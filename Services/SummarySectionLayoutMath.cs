@@ -352,7 +352,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Width of the currency table's dark header band. It ends one
+        /// Width of the currency table: its dark header band, and the span
+        /// each data row's content occupies. It ends one
         /// PlanRelayoutMath.TableRightMargin past the marker column rather
         /// than at the panel's edge: once the block is pulled in beside the
         /// names (see <see cref="ComputeCurrencyColumnEdgesForPanel"/>), a
@@ -366,6 +367,29 @@ namespace GW2CraftingHelper.Services
             int width = edges.MarkerX + CurrencyMarkerWidth + PlanRelayoutMath.TableRightMargin;
             if (width > panelWidth) width = panelWidth;
             return width > 0 ? width : 0;
+        }
+
+        /// <summary>
+        /// Left x the whole currency table sits at so it is CENTRED in the
+        /// section rather than left-pinned. Batch H pulled the numeric
+        /// block in beside the names, which left the finished table sitting
+        /// against the section's left edge with all the recovered space
+        /// dead to its right; the maintainer's field test asked for that
+        /// space split evenly instead.
+        /// <para>
+        /// Every coordinate the table lays out - icon, name,
+        /// <see cref="ComputeCurrencyColumnEdgesForPanel"/>'s four edges -
+        /// stays relative to this one offset, so the columns' internal
+        /// alignment and the header's tracking of them are untouched by
+        /// centring, and a table already spanning the panel
+        /// (<see cref="CurrencyHeaderBandWidth"/> == panelWidth) gets 0,
+        /// i.e. exactly the pre-centring layout.
+        /// </para>
+        /// </summary>
+        public static int CurrencyTableOffsetX(int panelWidth, int widestNumberWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.CenterX(
+                panelWidth, CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd));
         }
     }
 }

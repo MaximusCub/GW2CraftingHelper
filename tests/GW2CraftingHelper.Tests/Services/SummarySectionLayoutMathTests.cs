@@ -459,6 +459,80 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(band < 1600 / 2);
         }
 
+        // --- CurrencyTableOffsetX (the field test's "the currency table
+        // under total cost needs to be centered") ---
+
+        [Fact]
+        public void CurrencyTableOffsetX_PinnedTable_IsZero()
+        {
+            // A table already spanning the panel has nothing to centre, and
+            // must lay out byte-identically to the pre-centring version.
+            Assert.Equal(
+                0,
+                SummarySectionLayoutMath.CurrencyTableOffsetX(
+                    panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780));
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_PulledInTable_SplitsTheLeftoverSpaceEvenly()
+        {
+            const int panelWidth = 1600;
+            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 120;
+
+            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, 0, widestNameEnd);
+            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(panelWidth, 0, widestNameEnd);
+
+            Assert.True(offset > 0);
+            // Same margin either side, to the odd pixel integer division
+            // leaves on the right.
+            Assert.Equal(panelWidth - band - offset, offset + (panelWidth - band) % 2);
+            // And the table still ends inside the panel.
+            Assert.True(offset + band <= panelWidth);
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_NarrowPanel_NeverGoesNegative()
+        {
+            // A panel narrower than the block itself: the table stays at
+            // the left edge rather than being pushed off it.
+            Assert.Equal(
+                0,
+                SummarySectionLayoutMath.CurrencyTableOffsetX(
+                    panelWidth: 120, widestNumberWidth: 0, widestNameEnd: 0));
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_LeavesEveryColumnInsideTheCentredTable()
+        {
+            // Centring must move the table, not reshape it: the columns
+            // are still laid out against the same width the offset is
+            // derived from, so the name column starts inside the table's
+            // left edge and the marker still ends one shared table margin
+            // inside its right edge. This is what lets the renderer centre
+            // header and rows by moving one panel each.
+            const int panelWidth = 1400;
+            const int widestNumberWidth = 90;
+            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 200;
+
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
+                panelWidth, widestNumberWidth, widestNameEnd);
+            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(
+                panelWidth, widestNumberWidth, widestNameEnd);
+            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(
+                panelWidth, widestNumberWidth, widestNameEnd);
+
+            Assert.True(offset > 0);
+            Assert.Equal(
+                band,
+                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth
+                    + PlanRelayoutMath.TableRightMargin);
+            Assert.True(SummarySectionLayoutMath.CurrencyIconX >= 0);
+            Assert.True(
+                edges.RequiredRightEdge
+                    - SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth)
+                    > SummarySectionLayoutMath.CurrencyNameX);
+        }
+
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
         // ComputeCurrencyColumnEdges (a large unclamped Have value, e.g. a
         // 6-7 digit Karma balance, must not intrude into the Required

@@ -579,6 +579,13 @@ namespace GW2CraftingHelper.Views.Rendering
 
         // --- Currency table ---
         //
+        // Every row - header included - is a full-width panel holding one
+        // centred content panel (CreateCurrencyTableRowContent), which is
+        // what puts the table in the middle of the section instead of
+        // against its left edge. Column coordinates stay relative to that
+        // panel, so SummarySectionLayoutMath's edge math is unchanged by
+        // the centring.
+        //
         // 4 columns (Currency | Required | Have | Needed) do not fit
         // CTableHeaderRenderer's left/middle/right (3-slot) shape, so this
         // hand-rolls its own header row - the same precedent
@@ -648,34 +655,72 @@ namespace GW2CraftingHelper.Views.Rendering
             return widest;
         }
 
-        private void CreateCurrencyTableHeaderRow(
-            FlowPanel parent, int panelWidth, int widestNumberWidth, int widestNameEnd)
+        /// <summary>
+        /// The centred slice of a currency-table row that everything in
+        /// that row is laid out inside. The table is centred by moving ONE
+        /// control per row (this panel) rather than by shifting every
+        /// column's x, so the columns keep the panel-relative geometry
+        /// SummarySectionLayoutMath computes for them and the header cannot
+        /// centre differently from the rows beneath it.
+        /// </summary>
+        private static Panel CreateCurrencyTableRowContent(
+            FlowPanel parent, int panelWidth, int rowHeight, int widestNumberWidth, int widestNameEnd,
+            Color background, out Panel rowPanel)
         {
-            var rowPanel = new Panel()
+            rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            return new Panel()
             {
                 Size = new Point(
                     SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd),
-                    TableHeaderStyle.RowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent
+                    rowHeight),
+                Location = new Point(
+                    SummarySectionLayoutMath.CurrencyTableOffsetX(panelWidth, widestNumberWidth, widestNameEnd), 0),
+                BackgroundColor = background,
+                Parent = rowPanel
             };
+        }
+
+        /// <summary>
+        /// Re-centres and re-widths a row built by
+        /// <see cref="CreateCurrencyTableRowContent"/>, plus the full-width
+        /// panel it sits in. Every currency row's relayout closure starts
+        /// with this, so none of them can drift from the others.
+        /// </summary>
+        private static void RelayoutCurrencyTableRowContent(
+            Panel rowPanel, Panel content, int panelWidth, int rowHeight,
+            int widestNumberWidth, int widestNameEnd)
+        {
+            rowPanel.Size = new Point(panelWidth, rowHeight);
+            content.Size = new Point(
+                SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd),
+                rowHeight);
+            content.Location = new Point(
+                SummarySectionLayoutMath.CurrencyTableOffsetX(panelWidth, widestNumberWidth, widestNameEnd), 0);
+        }
+
+        private void CreateCurrencyTableHeaderRow(
+            FlowPanel parent, int panelWidth, int widestNumberWidth, int widestNameEnd)
+        {
+            var band = CreateCurrencyTableRowContent(
+                parent, panelWidth, TableHeaderStyle.RowHeight, widestNumberWidth, widestNameEnd,
+                TableHeaderStyle.BandColor, out var headerRowPanel);
             var font = TableHeaderStyle.Font;
             new Label()
             {
                 Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
-                Parent = rowPanel
+                Parent = band
             };
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                 panelWidth, widestNumberWidth, widestNameEnd);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Required", font, TableHeaderStyle.LabelColor, edges.RequiredRightEdge, TableHeaderStyle.LabelY);
+                band, "Required", font, TableHeaderStyle.LabelColor, edges.RequiredRightEdge, TableHeaderStyle.LabelY);
             var haveLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Have", font, TableHeaderStyle.LabelColor, edges.HaveRightEdge, TableHeaderStyle.LabelY);
+                band, "Have", font, TableHeaderStyle.LabelColor, edges.HaveRightEdge, TableHeaderStyle.LabelY);
             var neededLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Needed", font, TableHeaderStyle.LabelColor, edges.NeededRightEdge, TableHeaderStyle.LabelY);
+                band, "Needed", font, TableHeaderStyle.LabelColor, edges.NeededRightEdge, TableHeaderStyle.LabelY);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -684,9 +729,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // maxTotalWidth).
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(
-                    SummarySectionLayoutMath.CurrencyHeaderBandWidth(w, widestNumberWidth, widestNameEnd),
-                    TableHeaderStyle.RowHeight);
+                RelayoutCurrencyTableRowContent(
+                    headerRowPanel, band, w, TableHeaderStyle.RowHeight, widestNumberWidth, widestNameEnd);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                     w, widestNumberWidth, widestNameEnd);
                 requiredLabel.Location = new Point(
@@ -721,7 +765,9 @@ namespace GW2CraftingHelper.Views.Rendering
             PlanRowViewModel row, FlowPanel parent, int panelWidth, int widestNumberWidth, int widestNameEnd)
         {
             const int rowHeight = CurrencyRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = CreateCurrencyTableRowContent(
+                parent, panelWidth, rowHeight, widestNumberWidth, widestNameEnd,
+                Color.Transparent, out var outerRowPanel);
             var font = GameService.Content.DefaultFont14;
 
             if (!string.IsNullOrEmpty(row.IconUrl))
@@ -748,10 +794,12 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             if (displayName != fullName)
             {
-                // Stamp BOTH the label AND its containing panel - a label
-                // captures the mouse before a tooltip on a control
-                // underneath it is ever reached, so a tooltip on rowPanel
+                // Stamp BOTH the label AND the row's content panel - a
+                // label captures the mouse before a tooltip on a control
+                // underneath it is ever reached, so the panel's tooltip
                 // alone only fires on the blank strip beside the name.
+                // That panel is the table's own centred slice, so the
+                // hover no longer extends into the margins either side.
                 TooltipFacility.ApplyPlain(nameLabel, fullName);
                 TooltipFacility.ApplyPlain(rowPanel, fullName);
             }
@@ -784,7 +832,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // defect for a visual element nothing asked for.
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(w, rowHeight);
+                RelayoutCurrencyTableRowContent(
+                    outerRowPanel, rowPanel, w, rowHeight, widestNumberWidth, widestNameEnd);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                     w, widestNumberWidth, widestNameEnd);
                 requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 4);
