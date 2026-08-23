@@ -126,7 +126,10 @@ namespace GW2CraftingHelper.Services
                 sb.Append('\n').Append("Vendor cap: ").Append(cap.CapValue).Append(" per ").Append(CapPeriodText(cap.CapType));
             }
 
-            tooltipText = sb.ToString();
+            // Single wrap seam (see TooltipTextFormat): the opportunity-cost
+            // sentence above is 76 characters, past the point where Blish's
+            // own 500px cap is the only thing bounding the tooltip.
+            tooltipText = TooltipTextFormat.Wrap(sb.ToString());
             return true;
         }
 

@@ -206,7 +206,12 @@ namespace GW2CraftingHelper.Services
                 extraTooltipLines.Add("Right-click: Open wiki page");
             }
 
-            return extraTooltipLines;
+            // Single wrap seam (see TooltipTextFormat): the vendor
+            // price-side caveats above run past 80 characters, wider than
+            // anything Blish's own 500px cap keeps inside this window. An
+            // over-budget line becomes several list entries, which is what
+            // the caller's newline join already renders.
+            return TooltipTextFormat.WrapLines(extraTooltipLines);
         }
 
         // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
