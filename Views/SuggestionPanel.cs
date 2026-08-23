@@ -29,12 +29,6 @@ namespace GW2CraftingHelper.Views
         private readonly AutocompleteTextBox _textBox;
         private readonly IItemSearchProvider _searchProvider;
 
-        // How far right of the text box the list opens. Dropping straight
-        // under the box put it over the row's own quantity field and the
-        // rows below it; the caller passes the offset that clears them (see
-        // CraftingPlanView.CreateItemRowControls).
-        private readonly int _anchorOffsetX;
-
         private Panel _panel;
         private FlowPanel _rowContainer;
         private IReadOnlyList<ItemSearchResult> _results = Array.Empty<ItemSearchResult>();
@@ -48,12 +42,10 @@ namespace GW2CraftingHelper.Views
 
         public SuggestionPanel(
             AutocompleteTextBox textBox,
-            IItemSearchProvider searchProvider,
-            int anchorOffsetX = 0)
+            IItemSearchProvider searchProvider)
         {
             _textBox = textBox;
             _searchProvider = searchProvider;
-            _anchorOffsetX = anchorOffsetX;
 
             _textBox.TextChanged += OnTextChanged;
             _textBox.ArrowPressed += OnArrowPressed;
@@ -289,10 +281,18 @@ namespace GW2CraftingHelper.Views
             bool fitBelow = (yBelow + panelHeight) <= screen.Height;
             int y = fitBelow ? yBelow : Math.Max(0, (int)tbBounds.Top - panelHeight);
 
-            // Offset right of the text box, then held on screen: the
-            // offset is measured against a row whose window may since have
-            // been dragged to the right edge.
-            int x = (int)tbBounds.X + _anchorOffsetX;
+            // Left edge of the text box: a classic dropdown, directly under
+            // the box being typed into. It was anchored right of the Qty
+            // stepper for a while so it would not cover the controls beneath
+            // it, and the field test rejected that outright - "the typeahead
+            // popup ... floats far off to the right". Transiently covering
+            // the row's own quantity field and the rows below is what a
+            // dropdown does; it closes on pick, on Escape and on a click
+            // outside.
+            //
+            // Still held on screen: the box belongs to a window the user may
+            // have dragged against the right edge.
+            int x = (int)tbBounds.X;
             int maxX = Math.Max(0, screen.Width - _panel.Width);
             if (x > maxX)
             {
