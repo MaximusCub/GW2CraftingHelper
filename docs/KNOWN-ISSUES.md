@@ -8863,4 +8863,14 @@ Blish-free layer):
 5. Copy still writes the full untruncated lines to the clipboard, not
    the ellipsized display text.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build 8026242,
+captures preflight/gI1-gI3). At Debug+ with the seeded session log:
+every entry rendered as a dim level-tinted prefix column ([WARN]
+orange, [INFO] white, [DEBUG] grey) plus an aligned message column;
+the long plan-timing line ended in a visible "..." instead of the
+old hard clip; hovering a row that fits showed no tooltip (correct
+narrowed semantics) while hovering the ellipsized row showed the
+full line in a multi-line tooltip. Follow was on and the newest
+entry sat at the bottom. Drag-resize refit not exercised live
+(synthetic resize drags unreliable); covered by the SuspendLayout
+fix, the width-guard early-outs, and the Blish-free layout tests.
