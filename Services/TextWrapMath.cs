@@ -24,7 +24,8 @@ namespace GW2CraftingHelper.Services
         public const string Ellipsis = "...";
 
         /// <summary>
-        /// Absolute line cap for <see cref="Wrap"/>. A note wrapped against
+        /// Default line cap for Wrap - the cap every caller that does not
+        /// state its own gets. A note wrapped against
         /// the 12px width floor NotesSectionLayoutMath clamps to could
         /// otherwise turn a few hundred characters into a hundred rows;
         /// past this cap the tail is ellipsized into the last line and the
@@ -93,7 +94,23 @@ namespace GW2CraftingHelper.Services
         public static WrappedText Wrap(
             string text, int firstLineMaxWidth, int maxWidth, Func<string, int> measure)
         {
+            return Wrap(text, firstLineMaxWidth, maxWidth, measure, MaxWrappedLines);
+        }
+
+        /// <summary>
+        /// As <see cref="Wrap(string, int, int, Func{string, int})"/>, with
+        /// the line cap supplied by the caller instead of taken from
+        /// <see cref="MaxWrappedLines"/> - for a surface whose height is
+        /// fixed by something other than a note column, e.g. a dialog that
+        /// cannot grow and must keep its buttons inside its own content
+        /// region. maxLines below 1 is treated as 1: a caller with no room
+        /// at all still gets the ellipsized head rather than nothing.
+        /// </summary>
+        public static WrappedText Wrap(
+            string text, int firstLineMaxWidth, int maxWidth, Func<string, int> measure, int maxLines)
+        {
             if (measure == null) throw new ArgumentNullException(nameof(measure));
+            if (maxLines < 1) maxLines = 1;
 
             var lines = new List<string>();
             foreach (string segment in SplitHardBreaks(text))
@@ -102,19 +119,19 @@ namespace GW2CraftingHelper.Services
             }
 
             bool truncated = false;
-            if (lines.Count > MaxWrappedLines)
+            if (lines.Count > maxLines)
             {
                 // The tail is rebuilt from the lines that do not fit rather
                 // than from original offsets: wrapping drops the space runs
                 // it breaks on, so there is no exact substring to slice.
                 // Only the ellipsized head of this string is ever shown -
                 // the caller's tooltip carries the true text.
-                var tail = new StringBuilder(lines[MaxWrappedLines - 1]);
-                for (int i = MaxWrappedLines; i < lines.Count; i++)
+                var tail = new StringBuilder(lines[maxLines - 1]);
+                for (int i = maxLines; i < lines.Count; i++)
                 {
                     tail.Append(' ').Append(lines[i]);
                 }
-                lines.RemoveRange(MaxWrappedLines - 1, lines.Count - (MaxWrappedLines - 1));
+                lines.RemoveRange(maxLines - 1, lines.Count - (maxLines - 1));
                 lines.Add(Ellipsize(tail.ToString(), BudgetFor(lines.Count, firstLineMaxWidth, maxWidth), measure));
                 truncated = true;
             }

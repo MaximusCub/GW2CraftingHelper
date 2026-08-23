@@ -207,6 +207,59 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Throws<ArgumentNullException>(() => TextWrapMath.Wrap("abc", 100, 100, null));
         }
 
+        // --- Caller-supplied line cap (ModalDialog: the dialog cannot grow,
+        // so the message is capped to the lines that fit above its buttons) ---
+
+        [Fact]
+        public void Wrap_CallerLineCap_CapsBelowTheDefaultAndEllipsizesTheTail()
+        {
+            // 10px per character at a 50px budget = 5 characters per line;
+            // six words of five characters would otherwise wrap to 6 lines.
+            string text = "aaaaa bbbbb ccccc ddddd eeeee fffff";
+
+            var wrapped = TextWrapMath.Wrap(text, 50, 50, Fixed10, 3);
+
+            Assert.Equal(3, wrapped.Lines.Count);
+            Assert.True(wrapped.Truncated);
+            Assert.Equal("aaaaa", wrapped.Lines[0]);
+            Assert.Equal("bbbbb", wrapped.Lines[1]);
+            Assert.EndsWith("...", wrapped.Lines[2]);
+        }
+
+        [Fact]
+        public void Wrap_CallerLineCap_TextThatFitsIsUntouched()
+        {
+            var wrapped = TextWrapMath.Wrap("aaaaa bbbbb", 50, 50, Fixed10, 3);
+
+            Assert.Equal(new[] { "aaaaa", "bbbbb" }, wrapped.Lines);
+            Assert.False(wrapped.Truncated);
+        }
+
+        [Fact]
+        public void Wrap_CallerLineCapBelowOne_StillYieldsOneLine()
+        {
+            // A dialog whose message area measured smaller than one line of
+            // its own font must still render the ellipsized head rather
+            // than an empty label.
+            var wrapped = TextWrapMath.Wrap("aaaaa bbbbb ccccc", 50, 50, Fixed10, 0);
+
+            Assert.Single(wrapped.Lines);
+            Assert.True(wrapped.Truncated);
+            Assert.EndsWith("...", wrapped.Lines[0]);
+        }
+
+        [Fact]
+        public void Wrap_WithoutACap_UsesTheDefaultLineCap()
+        {
+            string text = new string('a', TextWrapMath.MaxWrappedLines * 3);
+
+            var withDefault = TextWrapMath.Wrap(text, 10, 10, Fixed10);
+            var withExplicitDefault = TextWrapMath.Wrap(text, 10, 10, Fixed10, TextWrapMath.MaxWrappedLines);
+
+            Assert.Equal(withExplicitDefault.Lines, withDefault.Lines);
+            Assert.Equal(withExplicitDefault.Truncated, withDefault.Truncated);
+        }
+
         [Fact]
         public void Wrap_DegenerateZeroBudget_TerminatesWithTheTextIntact()
         {
