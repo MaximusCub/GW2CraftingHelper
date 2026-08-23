@@ -157,5 +157,80 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(listResult, arrayResult);
         }
+
+        // --- BlockWidth / ComputeEdgesForPanel (audit batch H) ---
+
+        [Fact]
+        public void BlockWidth_IsTheSpanComputeEdgesActuallyLaysOut()
+        {
+            const int maxQtyWidth = 32;
+            var edges = ShoppingColumnMath.ComputeEdges(1000, maxEachWidth: 0, maxTotalWidth: 0);
+
+            int blockWidth = ShoppingColumnMath.BlockWidth(
+                maxEachWidth: 0, maxTotalWidth: 0, maxQtyWidth: maxQtyWidth);
+
+            Assert.Equal(1000 - (edges.QtyRightEdge - maxQtyWidth), blockWidth);
+        }
+
+        [Fact]
+        public void ComputeEdgesForPanel_LongNames_MatchesThePanelPinnedEdges()
+        {
+            // A name wide enough to reach the block already: the table must
+            // lay out exactly as it did before the gutter fix.
+            var pinned = ShoppingColumnMath.ComputeEdges(1000 - 8, maxEachWidth: 0, maxTotalWidth: 0);
+            var pulled = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1000, maxEachWidth: 0, maxTotalWidth: 0, maxQtyWidth: 32, widestNameEnd: 900);
+
+            Assert.Equal(pinned.TotalRightEdge, pulled.TotalRightEdge);
+            Assert.Equal(pinned.EachRightEdge, pulled.EachRightEdge);
+            Assert.Equal(pinned.QtyRightEdge, pulled.QtyRightEdge);
+        }
+
+        [Fact]
+        public void ComputeEdgesForPanel_ShortNames_PullsTheWholeBlockInTogether()
+        {
+            var pinned = ShoppingColumnMath.ComputeEdges(1400 - 8, maxEachWidth: 0, maxTotalWidth: 0);
+            var pulled = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1400, maxEachWidth: 0, maxTotalWidth: 0, maxQtyWidth: 32, widestNameEnd: 300);
+
+            int shift = pinned.TotalRightEdge - pulled.TotalRightEdge;
+            Assert.True(shift > 0);
+            Assert.Equal(shift, pinned.EachRightEdge - pulled.EachRightEdge);
+            Assert.Equal(shift, pinned.QtyRightEdge - pulled.QtyRightEdge);
+
+            // The Amount column's left edge lands one breathing room past
+            // the widest name, which is what closes the gutter.
+            Assert.Equal(
+                300 + PlanRelayoutMath.TableGutterBreathingRoom,
+                pulled.QtyRightEdge - 32);
+        }
+
+        [Fact]
+        public void ComputeEdgesForPanel_PulledInBlock_LeavesTheWidestNameItsFullWidth()
+        {
+            const int nameX = 50;
+            const int nameWidth = 260;
+            const int qtyWidth = 32;
+
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1400, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: qtyWidth, widestNameEnd: nameX + nameWidth);
+
+            // NameToQtyGap (12) as CreateShoppingRow passes it, for a row
+            // with no source tag.
+            int budget = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                edges.QtyRightEdge, qtyWidth, 12, nameX);
+
+            Assert.True(budget >= nameWidth);
+        }
+
+        [Fact]
+        public void ComputeEdgesForPanel_NarrowPanel_NeverPushesTheBlockOffTheRightEdge()
+        {
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 500, maxEachWidth: 0, maxTotalWidth: 0, maxQtyWidth: 32, widestNameEnd: 60);
+
+            Assert.Equal(500 - 8, edges.TotalRightEdge);
+        }
     }
 }

@@ -55,6 +55,88 @@ namespace GW2CraftingHelper.Services
             return width > 20 ? width : 20;
         }
 
+        /// <summary>
+        /// Gap left between the widest name a table renders and the
+        /// right-hand block of columns pulled in beside it. Chosen to be
+        /// wider than every per-table name-to-column gap that feeds
+        /// <see cref="NameMaxWidthBeforeColumn"/> (8 in the tree, 12 in
+        /// Used Materials/Shopping List, 14 in the currency table), which
+        /// is what makes <see cref="RightBlockX"/> unable to ellipsize a
+        /// name it just measured - see that method.
+        /// </summary>
+        public const int TableGutterBreathingRoom = 24;
+
+        /// <summary>
+        /// Left x a right-hand block is never pulled in past, however short
+        /// a table's names are: a two-column table whose numbers start at
+        /// x=90 reads as a fragment floating at the panel's left edge
+        /// rather than a table.
+        /// </summary>
+        public const int TableRightBlockMinX = 240;
+
+        /// <summary>
+        /// Left x of a data table's right-hand block of columns (the
+        /// right-aligned numeric/pill columns every plan table pins to the
+        /// panel edge) once the dead gutter between it and the left-pinned
+        /// name column is closed. The block is pulled LEFT to sit
+        /// <paramref name="breathingRoom"/> past the widest name the table
+        /// renders, and is never pushed right of <paramref name="pinnedX"/>
+        /// (the panel-edge-anchored position it had before this existed),
+        /// so a narrow window degrades to exactly the old layout rather
+        /// than overrunning the panel.
+        /// <para>
+        /// <paramref name="widestNameEnd"/> is the largest
+        /// "name x + rendered name width" over the rows this table
+        /// measures, from the UNTRUNCATED names - the ellipsis budget is
+        /// derived from the block position, so feeding it truncated widths
+        /// would be circular. Because the same
+        /// <paramref name="breathingRoom"/> exceeds every gap the callers
+        /// pass to <see cref="NameMaxWidthBeforeColumn"/>, a pulled-in
+        /// block always leaves the widest name at least its own full width,
+        /// i.e. closing the gutter can never introduce an ellipsis.
+        /// </para>
+        /// <para>
+        /// 0 (or less) means "nothing measured" and keeps the block pinned,
+        /// so a caller with no rows to scan is byte-identical to the old
+        /// behaviour.
+        /// </para>
+        /// </summary>
+        public static int RightBlockX(
+            int pinnedX,
+            int widestNameEnd,
+            int breathingRoom = TableGutterBreathingRoom,
+            int minBlockX = TableRightBlockMinX)
+        {
+            if (widestNameEnd <= 0) return pinnedX;
+
+            int desired = widestNameEnd + breathingRoom;
+            if (desired < minBlockX) desired = minBlockX;
+            return desired < pinnedX ? desired : pinnedX;
+        }
+
+        /// <summary>
+        /// Gap every plan table keeps between its right-hand block and the
+        /// panel's right edge - the margin the block was pinned to before
+        /// <see cref="RightBlockX"/> existed, and the one a bounded row
+        /// divider or header band keeps past the block's right edge so a
+        /// pinned table's chrome is byte-identical to what it drew before.
+        /// </summary>
+        public const int TableRightMargin = 8;
+
+        /// <summary>
+        /// Right edge of a blockWidth-wide right-hand block once
+        /// <see cref="RightBlockX"/> has closed the dead gutter before it -
+        /// i.e. the anchor every column inside the block derives from. The
+        /// one expression each flat plan table's build pass and relayout
+        /// closures share, so no two of them can anchor a table differently.
+        /// widestNameEnd 0 gives exactly the old
+        /// <c>panelWidth - TableRightMargin</c> edge.
+        /// </summary>
+        public static int RightBlockRightEdge(int panelWidth, int blockWidth, int widestNameEnd)
+        {
+            return RightBlockX(panelWidth - TableRightMargin - blockWidth, widestNameEnd) + blockWidth;
+        }
+
         public readonly struct TreeColumnEdges
         {
             public readonly int PillColX;
@@ -79,13 +161,23 @@ namespace GW2CraftingHelper.Services
         /// build and the relayout/re-ellipsis closures call this
         /// same function, so a tree row's columns and its build-time
         /// counterpart can never drift apart.
+        /// <para>
+        /// widestNameEnd closes the tree's dead gutter: the pill+cost block
+        /// moves as ONE unit (see <see cref="RightBlockX"/>), so the
+        /// pill column's own budget - maxRightEdge minus pillColX, which
+        /// <see cref="ComputePillFit"/> resolves against - is exactly as
+        /// wide as it was when the block was pinned to the panel edge. A
+        /// pill that fitted before still fits. Left at its 0 default the
+        /// whole grid is byte-identical to the pinned layout.
+        /// </para>
         /// </summary>
         public static TreeColumnEdges ComputeTreeColumnEdges(
             int panelWidth, int nameX, int qtyPrefixWidth,
-            int pillColumnWidth, int costColumnWidth, int rightMargin)
+            int pillColumnWidth, int costColumnWidth, int rightMargin, int widestNameEnd = 0)
         {
-            int pillColX = panelWidth - (rightMargin + costColumnWidth) - pillColumnWidth;
-            int costRightEdge = panelWidth - rightMargin;
+            int pillColX = RightBlockX(
+                panelWidth - (rightMargin + costColumnWidth) - pillColumnWidth, widestNameEnd);
+            int costRightEdge = pillColX + pillColumnWidth + costColumnWidth;
 
             int nameMaxWidth = pillColX - nameX - 8;
             if (nameMaxWidth < 20) nameMaxWidth = 20;

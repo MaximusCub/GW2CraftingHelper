@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 
 namespace GW2CraftingHelper.Views.Rendering
@@ -49,10 +50,48 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody.
+        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody,
+        /// then given the one-pass pre-scan the other plan tables carry
+        /// (audit batch H): the widest sublabel - this table's whole
+        /// right-hand block - and the widest UNTRUNCATED extent of the
+        /// "Craft Nx Name" run, so the sublabel column can be pulled in
+        /// beside that run rather than pinned to the panel edge. The run is
+        /// built by cumulative cursor-x concatenation and never ellipsized
+        /// (see the class doc comment), so the scan reproduces exactly that
+        /// concatenation; pulling the column in past it is what stops a long
+        /// name running under the sublabel.
+        /// <para>
+        /// TimegatedNotice rows are plain full-width text rows with no
+        /// columns of their own, so they take no part in the scan. A section
+        /// where no row carries a sublabel has no right-hand block to pull
+        /// in and stays pinned exactly as before.
+        /// </para>
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            var textFont = GameService.Content.DefaultFont16;
+            var sublabelFont = GameService.Content.DefaultFont12;
+            int maxSublabelWidth = 0;
+            int widestNameEnd = 0;
+            foreach (var row in section.Rows)
+            {
+                if (row.RowType == PlanRowType.TimegatedNotice) continue;
+
+                int sublabelWidth = MeasureWidth(sublabelFont, row.Sublabel);
+                if (sublabelWidth > maxSublabelWidth) maxSublabelWidth = sublabelWidth;
+
+                int nameEnd = TextX
+                    + MeasureWidth(textFont, CraftPrefix)
+                    + MeasureWidth(textFont, QtyPrefix(row.Quantity))
+                    + MeasureWidth(textFont, row.Label);
+                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
+            }
+
+            if (maxSublabelWidth == 0)
+            {
+                widestNameEnd = 0;
+            }
+
             // A TimegatedNotice row (vendor-cap informational
             // line) is a plain text row, not a numbered craft step - render
             // it via the same generic TextRowRenderer pattern every other
@@ -69,22 +108,48 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else
                 {
-                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
+                    CreateCraftStepRow(
+                        row, stepNumber++, contentFlow, panelWidth, maxSublabelWidth, widestNameEnd, isLast);
                 }
             }
         }
 
+        private static int MeasureWidth(BitmapFont font, string text)
+        {
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        private static string QtyPrefix(int quantity)
+        {
+            return $"{quantity}x ";
+        }
+
+        /// <summary>
+        /// Right edge of the sublabel column at a given panel width - the one
+        /// formula the build pass and every resize closure share.
+        /// </summary>
+        private static int SublabelRightEdge(int panelWidth, int sublabelColumnWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd);
+        }
+
         // Moved verbatim from CraftingPlanView.CreateCraftStepRow. Only
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
+        // Left x of the row's text run, and its fixed leading word - both
+        // shared with Render()'s pre-scan so the measured extent is exactly
+        // what the row lays out.
+        private const int TextX = 94; // iconX(52) + frame(34) + gap(8)
+        private const string CraftPrefix = "Craft ";
+
         private void CreateCraftStepRow(
-            PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth, bool isLast)
+            PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth,
+            int sublabelColumnWidth, int widestNameEnd, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
             const int badgeSize = 36;
             const int badgeX = 8;
             const int badgeY = 4;
             const int iconX = 52;
-            const int textX = 94; // iconX(52) + frame(34) + gap(8)
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
@@ -115,11 +180,11 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var textFont = GameService.Content.DefaultFont16;
             var greyColor = new Color(170, 170, 170);
-            int x = textX;
+            int x = TextX;
 
             var craftLabel = new Label()
             {
-                Text = "Craft ", Font = textFont, TextColor = greyColor,
+                Text = CraftPrefix, Font = textFont, TextColor = greyColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(x, 13), Parent = rowPanel
             };
@@ -127,7 +192,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var qtyLabel = new Label()
             {
-                Text = $"{row.Quantity}x ", Font = textFont, TextColor = greyColor,
+                Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(x, 13), Parent = rowPanel
             };
@@ -146,7 +211,8 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
-                    new Color(153, 153, 153), panelWidth - 8, 16);
+                    new Color(153, 153, 153),
+                    SublabelRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd), 16);
             }
 
             // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
@@ -160,13 +226,19 @@ namespace GW2CraftingHelper.Views.Rendering
             // width-dependent - textX never depended on panelWidth); only
             // the row width, its divider, and the right-aligned sublabel
             // need to move.
-            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 1, _sink, w =>
-            {
-                if (sublabelLabel != null)
+            RowRelayoutHelpers.FinishRow(
+                rowPanel, panelWidth, rowHeight, isLast, 1, _sink,
+                w =>
                 {
-                    sublabelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, sublabelLabel.Width), 16);
-                }
-            });
+                    if (sublabelLabel != null)
+                    {
+                        sublabelLabel.Location = new Point(
+                            PlanRelayoutMath.RightAlignedX(
+                                SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd), sublabelLabel.Width),
+                            16);
+                    }
+                },
+                w => SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
         }
     }
 }

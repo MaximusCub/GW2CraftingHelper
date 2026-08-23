@@ -268,6 +268,117 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(TreeCostColumnMath.TotalWidth(widths), edges.TotalWidth);
         }
 
+        // --- ScanColumns name extent (audit batch H: dead gutters) ---
+
+        private static CraftingTreeNode NamedNode(
+            int nodeId, string name, int quantity = 0, IReadOnlyList<CraftingTreeNode> children = null)
+        {
+            return new CraftingTreeNode
+            {
+                NodeId = nodeId,
+                Name = name,
+                Quantity = quantity,
+                Children = children
+            };
+        }
+
+        // The view's own nameX arithmetic (indent 24 per depth, caret 18,
+        // icon frame 34, gap 6) against the one-pixel-per-character font.
+        private static int NameEnd(CraftingTreeNode node, int depth)
+        {
+            int nameX = (depth * 24) + 18 + 34 + 6;
+            int qtyWidth = node.Quantity > 0 ? MeasureByLength($"{node.Quantity}x ") : 0;
+            return nameX + qtyWidth + MeasureByLength(node.Name ?? "");
+        }
+
+        private static TreeCostColumnMath.TreeColumnScan ScanNames(IReadOnlyList<CraftingTreeNode> roots)
+        {
+            return TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0, NameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_NoNameCallback_ReportsZeroExtent()
+        {
+            var scan = TreeCostColumnMath.ScanColumns(
+                new[] { NamedNode(1, "Mithril Ingot") }, MeasureByLength, _ => 0, null);
+
+            Assert.Equal(0, scan.WidestNameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_WidestNameWins_NotTheFirstOrLast()
+        {
+            var roots = new[]
+            {
+                NamedNode(1, "Bolt", children: new[]
+                {
+                    NamedNode(2, "Elonian Leather Square"),
+                    NamedNode(3, "Ore")
+                })
+            };
+
+            var scan = ScanNames(roots);
+
+            Assert.Equal(58 + 24 + "Elonian Leather Square".Length, scan.WidestNameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_DeepShortNameCanOutreachAShallowLongOne()
+        {
+            // Indent is part of the extent: the whole point is where the
+            // name column ENDS on screen, not how long the string is.
+            var roots = new[]
+            {
+                NamedNode(1, "Mithril Plated Dowel", children: new[]
+                {
+                    NamedNode(2, "x", children: new[]
+                    {
+                        NamedNode(3, "y", children: new[] { NamedNode(4, "Ore") })
+                    })
+                })
+            };
+
+            var scan = ScanNames(roots);
+
+            Assert.Equal(58 + (3 * 24) + "Ore".Length, scan.WidestNameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_QuantityPrefixCountsTowardTheExtent()
+        {
+            var withPrefix = ScanNames(new[] { NamedNode(1, "Ore", quantity: 250) });
+            var withoutPrefix = ScanNames(new[] { NamedNode(1, "Ore") });
+
+            Assert.Equal("250x ".Length, withPrefix.WidestNameEnd - withoutPrefix.WidestNameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_CollapsedSubtreeStillCounts()
+        {
+            // Rows are built lazily; a scan that skipped unbuilt children
+            // would move every column the first time one was expanded.
+            var roots = new[]
+            {
+                NamedNode(1, "Ore", children: new[] { NamedNode(2, "A Very Long Ingredient Name") })
+            };
+
+            Assert.Equal(58 + 24 + "A Very Long Ingredient Name".Length, ScanNames(roots).WidestNameEnd);
+        }
+
+        [Fact]
+        public void ScanColumns_CostWidths_MatchTheCostOnlyScan()
+        {
+            var roots = new[] { Node(1, subtreeCost: 123456), Node(2, subtreeCost: 42) };
+
+            var costOnly = Scan(roots);
+            var both = TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0, (_, __) => 999);
+
+            Assert.Equal(costOnly.GoldTextWidth, both.CostWidths.GoldTextWidth);
+            Assert.Equal(costOnly.SilverTextWidth, both.CostWidths.SilverTextWidth);
+            Assert.Equal(costOnly.CopperTextWidth, both.CostWidths.CopperTextWidth);
+            Assert.Equal(999, both.WidestNameEnd);
+        }
+
         [Fact]
         public void SegmentWidth_AbsentText_IsZero()
         {

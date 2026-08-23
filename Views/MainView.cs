@@ -106,24 +106,32 @@ namespace GW2CraftingHelper.Views
         // long status string slid under the button row at the window's
         // clamped minimum size. So
         // every row below shifts down by StatusRowHeight + the same 5px
-        // gap the header already used before SearchRowY - every other gap
-        // (SearchRowY->SourceFilterRowY, etc.) is preserved exactly.
+        // gap the header already used before SearchRowY.
         private const int StatusRowY = HeaderRowY + HeaderHeight + 5;
         private const int StatusRowHeight = 24;
         private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
-        private const int SourceFilterRowY = SearchRowY + SearchRowHeight + 3;
+
+        // The source-filter checkboxes share the search row - same Y,
+        // offset X - while the whole run fits beside the search box in one
+        // row: everything right of the content-type dropdown was empty. Past
+        // one row they drop back to their own full-width row below it, this
+        // gap beneath the search row, because sharing halves the width they
+        // flow into and a wrapped run hides filters behind the 4-row cap's
+        // scrollbar. Which mode is live is decided by the flow itself, in
+        // ApplyTopRegionLayout - see Services/SnapshotHeaderLayout.
+        private const int SearchToFilterGapY = 3;
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;
 
-        // The source-filter row's height is account-driven: it carries one
+        // The source-filter run's height is account-driven: it carries one
         // checkbox per character (1 to 15+) and wraps onto extra rows rather
-        // than running off the window's right edge, so every row below it
-        // shifts down by whatever it ends up needing. _sourceFilterHeight
-        // holds the current measured value (see ApplyTopRegionLayout);
-        // SourceFilterSingleRowHeight is both the floor and the exact height
-        // the row had while it was four fixed checkboxes, so the common
-        // single-row case is pixel-identical to before.
+        // than running off the window's right edge. While it shares the
+        // search row the rows below shift down only by what it needs BEYOND
+        // the search row's own height (see SearchBandHeight) - a run that
+        // fits beside the search box costs the header nothing.
+        // _sourceFilterHeight holds the current measured value (see
+        // ApplyTopRegionLayout); SourceFilterSingleRowHeight is its floor.
         private const int SourceFilterCellHeight = 25;
         private const int SourceFilterCellGapX = 10;
         private const int SourceFilterRowGapY = 4;
@@ -131,7 +139,7 @@ namespace GW2CraftingHelper.Views
         private const int SourceFilterBottomPad = 2;
         private const int SourceFilterSingleRowHeight = SourceFilterTopPad + SourceFilterCellHeight + SourceFilterBottomPad;
 
-        // The row grows one cell per character, so it must have an upper
+        // The run grows one cell per character, so it must have an upper
         // bound: unbounded, a large roster in a short window pushes the
         // result list to zero height with no way for the user to shrink the
         // row back. Past the bound the row scrolls instead of growing (see
@@ -156,41 +164,65 @@ namespace GW2CraftingHelper.Views
         private int _containerWidth;
         private int _containerHeight;
 
-        // The two inputs the source-filter row was last flowed against:
-        // the available width, and MaxSourceFilterHeight (height-driven,
-        // and it decides whether the row scrolls and so re-flows narrower).
-        // A resize moving neither - most of a vertical drag - reuses the
-        // placements instead of re-running the flow and rewriting every
-        // checkbox Location. -1 is the invalid marker, set wherever the
-        // cell set itself changes.
+        // The inputs the source-filter row was last flowed against: the
+        // container width (the flow's own width is a pure function of it and
+        // of the mode the flow itself picks) and MaxSourceFilterHeight in
+        // BOTH modes - height-driven, and it decides whether the row scrolls
+        // and so re-flows narrower. A resize moving none of them - most of a
+        // vertical drag - reuses the placements instead of re-running the
+        // flow and rewriting every checkbox Location. -1 is the invalid
+        // marker, set wherever the cell set itself changes.
         private int _lastFlowWidth = -1;
-        private int _lastFlowCap = -1;
+        private int _lastFlowSharedCap = -1;
+        private int _lastFlowOwnRowCap = -1;
 
-        private int CoinRowY => SourceFilterRowY + _sourceFilterHeight + SectionGapY;
+        // Which of the two modes the last flow resolved to - see
+        // SearchToFilterGapY. Shared until a flow says otherwise, so the
+        // pre-first-snapshot header (zero cells) reserves nothing.
+        private bool _sharesSearchRow = true;
+
+        private SnapshotHeaderLayout.SourceFilterPlacement CurrentPlacement =>
+            SnapshotHeaderLayout.PlaceSourceFilterRun(
+                _containerWidth, SourceFilterX, SearchRowHeight, SearchToFilterGapY, _sharesSearchRow);
+
+        private int SearchBandHeight =>
+            SnapshotHeaderLayout.SearchBandHeight(SearchRowHeight, _sourceFilterHeight, CurrentPlacement);
+
+        private int CoinRowY => SearchRowY + SearchBandHeight + SectionGapY;
         private int ContentY => CoinRowY + CoinHeight + SectionGapY;
         private int TopRegionHeight => ContentY;
 
-        // Fixed distance from the filter row's bottom edge to the content
+        // Fixed distance from the search band's bottom edge to the content
         // region's top: the coin row and the gap on either side of it.
         private const int BelowSourceFilterHeight = SectionGapY + CoinHeight + SectionGapY;
 
-        // Height the filter row may not exceed: never tall enough to drop
-        // the result list below MinContentHeight, never more than
-        // SourceFilterMaxRows of cells, and never below the single-row
+        // Height the filter row may not exceed, given the y it starts at
+        // (which differs by mode - see SearchToFilterGapY): never tall
+        // enough to drop the result list below MinContentHeight, never more
+        // than SourceFilterMaxRows of cells, and never below the single-row
         // height the row had before it became account-sized.
-        private int MaxSourceFilterHeight
+        private int MaxSourceFilterHeight(int filterRowY)
         {
-            get
-            {
-                int budget = _containerHeight - SourceFilterRowY - BelowSourceFilterHeight - MinContentHeight;
-                int cap = budget < SourceFilterMaxRowsHeight ? budget : SourceFilterMaxRowsHeight;
-                return cap > SourceFilterSingleRowHeight ? cap : SourceFilterSingleRowHeight;
-            }
+            int budget = _containerHeight - filterRowY - BelowSourceFilterHeight - MinContentHeight;
+            int cap = budget < SourceFilterMaxRowsHeight ? budget : SourceFilterMaxRowsHeight;
+            return cap > SourceFilterSingleRowHeight ? cap : SourceFilterSingleRowHeight;
         }
 
         private const int SearchBoxWidth = 300;
         private const int FilterDropdownWidth = 140;
         private const int FilterDropdownX = SearchBoxWidth + 10;
+
+        // Left x of the source-filter run, clear of the dropdown. The
+        // panel itself carries this offset, so SourceFilterFlowLayout keeps
+        // placing cells from 0 in the panel's own coordinates and only its
+        // available width changes.
+        private const int SourceFilterX = FilterDropdownX + FilterDropdownWidth + 20;
+
+        // Dim caption ahead of the wallet coin total, so the row reads as a
+        // labelled figure rather than a stray unlabelled list row.
+        private const string CoinCaption = "Coin";
+        private const int CoinCaptionGap = 8;
+        private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
         private const int ItemRowHeight = 52;
         private const int WalletRowHeight = 36;
@@ -395,9 +427,15 @@ namespace GW2CraftingHelper.Views
             // Search row: plain TextBox (not SuggestionPanel/
             // AutocompleteTextBox - see class doc comment) + the existing
             // content-type dropdown alongside it.
+            // While the filter run shares this row its width stops at
+            // SourceFilterX rather than spanning: the source-filter panel is
+            // a later sibling occupying the rest of the row, and two
+            // overlapping full-width panels would leave which one receives a
+            // checkbox click up to child ordering. On the run's own-row
+            // fallback there is no overlap, and it spans as it always did.
             _filterPanel = new Panel()
             {
-                Size = new Point(w, SearchRowHeight),
+                Size = new Point(FilterPanelWidth(w), SearchRowHeight),
                 Location = new Point(0, SearchRowY),
                 Parent = buildPanel
             };
@@ -435,7 +473,8 @@ namespace GW2CraftingHelper.Views
                 RebuildContent();
             };
 
-            // Source-filter row: one checkbox per storage location plus one
+            // Source-filter run, in the empty right half of the search row:
+            // one checkbox per storage location plus one
             // per character, all checked by default. Only meaningful when
             // the content-type dropdown includes Items (All/Items) - left
             // visible-but-inert when Wallet is selected rather than adding
@@ -465,10 +504,16 @@ namespace GW2CraftingHelper.Views
             _charactersMasterCheckbox = null;
             _lastFlowWidth = -1;
 
+            // Placeholder placement in whichever mode is current: the flow
+            // that decides the mode needs the checkboxes, and they are
+            // created by RebuildSourceFilterRow from the marshaled tail
+            // below. _lastFlowWidth is invalidated just above, so the
+            // ApplyTopRegionLayout that tail ends with cannot early-out.
+            var placement = CurrentPlacement;
             _sourceFilterPanel = new Panel()
             {
-                Size = new Point(w, _sourceFilterHeight),
-                Location = new Point(0, SourceFilterRowY),
+                Size = new Point(placement.Width, _sourceFilterHeight),
+                Location = new Point(placement.X, SearchRowY + placement.OffsetY),
                 Parent = buildPanel
             };
 
@@ -612,12 +657,12 @@ namespace GW2CraftingHelper.Views
             _clearButton.Location = new Point(w - 220, 5);
             _refreshButton.Location = new Point(w - 110, 5);
             _statusPanel.Size = new Point(w, StatusRowHeight);
-            _filterPanel.Size = new Point(w, SearchRowHeight);
 
             // Re-flows the source-filter checkboxes at the new width (a
-            // narrower window can push them onto more rows) and re-anchors
-            // the coin and content panels beneath whatever height that
-            // needs - the reason those two are not sized here directly.
+            // narrower window can push them onto more rows, and past one row
+            // off the search row entirely) and re-anchors the search, coin
+            // and content panels beneath whatever that needs - the reason
+            // those three are not sized here directly.
             ApplyTopRegionLayout();
         }
 
@@ -793,15 +838,41 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// Width the search row's own panel occupies before the
+        /// source-filter run takes over - the whole row when the run is not
+        /// sharing it, or while the window is too narrow to host both.
+        /// </summary>
+        private int FilterPanelWidth(int panelWidth)
+        {
+            if (!_sharesSearchRow) return panelWidth;
+
+            return panelWidth < SourceFilterX ? panelWidth : SourceFilterX;
+        }
+
+        private static SourceFilterFlowResult Flow(IReadOnlyList<int> cellWidths, int availableWidth)
+        {
+            return SourceFilterFlowLayout.Layout(
+                cellWidths, availableWidth, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+        }
+
+        /// <summary>
         /// Flows the source-filter checkboxes at the current width and
-        /// re-anchors the coin and content rows beneath the height that
-        /// needs - the one place <see cref="_sourceFilterHeight"/> (and
-        /// therefore CoinRowY/ContentY/TopRegionHeight) is written.
+        /// re-anchors the search, coin and content rows around the height
+        /// and the mode that needs - the one place
+        /// <see cref="_sourceFilterHeight"/> and
+        /// <see cref="_sharesSearchRow"/> (and therefore CoinRowY/ContentY/
+        /// TopRegionHeight) are written.
         /// <para>
-        /// The flow pass itself is skipped when neither of its two inputs
-        /// moved (see <see cref="_lastFlowWidth"/>); the rows below are
+        /// The flow pass itself is skipped when none of its inputs moved
+        /// (see <see cref="_lastFlowWidth"/>); the rows below are
         /// re-anchored either way, since a height-only resize still moves
         /// the content panel's bottom edge.
+        /// </para>
+        /// <para>
+        /// The run is flowed beside the search box first and re-flowed on
+        /// its own full-width row below when that wrapped it - the mode is
+        /// the flow's outcome, not an input to it, which is why both modes'
+        /// caps are read up front and both are part of the cache key.
         /// </para>
         /// </summary>
         private void ApplyTopRegionLayout()
@@ -810,12 +881,13 @@ namespace GW2CraftingHelper.Views
 
             if (_sourceFilterPanel != null)
             {
-                // Read before the early-out: the cap is height-driven, so a
-                // height-only resize can change it, and with it whether the
-                // row scrolls (and therefore re-flows narrower).
-                int cap = MaxSourceFilterHeight;
+                // Read before the early-out: the caps are height-driven, so
+                // a height-only resize can change them, and with them
+                // whether the row scrolls (and therefore re-flows narrower).
+                int sharedCap = MaxSourceFilterHeight(SearchRowY);
+                int ownRowCap = MaxSourceFilterHeight(SearchRowY + SearchRowHeight + SearchToFilterGapY);
 
-                if (w != _lastFlowWidth || cap != _lastFlowCap)
+                if (w != _lastFlowWidth || sharedCap != _lastFlowSharedCap || ownRowCap != _lastFlowOwnRowCap)
                 {
                     // Single read: Build's ThreadPool body swaps this field,
                     // so the count and the indexer below must come from the
@@ -828,8 +900,22 @@ namespace GW2CraftingHelper.Views
                         widths.Add(checkbox.Width);
                     }
 
-                    var flow = SourceFilterFlowLayout.Layout(
-                        widths, w, SourceFilterCellHeight, SourceFilterCellGapX, SourceFilterRowGapY);
+                    var placement = SnapshotHeaderLayout.PlaceSourceFilterRun(
+                        w, SourceFilterX, SearchRowHeight, SearchToFilterGapY, sharesSearchRow: true);
+                    var flow = Flow(widths, placement.Width);
+
+                    // Sharing the search row halves the width the run flows
+                    // into; a run that wraps there would hide filters behind
+                    // the cap's scrollbar to save 38px of header, so it takes
+                    // its own full-width row instead.
+                    if (!SnapshotHeaderLayout.SharesSearchRow(flow.RowCount))
+                    {
+                        placement = SnapshotHeaderLayout.PlaceSourceFilterRun(
+                            w, SourceFilterX, SearchRowHeight, SearchToFilterGapY, sharesSearchRow: false);
+                        flow = Flow(widths, placement.Width);
+                    }
+
+                    int cap = placement.SharesSearchRow ? sharedCap : ownRowCap;
                     int height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
 
                     // Past the cap the row scrolls rather than growing, so the
@@ -838,12 +924,7 @@ namespace GW2CraftingHelper.Views
                     bool scroll = height > cap;
                     if (scroll)
                     {
-                        flow = SourceFilterFlowLayout.Layout(
-                            widths,
-                            w - SourceFilterScrollbarAllowance,
-                            SourceFilterCellHeight,
-                            SourceFilterCellGapX,
-                            SourceFilterRowGapY);
+                        flow = Flow(widths, placement.Width - SourceFilterScrollbarAllowance);
                         height = SourceFilterTopPad + flow.TotalHeight + SourceFilterBottomPad;
                     }
 
@@ -857,13 +938,23 @@ namespace GW2CraftingHelper.Views
                         height = SourceFilterSingleRowHeight;
                     }
 
+                    _sharesSearchRow = placement.SharesSearchRow;
                     _sourceFilterHeight = height < cap ? height : cap;
                     _sourceFilterPanel.CanScroll = scroll;
-                    _sourceFilterPanel.Size = new Point(w, _sourceFilterHeight);
+                    _sourceFilterPanel.Location = new Point(placement.X, SearchRowY + placement.OffsetY);
+                    _sourceFilterPanel.Size = new Point(placement.Width, _sourceFilterHeight);
 
                     _lastFlowWidth = w;
-                    _lastFlowCap = cap;
+                    _lastFlowSharedCap = sharedCap;
+                    _lastFlowOwnRowCap = ownRowCap;
                 }
+            }
+
+            if (_filterPanel != null)
+            {
+                // Sized here rather than in OnPanelResized: its width depends
+                // on the mode the flow above just resolved.
+                _filterPanel.Size = new Point(FilterPanelWidth(w), SearchRowHeight);
             }
 
             if (_coinPanel != null)
@@ -1537,6 +1628,10 @@ namespace GW2CraftingHelper.Views
         // inter-segment gap 6; label then icon to its right) is now the
         // exact same CoinSegmentMath-driven code CraftingPlanView's coin
         // cells use, not just a matching copy of it.
+        // The dim "Coin" caption is built here rather than once at
+        // construction because this method disposes every child of
+        // _coinPanel on each refresh; a caption parked outside that cycle
+        // would be destroyed by the first snapshot update.
         private void UpdateCoinDisplay(int copper)
         {
             if (_coinPanel == null) return;
@@ -1549,12 +1644,26 @@ namespace GW2CraftingHelper.Views
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             var font = GameService.Content.DefaultFont14;
+            var captionFont = GameService.Content.DefaultFont12;
+            new Label()
+            {
+                Text = CoinCaption,
+                Font = captionFont,
+                TextColor = CoinCaptionColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, 4),
+                Parent = _coinPanel
+            };
+            int captionWidth = (int)Math.Ceiling(captionFont.MeasureString(CoinCaption).Width);
+
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
             CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156904, gold.ToString());
             CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156907, silver.ToString());
             CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156902, cop.ToString());
 
-            CoinCurrencyRenderer.LayoutCoinSegments(_coinPanel, segments, 0, 2, font);
+            CoinCurrencyRenderer.LayoutCoinSegments(
+                _coinPanel, segments, captionWidth + CoinCaptionGap, 2, font);
         }
     }
 }
