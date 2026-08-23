@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void AtFloor_Visible()
         {
             // Boundary inclusive: the entry AT the snapshot version itself
-            // was not yet counted when "Clear view" read ModuleLog.Version
+            // was not yet counted when "Clear View" read ModuleLog.Version
             // (a Version of N means N entries have been appended, i.e. the
             // highest existing absolute index is N-1), so it must stay
             // visible, not be treated as "before" the floor.

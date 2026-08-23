@@ -63,7 +63,7 @@ namespace GW2CraftingHelper
         private LogTabContent _logContent;
         private Tab _logTab;
 
-        // The Log tab's "Clear view" floor lives on Module, not
+        // The Log tab's "Clear View" floor lives on Module, not
         // LogTabContent: Blish reconstructs LogTabContent on every tab
         // selection, so a field there cannot survive a tab switch (a
         // cleared view resurrected on reopen). A plain long is enough -

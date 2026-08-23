@@ -1,7 +1,7 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Pure "Clear view" floor arithmetic for the Log tab.
+    /// Pure "Clear View" floor arithmetic for the Log tab.
     /// Blish-free by design so it can be
     /// unit-tested directly - LogTabContent itself cannot be (a Blish HUD
     /// view; tests must never reference Blish HUD per repo rules), and the
@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// field's own doc comment) is a plain long with no logic of its own
     /// worth testing beyond this comparison.
     ///
-    /// The floor is a ring Version snapshot taken at "Clear view" click
+    /// The floor is a ring Version snapshot taken at "Clear View" click
     /// time (Module._logViewClearedBeforeVersion = ModuleLog.Version, set
     /// via LogTabContent.ClearView); an entry is hidden from the CURRENT
     /// view iff its own absolute ring index falls strictly before that

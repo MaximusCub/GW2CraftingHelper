@@ -276,10 +276,23 @@ namespace GW2CraftingHelper.Tests.Services
 
         [Theory]
         [InlineData("Invalid")]
-        [InlineData("cleared")]
+        [InlineData("ignored")]
         public void CellTagWidth_FitsEveryFixedTagString(string tag)
         {
             Assert.True(tag.Length * MaxCharWidthPx <= SettingsCurrencyGridLayout.CellTagWidth);
+        }
+
+        // The cell's total extent is what decides whether the grid gets two
+        // columns at the window's 930px minimum, so a label rename that
+        // needs more room must take it from inside the cell - never from
+        // MinColumnWidth. 884px content region - 20px right padding = 864.
+        [Fact]
+        public void MinColumnWidth_StillFitsTwoColumnsAtTheWindowMinimum()
+        {
+            const int SettingsPanelWidthAtWindowMinimum = 864;
+
+            Assert.Equal(2, SettingsCurrencyGridLayout.ComputeColumnCount(SettingsPanelWidthAtWindowMinimum));
+            Assert.True(2 * SettingsCurrencyGridLayout.MinColumnWidth <= SettingsPanelWidthAtWindowMinimum);
         }
 
         [Fact]
@@ -290,7 +303,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int CheckboxGlyphAndGapPx = 24;
 
             Assert.True(
-                CheckboxGlyphAndGapPx + "Clear".Length * MaxCharWidthPx
+                CheckboxGlyphAndGapPx + "Ignore".Length * MaxCharWidthPx
                     <= SettingsCurrencyGridLayout.CellClearWidth);
         }
 

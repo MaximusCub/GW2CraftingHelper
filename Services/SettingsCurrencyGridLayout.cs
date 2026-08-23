@@ -21,13 +21,24 @@ namespace GW2CraftingHelper.Services
         public const int CellNameWidth = 170;
         public const int CellInputX = CellNameX + CellNameWidth;
         public const int CellInputWidth = 70;
-        public const int CellClearX = CellInputX + CellInputWidth + 6;
+        public const int CellClearX = CellInputX + CellInputWidth + CellInputToClearGap;
 
         /// <summary>
-        /// Room for the "Clear" checkbox (box plus its label at
-        /// DefaultFont14, ~7.7px per character).
+        /// Gap between the amount box and the "Ignore" checkbox. Was 6, with
+        /// the checkbox on 70; the label rename needed four more pixels and
+        /// they came from here rather than from the cell's total extent -
+        /// MinColumnWidth below is load-bearing at the window's 930px
+        /// minimum (2 * 424 = 848 against an 864px settings panel), so
+        /// growing the cell would drop the grid from two columns to one
+        /// there.
         /// </summary>
-        public const int CellClearWidth = 70;
+        public const int CellInputToClearGap = 2;
+
+        /// <summary>
+        /// Room for the per-currency "Ignore" checkbox (box plus its label
+        /// at DefaultFont14, ~7.7px per character).
+        /// </summary>
+        public const int CellClearWidth = 74;
 
         public const int CellTagX = CellClearX + CellClearWidth;
 
@@ -35,7 +46,7 @@ namespace GW2CraftingHelper.Services
         /// Room for the widest string the cell's one tag slot shows:
         /// "default 3600" (12 characters; 3600 is the largest value in
         /// CurrencyDecisionDefaults), which the red "Invalid" tag and
-        /// "cleared" both fit inside.
+        /// "ignored" both fit inside.
         /// </summary>
         public const int CellTagWidth = 100;
 

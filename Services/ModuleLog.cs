@@ -433,7 +433,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Same as the parameterless <see cref="Snapshot()"/>, plus the
         /// Version the returned list was read at - a single lock-scoped
-        /// read of both, so a caller (the Log tab's "Clear view", which
+        /// read of both, so a caller (the Log tab's "Clear View", which
         /// needs to know exactly which absolute entry index each returned
         /// row corresponds to - see LogTabContent) never has to reconcile
         /// two separately-timed reads that a concurrent Write could have

@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Views
         private const int ButtonWidth = 100;
         // Wider than ButtonWidth - "Delete Log File" is deliberately
         // spelled out in full so the destructive scope is unmistakable
-        // next to the view-only "Clear view".
+        // next to the view-only "Clear View".
         private const int DeleteButtonWidth = 120;
         private const int Gap = 8;
 
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Views
         // broader one): <see cref="_renderedRows"/>, <see
         // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
         // <see cref="_fullPrefixWidth"/>, <see cref="_lastLayoutWidth"/>, the
-        // Module-owned "Clear view" floor reached via
+        // Module-owned "Clear View" floor reached via
         // <see cref="_getClearedBeforeVersion"/>/
         // <see cref="_setClearedBeforeVersion"/>, this field, and
         // _contentPanel's Children collection are MAIN-THREAD-ONLY - every
@@ -225,9 +225,9 @@ namespace GW2CraftingHelper.Views
             internal string FullLine;
         }
 
-        // The "Clear view" floor must not be a plain instance field
+        // The "Clear View" floor must not be a plain instance field
         // here: Blish constructs a brand new LogTabContent on every tab
-        // visit, so an instance field resets and a "Clear view" click
+        // visit, so an instance field resets and a "Clear View" click
         // silently undoes itself on the next tab switch.
         // Moved onto Module itself (Module._logViewClearedBeforeVersion -
         // see that field's own doc comment for the full threading
@@ -263,10 +263,23 @@ namespace GW2CraftingHelper.Views
                 Parent = container
             };
 
+            // Textbox first, then the dropdown that narrows it - the
+            // order the Snapshot tab's own search row uses. This row read
+            // dropdown-then-textbox, so the module's two search rows were
+            // mirror images of each other (audit batch J, M12).
+            _searchBox = new TextBox
+            {
+                Size = new Point(SearchBoxWidth, 26),
+                Location = new Point(0, 7),
+                PlaceholderText = "Search log entries...",
+                Parent = _toolbarPanel
+            };
+            _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
+
             _levelDropdown = new Dropdown
             {
                 Size = new Point(LevelDropdownWidth, 30),
-                Location = new Point(0, 5),
+                Location = new Point(SearchBoxWidth + Gap, 5),
                 Parent = _toolbarPanel
             };
             _levelDropdown.Items.Add("All");
@@ -276,15 +289,6 @@ namespace GW2CraftingHelper.Views
             _levelDropdown.Items.Add("Debug+");
             _levelDropdown.SelectedItem = "Info+"; // d2 Section 3 default
             _levelDropdown.ValueChanged += (_, __) => RebuildRowsIfBuilt();
-
-            _searchBox = new TextBox
-            {
-                Size = new Point(SearchBoxWidth, 26),
-                Location = new Point(LevelDropdownWidth + Gap, 7),
-                PlaceholderText = "Search...",
-                Parent = _toolbarPanel
-            };
-            _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
 
             _followCheckbox = new Checkbox
             {
@@ -297,7 +301,7 @@ namespace GW2CraftingHelper.Views
 
             _clearViewButton = new StandardButton
             {
-                Text = "Clear view",
+                Text = "Clear View",
                 Size = new Point(ButtonWidth, 28),
                 Parent = _toolbarPanel
             };
@@ -446,7 +450,7 @@ namespace GW2CraftingHelper.Views
         /// incremental equivalent and still falls back to a full
         /// <see cref="RebuildRows"/>. Full rebuild otherwise stays reserved
         /// for the filter-changed paths (level dropdown / search box /
-        /// Clear view) and for <see cref="Refresh"/>'s own tab-switch case.
+        /// Clear View) and for <see cref="Refresh"/>'s own tab-switch case.
         /// </para>
         /// </summary>
         public void PollForUpdates()
@@ -665,7 +669,7 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Full dispose+rebuild from the ring, respecting the current
         /// filter state. Reserved for the filter-changed paths (level
-        /// dropdown / search box / Clear view), <see cref="Refresh"/>'s
+        /// dropdown / search box / Clear View), <see cref="Refresh"/>'s
         /// tab-switch case, and the empty-to-non-empty transition
         /// <see cref="AppendNewRows"/> cannot handle incrementally - NOT
         /// called on every live Version bump while the tab is open and
