@@ -38,13 +38,22 @@ namespace GW2CraftingHelper.Views.Rendering
             return string.IsNullOrEmpty(indicator) ? title : title + " " + indicator;
         }
 
+        /// <summary>
+        /// Wires a header label as a sort control. The tooltip applied here
+        /// is LOAD-BEARING, not decoration: a Blish Label only captures the
+        /// mouse while it carries a tooltip (KNOWN-ISSUES' repeated finding
+        /// that a label swallows its container's tooltip), so dropping it
+        /// would leave the Click handler below wired but never raised - a
+        /// dead header with no build or test failure to show for it.
+        /// </summary>
         internal static void MakeClickable(Label label, Action onClick)
         {
             if (label == null || onClick == null) return;
 
+            Color resting = label.TextColor;
             TooltipFacility.ApplyPlain(label, HeaderTooltip);
             label.MouseEntered += (_, __) => label.TextColor = HoverColor;
-            label.MouseLeft += (_, __) => label.TextColor = TableHeaderStyle.LabelColor;
+            label.MouseLeft += (_, __) => label.TextColor = resting;
             label.Click += (_, __) => onClick();
         }
     }

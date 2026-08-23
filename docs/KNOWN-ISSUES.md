@@ -11186,7 +11186,7 @@ the plan's own, with no indicator drawn anywhere.
   direction plus the click cycle; `Services/PlanTableSorter` orders the
   already-built `PlanRowViewModel`s. Sorting never mutates the caller's
   list and hands the same instance back when no sort is active, so the
-  default path allocates nothing. 24 tests.
+  default path allocates nothing. 26 tests.
 - **Item sorts ordinal-ignore-case; Amount sorts numerically.** A string
   sort would put 111 before 9; the Amount test pins 9/111/136/816 in
   both directions. Ties keep their original relative order (stable) in
@@ -11208,6 +11208,14 @@ the plan's own, with no indicator drawn anywhere.
   than one currency keys on its ordinally-first currency name and that
   entry's amount, which is stable regardless of the order the resolver
   emitted them in; no attempt is made to add amounts across currencies.
+  Within a currency the numeric key is the amount's exact per-unit rate
+  where one exists (`CurrencyAmountViewModel.UnitRate`, set by
+  `CurrencyDisplayResolver` beside every "Each" amount), NOT `Amount`: a
+  rate that does not divide evenly deliberately leaves `Amount` at 0 and
+  shows the rate as bundle text ("912 for 92" - the live Philosopher's
+  Stone case), so keying on `Amount` would sort every bundle-priced row
+  as if it were free and tie them all with each other. `UnitRate` is a
+  sort key only; nothing renders it.
 - **The indicator rides inside the clickable header label.** The label
   IS the click target, and its text carries the ASCII "^"/"v" (the
   tree's caret vocabulary - M12 unified the module on ASCII). That keeps
@@ -11219,7 +11227,14 @@ the plan's own, with no indicator drawn anywhere.
   every other c-table caller (Required Recipes, Required Disciplines,
   the tree), whose labels stay inert exactly as before. Since an
   unsorted column deliberately shows no indicator, a hover tint and a
-  one-line tooltip are what say "clickable" before the first click.
+  one-line tooltip are what say "clickable" before the first click. That
+  tooltip is load-bearing, not decoration: a Blish `Label` only captures
+  the mouse while it carries one (this file's repeated finding that a
+  label swallows its container's tooltip), so removing it would silently
+  kill click delivery to every sort header - stated in
+  `SortableHeaderLabel.MakeClickable` so a future edit cannot drop it
+  unaware. Gate item 1 exercises a real click on a `Label`, which is the
+  one assumption in this branch that is inferred rather than measured.
 - **A click re-renders the plan.** Section rows are a `FlowPanel`'s
   children in flow order, which is not reorderable in place, so the
   sort is applied the one way it can be: `PreserveScrollAcross(() =>
@@ -11233,10 +11248,11 @@ the plan's own, with no indicator drawn anywhere.
   session (never persisted), unlike `_sectionExpansion`, which a new
   Generate deliberately resets to the section defaults.
 
-Build 0 errors, 2146 StyleCop warnings (2135 before; the 11 added sit in
-the same rule families the codebase trips throughout). Suite 2227 passed
-/ 0 failed (2203 baseline, +24: eight on the click cycle, sixteen on the
-comparators), tree clean, nothing pushed.
+Build 0 errors, 2147 StyleCop warnings (2135 before; the 12 added sit in
+the same rule families the codebase trips throughout). Suite 2229 passed
+/ 0 failed (2203 baseline, +26: eight on the click cycle, eighteen on
+the comparators; existing resolver tests gained assertions pinning the
+per-unit rate), tree clean, nothing pushed.
 
 Desktop gate items:
 
