@@ -135,6 +135,52 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // --- RightBlockRightEdge (the flat plan tables' shared anchor) ---
+
+        [Fact]
+        public void RightBlockRightEdge_NothingMeasured_IsThePinnedPanelEdge()
+        {
+            // What every table built before the gutter fix, and what a
+            // section with no right-hand column at all still builds: the
+            // block's right edge one margin in from the panel edge.
+            Assert.Equal(
+                1400 - PlanRelayoutMath.TableRightMargin,
+                PlanRelayoutMath.RightBlockRightEdge(panelWidth: 1400, blockWidth: 60, widestNameEnd: 0));
+        }
+
+        [Fact]
+        public void RightBlockRightEdge_ShortNamesInWidePanel_PullsTheWholeBlockIn()
+        {
+            const int blockWidth = 60;
+            int widestNameEnd = 500;
+
+            int rightEdge = PlanRelayoutMath.RightBlockRightEdge(1400, blockWidth, widestNameEnd);
+
+            // The block keeps its own width; only where it starts moved.
+            Assert.Equal(
+                widestNameEnd + PlanRelayoutMath.TableGutterBreathingRoom + blockWidth, rightEdge);
+
+            // What the row divider and the header band are bounded to: past
+            // the last column, and well inside the panel - the two together
+            // are what stop the closed gutter from being re-advertised by
+            // full-width chrome.
+            int chromeWidth = rightEdge + PlanRelayoutMath.TableRightMargin;
+            Assert.True(chromeWidth > rightEdge);
+            Assert.True(chromeWidth < 1400);
+        }
+
+        [Fact]
+        public void RightBlockRightEdge_NarrowPanel_NeverOverrunsThePinnedEdge()
+        {
+            // The degenerate direction that matters: long names in a small
+            // window must not push the numbers off the panel.
+            int pinned = 930 - PlanRelayoutMath.TableRightMargin - 60;
+
+            Assert.Equal(
+                pinned + 60,
+                PlanRelayoutMath.RightBlockRightEdge(panelWidth: 930, blockWidth: 60, widestNameEnd: 5000));
+        }
+
         // --- ComputeTreeColumnEdges ---
 
         [Fact]

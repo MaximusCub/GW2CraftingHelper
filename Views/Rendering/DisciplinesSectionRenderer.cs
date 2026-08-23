@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 
 namespace GW2CraftingHelper.Views.Rendering
@@ -68,46 +69,111 @@ namespace GW2CraftingHelper.Views.Rendering
         /// PlanRelayoutMath - NameMaxWidthBeforeColumn's existing 20px
         /// floor still clamps the ellipsis width on narrow panels exactly
         /// as it did before.
+        ///
+        /// The same pass measures what the Level column may be pulled in to
+        /// (audit batch H): the widest UNTRUNCATED extent of everything left
+        /// of it, which is the character-availability text where a section
+        /// has any and the discipline names where it does not. A long
+        /// availability string simply leaves the column pinned where it
+        /// already was - RightBlockX never moves a block right - so this can
+        /// only ever shorten the gutter, never the ellipsis budget.
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = GameService.Content.DefaultFont14;
+            var charFont = GameService.Content.DefaultFont12;
             int maxNameWidth = 0;
+            int maxCharWidth = 0;
+            int maxLevelWidth = 0;
             bool anyCharacterText = false;
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                int nameWidth = (int)Math.Ceiling(font.MeasureString(section.Rows[i].Label ?? "").Width);
+                int nameWidth = MeasureWidth(font, section.Rows[i].Label);
                 if (nameWidth > maxNameWidth)
                 {
                     maxNameWidth = nameWidth;
                 }
 
+                int levelWidth = MeasureWidth(font, section.Rows[i].Sublabel);
+                if (levelWidth > maxLevelWidth)
+                {
+                    maxLevelWidth = levelWidth;
+                }
+
                 if (!string.IsNullOrEmpty(section.Rows[i].CharacterAvailabilityText))
                 {
-                    anyCharacterText = true;
+                    if (!anyCharacterText)
+                    {
+                        // The column's own header is part of its extent: it
+                        // starts at the same charX and can be wider than a
+                        // short availability string, and the Level column
+                        // must not be pulled in over it.
+                        anyCharacterText = true;
+                        maxCharWidth = MeasureWidth(font, CharactersHeaderText);
+                    }
+
+                    int charWidth = MeasureWidth(charFont, section.Rows[i].CharacterAvailabilityText);
+                    if (charWidth > maxCharWidth)
+                    {
+                        maxCharWidth = charWidth;
+                    }
                 }
             }
 
             int charX = 8 + maxNameWidth + CharGap;
 
+            int levelColumnWidth = 0;
+            int widestNameEnd = 0;
+            if (maxLevelWidth > 0)
+            {
+                // The header label right-aligns onto the same edge as the
+                // rows, so the block has to be at least as wide as it.
+                int headerWidth = MeasureWidth(font, LevelHeaderText);
+                levelColumnWidth = maxLevelWidth > headerWidth ? maxLevelWidth : headerWidth;
+                widestNameEnd = anyCharacterText ? charX + maxCharWidth : 8 + maxNameWidth;
+            }
+
+            Func<int, int> levelRightEdge = w => LevelRightEdge(w, levelColumnWidth, widestNameEnd);
             if (anyCharacterText)
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink, "Characters", charX);
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    contentFlow, panelWidth, "Discipline", 8, LevelHeaderText, _sink, CharactersHeaderText, charX,
+                    rightXForWidth: levelRightEdge);
             }
             else
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Discipline", 8, "Level", _sink);
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    contentFlow, panelWidth, "Discipline", 8, LevelHeaderText, _sink,
+                    rightXForWidth: levelRightEdge);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateDisciplineRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1, charX);
+                CreateDisciplineRow(
+                    section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1,
+                    charX, levelColumnWidth, widestNameEnd);
             }
         }
 
         // Shared between Render() (header column X) and
         // CreateDisciplineRow so both always agree on the same gap.
         private const int CharGap = 12;
+        private const string LevelHeaderText = "Level";
+        private const string CharactersHeaderText = "Characters";
+
+        private static int MeasureWidth(BitmapFont font, string text)
+        {
+            return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        /// <summary>
+        /// Right edge of the Level column at a given panel width - the one
+        /// formula the header, the build pass and every resize closure share.
+        /// </summary>
+        private static int LevelRightEdge(int panelWidth, int levelColumnWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, levelColumnWidth, widestNameEnd);
+        }
 
         // Moved verbatim from CraftingPlanView.CreateDisciplineRow. Only
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
@@ -121,7 +187,9 @@ namespace GW2CraftingHelper.Views.Rendering
         // full. Guaranteed >= 8 + nameLabel.Width + CharGap for every row
         // in this call (charX's max-of-all-rows construction), so charLabel
         // can never overlap nameLabel here.
-        private void CreateDisciplineRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast, int charX)
+        private void CreateDisciplineRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast,
+            int charX, int levelColumnWidth, int widestNameEnd)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -133,7 +201,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(8, 7), Parent = rowPanel
             };
-            var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, panelWidth - 8, 7);
+            int levelRightEdge = LevelRightEdge(panelWidth, levelColumnWidth, widestNameEnd);
+            var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, levelRightEdge, 7);
 
             // "Anna (500), Bob (400/450)" - secondary text sitting
             // between the discipline name and the right-aligned Level
@@ -155,7 +224,7 @@ namespace GW2CraftingHelper.Views.Rendering
             Label charLabel = null;
             if (!string.IsNullOrEmpty(fullCharText))
             {
-                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(panelWidth - 8, levelLabel.Width, CharGap, charX);
+                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(levelRightEdge, levelLabel.Width, CharGap, charX);
                 string charDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, charMaxWidth);
                 charLabel = new Label()
                 {
@@ -178,16 +247,23 @@ namespace GW2CraftingHelper.Views.Rendering
             // so there is no icon-clearance side effect to worry about -
             // the new divider top (rowHeight - 3 = 29) sits well clear of
             // the text baseline.
-            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 1, _sink, w =>
-            {
-                levelLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, levelLabel.Width), 7);
-            });
+            RowRelayoutHelpers.FinishRow(
+                rowPanel, panelWidth, rowHeight, isLast, 1, _sink,
+                w =>
+                {
+                    levelLabel.Location = new Point(
+                        PlanRelayoutMath.RightAlignedX(
+                            LevelRightEdge(w, levelColumnWidth, widestNameEnd), levelLabel.Width),
+                        7);
+                },
+                w => LevelRightEdge(w, levelColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
 
             if (charLabel != null)
             {
                 _sink.AddReellipsis(w =>
                 {
-                    int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(w - 8, levelLabel.Width, CharGap, charX);
+                    int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                        LevelRightEdge(w, levelColumnWidth, widestNameEnd), levelLabel.Width, CharGap, charX);
                     string newDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, newMaxWidth);
                     if (charLabel.Text != newDisplayText)
                     {

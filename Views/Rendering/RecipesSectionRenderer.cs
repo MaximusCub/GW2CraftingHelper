@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 
 namespace GW2CraftingHelper.Views.Rendering
@@ -53,18 +54,89 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
+        // Left x of the name column (past the row's 34px framed icon at
+        // x=8), shared by the header and every row.
+        private const int NameX = 50;
+        private const string StatusHeaderText = "Status";
+
         /// <summary>
         /// Moved verbatim from CraftingPlanView.CreateRecipesBody, plus the
         /// CreateCTableHeaderRow call this renderer now owns directly (see
-        /// the class doc comment above).
+        /// the class doc comment above), then given the same one-pass
+        /// pre-scan the other plan tables carry (audit batch H): the widest
+        /// status tag - which is this table's whole right-hand block - and
+        /// the widest UNTRUNCATED name extent, so the Status column can be
+        /// pulled in beside the names rather than pinned to the panel edge
+        /// with a growing empty band between them. This row's name has no
+        /// ellipsis at all (see the class doc comment), so the scan measures
+        /// both the name line and the optional sublabel line beneath it;
+        /// pulling the block in past the widest of them is what keeps a long
+        /// name from running under the status tag.
+        /// <para>
+        /// A section where no row carries a status tag has no right-hand
+        /// block to pull in, and stays pinned exactly as before.
+        /// </para>
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            CTableHeaderRenderer.CreateCTableHeaderRow(contentFlow, panelWidth, "Recipe", 50, "Status", _sink);
+            var font = GameService.Content.DefaultFont14;
+            var sublabelFont = GameService.Content.DefaultFont12;
+            int maxStatusWidth = 0;
+            int widestNameEnd = 0;
+            foreach (var row in section.Rows)
+            {
+                if (!string.IsNullOrEmpty(row.StatusTag))
+                {
+                    int statusWidth = MeasureWidth(font, row.StatusTag);
+                    if (statusWidth > maxStatusWidth) maxStatusWidth = statusWidth;
+                }
+
+                int nameEnd = NameX + MeasureWidth(font, row.Label ?? "");
+                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
+
+                if (!string.IsNullOrEmpty(row.Sublabel))
+                {
+                    int sublabelEnd = NameX + MeasureWidth(sublabelFont, row.Sublabel);
+                    if (sublabelEnd > widestNameEnd) widestNameEnd = sublabelEnd;
+                }
+            }
+
+            int statusColumnWidth = 0;
+            if (maxStatusWidth > 0)
+            {
+                // The header label right-aligns onto the same edge as the
+                // rows, so the block has to be at least as wide as it.
+                int headerWidth = MeasureWidth(font, StatusHeaderText);
+                statusColumnWidth = maxStatusWidth > headerWidth ? maxStatusWidth : headerWidth;
+            }
+            else
+            {
+                widestNameEnd = 0;
+            }
+
+            CTableHeaderRenderer.CreateCTableHeaderRow(
+                contentFlow, panelWidth, "Recipe", NameX, StatusHeaderText, _sink,
+                rightXForWidth: w => StatusRightEdge(w, statusColumnWidth, widestNameEnd));
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateRecipeRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+                CreateRecipeRow(
+                    section.Rows[i], contentFlow, panelWidth, statusColumnWidth, widestNameEnd,
+                    i == section.Rows.Count - 1);
             }
+        }
+
+        private static int MeasureWidth(BitmapFont font, string text)
+        {
+            return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        /// <summary>
+        /// Right edge of the Status column at a given panel width - the one
+        /// formula the header, the build pass and every resize closure share.
+        /// </summary>
+        private static int StatusRightEdge(int panelWidth, int statusColumnWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, statusColumnWidth, widestNameEnd);
         }
 
         // The no-sublabel branch's rowHeight (32)
@@ -84,7 +156,9 @@ namespace GW2CraftingHelper.Views.Rendering
         //
         // Moved verbatim from CraftingPlanView.CreateRecipeRow. Only
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
-        private void CreateRecipeRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateRecipeRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth,
+            int statusColumnWidth, int widestNameEnd, bool isLast)
         {
             bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
             int rowHeight = hasSublabel
@@ -149,7 +223,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(50, nameY),
+                Location = new Point(NameX, nameY),
                 Parent = rowPanel
             };
 
@@ -162,7 +236,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     TextColor = new Color(170, 170, 170),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(50, 22),
+                    Location = new Point(NameX, 22),
                     Parent = rowPanel
                 };
             }
@@ -179,7 +253,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     statusColor = new Color(150, 200, 150);
                 }
-                statusLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.StatusTag, font, statusColor, panelWidth - 8, hasSublabel ? 10 : 8);
+                statusLabel = LabelHelpers.CreateRightAlignedLabel(
+                    rowPanel, row.StatusTag, font, statusColor,
+                    StatusRightEdge(panelWidth, statusColumnWidth, widestNameEnd), hasSublabel ? 10 : 8);
             }
 
             // M36b: bottomClearance depends on which rowHeight this branch
@@ -190,13 +266,19 @@ namespace GW2CraftingHelper.Views.Rendering
             // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
             // immune and flush-fit with zero slack; giving it
             // clearance it doesn't need would reintroduce that overlap.
-            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink, w =>
-            {
-                if (statusLabel != null)
+            RowRelayoutHelpers.FinishRow(
+                rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink,
+                w =>
                 {
-                    statusLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, statusLabel.Width), hasSublabel ? 10 : 8);
-                }
-            });
+                    if (statusLabel != null)
+                    {
+                        statusLabel.Location = new Point(
+                            PlanRelayoutMath.RightAlignedX(
+                                StatusRightEdge(w, statusColumnWidth, widestNameEnd), statusLabel.Width),
+                            hasSublabel ? 10 : 8);
+                    }
+                },
+                w => StatusRightEdge(w, statusColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
         }
     }
 }

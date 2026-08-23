@@ -114,6 +114,29 @@ namespace GW2CraftingHelper.Services
             return desired < pinnedX ? desired : pinnedX;
         }
 
+        /// <summary>
+        /// Gap every plan table keeps between its right-hand block and the
+        /// panel's right edge - the margin the block was pinned to before
+        /// <see cref="RightBlockX"/> existed, and the one a bounded row
+        /// divider or header band keeps past the block's right edge so a
+        /// pinned table's chrome is byte-identical to what it drew before.
+        /// </summary>
+        public const int TableRightMargin = 8;
+
+        /// <summary>
+        /// Right edge of a blockWidth-wide right-hand block once
+        /// <see cref="RightBlockX"/> has closed the dead gutter before it -
+        /// i.e. the anchor every column inside the block derives from. The
+        /// one expression each flat plan table's build pass and relayout
+        /// closures share, so no two of them can anchor a table differently.
+        /// widestNameEnd 0 gives exactly the old
+        /// <c>panelWidth - TableRightMargin</c> edge.
+        /// </summary>
+        public static int RightBlockRightEdge(int panelWidth, int blockWidth, int widestNameEnd)
+        {
+            return RightBlockX(panelWidth - TableRightMargin - blockWidth, widestNameEnd) + blockWidth;
+        }
+
         public readonly struct TreeColumnEdges
         {
             public readonly int PillColX;

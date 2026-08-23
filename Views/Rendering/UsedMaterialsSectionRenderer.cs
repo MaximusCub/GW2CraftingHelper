@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static int QtyRightEdge(int panelWidth, int maxQtyWidth, int widestNameEnd)
         {
-            return PlanRelayoutMath.RightBlockX(panelWidth - 8 - maxQtyWidth, widestNameEnd) + maxQtyWidth;
+            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
         }
 
         // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
@@ -142,10 +142,13 @@ namespace GW2CraftingHelper.Views.Rendering
             // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
             // flush-fit with zero slack; giving it clearance it doesn't
             // need would reintroduce the icon/divider overlap.
-            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
-            {
-                qtyLabel.Location = new Point(QtyRightEdge(w, maxQtyWidth, widestNameEnd) - qtyWidth, 9);
-            });
+            RowRelayoutHelpers.FinishRow(
+                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
+                w =>
+                {
+                    qtyLabel.Location = new Point(QtyRightEdge(w, maxQtyWidth, widestNameEnd) - qtyWidth, 9);
+                },
+                w => QtyRightEdge(w, maxQtyWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
             _sink.AddReellipsis(w =>
             {
                 if (IconNameRowHelpers.ReellipsizeName(

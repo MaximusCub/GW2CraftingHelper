@@ -45,18 +45,43 @@ namespace GW2CraftingHelper.Views.Rendering
         /// may be null for a row with nothing else to reposition (none of
         /// today's five callers needs this, but a future flush-fit row with
         /// only font-fixed content might).
+        /// <para>
+        /// dividerWidthForWidth bounds the rule to the table it belongs to
+        /// (audit batch H fix round): once a table's right-hand block is
+        /// pulled in beside its names, a full-panel-width rule runs hundreds
+        /// of px past the last column into empty space and advertises the
+        /// gutter it was supposed to close. Callers pass their own
+        /// "block right edge + PlanRelayoutMath.TableRightMargin", which is
+        /// exactly the panel width whenever the block is still pinned - so a
+        /// pinned table's rule is byte-identical to the one it drew before.
+        /// Null keeps the full width for rows with no right-hand block at all.
+        /// The result is clamped into [0, w] so a caller's arithmetic can
+        /// never produce a rule wider than its own row panel.
+        /// </para>
         /// </summary>
         internal static void FinishRow(
             Panel rowPanel, int panelWidth, int rowHeight, bool isLast, int bottomClearance,
-            ISectionRelayoutSink sink, Action<int> extraRelayout)
+            ISectionRelayoutSink sink, Action<int> extraRelayout, Func<int, int> dividerWidthForWidth = null)
         {
-            Panel divider = isLast ? null : LabelHelpers.CreateRowDivider(rowPanel, panelWidth, rowHeight, bottomClearance);
+            Panel divider = isLast
+                ? null
+                : LabelHelpers.CreateRowDivider(
+                    rowPanel, DividerWidth(dividerWidthForWidth, panelWidth), rowHeight, bottomClearance);
             sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 extraRelayout?.Invoke(w);
-                if (divider != null) divider.Size = new Point(w, 2);
+                if (divider != null) divider.Size = new Point(DividerWidth(dividerWidthForWidth, w), 2);
             });
+        }
+
+        private static int DividerWidth(Func<int, int> dividerWidthForWidth, int panelWidth)
+        {
+            if (dividerWidthForWidth == null) return panelWidth;
+
+            int width = dividerWidthForWidth(panelWidth);
+            if (width > panelWidth) width = panelWidth;
+            return width > 0 ? width : 0;
         }
     }
 }
