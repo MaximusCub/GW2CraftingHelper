@@ -48,64 +48,6 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
         }
 
-        // ---- ForSnapshotAge ----
-
-        [Fact]
-        public void ForSnapshotAge_LessThanOneMinute_ReturnsJustNow()
-        {
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(30)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_Zero_ReturnsJustNow()
-        {
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.Zero));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_Negative_ClampedToZero_ReturnsJustNow()
-        {
-            // CapturedAt momentarily ahead of the local clock (minor clock
-            // skew) must never render as a negative duration.
-            Assert.Equal("just now", StatusText.ForSnapshotAge(TimeSpan.FromSeconds(-5)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_UnderOneHour_ReturnsMinutesAgo()
-        {
-            Assert.Equal("2m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(2)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_JustUnderOneHour_ReturnsMinutesAgo()
-        {
-            Assert.Equal("59m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(59)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_UnderOneDay_ReturnsHoursAndMinutesAgo()
-        {
-            Assert.Equal("1h 5m ago", StatusText.ForSnapshotAge(TimeSpan.FromMinutes(65)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_ExactlyOneHour_ReturnsHoursAndMinutesAgo()
-        {
-            Assert.Equal("1h 0m ago", StatusText.ForSnapshotAge(TimeSpan.FromHours(1)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_OneDayOrMore_ReturnsDaysAgo()
-        {
-            Assert.Equal("2d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(2)));
-        }
-
-        [Fact]
-        public void ForSnapshotAge_ExactlyOneDay_ReturnsDaysAgo()
-        {
-            Assert.Equal("1d ago", StatusText.ForSnapshotAge(TimeSpan.FromDays(1)));
-        }
-
         // ---- IsStale (the staleness label and Module.Update()'s
         // auto-refresh gate share ONE threshold, sourced from
         // SnapshotRefreshIntervalMinutes - the threshold is a parameter
@@ -243,28 +185,33 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ForSnapshotAgeSuffix_Zero_ReadsAsCaptured()
+        {
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.Zero));
+        }
+
+        [Fact]
         public void ForSnapshotAgeSuffix_Negative_ClampedToZero()
         {
-            // Same clock-skew clamp ForSnapshotAge applies - never a
-            // negative duration on screen.
+            // CapturedAt momentarily ahead of the local clock (minor clock
+            // skew) must never render as a negative duration.
             Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(-5)));
         }
 
-        // The two age wordings read the same bucket ladder, so they can
-        // never disagree about when a snapshot turns from minutes into
-        // hours - the drift this extraction exists to prevent.
+        // The bucket ladder, boundary by boundary - the coverage that used
+        // to sit on a second, caller-less age wording.
         [Theory]
-        [InlineData(2)]
-        [InlineData(59)]
-        [InlineData(60)]
-        [InlineData(200)]
-        [InlineData(1440)]
-        [InlineData(41760)]
-        public void ForSnapshotAgeSuffix_AgreesWithForSnapshotAgeBuckets(int minutes)
+        [InlineData(0.5, "snapshot just captured")]
+        [InlineData(1, "snapshot 1m old")]
+        [InlineData(59, "snapshot 59m old")]
+        [InlineData(60, "snapshot 1h 0m old")]
+        [InlineData(65, "snapshot 1h 5m old")]
+        [InlineData(1439, "snapshot 23h 59m old")]
+        [InlineData(1440, "snapshot 1d old")]
+        [InlineData(2880, "snapshot 2d old")]
+        public void ForSnapshotAgeSuffix_BucketLadder(double minutes, string expected)
         {
-            var age = TimeSpan.FromMinutes(minutes);
-            string magnitude = StatusText.ForSnapshotAge(age).Replace(" ago", "");
-            Assert.Equal($"snapshot {magnitude} old", StatusText.ForSnapshotAgeSuffix(age));
+            Assert.Equal(expected, StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(minutes)));
         }
     }
 

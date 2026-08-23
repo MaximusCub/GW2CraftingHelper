@@ -65,30 +65,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Formats a snapshot's age for the Snapshot tab's staleness
-        /// suffix (d1-snapshot-about-settings.md Feature 1),
-        /// e.g. "Updated - Aug 15, 2026 3:41 PM (2m ago)". A negative age
-        /// (CapturedAt momentarily ahead of the local clock - e.g. minor
-        /// clock skew right after a fetch) is treated as zero rather than
-        /// shown as a negative duration.
-        /// </summary>
-        public static string ForSnapshotAge(TimeSpan age)
-        {
-            if (age < TimeSpan.Zero)
-            {
-                age = TimeSpan.Zero;
-            }
-
-            return age.TotalMinutes < 1 ? "just now" : $"{AgeMagnitude(age)} ago";
-        }
-
-        /// <summary>
-        /// How much time an age is, with no "ago"/"old" framing - the one
-        /// bucket ladder <see cref="ForSnapshotAge"/> and
-        /// <see cref="ForSnapshotAgeSuffix"/> both read, so the two
-        /// wordings can never disagree about when a snapshot turns from
-        /// minutes into hours. Callers handle the sub-minute case
-        /// themselves; below a minute this reports "0m".
+        /// How much time an age is, with no "ago"/"old" framing - the
+        /// bucket ladder behind <see cref="ForSnapshotAgeSuffix"/>. The
+        /// caller handles the sub-minute case; below a minute this reports
+        /// "0m".
         /// </summary>
         private static string AgeMagnitude(TimeSpan age)
         {
@@ -116,9 +96,15 @@ namespace GW2CraftingHelper.Services
         /// second fact about a different one. "(snapshot 29d old)" names
         /// its subject, so the two can no longer collapse into one.
         /// <para>
-        /// Built on <see cref="ForSnapshotAge"/>'s buckets rather than
-        /// beside them, so the two can never disagree about when a
-        /// snapshot turns from minutes into hours.
+        /// The module's only snapshot-age wording. A second one ("2m ago")
+        /// briefly existed beside it and was deleted once this replaced its
+        /// last caller: two formatters over one ladder, with only tests
+        /// holding the older one up, is drift waiting to happen.
+        /// </para>
+        /// <para>
+        /// A negative age (CapturedAt momentarily ahead of the local clock -
+        /// e.g. minor clock skew right after a fetch) is treated as zero
+        /// rather than shown as a negative duration.
         /// </para>
         /// </summary>
         public static string ForSnapshotAgeSuffix(TimeSpan age)
