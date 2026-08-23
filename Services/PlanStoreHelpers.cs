@@ -55,7 +55,15 @@ namespace GW2CraftingHelper.Services
         {
             if (string.IsNullOrWhiteSpace(json)) return null;
 
-            var plan = JsonConvert.DeserializeObject<PersistedPlan>(json);
+            // MaxDepth raised from Newtonsoft's default 64: a persisted
+            // +24 Agony Infusion plan (23 recipe levels, the deepest chain
+            // in the game per docs/research/minimum-window-width.md) nests
+            // ~3 JSON levels per tree node and failed to load with the
+            // default - saving is unaffected because Json.NET only
+            // enforces MaxDepth on read. 512 covers the validator's
+            // 200-domain-level bound at ~3 JSON levels each.
+            var plan = JsonConvert.DeserializeObject<PersistedPlan>(
+                json, new JsonSerializerSettings { MaxDepth = 512 });
 
             // A structurally valid but too-degraded-to-render object (e.g.
             // an old schema missing the fields this feature actually needs,
