@@ -599,20 +599,6 @@ namespace GW2CraftingHelper
                 }
             };
 
-            // Closing the window while the Settings tab is open never
-            // raises TabChanged, so the same prompt is hung off the
-            // window's own hide transition. Blish nulls the Hidden event
-            // as the first act of Control.Dispose (measured in the
-            // vendored 1.3.0 binary), so Unload's _mainWindow.Dispose()
-            // cannot re-enter this after _modalDialog has been disposed.
-            _mainWindow.Hidden += (s, e) =>
-            {
-                if (_mainWindow.SelectedTab == _settingsTab)
-                {
-                    PromptForUnsavedSettings();
-                }
-            };
-
             _cornerIcon = new CornerIcon()
             {
                 IconName = "GW2 Crafting Helper",
@@ -629,7 +615,7 @@ namespace GW2CraftingHelper
 
         /// <summary>
         /// Asks whether to keep or drop unsaved Settings edits, once the
-        /// user has already left the tab (or closed the window).
+        /// user has already left the tab.
         ///
         /// <para>
         /// The prompt is after the fact because Blish 1.3.0 has nowhere to
@@ -653,6 +639,19 @@ namespace GW2CraftingHelper
         /// text when this runs and Save persists exactly what was on
         /// screen.
         /// </para>
+        ///
+        /// <para>
+        /// Only the tab path is hooked. The window's own Hidden event is
+        /// NOT: measured in the vendored 1.3.0 binary, every WindowBase2
+        /// subscribes to Gw2Mumble.PlayerCharacter.IsInCombatChanged and
+        /// Gw2Instance.IsInGameChanged, both of which call Hide() when the
+        /// user has Blish's "hide windows in combat" / "hide during
+        /// loading" overlay options on - so entering combat with an edited
+        /// field would pop a modal over gameplay. Closing the window
+        /// leaves the edits in the live TextBoxes exactly as it always
+        /// has: nothing tears the view down, so reopening the window shows
+        /// the typed text again.
+        /// </para>
         /// </summary>
         private void PromptForUnsavedSettings()
         {
@@ -664,10 +663,41 @@ namespace GW2CraftingHelper
             string changeWord = unsaved == 1 ? "change" : "changes";
             _modalDialog.Show(
                 $"You have {unsaved} unsaved {changeWord} on the Settings tab. Save now, or discard and keep the last saved values?",
-                () => _settingsContent.SaveAll(),
+                () => ReportSaveOutcome(_settingsContent.SaveAll()),
                 () => _settingsContent.DiscardChanges(),
                 "Save",
                 "Discard");
+        }
+
+        // The tab's own save bar reports the outcome of a Save, but saving
+        // from the prompt above happens after the view was torn down - its
+        // status label is unparented by then and renders nowhere, so a
+        // rejected entry would vanish with no explanation at all. Raising a
+        // second dialog from the first one's callback is supported:
+        // ModalDialog.Dismiss clears its state and hides the window before
+        // running the callback.
+        private void ReportSaveOutcome(SettingsTabContent.SaveOutcome outcome)
+        {
+            if (outcome.AllSaved) return;
+
+            string message;
+            if (outcome.WriteFailed)
+            {
+                message = "Your Settings changes could not be saved - the module log has the details. Open the Settings tab to try again?";
+            }
+            else
+            {
+                string entryWord = outcome.InvalidCount == 1 ? "entry" : "entries";
+                string subject = outcome.InvalidCount == 1 ? "it" : "them";
+                message = $"{outcome.InvalidCount} Settings {entryWord} could not be saved - the value was not a valid number. Everything else was saved. Open the Settings tab to re-enter {subject}?";
+            }
+
+            _modalDialog.Show(
+                message,
+                () => _mainWindow.SelectedTab = _settingsTab,
+                null,
+                "Open Settings",
+                "Dismiss");
         }
 
         // Reads Blish's FestivalContext and projects it to plain strings,

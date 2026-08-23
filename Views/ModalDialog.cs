@@ -38,6 +38,12 @@ namespace GW2CraftingHelper.Views
         private const int ButtonHeight = 25;
         private const int ButtonBottomMargin = 10;
 
+        // Total left+right slack around a measured button label, so a label
+        // that only just fits the button's floor width does not sit edge to
+        // edge with the border. 12px a side, matching the message label's
+        // own MessageTopMargin-scale spacing.
+        private const int ButtonSidePadding = 24;
+
         // The button line is FIXED, not measured against the message, and
         // the message is capped to the lines that fit above it instead.
         // The window cannot grow to fit a longer sentence: WindowBase2
@@ -176,14 +182,16 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyPlain(messageLabel, wrapped.Truncated ? message : null);
 
             // Buttons: centered horizontally, on the fixed bottom line so
-            // every caller's dialog puts them in the same place.
-            int btnW = 100;
-            // 70 is the width every caller had before cancelText existed
-            // and is the floor, so "Cancel" is pixel-identical to what it
-            // was; a longer label grows the button instead of being
-            // clipped by StandardButton's own scissor.
+            // every caller's dialog puts them in the same place. 100 and 70
+            // are the widths every caller had before either label was
+            // configurable and remain the floors, so all four existing
+            // dialogs are pixel-identical; a label too long for its floor
+            // grows the button instead of being clipped by StandardButton's
+            // own scissor (it centres text with zero side padding, so the
+            // breathing room has to be added here).
             string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
-            int cancelW = System.Math.Max(70, measure(cancelLabel) + 24);
+            int btnW = System.Math.Max(100, measure(confirmText ?? "") + ButtonSidePadding);
+            int cancelW = System.Math.Max(70, measure(cancelLabel) + ButtonSidePadding);
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;
