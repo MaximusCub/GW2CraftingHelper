@@ -54,6 +54,7 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyPlain(label, HeaderTooltip);
             label.MouseEntered += (_, __) => label.TextColor = HoverColor;
             label.MouseLeft += (_, __) => label.TextColor = resting;
+            PressFeedback.Wire(label);
             label.Click += (_, __) => onClick();
         }
     }

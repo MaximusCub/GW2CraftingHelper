@@ -1367,7 +1367,7 @@ namespace GW2CraftingHelper.Views
                 Parent = container
             };
 
-            var saveButton = new StandardButton()
+            var saveButton = new FeedbackButton()
             {
                 Text = "Save",
                 Size = new Point(80, UiMetrics.ButtonHeight),

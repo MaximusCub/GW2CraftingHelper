@@ -81,6 +81,7 @@
     <Compile Include="Models\PlanSolveContext.cs" />
     <Compile Include="Models\PlanRequestItem.cs" />
     <Compile Include="Models\OwnMaterialsMode.cs" />
+    <Compile Include="Services\InlineSpinnerLayout.cs" />
     <Compile Include="Services\TopRegionLayoutMath.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
@@ -163,6 +164,7 @@
     <Compile Include="Views\SuggestionPanel.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
     <Compile Include="Views\Rendering\RarityColors.cs" />
+    <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
@@ -171,6 +173,8 @@
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\PressFeedback.cs" />
+    <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />

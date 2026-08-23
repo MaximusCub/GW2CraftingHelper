@@ -161,9 +161,15 @@ namespace GW2CraftingHelper.Views
         // internal guards, and SpinnerTick/RenderFromBoard/Build()'s
         // re-arm block all PULL from it.
         private readonly PlanStripStatusBoard _statusBoard;
-        private int _spinnerFrameIndex;
         private DateTime _lastSpinnerTickUtc;
-        private static readonly char[] SpinnerFrames = { '|', '/', '-', '\\' };
+
+        // How often the strip re-renders itself from the status board while
+        // a generation is in flight. The whirly part is Blish's own
+        // LoadingSpinner control, which animates off global game time and
+        // needs no help from here (see InlineSpinner); this throttle exists
+        // only to keep the ticker from rewriting an AutoSizeWidth Label's
+        // Text - and re-triggering its text measure - 60x/sec for the whole
+        // of every generation.
         private static readonly TimeSpan SpinnerTickInterval = TimeSpan.FromMilliseconds(150);
 
         // The toolbar's Use Own Materials / Prices / Value Own Materials
@@ -269,6 +275,11 @@ namespace GW2CraftingHelper.Views
         private Checkbox _valueOwnMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
+
+        // Trails _statusLabel while a generation is in flight. A sibling of
+        // the label rather than a decoration inside it: it is a Control that
+        // paints a texture, not a glyph the label could carry.
+        private LoadingSpinner _statusSpinner;
         private Panel _separator;
         private FlowPanel _contentPanel;
 
@@ -580,6 +591,14 @@ namespace GW2CraftingHelper.Views
             if (_statusLabel != null)
             {
                 _statusLabel.Text = status ?? "";
+
+                // The label is AutoSizeWidth, so its right edge moves with
+                // every text change and the spinner has to follow it. Done
+                // here rather than only in RenderFromBoard because the
+                // strip has several other writers (Resolving..., the
+                // invalid-quantity notice, the section renderers' own
+                // SetStatus callback) and any of them can land mid-flight.
+                InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             }
         }
 
@@ -1475,7 +1494,7 @@ namespace GW2CraftingHelper.Views
             int nextX = RowButtonsX;
             if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
             {
-                var removeButton = new StandardButton()
+                var removeButton = new FeedbackButton()
                 {
                     Text = "-",
                     Size = new Point(RowButtonSize, RowButtonSize),
@@ -1489,7 +1508,7 @@ namespace GW2CraftingHelper.Views
 
             if (index == _itemRows.Count - 1)
             {
-                var addButton = new StandardButton()
+                var addButton = new FeedbackButton()
                 {
                     Text = "+",
                     Size = new Point(RowButtonSize, RowButtonSize),
@@ -1558,6 +1577,7 @@ namespace GW2CraftingHelper.Views
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             _separator.Location = new Point(0, layout.SeparatorY);
             _contentPanel.Location = new Point(0, layout.ContentY);
             _contentPanel.Size = new Point(w, h - layout.TopRegionHeight);
@@ -1715,7 +1735,7 @@ namespace GW2CraftingHelper.Views
             // constructed - see the comment at that construction site.
             _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
-            _generateButton = new StandardButton()
+            _generateButton = new FeedbackButton()
             {
                 Text = "Generate Plan",
                 Size = new Point(120, UiMetrics.ButtonHeight),
@@ -1735,6 +1755,9 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, layout.StatusRowY),
                 Parent = buildPanel
             };
+
+            _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Static separator between controls and content
             _separator = new Panel()
@@ -1890,7 +1913,7 @@ namespace GW2CraftingHelper.Views
             void PlaceRight(string text, int width, int gapToLeft, string tooltipText,
                 Func<TreeToolbarCommands, Action> pick)
             {
-                var button = new StandardButton()
+                var button = new FeedbackButton()
                 {
                     Text = text,
                     Size = new Point(width, TreeToolbarButtonHeight),
@@ -2016,6 +2039,7 @@ namespace GW2CraftingHelper.Views
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _separator.Location = new Point(0, layout.SeparatorY);
             _contentPanel.Location = new Point(0, layout.ContentY);
@@ -3039,24 +3063,24 @@ namespace GW2CraftingHelper.Views
         {
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
+            // The spinner is shown on exactly the condition the old ASCII
+            // glyph was appended on, and every branch below re-anchors it
+            // through SetStatus.
+            if (_statusSpinner != null)
+            {
+                _statusSpinner.Visible = snapshot.InFlight;
+            }
+
             if (snapshot.InFlight)
             {
                 string text = string.IsNullOrEmpty(snapshot.PhaseText) ? "Generating..." : snapshot.PhaseText;
-                // The glyph goes at the END
-                // of the string, not the start. SpinnerFrames' proportional-
-                // font glyphs ('|' '/' '-' '\') each have a different
-                // advance width; with the glyph first, every character
-                // after it in the same AutoSizeWidth label shifts
-                // horizontally by that width delta ~7x/sec
-                // (SpinnerTickInterval), making the phase text visibly
-                // jitter left-right during generation even though the
-                // label's own Location never changes. Putting the glyph
-                // last means the phase text is always laid out identically
-                // from the label's fixed x=0 origin - only the trailing
-                // glyph (and the label's overall AutoSizeWidth) moves,
-                // which reads as a normal spinner rather than shifting
-                // text.
-                SetStatus(WithStandingNotices($"{text} {SpinnerFrames[_spinnerFrameIndex]}"));
+                // The spinner trails the text rather than leading it, as
+                // the ASCII glyph did before it: the phase text then always
+                // lays out from the label's fixed x=0 origin, and only the
+                // spinner moves as the text changes. Leading it would shift
+                // every character of the phase text horizontally whenever
+                // the standing notices changed the label's leading run.
+                SetStatus(WithStandingNotices(text));
             }
             else if (!string.IsNullOrEmpty(snapshot.FinalStatusText))
             {
@@ -3119,12 +3143,12 @@ namespace GW2CraftingHelper.Views
         /// decision itself lives there (Blish-free, so the "finish landed
         /// before/between ticks" orderings are directly testable); this
         /// method only carries out whatever it returns and owns the
-        /// spinner-glyph throttling.
+        /// re-render throttling.
         /// <see cref="PlanStripTickAction.RenderFinalAndStop"/> is what
         /// makes "the board reports finished -> render final status and
         /// stop" true without any separate completion-callback write into
-        /// this control ever being needed. The spinner glyph itself only
-        /// advances (and only then re-renders) once per SpinnerTickInterval,
+        /// this control ever being needed. The strip re-renders once per
+        /// SpinnerTickInterval,
         /// not every frame - DoUpdate fires ~60x/sec, and writing to an
         /// AutoSizeWidth Label's Text re-triggers a text measure/layout
         /// pass even when the string is unchanged, so re-rendering every
@@ -3148,7 +3172,6 @@ namespace GW2CraftingHelper.Views
                     if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
                     {
                         _lastSpinnerTickUtc = now;
-                        _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
                         RenderFromBoard(snapshot);
                     }
                     return true;
@@ -3177,7 +3200,6 @@ namespace GW2CraftingHelper.Views
         private void ArmSpinnerTicker(int myGen)
         {
             _spinnerTicker?.Cancel();
-            _spinnerFrameIndex = 0;
             _lastSpinnerTickUtc = DateTime.UtcNow;
             _spinnerTicker = new FrameTicker(gameTime => SpinnerTick(myGen, gameTime));
             RenderFromBoard(_statusBoard.Snapshot());
@@ -3521,12 +3543,16 @@ namespace GW2CraftingHelper.Views
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
         /// lets a caller with its own header-row control veto the toggle
-        /// when the click landed on that control - only Required Recipes'
-        /// "Hide Unlocked" checkbox still needs it.
+        /// when the click landed on that control, and suppressPress does the
+        /// same for the press feedback (Container.TriggerMouseInput raises
+        /// the header's own press before walking to that control, so without
+        /// it one press on the control dims the whole header and plays the
+        /// click sound twice) - only Required Recipes' "Hide Unlocked"
+        /// checkbox still needs either.
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
-            Func<bool> suppressToggle = null)
+            Func<bool> suppressToggle = null, Func<bool> suppressPress = null)
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
@@ -3548,6 +3574,7 @@ namespace GW2CraftingHelper.Views
             };
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
+            PressFeedback.Wire(headerPanel, suppressPress);
 
             // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
             // pixel-level screenshot scans showed the triangles failing to
@@ -3833,15 +3860,24 @@ namespace GW2CraftingHelper.Views
             string headerTitle = RequiredRecipesVisibility.BuildHeaderTitle(
                 section.Rows.Count, visibleRows.Count, _hideUnlockedRecipes);
 
+            // suppressToggle reads the press-time flag (a click that began
+            // off the checkbox still toggles the section); the press
+            // feedback has to read MouseOver live instead, because it runs
+            // during the very press that sets that flag and would otherwise
+            // see the previous press's value. The checkbox is built below,
+            // after the header it parents to - both predicates are only ever
+            // called from a mouse event, long after that.
+            Checkbox hideUnlockedCheckbox = null;
             bool pressStartedOnCheckbox = false;
             var header = CreateSectionHeader(
                 headerTitle, section.SectionType, panelWidth, section.IsDefaultExpanded,
-                () => pressStartedOnCheckbox);
+                () => pressStartedOnCheckbox,
+                () => hideUnlockedCheckbox != null && hideUnlockedCheckbox.MouseOver);
             var headerPanel = header.HeaderPanel;
             var contentFlow = header.ContentFlow;
 
             const int checkboxWidth = 200;
-            var hideUnlockedCheckbox = new Checkbox()
+            hideUnlockedCheckbox = new Checkbox()
             {
                 Text = "Hide Unlocked Recipes",
                 Checked = _hideUnlockedRecipes,

@@ -129,7 +129,7 @@ namespace GW2CraftingHelper.Views
         // every row below shifts down by StatusRowHeight + the same 5px
         // gap the header already used before SearchRowY.
         private const int StatusRowY = HeaderRowY + HeaderHeight + 5;
-        private const int StatusRowHeight = 24;
+        private const int StatusRowHeight = SnapshotHeaderLayout.StatusRowHeight;
         private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
 
@@ -286,6 +286,12 @@ namespace GW2CraftingHelper.Views
 
         private Panel _coinPanel;
         private Label _statusLabel;
+        private LoadingSpinner _statusSpinner;
+
+        // Whether a Refresh Now is still in flight. Read by Build() so a
+        // rebuild mid-refresh restores the spinner, and by the refresh's own
+        // start/finally pair so the two can never disagree.
+        private bool _refreshInFlight;
         private Color _defaultStatusColor;
 
         public MainView(
@@ -389,7 +395,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _headerPanel
             };
 
-            _clearButton = new StandardButton()
+            _clearButton = new FeedbackButton()
             {
                 Text = "Clear Cache",
                 Size = new Point(100, UiMetrics.ButtonHeight),
@@ -401,7 +407,7 @@ namespace GW2CraftingHelper.Views
                 _clearButton,
                 "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.");
 
-            _refreshButton = new StandardButton()
+            _refreshButton = new FeedbackButton()
             {
                 Text = "Refresh Now",
                 Size = new Point(100, UiMetrics.ButtonHeight),
@@ -441,6 +447,16 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
+
+            // Trails the status text for the whole of a Refresh Now. A tab
+            // switch rebuilds this row while the refresh is still running,
+            // so its visibility comes from _refreshInFlight rather than
+            // defaulting to hidden - otherwise the returning user sees
+            // "Refreshing..." with nothing turning.
+            _statusSpinner = InlineSpinner.Create(_statusPanel, InlineSpinnerLayout.SnapshotStatusSize);
+            _statusSpinner.Visible = _refreshInFlight;
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
+
             // Capture Blish's own real default rather than guessing/
             // hardcoding one, so the non-stale case is byte-identical to
             // today's unset-TextColor appearance once ApplyStatusDisplay
@@ -1125,6 +1141,7 @@ namespace GW2CraftingHelper.Views
             int generation = _clearGeneration;
 
             SetSnapshotActionsEnabled(false);
+            SetRefreshSpinnerVisible(true);
             SetStatus("Refreshing...");
 
             try
@@ -1244,9 +1261,29 @@ namespace GW2CraftingHelper.Views
                 // executes and Run always queues.
                 MainThreadMarshal.Run(() =>
                 {
+                    // Ahead of the teardown guard below on purpose: this
+                    // clears a flag a later rebuild reads, and leaving it
+                    // set would spin a spinner over a finished refresh.
+                    SetRefreshSpinnerVisible(false);
                     if (_headerPanel == null || _headerPanel.Parent == null) return;
                     SetSnapshotActionsEnabled(true);
                 });
+            }
+        }
+
+        /// <summary>
+        /// The refresh spinner's single writer. The flag is set even when
+        /// the control is gone (module torn down mid-refresh, or Build has
+        /// not run yet), so a rebuild that happens between the two calls
+        /// still restores the right state - the control write itself is
+        /// null-tolerant for the same reason.
+        /// </summary>
+        private void SetRefreshSpinnerVisible(bool visible)
+        {
+            _refreshInFlight = visible;
+            if (_statusSpinner != null)
+            {
+                _statusSpinner.Visible = visible;
             }
         }
 
@@ -1294,6 +1331,7 @@ namespace GW2CraftingHelper.Views
             }
 
             _statusLabel.Text = text;
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
         }
 
         /// <summary>

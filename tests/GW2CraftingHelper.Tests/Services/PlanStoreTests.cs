@@ -75,6 +75,17 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi));
         }
 
+        private static CraftingPlanPipeline BuildPipelineWith(
+            InMemoryRecipeApiClient recipeApi, InMemoryPriceApiClient priceApi)
+        {
+            var itemApi = new InMemoryItemApiClient();
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi));
+        }
+
         // A THREE-level real tree (item 1 <-
         // recipe 10 <- item 2 <- recipe 20 <- item 3), so
         // result.CraftingTree.Children[0].Children[0] is a real depth-2
@@ -1829,6 +1840,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(currencyLeaf.IsCostComponent);
             Assert.Equal(6, currencyLeaf.Quantity);
             Assert.Null(currencyLeaf.SubtreeCost);
+        }
+
+        [Fact]
+        public async Task Save_Load_RoundTripsTheDeepestRealisticChain()
+        {
+            // Regression: a persisted +24 Agony Infusion plan (23 recipe
+            // levels, the deepest chain in the game) exceeded Newtonsoft's
+            // default read MaxDepth of 64 and silently failed to load.
+            // 30 levels here nests ~90 JSON levels, past the old default.
+            var recipeApi = new InMemoryRecipeApiClient();
+            const int depth = 30;
+            for (int level = 1; level <= depth; level++)
+            {
+                int outputItem = level;
+                recipeApi.AddSearchResult(outputItem, 1000 + level);
+                recipeApi.AddRecipe(new RawRecipe
+                {
+                    Id = 1000 + level,
+                    OutputItemId = outputItem,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient
+                        {
+                            Type = "Item",
+                            Id = level == 1 ? depth + 1 : level - 1,
+                            Count = 1
+                        }
+                    },
+                    Disciplines = new List<string> { "Artificer" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                });
+            }
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(depth + 1, buyUnitPrice: 10, sellUnitPrice: 12);
+            var pipeline = BuildPipelineWith(recipeApi, priceApi);
+
+            var result = await pipeline.GenerateStructuredAsync(
+                depth, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            _store.Save(Wrap(result, new DateTime(2026, 8, 24, 9, 0, 0, DateTimeKind.Local)));
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            int walked = 0;
+            var node = loaded.Result.CraftingTree;
+            while (node != null)
+            {
+                walked++;
+                node = node.Children?.FirstOrDefault(c => !c.IsCostComponent);
+            }
+            Assert.True(walked >= depth, $"walked only {walked} levels of {depth}");
         }
     }
 }

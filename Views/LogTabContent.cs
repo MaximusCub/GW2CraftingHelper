@@ -299,7 +299,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _toolbarPanel
             };
 
-            _clearViewButton = new StandardButton
+            _clearViewButton = new FeedbackButton
             {
                 Text = "Clear View",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
@@ -310,7 +310,7 @@ namespace GW2CraftingHelper.Views
                 "Hide current entries from this view. New entries still appear; the log file keeps everything.");
             _clearViewButton.Click += (_, __) => ClearView();
 
-            _copyButton = new StandardButton
+            _copyButton = new FeedbackButton
             {
                 Text = "Copy",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
@@ -318,7 +318,7 @@ namespace GW2CraftingHelper.Views
             };
             _copyButton.Click += (_, __) => CopyToClipboard();
 
-            _deleteFileButton = new StandardButton
+            _deleteFileButton = new FeedbackButton
             {
                 Text = "Delete Log File",
                 Size = new Point(DeleteButtonWidth, UiMetrics.ButtonHeight),

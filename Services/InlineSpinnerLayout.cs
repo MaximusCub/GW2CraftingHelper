@@ -1,0 +1,65 @@
+namespace GW2CraftingHelper.Services
+{
+    /// <summary>
+    /// Where an inline loading spinner sits relative to the status label it
+    /// trails (Blish-free, unit-testable). Both status rows that show one
+    /// are a fixed-height strip with an auto-width label pinned to the left
+    /// edge, so the spinner's position is pure arithmetic over the label's
+    /// live bounds - which is the whole of what the view has to get right.
+    /// <para>See docs/ARCHITECTURE.md section 4.</para>
+    /// </summary>
+    public static class InlineSpinnerLayout
+    {
+        /// <summary>
+        /// Spinner edge for the plan tab's status row. That row is
+        /// <see cref="TopRegionLayoutMath.StatusToSeparatorGap"/> logical
+        /// pixels tall, so 18 leaves clearance above and below without the
+        /// spinner ever reaching the separator beneath it.
+        /// </summary>
+        public const int PlanStripSize = 18;
+
+        /// <summary>
+        /// Spinner edge for the Snapshot tab's status row, which is its own
+        /// panel of <see cref="SnapshotHeaderLayout.StatusRowHeight"/>.
+        /// </summary>
+        public const int SnapshotStatusSize = 20;
+
+        /// <summary>
+        /// Gap between the label's right edge and the spinner.
+        /// </summary>
+        public const int LabelGap = 6;
+
+        /// <summary>
+        /// Places a square spinner of <paramref name="spinnerSize"/> to the
+        /// right of a label occupying the given bounds. The spinner is
+        /// vertically centered on the label, then clamped so it never
+        /// starts above the label's own top: the label is top-aligned in
+        /// its row, so that clamp is what keeps the spinner inside the row
+        /// band whenever the spinner is the taller of the two.
+        /// </summary>
+        public static SpinnerPlacement Place(
+            int labelX, int labelY, int labelWidth, int labelHeight, int spinnerSize, int gap)
+        {
+            int x = labelX + labelWidth + gap;
+            int y = labelY + (labelHeight - spinnerSize) / 2;
+            if (y < labelY)
+            {
+                y = labelY;
+            }
+
+            return new SpinnerPlacement(x, y);
+        }
+    }
+
+    public readonly struct SpinnerPlacement
+    {
+        public readonly int X;
+        public readonly int Y;
+
+        public SpinnerPlacement(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+    }
+}

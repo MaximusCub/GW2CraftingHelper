@@ -69,13 +69,11 @@ namespace GW2CraftingHelper.Services
         // 10x+ any realistic GW2 crafting tree depth (real trees observed
         // during development top out around a dozen levels - raw material
         // -> refined material -> component -> sub-assembly -> final item).
-        // Newtonsoft's own JsonReader.MaxDepth (64, unconfigured here - see
-        // PlanStoreHelpers' own doc comment on why no custom
-        // JsonSerializerSettings are used) already rejects JSON nested
-        // deeper than this before either recursive walk below ever runs,
-        // but the walk itself must not
-        // be the weak point - so it enforces its own generous, explicit
-        // bound rather than relying on that upstream protection alone. A
+        // The JSON reader's MaxDepth is raised to 512 in
+        // PlanStoreHelpers (the default 64 rejected the game's deepest
+        // real chain, +24 Agony Infusion at 23 recipe levels x ~3 JSON
+        // levels per node), so this walk enforces the domain-level bound
+        // itself rather than relying on any upstream protection. A
         // depth this shallow is also nowhere near a real stack-overflow
         // risk (a few hundred bytes per frame at most), so this exists
         // purely to fail loudly and reject the file rather than to guard
@@ -331,8 +329,8 @@ namespace GW2CraftingHelper.Services
             // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
             // CraftingPlanResult.UsedMaterials above (Newtonsoft writes no
-            // $ref by default - see PlanStoreHelpers' own doc comment on
-            // why no custom JsonSerializerSettings are used) - a plan.json
+            // $ref by default; PlanStoreHelpers' reader settings raise
+            // only MaxDepth and leave reference handling alone) - a plan.json
             // with a clean Result.UsedMaterials but a null entry inside
             // Result.SolveContext.UsedMaterials sails through the check
             // above untouched. Every override re-solve

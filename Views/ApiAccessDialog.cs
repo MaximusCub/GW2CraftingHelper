@@ -3,6 +3,7 @@ using System.Linq;
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
 
@@ -137,7 +138,7 @@ namespace GW2CraftingHelper.Views
             int btnX = (ContentWidth - totalBtnW) / 2;
             int btnY = y + ButtonTopMargin;
 
-            var retryBtn = new StandardButton()
+            var retryBtn = new FeedbackButton()
             {
                 Text = "Retry",
                 Size = new Point(btnW, 25),
@@ -151,7 +152,7 @@ namespace GW2CraftingHelper.Views
                 _onRetry?.Invoke();
             };
 
-            var closeBtn = new StandardButton()
+            var closeBtn = new FeedbackButton()
             {
                 Text = "Close",
                 Size = new Point(closeW, 25),

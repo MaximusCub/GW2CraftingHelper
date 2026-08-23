@@ -197,7 +197,7 @@ namespace GW2CraftingHelper.Views
             int btnX = (ContentWidth - totalBtnW) / 2;
             int btnY = ButtonY;
 
-            var confirmBtn = new StandardButton()
+            var confirmBtn = new FeedbackButton()
             {
                 Text = confirmText,
                 Size = new Point(btnW, ButtonHeight),
@@ -206,7 +206,7 @@ namespace GW2CraftingHelper.Views
             };
             confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
 
-            var cancelBtn = new StandardButton()
+            var cancelBtn = new FeedbackButton()
             {
                 Text = cancelLabel,
                 Size = new Point(cancelW, ButtonHeight),
