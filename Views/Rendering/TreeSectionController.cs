@@ -839,16 +839,20 @@ namespace GW2CraftingHelper.Views.Rendering
             Label qtyLabel = null;
             if (qtyPrefix.Length > 0)
             {
-                qtyLabel = new Label()
-                {
-                    Text = qtyPrefix,
-                    Font = nameFont,
-                    TextColor = qtyColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(nameX, 12),
-                    Parent = rowPanel
-                };
+                // Same baseline as the name label below it - both boxes get
+                // the descender clearance so the two halves of "12x <name>"
+                // can never sit on different lines.
+                qtyLabel = LabelHelpers.WithDescenderClearance(
+                    new Label()
+                    {
+                        Text = qtyPrefix,
+                        Font = nameFont,
+                        TextColor = qtyColor,
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(nameX, 12),
+                        Parent = rowPanel
+                    });
             }
             var nameLabel = LabelHelpers.WithDescenderClearance(
                 new Label()

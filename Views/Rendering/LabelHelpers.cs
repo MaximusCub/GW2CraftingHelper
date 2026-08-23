@@ -112,12 +112,25 @@ namespace GW2CraftingHelper.Views.Rendering
         /// right-aligns against a label's width moves. Single-line labels
         /// only - a later Text assignment of the same one-line shape keeps
         /// this height, which is the point.
+        ///
+        /// VerticalAlignment is pinned to Top, and that is what makes the
+        /// extra height safe to apply to some labels in a row and not
+        /// others. Blish_HUD.Controls.Label.VerticalAlignment is a public
+        /// settable property whose default this module does not control; if
+        /// it were Middle, growing a box by 2 would push its glyphs down by
+        /// 1 while an unswept sibling on the same row stayed put, and a
+        /// ragged baseline inside one sentence ("Craft 12x " + item name)
+        /// is worse than the clip this fixes. Top makes the two pixels land
+        /// entirely BELOW the glyphs, so a swept label renders at exactly
+        /// the y it rendered at before - the change is additive clearance,
+        /// never motion.
         /// </summary>
         internal static Label WithDescenderClearance(Label label)
         {
             var font = label?.Font;
             if (font == null) return label;
 
+            label.VerticalAlignment = VerticalAlignment.Top;
             label.AutoSizeHeight = false;
             label.Height =
                 (int)System.Math.Ceiling(font.MeasureString(label.Text ?? "").Height) + DescenderClearance;

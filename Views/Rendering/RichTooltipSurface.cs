@@ -214,7 +214,12 @@ namespace GW2CraftingHelper.Views.Rendering
                     continue;
                 }
 
-                _ = new Label()
+                // Same class as the plan's row labels: these spans carry
+                // item and character names, so they need the descender
+                // clearance too. Height is never read back here (the panel
+                // is sized from the line layout), so pinning it is inert
+                // beyond the two pixels.
+                _ = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = placed.Span.Text,
                     Font = font,
@@ -223,7 +228,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeHeight = true,
                     Location = new Point(placed.X, y),
                     Parent = _contentPanel
-                };
+                });
             }
         }
 

@@ -180,12 +180,16 @@ namespace GW2CraftingHelper.Views.Rendering
             var font = TableHeaderStyle.Font;
             var color = TableHeaderStyle.LabelColor;
 
-            new Label()
+            // This section builds its own header row rather than going
+            // through CTableHeaderRenderer, so "Item" has to opt into the
+            // same box treatment its Amount/Each/Total siblings get for
+            // free from CreateRightAlignedLabel.
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "Item", Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
-            };
+            });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, "Amount", font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(
@@ -308,16 +312,17 @@ namespace GW2CraftingHelper.Views.Rendering
                     rowPanel, sourceTag, NameX + nameLabel.Width + TagGap, 9, tagBorder, tagFill);
             }
 
-            var qtyLabel = new Label()
-            {
-                Text = qtyText,
-                Font = font,
-                TextColor = new Color(200, 200, 200),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
-                Parent = rowPanel
-            };
+            var qtyLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = qtyText,
+                    Font = font,
+                    TextColor = new Color(200, 200, 200),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
+                    Parent = rowPanel
+                });
 
             // Each/Total cells: coin-only rows render exactly as before;
             // a row priced wholly or partly in a non-coin currency (e.g. a
