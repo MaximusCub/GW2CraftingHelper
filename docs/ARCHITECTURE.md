@@ -285,6 +285,17 @@ must-register check, the scroll-neutral assert, `ReplayRelayout`'s own
 foreach) sees a sink-registered closure exactly as it would have seen one
 added inline.
 
+The registry's hard rule is that a replayed closure may never change a
+row's height - that is what lets the settle pass skip scroll preservation
+entirely. The Plan Notes section is the one place where the right answer
+at a new width genuinely is a different height (it spends one fixed-height
+row per WRAPPED LINE, so a width that changes a note's line count changes
+the section's height). Rather than weaken the rule, its re-ellipsis
+closure calls `RequestRerenderAfterSettle`, and `ResizeSettleStep` runs a
+single `PreserveScrollAcross(() => RenderPlan(...))` once the pass has
+finished - deferred because `RenderPlan` clears the registry the pass is
+iterating.
+
 **The M38 decomposition:** `CraftingPlanView` was originally a single
 ~4,800-line class covering navigation, layout, six content sections, the
 recipe tree, and scroll/resize/wheel handling. M38 (WP-21, WP-23a-d,

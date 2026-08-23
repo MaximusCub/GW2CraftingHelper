@@ -1018,10 +1018,9 @@ namespace GW2CraftingHelper.Services
             // 5. Gambling-forge scope note (0 or 1 logical entry). The
             // wording distinguishes fractional EV yield (already priced
             // in) from true multi-outcome gambles, which this module never
-            // represents. Split into 3 complete-sentence rows: a single
-            // ~243-char row would edge-clip exactly the caveat the note
-            // exists to deliver, and the split preserves the fixed
-            // height-per-row contract.
+            // represents. One row: NotesSectionRenderer width-wraps a note
+            // across as many fixed-height rows as it needs, so the builder
+            // does not hand-split sentences to keep long text on screen.
             if (result.ProbabilisticForgeOutputItemIds != null &&
                 result.ProbabilisticForgeOutputItemIds.Count > 0)
             {
@@ -1029,18 +1028,9 @@ namespace GW2CraftingHelper.Services
                 {
                     RowType = PlanRowType.NoteLine,
                     Label = "This plan includes a Mystic Clover-style Mystic Forge yield - its expected " +
-                        "output is already probability-adjusted."
-                });
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.NoteLine,
-                    Label = "True multi-outcome Mystic Forge gambles (e.g. precursor forging) are a " +
-                        "different mechanic."
-                });
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.NoteLine,
-                    Label = "This plan never models or shows them."
+                        "output is already probability-adjusted. True multi-outcome Mystic Forge gambles " +
+                        "(e.g. precursor forging) are a different mechanic. This plan never models or " +
+                        "shows them."
                 });
                 noteEntryCount++;
             }

@@ -8573,6 +8573,9 @@ in that proposal, against their original opposite choices).
   character-matched row still reports the account-wide total and full
   breakdown across the checked sources, not just the matched character's
   share, so a total means the same thing on every row in the list.
+  Character labels later gained a 2-character minimum query length
+  (char-search-min2 below); item and currency names still match from the
+  first letter.
 - **Perf note (keystroke path):** character matching costs a full source
   walk for every item whose name does not match, where the old name-only
   search skipped straight past it. That is bounded above by the
@@ -8689,7 +8692,10 @@ deliberately skipped:
 
 - **Character-search minimum query length:** a one-character query still
   walks every source of every non-matching item. Left as is; the worst
-  case is still bounded by the empty-search rebuild.
+  case is still bounded by the empty-search rebuild. **CLOSED
+  (char-search-min2):** the maintainer set a 2-character minimum, for
+  the result-list reason rather than the perf one - see that section
+  below.
 - **Tri-state master checkbox:** the two-state quirk recorded in the
   char-source-search section above stands.
 
@@ -8707,6 +8713,224 @@ new Blish-free tests), and the resize early-out + reader hoists,
 which are code-review-verified (the verify pass caught and the
 orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
 before release). Suite 1886/1886.
+
+## Character-name search minimum query length (char-search-min2)
+
+Maintainer decision, closing the "Character-search minimum query length"
+item the nth-cleanup batch left open by choice. The reason is the result
+list, not the per-keystroke cost: with one-letter matching, typing "ar"
+on the way to an item name first passes through "a", which surfaces
+everything held by every character whose name contains an "a" - so the
+opening keystrokes of an item search widen the list instead of narrowing
+it.
+
+- **Rule:** a character label matches only from 2 characters on. Item
+  names and wallet currency names are unchanged - a single letter still
+  matches them, so the common search is untouched.
+- **Where:** SnapshotSearchResultBuilder.CharacterNameMatches, behind the
+  named MinCharacterSearchLength constant, so the one seam that decides
+  "does this source's character name match" carries the floor and the
+  BuildItemRows call site keeps its existing shape. The length compared
+  is the trimmed query the builder already computes, so padding a single
+  letter with spaces does not buy character matching.
+- **Not a perf change:** the source walk itself is unchanged (BuildItemRows
+  walks every checked source of every item regardless, to total it), so
+  the one-character query costs what it always did, minus the substring
+  scans it no longer performs. The bound recorded in char-source-search
+  still holds.
+- **Tests (+3, 1886 -> 1889):** a 1-character query returns the item whose
+  own name matches and *not* the item held by a character whose name
+  matches; the same pair at exactly 2 characters returns the
+  character-held item (the boundary is exact - 2 matches, 1 does not); a
+  whitespace-padded single letter stays below the floor.
+
+Validation: module build 0 errors; suite 1889/1889.
+
+Desktop gate should look at: type a single letter that begins a character
+name into the Snapshot search and confirm only item/currency name matches
+appear (no character holdings), then add the second letter and confirm
+that character's items appear. The per-character checkboxes and the
+AND-composition from char-source-search are unaffected and need no
+re-gating.
+Gate: PASS (2026-08-22, Paint-dummy desktop session, branch build
+651375c, captures preflight/m2a-one-char.png / m2b-two-char.png).
+The preflight roster's holder names all contain "t" (Maximus Test,
+Alt Number Two, Third Wheel, Ranger Of The North...), giving a clean
+discriminator: typing "t" returned only item/currency name matches
+with the 6-holder Green Wood Log ABSENT (the floor holding at one
+character); adding "h" ("th", matched by no item name) returned
+exactly Green Wood Log via Third Wheel / Ranger Of The North (the
+floor lifting at two). The reviewer's noted empty-state wording gap
+(a one-letter query's message does not mention the character-label
+floor) was observed as accurate-but-unexplained live; left as the
+recorded maintainer call.
+
+## Audit batch I: log entry readability (audit-i-log)
+
+UX audit finding (M7): every Log tab entry was ONE `AutoSizeWidth`
+Label built from the whole flat line, tinted end to end by
+`ColorForLevel`, hard-clipped at the panel's right edge with no wrap,
+no ellipsis and no indication that text had been lost - a WARN
+carrying a long path plus an exception simply lost its tail, and the
+level tint was the only structure in a wall of same-shaped text.
+
+**Row split.** Each entry is now a fixed-height row `Panel` holding two
+columns:
+
+- a prefix Label at x=0 showing `[LEVEL] timestamp [tag]`, dimmed to
+  70% alpha (this repo's existing `Color.White * 0.35f` idiom) but
+  still carrying the level color, so severity still reads at a glance
+  down the column while the chrome recedes behind the message;
+- the message Label at the shared message-column x, with an explicit
+  width (row width minus the prefix column, the 8px gap and the 8px
+  right pad).
+
+Both columns run through the existing `LabelHelpers.EllipsizeToWidth`,
+and a row that had to shorten EITHER column gets `BasicTooltipText`
+with the full line - assigned to the row Panel AND to both Labels,
+because Blish resolves a tooltip on the control under the mouse and
+does not bubble to the parent (the swallowed-hover class already
+recorded for `ShoppingListSectionRenderer` in this file). The `...`
+plus that tooltip are the truncation indicator the audit asked for.
+
+The prefix column is sized from a worst-case template - the widest
+level name, a timestamp built from the widest decimal digit, and a
+14-character tag allowance - rather than from the rows currently on
+screen. That is load-bearing, not decoration: the incremental
+`AppendNewRows` path only ever sees the new entries, so a width derived
+from what a pass can see would drift away from the rows the last full
+`RebuildRows` produced and stagger the message column.
+
+The tag allowance is counted in `'w'` glyphs and sized off the longest
+tag actually written anywhere in the tree - `snapshot-fetch`, 14
+characters. The margin is the glyph: every tag in the module is
+lowercase ASCII plus `-`, all narrower than `'w'`, so 14 `'w'`s clear a
+14-character tag with room to spare. The first draft reserved 10 on the
+stated (wrong) belief that `scrolldiag` was the longest tag; at that
+width `[snapshot-fetch]`, the module's most common WARN source, risked
+rendering permanently truncated AND permanently tooltip-flagged at every
+window width, in the very column this change exists to make readable.
+
+**Ellipsize, not wrap (decision).** Wrapping reads better for a long
+exception, but it makes row height a function of content, and this
+tab's whole row model is built on uniform rows: the eviction trim, the
+append path and the Follow tail-scroll (`VerticalScrollOffset =
+int.MaxValue`, an overshoot that clamps) all assume the panel's content
+height is settled at the moment they run. Blish measures a wrapped
+`AutoSizeHeight` label during its own deferred layout pass, so the
+overshoot would fire against a stale height and Follow would land short
+of the bottom. Wrapping also lets one stack-trace ERROR fill the whole
+viewport in what is meant to be a tail view. Ellipsize + tooltip
+preserves fixed row heights, leaves every one of those mechanisms
+untouched, and is what the audit accepts as the minimum.
+
+**Resize.** The container's `Resized` handler re-fits every visible row
+after resizing the content panel, walking `_renderedRows` (the same
+FIFO the eviction trim uses) - the same shape the recent status-row
+rework in this file uses for the toolbar/status/content panels. Two
+cheap outs keep a resize drag off the hot path: a vertical-only drag
+leaves the content width unchanged and returns before touching a single
+row, and a row already showing its untruncated text whose column only
+grew skips the `MeasureString` binary search inside `EllipsizeToWidth`.
+
+The walk itself is wrapped in `_contentPanel.SuspendLayout()` /
+`ResumeLayout(false)`, the same pair `CraftingPlanView.ReplayRelayout`
+uses and for the same reason - and the reason the first draft's "worst
+case is still bounded by the ring's 2000 entries" was the wrong cost
+model. Assigning a row Panel's `Size` fires that Panel's own `Resized`,
+which `FlowPanel` wires to a full reflow of every sibling, so an
+unsuspended loop over a full ring is O(rows^2) position writes plus a
+fresh children array per reflow - on every frame of a horizontal drag,
+on the UI thread - not O(rows). Suspending the parent propagates down
+(Blish's `IsLayoutSuspended` walks the parent chain) and
+`ResumeLayout(false)` leaves the single coalesced reflow to Blish's own
+next-frame `UpdateLayout`. With the suspend in place the per-drag-frame
+cost is back to linear in the ring's 2000 entries.
+
+`RebuildRows` re-parents up to 2000 rows on every search-box keystroke
+and carries the same unsuspended-reflow shape. That is pre-existing (the
+old label-per-row build did the same) and is deliberately left alone
+here; it is the obvious next candidate if the Log tab ever needs a
+second perf pass.
+
+**Extraction.** `LogTabContent.FormatLine` moved to the Blish-free
+`Services/LogLineFormat`, which also splits an entry into its prefix
+and message halves; `Line()` recomposes them into exactly the string
+`FormatLine` produced, so the search filter, the Copy button and the
+tooltip all still work in one unchanged flat line (Copy still emits
+full lines - unaffected by the split).
+
+`Message()` has one deliberate departure from the old `FormatLine`
+output: every run of CR/LF/TAB collapses to a single space (leading runs
+dropped, no trailing whitespace kept). Without it a multi-line message
+lost everything after its first line, silently - a fixed-height row Panel
+clips lines 2..n, and `BitmapFont.MeasureString` reports a multi-line
+string's WIDEST LINE rather than its full extent, so `EllipsizeToWidth`
+sees a string that "fits", returns it unchanged, and the row is marked
+neither shortened nor tooltipped. No in-tree call site embeds a newline
+today, but any `ex.Message` interpolation is one BCL/HTTP/serialization
+exception away from one (e.g. `CraftingPlanPipeline`'s generation-failure
+WARN). Flattening in the formatter rather than at the label also keeps
+Copy's `Environment.NewLine` join at one line per entry.
+
+`Services/LogRowLayout` carries
+the column arithmetic, so the degenerate widths that would otherwise
+blank every row (a message column ellipsized to zero) are pinned by
+tests rather than only observable live. Row virtualization/build
+behavior - `RebuildRows`, `AppendNewRows`, the eviction trim,
+`RebuildRowsIfBuilt`, the `_buildComplete` gate - is untouched; this is
+a per-row presentation change.
+
+The class doc comment's "label-per-row, no multi-column ellipsized rows
+that must reflow live during a resize drag" claim is now false and was
+rewritten: rows ARE multi-column and DO reflow, but the tab still does
+not opt into the `PlanContentHeightMath`/relayout-registry contract,
+and the comment now says why (uniform row heights, overshoot scroll -
+no per-section height math and no settle/verify pass to defer into).
+
+**Validation per commit:** module build 0 errors (pre-existing StyleCop
+warnings only; no new warning class in the edited files). Suite 1886
+baseline -> 1900 after commit 1 (14 new Blish-free tests:
+`LogLineFormatTests` pins that prefix + " " + message is byte-identical
+to the old flat line, including the no-tag and null-message cases;
+`LogRowLayoutTests` pins the narrow-row prefix cap and the
+never-collapse floor) -> 1900 after commit 2 (view-only) -> 1904 after
+the review-fix commit (4 more, pinning the CR/LF/TAB flattening and the
+unchanged-reference fast path).
+
+**Desktop gate items** (rendered surface, outside the test-runnable
+Blish-free layer):
+
+1. A long WARN line (long path + exception) shows a dim
+   `[WARN] timestamp [tag]` prefix, an ellipsized message ending in
+   `...`, and a tooltip carrying the full untruncated line - hovering
+   the prefix, the message and the row's empty right edge all raise it.
+2. Narrowing and widening the module window re-fits the rows: the
+   message re-ellipsizes to the new width, previously-truncated rows
+   recover their full text when the window grows, and the tooltip
+   appears/disappears with the truncation. Do this with the level filter
+   on `Debug+` and a full ring (2000 entries) and watch for drag stutter -
+   that is the case the `SuspendLayout` wrap above exists for, and it has
+   only ever been reasoned about, never measured on hardware.
+3. The level tint is still legible at a glance - ERROR/WARN rows read
+   red/amber down the prefix column, and the message keeps the full
+   (undimmed) level color.
+4. Follow still snaps: with Follow checked, new entries append at the
+   bottom and the view stays pinned there; unchecking Follow freezes it.
+5. Copy still writes the full untruncated lines to the clipboard, not
+   the ellipsized display text.
+
+Gate: PASS (2026-08-22 evening desktop batch, branch build 8026242,
+captures preflight/gI1-gI3). At Debug+ with the seeded session log:
+every entry rendered as a dim level-tinted prefix column ([WARN]
+orange, [INFO] white, [DEBUG] grey) plus an aligned message column;
+the long plan-timing line ended in a visible "..." instead of the
+old hard clip; hovering a row that fits showed no tooltip (correct
+narrowed semantics) while hovering the ellipsized row showed the
+full line in a multi-line tooltip. Follow was on and the newest
+entry sat at the bottom. Drag-resize refit not exercised live
+(synthetic resize drags unreliable); covered by the SuspendLayout
+fix, the width-guard early-outs, and the Blish-free layout tests.
 
 ## Audit batch F: input flow (audit-f-input-flow)
 
@@ -8837,7 +9061,391 @@ What the desktop gate should look at:
 7. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
    plainly and do not clip.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build 454681b,
+captures preflight/gF0-gF5). (1) Typed "mystic clover" lowercase,
+never opened the suggestion list, pressed Generate: the module log
+recorded "Plan for Mystic Clover x1" - unique-exact-name adoption
+working end to end. (2) The suggestion list opened to the right of
+the qty stepper, no longer covering Use Own Materials or the Prices
+label (the documented partial-overlap tradeoff visible and
+acceptable). (3) Toggling Value Own Materials appended the standing
+notice "Settings changed - press Generate Plan to update" after the
+board status with a separator; it survived subsequent renders and
+was still standing alongside a later honest-status line. (4) The
+"+" button showed "Add another item to this plan" on hover at its
+separated position. (5) Appending "xx" to the resolved name and
+pressing Generate produced "No item matched what you typed - pick
+an item from the suggestion list." with the previous plan untouched
+- stale-pick invalidation plus the honest empty status, no wrong
+plan. Ambiguous-name and multi-row partial-resolution statuses were
+not staged live (no duplicate-named craftable in the fixture path);
+both are pinned by the ItemRowSelection tests. Bonus: the x1
+all-owned plan rendered the HAVE pill and a 0c cost tile - the
+zero-cost plan state previously uncaptured.
+
+## Audit batch G: Settings restructure (audit-g-settings)
+
+Commits on audit-g-settings off master 47bb2c5, covering the three
+maintainer-approved UX audit findings against Views/SettingsTabContent.
+cs (M4 currency-list density, M5 save buttons + empty heading, M6
+visual structure), plus the review round that followed them. Persistence semantics are untouched - every setting
+is written by the same code, with the same validation, the same
+"invalid rows keep their persisted value" contract and the same
+three-state currency precedence as before; only layout, control
+placement and the confirmation surface changed.
+
+**Supersedes B14** (backlog-cleanup, gate PASS 2026-08-17): that batch
+deduplicated the four per-section save rows into one AddSaveRow helper
+and live-verified all four rendering identically with their green
+dated "Saved" labels. Under the maintainer-approved M5 the four rows
+and their four status labels are gone entirely, replaced by one Save,
+so that gate observation no longer describes the shipping UI. The
+dated green confirmation pattern itself is kept, once.
+
+- **One line per currency, two-up (M4):** each currency was a 54px
+  two-line row spanning the full panel while using only its left
+  portion - name/input/hint/error on line one, a default-state label
+  and Clear checkbox on line two - stacked 47 deep. Each is now a 30px
+  cell: name (ellipsized to 170px, full name on hover only when it did
+  not fit), input, Clear, and one tag slot at the right of the cell.
+  That slot shows the persisted default state ("default N", or
+  "cleared" when suppressed) and is taken over by the red "Invalid"
+  warning while an amount will not parse - only ever one of the two, so
+  a half-width cell needs room for one. The gw2efficiency attribution +
+  editable/clearable wording is on the input's tooltip. The input's
+  placeholder is the unit ("copper") on every row: Blish's TextBox
+  insets a placeholder 10px a side and draws it untruncated inside the
+  control's own scissor, so a 70px box shows ~50px of it - enough for
+  "copper", not for "default: 3600", which is why the default estimate
+  is a label and not the placeholder it briefly was. Cells are packed
+  left-to-right, top-to-bottom into an absolutely-positioned grid
+  panel. Section height: ~2,690px -> ~880px two-up (the row block
+  itself 2,538 -> 720).
+- **Filter box (M4):** a "Filter currencies..." TextBox above the grid
+  hides non-matching cells and re-packs the rest, with a "N of 47
+  shown" counter beside it. Hidden rows are still read and written by
+  Save - filtering is display-only, nothing is dropped. A row whose
+  amount did not parse is forced back on screen by the next filter pass
+  whatever the query says (SettingsCurrencyGridLayout.Compute's
+  alwaysShow), so the save bar's "N invalid entries not saved" can
+  never point at a tag the filter is concealing.
+- **The grid panel holds its unfiltered height (M4):** Blish's
+  Scrollbar zeroes ScrollDistance/TargetScrollDistance whenever the
+  scrolling container's content height changes - its RecalculateLayout
+  captures the previous scrollbar percent, recomputes it from the
+  visible children, and resets on any difference - and it does so a
+  frame later, so the reset cannot be undone in place. Sizing the grid
+  to the match count therefore snapped the tab back to scroll-top on
+  every filter keystroke that changed the count. The grid panel is now
+  fixed at SettingsCurrencyGridLayout.ComputeHeight (the full 47-row
+  height for the current column count) and only the cells move; the
+  cost is trailing blank space under a filtered list, which is why the
+  grid is deliberately the last thing in the panel and the Astral
+  Acclaim note moved above it.
+- **Width changes are re-laid out (M4):** the row/header panels, the
+  header rules, the grid panel and every cell + cell rule are re-sized
+  from container.Resized (ApplyPanelWidth, early-out when the width did
+  not move, so a height-only resize or a vertical drag costs nothing).
+  Without it the tab kept the width it was first opened at: narrowing
+  the window left the second column of cells beyond the panel's right
+  edge, invisible and untypeable until the tab was closed and
+  re-opened.
+- **Section order (M4):** the three short sections (Homestead
+  Refinement, Logging, Snapshot) now build before the long currency
+  section, so the tab opens on controls rather than on a wall of
+  currency rows.
+- **One Save for the tab (M5):** the four per-section Save buttons are
+  replaced by a single Save in a bar that is a sibling of the scrolling
+  FlowPanel, so it never scrolls away. SaveAll runs all four persists
+  in order - currency valuations (with its defensive "Save failed - see
+  log" branch), Homestead tiers, log max size (including the live
+  ModuleLog.MaxFileSizeBytes push) + retention days, snapshot refresh
+  interval - sums their invalid-entry counts and writes one status:
+  green "Saved - <date>" when everything parsed, amber "Saved - N
+  invalid entries not saved" otherwise. Per-row error labels are
+  unchanged. Placement note: the audit suggested a fixed footer; the
+  bar is anchored at the TOP instead, because LogTabContent already
+  builds a fixed toolbar this way above its own CanScroll FlowPanel
+  and a top bar needs only ContentRegion.Width, while a bottom footer
+  would also depend on ContentRegion.Height being final at Build time
+  (its failure mode being a Save bar floating over the rows).
+- **Empty heading demoted (M5):** "Plan Defaults" was a section header
+  with three info lines and no controls at all. It is now a single note
+  line under Currency Valuations, the pricing section it points at.
+- **Dividers (M6):** AddSectionHeader draws the same 2px
+  SectionDividerColor rule CraftingPlanView's section headers do
+  (bottom-anchored with 1px clearance in the 30px header), and each
+  currency cell carries a LabelHelpers.CreateRowDivider rule, hidden on
+  the cells of the last populated grid row so it re-anchors as the
+  filter re-packs the list. The cell's input sits at y=1 so it ends
+  clear of the rule at y=27.
+- **Layout math is Blish-free (M4):** Services/
+  SettingsCurrencyGridLayout.cs owns the filter predicate, the packing
+  math (column count, column width, per-cell X/Y/row, grid height) AND
+  the cell's horizontal constants; the view aliases those constants at
+  compile time and only copies placements onto controls. MinColumnWidth
+  is now derived (CellTagX + CellTagWidth = 424) rather than
+  hand-estimated: the previous 340 was short of the cell it claimed to
+  size, so a two-up column between 680 and ~722px clipped the invalid
+  tag. Two-up now needs a 848px panel, below which the grid falls back
+  to one column - including at the window's 930px minimum, where the
+  section is 1,410px of rows rather than 720. 42 tests cover the
+  one/two-column boundary, blank/trimmed/case-insensitive matching,
+  re-packing around hidden entries, alwaysShow overrides (including a
+  short array), the empty result, null names, non-positive
+  width/height, the fixed height, and the width budgets - the tag
+  budget against every real value in CurrencyDecisionDefaults, so a
+  future six-figure default fails the suite instead of clipping.
+- **Review-pass fixes (own commit):** Build now nulls the currency
+  grid/filter/count/status fields alongside the row lists it already
+  cleared (same stale-disposed-control class as the _homesteadRows
+  comment records); the scroll panel's height is clamped at 0 now that
+  the save bar is subtracted from it; the demoted note was shortened to
+  fit the panel width at the window's 930px minimum.
+- **Measured, not assumed:** the filter's re-flow relies on FlowPanel
+  subscribing to each child's Resized and skipping invisible children -
+  both confirmed by decompiling the shipped Blish HUD 1.3.0 binary
+  (FlowPanel.OnChildAdded -> ChangedChildOnResized ->
+  ReflowChildLayout, which filters on c.Visible), so setting the grid
+  panel's Height is enough and the first draft's extra Invalidate was
+  removed as a second reflow per keystroke.
+
+Validation: build 0 errors and the full suite green before each commit
+(1886 baseline -> 1928 with the new layout tests; the increase is all
+new tests, zero regressions).
+
+Desktop gate items (all in the Settings tab):
+1. Currency rows are one line each, with Clear on the same line and a
+   readable "default N" tag at the right of every defaulted cell (the
+   whole number, not a clipped one) - check a 4-digit default such as
+   Guild Commendation or Spirit Shard. Two cells per line once the
+   window is wide enough (panel >= 848px); one per line at the 930px
+   window minimum. The whole section fits in roughly a screen and a
+   half two-up instead of four-plus screens.
+2. Typing in the filter box hides non-matching currencies and re-packs
+   the rest with no gaps; the counter reads "N of 47 shown"; clearing
+   the box restores all 47. Scroll down to the filter box first: the
+   panel must NOT jump back to the top on any keystroke, including
+   backspaces. The grid keeps its full height, so a short match list
+   leaves blank space below it.
+3. One Save button, visible without scrolling from any scroll position,
+   and one green dated "Saved - <date>" confirmation. Change one value
+   in EVERY section (a currency amount, a Homestead tier, log max size,
+   log retention, snapshot interval), click Save once, reopen the tab
+   and confirm all five persisted. Enter one bad value and confirm the
+   amber "1 invalid entry not saved" wording plus the per-row tag.
+4. A 2px rule under every section header, and a rule between currency
+   rows with none dangling under the last populated row (check both
+   unfiltered and with a filter that leaves an odd number of matches).
+5. Section order top to bottom: Homestead Refinement, Logging,
+   Snapshot, Currency Valuations; no "Plan Defaults" header anywhere,
+   with its note present under Currency Valuations.
+6. Resize the window while the Settings tab is open, both wider and
+   back down to the 930px minimum, and confirm every currency cell
+   stays inside the panel and stays typeable, the columns switch
+   between one-up and two-up, and the section-header rules span the new
+   width.
+7. Type a bad amount into one currency, filter it off screen, click
+   Save: the amber "1 invalid entry not saved" must be accompanied by
+   that row reappearing with its red "Invalid" tag despite the filter.
+Gate: PASS (2026-08-22 evening desktop batch, branch build b740035,
+captures preflight/gG1-gG7). (1) The tab rendered top-down as: top
+Save bar, Homestead / Logging / Snapshot short sections each with
+the 2px header rule, then Currency Valuations with the filter box,
+"47 currencies" count, and the one-line two-up grid - "copper"
+placeholder inputs, Clear checkboxes, grey default tags, row rules,
+name ellipsis on "Manifesto of the Moletaria...". (2) Typing
+"shard" filtered to "6 of 47 shown" with the grid repacked two-up
+and no scroll jump. (3) Save produced the green "Saved - Aug 22,
+2026 8:33 PM" label beside the button (all sections saved in one
+click; Save's "Save every section on this tab." tooltip verified).
+(4) The "was N" override tag and amber "cleared" tag were NOT
+exercised live: late-session synthetic keyboard degradation kept
+the override keystrokes landing in the filter box (a documented
+input-death mode, not a module fault - the filter box accepting
+them proves the click-to-focus path). Both tags are pinned by the
+RefreshCurrencyRowDefaultState logic restored verbatim from
+master's proven three-state code plus the CellTagWidth fit test.
+One-column fallback at the 930px minimum also not exercised
+(synthetic resize unreliable); pinned by SettingsCurrencyGridLayout
+tests.
+
+## Audit batch K: Plan Notes wrapping (audit-k-notes)
+
+UX audit finding M14. `Views/Rendering/NotesSectionRenderer` locked each
+note to one `PlanContentHeightMath.FallbackTextRowHeight` (28px) row and
+ellipsized it with `LabelHelpers.EllipsizeToWidth`, with a DEBUG assert
+forbidding any child from exceeding that height. At ~830px usable that
+capped a note near 100 characters before the rest became hover-only
+tooltip text - while the maintainer's UI law routes every opportunity and
+every complex consideration into exactly this section.
+
+### Reconciliation: M14's one-row claim vs. the live capture's three lines
+
+The 2026-08-22 desktop captures (`preflight/ph11-scroll2.png`,
+`preflight/ph12-scroll3.png`, Mystic Clover x77) show the Notes header
+reading "Notes (1)" above THREE stacked text lines. That is not a note
+containing line breaks and is not evidence against M14:
+
+- `PlanViewModelBuilder.BuildNotesSection` block 5 emitted the forge-scope
+  caveat as **three separate `PlanRowType.NoteLine` rows**, one complete
+  sentence each, with its own comment saying why ("a single ~243-char row
+  would edge-clip exactly the caveat the note exists to deliver, and the
+  split preserves the fixed height-per-row contract"). It was a
+  hand-authored workaround for M14, written at the builder, one plan-
+  content-specific note at a time. **This branch retires it**: the caveat
+  is now one row carrying all three sentences, and the renderer wraps it.
+  The builder no longer hand-splits notes to keep text on screen, and the
+  comment that told the next author to do so is gone.
+- The header's "(N)" counts logical note ENTRIES (`noteEntryCount`), not
+  physical rows, which is why three rows read as "Notes (1)".
+- No note Label in the builder contains a `\n` today. M14's claim -
+  every note row renders as exactly one ellipsized 28px line - was and is
+  accurate at the renderer.
+
+So the gap to close was greedy WIDTH-wrapping of a long unbroken line,
+which is what still ellipsized at ~100 characters. Explicit line breaks
+are supported anyway (they compose with width wrapping, each hard line
+wrapping on its own), so a note can carry its own breaks without the
+builder having to split it into rows.
+
+### What changed
+
+- **`Services/TextWrapMath`** (new, Blish-free): greedy word wrap with a
+  separate first-line budget, explicit-line-break splitting, hard-split
+  of a token wider than a whole line, and the
+  single-line ellipsis moved verbatim out of
+  `LabelHelpers.EllipsizeToWidth`. Measurement is a `Func<string,int>`
+  seam rather than a `BitmapFont` - the same shape
+  `SummarySectionLayoutMath` uses when it takes an already-measured
+  `widestNumberWidth`. `LabelHelpers.EllipsizeToWidth` is now the font
+  adapter over it, so the two truncation paths cannot drift.
+- **`Services/NotesSectionLayoutMath`** (new, Blish-free): the note text
+  budget (via the shared `PlanRelayoutMath.NameMaxWidthBeforeColumn`, not
+  a second copy), the per-note wrap, and the body height.
+- **`NotesSectionRenderer`**: one 28px row Panel per wrapped LINE. The
+  fixed row-height contract and the DEBUG child-extent assert are
+  unchanged - only the row COUNT became width-dependent.
+- **Height math**: the Notes arm now counts wrapped lines. `rows.Count`
+  is no longer the row count on screen, so `Render` returns the height it
+  built and `CreateCollapsibleSection` uses that (the same special-casing
+  Summary already has, with the stronger property that the number cannot
+  drift from what was built because it IS what was built).
+  `PlanContentHeightMath.SectionBodyHeight` is untouched; its class doc's
+  "no text wrapping anywhere in the file" sentence and
+  `PlanViewModel`'s matching comment were corrected.
+- **`PlanViewModelBuilder`**: the forge-scope caveat collapses from three
+  hand-split sentence rows to one row, retiring the M14 workaround.
+- **`ISectionRelayoutSink.RequestRerenderAfterSettle`** (new): the seam a
+  re-ellipsis closure uses to ask for one deferred rebuild when the
+  settled width changes a note's line count - see the resize decision
+  below.
+
+### Design decisions (recorded, not incidental)
+
+- **Over-long single word hard-splits, it does not ellipsize.** A token
+  wider than a whole line is broken across lines at the widest prefix
+  that fits, so nothing is lost - ellipsis is exactly the text loss this
+  work removes. Ellipsis survives only as the tail of a note past
+  `TextWrapMath.MaxWrappedLines` (24).
+- **Coin cell on the first line only**, so only the first line's budget
+  is reduced by it and every later line gets the full width.
+- **Continuation lines carry the same two-space indent** as the first, so
+  a wrapped note reads as one block rather than as several notes.
+- **Resize re-wraps at settle; a changed line count defers to a rebuild.**
+  `RunReellipsis`/`ReplayRelayout` must never change a row's height (see
+  `CraftingPlanView`'s `_relayoutActions` field comment; that property is
+  what lets the settle pass skip scroll preservation entirely), and this
+  section spends one row per line - so a width that changes a note's line
+  count changes the section's height. The closure writes the new text
+  back in place while the count is unchanged; when it moves, it calls
+  `ISectionRelayoutSink.RequestRerenderAfterSettle` and `ResizeSettleStep`
+  runs one `PreserveScrollAcross(() => RenderPlan(_currentPlan))` after
+  the pass finishes - deferred because `RenderPlan` clears the registry
+  `RunReellipsis` is iterating. At most one rebuild per settled drag, only
+  when a line count actually moved, and through the same scroll-preserving
+  path every other rebuild (Generate, pill re-solve, hide-unlocked toggle)
+  uses. The earlier slot-pinned variant of this pass was rejected in
+  review: padding a shortened note to its old slot count leaves permanent
+  blank 28px rows INSIDE the section, mid-note, for the rest of the
+  session's plan.
+- **A truncated note puts the full text on the tooltip of every one of
+  its rows**, not just the last one, so a hover anywhere on the note
+  reads the whole thing.
+
+### Tests (+39, 1890 -> 1929)
+
+`TextWrapMathTests` (24): ellipsis parity cases (fits whole, truncates,
+budget narrower than "...", non-positive budget, null measure); short
+text stays one line; empty and null text still produce one line; long
+text breaks at word boundaries with every word kept; no line exceeds its
+budget; wrapping consults the measurement rather than counting characters
+(a proportional measure where "i" is narrow); over-long word hard-splits
+losslessly, both alone and after normal words; explicit `\n`, `\r\n` and
+`\r` breaks compose with width wrapping and force a break even when the
+text would fit; blank source line keeps its own row; leading indent is
+content; the first-line budget is honored separately; past the line cap
+the tail ellipsizes and reports truncation; a zero budget terminates with
+the text intact; the wrap is deterministic at a fixed width (what the
+renderer's line-count comparison rests on) and a wider budget genuinely
+needs fewer lines (the widen case behind the deferred rebuild).
+
+`NotesSectionLayoutMathTests` (15): the text budget reserves the coin
+cell plus its gap and matches the shared `NameMaxWidthBeforeColumn`
+formula; short note is one indented line; empty and null notes still
+occupy one row; the real forge-scope note wraps with no ellipsis and no
+lost words; every line of a wrapped note is indented; a valued note's
+first line is shorter than the rest and both respect their own budgets;
+explicit breaks compose with width wrapping; narrowing then widening back
+recovers exactly the original lines, with no blank line and no leftover
+ellipsis; a very
+narrow panel does not degenerate; null measure throws; body height counts
+wrapped LINES (and would have been undercounted by the old per-row arm),
+zero/negative lines are zero, and one line is exactly
+`FallbackTextRowHeight`.
+
+`PlanViewModelBuilderNotesForgeScopeTests` now pins the caveat to ONE
+`NoteLine` row carrying all three sentences (it asserted three rows
+before), which is the regression guard on the retired hand-split.
+
+Validation: module build 0 errors; suite 1929/1929.
+
+Desktop gate should look at:
+1. Generate the Mystic Clover x77 plan and open Notes. The forge-scope
+   caveat must render in full with no "..." anywhere in the section, and
+   the section body must end flush against its last line of text - no
+   clipped final row and no blank rows, which is the check that the
+   renderer's returned height matches what it built.
+2. The forge-scope caveat is now ONE ~243-char note row, so item 1 is
+   itself the wrap check: it must read as two or more indented lines that
+   hang together as one block, with no "...". Also worth confirming on a
+   second long note if the preflight account can produce one - a seasonal
+   vendor tip ("During <festival>: <merchant> trades <cost> for Nx <item>
+   (limit N purchases/week)") or a recipe-sheet savings lead-in.
+3. Valued notes (any Excess/reclaim line, or the "Total reclaimable
+   value" rollup): the coin amount must sit at the right of the note's
+   FIRST line with the icons still to the RIGHT of each number, and the
+   text must not run under it.
+4. Narrow the window until a note re-wraps, then widen it back. Mid-drag
+   the section must not jump or lose scroll position; at settle the note
+   must re-flow to its correct line count at the new width, with NO blank
+   28px rows anywhere inside the section and no "..." at a width the text
+   fits. Scroll position must survive the settle-time rebuild that the
+   changed line count triggers - this is the item that exercises
+   `RequestRerenderAfterSettle`, so also confirm repeated narrow/widen
+   cycles do not accumulate drift or flicker.
+Gate: PASS (2026-08-22 evening desktop batch, branch build 35b83f9,
+captures preflight/gK1-gK3). Generated Mystic Clover x77 live on
+the branch build: the Notes section read "Notes (1)" and the forge
+caveat rendered as ONE note wrapping naturally across two width-fit
+lines (breaking mid-sentence at "e.g. / precursor forging"),
+replacing the three hand-split single-sentence rows the 2026-08-22
+photography captures show on master. Section heights composed
+correctly below Crafting Steps with the timegate line intact. The
+resize-across-a-line-count-change rebuild (RequestRerenderAfterSettle)
+was not exercised live - synthetic resize-grip drags are documented
+unreliable - and stands on the TextWrapMath/NotesSectionLayoutMath
+tests plus the verify pass's height-contract walk.
 
 ---
 
