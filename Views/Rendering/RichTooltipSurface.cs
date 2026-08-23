@@ -117,7 +117,10 @@ namespace GW2CraftingHelper.Views.Rendering
             DisposeContent();
 
             var font = GameService.Content.DefaultFont14;
-            int rowHeight = font.LineHeight;
+            // Never shorter than a coin icon: the content panel clips its
+            // children, and a row that cannot hold a 20px icon would clip
+            // the bottom off every coin run on the last line.
+            int rowHeight = System.Math.Max(font.LineHeight, CoinSegmentMath.CoinIconSize);
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
                 GameService.Graphics.SpriteScreen.Width, ChromeWidth);
 
@@ -136,13 +139,25 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = this
             };
 
+            // Fixed-size coin icons centred against a taller number font,
+            // the same correction the Summary band's promoted tile makes -
+            // without it the icons stick to the top of their row.
+            int iconYOffset = System.Math.Max(0, (rowHeight - CoinSegmentMath.CoinIconSize) / 2);
             for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
             {
-                RenderRow(layout.Rows[rowIndex], rowIndex * rowHeight, font);
+                RenderRow(layout.Rows[rowIndex], rowIndex * rowHeight, font, iconYOffset);
             }
+
+            // Sized NOW rather than on the next update tick. The content
+            // panel's extent is explicit, so the base RecalculateLayout has
+            // everything it needs, and Show()'s Reposition below would
+            // otherwise clamp against the PREVIOUS hover's size for one
+            // frame - Blish only recalculates a container's layout while it
+            // is parented, and this one is parented by Show().
+            RecalculateLayout();
         }
 
-        private void RenderRow(TooltipLayoutMath.LaidOutRow row, int y, BitmapFont font)
+        private void RenderRow(TooltipLayoutMath.LaidOutRow row, int y, BitmapFont font, int iconYOffset)
         {
             foreach (var placed in row.Spans)
             {
@@ -156,7 +171,9 @@ namespace GW2CraftingHelper.Views.Rendering
                         CoinCurrencyRenderer.BuildCoinSegments(placed.Span.CoinCopper, font),
                         placed.X,
                         y,
-                        font);
+                        font,
+                        1f,
+                        iconYOffset);
                     continue;
                 }
 
