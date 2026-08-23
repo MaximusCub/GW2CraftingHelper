@@ -11400,4 +11400,30 @@ Desktop gate items:
    defect. Then restart Blish at full screen and confirm the 1436 minimum
    is back.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS after two gate-found fixes (2026-08-23 desktop sessions,
+captures preflight/gMW1-gMW12). The gate found the directive's core
+path broken TWICE: (1) the effective floor was computed once at
+module build against a sprite screen that had not settled - a
+persisted ~990px window opened unclamped (gMW1); fixed by deriving
+the floor at every clamp (c3f1b3a). (2) Even then, Blish adopts the
+client size AFTER modules load and no window layout pass runs on
+its own post-attach, so a launch on a wide client kept the smaller
+floor (persisted-size ground truth read from settings.json between
+sessions); fixed by re-clamping on SpriteScreen.Resized (570af3e).
+Verified on the fixed build: the window opens clamped to the
+screen-fitted floor every launch (990 -> 1161 on a ~1170px dummy;
+the full 1436 layout live on the widened dummy - ten source
+checkboxes on one row, header buttons at the far right). Programmatic
+clamps do not re-persist the size (Blish saves on drag-end only) -
+cosmetic, since the clamp lifts the window at every launch. THE
+DEFINING ITEM LIVE: generated +24 Agony Infusion; the optimal plan
+buys +22s off the TP (40,000g), and Craft All forced the full
+23-level chain - "Decisions updated (23 override(s))", the reagent
+cascade readable at every depth, the Shopping List carrying the
+research-predicted 8388608x quantities and six-digit gold totals
+(124,990g) inside the widened cost columns with no truncation and
+no dropped pills. First-ever live captures of the Required
+Disciplines and Required Recipes sections landed as a bonus
+(gMW11). Settings two-column at the minimum implicitly verified by
+the earlier gA1w-era sessions at narrower widths already showing
+two columns.
