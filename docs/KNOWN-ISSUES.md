@@ -10975,4 +10975,23 @@ Desktop gate items, one per bug:
    "12x <name>" likewise, and the shopping list's "Item" header sits on
    the same line as its Amount/Each/Total headers.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS after one gate-found fix (2026-08-23 desktop sessions,
+captures preflight/gA1w-gA7w). (1) Modal: the FIRST gate run showed
+the second wrapped line clipped mid-glyph - AutoSizeHeight with a
+fixed Width takes Blish's stale-layout-pass measure; fixed in
+cf193ea by adopting ApiAccessDialog's auto-size-both-and-parent-last
+shape, re-gated: both lines fully visible ("...when the GW2 API is /
+reachable."), buttons anchored, title-bar chrome clean at 560px.
+(2) Settings: the typed-override path was LIVE-PROVEN end to end
+for the first time - typed 5 into Karma's box (placeholder shows
+the row's default digits under the new Currency / Copper per unit
+headers), Save produced the green dated label and the tag flipped
+to "was 1"; override then reverted to keep the fixture canonical.
+(3) Typeahead: eight results dropped directly under the search box,
+left-aligned with it. (4) The root row's coin run ends under the
+Cost header's right edge (previously ~80px short); currency rows
+unchanged. (5) Zoomed crop confirms full descenders on "Log",
+"Augur's" and "Mystic" where the ph01 capture shows clipping.
+Blish's fixed 80px title indent (title cannot be centered without
+reimplementing window chrome) is recorded as the accepted limit;
+the Emblem option noted for a future maintainer call.
