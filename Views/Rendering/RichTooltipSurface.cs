@@ -232,9 +232,10 @@ namespace GW2CraftingHelper.Views.Rendering
             // Container.ClearChildren only detaches (Parent = null) - it
             // does not dispose - so the previous hover's Labels and coin
             // icons have to be disposed explicitly or every hover for the
-            // session accumulates another content tree.
-            var previous = new List<Control>(Children);
-            foreach (var child in previous)
+            // session accumulates another content tree. Snapshot via the
+            // collection's own ToArray: ControlCollection.CopyTo throws by
+            // design, so a List built from it crashes on the second hover.
+            foreach (var child in Children.ToArray())
             {
                 child.Dispose();
             }
