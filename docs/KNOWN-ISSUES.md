@@ -11259,6 +11259,13 @@ statements are now reconciled: the constant is derived through the full
 chain, and a second test states the actual two-column threshold - a 848px
 panel, i.e. a **974px window**, which the old minimum missed by 44px.
 
+The same class of assumption - reading 884 as a tab's usable panel width -
+also sits in `SnapshotHeaderLayoutTests`, where 884 is the width the
+roster-wrap audit's cell counts were taken at. Those assertions are about
+the wrap decision at whatever width they are handed, not about the
+minimum, so the number was annotated rather than changed; moving it would
+have discarded the audit's own measurement.
+
 At the new minimum the settings panel is **1310px**, so the Settings tab
 is now always two-column and the one-column path is only reachable by a
 tab whose panel is under 848px - none, at this minimum. The cell-extent
