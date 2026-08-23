@@ -26,6 +26,11 @@ namespace GW2CraftingHelper.Services
     /// everything once per render pass costs one walk of an
     /// already-materialised tree and buys a column that never shifts
     /// under the user.
+    ///
+    /// That same walk now also reports the widest name extent in the tree
+    /// (<see cref="ScanColumns"/>), which is what lets the pill+cost block
+    /// be pulled in beside the names instead of pinned to the panel edge -
+    /// same stability argument, same single pass.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
     public static class TreeCostColumnMath
@@ -164,10 +169,43 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Everything one render pass's single walk of the tree measures:
+        /// the cost sub-column widths, plus the rightmost x any row's name
+        /// column reaches (see <see cref="ScanColumns"/>).
+        /// </summary>
+        public readonly struct TreeColumnScan
+        {
+            public readonly CostColumnWidths CostWidths;
+            public readonly int WidestNameEnd;
+
+            public TreeColumnScan(CostColumnWidths costWidths, int widestNameEnd)
+            {
+                CostWidths = costWidths;
+                WidestNameEnd = widestNameEnd;
+            }
+
+            public static readonly TreeColumnScan Empty =
+                new TreeColumnScan(CostColumnWidths.Empty, 0);
+        }
+
+        /// <summary>
+        /// <see cref="ScanColumns"/> without the name measurement - the
+        /// cost-only shape this class started as.
+        /// </summary>
+        public static CostColumnWidths Scan(
+            IReadOnlyList<CraftingTreeNode> roots,
+            Func<string, int> measureText,
+            Func<CraftingTreeNode, int> measureCurrencyRunWidth)
+        {
+            return ScanColumns(roots, measureText, measureCurrencyRunWidth, null).CostWidths;
+        }
+
+        /// <summary>
         /// Widest value per denomination across every node in the tree
         /// that renders a cost cell at all (SubtreeCost.HasValue - a
         /// HAVE/UNKNOWN node keeps the column blank and must not widen
-        /// it).
+        /// it), plus the widest name extent across EVERY node (every row
+        /// draws a name, costed or not).
         /// <para>
         /// measureText is the caller's own text measurement
         /// (BitmapFont.MeasureString is Blish-bound, so it stays with the
@@ -175,22 +213,37 @@ namespace GW2CraftingHelper.Services
         /// resolved currency run, called only for the nodes that actually
         /// draw one. Both are invoked at most once per node.
         /// </para>
+        /// <para>
+        /// measureNameEnd (node, depth) returns the x that node's name
+        /// column ends at - its depth-derived indent plus its untruncated
+        /// quantity prefix and name - and is optional: null skips it and
+        /// reports 0, which
+        /// PlanRelayoutMath.ComputeTreeColumnEdges reads as "leave the
+        /// columns pinned to the panel edge". It rides the SAME walk as
+        /// the cost measurements rather than a second pass, and for the
+        /// same reason that walk covers the whole tree: rows are built
+        /// lazily, so a visible-rows-only extent would move every column
+        /// the first time a node is expanded.
+        /// </para>
         /// </summary>
-        public static CostColumnWidths Scan(
+        public static TreeColumnScan ScanColumns(
             IReadOnlyList<CraftingTreeNode> roots,
             Func<string, int> measureText,
-            Func<CraftingTreeNode, int> measureCurrencyRunWidth)
+            Func<CraftingTreeNode, int> measureCurrencyRunWidth,
+            Func<CraftingTreeNode, int, int> measureNameEnd)
         {
-            if (roots == null || roots.Count == 0) return CostColumnWidths.Empty;
+            if (roots == null || roots.Count == 0) return TreeColumnScan.Empty;
             if (measureText == null) throw new ArgumentNullException(nameof(measureText));
             if (measureCurrencyRunWidth == null) throw new ArgumentNullException(nameof(measureCurrencyRunWidth));
 
-            int gold = 0, silver = 0, copper = 0, currency = 0;
+            int gold = 0, silver = 0, copper = 0, currency = 0, nameEnd = 0;
             foreach (var root in roots)
             {
-                ScanNode(root, measureText, measureCurrencyRunWidth, ref gold, ref silver, ref copper, ref currency);
+                ScanNode(
+                    root, measureText, measureCurrencyRunWidth, measureNameEnd,
+                    ref gold, ref silver, ref copper, ref currency, ref nameEnd);
             }
-            return new CostColumnWidths(gold, silver, copper, currency);
+            return new TreeColumnScan(new CostColumnWidths(gold, silver, copper, currency), nameEnd);
         }
 
         // Explicit stack rather than recursion: a solver tree's depth is
@@ -199,15 +252,17 @@ namespace GW2CraftingHelper.Services
         // state ever reveals.
         private static void ScanNode(
             CraftingTreeNode root, Func<string, int> measureText, Func<CraftingTreeNode, int> measureCurrencyRunWidth,
-            ref int gold, ref int silver, ref int copper, ref int currency)
+            Func<CraftingTreeNode, int, int> measureNameEnd,
+            ref int gold, ref int silver, ref int copper, ref int currency, ref int nameEnd)
         {
             if (root == null) return;
 
-            var pending = new Stack<CraftingTreeNode>();
-            pending.Push(root);
+            var pending = new Stack<PendingNode>();
+            pending.Push(new PendingNode(root, 0));
             while (pending.Count > 0)
             {
-                var node = pending.Pop();
+                var pendingNode = pending.Pop();
+                var node = pendingNode.Node;
                 if (node == null) continue;
 
                 // > 0, not merely HasValue: a genuinely zero-and-uncosted
@@ -226,12 +281,32 @@ namespace GW2CraftingHelper.Services
                     currency = Max(currency, measureCurrencyRunWidth(node));
                 }
 
+                if (measureNameEnd != null)
+                {
+                    nameEnd = Max(nameEnd, measureNameEnd(node, pendingNode.Depth));
+                }
+
                 var children = node.Children;
                 if (children == null) continue;
                 for (int i = 0; i < children.Count; i++)
                 {
-                    pending.Push(children[i]);
+                    pending.Push(new PendingNode(children[i], pendingNode.Depth + 1));
                 }
+            }
+        }
+
+        // The walk carries each node's depth because the name column's x is
+        // indent-derived; a plain struct rather than a ValueTuple keeps the
+        // stack's element type named at the two use sites.
+        private readonly struct PendingNode
+        {
+            public readonly CraftingTreeNode Node;
+            public readonly int Depth;
+
+            public PendingNode(CraftingTreeNode node, int depth)
+            {
+                Node = node;
+                Depth = depth;
             }
         }
 

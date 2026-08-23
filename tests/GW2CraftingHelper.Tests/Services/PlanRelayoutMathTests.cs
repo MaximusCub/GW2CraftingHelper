@@ -66,6 +66,75 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(20, result);
         }
 
+        // --- RightBlockX (audit batch H: dead gutters) ---
+
+        [Fact]
+        public void RightBlockX_NothingMeasured_StaysPinned()
+        {
+            Assert.Equal(500, PlanRelayoutMath.RightBlockX(pinnedX: 500, widestNameEnd: 0));
+            Assert.Equal(500, PlanRelayoutMath.RightBlockX(pinnedX: 500, widestNameEnd: -1));
+        }
+
+        [Fact]
+        public void RightBlockX_ShortNamesInWidePanel_PullsBlockInBesideTheNames()
+        {
+            // 620px of dead gutter between a 300px-wide name column and a
+            // block pinned at 600 - the whole point of the finding.
+            int x = PlanRelayoutMath.RightBlockX(pinnedX: 600, widestNameEnd: 300);
+
+            Assert.Equal(300 + PlanRelayoutMath.TableGutterBreathingRoom, x);
+        }
+
+        [Fact]
+        public void RightBlockX_NamesWiderThanTheGutter_NeverPushesPastThePinnedX()
+        {
+            // A name long enough to reach the block already: the block must
+            // not move RIGHT (it would leave the panel), so this degrades
+            // to exactly the pre-fix layout.
+            Assert.Equal(600, PlanRelayoutMath.RightBlockX(pinnedX: 600, widestNameEnd: 590));
+            Assert.Equal(600, PlanRelayoutMath.RightBlockX(pinnedX: 600, widestNameEnd: 5000));
+        }
+
+        [Fact]
+        public void RightBlockX_VeryShortNames_ClampsToTheMinimum()
+        {
+            int x = PlanRelayoutMath.RightBlockX(pinnedX: 900, widestNameEnd: 40);
+
+            Assert.Equal(PlanRelayoutMath.TableRightBlockMinX, x);
+        }
+
+        [Fact]
+        public void RightBlockX_NarrowPanelBelowTheMinimum_PinnedStillWins()
+        {
+            // Panel so narrow the pinned position is already left of the
+            // floor: the floor must not push the block back out over the
+            // panel edge.
+            int pinned = PlanRelayoutMath.TableRightBlockMinX - 60;
+
+            Assert.Equal(pinned, PlanRelayoutMath.RightBlockX(pinned, widestNameEnd: 40));
+        }
+
+        [Fact]
+        public void RightBlockX_PulledInBlock_LeavesTheWidestNameItsFullWidth()
+        {
+            // The invariant the breathing room exists for: after the pull,
+            // the ellipsis budget NameMaxWidthBeforeColumn hands the widest
+            // row still covers that row's whole untruncated name, at every
+            // per-table gap in the codebase.
+            const int nameX = 50;
+            const int nameWidth = 220;
+            int widestNameEnd = nameX + nameWidth;
+
+            foreach (int gap in new[] { 8, 12, 14 })
+            {
+                int blockX = PlanRelayoutMath.RightBlockX(pinnedX: 900, widestNameEnd: widestNameEnd);
+                int budget = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                    columnRightXBeforeGap: blockX, trailingColumnWidth: 0, gapBeforeColumn: gap, nameX: nameX);
+
+                Assert.True(budget >= nameWidth, $"gap {gap} truncated the name it was measured from");
+            }
+        }
+
         // --- ComputeTreeColumnEdges ---
 
         [Fact]
@@ -126,6 +195,66 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(300, wide.PillColX - narrow.PillColX);
             Assert.Equal(300, wide.CostRightEdge - narrow.CostRightEdge);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_ShortNamesInWidePanel_PullsPillAndCostInTogether()
+        {
+            int panelWidth = 1200;
+            int nameX = 58;
+            int widestNameEnd = nameX + 200;
+
+            var pinned = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyPrefixWidth: 0,
+                pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8);
+            var pulled = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyPrefixWidth: 0,
+                pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8, widestNameEnd: widestNameEnd);
+
+            Assert.Equal(widestNameEnd + PlanRelayoutMath.TableGutterBreathingRoom, pulled.PillColX);
+            Assert.True(pulled.PillColX < pinned.PillColX);
+
+            // Moved as one block: the cost column keeps its exact offset
+            // from the pill column, so the pill budget is untouched.
+            Assert.Equal(
+                pinned.CostRightEdge - pinned.PillColX,
+                pulled.CostRightEdge - pulled.PillColX);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_LongNames_IdenticalToThePinnedLayout()
+        {
+            int panelWidth = 900;
+            int nameX = 58;
+
+            var pinned = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyPrefixWidth: 12,
+                pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8);
+            var pulled = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX, qtyPrefixWidth: 12,
+                pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8, widestNameEnd: 880);
+
+            Assert.Equal(pinned.PillColX, pulled.PillColX);
+            Assert.Equal(pinned.CostRightEdge, pulled.CostRightEdge);
+            Assert.Equal(pinned.NameMaxWidth, pulled.NameMaxWidth);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_PulledInBlock_WidestRowKeepsItsFullNameWidth()
+        {
+            // The tree's own instance of the "closing the gutter never
+            // ellipsizes" invariant, including the qty prefix that shares
+            // the name column with the name.
+            int nameX = 58;
+            int qtyPrefixWidth = 26;
+            int nameWidth = 180;
+            int widestNameEnd = nameX + qtyPrefixWidth + nameWidth;
+
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth: 1400, nameX: nameX, qtyPrefixWidth: qtyPrefixWidth,
+                pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8, widestNameEnd: widestNameEnd);
+
+            Assert.True(edges.NameMaxWidth >= nameWidth);
         }
 
         // --- ComputeCostTileGeometry ---

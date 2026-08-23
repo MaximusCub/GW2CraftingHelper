@@ -196,6 +196,14 @@ namespace GW2CraftingHelper.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
+        // Rightmost x any row's name column reaches, from the same
+        // pre-scan. The pill+cost block is pulled in to just past this
+        // instead of sitting against the panel edge, which is what closes
+        // the tree's dead gutter - see PlanRelayoutMath.RightBlockX. 0
+        // (a tree-less render pass) leaves the block pinned exactly where
+        // it used to sit.
+        private int _widestNameEnd;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -214,6 +222,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeRoots = null;
             _treeFlow = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
+            _widestNameEnd = 0;
 
             // Withdrawn with the render pass that published them: the tree
             // actions operate on the controls this reset is about to
@@ -319,17 +328,21 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
             _treeFlow = treeFlow;
 
-            // Cost-column pre-scan: ONE walk of the whole tree per render
+            // Column pre-scan: ONE walk of the whole tree per render
             // pass, before any row is built, so every row (including the
             // ones an expand click builds later) anchors to the same
-            // sub-columns. Never re-run per row draw or per resize tick -
-            // the widths are data-derived, not panelWidth-derived.
-            _costColumnWidths = ScanCostColumnWidths(_treeRoots);
+            // sub-columns and the same gutter-closing block x. Never re-run
+            // per row draw or per resize tick - both results are
+            // data-derived, not panelWidth-derived.
+            var scan = ScanTreeColumns(_treeRoots);
+            _costColumnWidths = scan.CostWidths;
+            _widestNameEnd = scan.WidestNameEnd;
 
             // Column headers over the two columns a tree row's right-hand
-            // side actually has. "Source" tracks the pill column, which
-            // moves with the panel width, hence middleXForWidth rather
-            // than a build-time x. Counted by
+            // side actually has. Both track the panel width now (the
+            // pill+cost block's x is width-derived), hence
+            // middleXForWidth/rightXForWidth rather than build-time x's.
+            // Counted by
             // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
             // treeFlow height assignment goes through.
             // Guarded on the same "is there a tree at all" condition
@@ -339,11 +352,14 @@ namespace GW2CraftingHelper.Views.Rendering
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
+                int headerNameEnd = _widestNameEnd;
                 CTableHeaderRenderer.CreateCTableHeaderRow(
                     treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
                     middleLabel: "Source",
                     middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX);
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).PillColX,
+                    rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).CostRightEdge);
             }
 
 #if DEBUG
@@ -563,34 +579,50 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Blish-bound half of the cost-column pre-scan: the pure walk
-        /// lives in TreeCostColumnMath.Scan, this supplies the two
-        /// measurements it cannot make itself. Number strings are memoised
-        /// because a tree repeats them heavily ("00", "42", ...), so
-        /// MeasureString runs once per DISTINCT string rather than once
-        /// per node; the currency callback only fires for the handful of
-        /// vendor nodes that draw a currency run at all.
+        /// Blish-bound half of the column pre-scan: the pure walk lives in
+        /// TreeCostColumnMath.ScanColumns, this supplies the measurements
+        /// it cannot make itself. Strings are memoised because a tree
+        /// repeats them heavily (number strings like "00"/"42", and one
+        /// item name recurs across the tree), so MeasureString runs once
+        /// per DISTINCT string rather than once per node; the currency
+        /// callback only fires for the handful of vendor nodes that draw a
+        /// currency run at all.
+        /// <para>
+        /// The name callback reconstructs RenderTreeNode's own nameX and
+        /// quantity prefix from the same constants that row builder uses,
+        /// against the UNTRUNCATED name - see
+        /// PlanRelayoutMath.RightBlockX for why a truncated width would be
+        /// circular.
+        /// </para>
         /// </summary>
-        private TreeCostColumnMath.CostColumnWidths ScanCostColumnWidths(IReadOnlyList<CraftingTreeNode> roots)
+        private TreeCostColumnMath.TreeColumnScan ScanTreeColumns(IReadOnlyList<CraftingTreeNode> roots)
         {
             var font = GameService.Content.DefaultFont14;
             var measured = new Dictionary<string, int>();
             var metadata = _getCurrentPlan()?.CurrencyMetadata;
 
-            return TreeCostColumnMath.Scan(
-                roots,
-                text =>
+            Func<string, int> measure = text =>
+            {
+                if (!measured.TryGetValue(text, out int width))
                 {
-                    if (!measured.TryGetValue(text, out int width))
-                    {
-                        width = (int)Math.Ceiling(font.MeasureString(text).Width);
-                        measured[text] = width;
-                    }
-                    return width;
-                },
+                    width = (int)Math.Ceiling(font.MeasureString(text).Width);
+                    measured[text] = width;
+                }
+                return width;
+            };
+
+            return TreeCostColumnMath.ScanColumns(
+                roots,
+                measure,
                 node => CoinCurrencyRenderer.TotalCurrencySegmentsWidth(
                     CoinCurrencyRenderer.BuildCurrencySegments(
-                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)));
+                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)),
+                (node, depth) =>
+                {
+                    int nameX = depth * TreeIndentPer + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
+                    int qtyWidth = node.Quantity > 0 ? measure($"{node.Quantity}x ") : 0;
+                    return nameX + qtyWidth + measure(node.Name ?? "");
+                });
         }
 
         /// <summary>
@@ -762,9 +794,10 @@ namespace GW2CraftingHelper.Views.Rendering
             // columns and its own relayout arithmetic identical by
             // construction.
             var columnWidths = _costColumnWidths;
+            int widestNameEnd = _widestNameEnd;
             int costColumnWidth = EffectiveCostColumnWidth();
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
             int pillColX = edges.PillColX;
             var costEdges = TreeCostColumnMath.ComputeEdges(edges.CostRightEdge, columnWidths);
 
@@ -1040,7 +1073,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
 
                 if (pillPanels.Count > 0)
                 {
@@ -1064,7 +1097,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddReellipsis(w =>
             {
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
@@ -1126,7 +1159,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// TreePillColumnWidth - 4, whatever the panel width, because both
         /// endpoints move together. That is why the fit is resolved once at
         /// build time and the resize closure only repositions - there is no
-        /// window width at which a hidden pill would have fit.
+        /// window width at which a hidden pill would have fit. Closing the
+        /// tree's dead gutter does not change that: the pill and cost
+        /// columns are pulled in as one block, so pillColX moves and the
+        /// budget does not.
         /// </para>
         /// </summary>
         // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only
