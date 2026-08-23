@@ -8837,4 +8837,24 @@ What the desktop gate should look at:
 7. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
    plainly and do not clip.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build 454681b,
+captures preflight/gF0-gF5). (1) Typed "mystic clover" lowercase,
+never opened the suggestion list, pressed Generate: the module log
+recorded "Plan for Mystic Clover x1" - unique-exact-name adoption
+working end to end. (2) The suggestion list opened to the right of
+the qty stepper, no longer covering Use Own Materials or the Prices
+label (the documented partial-overlap tradeoff visible and
+acceptable). (3) Toggling Value Own Materials appended the standing
+notice "Settings changed - press Generate Plan to update" after the
+board status with a separator; it survived subsequent renders and
+was still standing alongside a later honest-status line. (4) The
+"+" button showed "Add another item to this plan" on hover at its
+separated position. (5) Appending "xx" to the resolved name and
+pressing Generate produced "No item matched what you typed - pick
+an item from the suggestion list." with the previous plan untouched
+- stale-pick invalidation plus the honest empty status, no wrong
+plan. Ambiguous-name and multi-row partial-resolution statuses were
+not staged live (no duplicate-named craftable in the fixture path);
+both are pinned by the ItemRowSelection tests. Bonus: the x1
+all-owned plan rendered the HAVE pill and a 0c cost tile - the
+zero-cost plan state previously uncaptured.
