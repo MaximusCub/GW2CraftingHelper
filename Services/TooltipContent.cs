@@ -45,6 +45,27 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// For a composer that assembles its lines as a list it still needs
+        /// to reorder (<c>TreeRowTooltipComposer</c> inserts the caption at
+        /// the front after the fact) rather than streaming them into a
+        /// <see cref="TooltipContentBuilder"/>.
+        /// </summary>
+        public static TooltipContent FromLines(IReadOnlyList<TooltipLine> lines)
+        {
+            return lines == null || lines.Count == 0 ? Empty : new TooltipContent(lines);
+        }
+
+        public static TooltipLine TextLine(string text)
+        {
+            return new TooltipLine(new List<TooltipSpan> { TooltipSpan.FromText(text ?? "") });
+        }
+
+        public static TooltipLine Line(params TooltipSpan[] spans)
+        {
+            return new TooltipLine(spans ?? new TooltipSpan[0]);
+        }
+
+        /// <summary>
         /// The exact string the plain path assigns to
         /// <c>BasicTooltipText</c>. Coin spans render their own plain text,
         /// which is why the two composers' deliberately different coin

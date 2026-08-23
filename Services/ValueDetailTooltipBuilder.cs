@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -51,6 +50,35 @@ namespace GW2CraftingHelper.Services
             out string tooltipText)
         {
             tooltipText = null;
+            if (!TryBuildContent(node, vendorCapsByItemId, out var content))
+            {
+                return false;
+            }
+
+            // Single wrap seam (see TooltipTextFormat): the opportunity-cost
+            // sentence is 76 characters, just past the budget, so the break
+            // lands where this module put it instead of wherever Blish's
+            // own 500px cap happens to fall. Applied HERE and not in
+            // TryBuildContent because the rich path wraps the same content
+            // against a real font at a real pixel width - one wrap policy
+            // per path, never both on one string.
+            tooltipText = TooltipTextFormat.Wrap(content.ToPlainText());
+            return true;
+        }
+
+        /// <summary>
+        /// The structured form <see cref="TryBuild"/> is a plain-text view
+        /// of. Each gold figure stays a coin span, which is what lets the
+        /// rich tooltip surface draw it with real coin icons instead of
+        /// spelling it "1g 23s 45c". Deliberately UNWRAPPED - see
+        /// <see cref="TryBuild"/>.
+        /// </summary>
+        public static bool TryBuildContent(
+            CraftingTreeNode node,
+            IReadOnlyDictionary<int, TimegatedItem> vendorCapsByItemId,
+            out TooltipContent content)
+        {
+            content = null;
 
             if (node == null)
             {
@@ -108,12 +136,12 @@ namespace GW2CraftingHelper.Services
                 return false;
             }
 
-            var sb = new StringBuilder();
-            sb.Append("Crafting gold price: ").Append(FormatCoin(realGold)).Append('\n');
-            sb.Append("Currencies: ").Append(FormatCoin(delta)).Append('\n');
-            sb.Append("This is an estimated opportunity cost for the used currencies in the recipe.\n");
-            sb.Append('\n');
-            sb.Append("Optimization price: ").Append(FormatCoin(decisionTotal));
+            var builder = new TooltipContentBuilder();
+            builder.Text("Crafting gold price: ").Coin(realGold, FormatCoin(realGold)).EndLine();
+            builder.Text("Currencies: ").Coin(delta, FormatCoin(delta)).EndLine();
+            builder.Text("This is an estimated opportunity cost for the used currencies in the recipe.").EndLine();
+            builder.EndLine();
+            builder.Text("Optimization price: ").Coin(decisionTotal, FormatCoin(decisionTotal));
 
             // Maintainer-ratified #21 resolution: append the winning
             // vendor offer's purchase cap, when this node's item has one -
@@ -123,14 +151,11 @@ namespace GW2CraftingHelper.Services
                 vendorCapsByItemId != null &&
                 vendorCapsByItemId.TryGetValue(node.ItemId, out var cap))
             {
-                sb.Append('\n').Append("Vendor cap: ").Append(cap.CapValue).Append(" per ").Append(CapPeriodText(cap.CapType));
+                builder.EndLine();
+                builder.Text($"Vendor cap: {cap.CapValue} per {CapPeriodText(cap.CapType)}");
             }
 
-            // Single wrap seam (see TooltipTextFormat): the opportunity-cost
-            // sentence above is 76 characters, just past the budget, so the
-            // break lands where this module put it instead of wherever
-            // Blish's own 500px cap happens to fall.
-            tooltipText = TooltipTextFormat.Wrap(sb.ToString());
+            content = builder.Build();
             return true;
         }
 
