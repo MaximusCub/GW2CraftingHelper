@@ -11164,3 +11164,164 @@ unchanged. (5) Zoomed crop confirms full descenders on "Log",
 Blish's fixed 80px title indent (title cannot be centered without
 reimplementing window chrome) is recorded as the accepted limit;
 the Emblem option noted for a future maintainer call.
+
+## Minimum width raise (min-width-1436)
+
+Maintainer-directed, from the measured research now committed at
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md):
+the module's 930px minimum ellipsized recipe-tree rows from roughly depth
+6 down, and the deepest chain in the game is far deeper than that. The
+research derived the width from the module's own seeds and the installed
+bitmap fonts rather than from an estimate - exact graph depths via SCC
+condensation over `ref/recipes_seed.json`, string widths parsed out of
+`menomonia-{12,14,16}-regular.xnb` with MonoGame.Extended's own advance
+rule, and the truncation threshold verified by replaying
+`PlanRelayoutMath.ComputeTreeColumnEdges`.
+
+- **The defining item is not a legendary.** `+24 Agony Infusion` (49447)
+  is a forced 23-level chain - one recipe per level, `2x +{N-1} Agony
+  Infusion` + `1x Thermocatalytic Reagent` - whose deepest row renders
+  `4194304x Thermocatalytic Reagent` at depth 23, 849px of `nameX` + qty
+  prefix + name. Legendaries are wide, not deep: the deepest
+  (Transcendence, Conflux) reach depth 14 and would only have needed a
+  ~1170px window. The chain terminates because Thermocatalytic Reagent is
+  vendor-only.
+- **`Module.MinWindowWidth` = 1436, height unchanged at 710.** The
+  research prescribed no height and nothing in the layout derives a height
+  from the window width - every renderer takes `panelWidth` only - so the
+  vertical budget is exactly what it was. The window/content region
+  rectangles keep the texture-authored 930x710 pair: they are
+  texture-space regions and Blish grows the content region by the same
+  delta as the window, so the 46px of horizontal chrome they encode holds
+  at every size.
+- **Nothing new enforces the minimum.** `ResizableTabbedWindow` already
+  clamped in both directions - `HandleWindowResize` for a drag,
+  `RecalculateLayout` for the constructed size AND for a size persisted by
+  an earlier session (`SavesSize = true`). A user whose saved window is
+  1100px wide therefore opens at 1436 and keeps their saved height; the
+  clamp only ever grows a window, never shrinks one.
+- **The centered launch position is now clamped at 0.** 1436 is wider than
+  a 1366px screen, where the old centering arithmetic would have produced
+  a negative x and put the title bar (and its close button) off the left
+  edge with nothing left to drag.
+- **`TreeSectionController.TreePillColumnWidth` 240 -> 256.** Measured:
+  the standard CRAFT/TP/VENDOR/IGNORE run is 222px against the 236px
+  budget a 240px column leaves, so any slightly wider label pushed the row
+  through the tightened-padding pass for no reason. 256 gives it 252px.
+  This is the only lever that changes the pill budget - `maxRightEdge -
+  pillColX` is `TreePillColumnWidth - 4` at every window width, because
+  the pill and cost columns move as one block - so the "+N" overflow pill
+  on a `HAVE n/m NEEDED` row (a measured 436px run) is unchanged by the
+  width raise and stays a known limit.
+
+**The two changes are sized against each other.** The 16px the pill column
+takes comes out of every row's name column, so at the 1436 minimum
+(1310px plan panel, after 126px of window-to-panel chrome):
+
+| row | name budget | measured need | slack |
+|---|---|---|---|
+| depth 23, deepest real row | 198px | 174px | 24px = the designed gutter |
+| depth 24, one vendor-leaf level below it | 174px | 174px | 0 - exact fit |
+| depth 23 at the old 930px minimum | 10px | 174px | clamped to the floor |
+
+The depth-24 line is why the number is 1436 rather than 1428:
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` can synthesise a leaf
+one `TreeIndentPer` below the recipe graph, and the minimum covers that
+unconditionally. All three rows are pinned by
+`PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRowInTheGame_*`,
+against the measured 65px quantity prefix and 174px name.
+
+### Correction: the settings panel was never 864px wide
+
+`SettingsCurrencyGridLayoutTests.SettingsPanelWidthAtWindowMinimum` was
+`864`, commented as "884px content region - 20px right padding". That
+skips the `ViewAdapter` chain every tab's content sits inside, so it
+overstated the panel by 60px. The real chain, all of it read from this
+repo's own source except the border term:
+
+```
+window minimum
+ - 46  window region 930 - content region 884        (Module.cs)
+ - 32  ViewAdapter OUTER_PADDING x2                  (ViewAdapter.cs)
+ -  8  Blish Panel border chrome, ~4 a side          (ViewAdapter.cs)
+ - 20  ViewAdapter INNER_PADDING x2                  (ViewAdapter.cs)
+ - 20  RightEdgePadding, clear of the scrollbar      (SettingsTabContent.cs)
+= window - 126
+```
+
+So the settings panel was **804px** at the old 930px minimum, not 864 -
+and since two columns need `2 * MinColumnWidth` = 848px, the currency grid
+was falling back to ONE column there. The test asserted two columns and
+passed for the wrong reason; the prose elsewhere in this file that says
+the grid "falls back to one column at the 930px minimum" (audit batch J
+and the M4 layout notes) was right, and the constant was wrong. Both
+statements are now reconciled: the constant is derived through the full
+chain, and a second test states the actual two-column threshold - a 848px
+panel, i.e. a **974px window**, which the old minimum missed by 44px.
+
+At the new minimum the settings panel is **1310px**, so the Settings tab
+is now always two-column and the one-column path is only reachable by a
+tab whose panel is under 848px - none, at this minimum. The cell-extent
+budget stops being load-bearing: `CellInputToClearGap` was squeezed from 6
+to 2 to protect a boundary that is now ~460px away.
+
+### Not implemented, deliberately
+
+- **The +2pt font variant (1472) is a pending maintainer decision.** The
+  research measured it at Menomonia 16/14 rather than scaling it, so the
+  number is real, but nothing here changes a font. `MinWindowWidth` is a
+  single constant specifically so that bump is a one-line change.
+- **Fitting the whole pill run** (`HAVE 4194304/8388608 NEEDED` and
+  friends) needs a ~440px pill column and a ~1612px window, not a wider
+  minimum. Out of scope; the "+N" pill and its tooltip continue to state
+  the fact.
+- **`Views/SettingsTabContent.cs` still carries a stale comment** citing
+  "the 884px content region the 930px window minimum leaves" as the reason
+  the Ignore checkbox stayed short. The file is concurrently owned by the
+  `settings-dirty-prompt` branch, so it was left alone rather than made a
+  merge hazard for a comment; the reasoning it records is superseded by
+  this section.
+- **Residual gutter risk**: the tree's cost column is measured, not fixed
+  (`max(150, scanned)`), and the 165px used above is a six-digit gold
+  total. An eight-digit total would add ~21px and spend the depth-23
+  gutter. The depth-24 row would ellipsize by that much in that case; a
+  plan that expensive is not reachable from any single item.
+- **Screens narrower than 1436** now get a window wider than their screen
+  (position clamped to the top-left corner). No module-side fix exists
+  short of allowing truncation again, which is the thing being removed.
+
+Validation: build 0 errors and the suite green before each commit; 2203
+baseline -> 2207 (+3 tree-width edges, +1 settings two-column threshold;
+zero regressions, one existing settings test corrected in place). Tree
+clean, nothing pushed.
+
+Desktop gate items:
+
+1. The window opens at least 1436px wide on a fresh profile AND with an
+   existing narrower saved size - delete nothing, just launch: a session
+   that last closed the window at ~930px must come back at 1436, keeping
+   its saved height and position. Then try to drag the left/right edge
+   inward: it must refuse to go below 1436 and must not judder or snap
+   back visibly while dragging.
+2. Deep-tree readability, the actual point of the change. Generate
+   `+24 Agony Infusion` LIVE (it is the real defining item, not a
+   fixture): scroll to the bottom of the Recipe Tree and confirm the
+   deepest row reads `4194304x Thermocatalytic Reagent` in full, with no
+   ellipsis, and that its cost column and pills still sit on the same x as
+   every other row's. A `+20 Agony Infusion` plan is the cheaper check if
+   the full chain is unwieldy - it must be untruncated with room to spare.
+3. Decision pills: on an ordinary plan, a row showing CRAFT / TP / VENDOR
+   / IGNORE draws all four at normal padding (they should look no tighter
+   than before this change), and a row with the `HAVE n/m NEEDED`
+   annotation still ends in the "+N" pill with its tooltip - the wider
+   column does not fix that case and must not pretend to.
+4. Settings tab at the minimum width: the currency grid is TWO columns,
+   every cell's "default N" tag is whole, and the section-header rules
+   span the panel. Drag wider and back to the minimum - it stays two-up
+   the whole way (the one-column fallback is now unreachable).
+5. Every other tab at the minimum width: Snapshot, Crafting Plan, Log,
+   Plan History, About. Nothing centered is off-center, nothing
+   right-anchored has drifted off the panel, and no section has developed
+   a dead horizontal band where a fixed-width block used to fill the row.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
