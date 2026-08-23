@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_ApiAccessNotReady_ReturnsAccessNotReadyText()
         {
             Assert.Equal(
-                "Refresh failed \u2014 GW2 API access not ready",
+                "Refresh failed: GW2 API access not ready",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.ApiAccessNotReady, failedSourceCount: 5, totalSourceCount: 5));
         }
 
@@ -157,7 +157,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_NetworkOrApiDown_ReturnsCouldNotReachText()
         {
             Assert.Equal(
-                "Refresh failed \u2014 could not reach the GW2 API",
+                "Refresh failed: could not reach the GW2 API",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.NetworkOrApiDown, failedSourceCount: 5, totalSourceCount: 5));
         }
 
@@ -165,7 +165,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ForRefreshFailure_PartialFailure_ReturnsCountText()
         {
             Assert.Equal(
-                "Refresh partially failed \u2014 2 of 5 sources",
+                "Refresh partially failed: 2 of 5 sources",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.PartialFailure, failedSourceCount: 2, totalSourceCount: 5));
         }
 
@@ -177,6 +177,94 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(
                 "Refresh failed",
                 StatusText.ForRefreshFailure(SnapshotFailureKind.Unknown, failedSourceCount: 0, totalSourceCount: 0));
+        }
+
+        // ---- Stamp (audit batch J, M10): the ONE shape every timestamped
+        // status line in the module uses. Four sites wrote it by hand with
+        // two different separators before this. ----
+
+        [Fact]
+        public void Stamp_VerbAndTime_UsesTheSingleSeparatorAndFormat()
+        {
+            Assert.Equal(
+                "Plan generated \u2014 Aug 8, 2026 3:00 PM",
+                StatusText.Stamp("Plan generated", new DateTime(2026, 8, 8, 15, 0, 0)));
+        }
+
+        [Fact]
+        public void Stamp_FailureCause_ReadsAsOneClausePerSeparator()
+        {
+            // The cause clause is colon-introduced and the timestamp
+            // dash-introduced, so the composed line never repeats one
+            // separator at two grammatical levels.
+            string cause = StatusText.ForRefreshFailure(
+                SnapshotFailureKind.NetworkOrApiDown, failedSourceCount: 5, totalSourceCount: 5);
+            Assert.Equal(
+                "Refresh failed: could not reach the GW2 API \u2014 Aug 15, 2026 3:41 PM",
+                StatusText.Stamp(cause, new DateTime(2026, 8, 15, 15, 41, 0)));
+        }
+
+        [Fact]
+        public void Stamp_BlankVerb_ReturnsBareTimestampNotADanglingSeparator()
+        {
+            string expected = "Aug 8, 2026 3:00 PM";
+            Assert.Equal(expected, StatusText.Stamp(null, new DateTime(2026, 8, 8, 15, 0, 0)));
+            Assert.Equal(expected, StatusText.Stamp("   ", new DateTime(2026, 8, 8, 15, 0, 0)));
+        }
+
+        // ---- ForSnapshotAgeSuffix (audit batch J, M10): the age suffix
+        // names its subject, so a failure timestamp followed by a snapshot
+        // age can no longer read as one moment. ----
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Days_NamesItsSubject()
+        {
+            Assert.Equal("snapshot 29d old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromDays(29)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Minutes_NamesItsSubject()
+        {
+            Assert.Equal("snapshot 2m old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(2)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Hours_KeepsTheMinutesComponent()
+        {
+            Assert.Equal(
+                "snapshot 3h 20m old",
+                StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(200)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_SubMinute_ReadsAsCapturedNotZeroOld()
+        {
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(30)));
+        }
+
+        [Fact]
+        public void ForSnapshotAgeSuffix_Negative_ClampedToZero()
+        {
+            // Same clock-skew clamp ForSnapshotAge applies - never a
+            // negative duration on screen.
+            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(-5)));
+        }
+
+        // The two age wordings read the same bucket ladder, so they can
+        // never disagree about when a snapshot turns from minutes into
+        // hours - the drift this extraction exists to prevent.
+        [Theory]
+        [InlineData(2)]
+        [InlineData(59)]
+        [InlineData(60)]
+        [InlineData(200)]
+        [InlineData(1440)]
+        [InlineData(41760)]
+        public void ForSnapshotAgeSuffix_AgreesWithForSnapshotAgeBuckets(int minutes)
+        {
+            var age = TimeSpan.FromMinutes(minutes);
+            string magnitude = StatusText.ForSnapshotAge(age).Replace(" ago", "");
+            Assert.Equal($"snapshot {magnitude} old", StatusText.ForSnapshotAgeSuffix(age));
         }
     }
 

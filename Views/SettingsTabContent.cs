@@ -1163,7 +1163,7 @@ namespace GW2CraftingHelper.Views
 
             if (invalidCount == 0)
             {
-                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                _statusLabel.Text = StatusText.Stamp("Saved", DateTime.Now);
                 _statusLabel.TextColor = SuccessTextColor;
             }
             else

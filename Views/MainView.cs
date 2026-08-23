@@ -1019,7 +1019,7 @@ namespace GW2CraftingHelper.Views
                     SetSnapshotActionsEnabled(true);
                     _clearCache();
                     SetSnapshot(null);
-                    var status = $"Cache cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                    var status = StatusText.Stamp("Cache cleared", DateTime.Now);
                     SetStatus(status);
                     _saveStatus(status);
                 },
@@ -1110,7 +1110,7 @@ namespace GW2CraftingHelper.Views
                 }
 
                 string status = snapshot != null
-                    ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}"
+                    ? StatusText.Stamp("Updated", snapshot.CapturedAt.ToLocalTime())
                     : null;
 
                 // Persist BEFORE marshaling, while still on this
@@ -1184,7 +1184,7 @@ namespace GW2CraftingHelper.Views
 
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
-                var status = $"{cause} \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                var status = StatusText.Stamp(cause, DateTime.Now);
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
@@ -1222,7 +1222,10 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Composes the header status label's text (base status text plus
         /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
-        /// (2m ago)") and recolors it once the snapshot is older than the
+        /// (snapshot 2m old)" - the suffix names its subject so it cannot
+        /// be misread as a restatement of the timestamp beside it, see
+        /// StatusText.ForSnapshotAgeSuffix) and recolors it once the
+        /// snapshot is older than the
         /// SnapshotRefreshIntervalMinutes setting - the same threshold
         /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
         /// on every call here just like that gate does, so a Settings tab
@@ -1249,7 +1252,7 @@ namespace GW2CraftingHelper.Views
             if (_snapshot != null)
             {
                 TimeSpan age = DateTime.UtcNow - _snapshot.CapturedAt;
-                string ageText = StatusText.ForSnapshotAge(age);
+                string ageText = StatusText.ForSnapshotAgeSuffix(age);
                 text = string.IsNullOrEmpty(text) ? ageText : $"{text} ({ageText})";
                 var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
                 _statusLabel.TextColor = StatusText.IsStale(age, staleThreshold) ? WarningTextColor : _defaultStatusColor;

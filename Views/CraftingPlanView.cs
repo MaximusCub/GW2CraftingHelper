@@ -643,7 +643,7 @@ namespace GW2CraftingHelper.Views
             // short time pattern has no AM/PM marker) and would disagree
             // with the Log tab's own InvariantCulture timestamps.
             _statusBoard.SeedRestored(
-                $"Generated {generatedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)} - prices may have changed - Regenerate");
+                StatusText.Stamp("Generated", generatedAt) + " - prices may have changed - Regenerate");
             RenderFromBoard(_statusBoard.Snapshot());
 
             if (_contentPanel == null || _contentPanel.Parent == null) return;
@@ -2854,7 +2854,7 @@ namespace GW2CraftingHelper.Views
                     // panel is torn down must not drop the "Plan
                     // generated" text - a later Build() pulls it from the
                     // board instead.
-                    _statusBoard.Finish(myGen, $"Plan generated - {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}");
+                    _statusBoard.Finish(myGen, StatusText.Stamp("Plan generated", _planGeneratedAt));
 
                     // Plan CONTENT still requires a live panel to render
                     // into - unlike the strip status above, this part of
