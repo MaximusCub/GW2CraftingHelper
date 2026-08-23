@@ -12,7 +12,13 @@ namespace GW2CraftingHelper.Views
     /// texture-derived constructed size nor a size persisted by an earlier
     /// session can open the window below the minimum.
     /// </summary>
-    public class ResizableTabbedWindow : TabbedWindow2
+    /// <remarks>
+    /// Sealed: the constructor clamps, which writes <c>Size</c> and so runs
+    /// the virtual OnResized/RecalculateLayout chain. Sealing keeps that off
+    /// any subclass override, which would otherwise run against a
+    /// half-constructed instance.
+    /// </remarks>
+    public sealed class ResizableTabbedWindow : TabbedWindow2
     {
         private readonly Point _minSize;
 
@@ -27,11 +33,13 @@ namespace GW2CraftingHelper.Views
             CanResize = true;
             SavesSize = true;
 
-            // The base constructor sizes the window from windowRegion, which
-            // is a region of the background texture and is narrower than the
-            // minimum. Clamping here rather than waiting for the first
-            // layout pass means the hosted views are never built against a
-            // content region they will immediately be resized out of.
+            // The base constructor sizes the window from windowRegion, a
+            // region of the background texture, which is narrower than the
+            // minimum. Clamping here means the window is never below the
+            // floor at any observable point - including its first draw -
+            // rather than depending on an invalidation ordering this repo
+            // has not measured. (Tabs are registered as lazy factories, so
+            // no hosted view exists in the gap either way.)
             ClampToMinimum();
         }
 
