@@ -10814,3 +10814,117 @@ dialog classes; backdrop still gates the module beneath both). Not
 staged live: L3's unified header bands and button heights across
 every tab (spot-checked on the surfaces above; pinned by the
 re-baselined height tests), M12's Log row-order swap (code-reviewed).
+
+## Field-test fixes wave 1 (field-fixes-1)
+
+The first feedback from outside the build loop: the maintainer ran v0.2.0
+as a user, in game, and reported five defects in their own words. Every
+one was reproduced from the code before it was touched, and three of them
+are visible in the existing gate captures - which is the useful lesson of
+this wave. The captures had them all along; nobody was looking for them,
+because each gate was reading for the item it was staged to prove.
+
+- **Bug 1, the confirm dialog did not fit its own sentence - DONE.**
+  `ModalDialog`'s message Label was 380px wide, centered, and never
+  wrapped, so Clear Cache's ~640px sentence was centered on the label's
+  midpoint and clipped at BOTH ends: `preflight/gB2-confirm-dialog`
+  shows "ched account snapshot? It can only be rebuilt when the GW2 A".
+  The 400px window additionally squeezed WindowBase2's left title-bar
+  texture into ~200px, which rasterizes as coloured streaks behind the
+  title - the "title seems poorly aligned too" half of the report. Both
+  are fixed by adopting `ApiAccessDialog`'s proven geometry and text
+  handling: 560x170, `DrawUtil.WrapText` against the content width, and
+  a button line measured off the wrapped text with a fixed bottom
+  anchor. Blish draws the title itself at a fixed 80px indent in
+  DefaultFont32 with no alignment control, so window width is the only
+  lever either dialog has over its title bar.
+- **Bug 2, the currency valuation box did not read as an input - DONE.**
+  The mechanic was never broken - typed digits go through
+  `SettingsInputParser.TryParseCopperValue` into `CurrencyValuation` and
+  out to the settings file on Save, and come back into the box on the
+  next open - but nothing in the cell said so. "copper" as the
+  placeholder named the unit the box holds, which reads as a label on a
+  read-only field, and the grey "default 3600" beside it states a fact
+  without offering an action. The unit moved out of the box into a
+  "Currency"/"Copper per unit" column header over the grid (stated once
+  per column), the box now hints with the currency's own default value,
+  and one info line names the interaction outright. The three-state tag,
+  the Ignore checkbox and every cell X are unchanged.
+- **Bug 3, the typeahead list floated far right - DONE.** The offset was
+  deliberate (M15): the list was anchored past the Qty stepper so it
+  would not cover the row's own quantity field or the rows below it. In
+  use it reads as a detached panel with no visible tie to the box being
+  typed into, so it is back to the classic dropdown position - the text
+  box's own left edge, immediately below it. Transient occlusion of the
+  controls underneath is what a dropdown does; the list closes on pick,
+  on focus loss and on any outside click. Screen clamp and the
+  flip-above-the-box branch kept; `anchorOffsetX` and
+  `SuggestionAnchorGap` removed.
+- **Bug 4, tree cost values sat left of the Cost header - DONE.** The
+  sub-column layout (batch D) meeting the pulled-in column edge (batch
+  H): the cost column reserves a trailing band as wide as the widest
+  currency run any row in the tree draws, and every row's copper
+  sub-column ends one gap left of it, while the "Cost" header
+  right-aligns on the far side of that band. So in any tree containing a
+  vendor-currency cost, coin-only rows ended a whole band short of the
+  header and currency rows landed under it - `preflight/gDE1-top` shows
+  the two ~80px apart. `TreeCostColumnMath.ComputeRowEdges` now
+  collapses the band for a row that does not fill it, so every row's
+  rightmost segment (coin run, currency run, or the unpriceable dash)
+  ends on the header's own edge; rows that do draw currency keep the
+  shared band and stay aligned with each other. Reserved column width
+  is unchanged, so no row reaches further right than the column already
+  owned.
+- **Bug 5, descenders clipped - DONE.** `AutoSizeHeight` sizes a Label
+  to exactly its font's measured text height, and Blish clips a control
+  to its own bounds - so a descender lands in the last row of the clip
+  window, which the `Container.Paint` scissor round trip recorded under
+  #23 can shave off by a logical pixel. Scroll-phase and UI-scale
+  dependent, hence intermittent. Reported for character names in
+  Required Disciplines; also visible in the wallet/item rows of
+  `preflight/ph01-snapshot-multichar`, which clips the tail off
+  "Green Wood Log".
+  `LabelHelpers.WithDescenderClearance` pins a label to its measured
+  height plus two pixels - the clearance the Log tab's row metrics have
+  carried since they were written - and is applied to the class: the
+  shared label factories (right-aligned, c-table header, icon+name row,
+  snapshot row text) and the hand-rolled row labels in the tree,
+  disciplines, recipes, craft steps, notes, summary and fallback-text
+  renderers. Not applied to pills and small tags (fixed-height chrome,
+  uppercase text) or the Log tab (already clear). Row heights unchanged.
+
+Build 0 errors, 2100 StyleCop warnings (2082 before this wave; the 18
+added sit in the same rule families the codebase trips throughout -
+trailing commas in multi-line initializers, comment spacing). Suite 2193
+passed / 0 failed (2186 baseline, +7: six on the new per-row cost edges, one on
+the currency column header; the stale "copper" placeholder width test was
+rewritten against the real defaults table), tree clean, nothing pushed.
+
+Desktop gate items, one per bug:
+
+1. Open Snapshot, press Clear Cache: the confirm reads its whole
+   sentence with margin on both sides, the title bar draws clean, and
+   Discard/Cancel sit on one line. Repeat for the Crafting Plan tab's
+   regenerate confirm and the Log tab's Delete Log File - both still fit
+   on one line. With the confirm up, a click on a checkbox behind it is
+   still eaten by the backdrop, and Escape still cancels.
+2. Settings > Currency Valuations: each grid column carries a
+   "Currency"/"Copper per unit" header, a currency with a default shows
+   that number greyed in its box, typing a number and pressing Save
+   persists it (tag flips to "was N"), and clearing the box and saving
+   restores "default N". Narrow the window to one column and the header
+   follows.
+3. Crafting Plan: type in an item search box - the suggestion list opens
+   directly under that box, left edges flush, and closes on pick and
+   on a click outside it. Drag the window to the right screen edge
+   and repeat: the list stays fully on screen.
+4. Generate a plan with a vendor-currency cost in it (Mystic Clover
+   does): in the Recipe Tree, gold-only rows, mixed coin+currency rows
+   and any unpriceable dash all end on the same x as the "Cost" header's
+   right edge. Drag-resize the window and they still do.
+5. A plan whose Required Disciplines rows carry character names with
+   descenders ('y', 'g', 'p'): the tails render whole, at more than one
+   scroll position. Same check on the Snapshot tab's item rows ("Green
+   Wood Log") and the plan's shopping list.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

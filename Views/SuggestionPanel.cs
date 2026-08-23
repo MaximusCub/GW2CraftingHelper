@@ -287,8 +287,8 @@ namespace GW2CraftingHelper.Views
             // it, and the field test rejected that outright - "the typeahead
             // popup ... floats far off to the right". Transiently covering
             // the row's own quantity field and the rows below is what a
-            // dropdown does; it closes on pick, on Escape and on a click
-            // outside.
+            // dropdown does; it closes on pick, on the box losing focus and
+            // on a click outside.
             //
             // Still held on screen: the box belongs to a window the user may
             // have dragged against the right edge.
