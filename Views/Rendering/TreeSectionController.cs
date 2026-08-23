@@ -795,10 +795,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = indent + TreeCaretColWidth;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
-            IconControls.CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            var iconFrame = IconControls.CreateRarityFramedIcon(
+                rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            Panel iconScrim = null;
             if (dimmed)
             {
-                new Panel()
+                iconScrim = new Panel()
                 {
                     Size = new Point(TreeIconSize, TreeIconSize),
                     Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
@@ -966,7 +968,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 };
             }
 
-            UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, displayName, fullName, statTooltipContent, extraTooltipContent);
+            UpdateTreeRowTooltip(
+                rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
+                displayName, fullName, statTooltipContent, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1156,7 +1160,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, newDisplayName, fullName, statTooltipContent, extraTooltipContent);
+                    UpdateTreeRowTooltip(
+                        rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
+                        newDisplayName, fullName, statTooltipContent, extraTooltipContent);
                 }
             });
         }
@@ -1174,6 +1180,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static void UpdateTreeRowTooltip(
             Panel rowPanel, Label nameLabel, Label qtyLabel,
+            Panel iconFrame, Panel iconScrim,
             string displayName, string fullName,
             TooltipContent statContent, TooltipContent extraContent)
         {
@@ -1226,6 +1233,14 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyRich(rowPanel, content);
             TooltipFacility.ApplyRich(nameLabel, content);
             TooltipFacility.ApplyRich(qtyLabel, content);
+
+            // The icon column is the same swallowed-hover case, one level
+            // deeper: the framed icon is a Panel inside a Panel, and a
+            // dimmed row lays a scrim Panel over the top of both. Left
+            // unstamped, the largest and most obvious target on the row -
+            // the item picture - was the one spot that showed nothing.
+            IconControls.ApplyRichToIconTree(iconFrame, content);
+            IconControls.ApplyRichToIconTree(iconScrim, content);
         }
 
         // --- Decision pills ---

@@ -3493,7 +3493,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateRarityFramedIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
@@ -3518,12 +3518,15 @@ namespace GW2CraftingHelper.Views
             var statContent = TreeRowTooltipComposer.BuildStatTooltipContent(vm.TreeRoot, _getItemStatBlock);
             if (!statContent.IsEmpty)
             {
-                // Stamped on the Label as well as the panel: a Label lying
-                // over the panel wins the hover outright (Control.
-                // ActiveControl is the deepest capturing control), the same
-                // swallowed-hover class already fixed on tree rows.
+                // Stamped on the Label and the icon as well as the panel:
+                // anything lying over the panel wins the hover outright
+                // (Control.ActiveControl is the deepest capturing control),
+                // the same swallowed-hover class already fixed on tree
+                // rows. The 44px icon is the header's largest target and
+                // the most natural one to point at.
                 TooltipFacility.ApplyRich(titlePanel, statContent);
                 TooltipFacility.ApplyRich(nameLabel, statContent);
+                IconControls.ApplyRichToIconTree(iconFrame, statContent);
             }
 
             if (qtyText.Length > 0)
