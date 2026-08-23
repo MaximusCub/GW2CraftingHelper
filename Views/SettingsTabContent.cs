@@ -5,6 +5,7 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
@@ -73,11 +74,13 @@ namespace GW2CraftingHelper.Views
         }
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
         private static readonly Color ErrorTextColor = new Color(255, 100, 100);
         private static readonly Color SuccessTextColor = new Color(150, 200, 150);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
         private const int RightEdgePadding = 20;
+        private const int SaveBarHeight = 40;
         private const int RowHeight = 30;
         private const int InfoRowHeight = 20;
         private const int NameColumnX = 16;
@@ -93,16 +96,26 @@ namespace GW2CraftingHelper.Views
             public int CurrencyId;
             public bool HasDefault;
             public long DefaultCopperPerUnit;
+
+            // The row's own one-line cell inside the currency grid, and the
+            // rule along its bottom - both driven by ApplyCurrencyFilter.
+            public Panel Cell;
+            public Panel Divider;
+
             public TextBox Input;
+
+            // The cell's single tag slot, shared by two labels at the same
+            // spot: DefaultLabel carries the persisted default/cleared state
+            // (Feature 1 requires it VISIBLE, not hover-only), ErrorLabel
+            // replaces it while the typed amount is unparseable. Only one is
+            // ever shown - see SetCurrencyRowError.
+            public Label DefaultLabel;
             public Label ErrorLabel;
 
-            // Null for a currency with no
-            // CurrencyDecisionDefaults entry (nothing to show/clear - see
-            // AddCurrencyRow). DefaultStateLabel reflects the currently-
-            // persisted default/cleared/overridden state; ClearCheckbox is
-            // the user's in-memory intent for the NEXT Save (see
-            // SaveValuations) - both null together, never independently.
-            public Label DefaultStateLabel;
+            // Null for a currency with no CurrencyDecisionDefaults entry
+            // (nothing to clear - see AddCurrencyRow). Holds the user's
+            // in-memory intent for the NEXT Save (see SaveValuations); the
+            // persisted state is shown by DefaultLabel.
             public Checkbox ClearCheckbox;
         }
 
@@ -120,11 +133,41 @@ namespace GW2CraftingHelper.Views
 
         private readonly ModuleSettings _settings;
         private readonly List<CurrencyRow> _rows = new List<CurrencyRow>();
+
+        // Row names in _rows order, held so the filter keystroke path does
+        // not rebuild a 47-entry list per character typed.
+        private readonly List<string> _currencyNames = new List<string>();
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
+
+        // One status label for the whole tab, next to the one Save button in
+        // the header bar (see BuildSaveBar) - the four per-section Save rows
+        // and their four status labels this replaced are recorded in
+        // KNOWN-ISSUES (audit batch G supersedes B14).
         private Label _statusLabel;
-        private Label _homesteadStatusLabel;
+
+        // The currency list's absolutely-positioned grid: one Panel holding
+        // every cell, repacked by ApplyCurrencyFilter as rows are hidden and
+        // held at its unfiltered height throughout (SetCurrencyGridHeight).
+        private Panel _currencyGridPanel;
+        private TextBox _currencyFilterInput;
+        private Label _currencyCountLabel;
+
+        // Reused per filter pass (one entry per row, in _rows order) rather
+        // than reallocated per keystroke: the rows whose amount did not
+        // parse, which stay on screen through any filter.
+        private bool[] _currencyForceVisible = new bool[0];
+
+        // Every direct child of _rootPanel that spans the panel width, plus
+        // the section-header rules inside them - re-widened together when
+        // the window is resized (see ApplyPanelWidth). Without this the
+        // controls keep the width the tab was first opened at, and a
+        // narrowed window pushes the grid's right-hand column off-panel.
+        private readonly List<Panel> _fullWidthPanels = new List<Panel>();
+
+        // Width the content is currently laid out at (see ApplyPanelWidth).
+        private int _panelWidth;
 
         // The ONE "Diagnostics" checkbox + the two log-file
         // policy rows (max size / retention) - d2-log-system.md Section 5.
@@ -137,7 +180,6 @@ namespace GW2CraftingHelper.Views
         private Label _logMaxSizeErrorLabel;
         private TextBox _logRetentionDaysInput;
         private Label _logRetentionDaysErrorLabel;
-        private Label _logStatusLabel;
 
         // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
@@ -146,7 +188,6 @@ namespace GW2CraftingHelper.Views
         // Homestead tier rows above.
         private TextBox _snapshotRefreshIntervalInput;
         private Label _snapshotRefreshIntervalErrorLabel;
-        private Label _snapshotStatusLabel;
 
         public SettingsTabContent(ModuleSettings settings)
         {
@@ -156,6 +197,17 @@ namespace GW2CraftingHelper.Views
         public void Build(Container container)
         {
             _rows.Clear();
+            _currencyNames.Clear();
+            _currencyForceVisible = new bool[0];
+            _fullWidthPanels.Clear();
+
+            // Same hazard as the stale _homesteadRows below: these point at
+            // the previous Build cycle's already-disposed controls until the
+            // currency section is rebuilt further down.
+            _currencyGridPanel = null;
+            _currencyFilterInput = null;
+            _currencyCountLabel = null;
+            _statusLabel = null;
 
             // Module.cs's Settings tab reuses this
             // SAME SettingsTabContent instance across every tab re-open
@@ -169,10 +221,14 @@ namespace GW2CraftingHelper.Views
             _homesteadRows.Clear();
 
             int panelWidth = container.ContentRegion.Width - RightEdgePadding;
+            _panelWidth = panelWidth;
+
+            var saveBar = BuildSaveBar(container);
 
             _rootPanel = new FlowPanel()
             {
-                Size = new Point(container.ContentRegion.Width, container.ContentRegion.Height),
+                Size = ContentSizeBelowSaveBar(container),
+                Location = new Point(0, SaveBarHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = container
@@ -180,21 +236,86 @@ namespace GW2CraftingHelper.Views
 
             container.Resized += (_, __) =>
             {
-                _rootPanel.Size = new Point(
-                    container.ContentRegion.Width,
-                    container.ContentRegion.Height);
+                saveBar.Size = new Point(container.ContentRegion.Width, SaveBarHeight);
+                _rootPanel.Size = ContentSizeBelowSaveBar(container);
+                ApplyPanelWidth(container.ContentRegion.Width - RightEdgePadding);
             };
 
-            BuildCurrencyValuationsSection(panelWidth);
-            BuildPlanDefaultsSection(panelWidth);
             BuildHomesteadRefinementSection(panelWidth);
             BuildLoggingSection(panelWidth);
             BuildSnapshotSection(panelWidth);
+            BuildCurrencyValuationsSection(panelWidth);
 
             LoadCurrentValuations();
             LoadCurrentHomesteadTiers();
             LoadCurrentLoggingSettings();
             LoadCurrentSnapshotSettings();
+        }
+
+        private static Point ContentSizeBelowSaveBar(Container container)
+        {
+            int height = container.ContentRegion.Height - SaveBarHeight;
+            return new Point(container.ContentRegion.Width, height > 0 ? height : 0);
+        }
+
+        /// <summary>
+        /// Re-lays the whole scrolling content out at a new panel width.
+        /// Every row/header panel is built at the width the tab happened to
+        /// open at, and the currency grid additionally derives its column
+        /// count, column width and cell X positions from it - so without
+        /// this, narrowing the window leaves the second column of cells
+        /// beyond the panel's right edge, unreachable until the tab is
+        /// closed and re-opened.
+        /// </summary>
+        private void ApplyPanelWidth(int panelWidth)
+        {
+            // Resized fires on height-only changes too (and repeatedly while
+            // the window is dragged), and re-widening every row re-flows the
+            // scrolling FlowPanel once per row - so do nothing unless the
+            // width actually moved.
+            if (panelWidth <= 0 || panelWidth == _panelWidth) return;
+
+            _panelWidth = panelWidth;
+
+            foreach (var panel in _fullWidthPanels)
+            {
+                panel.Width = panelWidth;
+            }
+
+            if (_currencyGridPanel == null) return;
+
+            _currencyGridPanel.Width = panelWidth;
+
+            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
+            foreach (var row in _rows)
+            {
+                row.Cell.Width = columnWidth;
+                row.Divider.Width = columnWidth;
+            }
+
+            SetCurrencyGridHeight();
+            ApplyCurrencyFilter();
+        }
+
+        /// <summary>
+        /// Holds the grid panel at its UNFILTERED height. Blish's Scrollbar
+        /// resets the scroll position to the top whenever the scrolling
+        /// container's content height changes (RecalculateLayout compares
+        /// the previous scrollbar percent against the freshly recomputed one
+        /// and zeroes ScrollDistance/TargetScrollDistance when they differ -
+        /// decompiled from the shipped 1.3.0 binary), and it does so a frame
+        /// later, so a resize cannot simply be undone in place. Sizing the
+        /// grid to the filtered list would therefore snap the tab to the top
+        /// on every filter keystroke that changes the match count; the cost
+        /// of the fixed height is trailing blank space below a filtered
+        /// list, which is why the grid is the last thing in the panel.
+        /// </summary>
+        private void SetCurrencyGridHeight()
+        {
+            if (_currencyGridPanel == null) return;
+
+            _currencyGridPanel.Height = SettingsCurrencyGridLayout.ComputeHeight(
+                _rows.Count, _panelWidth, CurrencyRowHeight);
         }
 
         private void BuildCurrencyValuationsSection(int panelWidth)
@@ -208,40 +329,37 @@ namespace GW2CraftingHelper.Views
             // default, if any", not "excluded". Use Clear to suppress a
             // default entirely.
             AddInfoLine("Some currencies show a default estimate and are valued automatically unless cleared.", panelWidth);
-
-            foreach (int currencyId in CuratedCurrencyIds)
-            {
-                AddCurrencyRow(currencyId, panelWidth);
-            }
-
+            // What the "Plan Defaults" section header used to introduce: it
+            // owned three info lines and no controls at all, so it is a note
+            // under the pricing section it points at, not a section.
+            AddInfoLine("Price basis and both \"own materials\" choices are set per plan in the Crafting Plan tab.", panelWidth);
             // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
             // for Astral Acclaim specifically - it is untradable and earned
             // via capped seasonal play, so unlike the other currencies
-            // above, there is no rate this settings row can honestly
+            // below, there is no rate this settings row can honestly
             // suggest. Left blank (the default) simply keeps it out of
-            // price comparisons, same as any other unset currency.
+            // price comparisons, same as any other unset currency. Above the
+            // grid rather than below it because the grid is deliberately the
+            // last thing in the panel - see SetCurrencyGridHeight.
             AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
 
-            _statusLabel = AddSaveRow(panelWidth, SaveValuations);
-        }
+            AddCurrencyFilterRow(panelWidth);
 
-        /// <summary>
-        /// The "Value own materials" checkbox
-        /// that used to live here (AddValueOwnMaterialsRow) has
-        /// been relocated inline into Views/CraftingPlanView.cs's controls
-        /// panel, next to Use Own Materials/price basis - it is now a
-        /// per-plan session choice (like those two neighbors), not a
-        /// global setting, since ModuleSettings.ValueOwnMaterials is no
-        /// longer read on the live generation path. This info line
-        /// replaces the old checkbox, matching this section's existing
-        /// "chosen per plan" info lines above.
-        /// </summary>
-        private void BuildPlanDefaultsSection(int panelWidth)
-        {
-            AddSectionHeader("Plan Defaults", panelWidth);
-            AddInfoLine("Price basis (Instant Buy / Buy Orders) is chosen per plan in the Crafting Plan tab.", panelWidth);
-            AddInfoLine("The \"Use Own Materials\" default is also set per plan in the Crafting Plan tab.", panelWidth);
-            AddInfoLine("\"Value own materials\" (decision-invariant reduction + 15% sell-back guard) is also chosen per plan in the Crafting Plan tab.", panelWidth);
+            _currencyGridPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 0),
+                Parent = _rootPanel
+            };
+
+            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
+            foreach (int currencyId in CuratedCurrencyIds)
+            {
+                AddCurrencyRow(currencyId, columnWidth);
+            }
+
+            _currencyForceVisible = new bool[_rows.Count];
+            SetCurrencyGridHeight();
+            ApplyCurrencyFilter();
         }
 
         /// <summary>
@@ -263,8 +381,6 @@ namespace GW2CraftingHelper.Views
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadFiberItemId, "Fiber (Farm)", panelWidth);
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)", panelWidth);
             AddHomesteadTierRow(Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)", panelWidth);
-
-            _homesteadStatusLabel = AddSaveRow(panelWidth, SaveHomesteadTiers);
         }
 
         private void AddHomesteadTierRow(int materialItemId, string materialLabel, int panelWidth)
@@ -274,6 +390,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             new Label()
             {
@@ -332,7 +449,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveHomesteadTiers()
+        private int SaveHomesteadTiers()
         {
             int invalidCount = 0;
             var parsedTiers = new Dictionary<int, int>();
@@ -369,19 +486,7 @@ namespace GW2CraftingHelper.Views
                 _settings.HomesteadWoodTier.Value = woodTier;
             }
 
-            if (_homesteadStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _homesteadStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _homesteadStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _homesteadStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _homesteadStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         /// <summary>
@@ -402,7 +507,6 @@ namespace GW2CraftingHelper.Views
             AddLogDiagnosticsRow(panelWidth);
             AddLogMaxSizeRow(panelWidth);
             AddLogRetentionDaysRow(panelWidth);
-            _logStatusLabel = AddSaveRow(panelWidth, SaveLoggingSettings);
         }
 
         private void AddLogDiagnosticsRow(int panelWidth)
@@ -412,6 +516,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             _logDiagnosticsCheckbox = new Checkbox()
             {
@@ -444,6 +549,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             new Label()
             {
@@ -490,6 +596,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             new Label()
             {
@@ -551,7 +658,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveLoggingSettings()
+        private int SaveLoggingSettings()
         {
             int invalidCount = 0;
 
@@ -602,19 +709,7 @@ namespace GW2CraftingHelper.Views
                 invalidCount++;
             }
 
-            if (_logStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _logStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _logStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _logStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _logStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         /// <summary>
@@ -631,7 +726,6 @@ namespace GW2CraftingHelper.Views
             AddInfoLine("How long a cached account snapshot may sit before an automatic background refresh runs.", panelWidth);
 
             AddSnapshotRefreshIntervalRow(panelWidth);
-            _snapshotStatusLabel = AddSaveRow(panelWidth, SaveSnapshotSettings);
         }
 
         private void AddSnapshotRefreshIntervalRow(int panelWidth)
@@ -641,6 +735,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             new Label()
             {
@@ -692,7 +787,7 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void SaveSnapshotSettings()
+        private int SaveSnapshotSettings()
         {
             int invalidCount = 0;
 
@@ -710,19 +805,7 @@ namespace GW2CraftingHelper.Views
                 invalidCount++;
             }
 
-            if (_snapshotStatusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _snapshotStatusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _snapshotStatusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _snapshotStatusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _snapshotStatusLabel.TextColor = WarningTextColor;
-            }
+            return invalidCount;
         }
 
         private void AddSectionHeader(string title, int panelWidth)
@@ -732,6 +815,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(headerPanel);
 
             new Label()
             {
@@ -742,6 +826,18 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, 4),
                 Parent = headerPanel
             };
+
+            // Same header rule as every CraftingPlanView section: 2px in
+            // SectionDividerColor, bottom-anchored with 1px clearance
+            // inside a 30px header (see LabelHelpers.CreateRowDivider for
+            // why 1px lines and flush anchoring are unsafe here).
+            _fullWidthPanels.Add(new Panel()
+            {
+                Size = new Point(panelWidth, 2),
+                Location = new Point(0, RowHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = headerPanel
+            });
         }
 
         private void AddInfoLine(string text, int panelWidth)
@@ -751,6 +847,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, InfoRowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
             new Label()
             {
@@ -763,55 +860,111 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // The default/cleared indicator and its Clear checkbox sit on
-        // their own line below the name/input/hint/error line -
-        // ErrorLabel is AutoSizeWidth and its text comfortably overruns
-        // any same-line gap, painting through the default label and the
-        // Clear checkbox - see
-        // CurrencyRowHeight/CurrencyDefaultLineY below. Both columns start
-        // well left of the old ErrorX-relative positions (aligned under
-        // the input box, not past the hint/error columns), so a
-        // realistically narrow Settings panel is far less likely to clip
-        // the Clear checkbox off the right edge than the old x>=624 layout
-        // was.
-        private const int CurrencyRowHeight = 54;
-        private const int CurrencyDefaultLineY = 32;
-        private const int CurrencyDefaultStateX = NameColumnX + NameColumnWidth;
-        private const int CurrencyClearCheckboxX = CurrencyDefaultStateX + 190;
+        // One line per currency: name, input, Clear, and one tag slot that
+        // shows either the default/cleared state or an "Invalid" warning.
+        // The horizontal constants live in SettingsCurrencyGridLayout so its
+        // MinColumnWidth (the one/two-column threshold) is derived from the
+        // same numbers, not hand-copied from them; these are compile-time
+        // aliases, not a second copy.
+        private const int CurrencyRowHeight = 30;
+        private const int CellNameX = SettingsCurrencyGridLayout.CellNameX;
+        private const int CellNameWidth = SettingsCurrencyGridLayout.CellNameWidth;
+        private const int CellInputX = SettingsCurrencyGridLayout.CellInputX;
+        private const int CellInputWidth = SettingsCurrencyGridLayout.CellInputWidth;
+        private const int CellClearX = SettingsCurrencyGridLayout.CellClearX;
+        private const int CellTagX = SettingsCurrencyGridLayout.CellTagX;
+        private const int CellTextY = 6;
+        // 1, not 2: the input then ends at y=27, clear of the row rule
+        // LabelHelpers.CreateRowDivider puts at 30 - 2 - 1.
+        private const int CellInputY = 1;
+        private const int CellDividerClearance = 1;
+        private const int CurrencyFilterWidth = 200;
 
-        private void AddCurrencyRow(int currencyId, int panelWidth)
+        private void AddCurrencyFilterRow(int panelWidth)
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, CurrencyRowHeight),
+                Size = new Point(panelWidth, RowHeight),
                 Parent = _rootPanel
             };
+            _fullWidthPanels.Add(rowPanel);
 
-            new Label()
+            _currencyFilterInput = new TextBox()
             {
-                Text = Gw2Constants.ResolveCurrencyName(currencyId),
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
+                Size = new Point(CurrencyFilterWidth, 26),
+                Location = new Point(CellNameX, CellInputY),
+                PlaceholderText = "Filter currencies...",
                 Parent = rowPanel
             };
+            _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
 
-            var input = new TextBox()
+            _currencyCountLabel = new Label()
             {
-                Size = new Point(InputWidth, 26),
-                Location = new Point(NameColumnX + NameColumnWidth, 3),
-                Parent = rowPanel
-            };
-
-            new Label()
-            {
-                Text = "copper per unit",
+                Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Location = new Point(HintX, 7),
+                Location = new Point(CellNameX + CurrencyFilterWidth + 12, CellTextY),
                 Parent = rowPanel
+            };
+        }
+
+        private void AddCurrencyRow(int currencyId, int columnWidth)
+        {
+            string name = Gw2Constants.ResolveCurrencyName(currencyId);
+
+            var cellPanel = new Panel()
+            {
+                Size = new Point(columnWidth, CurrencyRowHeight),
+                Parent = _currencyGridPanel
+            };
+
+            string shortName = LabelHelpers.EllipsizeToWidth(
+                GameService.Content.DefaultFont14, name, CellNameWidth);
+            new Label()
+            {
+                Text = shortName,
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = CellNameWidth,
+                // Only when the name did not fit - an always-on tooltip
+                // repeating the visible text is noise.
+                BasicTooltipText = shortName == name ? null : name,
+                Location = new Point(CellNameX, CellTextY),
+                Parent = cellPanel
+            };
+
+            bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
+
+            var input = new TextBox()
+            {
+                Size = new Point(CellInputWidth, 26),
+                Location = new Point(CellInputX, CellInputY),
+                // The unit, on every row: a 70px box leaves ~50px of text
+                // region (Blish's TextBox insets the placeholder by 10px a
+                // side and does not truncate it), which "copper" fits and
+                // "default: 3600" does not - the default estimate is shown
+                // by DefaultLabel below instead.
+                PlaceholderText = "copper",
+                // Feature 1 spec: the estimate is labeled as such, with
+                // attribution/editable/clearable spelled out on hover.
+                BasicTooltipText = hasDefault
+                    ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or use Clear to suppress it."
+                    : "Coin value of one unit, in copper.",
+                Parent = cellPanel
+            };
+
+            var defaultLabel = new Label()
+            {
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                BasicTooltipText = hasDefault
+                    ? "This currency is valued automatically at its default estimate unless you type your own amount or check Clear."
+                    : null,
+                Location = new Point(CellTagX, CellTextY),
+                Parent = cellPanel
             };
 
             var errorLabel = new Label()
@@ -820,56 +973,94 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = ErrorTextColor,
-                Location = new Point(ErrorX, 7),
-                Parent = rowPanel
+                BasicTooltipText = "Enter a positive whole number of copper, or leave the box blank.",
+                Location = new Point(CellTagX, CellTextY),
+                Parent = cellPanel
             };
 
-            bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
-
-            Label defaultStateLabel = null;
             Checkbox clearCheckbox = null;
             if (hasDefault)
             {
-                defaultStateLabel = new Label()
-                {
-                    Text = "",
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    TextColor = InfoTextColor,
-                    Location = new Point(CurrencyDefaultStateX, CurrencyDefaultLineY),
-                    // Feature 1 spec: visibly labeled as an estimate, with
-                    // attribution/editable/clearable spelled out on hover.
-                    BasicTooltipText = "Adapted from gw2efficiency, decision-only estimate. Editable above; use Clear to suppress it.",
-                    Parent = rowPanel
-                };
-
                 clearCheckbox = new Checkbox()
                 {
                     Text = "Clear",
-                    Location = new Point(CurrencyClearCheckboxX, CurrencyDefaultLineY),
+                    Location = new Point(CellClearX, CellTextY),
                     BasicTooltipText = "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.",
-                    Parent = rowPanel
+                    Parent = cellPanel
                 };
             }
 
+            // Appended in the same step as the row it names - the filter
+            // maps grid.Cells[i] back onto _rows[i] by index.
+            _currencyNames.Add(name);
             _rows.Add(new CurrencyRow
             {
                 CurrencyId = currencyId,
                 HasDefault = hasDefault,
                 DefaultCopperPerUnit = defaultCopperPerUnit,
+                Cell = cellPanel,
+                // Shown/hidden per filter pass: the cells on the last
+                // populated grid row carry no rule (see ApplyCurrencyFilter).
+                Divider = LabelHelpers.CreateRowDivider(
+                    cellPanel, columnWidth, CurrencyRowHeight, CellDividerClearance),
                 Input = input,
+                DefaultLabel = defaultLabel,
                 ErrorLabel = errorLabel,
-                DefaultStateLabel = defaultStateLabel,
                 ClearCheckbox = clearCheckbox
             });
         }
 
         /// <summary>
-        /// Refreshes one row's default/
-        /// cleared indicator label and Clear checkbox from the given
-        /// (already-loaded or just-saved) valuation - shared by
+        /// Packs the cells matching the filter box two-up (one-up on a
+        /// narrow panel) and hides the rest. The grid panel keeps its
+        /// unfiltered height throughout - see SetCurrencyGridHeight.
+        /// </summary>
+        private void ApplyCurrencyFilter()
+        {
+            if (_currencyGridPanel == null) return;
+
+            for (int i = 0; i < _rows.Count && i < _currencyForceVisible.Length; i++)
+            {
+                _currencyForceVisible[i] = _rows[i].ErrorLabel.Text.Length > 0;
+            }
+
+            var grid = SettingsCurrencyGridLayout.Compute(
+                _currencyNames, _currencyFilterInput?.Text, _panelWidth, CurrencyRowHeight,
+                _currencyForceVisible);
+
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                var row = _rows[i];
+                var placement = grid.Cells[i];
+
+                row.Cell.Visible = placement.Visible;
+                if (placement.Visible)
+                {
+                    row.Cell.Location = new Point(placement.X, placement.Y);
+                }
+                // Hidden cells report Row = -1, so the guard below also
+                // keeps their rule off.
+                row.Divider.Visible = placement.Row >= 0 && placement.Row < grid.RowCount - 1;
+            }
+
+            if (_currencyCountLabel != null)
+            {
+                _currencyCountLabel.Text = grid.VisibleCount == _rows.Count
+                    ? $"{_rows.Count} currencies"
+                    : $"{grid.VisibleCount} of {_rows.Count} shown";
+            }
+        }
+
+        /// <summary>
+        /// Refreshes one row's Clear checkbox and its default/cleared tag
+        /// from the given already-loaded or just-saved valuation - shared by
         /// LoadCurrentValuations and SaveValuations so the two can never
-        /// disagree about how to render the same state.
+        /// disagree about how to render the same state. The tag is a label,
+        /// not the input's placeholder: the placeholder is clipped to ~50px
+        /// of text region by the 70px box (Blish's TextInputBase draws it
+        /// untruncated inside the control's own scissor), which cuts the
+        /// number off the default state entirely, and it would vanish behind
+        /// any typed override besides.
         /// </summary>
         private static void RefreshCurrencyRowDefaultState(CurrencyRow row, CurrencyValuation valuation)
         {
@@ -882,27 +1073,42 @@ namespace GW2CraftingHelper.Views
             bool hasOverride = valuation.TryGetCopperValue(row.CurrencyId, out _);
 
             row.ClearCheckbox.Checked = isCleared;
-            row.DefaultStateLabel.Text = isCleared
-                ? "default cleared"
+            row.DefaultLabel.Text = isCleared
+                ? "cleared"
                 : hasOverride
-                    ? $"(default was {row.DefaultCopperPerUnit})"
-                    : $"default: {row.DefaultCopperPerUnit}";
-            row.DefaultStateLabel.TextColor = isCleared ? WarningTextColor : InfoTextColor;
+                    ? $"was {row.DefaultCopperPerUnit}"
+                    : $"default {row.DefaultCopperPerUnit}";
+            row.DefaultLabel.TextColor = isCleared ? WarningTextColor : InfoTextColor;
         }
 
         /// <summary>
-        /// The one save-row shape every section uses: a row panel holding
-        /// a Save button wired to onSave and a status label, returned so
-        /// the caller can keep its own field pointing at it. Construction
-        /// order and every control property match the four per-section
-        /// builders this replaced byte-for-byte.
+        /// The cell's two tags share one slot (see CurrencyRow.DefaultLabel):
+        /// the red warning takes it while an amount will not parse, and the
+        /// default/cleared state comes back when it does.
         /// </summary>
-        private Label AddSaveRow(int panelWidth, Action onSave)
+        private static void SetCurrencyRowError(CurrencyRow row, string text)
         {
-            var rowPanel = new Panel()
+            row.ErrorLabel.Text = text ?? "";
+            row.DefaultLabel.Visible = row.ErrorLabel.Text.Length == 0;
+        }
+
+        /// <summary>
+        /// The tab's one Save button and its one status label, in a bar that
+        /// is a sibling of the scrolling content (not a row inside it), so
+        /// Save stays reachable from any scroll position. Anchored at the
+        /// TOP rather than as a bottom footer: LogTabContent already builds
+        /// a fixed toolbar this way above its own CanScroll FlowPanel, and a
+        /// top bar needs only ContentRegion.Width to place correctly - a
+        /// bottom footer would additionally depend on ContentRegion.Height
+        /// being final at Build time, whose failure mode is a Save bar
+        /// floating over the rows.
+        /// </summary>
+        private Panel BuildSaveBar(Container container)
+        {
+            var barPanel = new Panel()
             {
-                Size = new Point(panelWidth, 40),
-                Parent = _rootPanel
+                Size = new Point(container.ContentRegion.Width, SaveBarHeight),
+                Parent = container
             };
 
             var saveButton = new StandardButton()
@@ -910,18 +1116,60 @@ namespace GW2CraftingHelper.Views
                 Text = "Save",
                 Size = new Point(80, 28),
                 Location = new Point(NameColumnX, 6),
-                Parent = rowPanel
+                BasicTooltipText = "Save every section on this tab.",
+                Parent = barPanel
             };
-            saveButton.Click += (_, __) => onSave();
+            saveButton.Click += (_, __) => SaveAll();
 
-            return new Label()
+            _statusLabel = new Label()
             {
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX + 80 + 12, 12),
-                Parent = rowPanel
+                Parent = barPanel
             };
+
+            return barPanel;
+        }
+
+        /// <summary>
+        /// Persists every section - currency valuations, Homestead tiers,
+        /// logging policy, snapshot refresh interval - in place of the four
+        /// per-section Save buttons. Each section keeps its own per-row
+        /// error labels and its own "invalid rows are left as previously
+        /// persisted" contract; only the confirmation is shared.
+        /// </summary>
+        private void SaveAll()
+        {
+            bool valuationsSaved = SaveValuations(out int invalidCount);
+            invalidCount += SaveHomesteadTiers();
+            invalidCount += SaveLoggingSettings();
+            invalidCount += SaveSnapshotSettings();
+
+            if (_statusLabel == null) return;
+
+            if (!valuationsSaved)
+            {
+                // Defensive branch (see SaveValuations' catch): the other
+                // three sections did persist, but a failed write is the
+                // headline and the per-row errors stay on screen.
+                _statusLabel.Text = "Save failed - see log";
+                _statusLabel.TextColor = ErrorTextColor;
+                return;
+            }
+
+            if (invalidCount == 0)
+            {
+                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                _statusLabel.TextColor = SuccessTextColor;
+            }
+            else
+            {
+                string entryWord = invalidCount == 1 ? "entry" : "entries";
+                _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                _statusLabel.TextColor = WarningTextColor;
+            }
         }
 
         private void LoadCurrentValuations()
@@ -933,12 +1181,17 @@ namespace GW2CraftingHelper.Views
                 row.Input.Text = valuation.TryGetCopperValue(row.CurrencyId, out long copperPerUnit)
                     ? copperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "";
-                row.ErrorLabel.Text = "";
+                SetCurrencyRowError(row, "");
                 RefreshCurrencyRowDefaultState(row, valuation);
             }
         }
 
-        private void SaveValuations()
+        /// <summary>
+        /// Returns false when the valuation could not be persisted at all;
+        /// invalidCount counts rows whose text did not parse (those keep
+        /// their previously-persisted value either way).
+        /// </summary>
+        private bool SaveValuations(out int invalidCount)
         {
             // Seeded from the currently-persisted valuation (not empty) so
             // an invalid row is left untouched below rather than silently
@@ -961,11 +1214,11 @@ namespace GW2CraftingHelper.Views
             }
             var cleared = new HashSet<int>(persisted.ClearedCurrencyIds);
 
-            int invalidCount = 0;
+            invalidCount = 0;
 
             foreach (var row in _rows)
             {
-                row.ErrorLabel.Text = "";
+                SetCurrencyRowError(row, "");
 
                 string text = row.Input.Text;
                 if (string.IsNullOrWhiteSpace(text))
@@ -1002,10 +1255,18 @@ namespace GW2CraftingHelper.Views
                     // Left out of this row's changes entirely - whatever
                     // was previously persisted for this currency (if
                     // anything) is preserved, matching "not saved" below.
-                    row.ErrorLabel.Text = "Must be a positive whole number";
+                    // Short enough to stay inside a half-width cell; the
+                    // label's tooltip carries the full rule.
+                    SetCurrencyRowError(row, "Invalid");
                     invalidCount++;
                 }
             }
+
+            // A row the filter is hiding still counts towards the save bar's
+            // "N invalid entries not saved", so re-run the filter with those
+            // rows forced visible - a warning whose tag is off screen points
+            // the user at nothing.
+            ApplyCurrencyFilter();
 
             CurrencyValuation saved;
             try
@@ -1026,12 +1287,7 @@ namespace GW2CraftingHelper.Views
                 // thread.
                 Logger.Warn(ex, "Failed to save currency valuations");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "settings", $"Failed to save currency valuations: {ex.GetType().Name} - {ex.Message}");
-                if (_statusLabel != null)
-                {
-                    _statusLabel.Text = "Save failed - see log";
-                    _statusLabel.TextColor = ErrorTextColor;
-                }
-                return;
+                return false;
             }
 
             foreach (var row in _rows)
@@ -1039,19 +1295,7 @@ namespace GW2CraftingHelper.Views
                 RefreshCurrencyRowDefaultState(row, saved);
             }
 
-            if (_statusLabel == null) return;
-
-            if (invalidCount == 0)
-            {
-                _statusLabel.Text = $"Saved - {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                _statusLabel.TextColor = SuccessTextColor;
-            }
-            else
-            {
-                string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
-                _statusLabel.TextColor = WarningTextColor;
-            }
+            return true;
         }
     }
 }
