@@ -11164,3 +11164,151 @@ unchanged. (5) Zoomed crop confirms full descenders on "Log",
 Blish's fixed 80px title indent (title cannot be centered without
 reimplementing window chrome) is recorded as the accepted limit;
 the Emblem option noted for a future maintainer call.
+
+## Settings dirty prompt (settings-dirty-prompt)
+
+Maintainer field-test directive, verbatim: "if settings have been edited
+before tabbing away.. it should prompt the user to ask if they want to
+save the changes they have made or discard before proceeding." The
+Settings tab has one Save button covering four sections, and nothing
+told a user who typed a currency override and then clicked another tab
+that the override was about to evaporate - the tab is rebuilt from
+persisted settings on every re-entry, so the edit was silently gone.
+
+**Dirty detection.** `Models/SettingsFormState` is a flat key/value bag
+of the tab's save-gated control values - one amount and one Ignore flag
+per currency row (47 of each), one tier per Homestead row, the two
+logging fields and the snapshot interval. Dirty is "this capture differs
+from the baseline taken at the last load or successful save", so typing
+a value and reverting it reads as clean, as does typing whitespace and
+deleting it (every value is trimmed on capture, matching what every
+`SettingsInputParser` entry point does before parsing). A key present in
+only one of the two captures counts as a change in both directions, and
+duplicate keys are rejected outright rather than overwritten - two
+controls sharing a key would collapse into one comparison and silently
+stop reporting edits to whichever lost. The type has no Blish reference,
+so the whole comparison is covered by real tests; only the thin
+`CaptureFormState` reader in `SettingsTabContent` touches controls.
+
+The Diagnostics checkbox is deliberately NOT part of the dirty model.
+Its `CheckedChanged` handler writes straight through to `ModuleSettings`
+and to the live `ModuleLog`, so it is never an unsaved change; listing
+it would raise a save prompt for a value already on disk.
+
+**Hook mechanics, measured from the vendored Blish HUD 1.3.0 binary**
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`, decompiled with
+`ilspycmd`). There is no cancellable before-change hook, and the reason
+is structural rather than an omission:
+
+- `TabbedWindow2.SelectedTab`'s setter is a plain (non-virtual) property.
+  It calls `SetProperty(ref _selectedTab, value, invalidateLayout: true)`
+  - which assigns the backing field - and only then calls
+  `OnTabChanged(new ValueChangedEventArgs<Tab>(previous, value))`.
+  By the time anything else runs, the tab has already changed.
+- `OnTabChanged` is `protected virtual`, but its FIRST act is
+  `ShowView(e.NewValue?.View())`, and it raises the public `TabChanged`
+  event LAST. So the outgoing view is already torn down and the incoming
+  one already requested before any module handler is reached. There is
+  no `TabChanging`, no `Cancel` flag on the event args, and no return
+  value the handler can use.
+- Two earlier interception points were measured and rejected.
+  (a) Overriding `OnTabChanged` in `ResizableTabbedWindow` and deferring
+  the `base` call until the user answers: `_selectedTab` is private and
+  has already moved, so the sidebar would highlight the new tab while the
+  old view is still on screen for the dialog's lifetime - a visibly
+  inconsistent state, and the deferred `base` call re-enters `ShowView`
+  from a dialog callback. (b) Overriding `OnClick` and swallowing the
+  click before `SelectedTab = HoveredTab` runs: `HoveredTab` is private,
+  so this means re-deriving the hit test from `SidebarActiveBounds`
+  (protected), `RelativeMousePosition` (public) and `Tabs.FromIndex`
+  (public) against TAB_VERTICALOFFSET=40 / TAB_HEIGHT=50, which are
+  private consts. That is a hand-copy of Blish's private layout geometry
+  whose drift mode is a missed or spurious prompt, and the click it reads
+  can differ from the cached `HoveredTab` the base would have used if the
+  mouse moved between the last `UpdateTabStates` and the click.
+
+So the prompt is raised AFTER the switch, from the public `TabChanged`
+event, keyed on `e.PreviousValue == _settingsTab`. This is safe because
+of a second measurement: `WindowBase2.ShowView` -> `ClearView` ->
+`Container.ClearChildren`, and `ClearChildren` only unparents
+(`while (_children.Count > 0) _children[0].Parent = null;`) - it does not
+dispose. The Settings TextBoxes and Checkboxes are therefore still alive
+and still holding the user's typed text when the handler runs, so both
+Save (persists exactly what was on screen) and the dirty comparison
+itself are reading real values, not a torn-down form.
+
+**Window close.** `TabChanged` never fires when the window is closed, so
+the same prompt is hung off `_mainWindow.Hidden`, guarded on the Settings
+tab being the selected one. This is cheap and correct rather than a
+known limit: `Control.Dispose(bool)` nulls the `Hidden` event as one of
+its first acts (before `Parent = null` and before `DisposeControl`), so
+`Unload`'s `_mainWindow.Dispose()` cannot re-enter the handler after
+`_modalDialog` has already been disposed one line earlier. The window
+fades out before `Visible` flips, so the prompt appears a beat after the
+window goes; `ModalBackdrop.Sync` already handles a hidden blocked
+surface by collapsing to zero size.
+
+**Prompt shape.** The existing `ModalDialog` has exactly two buttons, and
+no third was added. Confirm = Save, cancel = Discard, and `cancelText` is
+now an optional `Show` parameter (defaulting to the "Cancel" every
+existing caller already got) so the second button says "Discard" rather
+than "Cancel" - a button labelled Cancel would promise to put the user
+back on the Settings tab, which is exactly what Blish gives no way to do.
+The button width floors at the historical 70px and grows to fit a longer
+label rather than being clipped by StandardButton's centered, unpadded
+text region. Discard restores the last loaded/saved values into the
+controls and clears the save bar's status line.
+
+**Accepted limits.**
+
+- The switch itself cannot be vetoed, so the tab has already changed when
+  the prompt appears. On the tab path this is benign - returning to
+  Settings rebuilds the form from persisted settings either way - but the
+  prompt cannot offer "stay here".
+- The dialog's title-bar X and the Escape key both route to cancel, which
+  here means Discard. That is the safe reading on the tab path (the edits
+  were already unreachable) and a real loss on the close path.
+- A module unload with dirty settings (Blish shutting down, module
+  disabled) tears the window down without prompting; `Unload` has no
+  user-interaction budget.
+- If another module dialog is already on screen `ModalDialog.Show`
+  returns false and the prompt is skipped for that leave. Not reachable
+  in practice - `ModalBackdrop` blocks the module window while any dialog
+  is up, so the tab click that would trigger it cannot land.
+
+Desktop gate:
+
+1. Settings tab, edit one currency amount (type a number into an empty
+   box), then click another tab. The prompt appears, headed "Confirm",
+   reading "You have 1 unsaved change on the Settings tab. Save now, or
+   discard and keep the last saved values?", with Save and Discard
+   buttons - both fully labelled, neither clipped.
+2. Choose Save on that prompt, return to the Settings tab: the typed
+   value is in the box and its tag reads "was N". Restore the fixture
+   afterwards (clear the box, Save).
+3. Repeat the edit, click another tab, choose Discard, return to the
+   Settings tab: the box is back to its pre-edit value and the tag reads
+   "default N" again.
+4. Clean tab switch: open the Settings tab, touch nothing, click another
+   tab. No prompt. Then scroll the tab, use the currency search box, and
+   switch away - still no prompt (neither is a save-gated field).
+5. Revert-to-original: type over a value, then retype the original text
+   exactly (or blank a box and retype what was in it), and switch away.
+   No prompt.
+6. Multi-section count: edit a Homestead tier AND the snapshot interval
+   AND one currency Ignore checkbox, then switch away. The prompt reads
+   "3 unsaved changes" (plural).
+7. Window close: edit a field on the Settings tab and click the window's
+   title-bar X. The prompt appears after the window fades. Choose
+   Discard, reopen the window (corner icon) - the Settings tab is still
+   selected, the form shows the restored values, and closing again does
+   NOT prompt.
+8. Diagnostics checkbox alone: toggle it, switch away. No prompt (it
+   applies immediately). Toggle it back afterwards to restore the
+   fixture.
+9. Invalid entry: type "abc" into a currency box, press Save (status
+   reads "Saved - 1 invalid entry not saved", the row tag reads
+   "Invalid"), then switch away. No prompt - the user has already been
+   told, and re-prompting would loop on a value that can never be saved.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

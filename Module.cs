@@ -663,7 +663,7 @@ namespace GW2CraftingHelper
 
             string changeWord = unsaved == 1 ? "change" : "changes";
             _modalDialog.Show(
-                $"You have {unsaved} unsaved {changeWord} on the Settings tab. Save them, or discard them and keep the last saved values?",
+                $"You have {unsaved} unsaved {changeWord} on the Settings tab. Save now, or discard and keep the last saved values?",
                 () => _settingsContent.SaveAll(),
                 () => _settingsContent.DiscardChanges(),
                 "Save",
