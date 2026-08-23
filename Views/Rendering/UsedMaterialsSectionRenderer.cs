@@ -101,7 +101,6 @@ namespace GW2CraftingHelper.Views.Rendering
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            const int nameX = NameX;
             int qtyRightEdge = QtyRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
             var font = GameService.Content.DefaultFont14;
 
@@ -116,7 +115,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // with no overlap.
             string fullName = row.Label ?? "";
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, nameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, NameX, 9);
             if (nameHandle.NameLabel.Text != fullName)
             {
                 rowPanel.BasicTooltipText = fullName;

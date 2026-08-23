@@ -112,21 +112,16 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
             }
 
-            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
-                panelWidth, maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
-
-            // Both the header and every data row are handed this SAME
-            // ColumnEdges instance (for the build), and the same cached
-            // pre-scan values (for their relayout closures) - a relayout
-            // tick re-invokes ShoppingColumnMath.ComputeEdgesForPanel with
-            // the new panelWidth but these SAME data-derived maxima (the
-            // pre-scan above depends only on row data, never on
-            // panelWidth, so it does not need to re-run on resize at all).
+            // The header and every data row derive their build-time edges
+            // from this SAME scan, and their relayout closures re-derive
+            // them from it too - the pre-scan depends only on row data,
+            // never on panelWidth, so it does not need to re-run on resize
+            // at all and no two rows can anchor the table differently.
             var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, scan);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, scan, i == section.Rows.Count - 1);
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, scan, i == section.Rows.Count - 1);
             }
         }
 
@@ -170,10 +165,12 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         // Moved verbatim from CraftingPlanView.CreateShoppingListHeaderRow.
-        // Only change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
+        // Changes since: _relayoutActions.Add(...) -> _sink.AddRelayout(...),
+        // and the column edges come from the shared pre-scan.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, ColumnScan scan)
+            FlowPanel parent, int panelWidth, ColumnScan scan)
         {
+            var edges = scan.EdgesFor(panelWidth);
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.ShoppingHeaderRowHeight),
@@ -238,13 +235,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
-            PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
-            ColumnScan scan, bool isLast)
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, ColumnScan scan, bool isLast)
         {
+            var edges = scan.EdgesFor(panelWidth);
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            const int nameX = NameX;
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
@@ -267,7 +263,7 @@ namespace GW2CraftingHelper.Views.Rendering
             string hintText = row.HintText;
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
-                edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, nameX, 9);
+                edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, NameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
             // Owned/needed split for this row's currency cost(s),
@@ -288,7 +284,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 PillColors.GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
                 tagPanel = LabelHelpers.CreateSmallTag(
-                    rowPanel, sourceTag, nameX + nameLabel.Width + TagGap, 9, tagBorder, tagFill);
+                    rowPanel, sourceTag, NameX + nameLabel.Width + TagGap, 9, tagBorder, tagFill);
             }
 
             var qtyLabel = new Label()
@@ -370,7 +366,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 if (tagPanel != null)
                 {
-                    tagPanel.Location = new Point(nameX + nameLabel.Width + TagGap, 9);
+                    tagPanel.Location = new Point(NameX + nameLabel.Width + TagGap, 9);
                 }
             });
         }
