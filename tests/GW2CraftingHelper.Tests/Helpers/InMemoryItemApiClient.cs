@@ -32,6 +32,15 @@ namespace GW2CraftingHelper.Tests.Helpers
             _items[id] = new RawItem { Id = id, Name = name, Icon = icon, Rarity = rarity, Flags = flags };
         }
 
+        /// <summary>
+        /// A fully-shaped item, for tests that care about the details block
+        /// this client's simpler overload cannot express.
+        /// </summary>
+        public void AddItem(RawItem item)
+        {
+            _items[item.Id] = item;
+        }
+
         public Task<IReadOnlyList<RawItem>> GetItemsAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
