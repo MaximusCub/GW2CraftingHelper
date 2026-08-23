@@ -105,6 +105,7 @@
     <Compile Include="Models\CurrencyValuation.cs" />
     <Compile Include="Models\CurrencyDecisionDefaults.cs" />
     <Compile Include="Models\HomesteadEfficiencyTiers.cs" />
+    <Compile Include="Models\SettingsFormState.cs" />
     <Compile Include="Models\CraftingPlan.cs" />
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
