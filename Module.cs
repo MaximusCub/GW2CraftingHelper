@@ -401,6 +401,7 @@ namespace GW2CraftingHelper
                 _lastStatus,
                 UserRefreshAsync,
                 _apiAccessDialog,
+                _modalDialog,
                 _settings,
                 ClearCache,
                 SaveStatus,

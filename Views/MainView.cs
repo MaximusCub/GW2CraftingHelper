@@ -53,6 +53,7 @@ namespace GW2CraftingHelper.Views
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly ApiAccessDialog _apiAccessDialog;
+        private readonly ModalDialog _modalDialog;
         private readonly ModuleSettings _settings;
         private readonly Action _clearCache;
         private readonly Action<string> _saveStatus;
@@ -226,6 +227,7 @@ namespace GW2CraftingHelper.Views
             string initialStatus,
             Func<Task<AccountSnapshot>> refreshAsync,
             ApiAccessDialog apiAccessDialog,
+            ModalDialog modalDialog,
             ModuleSettings settings,
             Action clearCache,
             Action<string> saveStatus,
@@ -243,6 +245,7 @@ namespace GW2CraftingHelper.Views
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _apiAccessDialog = apiAccessDialog;
+            _modalDialog = modalDialog ?? throw new ArgumentNullException(nameof(modalDialog));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _clearCache = clearCache;
             _saveStatus = saveStatus;
@@ -325,6 +328,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Clear Cache",
                 Size = new Point(100, 30),
                 Location = new Point(w - 220, 5),
+                BasicTooltipText = "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.",
                 Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
@@ -338,14 +342,7 @@ namespace GW2CraftingHelper.Views
                 Enabled = _refreshAsync != null
             };
 
-            _clearButton.Click += (_, __) =>
-            {
-                _clearCache();
-                SetSnapshot(null);
-                var status = $"Cache Cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-                SetStatus(status);
-                _saveStatus(status);
-            };
+            _clearButton.Click += (_, __) => ConfirmClearCache();
 
             _refreshButton.Click += async (_, __) => await RefreshNowAsync();
 
@@ -867,6 +864,40 @@ namespace GW2CraftingHelper.Views
                 _contentPanel.Location = new Point(0, ContentY);
                 _contentPanel.Size = new Point(w, contentHeight > 0 ? contentHeight : 0);
             }
+        }
+
+        /// <summary>
+        /// The Clear Cache button's click flow, behind the same ModalDialog
+        /// confirm the Log tab's Delete Log File and the Crafting Plan tab's
+        /// regenerate gate use. The confirm is unconditional: clearing
+        /// deletes the only copy of the account snapshot, and rebuilding it
+        /// requires a reachable GW2 API - the exact condition a user is
+        /// often already stuck on when they reach for this button.
+        /// <para>
+        /// Unlike Delete Log File, the destructive work stays inline on the
+        /// main thread: ClearCache is a token cancel plus a single
+        /// SnapshotStore.Delete and three field resets under
+        /// SnapshotCommitGate's lock - no queue drain, no lock a background
+        /// loop can hold - and SetSnapshot/SetStatus below are control
+        /// mutations that must run on the main thread anyway.
+        /// </para>
+        /// </summary>
+        private void ConfirmClearCache()
+        {
+            if (_clearCache == null) return;
+
+            _modalDialog.Show(
+                "Discard the cached account snapshot? It can only be rebuilt when the GW2 API is reachable.",
+                () =>
+                {
+                    _clearCache();
+                    SetSnapshot(null);
+                    var status = $"Cache cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
+                    SetStatus(status);
+                    _saveStatus(status);
+                },
+                null,
+                confirmText: "Discard");
         }
 
         /// <summary>
