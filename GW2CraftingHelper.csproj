@@ -139,6 +139,7 @@
     <Compile Include="Services\ItemStatMath.cs" />
     <Compile Include="Services\ItemDescriptionSanitizer.cs" />
     <Compile Include="Services\ItemStatBlockFactory.cs" />
+    <Compile Include="Services\ItemStatTooltipComposer.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
     <Compile Include="Services\CostLineValuation.cs" />
     <Compile Include="Services\SeasonalOfferFilter.cs" />
