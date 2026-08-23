@@ -12238,3 +12238,274 @@ window - the dummy maxes near 1490 effective), the one-column
 fallback (unreachable at the enforced minimum), and the documented
 scroll-reset-on-column-count-change (accepted, recorded with its
 measured Blish cause rather than defended against).
+
+---
+
+## Font bump and decision-round polish (font-and-polish)
+
+Four maintainer decisions from the same field-test round, taken as four
+commits. The first is the module-wide type change the
+minimum-window-width research had been holding open; the other three are
+small, independent fixes to things the field test tripped over.
+
+### 1. The +2pt bump ("do it")
+
+Body text moves **Menomonia 14 -> 16** and small/caption/pill text
+**12 -> 14**. Title (18) and the plan's display title (32) are unchanged.
+
+`Views/Rendering/UiFonts` names the four sizes by ROLE - `Body`,
+`Caption`, `Title`, `Display` - and is now the only place
+`GameService.Content.DefaultFontNN` is read from anywhere under `Views/`.
+That is the point: the previous size decision was spread over ~60 call
+sites plus every Label that silently took Blish's own default, so
+"is the module consistent?" was not a question anyone could answer by
+looking. It is now `grep -rn DefaultFont Views/` returning comments only.
+
+- **49 Labels were taking Blish's DefaultFont14 default** rather than
+  setting a font. Under the old scheme that was invisibly correct; under
+  the bump it would have left a third of the module one size behind.
+  Every one of them now names a font.
+- **Three control types are deliberately excluded and stay at Blish's
+  own DefaultFont14**: `Checkbox` exposes no `Font` property at all, and
+  `TextBox`/`Dropdown` have internal padding Blish authors against its
+  default while holding typed values rather than module prose. Anything
+  MEASURING one of those three measures in `Caption`, which is the size
+  they actually paint - `MainView.MeasureCheckboxWidth` and
+  `SettingsCurrencyGridLayout.CellClearWidth` both say so at the point of
+  use, and `SettingsCurrencyGridLayoutTests` carries a second char-width
+  bound for exactly those two controls.
+
+#### Measured font metrics behind every re-derived constant
+
+Taken by parsing the installed
+`C:\Blish.HUD\Content\fonts\menomonia\menomonia-{12,14,16,18}-regular.xnb`
+(MonoGame.Extended `BitmapFontReader` XNB, uncompressed) and measuring
+with MG.Extended's own advance / `XOffset+Width` rule - the same method
+`docs/research/minimum-window-width.md` used, re-run and cross-checked
+against that report's published figures before being trusted (it
+reproduces the report's pill-run table exactly: 222/198, 242/218,
+436/406, 482/452, and its 174px `Thermocatalytic Reagent`).
+
+| size | line height | lowest ASCII ink, past the line box | `M` | `w` | `0` |
+|---|---|---|---|---|---|
+| 12 | 13 | +3 | 11 | 11 | 8 |
+| 14 | 18 | +1 | 13 | 13 | 9 |
+| 16 | 20 | +1 | 15 | 14 | 10 |
+| 18 | 20 | +3 | 16 | 16 | 11 |
+
+Real strings measure **1.10-1.11x** wider at 16 than at 14 (730 -> 810,
+174 -> 192, 263 -> 292), not the naive 16/14 = 1.143.
+
+#### Constants re-derived (old -> new, and on what basis)
+
+| constant | old | new | basis |
+|---|---|---|---|
+| `WindowSizing.MinWindowWidth` | 1436 | **1472** | the research's +2pt variant (1448, measured at Menomonia 16, not scaled) plus one `TreeIndentPer` of vendor-leaf headroom |
+| `TooltipTextFormat.LineBudgetChars` | 75 | **67** | 75 / 1.11, the measured Font16/Font14 prose ratio - scaling the shipped budget keeps whatever calibration prose the original 6.5px/char figure came from |
+| `SnapshotItemGridLayout.MaxCharWidthPx` | 8 | **9** | item names measure ~8.4px/char at Font16 (192px over 23 characters), rounded up |
+| `SnapshotItemGridLayout.MinColumnWidth` | 464 | **516** | derived: `40 + 52*9 + 8`. Two columns at 1158px, three at 1674px |
+| `SettingsCurrencyGridLayout.CellNameWidth` | 170 | **190** | 170 x 1.11, so the same currency names still fit before ellipsis |
+| `SettingsCurrencyGridLayout.CellTagWidth` | 100 | **110** | "default 3600" measures 98px at Font16; keeps the ~11% slack the 100px slot gave its 89px at Font14 |
+| `SettingsCurrencyGridLayout.CellClearWidth` | 74 | **74** | unchanged - it sizes a `Checkbox` label Blish keeps at Font14 |
+| `SettingsCurrencyGridLayout.MinColumnWidth` | 424 | **454** | derived from the three above. Two columns need a 908px panel (a 1034px window), clearing the 1472 minimum by ~426px |
+| `PlanContentHeightMath.CTableHeaderRowHeight` | 26 | **28** | header label at `LabelY` 5, lowest Font16 ink y=26 - exactly the old band |
+| `PlanContentHeightMath.DisciplineRowHeight` | 32 | **36** | two labels at y=7/y=9, ink y=28, divider top was y=29. 36 is what every other single-line table row uses and is on `CreateRowDivider`'s proven-immune list |
+| `PlanContentHeightMath.RecipeRowHeightWithSublabel` | 44 | **48** | name line box 18 -> 20 pushed the sublabel y=22 -> 24, and the sublabel's own font grew: ink y=43 against a divider at y=41 |
+| `RecipesSectionRenderer` sublabel y | 22 | **24** | sits directly under the name's new 20px line box |
+| `TopRegionLayoutMath.StatusToSeparatorGap` | 21 | **23** | the plan status label's Font16 ink landed exactly on the separator |
+| `SummarySectionLayoutMath.CostBandCaptionLineHeight` | 20 | **25** | caption font 12 -> 14, measured line height 13 -> 18; keeps the same slack over the real metric |
+| `SummarySectionLayoutMath.CostBandCurrencyNoteHeight` | 18 | **23** | same +5 |
+| `SummarySectionLayoutMath.CostBandHeight(false/true)` | 68 / 86 | **73 / 96** | falls out of the two above |
+| `TreeSectionController.PillHeight` | 20 | **24** | the pill label sits at y=2 in an inset panel of `PillHeight - 2`; its Font14 ink is y=21 against an 18px interior |
+| `LabelHelpers.SmallTagHeight` | 18 (literal) | **22** (named) | same shape one level out; promoted to a constant because two call sites centred a tag with a hand-repeated `- 18` |
+| `MainView.ItemRowHeight` | 52 | **56** | name line box ends y=24, so the breakdown moved y=24 -> 26 and its ink y=43 -> 47; keeps the old 9px bottom slack |
+| `MainView` breakdown line y | 24 | **26** | as above |
+| `SettingsTabContent.CurrencyRowHeight` | 30 | **32** | cell labels at y=6, Font16 ink y=27, divider top y=27 |
+| `SettingsTabContent.CurrencyHeaderRowHeight` | 24 | **26** | header labels' Font16 ink y=25 |
+| `SettingsTabContent.InfoRowHeight` | 20 | **22** | info line at y=2, Font16 ink y=23 - same 1px overhang 20 gave Font14's y=21 |
+| `AboutTabContent.InfoRowHeight` | 20 | **22** | same site shape (`AddLabeledInfoSection`'s fixed-height heading panel) |
+| `CraftingPlanView` section header font | Font16 | **Font18 (`Title`)** | Body moved onto the 16 this header sat at, flattening the page to one level. Font18 no longer collides with the plan title (Font32) and matches what Settings/About already use |
+| `CraftingPlanView.SectionHeaderRowHeight` | 30 (literal) | **32** (named) | the promoted Font18 title's ink is y=28 against a divider at y=27 |
+| `ModalDialog.WindowHeight` | 170 | **190** | the message is capped to whole lines of the body font; +20 is exactly one Font16 line, taking the cap from three lines back to four to pay for ~11% wider text |
+
+**Deliberately unchanged, each for a stated reason** (recorded beside the
+constant, not just here):
+
+- `PlanRelayoutMath.TreePillColumnWidth` stays **256**. The research's
+  four-pill `CRAFT/TP/VENDOR/IGNORE` run measures **242px** at Font14
+  against the **252px** budget a 256px column leaves, so it still fits at
+  normal padding. The `CURRENCY` + `HAVE n/m TOTAL` run does now need the
+  tightened-padding pass (263 normal / 251 tight), which
+  `ComputePillFit` already applies unprompted; the `HAVE n/m NEEDED`
+  annotation overflows to `+N` as it always did.
+- `UsedMaterialRowHeight` / `ShoppingRowHeight` /
+  `RecipeRowHeightNoSublabel` (36) and `TreeRowHeight` (40) are
+  **icon-driven**: a 34px rarity frame plus a 2px divider already exceeds
+  the tallest text run in them.
+- `CraftStepRowHeight` (44): its body text was **already Font16** before
+  the bump, so only its Font12 -> Font14 sublabel moved, and that
+  sublabel's new ink (y=35) still clears its divider at y=41.
+- `CurrencyRowHeight` / `FallbackTextRowHeight` (28): a single line at
+  y=4 (ink 25) or y=7 (ink 26), with no divider beneath either.
+- `CostTileRowHeight` (56): its amount is bottom-anchored by
+  `BandAmountY` and its caption block bottom, at the grown caption
+  metric, still lands above it (24 vs 30).
+- `SnapshotHeaderLayout.StatusRowHeight` / `LogTabContent.StatusRowHeight`
+  (24): status labels sit at y=2, Font16 ink y=23.
+- `MainView.WalletRowHeight` (36): icon-driven (32px icon at y=2, plus
+  2), and its single Font16 line's ink (y=27) sits well inside.
+- `LogTabContent`'s row metrics are **measured from the font at runtime**
+  (`Measure(font, "Ag").Height + 2`), so they moved on their own.
+  `NotesSectionLayoutMath` likewise takes a measure function.
+- `ApiAccessDialog.WindowHeight` (300): **inferred, not measured** - by
+  line count its three checks wrap to six lines at both sizes, putting
+  the button line near y=193 inside a ~255px content region, i.e. ~60px
+  of headroom. Gate item 1 is what actually confirms it.
+
+#### Modelling honesty on the 1472 figure
+
+The window minimum is **measured for the fonts and inferred for the
+chrome**, exactly as it was at 1436: the 126px window-to-panel chain has
+one ~8px term (Blish's `Panel` border) taken from this repo's own comment
+rather than a decompile, so the whole figure carries +/-2px there. Two
+further pixels of slop come from the cost column: this round's
+re-measurement of a six-digit gold run gives 178px where the research's
+table says 175, a 3px difference in how the two rounded the trailing
+glyph. `PlanRelayoutMathTests`' deepest-row constants are taken in the
+research's convention (`DeepestRowQtyPrefixWidth` 65 -> **73** by that
+string's own measured 77/68 ratio, `DeepestRowNameWidth` 174 -> **192**
+measured directly, `DeepestPlanCostColumnWidth` 165 -> **175** by scaling
+only the three digit runs), which is what keeps the depth-23 row's
+designed 24px gutter and the depth-24 vendor leaf's exact zero-gutter fit
+assertable rather than approximate. Under this round's own convention the
+depth-23 gutter would read 21px instead of 24 - inside the chrome term's
+own uncertainty, and not worth moving the minimum for.
+
+### 2. The one-letter empty-state hint ("add a hint")
+
+`SnapshotSearchResultBuilder` holds character-name matching back below
+`MinCharacterSearchLength` (2) for a good reason - one letter surfaces
+everything a character whose name contains it holds, so the opening
+keystroke of an item search would widen the list instead of narrowing it
+- but the hold-back is invisible: the list comes back empty and reads as
+a broken search.
+
+`ShortQueryCharacterHint` returns one extra line for the "No items
+match ..." message on **exactly** the case the rule caused: a query
+shorter than the minimum whose next keystroke really would match a roster
+name. It is silent on a two-letter query (that already searches character
+names, so an empty list there is a genuine no-result and the hint would
+be a lie), on a one-letter query no roster name carries, on a blank query,
+and with no roster at all. It takes the unchecked-character set so a
+character the source filter has excluded never triggers a promise the
+filter cannot keep. It names no character and no id. MainView appends it
+on the items branch only - the Wallet filter has no character matching at
+all. Seven Blish-free cases, one of which drives the real `BuildItemRows`
+path at one and then two letters to show the hint's premise is true.
+
+### 3. The background-refresh spinner ("use spinner")
+
+Only a clicked Refresh Now turned the inline spinner; the timer-driven
+auto-refresh (`Update()`'s staleness gate, `OnSubtokenUpdated`, module
+load) ran silently.
+
+`Module` carries a `volatile _backgroundRefreshInFlight` around
+`RefreshSnapshotInBackgroundAsync`'s body, set **past** both early
+returns so a tick that declines to refresh (already running, or inside
+the failure backoff) never spins over nothing. `Update()` drains it to
+the view on change - the same dirty-flag shape `SaveStatusThreadSafe`
+already uses for status text, because the `finally` may resume on a
+ThreadPool thread. The drain sits ABOVE `Update()`'s
+`if (_refreshInProgress) return;`, or it could only ever switch the
+spinner on after the refresh it belongs to had finished, and it only
+marks a value applied once a view existed to receive it, so the
+module-load refresh is not lost against a null `_snapshotContent`.
+
+`MainView` keeps **two** flags and shows the OR of them. One shared flag
+would let a Refresh Now clicked DURING an auto-refresh switch the running
+refresh's spinner off: `UserRefreshAsync`'s own `_refreshInProgress` gate
+returns null immediately in that case and MainView's `finally` runs at
+once. `_refreshInProgress` remains the gate on whether a refresh may
+START and is deliberately not reused for this.
+
+Spinner only, not the status text: the user did not ask for this refresh,
+so replacing the timestamp they are reading with "Refreshing..." is a
+surprise rather than feedback - and the background path's cancellation
+arm writes no status that would restore the label afterwards.
+
+### 4. Sort reset on a new plan ("reset to defaults when you gen a new plan")
+
+`ResetPerPlanSortState` clears both sortable tables to `None` at
+`TriggerGenerate`'s commit point, beside the existing
+`_sectionExpansion.Clear()`. That point is precisely what distinguishes a
+new plan from a re-render of the same one: a re-sort, a tree pill
+override and a re-solve all re-render through `RenderPlan` without ever
+reaching it, so they keep the sort exactly as before - which is the
+behaviour the sortable-tables round deliberately built and which stays.
+
+One method rather than two calls at the site, so a future third sortable
+table cannot be reset in one place and forgotten in another.
+
+Not reset elsewhere, on purpose: `ApplyRestoredPlan` cannot run after a
+Generate in the same session (`_generateCompletedThisSession` guards it),
+so a reset there would be a no-op; `RollBackFailedPlanRender` leaves no
+plan and therefore no sortable table rendered at all, and the next
+Generate resets it anyway.
+
+`TableSortState`'s class doc claimed the superseded lifetime and is
+corrected. The struck-through claim in the sortable-tables section above
+points here.
+
+### Reviewer-scrutiny list
+
+Things a reviewer should look at hardest, stated rather than buried:
+
+1. **`UiFonts` is a new abstraction.** It is justified by the 60+ call
+   sites it replaces and by `UiMetrics`' existing precedent in the same
+   namespace, but it IS new surface.
+2. **43 of the 49 Label font insertions were mechanical.** Each was
+   verified to be body prose, not a caption; the ones inside fixed-height
+   rows were then checked against that row's ink budget, which is where
+   the eight row-height growths came from.
+3. **`ModalDialog.WindowHeight` 170 -> 190 is the one growth not forced
+   by a clipping calculation** - three lines still fit at 170. It buys
+   back the line ~11% wider text can now need.
+4. **The 1472 minimum's +/-2px chrome term and the 3px cost-column
+   convention gap** are described above rather than papered over.
+5. **The spinner wiring has no automated coverage.** `Module` and
+   `MainView` are Blish-bound; the two-flag OR and the `Update()` drain
+   are argued from source and pinned only by desktop gate item 4.
+6. **`Checkbox` staying at Font14** is a visible inconsistency in the
+   Settings tab and the Snapshot source filters - Blish gives no seam.
+   Worth a maintainer look at the gate.
+7. **The `CURRENCY` + `HAVE n/m TOTAL` pill run now needs the tightened
+   padding pass** where it did not before. Not a regression (the pass
+   exists for this), but it is a visible density change on those rows.
+
+### Desktop gate
+
+1. At the **1472** minimum, read a plan and a snapshot end to end on
+   every tab. Row text is legibly larger than before and nothing is
+   clipped: check the Required Disciplines character line (the reported
+   descender site), Required Recipes rows WITH a sublabel, the Summary
+   cost band's caption and disclosure line, the tree's decision pills,
+   and the Shopping List's source tags.
+2. Resize from the minimum outward and back. No row, divider, tag or pill
+   overlaps its neighbour at any width, the Snapshot grid still gives two
+   columns at the minimum and a third past ~1674px, and the Settings
+   currency grid stays two-up.
+3. Snapshot tab: type ONE letter that a character's name contains but no
+   item's does - the empty-state message carries "Type another letter to
+   match character names." Type a letter no character carries, and a
+   two-letter query, and confirm the line does NOT appear.
+4. Leave the module past the snapshot refresh interval with the Snapshot
+   tab open: the spinner appears beside the status label for the whole of
+   the automatic refresh and stops when it lands. Click Refresh Now while
+   that automatic refresh is running and confirm the spinner keeps
+   turning rather than stopping early.
+5. Sort Used Materials by Amount, then Generate a new plan: the header
+   indicator is gone and the rows are in the plan's own order. Re-sort,
+   then click a tree decision pill (re-solve) and confirm the sort and
+   its indicator SURVIVE that.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
