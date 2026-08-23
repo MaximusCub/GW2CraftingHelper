@@ -180,7 +180,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // as two literals, the same premultiplied "Color * f" idiom
         // FullCoverageFill below already uses: Blish composites a Panel's
         // BackgroundColor over whatever is behind it, so the window's
-        // parchment texture still reads through the fill.
+        // parchment texture still reads through the fill at 86%. The frame
+        // paints ON the fill (see CreateHighlightBox), so an edge lands at
+        // 1 - 0.5 * 0.86 ~= 0.57 against that 0.14 interior - the ring is
+        // four times the interior's density, which is what makes it read
+        // as an edge at 1px.
         private static readonly Color ResultHighlightTint = new Color(214, 176, 96);
         private static readonly Color ResultHighlightFill = ResultHighlightTint * 0.14f;
         private static readonly Color ResultHighlightBorder = ResultHighlightTint * 0.5f;
@@ -311,15 +315,11 @@ namespace GW2CraftingHelper.Views.Rendering
             int amountHeight = AmountBlockHeight(amountFont);
             int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
 
-            // Clamped below the caption block: rowHeight is a fixed
-            // constant while the font's real metrics come from whatever
-            // Blish loaded, so a font taller than the band was sized for
-            // must overflow downward (loud - the DEBUG assert below catches
-            // it) rather than silently overprint the caption.
-            int amountY = AmountY(rowHeight, amountHeight, captionBlockBottom, amountBottomPad);
+            int amountY = SummarySectionLayoutMath.BandAmountY(
+                rowHeight, amountHeight, captionBlockBottom, amountBottomPad);
 
-            int boxTop = captionY - SummarySectionLayoutMath.CostBandBoxPadY;
-            int boxHeight = amountY + amountHeight + SummarySectionLayoutMath.CostBandBoxPadY - boxTop;
+            int boxTop = SummarySectionLayoutMath.CostBandBoxTop;
+            int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(amountY, amountHeight);
 
             var tiles = new List<CostTileHandle>(tileCount);
             for (int i = 0; i < tileCount; i++)
@@ -357,15 +357,15 @@ namespace GW2CraftingHelper.Views.Rendering
                     int widest = captionWidth;
                     if (noteWidth > widest) widest = noteWidth;
                     if (segmentsWidth > widest) widest = segmentsWidth;
-                    int boxWidth = widest + 2 * SummarySectionLayoutMath.CostBandBoxPadX;
+                    int boxWidth = SummarySectionLayoutMath.CostBandBoxWidth(widest);
 
                     box = CreateHighlightBox(
                         rowPanel,
                         ContentX(lone, tileX, geometry.TileWidth, boxWidth),
-                        boxTop, boxWidth, boxHeight,
-                        out host);
-                    hostTop = boxTop + HighlightBoxBorder;
-                    hostWidth = boxWidth - 2 * HighlightBoxBorder;
+                        boxTop, boxWidth, boxHeight);
+                    host = box;
+                    hostTop = boxTop;
+                    hostWidth = boxWidth;
                 }
 
                 var captionLabel = new Label()
@@ -511,36 +511,56 @@ namespace GW2CraftingHelper.Views.Rendering
 #endif
         }
 
-        // The highlight box's 1px border, drawn the way
-        // LabelHelpers.CreateSmallTag draws a pill's: an outer panel in the
-        // border colour with the fill panel inset inside it.
+        /// <summary>Width of the highlight box's frame.</summary>
         private const int HighlightBoxBorder = 1;
 
         /// <summary>
-        /// The result tile's highlight box. Returns the OUTER panel (what a
-        /// resize moves) and hands back the inner fill panel every control
-        /// inside the box is parented to - children paint over their
-        /// container's background, so nothing here depends on sibling
-        /// z-order.
+        /// The result tile's highlight box, and the container its caption,
+        /// disclosure line and amount are parented to. The box IS the fill
+        /// panel - nothing paints beneath it, so the parchment behind the
+        /// section shows through at exactly ResultHighlightFill's alpha.
+        /// The frame is four 1px edge panels drawn ON the fill (so an edge
+        /// composites to fill+border, visibly denser than the interior);
+        /// deliberately NOT the LabelHelpers.CreateSmallTag idiom of a
+        /// border-coloured panel with the fill inset inside it, which every
+        /// other caller gets away with only because its border is opaque.
+        /// A translucent border there would under-paint the whole interior.
+        ///
+        /// The edges are siblings of the tile's labels but can never
+        /// overlap them: content is inset by CostBandBoxPadX/PadY, both of
+        /// which exceed this border width.
         /// </summary>
         private static Panel CreateHighlightBox(
-            Panel parent, int x, int y, int width, int height, out Panel content)
+            Panel parent, int x, int y, int width, int height)
         {
-            var outer = new Panel()
+            var box = new Panel()
+            {
+                Size = new Point(width, height),
+                Location = new Point(x, y),
+                BackgroundColor = ResultHighlightFill,
+                Parent = parent
+            };
+
+            const int b = HighlightBoxBorder;
+            AddHighlightBoxEdge(box, 0, 0, width, b);
+            AddHighlightBoxEdge(box, 0, height - b, width, b);
+            AddHighlightBoxEdge(box, 0, b, b, height - 2 * b);
+            AddHighlightBoxEdge(box, width - b, b, b, height - 2 * b);
+
+            return box;
+        }
+
+        private static void AddHighlightBoxEdge(Panel box, int x, int y, int width, int height)
+        {
+            if (width <= 0 || height <= 0) return;
+
+            new Panel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
                 BackgroundColor = ResultHighlightBorder,
-                Parent = parent
+                Parent = box
             };
-            content = new Panel()
-            {
-                Size = new Point(width - 2 * HighlightBoxBorder, height - 2 * HighlightBoxBorder),
-                Location = new Point(HighlightBoxBorder, HighlightBoxBorder),
-                BackgroundColor = ResultHighlightFill,
-                Parent = outer
-            };
-            return outer;
         }
 
         /// <summary>
@@ -565,16 +585,6 @@ namespace GW2CraftingHelper.Views.Rendering
         private static int ContentX(bool lone, int tileX, int tileWidth, int contentWidth)
         {
             return lone ? LoneTileContentX : tileX + PlanRelayoutMath.CenterX(tileWidth, contentWidth);
-        }
-
-        /// <summary>
-        /// Top y of an amountHeight-tall amount run: bottom-anchored
-        /// inside rowHeight, never allowed above the caption block.
-        /// </summary>
-        private static int AmountY(int rowHeight, int amountHeight, int captionBlockBottom, int bottomPad)
-        {
-            int y = rowHeight - bottomPad - amountHeight;
-            return y > captionBlockBottom ? y : captionBlockBottom;
         }
 
         // --- Currency table ---

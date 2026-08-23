@@ -183,6 +183,52 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Top y of an amountHeight-tall amount run inside a band of
+        /// rowHeight: bottom-anchored above bottomPad, never allowed above
+        /// the caption block. rowHeight is a fixed constant while
+        /// captionBlockBottom comes from whatever font metrics Blish
+        /// loaded, so a font taller than the band was sized for overflows
+        /// downward (loud - the renderer's DEBUG assert catches it) rather
+        /// than silently overprinting the caption.
+        /// </summary>
+        public static int BandAmountY(int rowHeight, int amountHeight, int captionBlockBottom, int bottomPad)
+        {
+            int y = rowHeight - bottomPad - amountHeight;
+            return y > captionBlockBottom ? y : captionBlockBottom;
+        }
+
+        /// <summary>
+        /// Band-space top edge of the highlight box: one pad above the
+        /// caption, which by <see cref="CostBandCaptionY"/>'s construction
+        /// is exactly one margin below the band's own top edge.
+        /// </summary>
+        public const int CostBandBoxTop = CostBandCaptionY - CostBandBoxPadY;
+
+        /// <summary>
+        /// Height of the highlight box around an amountHeight-tall amount
+        /// run whose top sits at band-space amountY: from
+        /// <see cref="CostBandBoxTop"/> down to one pad below the amount.
+        /// The box is the band's lowest ink, so this - not the amount run -
+        /// is what has to fit inside <see cref="CostBandHeight"/>.
+        /// </summary>
+        public static int CostBandBoxHeight(int amountY, int amountHeight)
+        {
+            return amountY + amountHeight + CostBandBoxPadY - CostBandBoxTop;
+        }
+
+        /// <summary>
+        /// Width of the highlight box around its widest measured line
+        /// (caption, disclosure line or coin run). Never clamped to the
+        /// tile slice: Blish clips a container's children, so a box
+        /// narrower than its content would cut the amount off where an
+        /// unboxed tile merely overlaps its neighbour.
+        /// </summary>
+        public static int CostBandBoxWidth(int widestContentWidth)
+        {
+            return widestContentWidth + 2 * CostBandBoxPadX;
+        }
+
+        /// <summary>
         /// The disclosure line's text, or null when the plan has no
         /// currency costs (in which case the coin figure genuinely IS the
         /// whole cost and no line is drawn). Pure copy rather than
