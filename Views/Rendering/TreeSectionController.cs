@@ -1060,13 +1060,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     // Pills have their own click actions; do not also treat
                     // a pill click as an expand/collapse toggle.
-                    foreach (var pill in pillPanels)
-                    {
-                        if (pill.MouseOver)
-                        {
-                            return;
-                        }
-                    }
+                    if (AnyPillHovered(pillPanels)) return;
+
                     _preserveScrollAcross(() =>
                     {
                         if (!state.ChildrenBuilt)
@@ -1093,7 +1088,10 @@ namespace GW2CraftingHelper.Views.Rendering
                         RefreshTreeContainerHeights();
                     });
                 };
-                PressFeedback.Wire(rowPanel);
+                // Same pill guard as toggleHandler, for the same reason: a
+                // press on a pill reaches this row panel too, and the row
+                // must not answer a click it is about to ignore.
+                PressFeedback.Wire(rowPanel, () => AnyPillHovered(pillPanels));
                 rowPanel.Click += toggleHandler;
             }
 
@@ -1203,6 +1201,26 @@ namespace GW2CraftingHelper.Views.Rendering
         // Services/DecisionPillPlanner.cs - Blish-free and directly unit
         // tested (DecisionPillPlannerTests) - so only the actual
         // Panel/Label rendering below stays here.
+
+        /// <summary>
+        /// Whether the cursor is over one of this row's decision pills. The
+        /// row panel receives every mouse event its pills do (measured -
+        /// Container.TriggerMouseInput raises the container's own events
+        /// before walking its children), so both the row's click handler and
+        /// its press feedback have to defer to the pill under the cursor.
+        /// </summary>
+        private static bool AnyPillHovered(List<Panel> pillPanels)
+        {
+            foreach (var pill in pillPanels)
+            {
+                if (pill.MouseOver)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Renders the pill column and returns the created pill panels so

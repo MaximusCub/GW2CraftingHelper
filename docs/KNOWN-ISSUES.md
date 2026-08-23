@@ -11954,6 +11954,22 @@ If a later Blish release fixes the double-prefixed path in
 a completed click, and the `PlayClick()` call in `PressFeedback.Wire` is
 what to drop.
 
+**Nested click targets (review round 1).** Measured:
+`Container.TriggerMouseInput` calls `base.TriggerMouseInput` - which
+raises the container's OWN mouse events - BEFORE it walks its children,
+and the deepest child only wins the RETURN value (ActiveControl) and the
+suppression of its siblings. So a press inside a wired child reaches the
+wired parent as well. Exactly one such nesting exists in the module: a
+decision pill inside an expandable tree row, which would otherwise have
+played two click sounds and dimmed two controls for one press. The row's
+click handler already had a "bail if a pill is hovered" guard for the
+same reason; `PressFeedback.Wire` takes an optional suppression
+predicate and the row now passes that same guard, extracted to
+`TreeSectionController.AnyPillHovered` so the two cannot drift. No other
+wired control is a descendant of another - the labels inside a tree row
+and inside a section header do receive the events, but they carry
+tooltips, not press wiring.
+
 ### Desktop gate
 
 1. Plan tab, press Generate Plan on a real multi-item request: a
@@ -11986,7 +12002,10 @@ what to drop.
 8. Press-and-hold Generate Plan, then any Settings tab button: the
    button dims while held and restores on release. Disabled buttons
    (Generate during a run) must NOT dim or click.
-9. Sound is NOT verifiable in the muted dummy session used for these
+9. Press a decision pill on a row that also expands: ONLY the pill
+   dims, not the whole row behind it, and the press produces one click
+   sound rather than two.
+10. Sound is NOT verifiable in the muted dummy session used for these
    captures - the screenshot harness runs Blish with no audio device, in
    which case `PlaySoundEffectByName` returns at its first guard. The
    click sound needs a live audio check by the maintainer; what IS

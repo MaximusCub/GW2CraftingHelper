@@ -70,9 +70,19 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Wires press-dim + click sound onto <paramref name="control"/>.
         /// The restore runs on release AND on the mouse leaving, because a
         /// press that drags off the control is delivered MouseLeft and never
-        /// a release - Blish routes both to the control under the cursor.
+        /// a release.
+        /// <para>
+        /// <paramref name="suppress"/> is for a container whose own click
+        /// handler already ignores clicks that landed on a wired child.
+        /// Measured: <c>Container.TriggerMouseInput</c> raises the
+        /// container's OWN mouse events first and only then walks its
+        /// children, so a press inside a wired child reaches BOTH - without
+        /// the predicate that is two click sounds and two dimmed controls
+        /// for one press. It is evaluated at press time, so the caller may
+        /// pass a list the press target is not in yet.
+        /// </para>
         /// </summary>
-        internal static void Wire(Control control)
+        internal static void Wire(Control control, Func<bool> suppress = null)
         {
             if (control == null) return;
 
@@ -92,6 +102,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // Click is gated on Enabled), so a disabled Generate button
                 // would otherwise answer a click it is about to ignore.
                 if (held || !control.Enabled) return;
+                if (suppress != null && suppress()) return;
 
                 held = true;
                 restingOpacity = control.Opacity;
