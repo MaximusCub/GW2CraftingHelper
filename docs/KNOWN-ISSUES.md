@@ -10212,6 +10212,20 @@ setter nulls `_tooltip` whenever the text changes. `ApplyRich` therefore
 clears `BasicTooltipText` BEFORE assigning the surface; the reverse order
 would silently drop it.
 
+**Content replaced under a stationary cursor.** `ApplyRich` finishes by
+calling `RichTooltipSurface.RefreshShowing`, which redraws the box when
+the surface is already visible for that same control (and hides it when
+the new content is empty). This is parity with the plain path, not a
+nicety: the `BasicTooltipText` setter either writes the new text into the
+live `BasicTooltipView` (`ActiveControl == this`) or drops `_tooltip` so
+the next hover rebuilds - both branches refresh. The rich path has no
+such setter, and `Tooltip.HandleMouseMoved` calls `Show` only while the
+tooltip is HIDDEN, so a re-applied content would otherwise stay stale
+until the pointer left. The reachable path is the tree's settle
+re-ellipsis (`UpdateTreeRowTooltip` from the re-ellipsis closure) firing
+after a window resize while the cursor rests on the row: the full-name
+line appears or disappears, and the visible box has to follow.
+
 ### What the surface adds over Blish's own tooltip
 
 **(a) Four-edge placement.** Measured (and already recorded under "Audit
@@ -10269,16 +10283,29 @@ it.
 
 ### Swallowed hover on the tree row (found migrating it)
 
-The tree row tooltip was assigned to the row Panel only, and Blish
-resolves a tooltip on the control under the cursor without bubbling to
-the parent - so the row's own name and quantity Labels swallowed it. The
-tooltip fired only over the bare strip of Panel beside them, which is
-the one place a reader is not pointing. That is the same swallowed-hover
-class already fixed in `ShoppingListSectionRenderer`, in `LogTabContent`'s
-rows, and in this same file's pill outer/inner/label stamping; the tree
-row was the remaining instance, and it hid exactly the full-item-name
-line the tooltip exists to show. Both Labels now carry the content
-alongside the Panel.
+The tree row tooltip was assigned to the row Panel only. Tooltip lookup
+reads exactly ONE control - `Tooltip.HandleMouseMoved` uses
+`Control.ActiveControl`, the deepest capturing control under the cursor -
+so the row's own name and quantity Labels swallowed it. The tooltip fired
+only over the bare strip of Panel beside them, which is the one place a
+reader is not pointing. That is the same swallowed-hover class already
+fixed in `ShoppingListSectionRenderer`, in `LogTabContent`'s rows, and in
+this same file's pill outer/inner/label stamping; the tree row was the
+remaining instance, and it hid exactly the full-item-name line the
+tooltip exists to show. Both Labels now carry the content alongside the
+Panel.
+
+**Tooltips only - do NOT copy the row's handlers onto the Labels.** Mouse
+EVENTS, unlike tooltip lookup, already reach the parent:
+`Container.TriggerMouseInput` calls `base.TriggerMouseInput` on ITSELF -
+which fires that container's own `Click` / `RightMouseButtonPressed` /
+`MouseMoved` handlers - before it walks its children, and the deepest
+child only wins the RETURN value (`control2 ?? control`, the value that
+becomes `ActiveControl`) and `break`s out of its SIBLINGS. So a
+left-click or right-drag over the row's name text already reaches
+`rowPanel`, which is also why the row's hover wash lights up over the
+name today. Stamping `toggleHandler` onto `nameLabel` would fire the
+toggle twice per click and leave the row visually unchanged.
 
 ### Deliberately out of scope
 
@@ -10305,7 +10332,14 @@ making `BasicTooltipView`'s max width relative to the screen.
    item name, wrapped if long, above the other lines. Hover directly over
    the row's NAME TEXT and over its quantity prefix, not just the empty
    strip beside them - the tooltip must appear over all three (before
-   this branch it appeared over none of the text).
+   this branch it appeared over none of the text). With the cursor on the
+   NAME text: left-click must expand/collapse the row exactly ONCE per
+   click (not toggle-and-toggle-back), and right-click must open the wiki
+   page - both handlers still live on the row Panel only.
+   Then park the cursor on an ellipsized row's name and resize the module
+   window until that name FITS: the open tooltip must drop its full-name
+   line while the cursor sits still, and gain it again when the window is
+   narrowed back.
 3. **Stays inside the screen on all four edges:** drag the module window
    so a tree row sits near the BOTTOM of the screen and hover a pill
    with a tall tooltip - the tooltip must stay fully on screen (this is

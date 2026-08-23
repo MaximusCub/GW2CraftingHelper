@@ -1138,15 +1138,25 @@ namespace GW2CraftingHelper.Views.Rendering
             var content = builder.Build();
 
             // The name and quantity Labels get it too, not just the row
-            // Panel. Blish resolves a tooltip on the control under the
-            // cursor and does not bubble to the parent, so a Label lying
-            // over the row swallows the row's hover - the same
+            // Panel. Tooltip lookup reads ONE control -
+            // Tooltip.HandleMouseMoved uses Control.ActiveControl, which is
+            // the deepest capturing control under the cursor - so a Label
+            // lying over the row swallows the row's hover. Same
             // swallowed-hover class already fixed in
             // ShoppingListSectionRenderer, in LogTabContent's rows, and in
             // this file's own pill outer/inner/label stamping. On the tree
             // it bit the worst spot: the item NAME, which is exactly what a
             // reader points at to find out what the row is, and exactly
             // what the tooltip's full-name line exists to expand.
+            //
+            // Tooltips ONLY. The row's click, right-click and hover-wash
+            // handlers stay on rowPanel alone and must not be copied onto
+            // these Labels: mouse EVENTS do reach the parent, because
+            // Container.TriggerMouseInput fires the container's own handlers
+            // (base.TriggerMouseInput) before it recurses into children - the
+            // deepest child only wins the RETURN value (ActiveControl) and
+            // suppresses its siblings. Duplicating toggleHandler onto a Label
+            // would toggle the row twice per click.
             TooltipFacility.ApplyRich(rowPanel, content);
             TooltipFacility.ApplyRich(nameLabel, content);
             TooltipFacility.ApplyRich(qtyLabel, content);
