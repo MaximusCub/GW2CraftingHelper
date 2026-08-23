@@ -9623,3 +9623,124 @@ single restore funnel review-verified in batch F) and the narrow-
 width pill-drop escalation beyond the +2 case. Suite 1969/1969 at
 HEAD; the height-math contract was re-walked clean by the verify
 round.
+
+## Audit batch H: table density (audit-h-density)
+
+Two maintainer-approved UX-audit findings, one premise: every data table
+in the module splits the name (pinned far left) from the numbers (pinned
+far right), so widening the window widens an empty band down the middle
+of every row 1:1 rather than making the table more readable. The audit
+measured 330-520px of that band at ordinary widths.
+
+- **M2, dead gutters in the plan tables.** The recipe tree (pill + cost
+  columns), the Summary currency table (Required/Have/Needed + the
+  full-coverage marker), Used Materials (Amount) and the Shopping List
+  (Amount/Each/Total) all anchored their right-hand block to
+  `panelWidth - 8`. Each now pulls that block in beside the names:
+  `PlanRelayoutMath.RightBlockX` takes the block's pinned x and the widest
+  name extent the table renders and returns the pulled-in x, clamped so it
+  never moves RIGHT of the pinned position (a narrow window degrades to
+  exactly the previous layout) and never left of `TableRightBlockMinX` (a
+  table of two-letter names should still read as a table). The widest name
+  extent comes from a per-render, data-derived measure pass over the
+  UNTRUNCATED names - truncated widths would be circular, since the
+  ellipsis budget is derived from the block position. It is measured once
+  and cached alongside the column maxima each table already cached, so a
+  resize tick re-derives edges without re-measuring anything.
+
+  The tree rides the whole-tree pre-scan batch D introduced
+  (`TreeCostColumnMath.ScanColumns` - the cost sub-column widths and the
+  name extent now come out of the SAME single walk), for the same reason
+  that scan covers unbuilt rows: rows are built lazily, so a
+  visible-rows-only extent would move every column the first time a node
+  was expanded. The Shopping List already pre-measured Each/Total per
+  render and simply measures two more things in that loop; Used Materials
+  had no pre-scan and gets one.
+
+  Two invariants make this safe rather than merely tighter. First, the
+  tree's pill and cost columns move as ONE block, so
+  `maxRightEdge - pillColX` is exactly what it was before and batch E's
+  `ComputePillFit` escalation (tighten, then "+N") sees an unchanged
+  budget - a pill that fitted still fits, and no pill that was hidden
+  becomes visible at some width, which is what its "+N" tooltip already
+  promises. Second, `TableGutterBreathingRoom` (24px) exceeds every
+  name-to-column gap that feeds `NameMaxWidthBeforeColumn` (8 in the tree,
+  12 in Used Materials/Shopping List, 14 in the currency table), so
+  closing the gutter can never ellipsize the very name it was measured
+  from - asserted directly, per table, in `PlanRelayoutMathTests`,
+  `ShoppingColumnMathTests` and `SummarySectionLayoutMathTests`.
+
+  The tree's "Cost" header had to follow its column, so
+  `CTableHeaderRenderer` gained `rightXForWidth` beside the
+  `middleXForWidth` batch D added for "Source".
+
+- **M8, Snapshot header density.** The header spent ~179px on five sparse
+  rows before the first result: title+buttons, status, a search row empty
+  for everything right of the dropdown, a full-width checkbox row, and a
+  24px unlabelled coin row. The source checkboxes now occupy the search
+  row's empty right half. `SourceFilterFlowLayout` remains the layout
+  engine - its 4-row cap and past-the-cap scrolling are untouched - and is
+  simply handed a reduced width, with the panel carrying the start offset
+  so cells still flow from 0 in their own coordinates. Cells are still
+  laid out sequentially from their own measured widths (verified, not
+  changed). `Services/SnapshotHeaderLayout` holds the two formulas that
+  follow: the reduced width, and the search band's height as the taller of
+  the search row and the filter run - so a run that fits beside the search
+  box costs the header nothing at all, and a wrapped run costs only what
+  it needs beyond 35px. Both of `ApplyTopRegionLayout`'s resize early-out
+  inputs moved with the row, so the cache now stores the FLOW's width
+  rather than the container's; and the search row's own panel now stops at
+  the run's start x, because two overlapping full-width panels would leave
+  which one receives a checkbox click to child ordering. The coin total
+  gained a dim "Coin" caption (rebuilt with the segments, since the
+  refresh disposes that panel's children) so it stops reading as a stray
+  list row.
+
+Known limit, deliberate: below a content width of ~470px the filter run
+would have no width to flow into. The window enforces a 930px minimum
+(884px content region), so that state is unreachable; `SourceFilterWidth`
+floors at 0 rather than going negative, and `SourceFilterFlowLayout`
+already degrades to one cell per row - wrapped, then scrolled, never
+clipped away.
+
+Height-math check at this HEAD: no renderer-emitted height changes.
+Batch H moves columns horizontally only - every row height, every
+`PlanContentHeightMath` contract and the Summary section's own
+`BodyHeight` are untouched. The Snapshot tab's Y arithmetic does change,
+but it is view-local (`CoinRowY`/`ContentY`) and now routed through
+`SnapshotHeaderLayout.SearchBandHeight`, pinned by tests.
+
+Validation: build 0 errors, full suite 2104 passed / 0 failed (2072
+baseline). No new test references Blish.
+
+What the desktop gate should look at:
+
+1. **Tree gutter closed:** generate a plan and look at the Recipe Tree at
+   the default window width. The pill column must sit just right of the
+   longest item name rather than out at the panel edge, with no wide empty
+   band between name and pills. Expand a deep branch: the columns must NOT
+   jump when previously-unbuilt rows appear.
+2. **Header row tracking:** the "Item / Source / Cost" header must sit
+   over the columns it names in both states, and must stay over them while
+   the window is dragged wider and narrower - including at the 930px
+   minimum, where the layout should look exactly as it did before this
+   branch.
+3. **Shopping List and Used Materials:** the Amount/Each/Total block (and
+   Used Materials' Amount) must be pulled in beside the names, header
+   labels still aligned with their columns. A long item name must still
+   ellipsize and keep its source badge out of the Amount column - and a
+   name that was NOT truncated before must not have become truncated.
+4. **Currency table:** Required must start relative to the currency name
+   column, and the green "OK" marker must stay at the block's right end,
+   not the panel's.
+5. **Snapshot search row holding the checkboxes:** the source checkboxes
+   must sit to the right of the content-type dropdown on the same row,
+   clickable (each click must still filter the results), and the result
+   list must start visibly higher than before. With a large roster the run
+   must wrap, cap at four rows and scroll - with every character still
+   reachable - and the list must move down by only what the run needs.
+6. **Coin caption:** the wallet total must read as a dim "Coin" label
+   followed by the gold/silver/copper figures, with each coin icon still
+   to the RIGHT of its number.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
