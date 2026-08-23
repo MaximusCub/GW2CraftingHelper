@@ -315,6 +315,17 @@ namespace GW2CraftingHelper.Views
         // rebuild mid-refresh restores the spinner, and by the refresh's own
         // start/finally pair so the two can never disagree.
         private bool _refreshInFlight;
+
+        // The same, for Module's timer-driven auto-refresh. Two independent
+        // flags rather than one shared one because the two paths have
+        // independent lifetimes as far as THIS class can see: a Refresh Now
+        // clicked while an auto-refresh is already running returns null
+        // immediately (Module.UserRefreshAsync's own _refreshInProgress
+        // gate) and runs its finally straight away, so a single flag would
+        // let that no-op click switch the running auto-refresh's spinner
+        // off. The spinner shows the OR of the two - see
+        // <see cref="ApplySpinnerVisibility"/>.
+        private bool _backgroundRefreshInFlight;
         private Color _defaultStatusColor;
 
         public MainView(
@@ -474,13 +485,13 @@ namespace GW2CraftingHelper.Views
                 Parent = _statusPanel
             };
 
-            // Trails the status text for the whole of a Refresh Now. A tab
-            // switch rebuilds this row while the refresh is still running,
-            // so its visibility comes from _refreshInFlight rather than
-            // defaulting to hidden - otherwise the returning user sees
+            // Trails the status text for the whole of a refresh, clicked or
+            // automatic. A tab switch rebuilds this row while the refresh is
+            // still running, so its visibility comes from the flags rather
+            // than defaulting to hidden - otherwise the returning user sees
             // "Refreshing..." with nothing turning.
             _statusSpinner = InlineSpinner.Create(_statusPanel, InlineSpinnerLayout.SnapshotStatusSize);
-            _statusSpinner.Visible = _refreshInFlight;
+            _statusSpinner.Visible = _refreshInFlight || _backgroundRefreshInFlight;
             InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Capture Blish's own real default rather than guessing/
@@ -1302,18 +1313,46 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// The refresh spinner's single writer. The flag is set even when
-        /// the control is gone (module torn down mid-refresh, or Build has
-        /// not run yet), so a rebuild that happens between the two calls
-        /// still restores the right state - the control write itself is
-        /// null-tolerant for the same reason.
+        /// The clicked-Refresh-Now half of the spinner switch.
         /// </summary>
         private void SetRefreshSpinnerVisible(bool visible)
         {
             _refreshInFlight = visible;
+            ApplySpinnerVisibility();
+        }
+
+        /// <summary>
+        /// The auto-refresh half of the same switch, called by Module's
+        /// Update() drain (main thread) when its background refresh starts
+        /// and again when it ends - see
+        /// <see cref="_backgroundRefreshInFlight"/> for why this is a second
+        /// flag and not a second writer of the first one.
+        /// <para>
+        /// Deliberately spinner-only: it does not touch the status TEXT the
+        /// way a clicked Refresh Now does. The user did not ask for this
+        /// refresh, so replacing the timestamp they are reading with
+        /// "Refreshing..." is a surprise rather than feedback - and the
+        /// background path's cancellation arm writes no status at all, so a
+        /// label overwritten here would have nothing to restore it.
+        /// </para>
+        /// </summary>
+        public void SetBackgroundRefreshInFlight(bool inFlight)
+        {
+            _backgroundRefreshInFlight = inFlight;
+            ApplySpinnerVisibility();
+        }
+
+        /// <summary>
+        /// One writer for the control, from both flags. Null-tolerant: the
+        /// flags are still updated when the control is gone (module torn
+        /// down mid-refresh, or Build has not run yet) so a rebuild between
+        /// the start and end calls restores the right state.
+        /// </summary>
+        private void ApplySpinnerVisibility()
+        {
             if (_statusSpinner != null)
             {
-                _statusSpinner.Visible = visible;
+                _statusSpinner.Visible = _refreshInFlight || _backgroundRefreshInFlight;
             }
         }
 
