@@ -8573,6 +8573,9 @@ in that proposal, against their original opposite choices).
   character-matched row still reports the account-wide total and full
   breakdown across the checked sources, not just the matched character's
   share, so a total means the same thing on every row in the list.
+  Character labels later gained a 2-character minimum query length
+  (char-search-min2 below); item and currency names still match from the
+  first letter.
 - **Perf note (keystroke path):** character matching costs a full source
   walk for every item whose name does not match, where the old name-only
   search skipped straight past it. That is bounded above by the
@@ -8689,7 +8692,10 @@ deliberately skipped:
 
 - **Character-search minimum query length:** a one-character query still
   walks every source of every non-matching item. Left as is; the worst
-  case is still bounded by the empty-search rebuild.
+  case is still bounded by the empty-search rebuild. **CLOSED
+  (char-search-min2):** the maintainer set a 2-character minimum, for
+  the result-list reason rather than the perf one - see that section
+  below.
 - **Tri-state master checkbox:** the two-state quirk recorded in the
   char-source-search section above stands.
 
@@ -8707,6 +8713,375 @@ new Blish-free tests), and the resize early-out + reader hoists,
 which are code-review-verified (the verify pass caught and the
 orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
 before release). Suite 1886/1886.
+
+## Character-name search minimum query length (char-search-min2)
+
+Maintainer decision, closing the "Character-search minimum query length"
+item the nth-cleanup batch left open by choice. The reason is the result
+list, not the per-keystroke cost: with one-letter matching, typing "ar"
+on the way to an item name first passes through "a", which surfaces
+everything held by every character whose name contains an "a" - so the
+opening keystrokes of an item search widen the list instead of narrowing
+it.
+
+- **Rule:** a character label matches only from 2 characters on. Item
+  names and wallet currency names are unchanged - a single letter still
+  matches them, so the common search is untouched.
+- **Where:** SnapshotSearchResultBuilder.CharacterNameMatches, behind the
+  named MinCharacterSearchLength constant, so the one seam that decides
+  "does this source's character name match" carries the floor and the
+  BuildItemRows call site keeps its existing shape. The length compared
+  is the trimmed query the builder already computes, so padding a single
+  letter with spaces does not buy character matching.
+- **Not a perf change:** the source walk itself is unchanged (BuildItemRows
+  walks every checked source of every item regardless, to total it), so
+  the one-character query costs what it always did, minus the substring
+  scans it no longer performs. The bound recorded in char-source-search
+  still holds.
+- **Tests (+3, 1886 -> 1889):** a 1-character query returns the item whose
+  own name matches and *not* the item held by a character whose name
+  matches; the same pair at exactly 2 characters returns the
+  character-held item (the boundary is exact - 2 matches, 1 does not); a
+  whitespace-padded single letter stays below the floor.
+
+Validation: module build 0 errors; suite 1889/1889.
+
+Desktop gate should look at: type a single letter that begins a character
+name into the Snapshot search and confirm only item/currency name matches
+appear (no character holdings), then add the second letter and confirm
+that character's items appear. The per-character checkboxes and the
+AND-composition from char-source-search are unaffected and need no
+re-gating.
+Gate: PASS (2026-08-22, Paint-dummy desktop session, branch build
+651375c, captures preflight/m2a-one-char.png / m2b-two-char.png).
+The preflight roster's holder names all contain "t" (Maximus Test,
+Alt Number Two, Third Wheel, Ranger Of The North...), giving a clean
+discriminator: typing "t" returned only item/currency name matches
+with the 6-holder Green Wood Log ABSENT (the floor holding at one
+character); adding "h" ("th", matched by no item name) returned
+exactly Green Wood Log via Third Wheel / Ranger Of The North (the
+floor lifting at two). The reviewer's noted empty-state wording gap
+(a one-letter query's message does not mention the character-label
+floor) was observed as accurate-but-unexplained live; left as the
+recorded maintainer call.
+
+## Audit batch I: log entry readability (audit-i-log)
+
+UX audit finding (M7): every Log tab entry was ONE `AutoSizeWidth`
+Label built from the whole flat line, tinted end to end by
+`ColorForLevel`, hard-clipped at the panel's right edge with no wrap,
+no ellipsis and no indication that text had been lost - a WARN
+carrying a long path plus an exception simply lost its tail, and the
+level tint was the only structure in a wall of same-shaped text.
+
+**Row split.** Each entry is now a fixed-height row `Panel` holding two
+columns:
+
+- a prefix Label at x=0 showing `[LEVEL] timestamp [tag]`, dimmed to
+  70% alpha (this repo's existing `Color.White * 0.35f` idiom) but
+  still carrying the level color, so severity still reads at a glance
+  down the column while the chrome recedes behind the message;
+- the message Label at the shared message-column x, with an explicit
+  width (row width minus the prefix column, the 8px gap and the 8px
+  right pad).
+
+Both columns run through the existing `LabelHelpers.EllipsizeToWidth`,
+and a row that had to shorten EITHER column gets `BasicTooltipText`
+with the full line - assigned to the row Panel AND to both Labels,
+because Blish resolves a tooltip on the control under the mouse and
+does not bubble to the parent (the swallowed-hover class already
+recorded for `ShoppingListSectionRenderer` in this file). The `...`
+plus that tooltip are the truncation indicator the audit asked for.
+
+The prefix column is sized from a worst-case template - the widest
+level name, a timestamp built from the widest decimal digit, and a
+14-character tag allowance - rather than from the rows currently on
+screen. That is load-bearing, not decoration: the incremental
+`AppendNewRows` path only ever sees the new entries, so a width derived
+from what a pass can see would drift away from the rows the last full
+`RebuildRows` produced and stagger the message column.
+
+The tag allowance is counted in `'w'` glyphs and sized off the longest
+tag actually written anywhere in the tree - `snapshot-fetch`, 14
+characters. The margin is the glyph: every tag in the module is
+lowercase ASCII plus `-`, all narrower than `'w'`, so 14 `'w'`s clear a
+14-character tag with room to spare. The first draft reserved 10 on the
+stated (wrong) belief that `scrolldiag` was the longest tag; at that
+width `[snapshot-fetch]`, the module's most common WARN source, risked
+rendering permanently truncated AND permanently tooltip-flagged at every
+window width, in the very column this change exists to make readable.
+
+**Ellipsize, not wrap (decision).** Wrapping reads better for a long
+exception, but it makes row height a function of content, and this
+tab's whole row model is built on uniform rows: the eviction trim, the
+append path and the Follow tail-scroll (`VerticalScrollOffset =
+int.MaxValue`, an overshoot that clamps) all assume the panel's content
+height is settled at the moment they run. Blish measures a wrapped
+`AutoSizeHeight` label during its own deferred layout pass, so the
+overshoot would fire against a stale height and Follow would land short
+of the bottom. Wrapping also lets one stack-trace ERROR fill the whole
+viewport in what is meant to be a tail view. Ellipsize + tooltip
+preserves fixed row heights, leaves every one of those mechanisms
+untouched, and is what the audit accepts as the minimum.
+
+**Resize.** The container's `Resized` handler re-fits every visible row
+after resizing the content panel, walking `_renderedRows` (the same
+FIFO the eviction trim uses) - the same shape the recent status-row
+rework in this file uses for the toolbar/status/content panels. Two
+cheap outs keep a resize drag off the hot path: a vertical-only drag
+leaves the content width unchanged and returns before touching a single
+row, and a row already showing its untruncated text whose column only
+grew skips the `MeasureString` binary search inside `EllipsizeToWidth`.
+
+The walk itself is wrapped in `_contentPanel.SuspendLayout()` /
+`ResumeLayout(false)`, the same pair `CraftingPlanView.ReplayRelayout`
+uses and for the same reason - and the reason the first draft's "worst
+case is still bounded by the ring's 2000 entries" was the wrong cost
+model. Assigning a row Panel's `Size` fires that Panel's own `Resized`,
+which `FlowPanel` wires to a full reflow of every sibling, so an
+unsuspended loop over a full ring is O(rows^2) position writes plus a
+fresh children array per reflow - on every frame of a horizontal drag,
+on the UI thread - not O(rows). Suspending the parent propagates down
+(Blish's `IsLayoutSuspended` walks the parent chain) and
+`ResumeLayout(false)` leaves the single coalesced reflow to Blish's own
+next-frame `UpdateLayout`. With the suspend in place the per-drag-frame
+cost is back to linear in the ring's 2000 entries.
+
+`RebuildRows` re-parents up to 2000 rows on every search-box keystroke
+and carries the same unsuspended-reflow shape. That is pre-existing (the
+old label-per-row build did the same) and is deliberately left alone
+here; it is the obvious next candidate if the Log tab ever needs a
+second perf pass.
+
+**Extraction.** `LogTabContent.FormatLine` moved to the Blish-free
+`Services/LogLineFormat`, which also splits an entry into its prefix
+and message halves; `Line()` recomposes them into exactly the string
+`FormatLine` produced, so the search filter, the Copy button and the
+tooltip all still work in one unchanged flat line (Copy still emits
+full lines - unaffected by the split).
+
+`Message()` has one deliberate departure from the old `FormatLine`
+output: every run of CR/LF/TAB collapses to a single space (leading runs
+dropped, no trailing whitespace kept). Without it a multi-line message
+lost everything after its first line, silently - a fixed-height row Panel
+clips lines 2..n, and `BitmapFont.MeasureString` reports a multi-line
+string's WIDEST LINE rather than its full extent, so `EllipsizeToWidth`
+sees a string that "fits", returns it unchanged, and the row is marked
+neither shortened nor tooltipped. No in-tree call site embeds a newline
+today, but any `ex.Message` interpolation is one BCL/HTTP/serialization
+exception away from one (e.g. `CraftingPlanPipeline`'s generation-failure
+WARN). Flattening in the formatter rather than at the label also keeps
+Copy's `Environment.NewLine` join at one line per entry.
+
+`Services/LogRowLayout` carries
+the column arithmetic, so the degenerate widths that would otherwise
+blank every row (a message column ellipsized to zero) are pinned by
+tests rather than only observable live. Row virtualization/build
+behavior - `RebuildRows`, `AppendNewRows`, the eviction trim,
+`RebuildRowsIfBuilt`, the `_buildComplete` gate - is untouched; this is
+a per-row presentation change.
+
+The class doc comment's "label-per-row, no multi-column ellipsized rows
+that must reflow live during a resize drag" claim is now false and was
+rewritten: rows ARE multi-column and DO reflow, but the tab still does
+not opt into the `PlanContentHeightMath`/relayout-registry contract,
+and the comment now says why (uniform row heights, overshoot scroll -
+no per-section height math and no settle/verify pass to defer into).
+
+**Validation per commit:** module build 0 errors (pre-existing StyleCop
+warnings only; no new warning class in the edited files). Suite 1886
+baseline -> 1900 after commit 1 (14 new Blish-free tests:
+`LogLineFormatTests` pins that prefix + " " + message is byte-identical
+to the old flat line, including the no-tag and null-message cases;
+`LogRowLayoutTests` pins the narrow-row prefix cap and the
+never-collapse floor) -> 1900 after commit 2 (view-only) -> 1904 after
+the review-fix commit (4 more, pinning the CR/LF/TAB flattening and the
+unchanged-reference fast path).
+
+**Desktop gate items** (rendered surface, outside the test-runnable
+Blish-free layer):
+
+1. A long WARN line (long path + exception) shows a dim
+   `[WARN] timestamp [tag]` prefix, an ellipsized message ending in
+   `...`, and a tooltip carrying the full untruncated line - hovering
+   the prefix, the message and the row's empty right edge all raise it.
+2. Narrowing and widening the module window re-fits the rows: the
+   message re-ellipsizes to the new width, previously-truncated rows
+   recover their full text when the window grows, and the tooltip
+   appears/disappears with the truncation. Do this with the level filter
+   on `Debug+` and a full ring (2000 entries) and watch for drag stutter -
+   that is the case the `SuspendLayout` wrap above exists for, and it has
+   only ever been reasoned about, never measured on hardware.
+3. The level tint is still legible at a glance - ERROR/WARN rows read
+   red/amber down the prefix column, and the message keeps the full
+   (undimmed) level color.
+4. Follow still snaps: with Follow checked, new entries append at the
+   bottom and the view stays pinned there; unchecking Follow freezes it.
+5. Copy still writes the full untruncated lines to the clipboard, not
+   the ellipsized display text.
+
+Gate: PASS (2026-08-22 evening desktop batch, branch build 8026242,
+captures preflight/gI1-gI3). At Debug+ with the seeded session log:
+every entry rendered as a dim level-tinted prefix column ([WARN]
+orange, [INFO] white, [DEBUG] grey) plus an aligned message column;
+the long plan-timing line ended in a visible "..." instead of the
+old hard clip; hovering a row that fits showed no tooltip (correct
+narrowed semantics) while hovering the ellipsized row showed the
+full line in a multi-line tooltip. Follow was on and the newest
+entry sat at the bottom. Drag-resize refit not exercised live
+(synthetic resize drags unreliable); covered by the SuspendLayout
+fix, the width-guard early-outs, and the Blish-free layout tests.
+
+## Audit batch F: input flow (audit-f-input-flow)
+
+Four maintainer-approved UX-audit findings on the Crafting Plan tab's
+input flow, plus one regression the first of them exposed.
+
+- **H4, stale resolved item (the correctness bug):** a row's item id was
+  set only by a suggestion pick and never cleared, and nothing else ever
+  assigned it. Editing the search box afterwards therefore left the plan
+  generating for the previously picked item while the box read the new
+  name - "Mystic Clover" on screen, Deldrimor Steel Ingot in the plan.
+  Three parts: (1) a search-box `TextChanged` handler drops the row's
+  resolved item once the text diverges from the resolved name, with case
+  and surrounding whitespace not counting as divergence; (2) Generate
+  first resolves typed-but-unpicked rows against the item search
+  provider, adopting an exact case-insensitive name match only - a
+  partial name stays unresolved rather than planning for whatever ranked
+  first, and the adoption is re-checked on the main thread against what
+  the row holds at that moment, so a pick or a further keystroke landing
+  during the search cannot be overwritten by a result describing older
+  text; (3) with nothing resolved, the status now distinguishes "Select
+  at least one item before generating." (every row blank) from "No item
+  matched what you typed - pick an item from the suggestion list."
+  (text that resolved to nothing), where the old copy told someone
+  staring at a filled-in box to select an item.
+  A name that belongs to **several items** is a third case, and the one
+  with no way to notice it: GW2 reuses item names freely (4136 of the
+  14762 seeded names are shared, and three distinct items are called
+  "Amethyst Gold Ring"), the provider sorts by name so they all land in
+  one result window, and item ids are never displayed - adopting the
+  first would have generated a full plan for an arbitrary one of them
+  with nothing on screen to say which. Such a name now stays unresolved
+  and says so: "More than one item has that name - pick the one you want
+  from the suggestion list."
+  A Generate where only SOME rows resolved no longer drops the rest in
+  silence either: the plan is still generated from the rows that
+  resolved, and the strip carries "N row(s) has/have no item selected and
+  is/are not in this plan." for as long as that plan is on screen.
+  While the resolution pass runs, Generate is disabled and the strip
+  reads "Resolving items..." - the pass is awaited, and nothing
+  downstream disables the button until a generation actually starts, so
+  clicks during it would otherwise be silent and each would start another
+  full generation.
+  The decisions live in the new Blish-free `Services/ItemRowSelection.cs`
+  (staleness rule, exact/ambiguous name match, status copy), covered by
+  20 tests. `TriggerGenerate` is now a thin wrapper that owns the
+  resolution await, the Generate button for its duration, and the marshal
+  back to the main thread before the generate body, which touches
+  controls from its first line; the body is `GenerateFromResolvedRows`.
+- **Typed text across a row add/remove (regression from H4):** rebuilt
+  rows seeded their search box from `ItemName`, which H4 now clears, so
+  typing a name and pressing "+" wiped it. Rows keep the text they last
+  showed (`ItemRowState.TypedText`) and seed from that.
+- **M1, deferred controls honesty:** the Prices dropdown, Value Own
+  Materials, and Use Own Materials on the no-plan path now put
+  "Settings changed - press Generate Plan to update" on the status strip
+  as they change - they look like the instant-apply controls on other
+  tabs but only affect the next plan. (Use Own Materials with a plan on
+  screen already regenerates behind a confirm, so it is not deferred.)
+  The warning is standing state, not a one-shot status write, and is
+  appended to whatever the status board says: a generation in flight
+  re-renders the strip about seven times a second and would otherwise
+  have erased it within 150ms, ending on "Plan generated - &lt;time&gt;"
+  for a plan built with the price basis the user had just changed away
+  from. It survives a tab switch for the same reason, and is cleared when
+  a generation actually starts - which is the run that includes it. The
+  "rows not in this plan" notice above rides the same mechanism.
+  A generation also dims the plan area to 0.45 opacity, restored in the
+  `finally` that already covers success, failure and cancellation alike;
+  a superseded generation returns at its `myGen` check and leaves the dim
+  to the newer generation that owns it.
+- **M15, suggestion list occlusion:** the list opened directly under the
+  search box, over this row's quantity field and every row below it.
+  `SuggestionPanel` takes an anchor offset and opens that far right of
+  the text box - right of the Qty stepper - clamped so a window at the
+  right screen edge cannot push it off. It still overlaps part of the
+  persistent controls row (the Prices dropdown's right half and Value Own
+  Materials) and this row's own +/- buttons while open; anchoring cannot
+  clear a full-width controls row, and this is the position the finding
+  approved.
+- **M16, the "+" button:** moved right of the quantity field so it no
+  longer abuts it and reads as a Qty stepper, and given the tooltip "Add
+  another item to this plan". The "-" button beside it got the same
+  treatment ("Remove this item from the plan") rather than leaving the
+  sibling half-fixed.
+
+Validation: build 0 errors and the full suite green per commit (1906,
+up from 1886 with the 20 new ItemRowSelection tests). No new test
+references Blish.
+
+What the desktop gate should look at:
+
+1. **Stale-pick invalidation, live:** pick an item from the suggestion
+   list, then edit the box to a different item's name and press Generate.
+   The plan must be for what the box says (or, for a partial name, the
+   "pick an item from the suggestion list" status) - never for the
+   earlier pick. Also: type a full item name without ever opening the
+   list and press Generate; it should plan that item.
+2. **Shared name:** type "Amethyst Gold Ring" in full, do not open the
+   suggestion list, press Generate. No plan may be generated - the status
+   must read "More than one item has that name - pick the one you want
+   from the suggestion list." Picking one of the three from the list and
+   pressing Generate must then plan normally.
+3. **Partly resolved Generate:** row 1 picked from the suggestion list,
+   row 2 typed with a name that matches nothing ("Mystic Clove"), press
+   Generate. The plan must be generated for row 1 AND the strip must
+   carry "1 row has no item selected and is not in this plan." for as
+   long as that plan is on screen - the old behavior planned row 1 and
+   said nothing at all about row 2.
+4. **Settings-changed status:** change Prices or Value Own Materials with
+   a plan on screen; the status line under the toolbar must switch to
+   "Settings changed - press Generate Plan to update" instead of leaving
+   the "Plan generated - <time>" line up. Then the harder case: press
+   Generate and change Prices WHILE it runs. The warning must appear
+   immediately, survive the whole run (the spinner re-renders the strip
+   about seven times a second), and still be there beside
+   "Plan generated - <time>" when the run finishes - the plan on screen
+   was built with the old basis. It must also survive a tab switch away
+   and back, and disappear the moment the next Generate starts.
+5. **Dimmed stale plan:** press Generate with a plan already on screen -
+   the plan area should visibly dim for the run and return to full
+   opacity when it finishes, on a successful run and on a failing one
+   (an offline/error run is the one worth checking).
+6. **Suggestion list position:** open the list on the first of two rows
+   and confirm the second row's search box and quantity field stay
+   visible and clickable, and that the list stays inside the window at
+   minimum window width (930).
+7. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
+   plainly and do not clip.
+
+Gate: PASS (2026-08-22 evening desktop batch, branch build 454681b,
+captures preflight/gF0-gF5). (1) Typed "mystic clover" lowercase,
+never opened the suggestion list, pressed Generate: the module log
+recorded "Plan for Mystic Clover x1" - unique-exact-name adoption
+working end to end. (2) The suggestion list opened to the right of
+the qty stepper, no longer covering Use Own Materials or the Prices
+label (the documented partial-overlap tradeoff visible and
+acceptable). (3) Toggling Value Own Materials appended the standing
+notice "Settings changed - press Generate Plan to update" after the
+board status with a separator; it survived subsequent renders and
+was still standing alongside a later honest-status line. (4) The
+"+" button showed "Add another item to this plan" on hover at its
+separated position. (5) Appending "xx" to the resolved name and
+pressing Generate produced "No item matched what you typed - pick
+an item from the suggestion list." with the previous plan untouched
+- stale-pick invalidation plus the honest empty status, no wrong
+plan. Ambiguous-name and multi-row partial-resolution statuses were
+not staged live (no duplicate-named craftable in the fixture path);
+both are pinned by the ItemRowSelection tests. Bonus: the x1
+all-owned plan rendered the HAVE pill and a 0c cost tile - the
+zero-cost plan state previously uncaptured.
 
 ## Audit batch G: Settings restructure (audit-g-settings)
 
