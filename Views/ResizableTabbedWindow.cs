@@ -50,6 +50,15 @@ namespace GW2CraftingHelper.Views
             CanResize = true;
             SavesSize = true;
 
+            // Blish adopts the game client's size AFTER modules load (the
+            // sprite screen resizes once the overlay attaches), and no
+            // window layout pass runs on its own after that - measured
+            // live 2026-08-23: without this, a launch on a wide client
+            // kept the smaller floor computed against the unsettled
+            // screen. Re-clamp whenever the screen itself changes size;
+            // unhooked in DisposeControl.
+            Blish_HUD.GameService.Graphics.SpriteScreen.Resized += OnScreenResized;
+
             // The base constructor sizes the window from windowRegion, a
             // region of the background texture, which is narrower than the
             // minimum. Clamping here means the window is never below the
@@ -78,6 +87,17 @@ namespace GW2CraftingHelper.Views
             // is what catches it; the clamp only ever grows a window, so a
             // saved size above the minimum is left exactly as it was.
             ClampToMinimum();
+        }
+
+        private void OnScreenResized(object sender, ResizedEventArgs e)
+        {
+            ClampToMinimum();
+        }
+
+        protected override void DisposeControl()
+        {
+            Blish_HUD.GameService.Graphics.SpriteScreen.Resized -= OnScreenResized;
+            base.DisposeControl();
         }
 
         private void ClampToMinimum()
