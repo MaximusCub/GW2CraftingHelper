@@ -7,12 +7,17 @@ namespace GW2CraftingHelper.Views.Rendering
     internal static class UiMetrics
     {
         /// <summary>
-        /// Height of every StandardButton in the module.
+        /// Height of every StandardButton on a TAB. The two dialogs
+        /// (ModalDialog, ApiAccessDialog) keep their own 25px footer
+        /// buttons and are not covered: their geometry is hand-placed
+        /// against a fixed window size, so a height change there moves a
+        /// button relative to a window edge rather than to a row of
+        /// neighbours, which is a separate decision and an unmade one.
         ///
         /// <para>
-        /// Three heights were in use (audit batch J, L3): 30 on the
-        /// Snapshot tab's Clear Cache / Refresh Now, 28 on the Log tab's
-        /// three buttons, Settings' Save and the plan's Generate Plan, and
+        /// Three heights were in use across the tabs (audit batch J, L3):
+        /// 30 on the Snapshot tab's Clear Cache / Refresh Now, 28 on the Log
+        /// tab's three buttons, Settings' Save and the plan's Generate Plan, and
         /// 24 on the plan's five Recipe Tree actions and its per-row +/-
         /// pair. 28 wins on button count, and it is the height of the one
         /// input row a button already shares - the plan's item row, whose

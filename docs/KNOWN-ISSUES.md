@@ -10528,6 +10528,15 @@ stale and three of its claims no longer held.
   unmade decision, recorded here rather than implied by the constant.
   The Snapshot pair's y is derived from the header height rather than
   rewritten; the tree toolbar's y already derived from its row height.
+  Scope, corrected in verification round 1: the constant covers the ten
+  buttons that live on a TAB. The four dialog footer buttons
+  (`ModalDialog`'s confirm/cancel, `ApiAccessDialog`'s retry/close) are
+  still 25 and were missing from the inventory above, so the constant's
+  summary line - "every StandardButton in the module" - was false as
+  written. They are left at 25 deliberately: each is hand-placed against
+  a fixed window size, so changing its height moves it relative to a
+  window edge rather than to a row of neighbours, which is a separate
+  unmade decision and not verifiable without the live gate.
 - **L5, missing wallet icon - DONE**, root cause first. `IconUrl` is
   empty for that entry. Live it comes from
   `Gw2AccountSnapshotService.ResolveCurrencyDetailsAsync`, which
@@ -10759,5 +10768,27 @@ stale "Clear checkbox" doc wording, the 2px input-to-checkbox gap, the
 plan header's "x N needed" suffix versus M9's prefix rule, the
 single-fetch currency cache behind L5's placeholder, and `UiMetrics`
 living in `Views.Rendering`.
+
+### Verification round 1
+
+All six fix-round-1 findings re-read at HEAD and confirmed fixed: the
+Snapshot resize path no longer touches the search debounce (one bounded
+waiter per drag, in-place `RefitResultRows`, gated on
+`_lastRowLayoutWidth`); the breakdown reads `{Label} {Count}`; the empty
+state is `else if (!boardSnapshot.InFlight)` and its relayout closure is
+reachable (the per-tick `ReplayRelayout` gate is `widthChanged` alone);
+`StatusText.ForSnapshotAge` is gone from the tree, tests included.
+Inventories re-taken independently and they hold: TextBoxes 26 at nine
+of eleven sites, Dropdowns 30 outside the plan tab, the plan item row's
+quantity box and +/- pair all 28 at y=3 in a 35px row.
+
+One residual defect of the same class as finding 3, fixed here:
+`UiMetrics.ButtonHeight`'s summary line still claimed "every
+StandardButton in the module" while four dialog footer buttons are 25.
+Comment scoped to tabs, the exclusion and its reason recorded, and the
+L3 bullet above corrected. Doc-only - no control height changed.
+
+Build 0 errors (2082 pre-existing StyleCop warnings), suite 2186 passed
+/ 0 failed, tree clean, nothing pushed.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
