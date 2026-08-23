@@ -11237,16 +11237,45 @@ and still holding the user's typed text when the handler runs, so both
 Save (persists exactly what was on screen) and the dirty comparison
 itself are reading real values, not a torn-down form.
 
-**Window close.** `TabChanged` never fires when the window is closed, so
-the same prompt is hung off `_mainWindow.Hidden`, guarded on the Settings
-tab being the selected one. This is cheap and correct rather than a
-known limit: `Control.Dispose(bool)` nulls the `Hidden` event as one of
-its first acts (before `Parent = null` and before `DisposeControl`), so
-`Unload`'s `_mainWindow.Dispose()` cannot re-enter the handler after
-`_modalDialog` has already been disposed one line earlier. The window
-fades out before `Visible` flips, so the prompt appears a beat after the
-window goes; `ModalBackdrop.Sync` already handles a hidden blocked
-surface by collapsing to zero size.
+**Window close is deliberately NOT hooked.** `TabChanged` never fires
+when the window is closed, and hanging the same prompt off
+`_mainWindow.Hidden` was tried and rejected on two measurements against
+the vendored binary:
+
+- `Hidden` is not "the user closed the window". Every `WindowBase2`
+  subscribes in its constructor to
+  `Gw2Mumble.PlayerCharacter.IsInCombatChanged ->
+  UpdateWindowBaseDynamicHUDCombatState` and to
+  `Gw2Instance.IsInGameChanged -> UpdateWindowBaseDynamicHUDLoadingState`,
+  and both statics call `wb.Hide()`. A user running Blish's overlay
+  options "hide windows in combat" (`DynamicHUDWindows = ShowPeaceful`)
+  or "hide during loading screens" (`DynamicHUDLoading = NeverShow`)
+  would get a modal save prompt over gameplay for pulling a mob or
+  zoning, with the auto-restored module window behind it. Both options
+  default to `AlwaysShow`, so it was configuration-dependent - which
+  makes it worse to diagnose, not better.
+- Closing is not destructive in the first place. Hiding the window does
+  not call `ShowView`/`ClearView`, so the Settings TextBoxes keep the
+  user's typed text and still have it when the window is reopened.
+  Prompting there put an Escape/X keypress (which routes to cancel, i.e.
+  Discard) between the user and edits that were never at risk.
+
+So closing the window is left exactly as it behaved before this branch:
+edits stay in the controls, and the prompt appears only when the user
+actually leaves the tab.
+
+**Off-thread build.** `WindowBase2.ShowView` runs the view's build as
+`view.DoLoad(progress).ContinueWith(BuildView)` with no scheduler, so
+`SettingsTabContent.Build` executes on a ThreadPool thread while
+`UnsavedChangeCount` is called from the main thread's `TabChanged`
+handler. `Build` clears and refills `_rows` (47 entries) and
+`_homesteadRows`, which `CaptureFormState` enumerates - a tab switch
+landing mid-build would throw "Collection was modified" out of Blish's
+own input dispatch, where the module has no try/catch. A `volatile bool
+_buildComplete`, cleared as the first statement of `Build` and set as the
+last of `LoadAll`, makes `UnsavedChangeCount` return 0 for that window.
+The cost is a missed prompt for a switch within a frame or two of the tab
+building, which is the same benign outcome the null baseline already had.
 
 **Prompt shape.** The existing `ModalDialog` has exactly two buttons, and
 no third was added. Confirm = Save, cancel = Discard, and `cancelText` is
@@ -11254,10 +11283,23 @@ now an optional `Show` parameter (defaulting to the "Cancel" every
 existing caller already got) so the second button says "Discard" rather
 than "Cancel" - a button labelled Cancel would promise to put the user
 back on the Settings tab, which is exactly what Blish gives no way to do.
-The button width floors at the historical 70px and grows to fit a longer
-label rather than being clipped by StandardButton's centered, unpadded
-text region. Discard restores the last loaded/saved values into the
+Both button widths floor at their historical values (100 confirm, 70
+cancel) and grow to fit a longer label rather than being clipped by
+StandardButton's centered, unpadded text region - every existing dialog
+is pixel-identical, and the second prompt's "Open Settings" fits. Discard restores the last loaded/saved values into the
 controls and clears the save bar's status line.
+
+**Saving from the prompt reports its own failures.** The tab's save bar
+is unparented the moment the view is torn down, so a `SaveAll` driven
+from the prompt has nowhere on screen to say "3 entries were rejected" -
+and `SaveAll` rebases its baseline on the controls, so nothing
+re-prompts either. The user asked to save and half of it silently would
+not. `SaveAll` therefore returns a `SaveOutcome` (invalid-entry count
+plus a failed-write flag; the in-tab Save button still ignores it and
+uses the status label), and the prompt raises a second dialog when the
+outcome is not `AllSaved`, offering "Open Settings" / "Dismiss". Note
+that reopening rebuilds the form from persisted settings, so the message
+says "re-enter" rather than promising the rejected text back.
 
 **Accepted limits.**
 
@@ -11266,8 +11308,11 @@ controls and clears the save bar's status line.
   Settings rebuilds the form from persisted settings either way - but the
   prompt cannot offer "stay here".
 - The dialog's title-bar X and the Escape key both route to cancel, which
-  here means Discard. That is the safe reading on the tab path (the edits
-  were already unreachable) and a real loss on the close path.
+  here means Discard. Benign now that the prompt is raised only on the
+  tab path: returning to Settings rebuilds the form from persisted
+  settings either way, so Discard is what leaving the tab already meant.
+- A tab switch that lands while the Settings tab is still building on
+  Blish's worker thread does not prompt (see "Off-thread build").
 - A module unload with dirty settings (Blish shutting down, module
   disabled) tears the window down without prompting; `Unload` has no
   user-interaction budget.
@@ -11299,16 +11344,27 @@ Desktop gate:
    AND one currency Ignore checkbox, then switch away. The prompt reads
    "3 unsaved changes" (plural).
 7. Window close: edit a field on the Settings tab and click the window's
-   title-bar X. The prompt appears after the window fades. Choose
-   Discard, reopen the window (corner icon) - the Settings tab is still
-   selected, the form shows the restored values, and closing again does
-   NOT prompt.
+   title-bar X. NO prompt appears. Reopen the window (corner icon) - the
+   Settings tab is still selected and the typed text is still in the box,
+   untouched.
 8. Diagnostics checkbox alone: toggle it, switch away. No prompt (it
    applies immediately). Toggle it back afterwards to restore the
    fixture.
-9. Invalid entry: type "abc" into a currency box, press Save (status
-   reads "Saved - 1 invalid entry not saved", the row tag reads
-   "Invalid"), then switch away. No prompt - the user has already been
-   told, and re-prompting would loop on a value that can never be saved.
+9. Invalid entry, saved in the tab: type "abc" into a currency box, press
+   Save (status reads "Saved - 1 invalid entry not saved", the row tag
+   reads "Invalid"), then switch away. No prompt - the user has already
+   been told, and re-prompting would loop on a value that can never be
+   saved.
+10. Invalid entry, saved from the prompt: type "abc" into a currency box
+    AND a valid number into a second one, switch away, choose Save. A
+    second dialog appears reading "1 Settings entry could not be saved -
+    the value was not a valid number. Everything else was saved. Open the
+    Settings tab to re-enter it?" with Open Settings / Dismiss. Choose
+    Open Settings: the tab is selected, the valid edit is persisted, and
+    the "abc" box is back to its persisted value. Restore the fixture
+    (clear the second box, Save).
+11. Dismiss on that second dialog closes it and leaves the module window
+    interactive (the backdrop is gone), with the tab the user switched to
+    still selected.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
