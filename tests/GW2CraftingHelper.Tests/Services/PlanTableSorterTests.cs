@@ -233,6 +233,59 @@ namespace GW2CraftingHelper.Tests.Services
                 new List<string> { "shards 5", "shards 2", "karma 900", "karma 100" }, Labels(descending));
         }
 
+        private static List<CurrencyAmountViewModel> UnitCurrency(int perBatchCount, int outputCount)
+        {
+            // Through the real resolver, so the rows carry exactly what the
+            // Shopping List renders - including the Amount 0 / "N for M"
+            // shape a non-evenly-divisible rate produces.
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard" } }
+            };
+            return CurrencyDisplayResolver.ResolveUnitAmounts(
+                outputCount, new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = perBatchCount } },
+                metadata);
+        }
+
+        [Fact]
+        public void EachColumn_BundlePricedCurrencyRow_SortsOnItsTrueRate_NotItsZeroAmount()
+        {
+            // The live Philosopher's Stone case: 912 shards for 92 units is
+            // ~9.9 each and renders as bundle text with Amount 0, so it must
+            // still sort ABOVE a whole-number 5-each row.
+            var rows = new List<PlanRowViewModel>
+            {
+                Row("philosopher's stone", unitCurrencies: UnitCurrency(912, 92)),
+                Row("mystic coin", unitCurrencies: UnitCurrency(5, 1))
+            };
+            Assert.Equal(0, rows[0].UnitCurrencyCosts[0].Amount);
+            Assert.Equal("912 for 92", rows[0].UnitCurrencyCosts[0].BundleLabel);
+
+            var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Ascending));
+            var descending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Descending));
+
+            Assert.Equal(new List<string> { "mystic coin", "philosopher's stone" }, Labels(ascending));
+            Assert.Equal(new List<string> { "philosopher's stone", "mystic coin" }, Labels(descending));
+        }
+
+        [Fact]
+        public void EachColumn_TwoBundlePricedRowsInOneCurrency_OrderByRate_NotSourcePosition()
+        {
+            // Both rows key as Amount 0; only the true rates (0.67 vs 333.3)
+            // separate them.
+            var rows = new List<PlanRowViewModel>
+            {
+                Row("1000 for 3", unitCurrencies: UnitCurrency(1000, 3)),
+                Row("2 for 3", unitCurrencies: UnitCurrency(2, 3))
+            };
+
+            var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Ascending));
+            var descending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Descending));
+
+            Assert.Equal(new List<string> { "2 for 3", "1000 for 3" }, Labels(ascending));
+            Assert.Equal(new List<string> { "1000 for 3", "2 for 3" }, Labels(descending));
+        }
+
         [Fact]
         public void MultiCurrencyRow_IsKeyedOnItsOrdinallyFirstCurrency_RegardlessOfListOrder()
         {

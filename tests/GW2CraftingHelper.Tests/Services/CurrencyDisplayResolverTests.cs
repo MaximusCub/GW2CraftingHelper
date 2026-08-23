@@ -128,6 +128,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result[0].Amount);
             Assert.Equal("Spirit Shards", result[0].Name);
             Assert.Equal("s.png", result[0].IconUrl);
+
+            // A total is already exact, so it carries no per-unit rate.
+            Assert.Null(result[0].UnitRate);
         }
 
         [Fact]
@@ -250,6 +253,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(result);
             Assert.Equal(1, result[0].Amount);
             Assert.Null(result[0].BundleLabel);
+            Assert.Equal(1d, result[0].UnitRate.Value, 6);
         }
 
         [Fact]
@@ -265,6 +269,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(result);
             Assert.Equal(0, result[0].Amount);
             Assert.Equal("2 for 3", result[0].BundleLabel);
+
+            // The exact rate survives as a non-display number so a sort on
+            // the Each column has something real to key on - PlanTableSorter.
+            Assert.Equal(2d / 3d, result[0].UnitRate.Value, 6);
         }
 
         [Fact]

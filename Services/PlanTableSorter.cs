@@ -117,6 +117,14 @@ namespace GW2CraftingHelper.Services
         /// is stable regardless of the order the resolver emitted them in;
         /// no attempt is made to add amounts across currencies.
         /// </para>
+        /// <para>
+        /// The numeric key inside a currency is
+        /// <see cref="CurrencyAmountViewModel.UnitRate"/> when the resolver
+        /// set one, NOT Amount: a per-unit amount whose rate does not
+        /// divide evenly carries Amount 0 and shows its rate as bundle
+        /// text ("912 for 92"), so keying on Amount would sort every such
+        /// row as free and tie them all with each other.
+        /// </para>
         /// </summary>
         private static int CompareValue(
             long aCoin, IReadOnlyList<CurrencyAmountViewModel> aCurrencies,
@@ -139,7 +147,7 @@ namespace GW2CraftingHelper.Services
                 int byName = string.Compare(
                     aKey?.Name ?? string.Empty, bKey?.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
                 if (byName != 0) return Flip(byName, direction);
-                return Flip((aKey?.Amount ?? 0).CompareTo(bKey?.Amount ?? 0), direction);
+                return Flip(NumericKey(aKey).CompareTo(NumericKey(bKey)), direction);
             }
 
             return 0;
@@ -178,12 +186,23 @@ namespace GW2CraftingHelper.Services
 
                 int byName = string.Compare(
                     candidate.Name ?? string.Empty, key.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-                if (byName < 0 || (byName == 0 && candidate.Amount > key.Amount))
+                if (byName < 0 || (byName == 0 && NumericKey(candidate) > NumericKey(key)))
                 {
                     key = candidate;
                 }
             }
             return key;
+        }
+
+        /// <summary>
+        /// The amount a currency cell really represents: its exact
+        /// per-unit rate where the resolver computed one, otherwise its
+        /// whole Amount.
+        /// </summary>
+        private static double NumericKey(CurrencyAmountViewModel amount)
+        {
+            if (amount == null) return 0;
+            return amount.UnitRate ?? amount.Amount;
         }
 
         private static int Flip(int comparison, TableSortDirection direction)
