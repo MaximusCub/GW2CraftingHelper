@@ -20,7 +20,24 @@ namespace GW2CraftingHelper.Views
     /// </remarks>
     public sealed class ResizableTabbedWindow : TabbedWindow2
     {
-        private readonly Point _minSize;
+        private readonly Point _designMinSize;
+
+        // The screen-fitted floor is re-derived on EVERY clamp rather than
+        // captured at construction: at module-build time the sprite screen
+        // has not necessarily settled to the real client size (measured
+        // live 2026-08-23 - a one-shot capture froze the floor near the
+        // unsettled backbuffer width and a persisted 990px window was
+        // never clamped up to 1436), so each clamp asks
+        // WindowSizing.EffectiveMinWindowWidth for the floor the CURRENT
+        // screen supports and the first layout pass after the screen
+        // settles grows the window the rest of the way.
+        private Point EffectiveMinSize()
+        {
+            int screenWidth = Blish_HUD.GameService.Graphics.SpriteScreen?.Width ?? 0;
+            return new Point(
+                Services.WindowSizing.EffectiveMinWindowWidth(screenWidth),
+                _designMinSize.Y);
+        }
 
         public ResizableTabbedWindow(
             AsyncTexture2D background,
@@ -29,7 +46,7 @@ namespace GW2CraftingHelper.Views
             Point minSize)
             : base(background, windowRegion, contentRegion)
         {
-            _minSize = minSize;
+            _designMinSize = minSize;
             CanResize = true;
             SavesSize = true;
 
@@ -45,9 +62,10 @@ namespace GW2CraftingHelper.Views
 
         protected override Point HandleWindowResize(Point newSize)
         {
+            var min = EffectiveMinSize();
             return new Point(
-                Math.Max(newSize.X, _minSize.X),
-                Math.Max(newSize.Y, _minSize.Y));
+                Math.Max(newSize.X, min.X),
+                Math.Max(newSize.Y, min.Y));
         }
 
         public override void RecalculateLayout()
@@ -64,14 +82,15 @@ namespace GW2CraftingHelper.Views
 
         private void ClampToMinimum()
         {
-            if (this.Width >= _minSize.X && this.Height >= _minSize.Y)
+            var min = EffectiveMinSize();
+            if (this.Width >= min.X && this.Height >= min.Y)
             {
                 return;
             }
 
             this.Size = new Point(
-                Math.Max(this.Width, _minSize.X),
-                Math.Max(this.Height, _minSize.Y));
+                Math.Max(this.Width, min.X),
+                Math.Max(this.Height, min.Y));
         }
     }
 }

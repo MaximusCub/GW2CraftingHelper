@@ -543,7 +543,7 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
                 new Rectangle(81, 11, 884, 684),
-                new Point(minWindowWidth, WindowSizing.MinWindowHeight))
+                new Point(WindowSizing.MinWindowWidth, WindowSizing.MinWindowHeight))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper",
