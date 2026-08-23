@@ -9888,4 +9888,23 @@ re-derive the readings above.
    past the window edge and no text cut off. Hover a vendor row whose
    price-side caveat fires and confirm the same for its longer sentence.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-fix HEAD, captures preflight/gA1-gA2, gB1-gB5). (A) The tree
+row carets rendered visibly for the first time - "v" beside the
+expanded root and Obsidian Shard rows, matching the section-header
+vocabulary. (B) The Clear Cache button showed its consequence
+tooltip; clicking it raised the Confirm dialog with Discard/Cancel
+and BOTH Snapshot buttons disabled for the dialog's lifetime (the
+interleave guard live); the Critical's regression path was
+exercised explicitly - Escape dismissed the dialog and the NEXT
+Clear Cache click reopened it (pre-fix, the stuck flag would have
+dead-buttoned every confirm in the module for the session); Cancel
+restored both buttons with the snapshot intact. The Discard path
+itself was not fired (preserving the canned fixture); its handler
+body is unchanged from the previously-shipped synchronous code.
+(C) The value-detail tooltip's opportunity-cost sentence wrapped
+onto a second line fully inside the window (previously cut dead at
+the edge); the translucent background remains, as scoped - that is
+tier 2's job. The two unwrapped feeder lines the review noted
+(item-name prefix, pill-tooltip left operand) are recorded for the
+tier-2 facility to absorb.
