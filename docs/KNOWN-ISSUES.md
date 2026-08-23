@@ -9727,7 +9727,10 @@ callbacks into locals and nulls the fields before invoking either. X and
 Escape therefore behave as **Cancel**, which is what the callers already
 want: `CraftingPlanView`'s cancel callback reverts and re-enables the
 own-materials checkbox (previously left disabled forever by an X dismissal),
-and Clear Cache's re-enables the Snapshot buttons. `Dispose()` unsubscribes
+and Clear Cache's re-enables the Snapshot buttons. The same revert also runs
+when `Show` REFUSES (another tab's confirm already on screen): both callers
+that arm state before showing - `MainView` and `CraftingPlanView` - now read
+the `bool` and unwind, so a refused request cannot strand a control either. `Dispose()` unsubscribes
 BEFORE hiding so module teardown cannot fire a caller's cancel callback into
 controls already being disposed.
 
@@ -9736,7 +9739,7 @@ controls already being disposed.
 `Services/ValueDetailTooltipBuilder` and `Services/TreeRowTooltipComposer`
 compose multi-line tooltip text whose individual lines were unbounded: the
 opportunity-cost sentence is 76 characters, the vendor price-side caveats
-82.
+83.
 
 `Services/TooltipTextFormat` (new, Blish-free) is the single wrap seam.
 It wraps each line of a composed tooltip to a **75-character** budget at
@@ -9872,7 +9875,12 @@ re-derive the readings above.
    guard behind it has no live gesture left to exercise - if one is ever
    found, its expected result is that the status settles on "Cache cleared",
    never "Updated - ..." and never a refresh-failure line.
-5. **Value-detail tooltip inside the window:** generate a
+5. **A refused Show strands nothing:** with the Clear Cache confirm still
+   open, switch to the Crafting Plan tab (with a plan on screen) and click
+   Use Own Materials. No second dialog may appear, and the checkbox must
+   snap back to its previous state and stay clickable - not left greyed
+   with its new value.
+6. **Value-detail tooltip inside the window:** generate a
    currency-bearing plan (a Mystic Clover / spirit-shard chain, anything
    whose committed CRAFT or VENDOR pill diverges) and hover that pill. The
    value-detail tooltip must show the opportunity-cost sentence wrapped

@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
 
-            // 82 characters, so the composer's TooltipTextFormat seam splits
+            // 83 characters, so the composer's TooltipTextFormat seam splits
             // it across list entries - the caller joins with newlines, so
             // rejoining with a space must reproduce the sentence exactly.
             Assert.StartsWith(
