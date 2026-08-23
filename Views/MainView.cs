@@ -1430,9 +1430,21 @@ namespace GW2CraftingHelper.Views
         /// can gain a column, a narrower one drop back to the single-column
         /// fallback), every cell moves to its new slot, and each of its text
         /// lines is re-ellipsized against the new COLUMN width - not the
-        /// panel width - with its tooltip re-decided. No search re-run, no
-        /// dispose-and-recreate, so the user's scroll position is untouched
-        /// - the reason a width change no longer goes through RebuildContent.
+        /// panel width - with its tooltip re-decided. No search re-run and no
+        /// dispose-and-recreate, which is why a width change no longer goes
+        /// through RebuildContent.
+        /// <para>
+        /// The scroll position survives a repack that KEEPS the column count
+        /// - the grid panel's width moves, its height does not. A repack that
+        /// changes the column count writes a new grid-panel height, and
+        /// Blish's Scrollbar zeroes the scroll position a frame after any
+        /// content-height change (measured: docs/KNOWN-ISSUES.md, "The grid
+        /// panel holds its unfiltered height"), so the list snaps to top.
+        /// Not defended against here: the tab has no scroll-restore
+        /// machinery (CraftingPlanView.PreserveScrollAcross is the module's
+        /// only one), and a column-count change re-flows every row anyway, so
+        /// there is no old position left to hold.
+        /// </para>
         /// </summary>
         private void RefitResultRows()
         {

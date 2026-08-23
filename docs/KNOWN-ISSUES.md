@@ -12125,7 +12125,24 @@ narrowed one drop back to the fallback - moves every cell to its new slot,
 and re-ellipsizes each line against its COLUMN width, re-deciding the
 per-line and row-strip tooltips through the same `FitRowTextLabel` /
 `ApplyRowStripTooltip` rules as before. Still no search re-run and no
-dispose-and-recreate, so the scroll position is untouched.
+dispose-and-recreate.
+
+**What that does and does not buy for the scroll position.** A repack that
+keeps the column count leaves the scroll alone: the grid panel's WIDTH
+moves, its height does not. A repack that CHANGES the column count is a
+different story - the panel's height moves with it (2 -> 3 columns drops it
+by about a third), and Blish's Scrollbar zeroes the scroll position a frame
+after any content-height change, measured and written up under "The grid
+panel holds its unfiltered height" in the Settings grid section above. So a
+drag across a column boundary snaps the list to the top. That is not
+defended against: the Snapshot tab has no scroll-restore machinery (the
+module's only one is `CraftingPlanView.PreserveScrollAcross`, which needs a
+reflection handle on Blish's private scrollbar field plus a frame-ticker
+verify), and a column-count change re-flows every row anyway, so there is
+no old position left to hold. The Settings grid's own answer - pin the
+panel to a height the filter cannot move - does not port: there the height
+is a function of a FIXED 47-cell list, here it is a function of the column
+count itself.
 
 `LayoutResultGrid` is the single writer for the grid's geometry, shared by
 the rebuild and the repack; the rebuild passes `refitText: false` because
@@ -12158,11 +12175,20 @@ toggle, and the coin row above the list are all untouched.
 1. Snapshot tab at the window minimum (1436): the result list renders
    **two columns**, and reading it left-to-right then down matches the
    order the single-column list had - the first four items are 1, 2 on
-   the top row and 3, 4 on the second, NOT 1, 3 / 2, 4.
+   the top row and 3, 4 on the second, NOT 1, 3 / 2, 4. With the list
+   long enough to show the scrollbar, confirm the RIGHTMOST column's text
+   stops clear of it. That is the one live check on the chain the unit
+   tests cannot make: they can pin the arithmetic, but only the running
+   tab can confirm MainView's content panel really is
+   `TabPanelWidthFor(window) + 20` wide (i.e. that this tab still adds no
+   right-edge padding of its own).
 2. Type into the search box and watch the list repack: the grid refills
-   from the top left with no gaps, and the scroll position does not jump
-   to the top on a keystroke that changes the match count. Toggle a
-   source checkbox and a content-type dropdown value for the same check.
+   from the top left with no gaps and the last row is the only partial
+   one. Toggle a source checkbox and a content-type dropdown value for
+   the same check. Scroll position is deliberately NOT part of this step
+   - a search rebuilds the row set, which moves the content height, and
+   Blish resets the scroll to top on that. Pre-existing behaviour of this
+   tab, unchanged by the grid.
 3. An item whose breakdown is too long for one column (search for a
    material held by several characters plus bank and material storage):
    the second line ends in an ellipsis and hovering the row shows the
@@ -12173,8 +12199,12 @@ toggle, and the coin row above the list are all untouched.
    every row full width, nothing clipped at the right edge, and the
    tooltips still carry whatever no longer fits.
 5. Drag the window wider, past ~1518px: a third column appears and the
-   rows repack into it without a rebuild - the scroll position stays put
-   and no row is left stranded at an old column position.
+   rows repack into it without a rebuild - no row is left stranded at an
+   old column position and no cell overlaps its neighbour. Two separate
+   scroll checks here, per "What that does and does not buy for the
+   scroll position" above: a drag that stays inside one column band
+   leaves the scroll where it was; the drag that adds the third column
+   snaps it to the top. Both are the expected result.
 6. With the content-type dropdown on "All" and a search that matches both
    (e.g. a term hitting an item and a currency): the wallet rows still
    render **below** the last item row, never interleaved with it, and the
