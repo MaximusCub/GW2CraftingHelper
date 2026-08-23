@@ -8929,4 +8929,15 @@ Desktop gate should look at:
    changed line count triggers - this is the item that exercises
    `RequestRerenderAfterSettle`, so also confirm repeated narrow/widen
    cycles do not accumulate drift or flicker.
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build 35b83f9,
+captures preflight/gK1-gK3). Generated Mystic Clover x77 live on
+the branch build: the Notes section read "Notes (1)" and the forge
+caveat rendered as ONE note wrapping naturally across two width-fit
+lines (breaking mid-sentence at "e.g. / precursor forging"),
+replacing the three hand-split single-sentence rows the 2026-08-22
+photography captures show on master. Section heights composed
+correctly below Crafting Steps with the timegate line intact. The
+resize-across-a-line-count-change rebuild (RequestRerenderAfterSettle)
+was not exercised live - synthetic resize-grip drags are documented
+unreliable - and stands on the TextWrapMath/NotesSectionLayoutMath
+tests plus the verify pass's height-contract walk.
