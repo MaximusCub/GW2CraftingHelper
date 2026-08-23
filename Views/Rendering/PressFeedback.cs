@@ -78,8 +78,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// container's OWN mouse events first and only then walks its
         /// children, so a press inside a wired child reaches BOTH - without
         /// the predicate that is two click sounds and two dimmed controls
-        /// for one press. It is evaluated at press time, so the caller may
-        /// pass a list the press target is not in yet.
+        /// for one press. It is evaluated at press time, so a container may
+        /// be wired before the child the predicate reads exists.
         /// </para>
         /// </summary>
         internal static void Wire(Control control, Func<bool> suppress = null)

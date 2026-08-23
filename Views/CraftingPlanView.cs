@@ -3543,12 +3543,16 @@ namespace GW2CraftingHelper.Views
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
         /// lets a caller with its own header-row control veto the toggle
-        /// when the click landed on that control - only Required Recipes'
-        /// "Hide Unlocked" checkbox still needs it.
+        /// when the click landed on that control, and suppressPress does the
+        /// same for the press feedback (Container.TriggerMouseInput raises
+        /// the header's own press before walking to that control, so without
+        /// it one press on the control dims the whole header and plays the
+        /// click sound twice) - only Required Recipes' "Hide Unlocked"
+        /// checkbox still needs either.
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
-            Func<bool> suppressToggle = null)
+            Func<bool> suppressToggle = null, Func<bool> suppressPress = null)
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
@@ -3570,7 +3574,7 @@ namespace GW2CraftingHelper.Views
             };
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
-            PressFeedback.Wire(headerPanel);
+            PressFeedback.Wire(headerPanel, suppressPress);
 
             // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
             // pixel-level screenshot scans showed the triangles failing to
@@ -3856,15 +3860,24 @@ namespace GW2CraftingHelper.Views
             string headerTitle = RequiredRecipesVisibility.BuildHeaderTitle(
                 section.Rows.Count, visibleRows.Count, _hideUnlockedRecipes);
 
+            // suppressToggle reads the press-time flag (a click that began
+            // off the checkbox still toggles the section); the press
+            // feedback has to read MouseOver live instead, because it runs
+            // during the very press that sets that flag and would otherwise
+            // see the previous press's value. The checkbox is built below,
+            // after the header it parents to - both predicates are only ever
+            // called from a mouse event, long after that.
+            Checkbox hideUnlockedCheckbox = null;
             bool pressStartedOnCheckbox = false;
             var header = CreateSectionHeader(
                 headerTitle, section.SectionType, panelWidth, section.IsDefaultExpanded,
-                () => pressStartedOnCheckbox);
+                () => pressStartedOnCheckbox,
+                () => hideUnlockedCheckbox != null && hideUnlockedCheckbox.MouseOver);
             var headerPanel = header.HeaderPanel;
             var contentFlow = header.ContentFlow;
 
             const int checkboxWidth = 200;
-            var hideUnlockedCheckbox = new Checkbox()
+            hideUnlockedCheckbox = new Checkbox()
             {
                 Text = "Hide Unlocked Recipes",
                 Checked = _hideUnlockedRecipes,
