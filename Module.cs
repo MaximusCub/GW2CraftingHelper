@@ -393,7 +393,10 @@ namespace GW2CraftingHelper
                 _emblemTexture = _moduleIconTexture;
             }
 
-            _modalDialog = new ModalDialog(_settings);
+            // The module window is built further down this method, so the
+            // blocked surface is handed over as a lambda rather than a
+            // reference - see ModalBackdrop for what it does with it.
+            _modalDialog = new ModalDialog(_settings, () => _mainWindow);
             _apiAccessDialog = new ApiAccessDialog();
 
             _snapshotContent = new MainView(

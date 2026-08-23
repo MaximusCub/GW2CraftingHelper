@@ -180,6 +180,7 @@
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
     <Compile Include="Views\Rendering\TreeToolbarCommands.cs" />
+    <Compile Include="Views\ModalBackdrop.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />

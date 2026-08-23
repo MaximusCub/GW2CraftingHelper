@@ -14,14 +14,28 @@ namespace GW2CraftingHelper.Views
 
         private readonly StandardWindow _window;
         private readonly ModuleSettings _settings;
+
+        // The surface a confirm has to freeze while it is up, resolved
+        // lazily: Module builds this dialog before it builds the module
+        // window. Null (no backdrop) is a supported shape - the dialog
+        // still works, it just is not modal, which is what every caller
+        // got before this existed.
+        private readonly Func<Control> _blockedSurface;
+
+        // Built on the FIRST Show(), not in the constructor, and that is
+        // load-bearing - see ModalBackdrop's z-order note: it has to be a
+        // later SpriteScreen child than the window it blocks.
+        private ModalBackdrop _backdrop;
+
         private bool _isShowing;
         private bool _suppressMoved;
         private Action _onConfirm;
         private Action _onCancel;
 
-        public ModalDialog(ModuleSettings settings)
+        public ModalDialog(ModuleSettings settings, Func<Control> blockedSurface = null)
         {
             _settings = settings;
+            _blockedSurface = blockedSurface;
 
             // Use a 1x1 pixel texture to avoid overflow from large asset textures.
             // StandardWindow chrome (title bar, borders, close button) uses its own
@@ -128,6 +142,7 @@ namespace GW2CraftingHelper.Views
 
             _window.Location = new Point(sx, sy);
 
+            ShowBackdrop();
             _window.Show();
             return true;
         }
@@ -142,7 +157,31 @@ namespace GW2CraftingHelper.Views
             _isShowing = false;
             _onConfirm = null;
             _onCancel = null;
+            _backdrop?.Hide();
             _window.Hide();
+        }
+
+        /// <summary>
+        /// Raises the input-eating layer beneath the dialog. Deferred to
+        /// the first Show() because the surface it blocks does not exist
+        /// when this dialog is constructed, AND because it must be a later
+        /// child of SpriteScreen than that surface to win the sibling-index
+        /// tiebreak (see ModalBackdrop).
+        /// </summary>
+        private void ShowBackdrop()
+        {
+            if (_blockedSurface == null) return;
+
+            if (_backdrop == null)
+            {
+                _backdrop = new ModalBackdrop(_window, _blockedSurface);
+            }
+
+            // Bounds and z-order before Visible: a frame that shows the
+            // backdrop at a stale rect is a frame where the click it exists
+            // to eat gets through.
+            _backdrop.Sync();
+            _backdrop.Show();
         }
 
         public void Dispose()
@@ -151,6 +190,8 @@ namespace GW2CraftingHelper.Views
             // cancel callback into controls the module is already disposing.
             _window.Hidden -= OnWindowHidden;
             _window.Moved -= OnWindowMoved;
+            _backdrop?.Dispose();
+            _backdrop = null;
             _window.Hide();
             _window.Dispose();
         }
@@ -174,6 +215,11 @@ namespace GW2CraftingHelper.Views
             _onConfirm = null;
             _onCancel = null;
 
+            // Dropped before the window, and before either callback runs -
+            // a confirm callback that opens another dialog re-raises it,
+            // and one that touches the module window must not be doing so
+            // through a live input blocker.
+            _backdrop?.Hide();
             _window.Hide();
 
             if (confirmed)
