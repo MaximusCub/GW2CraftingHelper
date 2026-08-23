@@ -236,5 +236,167 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(0, count);
         }
+
+        // --- ComputePillFit ---
+        //
+        // The escalation the tree row actually runs: draw everything, else
+        // tighten padding, else tighten AND announce the remainder with a
+        // "+N" pill. The old behaviour stopped at "draw as many as fit and
+        // say nothing".
+
+        // Stand-in for the renderer's MeasureString of "+N": a fixed base
+        // plus one unit per digit, so a width that grows with the digit
+        // count (the only thing that can move the fixed point) is exercised
+        // rather than assumed away.
+        private static int OverflowWidth(int hidden)
+        {
+            return 20 + hidden.ToString().Length * 6;
+        }
+
+        [Fact]
+        public void ComputePillFit_AllFitAtFullPadding_NoTighteningNoOverflow()
+        {
+            var widths = new[] { 50, 60, 40 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(0, fit.WidthReduction);
+            Assert.Equal(0, fit.OverflowPillWidth);
+        }
+
+        [Fact]
+        public void ComputePillFit_TighteningIsEnough_KeepsEveryPill()
+        {
+            // 60+6+60+6+60+6+60 = 258 at full width (one pill over 240),
+            // 54+6+54+6+54+6+54 = 234 once each pill loses 6px. Squeezing
+            // beats hiding a real option, so nothing is dropped and no
+            // "+N" appears.
+            var widths = new[] { 60, 60, 60, 60 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(4, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(6, fit.WidthReduction);
+            Assert.Equal(0, fit.OverflowPillWidth);
+        }
+
+        [Fact]
+        public void ComputePillFit_StillOverflowsAfterTightening_ReservesOverflowPill()
+        {
+            // Mirrors the live shape: CRAFT/TP/VENDOR then the wide
+            // "HAVE 12/20 NEEDED" annotation and IGNORE. Even tightened the
+            // set overruns, so the row announces the remainder instead of
+            // ending early.
+            var widths = new[] { 60, 55, 60, 120, 55 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(6, fit.WidthReduction);
+            Assert.True(fit.HiddenCount > 0);
+            Assert.Equal(5, fit.VisibleCount + fit.HiddenCount);
+            Assert.Equal(OverflowWidth(fit.HiddenCount), fit.OverflowPillWidth);
+
+            // The visible run plus the reserved "+N" must actually fit the
+            // budget - the whole point of reserving it up front.
+            int used = 0;
+            for (int i = 0; i < fit.VisibleCount; i++)
+            {
+                used += PlanRelayoutMath.ReducedWidth(widths[i], fit.WidthReduction) + 6;
+            }
+            Assert.True(used + fit.OverflowPillWidth <= 240);
+        }
+
+        [Fact]
+        public void ComputePillFit_ReservingOverflowDisplacesAnotherPill_CountsStayConsistent()
+        {
+            // The reserved "+N" is wide enough to push out the pill that
+            // only just fit, so HiddenCount must reflect the post-reserve
+            // truth, not the pre-reserve estimate.
+            var widths = new[] { 100, 100, 100, 100 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 0, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(4, fit.VisibleCount + fit.HiddenCount);
+            Assert.True(fit.VisibleCount >= 1);
+            Assert.True(fit.HiddenCount >= 1);
+        }
+
+        [Fact]
+        public void ComputePillFit_NoOverflowMeasurer_DegradesToSilentDrop()
+        {
+            // Defensive: a null measurer must not throw or invent a pill it
+            // cannot size - it reverts to the pre-existing behaviour.
+            var widths = new[] { 60, 55, 60, 120, 55 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: null);
+
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(0, fit.OverflowPillWidth);
+            Assert.True(fit.VisibleCount > 0);
+        }
+
+        [Fact]
+        public void ComputePillFit_NoTighteningAvailable_SkipsStraightToOverflow()
+        {
+            var widths = new[] { 60, 55, 60, 120, 55 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 0, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(0, fit.WidthReduction);
+            Assert.Equal(5, fit.VisibleCount + fit.HiddenCount);
+            Assert.True(fit.HiddenCount > 0);
+        }
+
+        [Fact]
+        public void ComputePillFit_SinglePillWiderThanBudget_StillDrawsItAndHidesNothing()
+        {
+            var widths = new[] { 400 };
+
+            var fit = PlanRelayoutMath.ComputePillFit(
+                widths, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(1, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+        }
+
+        [Fact]
+        public void ComputePillFit_EmptyOrNull_ReturnsNothing()
+        {
+            var empty = PlanRelayoutMath.ComputePillFit(
+                new int[0], widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+            var none = PlanRelayoutMath.ComputePillFit(
+                null, widthReduction: 6, gap: 6, startX: 0, maxRightEdge: 240,
+                overflowPillWidthForHidden: OverflowWidth);
+
+            Assert.Equal(0, empty.VisibleCount);
+            Assert.Equal(0, empty.HiddenCount);
+            Assert.Equal(0, none.VisibleCount);
+            Assert.Equal(0, none.HiddenCount);
+        }
+
+        [Fact]
+        public void ReducedWidth_NeverGoesBelowOnePixel()
+        {
+            Assert.Equal(54, PlanRelayoutMath.ReducedWidth(60, 6));
+            Assert.Equal(60, PlanRelayoutMath.ReducedWidth(60, 0));
+            Assert.Equal(1, PlanRelayoutMath.ReducedWidth(4, 20));
+        }
     }
 }

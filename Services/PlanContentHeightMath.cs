@@ -49,6 +49,16 @@ namespace GW2CraftingHelper.Services
         public const int RecipeRowHeightNoSublabel = 36;
         public const int RecipeRowHeightWithSublabel = 44;
         public const int CostTileRowHeight = 56;
+
+        // The Summary section's COST formula band, whose result tile
+        // ("Actual Cost to Craft") carries a promoted amount font instead
+        // of the DefaultFont16 every other tile uses - it is the plan's
+        // headline figure, not one derived stat among three. Taller than
+        // CostTileRowHeight by exactly the extra leading that font needs
+        // plus a caption line's clearance. The profit band keeps
+        // CostTileRowHeight. See Services/SummarySectionLayoutMath.
+        // CostBandHeight, which is the only thing that reads this.
+        public const int PromotedCostTileRowHeight = 76;
         public const int CurrencyRowHeight = 28;
         public const int FallbackTextRowHeight = 28;
         public const int TreeRowHeight = 40;
@@ -209,14 +219,24 @@ namespace GW2CraftingHelper.Services
         /// root, plus one MultiRootDividerHeight gap between each pair of
         /// consecutive roots (never before the first or after the last). A
         /// one-element roots list (the single-item case) has no divider at
-        /// all and is therefore byte-identical to calling
-        /// TreeNodeHeight(roots[0], 0, false, ...) directly.
+        /// all, so a single-item plan differs from
+        /// TreeNodeHeight(roots[0], 0, false, ...) by exactly the column
+        /// header below.
+        /// <para>
+        /// One CTableHeaderRowHeight column header
+        /// (TreeSectionController.CreateTreeSection builds it into the
+        /// same FlowPanel, above every root) precedes the roots whenever
+        /// there is a tree at all - the tree's right-hand columns are
+        /// unlabelled otherwise, unlike every other c-table in the plan.
+        /// An empty/absent roots list renders no tree and therefore no
+        /// header either, and still measures 0.
+        /// </para>
         /// </summary>
         public static int MultiRootTreeFlowHeight(
             IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
             if (roots == null || roots.Count == 0) return 0;
-            int total = 0;
+            int total = CTableHeaderRowHeight;
             for (int i = 0; i < roots.Count; i++)
             {
                 if (i > 0) total += MultiRootDividerHeight;

@@ -16,6 +16,39 @@ namespace GW2CraftingHelper.Views.Rendering
     internal static class PillColors
     {
         /// <summary>
+        /// Pill kinds that are chrome, never an affordance: they annotate a
+        /// row, and clicking them has never done anything. They are styled
+        /// deliberately unlike a clickable pill (recessed border, dimmed
+        /// label) so "can I click this?" is answerable without hovering.
+        /// PillKind.Subdued is NOT here - it looks muted but stays fully
+        /// clickable (see DecisionPillPlanner's own note on it).
+        /// </summary>
+        internal static bool IsNonInteractiveChrome(PillKind kind)
+        {
+            return kind == PillKind.Locked;
+        }
+
+        /// <summary>
+        /// Label alpha for a non-interactive pill. Below white, but well
+        /// above the 0.35 a dimmed row's own name/value labels use - this
+        /// text must still be readable at rest, it just must not read as
+        /// the same tier as a pill you can act on.
+        /// </summary>
+        internal const float NonInteractiveTextAlpha = 0.78f;
+
+        /// <summary>
+        /// Alpha floor for a DIMMED row's pill border/fill/label. The
+        /// reference-branch dim factor (0.35, still used for that row's
+        /// name/quantity/cost) crushed every pill hue toward the same
+        /// near-black ring, so a dimmed row's pill set was unreadable as a
+        /// set - which is the opposite of what dimming should say ("this
+        /// whole branch is inactive"). At 0.6 the hues survive, and the
+        /// left-indent rule TreeSectionController draws does the
+        /// "one inactive block" work the crush was doing badly.
+        /// </summary>
+        internal const float DimmedPillFactor = 0.6f;
+
+        /// <summary>
         /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
         /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
         /// node.IsIgnored) - ignored for every other kind.
@@ -70,19 +103,25 @@ namespace GW2CraftingHelper.Views.Rendering
                     fill = border * 0.15f;
                     break;
                 case PillKind.Subdued:
-                    // Literally Locked's
-                    // own RGB values below - reuse an existing muted
-                    // PillKind, no new colors - kept as its own switch arm (not folded
-                    // into the Locked case) only so a future edit to
-                    // Locked's color doesn't silently retint Subdued too
-                    // without a deliberate choice; the two case bodies
-                    // must stay byte-for-byte identical.
+                    // Was byte-identical to Locked below, kept as its own
+                    // arm precisely so a later edit to Locked could not
+                    // retint it without a deliberate choice. This is that
+                    // choice: Locked became non-interactive chrome and
+                    // recessed its ring, while a Subdued pill is still a
+                    // real click target and keeps the full-strength muted
+                    // grey. The two are now deliberately different.
                     border = new Color(107, 107, 107); // #6B6B6B
                     fill = Color.Black * 0.3f;
                     break;
                 case PillKind.Locked:
                 default:
-                    border = new Color(107, 107, 107); // #6B6B6B
+                    // Non-interactive chrome (UNKNOWN / UNRECOGNIZED /
+                    // CURRENCY / GUILD UPGRADE / the sole-source badge, plus
+                    // the Shopping List's source tags). The ring drops to
+                    // 45% alpha so it reads as a recessed plate rather than
+                    // the crisp full-strength ring an Available pill - which
+                    // IS clickable - draws at the same hue family.
+                    border = new Color(107, 107, 107) * 0.45f; // #6B6B6B
                     fill = Color.Black * 0.3f;
                     break;
             }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services
@@ -105,9 +106,14 @@ namespace GW2CraftingHelper.Services
         /// column). The tree row has no wrap/second-line support
         /// (TreeRowHeight is a single fixed height shared by every
         /// scroll/layout-height calculation in CraftingPlanView), so pills
-        /// that would overlap the cost column are dropped instead of
-        /// rendered - CraftingPlanView.RenderDecisionPills is the only
-        /// caller.
+        /// that would overlap the cost column cannot be rendered.
+        /// <para>
+        /// This is the primitive, not the policy: <see cref="ComputePillFit"/>
+        /// calls it up to three times (normal padding, tightened padding,
+        /// tightened padding with room reserved for a "+N" pill) and is
+        /// what the renderer actually uses. Dropping the remainder without
+        /// announcing it is what ComputePillFit exists to stop.
+        /// </para>
         ///
         /// Always returns at least 1 when pillWidths is non-empty, even if
         /// that first pill alone would exceed the budget: a completely
@@ -119,6 +125,18 @@ namespace GW2CraftingHelper.Services
         public static int ComputeVisiblePillCount(
             IReadOnlyList<int> pillWidths, int gap, int startX, int maxRightEdge)
         {
+            return ComputeVisiblePillCount(pillWidths, 0, gap, startX, maxRightEdge);
+        }
+
+        /// <summary>
+        /// <see cref="ComputeVisiblePillCount"/> with every pill narrowed by
+        /// widthReduction - the tightened-padding pass, without a second
+        /// measured-width list existing for the tree to allocate per row.
+        /// A pill can never narrow below 1px however large the reduction.
+        /// </summary>
+        private static int ComputeVisiblePillCount(
+            IReadOnlyList<int> pillWidths, int widthReduction, int gap, int startX, int maxRightEdge)
+        {
             if (pillWidths == null || pillWidths.Count == 0)
             {
                 return 0;
@@ -128,7 +146,7 @@ namespace GW2CraftingHelper.Services
             int count = 0;
             for (int i = 0; i < pillWidths.Count; i++)
             {
-                int width = pillWidths[i];
+                int width = ReducedWidth(pillWidths[i], widthReduction);
                 if (i > 0 && x + width > maxRightEdge)
                 {
                     break;
@@ -137,6 +155,131 @@ namespace GW2CraftingHelper.Services
                 count++;
             }
             return count;
+        }
+
+        /// <summary>
+        /// One pill's width at a given padding reduction, floored at 1px.
+        /// The renderer calls this too, so build and fit cannot disagree
+        /// about how wide a tightened pill is.
+        /// </summary>
+        public static int ReducedWidth(int fullWidth, int widthReduction)
+        {
+            int width = fullWidth - widthReduction;
+            return width > 1 ? width : 1;
+        }
+
+        /// <summary>
+        /// How <see cref="ComputePillFit"/> resolved one tree row's pill
+        /// column: how many pills to draw, how much narrower to draw them
+        /// (0 = their measured width), how many were left out, and how wide
+        /// the trailing "+N" pill announcing them must be (0 when nothing
+        /// was left out).
+        /// </summary>
+        public readonly struct PillFitPlan
+        {
+            public readonly int VisibleCount;
+            public readonly int HiddenCount;
+            public readonly int WidthReduction;
+            public readonly int OverflowPillWidth;
+
+            public PillFitPlan(int visibleCount, int hiddenCount, int widthReduction, int overflowPillWidth)
+            {
+                VisibleCount = visibleCount;
+                HiddenCount = hiddenCount;
+                WidthReduction = widthReduction;
+                OverflowPillWidth = overflowPillWidth;
+            }
+        }
+
+        /// <summary>
+        /// Full pill-column plan for one tree row, in the order the fix
+        /// escalates:
+        /// <list type="number">
+        /// <item><description>Every pill fits at its normal padding - draw
+        /// them all, nothing else changes.</description></item>
+        /// <item><description>They fit once every pill is narrowed by
+        /// <paramref name="widthReduction"/> - draw them all that narrow.
+        /// Squeezing is cheaper than hiding a real option.
+        /// </description></item>
+        /// <item><description>They still do not fit - reserve room for a
+        /// trailing "+N" pill and draw as many tightened pills as fit
+        /// before it, so the row states that options exist rather than
+        /// dropping them silently.</description></item>
+        /// </list>
+        /// The "+N" pill's own width depends on N, which depends on how
+        /// many pills its width displaced, so the last step iterates to a
+        /// fixed point. N is non-decreasing across iterations and bounded
+        /// by the pill count, so it settles immediately in practice (only a
+        /// digit-count change moves it at all); the loop is capped anyway,
+        /// and HiddenCount is derived from the final VisibleCount either
+        /// way, so an uncoverged width is a few pixels wrong and never a
+        /// wrong count.
+        /// <para>
+        /// <paramref name="overflowPillWidthForHidden"/> measures "+N" for
+        /// a given N. Null degrades to the old drop-silently behaviour
+        /// rather than throwing, as does a non-positive
+        /// <paramref name="widthReduction"/> for the tightening step.
+        /// </para>
+        /// <para>
+        /// Like <see cref="ComputeVisiblePillCount"/>, at least one pill is
+        /// always drawn even if it alone overruns - so a row whose budget
+        /// cannot even hold one pill plus the "+N" draws both slightly
+        /// over, which still beats an empty column.
+        /// </para>
+        /// </summary>
+        public static PillFitPlan ComputePillFit(
+            IReadOnlyList<int> pillWidths,
+            int widthReduction,
+            int gap,
+            int startX,
+            int maxRightEdge,
+            Func<int, int> overflowPillWidthForHidden)
+        {
+            if (pillWidths == null || pillWidths.Count == 0)
+            {
+                return new PillFitPlan(0, 0, 0, 0);
+            }
+
+            int count = pillWidths.Count;
+            int fullFit = ComputeVisiblePillCount(pillWidths, 0, gap, startX, maxRightEdge);
+            if (fullFit >= count)
+            {
+                return new PillFitPlan(fullFit, 0, 0, 0);
+            }
+
+            int reduction = widthReduction > 0 ? widthReduction : 0;
+            int reducedFit = reduction > 0
+                ? ComputeVisiblePillCount(pillWidths, reduction, gap, startX, maxRightEdge)
+                : fullFit;
+            if (reducedFit >= count)
+            {
+                return new PillFitPlan(reducedFit, 0, reduction, 0);
+            }
+
+            if (overflowPillWidthForHidden == null)
+            {
+                return new PillFitPlan(reducedFit, 0, reduction, 0);
+            }
+
+            int hidden = count - reducedFit;
+            int visible = reducedFit;
+            int overflowWidth = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                int candidateWidth = overflowPillWidthForHidden(hidden);
+                if (candidateWidth < 0) candidateWidth = 0;
+
+                int fit = ComputeVisiblePillCount(
+                    pillWidths, reduction, gap, startX, maxRightEdge - candidateWidth - gap);
+                int nextHidden = count - fit;
+
+                overflowWidth = candidateWidth;
+                visible = fit;
+                if (nextHidden == hidden) break;
+                hidden = nextHidden;
+            }
+
+            return new PillFitPlan(visible, count - visible, reduction, overflowWidth);
         }
 
         public readonly struct CostTileGeometry

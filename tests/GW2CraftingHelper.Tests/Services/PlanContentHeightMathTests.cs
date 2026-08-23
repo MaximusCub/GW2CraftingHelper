@@ -271,16 +271,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void MultiRootTreeFlowHeight_SingleRoot_MatchesTreeNodeHeightExactly()
+        public void MultiRootTreeFlowHeight_SingleRoot_IsTheColumnHeaderPlusThatRootsOwnHeight()
         {
-            // The single-item case must be byte-identical to calling
-            // TreeNodeHeight directly - no separate per-root header row.
+            // The single-item case is the shared column header (one per
+            // tree section, never one per root) plus exactly what
+            // TreeNodeHeight reports for that root - no divider.
             var children = new List<CraftingTreeNode> { Node(2), Node(3) };
             var root = Node(1, children: children);
             var roots = new List<CraftingTreeNode> { root };
 
-            int expected = PlanContentHeightMath.TreeNodeHeight(root, 0, false, null);
+            int expected = PlanContentHeightMath.CTableHeaderRowHeight
+                + PlanContentHeightMath.TreeNodeHeight(root, 0, false, null);
             Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, null));
+        }
+
+        [Fact]
+        public void MultiRootTreeFlowHeight_ColumnHeaderCountedOnce_NotPerRoot()
+        {
+            var one = new List<CraftingTreeNode> { Node(1) };
+            var three = new List<CraftingTreeNode> { Node(1), Node(2), Node(3) };
+
+            int perRootRowsAndDividers =
+                3 * PlanContentHeightMath.TreeRowHeight + 2 * PlanContentHeightMath.MultiRootDividerHeight;
+
+            Assert.Equal(
+                PlanContentHeightMath.CTableHeaderRowHeight + PlanContentHeightMath.TreeRowHeight,
+                PlanContentHeightMath.MultiRootTreeFlowHeight(one, null));
+            Assert.Equal(
+                PlanContentHeightMath.CTableHeaderRowHeight + perRootRowsAndDividers,
+                PlanContentHeightMath.MultiRootTreeFlowHeight(three, null));
         }
 
         [Fact]
@@ -294,6 +313,7 @@ namespace GW2CraftingHelper.Tests.Services
             // One divider between each pair of consecutive roots (2 gaps
             // for 3 roots) - never before the first or after the last.
             int expected =
+                PlanContentHeightMath.CTableHeaderRowHeight +
                 PlanContentHeightMath.TreeNodeHeight(rootA, 0, false, null) +
                 PlanContentHeightMath.TreeNodeHeight(rootB, 0, false, null) +
                 PlanContentHeightMath.TreeNodeHeight(rootC, 0, false, null) +
@@ -310,6 +330,7 @@ namespace GW2CraftingHelper.Tests.Services
             var overrides = new Dictionary<int, bool> { { 1, false } }; // collapse root A only
 
             int expected =
+                PlanContentHeightMath.CTableHeaderRowHeight +
                 PlanContentHeightMath.TreeRowHeight + // rootA collapsed - own row only
                 PlanContentHeightMath.MultiRootDividerHeight +
                 (PlanContentHeightMath.TreeRowHeight + PlanContentHeightMath.TreeRowHeight); // rootB expanded (default)

@@ -252,6 +252,26 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Whether this pill is a click target on a live (non-dimmed) row:
+        /// a source pill the user can switch to, or the Ignore toggle.
+        /// Every other pill is an annotation and has never done anything on
+        /// click.
+        /// <para>
+        /// The view needs this twice and the two readings must agree: to
+        /// decide whether to wire a handler, and - on a dimmed reference
+        /// branch, where no handler is wired at all - to decide whether the
+        /// pill needs a tooltip explaining why the click it advertises does
+        /// nothing. Splitting that predicate across the two sites is how
+        /// the dimmed set ended up drawing full clickable-looking pills
+        /// with no tooltip at all.
+        /// </para>
+        /// </summary>
+        public static bool IsInteractive(PillSpec spec)
+        {
+            return spec.Source.HasValue || spec.Kind == PillKind.Ignore;
+        }
+
+        /// <summary>
         /// The node's raw cost breakdown for one source. The defensive
         /// default arm returns an unavailable breakdown rather than
         /// throwing, so a future regression degrades to "never subdued"

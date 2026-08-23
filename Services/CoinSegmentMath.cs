@@ -24,6 +24,14 @@ namespace GW2CraftingHelper.Services
         public const int CoinLabelIconGap = 2;
         public const int CoinSegmentGap = 6;
 
+        // GW2 coin asset ids (repo CLAUDE.md). Named here because the
+        // recipe tree's per-denomination cost columns have to map an
+        // already-built segment back to its denomination, which the raw
+        // literals made unreadable at that call site.
+        public const int GoldAssetId = 156904;
+        public const int SilverAssetId = 156907;
+        public const int CopperAssetId = 156902;
+
         /// <summary>
         /// The three-way coin split every display site uses: 10000 copper
         /// per gold, 100 per silver. Negative input clamps to 0, matching
@@ -39,6 +47,29 @@ namespace GW2CraftingHelper.Services
                 copper = 0;
             }
             return (copper / 10000, (copper % 10000) / 100, copper % 100);
+        }
+
+        /// <summary>
+        /// The exact strings a coin amount renders as, per denomination -
+        /// null for a leading all-zero unit that is omitted entirely (a
+        /// sub-1-gold amount starts at silver, un-padded; copper always
+        /// renders, even "0", so a zero total is never a blank cell).
+        /// CoinCurrencyRenderer.BuildCoinSegments builds its specs from
+        /// this, and the recipe tree's cost-column pre-scan measures the
+        /// same strings, so the widths a column reserves can never differ
+        /// from the text that lands in it.
+        /// </summary>
+        public static (string Gold, string Silver, string Copper) FormatSegmentTexts(long copper)
+        {
+            var (gold, silver, cop) = Split(copper);
+
+            bool showGold = gold > 0;
+            bool showSilver = showGold || silver > 0;
+
+            return (
+                showGold ? gold.ToString() : null,
+                showSilver ? (showGold ? silver.ToString("D2") : silver.ToString()) : null,
+                showSilver ? cop.ToString("D2") : cop.ToString());
         }
 
         public struct CoinSegmentSpec

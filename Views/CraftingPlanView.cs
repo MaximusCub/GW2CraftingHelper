@@ -32,9 +32,12 @@ namespace GW2CraftingHelper.Views
         // substrate consumed by several regions below (see m38-a1-architecture.md S3).
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
-        // Layout constants
-        private const int RowHeight = 35;
-        private const int InputRowY = 5;
+        // Layout constants. The top strip's own Y arithmetic lives in the
+        // Blish-free Services/TopRegionLayoutMath (three call sites lay the
+        // strip out from it); these two are aliases so the row builders in
+        // this file keep reading naturally.
+        private const int RowHeight = TopRegionLayoutMath.RowHeight;
+        private const int InputRowY = TopRegionLayoutMath.InputRowY;
 
         // Item-row geometry, left to right: search box, "Qty:" label,
         // quantity field, then the add/remove buttons. The buttons keep a
@@ -47,14 +50,6 @@ namespace GW2CraftingHelper.Views
         private const int RowButtonsX = 320;
         private const int SuggestionAnchorGap = 12;
 
-        // The top strip is InputRowsAreaHeight(N) item rows followed by
-        // the controls/status/separator rows (see ComputeTopRegionLayout);
-        // with N == 1 every Y offset reproduces the original fixed
-        // single-row layout exactly.
-        private const int TopRegionRowGap = 3;
-        private const int StatusToSeparatorGap = 21;
-        private const int SeparatorToContentGap = 5;
-        private const int ContentToBottomPad = 5;
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
@@ -66,38 +61,15 @@ namespace GW2CraftingHelper.Views
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         /// <summary>
-        /// Pure top-strip Y-offset arithmetic (Blish-free math, kept as a
-        /// plain struct/method rather than a control mutation so Build()
-        /// and every row Add/Remove reflow call the exact same formula).
-        /// See the constants'
-        /// own doc comment for the rowCount==1 byte-identical guarantee.
+        /// This view's own binding of TopRegionLayoutMath.Compute: the
+        /// row count and the tree toolbar's visibility are view state, the
+        /// arithmetic is not. Every caller goes through here so no call
+        /// site can lay the strip out against a different answer to "is the
+        /// toolbar row showing".
         /// </summary>
-        private struct TopRegionLayout
+        private TopRegionLayout ComputeTopRegionLayout()
         {
-            public int InputPanelHeight;
-            public int ControlsRowY;
-            public int StatusRowY;
-            public int SeparatorY;
-            public int ContentY;
-            public int TopRegionHeight;
-        }
-
-        private static TopRegionLayout ComputeTopRegionLayout(int rowCount)
-        {
-            int inputPanelHeight = rowCount * RowHeight;
-            int controlsRowY = InputRowY + inputPanelHeight + TopRegionRowGap;
-            int statusRowY = controlsRowY + RowHeight + TopRegionRowGap;
-            int separatorY = statusRowY + StatusToSeparatorGap;
-            int contentY = separatorY + SeparatorToContentGap;
-            return new TopRegionLayout
-            {
-                InputPanelHeight = inputPanelHeight,
-                ControlsRowY = controlsRowY,
-                StatusRowY = statusRowY,
-                SeparatorY = separatorY,
-                ContentY = contentY,
-                TopRegionHeight = contentY + ContentToBottomPad
-            };
+            return TopRegionLayoutMath.Compute(_itemRows.Count, _treeToolbarVisible);
         }
 
         // phaseProgress carries live coarse-phase events for the status
@@ -274,7 +246,7 @@ namespace GW2CraftingHelper.Views
         // The Container Build() was called with, retained so
         // AddItemRow/RemoveItemRow (fired by a row button's Click, long
         // after Build() returns) can re-read ContentRegion and reflow the
-        // top strip - see ReflowInputRegion.
+        // top strip - see ReflowTopRegion.
         private Container _buildPanel;
         private Panel _inputPanel;
         private Panel _controlsPanel;
@@ -284,6 +256,23 @@ namespace GW2CraftingHelper.Views
         private Label _statusLabel;
         private Panel _separator;
         private FlowPanel _contentPanel;
+
+        // Recipe Tree toolbar row. The five buttons used to live in the
+        // tree's section header inside the scroll flow, which meant a long
+        // plan scrolled Collapse All away at exactly the moment it became
+        // useful. They sit in the non-scrolling strip now; the state they
+        // act on stays with TreeSectionController and reaches them through
+        // _treeToolbarCommands, republished by every tree render and
+        // withdrawn (null) by every render that produces no tree.
+        //
+        // _treeToolbarVisible is the single answer to "does the strip
+        // reserve a row for this?" - the panel's Visible flag and
+        // TopRegionLayoutMath both read it, so they cannot disagree.
+        private Panel _treeToolbarPanel;
+        private bool _treeToolbarVisible;
+        private TreeToolbarCommands _treeToolbarCommands;
+        private readonly List<(StandardButton Button, int Width, int GapToLeft)> _treeToolbarButtons =
+            new List<(StandardButton, int, int)>(5);
 
         #endregion // General: Blish UI control fields (shared across all responsibilities)
 
@@ -557,7 +546,8 @@ namespace GW2CraftingHelper.Views
                 {
                     var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
                     return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
-                });
+                },
+                commands => _treeToolbarCommands = commands);
         }
 
         public void SetStatus(string status)
@@ -645,7 +635,7 @@ namespace GW2CraftingHelper.Views
             // this module's UI/log strings are English-only, so timestamp
             // formatting is pinned to InvariantCulture rather than the
             // ambient CurrentCulture - matching MainView.cs, Module.cs,
-            // SettingsTabContent.cs and LogTabContent.cs. This file's three
+            // SettingsTabContent.cs and LogTabContent.cs. This file's own
             // sites predate that policy (they originated the "MMM d, yyyy
             // h:mm tt" format string) and were converted to match it rather
             // than left on CurrentCulture, which would go on to produce a
@@ -705,6 +695,10 @@ namespace GW2CraftingHelper.Views
             _planGeneratedAt = default(DateTime);
 
             ResetContentPanelToEmpty();
+            // ResetContentPanelToEmpty withdrew the toolbar commands; the
+            // row itself would otherwise stay reserved over a plan that no
+            // longer exists.
+            ApplyTreeToolbarVisibility(false);
 
             if (_statusBoard.ClearRestoredSeed())
             {
@@ -1328,7 +1322,7 @@ namespace GW2CraftingHelper.Views
         /// Disposes every current item row's live controls and rebuilds
         /// them from _itemRows.
         /// Called by Build() (initial construction) and by
-        /// AddItemRow/RemoveItemRow via ReflowInputRegion (row-count
+        /// AddItemRow/RemoveItemRow via ReflowTopRegion (row-count
         /// changes) - a full rebuild rather than a patch, matching this
         /// file's existing dispose+recreate pattern (e.g. RenderPlan
         /// disposes all of _contentPanel's children on every render rather
@@ -1358,7 +1352,7 @@ namespace GW2CraftingHelper.Views
                 // control's Parent is nulled on disposal" comment). Disposing
                 // it again here would be a double-Dispose on an
                 // already-torn-down control; only a genuine same-cycle
-                // Add/Remove reflow (ReflowInputRegion, _inputPanel still
+                // Add/Remove reflow (ReflowTopRegion, _inputPanel still
                 // live) leaves RowPanel.Parent non-null, meaning THIS row
                 // genuinely still needs disposing before its replacement is
                 // built.
@@ -1490,7 +1484,7 @@ namespace GW2CraftingHelper.Views
         private void AddItemRow()
         {
             _itemRows.Add(new ItemRowState());
-            ReflowInputRegion();
+            ReflowTopRegion(rebuildItemRows: true);
         }
 
         private void RemoveItemRow(ItemRowState row)
@@ -1503,33 +1497,44 @@ namespace GW2CraftingHelper.Views
             row.SuggestionPanel?.Dispose();
             row.RowPanel?.Dispose();
             _itemRows.RemoveAt(index);
-            ReflowInputRegion();
+            ReflowTopRegion(rebuildItemRows: true);
         }
 
         /// <summary>
-        /// Rebuilds the item-row controls and repositions every fixed
-        /// element below them (controls/status/separator/content) after
-        /// the row count changes - the Add/Remove counterpart to
-        /// OnPanelResized's own width-driven repositioning. Row add/remove
-        /// never changes width, only the top strip's total height, so this
-        /// mirrors OnPanelResized's heightChanged branch (scroll-preserve)
-        /// without needing its widthChanged branch (no relayout replay).
+        /// Repositions every fixed element of the top strip
+        /// (controls/toolbar/status/separator/content) after something
+        /// changed its total height - an item row added or removed, or the
+        /// Recipe Tree toolbar row appearing/disappearing with the plan.
+        /// The width-driven counterpart is OnPanelResized. Neither trigger
+        /// changes width, only height, so this mirrors OnPanelResized's
+        /// heightChanged branch (scroll-preserve) without needing its
+        /// widthChanged branch (no relayout replay).
+        /// <para>
+        /// <paramref name="rebuildItemRows"/> is the one part that belongs
+        /// to the row add/remove trigger alone: the toolbar appearing must
+        /// not tear down and rebuild every search box (and with it the
+        /// user's in-progress typing and open suggestion list).
+        /// </para>
         /// </summary>
-        private void ReflowInputRegion()
+        private void ReflowTopRegion(bool rebuildItemRows = false)
         {
             if (_buildPanel == null || _inputPanel == null) return;
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
-            var layout = ComputeTopRegionLayout(_itemRows.Count);
+            var layout = ComputeTopRegionLayout();
 
             int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
             int previousContentHeight = _contentPanel?.Height ?? 0;
 
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
-            RebuildItemRowControls(w);
+            if (rebuildItemRows)
+            {
+                RebuildItemRowControls(w);
+            }
 
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
+            PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
             _separator.Location = new Point(0, layout.SeparatorY);
             _contentPanel.Location = new Point(0, layout.ContentY);
@@ -1587,7 +1592,16 @@ namespace GW2CraftingHelper.Views
                 _itemRows.Add(new ItemRowState());
             }
 
-            var layout = ComputeTopRegionLayout(_itemRows.Count);
+            // Settled BEFORE the layout is computed, from the plan this
+            // Build is about to render (a tab switch re-renders whatever
+            // _currentPlan holds, at the bottom of this method). Deriving
+            // it here rather than letting RenderPlan discover it means the
+            // strip is laid out once, with the row already accounted for,
+            // instead of being rebuilt a moment later.
+            _treeToolbarVisible = ResolveTreeRoots(_currentPlan) != null;
+            _treeToolbarCommands = null;
+
+            var layout = ComputeTopRegionLayout();
 
             // Input rows: search box + quantity per requested item.
             _inputPanel = new Panel()
@@ -1686,6 +1700,8 @@ namespace GW2CraftingHelper.Views
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
+            CreateTreeToolbarRow(buildPanel, w, layout.TreeToolbarRowY);
+
             // Status label
             _statusLabel = new Label()
             {
@@ -1779,6 +1795,153 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        // Toolbar row geometry. The five widths are the ones the buttons
+        // carried in the section header; only their home changed.
+        private const int TreeToolbarButtonHeight = 24;
+        private const int TreeToolbarButtonY =
+            (TopRegionLayoutMath.TreeToolbarRowHeight - TreeToolbarButtonHeight) / 2;
+        private const int TreeToolbarButtonGap = 4;
+
+        // Separates the three plan-mutating presets from the two view-only
+        // actions. Wider than TreeToolbarButtonGap on purpose: "Buy All"
+        // re-solves the whole plan and "Expand All" only opens branches,
+        // and sitting them 4px apart in one undifferentiated run invited
+        // exactly the misclick that costs a set of manual overrides.
+        private const int TreeToolbarGroupGap = 20;
+
+        /// <summary>
+        /// The Recipe Tree's action row, in the non-scrolling strip. It is
+        /// built once per Build() and hidden - not disposed - whenever the
+        /// current plan has no tree, because the strip's Y arithmetic
+        /// already collapses the row in that state
+        /// (TopRegionLayoutMath.Compute) and a hidden panel costs nothing.
+        /// <para>
+        /// The buttons hold no tree state of their own: each one reads
+        /// _treeToolbarCommands at click time, which is null between a
+        /// render dropping the old tree and the next one publishing a new
+        /// one. A click in that window does nothing rather than reaching
+        /// into disposed controls.
+        /// </para>
+        /// </summary>
+        private void CreateTreeToolbarRow(Container buildPanel, int w, int rowY)
+        {
+            _treeToolbarButtons.Clear();
+
+            // Size/Location/Visible are all settled by the
+            // PlaceTreeToolbarRow call at the bottom of this method, the
+            // one writer of them.
+            _treeToolbarPanel = new Panel()
+            {
+                Parent = buildPanel
+            };
+
+            // Names what the buttons act on. The section title itself stays
+            // in the scroll flow with the tree, so without this the row
+            // would be five verbs attached to nothing.
+            new Label()
+            {
+                Text = "Recipe Tree:",
+                TextColor = new Color(170, 170, 170),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, TreeToolbarButtonY + 3),
+                Parent = _treeToolbarPanel
+            };
+
+            // Right to left, so the row stays anchored to the right edge at
+            // every window width. gapToLeft is the space left BEFORE the
+            // next button placed (which lands to this one's left).
+            void PlaceRight(string text, int width, int gapToLeft, string tooltipText,
+                Func<TreeToolbarCommands, Action> pick)
+            {
+                var button = new StandardButton()
+                {
+                    Text = text,
+                    Size = new Point(width, TreeToolbarButtonHeight),
+                    BasicTooltipText = tooltipText,
+                    Parent = _treeToolbarPanel
+                };
+                button.Click += (_, __) =>
+                {
+                    var commands = _treeToolbarCommands;
+                    if (commands == null) return;
+                    pick(commands)?.Invoke();
+                };
+                _treeToolbarButtons.Add((button, width, gapToLeft));
+            }
+
+            PlaceRight("Collapse All", 96, TreeToolbarButtonGap,
+                "Collapses every branch of the Recipe Tree back down to the top level.",
+                c => c.CollapseAll);
+            PlaceRight("Expand All", 92, TreeToolbarGroupGap,
+                "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.",
+                c => c.ExpandAll);
+            PlaceRight("Buy All", 70, TreeToolbarButtonGap,
+                "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
+                "including nodes hidden under bought items - replacing any manual choices already made. " +
+                "Ingredients with no Trading Post price fall back to the solver's normal choice.",
+                c => c.BuyAll);
+            PlaceRight("Craft All", 76, TreeToolbarButtonGap,
+                "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
+                "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
+                "with no recipe fall back to the solver's normal choice.",
+                c => c.CraftAll);
+            PlaceRight("Best Path", 80, 0,
+                "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
+                "cheapest plan. Ignore selections are left unchanged.",
+                c => c.BestPath);
+
+            PlaceTreeToolbarRow(w, rowY);
+        }
+
+        /// <summary>
+        /// Repositions and re-sizes the toolbar row and its right-anchored
+        /// buttons - pure geometry, no rebuild, so it is safe on every
+        /// resize tick. The sole writer of the panel's Visible/Size, and it
+        /// reads _treeToolbarVisible, the same flag TopRegionLayoutMath is
+        /// handed.
+        /// <para>
+        /// A hidden row is given zero height as well as Visible = false.
+        /// The strip's arithmetic collapses the row entirely when it is
+        /// hidden, which puts its Y exactly on the status row - so a
+        /// full-height panel there would sit over the top few pixels of
+        /// the scrollable content area, and this way it cannot intercept
+        /// anything even if Blish's hit-testing ever stopped honouring
+        /// Visible.
+        /// </para>
+        /// </summary>
+        private void PlaceTreeToolbarRow(int w, int rowY)
+        {
+            if (_treeToolbarPanel == null) return;
+
+            _treeToolbarPanel.Visible = _treeToolbarVisible;
+            _treeToolbarPanel.Size = new Point(
+                w, _treeToolbarVisible ? TopRegionLayoutMath.TreeToolbarRowHeight : 0);
+            _treeToolbarPanel.Location = new Point(0, rowY);
+
+            int x = w - RightEdgePadding;
+            foreach (var (button, width, gapToLeft) in _treeToolbarButtons)
+            {
+                x -= width;
+                button.Location = new Point(x, TreeToolbarButtonY);
+                x -= gapToLeft;
+            }
+        }
+
+        /// <summary>
+        /// Shows or hides the toolbar row, reflowing the strip below it
+        /// only when the answer actually changed - a plan re-render that
+        /// keeps its tree (every pill click, every preset) must not shift
+        /// the layout at all.
+        /// </summary>
+        private void ApplyTreeToolbarVisibility(bool visible)
+        {
+            if (_treeToolbarVisible == visible) return;
+
+            _treeToolbarVisible = visible;
+            ReflowTopRegion();
+        }
+
         #endregion // General: view construction (Build) - wires every section/handler together
 
         #region 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
@@ -1802,8 +1965,8 @@ namespace GW2CraftingHelper.Views
             // (_itemRows.Count) rather than a fixed one, so its own and
             // every row panel's width need updating too, and the Y offsets
             // below it come from the same ComputeTopRegionLayout formula
-            // Build()/ReflowInputRegion use rather than fixed constants.
-            var layout = ComputeTopRegionLayout(_itemRows.Count);
+            // Build()/ReflowTopRegion use rather than fixed constants.
+            var layout = ComputeTopRegionLayout();
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             foreach (var row in _itemRows)
             {
@@ -1815,6 +1978,7 @@ namespace GW2CraftingHelper.Views
             _controlsPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
+            PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _separator.Location = new Point(0, layout.SeparatorY);
@@ -2755,16 +2919,38 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Dims (or restores) the plan area. A panel rebuilt mid-generation
-        /// starts undimmed and is left that way - Build renders whatever
-        /// plan state exists into a fresh FlowPanel, and the generation
-        /// that dimmed the old one has nothing left to restore.
+        /// Dims (or restores) the plan area, the Recipe Tree's action row
+        /// included. A panel rebuilt mid-generation starts undimmed and is
+        /// left that way - Build renders whatever plan state exists into a
+        /// fresh FlowPanel, and the generation that dimmed the old one has
+        /// nothing left to restore.
+        /// <para>
+        /// The toolbar row sits in the non-scrolling strip, outside
+        /// _contentPanel, so it does not inherit that dim - but its five
+        /// buttons mutate the very plan being superseded, and leaving them
+        /// at full brightness above a faded tree says the opposite of what
+        /// the dim says. Disabled as well as dimmed: Opacity does not block
+        /// hit-testing, so without this a Best Path click mid-run re-solves
+        /// a plan that is about to be thrown away. Both panels are created
+        /// in the same Build pass, so the _contentPanel guard above covers
+        /// the toolbar too.
+        /// </para>
         /// </summary>
         private void SetContentDimmed(bool dimmed)
         {
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
-            _contentPanel.Opacity = dimmed ? StalePlanOpacity : 1f;
+            float opacity = dimmed ? StalePlanOpacity : 1f;
+            _contentPanel.Opacity = opacity;
+
+            if (_treeToolbarPanel != null)
+            {
+                _treeToolbarPanel.Opacity = opacity;
+            }
+            foreach (var entry in _treeToolbarButtons)
+            {
+                entry.Button.Enabled = !dimmed;
+            }
         }
 
         /// <summary>
@@ -3029,16 +3215,7 @@ namespace GW2CraftingHelper.Views
                 CreateCollapsibleSection(summarySection, panelWidth);
             }
 
-            // A multi-item
-            // batch supplies N roots directly (vm.MultiItemRoots); a
-            // single-item plan is wrapped into a one-element list here so
-            // CreateTreeSection/RefreshTreeContainerHeights always deal
-            // with "a list of roots" - one root renders byte-identically to
-            // the single-tree path (see PlanContentHeightMath.
-            // MultiRootTreeFlowHeight's own doc comment).
-            List<CraftingTreeNode> treeRoots = vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0
-                ? vm.MultiItemRoots
-                : (vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null);
+            var treeRoots = ResolveTreeRoots(vm);
             if (treeRoots != null)
             {
                 _treeController.CreateTreeSection(treeRoots, panelWidth);
@@ -3049,50 +3226,106 @@ namespace GW2CraftingHelper.Views
                 if (section.SectionType == PlanSectionType.Summary) continue;
                 CreateCollapsibleSection(section, panelWidth);
             }
+
+            // After the tree, so CreateTreeSection has already published
+            // this render's toolbar commands (ResetContentPanelToEmpty
+            // withdrew the previous render's at the top of this method).
+            // A re-render that keeps its tree finds the visibility
+            // unchanged and reflows nothing.
+            ApplyTreeToolbarVisibility(treeRoots != null);
         }
 
         /// <summary>
-        /// Plan header: rarity-framed item icon + two-tone title ("Crafting
-        /// Plan for " in white, item name in its rarity color) + grey
-        /// quantity, centered as a unit; timestamp right-aligned below.
-        /// Mirrors gw2e's centered .tooltip-item + name header block.
+        /// The plan's top-level tree roots, or null when it has no tree at
+        /// all. A multi-item batch supplies N roots directly
+        /// (vm.MultiItemRoots); a single-item plan is wrapped into a
+        /// one-element list so CreateTreeSection/RefreshTreeContainerHeights
+        /// always deal with "a list of roots" - one root renders
+        /// byte-identically to the single-tree path (see
+        /// PlanContentHeightMath.MultiRootTreeFlowHeight's own doc comment).
+        /// <para>
+        /// Build() asks the same question before laying the top strip out,
+        /// so "does this plan have a tree" is answered in exactly one
+        /// place: the strip reserving a toolbar row and RenderPlan building
+        /// a tree section cannot disagree.
+        /// </para>
+        /// </summary>
+        private static List<CraftingTreeNode> ResolveTreeRoots(PlanViewModel vm)
+        {
+            if (vm == null) return null;
+            if (vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0)
+            {
+                return vm.MultiItemRoots;
+            }
+            return vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null;
+        }
+
+        /// <summary>
+        /// Plan header: rarity-framed item icon + the item's own name in
+        /// its rarity colour + a grey quantity, left-aligned at the
+        /// content gutter every section below it also starts at.
+        ///
+        /// Three separate things used to compete here. The block was
+        /// CENTRED while everything under it was left-aligned, so the plan
+        /// had no single left edge. It carried a right-aligned "Generated:
+        /// ..." panel duplicating - to the minute - the timestamp the
+        /// fixed status strip 70px above already shows, so a plan opened
+        /// with the same text twice. And its title shared DefaultFont18
+        /// with every collapsible section header, leaving the page with no
+        /// typographic top level at all.
+        ///
+        /// So: the in-scroll timestamp is gone (the strip keeps it, and it
+        /// never scrolls away); the title is left-aligned and rendered at
+        /// DefaultFont32, and CreateSectionHeader drops to DefaultFont16,
+        /// so Font18-and-up now belongs to the page title alone. The
+        /// "Crafting Plan for " prefix is gone with it - the tab is
+        /// already titled "Crafting Plan" and the strip already says "Plan
+        /// generated", so the prefix cost half the title's width to repeat
+        /// what two other elements say.
         /// </summary>
         private void CreatePlanHeader(PlanViewModel vm, int panelWidth)
         {
-            const int headerHeight = 60;
-            const int headerTopPad = 10;
-            const int headerBottomPad = 4;
+            const int headerHeight = 56;
             const int iconSize = 40;
             const int iconBorder = 2;
-            const int iconPad = 8;
+            const int iconPad = 10;
+
+            // Same 8px content gutter the Summary section's tiles, the
+            // currency table's icon column and the footnote all start at.
+            const int headerX = 8;
 
             int frameSize = iconSize + iconBorder * 2;
 
-            var titleFont = GameService.Content.DefaultFont18;
-            var qtyFont = GameService.Content.DefaultFont16;
+            var titleFont = GameService.Content.DefaultFont32;
+            var qtyFont = GameService.Content.DefaultFont18;
 
-            string prefixText = "Crafting Plan for ";
             string nameText = vm.TargetItemName ?? "Unknown Item";
-            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity}" : "";
 
-            var prefixMeasure = titleFont.MeasureString(prefixText);
+            // "needed", not a bare count: the quantity here is what the
+            // plan still has to obtain after owned materials were
+            // subtracted, which is routinely smaller than the number in
+            // the Qty box the user typed (live capture ph13: box 77,
+            // header 42, 35 already owned). A bare "x 42" beside a box
+            // reading 77 reads as a bug. Deliberately not "to craft" -
+            // a root the solver decided to BUY is just as legitimate.
+            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity} needed" : "";
+
             var nameMeasure = titleFont.MeasureString(nameText);
-            int prefixWidth = (int)System.Math.Ceiling(prefixMeasure.Width);
             int nameWidth = (int)System.Math.Ceiling(nameMeasure.Width);
-            int textHeight = (int)System.Math.Ceiling(prefixMeasure.Height);
+            int textHeight = (int)System.Math.Ceiling(nameMeasure.Height);
 
-            int qtyWidth = 0;
+            int qtyHeight = 0;
             if (qtyText.Length > 0)
             {
-                qtyWidth = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Width);
+                qtyHeight = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Height);
             }
 
-            int totalTitleWidth = frameSize + iconPad + prefixWidth + nameWidth + qtyWidth;
-            int startX = PlanRelayoutMath.CenterX(panelWidth, totalTitleWidth);
-            int centerRegion = headerHeight - headerTopPad - headerBottomPad;
-            int iconY = headerTopPad + (centerRegion - frameSize) / 2;
-            // Anchor text to icon's visual center with -2px optical nudge for descenders
-            int textY = iconY + (frameSize - textHeight) / 2 - 2;
+            int iconY = (headerHeight - frameSize) / 2;
+            int textY = iconY + (frameSize - textHeight) / 2;
+            // Bottom-aligned against the much taller name rather than
+            // top-aligned, with a small optical lift off the descender
+            // line, so the two sit on one reading line.
+            int qtyY = textY + textHeight - qtyHeight - 4;
 
             var titlePanel = new Panel()
             {
@@ -3100,23 +3333,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            var iconFrame = IconControls.CreateRarityFramedIcon(
-                titlePanel, vm.TargetIconUrl, vm.TargetRarity, startX, iconY,
+            IconControls.CreateRarityFramedIcon(
+                titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
-            int textX = startX + frameSize + iconPad;
-            var prefixLabel = new Label()
-            {
-                Text = prefixText,
-                Font = titleFont,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(textX, textY),
-                Parent = titlePanel
-            };
-            textX += prefixWidth;
-
-            var nameLabel = new Label()
+            int textX = headerX + frameSize + iconPad;
+            new Label()
             {
                 Text = nameText,
                 Font = titleFont,
@@ -3128,71 +3350,27 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(textX, textY),
                 Parent = titlePanel
             };
-            textX += nameWidth;
 
-            Label qtyLabel = null;
             if (qtyText.Length > 0)
             {
-                // DefaultFont16 sits a little taller than Font18's cap
-                // height at this weight; +3 keeps its baseline visually
-                // aligned with the name label instead of reading "raised".
-                qtyLabel = new Label()
+                new Label()
                 {
                     Text = qtyText,
                     Font = qtyFont,
                     TextColor = new Color(170, 170, 170),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(textX, textY + 3),
+                    Location = new Point(textX + nameWidth, qtyY),
                     Parent = titlePanel
                 };
             }
 
-            // Generated timestamp: right-aligned
-            var tsPanel = new Panel()
-            {
-                Size = new Point(panelWidth, 22),
-                Parent = _contentPanel
-            };
-
-            string tsText = $"Generated: {_planGeneratedAt.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
-            var tsFont = GameService.Content.DefaultFont14;
-            var tsMeasured = tsFont.MeasureString(tsText);
-            int tsWidth = (int)System.Math.Ceiling(tsMeasured.Width);
-
-            var tsLabel = new Label()
-            {
-                Text = tsText,
-                Font = tsFont,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(PlanRelayoutMath.RightAlignedX(panelWidth - 8, tsWidth), 2),
-                Parent = tsPanel
-            };
-
-            // Every measured width here (prefixWidth, nameWidth,
-            // qtyWidth, tsWidth) is font-only and invariant to panelWidth -
-            // only the centering/right-alignment anchors shift, so this is a
-            // pure reposition, no re-measure, on every drag tick.
-            _relayoutActions.Add(w =>
-            {
-                int newStartX = PlanRelayoutMath.CenterX(w, totalTitleWidth);
-                titlePanel.Size = new Point(w, headerHeight);
-                iconFrame.Location = new Point(newStartX, iconY);
-
-                int x = newStartX + frameSize + iconPad;
-                prefixLabel.Location = new Point(x, textY);
-                x += prefixWidth;
-                nameLabel.Location = new Point(x, textY);
-                x += nameWidth;
-                if (qtyLabel != null)
-                {
-                    qtyLabel.Location = new Point(x, textY + 3);
-                }
-
-                tsPanel.Size = new Point(w, 22);
-                tsLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(w - 8, tsWidth), 2);
-            });
+            // Every x here is now a constant or a font-only measurement,
+            // so nothing in the title moves with the panel width - only
+            // the panel's own cosmetic width, same as TextRowRenderer's
+            // rows. The centring anchor (and the right-aligned timestamp
+            // that needed one) is gone.
+            _relayoutActions.Add(w => titlePanel.Size = new Point(w, headerHeight));
         }
 
         /// <summary>
@@ -3209,13 +3387,13 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Shared chrome for every collapsible section (the 6 PlanSectionType
-        /// sections and the Recipe Tree alike): caret + Font18 title, a 2px
+        /// sections and the Recipe Tree alike): caret + Font16 title, a 2px
         /// divider spanning the full width under the header, a hover wash on
         /// the whole clickable row, and click-to-toggle with expansion state
         /// persisted in _sectionExpansion under sectionKey. suppressToggle
-        /// lets a caller with its own header-row buttons (the tree's
-        /// Expand All / Collapse All / presets) veto the toggle when the
-        /// click landed on one of them.
+        /// lets a caller with its own header-row control veto the toggle
+        /// when the click landed on that control - only Required Recipes'
+        /// "Hide Unlocked" checkbox still needs it.
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
@@ -3257,13 +3435,17 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
+            // DefaultFont16, not 18: the plan title above now owns
+            // Font18-and-up (it renders at Font32), so a section header
+            // sharing Font18 with it would flatten the page back into one
+            // typographic level - see CreatePlanHeader.
             new Label()
             {
                 Text = title,
-                Font = GameService.Content.DefaultFont18,
+                Font = GameService.Content.DefaultFont16,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(22, 4),
+                Location = new Point(22, 5),
                 Parent = headerPanel
             };
 
@@ -3281,7 +3463,7 @@ namespace GW2CraftingHelper.Views
             // default 0.897 scale but vulnerable (~16-17%) at the "Small"
             // 0.81 scale, so it gets the same 1px bottom clearance as the
             // vulnerable row types (y = 30 - 2 - 1 = 27). Title text sits
-            // at y=4 with DefaultFont18 and remains clear of y=27.
+            // at y=5 with DefaultFont16 and remains clear of y=27.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
@@ -3471,10 +3653,11 @@ namespace GW2CraftingHelper.Views
         /// TOTAL alongside the visible count so it can never read as
         /// dishonest about how many recipes the plan actually needs.
         ///
-        /// The header-row "Hide Unlocked" checkbox mirrors
-        /// TreeSectionController.CreateTreeSection's own header-button
-        /// pattern exactly (the only other place in this file needs a
-        /// suppressToggle-guarded extra control in a section header):
+        /// The header-row "Hide Unlocked" checkbox is now the only
+        /// interactive control left in any section header (the Recipe
+        /// Tree's five buttons moved to the non-scrolling strip - see
+        /// TreeToolbarCommands), so this is the sole remaining user of
+        /// CreateSectionHeader's suppressToggle guard:
         /// pressStartedOnCheckbox is declared before CreateSectionHeader
         /// runs (its click-to-toggle wiring captures the suppressToggle
         /// closure by reference, reading the checkbox's MouseOver lazily at

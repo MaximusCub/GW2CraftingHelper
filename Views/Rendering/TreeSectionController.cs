@@ -4,6 +4,7 @@ using Blish_HUD.Input;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 
@@ -83,6 +84,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly Action<IReadOnlyList<string>> _setLastDebugLog;
         private readonly Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> _createSectionHeader;
 
+        // Publishes (or, with null, withdraws) the five tree actions to
+        // whatever surface hosts their buttons - see TreeToolbarCommands.
+        private readonly Action<TreeToolbarCommands> _setTreeToolbar;
+
         private static readonly Logger Logger = Logger.GetLogger<TreeSectionController>();
 
         internal TreeSectionController(
@@ -96,7 +101,8 @@ namespace GW2CraftingHelper.Views.Rendering
             Func<PlanViewModel> getCurrentPlan,
             Action<PlanViewModel> setCurrentPlan,
             Action<IReadOnlyList<string>> setLastDebugLog,
-            Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader)
+            Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader,
+            Action<TreeToolbarCommands> setTreeToolbar)
         {
             // resolveOverridesSync is deliberately NOT null-guarded - the
             // sole production call site (CraftingPlanView's own
@@ -116,6 +122,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _setCurrentPlan = setCurrentPlan ?? throw new ArgumentNullException(nameof(setCurrentPlan));
             _setLastDebugLog = setLastDebugLog ?? throw new ArgumentNullException(nameof(setLastDebugLog));
             _createSectionHeader = createSectionHeader ?? throw new ArgumentNullException(nameof(createSectionHeader));
+            _setTreeToolbar = setTreeToolbar ?? throw new ArgumentNullException(nameof(setTreeToolbar));
         }
 
         // Per-node user decision overrides (keyed by solver NodeId) and
@@ -178,6 +185,17 @@ namespace GW2CraftingHelper.Views.Rendering
         private List<CraftingTreeNode> _treeRoots;
         private FlowPanel _treeFlow;
 
+        // Per-render-pass widest value per coin denomination (plus the
+        // widest whole currency run) across the ENTIRE tree, so every
+        // row's cost cell lands in the same sub-columns and the coin icons
+        // form straight vertical rules - see Services/TreeCostColumnMath,
+        // including why this covers every node rather than only the rows
+        // currently expanded. Scanned once in CreateTreeSection and read
+        // by every RenderTreeNode call of that pass, including the ones a
+        // later expand click builds lazily.
+        private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
+            TreeCostColumnMath.CostColumnWidths.Empty;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -195,6 +213,12 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeNodeStates.Clear();
             _treeRoots = null;
             _treeFlow = null;
+            _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
+
+            // Withdrawn with the render pass that published them: the tree
+            // actions operate on the controls this reset is about to
+            // discard, and the next plan may have no tree at all.
+            _setTreeToolbar(null);
         }
 
         /// <summary>
@@ -284,81 +308,43 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             _treeNodeStates.Clear();
 
-            // The header's Click-to-toggle is wired inside CreateSectionHeader
-            // before these buttons exist; suppressToggle captures them by
-            // reference and reads their (assigned-below) MouseOver lazily,
-            // at click time - not at subscription time.
-            StandardButton expandAllButton = null;
-            StandardButton collapseAllButton = null;
-            StandardButton bestPathButton = null;
-            StandardButton craftAllButton = null;
-            StandardButton buyAllButton = null;
-
-            // Guard uses PRESS-time hover state: with a release-time check,
-            // pressing on the header background and releasing over a button
-            // dropped the click entirely (neither toggle nor button fired).
-            bool pressStartedOnButton = false;
-
+            // The five action buttons this header used to carry now live in
+            // CraftingPlanView's non-scrolling top strip - see
+            // TreeToolbarCommands. Nothing interactive is left in the header,
+            // so the suppressToggle guard (and the press-time hover flag it
+            // read) went with them.
             var header = _createSectionHeader(
-                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true,
-                () => pressStartedOnButton);
-            var headerPanel = header.HeaderPanel;
+                "Recipe Tree", PlanSectionType.RecipeTree, panelWidth, true, null);
             var treeFlow = header.ContentFlow;
             _treeRoots = treeRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(treeRoots);
             _treeFlow = treeFlow;
 
-            // Header-row buttons, right-to-left per the spec's fixed
-            // offsets-from-the-right layout: Collapse All, Expand All, then
-            // the presets (Buy All / Craft All / Best Path) continuing
-            // leftward with 4px gaps so they never collide with the title.
-            int cursorX = panelWidth;
-            var headerButtons = new List<(StandardButton Button, int Width)>(5);
-            StandardButton PlaceButtonRight(string text, int width, string tooltipText)
+            // Cost-column pre-scan: ONE walk of the whole tree per render
+            // pass, before any row is built, so every row (including the
+            // ones an expand click builds later) anchors to the same
+            // sub-columns. Never re-run per row draw or per resize tick -
+            // the widths are data-derived, not panelWidth-derived.
+            _costColumnWidths = ScanCostColumnWidths(_treeRoots);
+
+            // Column headers over the two columns a tree row's right-hand
+            // side actually has. "Source" tracks the pill column, which
+            // moves with the panel width, hence middleXForWidth rather
+            // than a build-time x. Counted by
+            // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
+            // treeFlow height assignment goes through.
+            // Guarded on the same "is there a tree at all" condition
+            // MultiRootTreeFlowHeight counts the header under: a header
+            // drawn over zero roots would be a row the section's own
+            // height math reserves nothing for.
+            if (_treeRoots.Count > 0)
             {
-                cursorX -= width;
-                var button = new StandardButton()
-                {
-                    Text = text,
-                    Size = new Point(width, 24),
-                    Location = new Point(cursorX, 3),
-                    BasicTooltipText = tooltipText,
-                    Parent = headerPanel
-                };
-                headerButtons.Add((button, width));
-                cursorX -= 4;
-                return button;
+                int headerCostColumnWidth = EffectiveCostColumnWidth();
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
+                    middleLabel: "Source",
+                    middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX);
             }
-
-            collapseAllButton = PlaceButtonRight("Collapse All", 96,
-                "Collapses every branch of the Recipe Tree back down to the top level.");
-            expandAllButton = PlaceButtonRight("Expand All", 92,
-                "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.");
-            buyAllButton = PlaceButtonRight("Buy All", 70,
-                "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
-                "including nodes hidden under bought items - replacing any manual choices already made. " +
-                "Ingredients with no Trading Post price fall back to the solver's normal choice.");
-            craftAllButton = PlaceButtonRight("Craft All", 76,
-                "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
-                "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
-                "with no recipe fall back to the solver's normal choice.");
-            bestPathButton = PlaceButtonRight("Best Path", 80,
-                "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
-                "cheapest plan. Ignore selections are left unchanged.");
-
-            // Right-to-left button placement is font-only (fixed
-            // widths) - pure reposition on every drag tick, same order as
-            // PlaceButtonRight built them so the right-to-left offsets
-            // reproduce identically.
-            _sink.AddRelayout(w =>
-            {
-                int x = w;
-                foreach (var (button, width) in headerButtons)
-                {
-                    x -= width;
-                    button.Location = new Point(x, 3);
-                    x -= 4;
-                }
-            });
 
 #if DEBUG
             int relayoutCountBeforeTree = _sink.RelayoutCount;
@@ -403,18 +389,30 @@ namespace GW2CraftingHelper.Views.Rendering
             // this method returns to RenderPlan/PreserveScrollAcross.
             RefreshTreeContainerHeights();
 
-            // Decision presets: clear overrides / force craft-everywhere /
-            // force buy-everywhere (feasibility respected by the solver).
-            bestPathButton.Click += (_, __) =>
+            // Published last: every action below reads state this method
+            // just finished building.
+            _setTreeToolbar(new TreeToolbarCommands
             {
-                if (_nodeOverrides.Count == 0) return;
-                _nodeOverrides.Clear();
-                ApplyOverridesAndResolve(isBestPathPreset: true);
-            };
-            craftAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.Craft);
-            buyAllButton.Click += (_, __) => ApplyPreset(AcquisitionSource.BuyFromTp);
+                BestPath = ApplyBestPathPreset,
+                CraftAll = () => ApplyPreset(AcquisitionSource.Craft),
+                BuyAll = () => ApplyPreset(AcquisitionSource.BuyFromTp),
+                ExpandAll = ExpandAll,
+                CollapseAll = CollapseAll
+            });
+        }
 
-            expandAllButton.Click += (_, __) => _preserveScrollAcross(() =>
+        // Decision preset: clear every manual override and re-solve for the
+        // solver's own cheapest plan.
+        private void ApplyBestPathPreset()
+        {
+            if (_nodeOverrides.Count == 0) return;
+            _nodeOverrides.Clear();
+            ApplyOverridesAndResolve(isBestPathPreset: true);
+        }
+
+        private void ExpandAll()
+        {
+            _preserveScrollAcross(() =>
             {
                 // Building children appends to _treeNodeStates; index loop
                 // deliberately walks the growing list.
@@ -440,8 +438,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
+        }
 
-            collapseAllButton.Click += (_, __) => _preserveScrollAcross(() =>
+        private void CollapseAll()
+        {
+            _preserveScrollAcross(() =>
             {
                 foreach (var s in _treeNodeStates)
                 {
@@ -452,14 +453,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
-
-            headerPanel.LeftMouseButtonPressed += (_, __) =>
-            {
-                pressStartedOnButton =
-                    expandAllButton.MouseOver || collapseAllButton.MouseOver ||
-                    bestPathButton.MouseOver || craftAllButton.MouseOver ||
-                    buyAllButton.MouseOver;
-            };
         }
 
         // Moved verbatim from CraftingPlanView.ApplyPreset. No edits - both
@@ -526,6 +519,79 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreePillColumnWidth = 240;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
+
+        // Left-indent rule down a dimmed subtree: 2px wide (1px is not
+        // guaranteed a physical scanline under Blish's non-integer UI
+        // scale - see LabelHelpers.CreateRowDivider), drawn at every dimmed
+        // row's own indent channel and spanning the full row height, so
+        // consecutive rows at the same depth join into one continuous line
+        // and the branch reads as a single inactive block instead of a
+        // stack of independently-styled rows. Sits inside the existing
+        // TreeRowHeight, so no height math changes.
+        // Decision-pill chrome. TightPillPadding is the first thing tried
+        // when a row's pills do not fit: 3px of side padding instead of 6
+        // still reads as a pill, and squeezing beats hiding a real option
+        // (PlanRelayoutMath.ComputePillFit).
+        private const int PillHeight = 20;
+        private const int PillGap = 6;
+        private const int PillPadding = 12;
+        private const int TightPillPadding = 6;
+
+        private const int TreeDimmedRuleWidth = 2;
+        private const int TreeDimmedRuleOffset = 8;
+        private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
+
+        // What a dead click on a dimmed pill means, and the one action
+        // that makes it live again. Every dimmed row is somewhere under a
+        // node the solver decided to buy, so switching that node to CRAFT
+        // is always the answer, however deep the row sits.
+        private const string DimmedPillTooltip =
+            "Under a bought item - switch the parent to CRAFT to change this";
+
+        /// <summary>
+        /// Width the cost column actually needs this render: its fixed
+        /// floor, or the pre-scanned sub-columns' real total when a tree
+        /// full of multi-gold (or currency-priced) values needs more. The
+        /// column's RIGHT edge never moves, so widening it only pushes the
+        /// decision pills and the name budget left - which is the point:
+        /// before, a wide cost run silently overprinted the pills.
+        /// </summary>
+        private int EffectiveCostColumnWidth()
+        {
+            int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
+            return scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
+        }
+
+        /// <summary>
+        /// Blish-bound half of the cost-column pre-scan: the pure walk
+        /// lives in TreeCostColumnMath.Scan, this supplies the two
+        /// measurements it cannot make itself. Number strings are memoised
+        /// because a tree repeats them heavily ("00", "42", ...), so
+        /// MeasureString runs once per DISTINCT string rather than once
+        /// per node; the currency callback only fires for the handful of
+        /// vendor nodes that draw a currency run at all.
+        /// </summary>
+        private TreeCostColumnMath.CostColumnWidths ScanCostColumnWidths(IReadOnlyList<CraftingTreeNode> roots)
+        {
+            var font = GameService.Content.DefaultFont14;
+            var measured = new Dictionary<string, int>();
+            var metadata = _getCurrentPlan()?.CurrencyMetadata;
+
+            return TreeCostColumnMath.Scan(
+                roots,
+                text =>
+                {
+                    if (!measured.TryGetValue(text, out int width))
+                    {
+                        width = (int)Math.Ceiling(font.MeasureString(text).Width);
+                        measured[text] = width;
+                    }
+                    return width;
+                },
+                node => CoinCurrencyRenderer.TotalCurrencySegmentsWidth(
+                    CoinCurrencyRenderer.BuildCurrencySegments(
+                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)));
+        }
 
         /// <summary>
         /// Recomputes and re-assigns the explicit
@@ -624,6 +690,23 @@ namespace GW2CraftingHelper.Views.Rendering
             // height arithmetic share one formula and cannot silently
             // desync - see that method's doc comment.
             bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
+
+            // Left-indent rule (see TreeDimmedRuleColor). Drawn before
+            // every other child so nothing else in the row paints under it,
+            // and never on a live row.
+            if (dimmed)
+            {
+                int ruleX = indent - TreeDimmedRuleOffset;
+                if (ruleX < 0) ruleX = 0;
+                new Panel()
+                {
+                    Size = new Point(TreeDimmedRuleWidth, TreeRowHeight),
+                    Location = new Point(ruleX, 0),
+                    BackgroundColor = TreeDimmedRuleColor,
+                    Parent = rowPanel
+                };
+            }
+
             Label arrowLabel = null;
             if (hasChildren)
             {
@@ -673,10 +756,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
                 : 0;
 
+            // Snapshot, not a live field read: every closure below outlives
+            // this call, and the next render pass resets _costColumnWidths
+            // before rebuilding. Capturing the value keeps a row's build-time
+            // columns and its own relayout arithmetic identical by
+            // construction.
+            var columnWidths = _costColumnWidths;
+            int costColumnWidth = EffectiveCostColumnWidth();
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
             int pillColX = edges.PillColX;
-            int costRightEdge = edges.CostRightEdge;
+            var costEdges = TreeCostColumnMath.ComputeEdges(edges.CostRightEdge, columnWidths);
 
             string fullName = node.Name ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
@@ -800,8 +890,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // single locked/HAVE/CURRENCY pill when there is no choice.
             var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
 
-            // Cost column: right-aligned so coin amounts line up vertically
-            // across every row regardless of digit count. Only rendered
+            // Cost column: four right-aligned sub-columns (gold, silver,
+            // copper, then any non-coin currency), each sized by this
+            // render's pre-scan of the whole tree, so the coin ICONS land
+            // on the same x on every row - see
+            // Services/TreeCostColumnMath. Right-aligning the run as a
+            // whole (the previous shape) lined up only the run's right
+            // edge, which a mixed coin/currency row shares with nothing.
+            // Only rendered
             // when this node has a real committed decision with a cost
             // figure at all (SubtreeCost.HasValue) - HAVE/CURRENCY/UNKNOWN
             // nodes carry no SubtreeCost and keep the column blank exactly
@@ -821,17 +917,21 @@ namespace GW2CraftingHelper.Views.Rendering
             // the breakdown lives one expand-click away as real child
             // rows, instead of one very long segmented row colliding with
             // the layout.
-            bool hasCostComponentChildren = node.Children.Count > 0 && node.Children[0].IsCostComponent;
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
                 var costFont = GameService.Content.DefaultFont14;
-                var currencyAmounts = hasCostComponentChildren
-                    ? null
-                    : CurrencyDisplayResolver.ResolveAmounts(
-                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata);
-                costCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costRightEdge, 12, costFont, dimmed ? 0.35f : 1f);
+                // TreeCostColumnMath.ShowsCurrencySegments, not a
+                // hand-repeated cost-component check: the pre-scan reserves
+                // the currency sub-column from that same predicate, so a
+                // second copy here could reserve for rows that never draw
+                // and vice versa.
+                var currencyAmounts = TreeCostColumnMath.ShowsCurrencySegments(node)
+                    ? CurrencyDisplayResolver.ResolveAmounts(
+                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata)
+                    : null;
+                costCell = CoinCurrencyRenderer.RenderValueCellInSubColumns(
+                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costEdges, 12, costFont, dimmed ? 0.35f : 1f);
             }
 
             // Child container. Children of a non-Craft decision are this
@@ -940,7 +1040,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
 
                 if (pillPanels.Count > 0)
                 {
@@ -948,12 +1048,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     foreach (var pill in pillPanels)
                     {
                         pill.Location = new Point(x, 10);
-                        x += pill.Width + 6;
+                        x += pill.Width + PillGap;
                     }
                 }
                 if (costCell != null)
                 {
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(costCell, e.CostRightEdge, 12);
+                    CoinCurrencyRenderer.RepositionValueCellInSubColumns(
+                        costCell, TreeCostColumnMath.ComputeEdges(e.CostRightEdge, columnWidths), 12);
                 }
                 if (childFlow != null)
                 {
@@ -963,7 +1064,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddReellipsis(w =>
             {
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, TreeCostColumnWidth, TreeRightMargin);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
                 if (nameLabel.Text != newDisplayName)
                 {
@@ -1014,11 +1115,19 @@ namespace GW2CraftingHelper.Views.Rendering
         /// than let trailing pills render on top of the right-aligned cost
         /// column (this row has no wrap/second-line support - TreeRowHeight
         /// is a fixed per-row height shared by every layout/scroll-height
-        /// calculation in this file), only as many pills as
-        /// PlanRelayoutMath.ComputeVisiblePillCount says fit are rendered -
-        /// see that method's doc comment for why this naturally drops the
-        /// lower-priority (OwnedInfo/Ignore) pills first while always
-        /// keeping at least the first (most important) pill.
+        /// calculation in this file), PlanRelayoutMath.ComputePillFit
+        /// decides the column: all pills at normal padding, else all pills
+        /// at tightened padding, else as many tightened pills as fit
+        /// alongside a trailing "+N" pill naming what was left out.
+        /// Trailing pills used to be dropped with nothing on the row to say
+        /// they existed at all.
+        /// <para>
+        /// The budget is width-INVARIANT: maxRightEdge - pillColX is always
+        /// TreePillColumnWidth - 4, whatever the panel width, because both
+        /// endpoints move together. That is why the fit is resolved once at
+        /// build time and the resize closure only repositions - there is no
+        /// window width at which a hidden pill would have fit.
+        /// </para>
         /// </summary>
         // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only
         // edit: the interactive/ignoreInteractive click handlers write
@@ -1040,56 +1149,46 @@ namespace GW2CraftingHelper.Views.Rendering
             var pillWidths = new List<int>(specs.Count);
             foreach (var spec in specs)
             {
-                int measuredWidth = (int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + 12;
-                pillWidths.Add(measuredWidth);
+                pillWidths.Add((int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding);
             }
             int maxRightEdge = pillColX + TreePillColumnWidth - 4;
-            int visibleCount = PlanRelayoutMath.ComputeVisiblePillCount(pillWidths, 6, pillColX, maxRightEdge);
+            var fit = PlanRelayoutMath.ComputePillFit(
+                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX, maxRightEdge,
+                MeasureOverflowPillWidth);
 
-            for (int specIndex = 0; specIndex < visibleCount; specIndex++)
+            int chosenPadding = PillPadding - fit.WidthReduction;
+
+            for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
                 var spec = specs[specIndex];
-                int pillWidth = pillWidths[specIndex];
-                int textWidth = pillWidth - 12;
+                int pillWidth = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
+                int textWidth = pillWidth - chosenPadding;
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop.
                 Color textColor = Color.White;
+                // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
+                // sole-source badge) reads one tier below a pill you can
+                // act on, matching the recessed ring PillColors gives it.
+                if (PillColors.IsNonInteractiveChrome(spec.Kind))
+                {
+                    textColor *= PillColors.NonInteractiveTextAlpha;
+                }
                 if (dimmed)
                 {
-                    borderColor *= 0.35f;
-                    fillColor *= 0.35f;
-                    textColor *= 0.35f;
+                    // PillColors.DimmedPillFactor, not the 0.35 this row's
+                    // name/quantity/cost use - see that constant's own doc
+                    // comment for why a pill needs a higher floor than the
+                    // text around it.
+                    borderColor *= PillColors.DimmedPillFactor;
+                    fillColor *= PillColors.DimmedPillFactor;
+                    textColor *= PillColors.DimmedPillFactor;
                 }
 
-                // Border simulated as an outer colored panel with a 1px-inset
-                // fill panel - same nesting technique as IconControls.CreateRarityFramedIcon.
-                var outer = new Panel()
-                {
-                    Size = new Point(pillWidth, 20),
-                    Location = new Point(x, pillY),
-                    BackgroundColor = borderColor,
-                    Parent = rowPanel
-                };
-                var inner = new Panel()
-                {
-                    Size = new Point(pillWidth - 2, 18),
-                    Location = new Point(1, 1),
-                    BackgroundColor = fillColor,
-                    Parent = outer
-                };
-                var label = new Label()
-                {
-                    Text = spec.Text,
-                    Font = font,
-                    TextColor = textColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point((pillWidth - 2 - textWidth) / 2, 2),
-                    Parent = inner
-                };
+                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
+                    borderColor, fillColor, textColor, out Panel inner, out Label label);
 
                 // tooltipText is resolved once below, then stamped onto
                 // outer/inner/label together - the inner fill panel and
@@ -1100,8 +1199,24 @@ namespace GW2CraftingHelper.Views.Rendering
                 // work correctly today.
                 string tooltipText = null;
 
+                // The dimmed-only difference between this and the two flags
+                // below is exactly what the dead-click tooltip at the
+                // bottom of this loop has to explain.
+                bool clickableWhenActive = DecisionPillPlanner.IsInteractive(spec);
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
+
+                // Built outside the interactive arm below: a decisively-
+                // losing pill owes the reader its "why it loses" text
+                // whether or not this row's clicks are wired, and a dimmed
+                // row's pills are exactly the ones that are not. Pure text
+                // derived from the spec, so it costs nothing to resolve
+                // here and null for every other kind.
+                string subduingText = spec.Kind == PillKind.Subdued
+                    ? PillSubduingTooltipBuilder.Build(
+                        spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata)
+                    : null;
+
                 if (interactive)
                 {
                     tooltipText = $"Switch to {spec.Text}";
@@ -1110,14 +1225,9 @@ namespace GW2CraftingHelper.Views.Rendering
                     // tooltip gains the "why" explanation, appended after
                     // the ordinary "Switch to X" line rather than replacing
                     // it, since clicking still does exactly that.
-                    if (spec.Kind == PillKind.Subdued)
+                    if (subduingText != null)
                     {
-                        string subduingText = PillSubduingTooltipBuilder.Build(
-                            spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata);
-                        if (subduingText != null)
-                        {
-                            tooltipText += "\n\n" + subduingText;
-                        }
+                        tooltipText += "\n\n" + subduingText;
                     }
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
@@ -1149,6 +1259,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     Color restingBorder = borderColor;
                     outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
                     outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                }
+                else if (spec.Kind == PillKind.Subdued)
+                {
+                    // Reached only when the click is NOT wired - a dimmed
+                    // row, or no re-solve callback at all. The pill still
+                    // shows why this option loses; the dead-click line
+                    // below is appended after it, never over it.
+                    tooltipText = subduingText;
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
@@ -1302,6 +1420,25 @@ namespace GW2CraftingHelper.Views.Rendering
                         : tooltipText + "\n\n" + valueDetailText;
                 }
 
+                // A dimmed row's would-be-clickable pills are inert: the
+                // reference branch under a bought item is a "what it would
+                // cost to craft instead" preview, not a live decision, so
+                // the click handlers above are never wired. They still draw
+                // a full pill set, so the only honest thing left is to say
+                // why the click did nothing and what to change to make it
+                // work. Appended, never assigned over: a dimmed Subdued
+                // pill carries its "why it loses" text (resolved in its own
+                // arm above, which exists precisely because the interactive
+                // arm never runs on a dimmed row), and a dimmed committed
+                // pill can carry the value-detail hover - neither may be
+                // clobbered.
+                if (dimmed && clickableWhenActive)
+                {
+                    tooltipText = tooltipText == null
+                        ? DimmedPillTooltip
+                        : tooltipText + "\n\n" + DimmedPillTooltip;
+                }
+
                 if (tooltipText != null)
                 {
                     outer.BasicTooltipText = tooltipText;
@@ -1310,10 +1447,135 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 pillPanels.Add(outer);
-                x += pillWidth + 6;
+                x += pillWidth + PillGap;
+            }
+
+            if (fit.HiddenCount > 0)
+            {
+                RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed, pillPanels);
             }
 
             return pillPanels;
+        }
+
+        /// <summary>
+        /// The trailing "+N" pill: the row admitting that N of its pills
+        /// did not fit, instead of the column simply ending early. Styled
+        /// as non-interactive chrome, because it is - clicking it does
+        /// nothing, and its tooltip names what is missing.
+        /// <para>
+        /// Deliberately NOT wired to a popup offering the hidden options.
+        /// The hidden pills are almost always the trailing annotation and
+        /// the IGNORE toggle, and a real affordance means a new
+        /// popup/menu surface (and its own dismiss, focus and scroll
+        /// behaviour) hanging off a case that tightened padding already
+        /// resolves most of the time. The tooltip states the fact; the
+        /// desktop gate decides whether the fact needs an affordance.
+        /// </para>
+        /// <para>
+        /// The tooltip does not suggest widening the window: the pill
+        /// column's budget is fixed at TreePillColumnWidth regardless of
+        /// panel width (see RenderDecisionPills), so that advice would be
+        /// false.
+        /// </para>
+        /// </summary>
+        private static void RenderOverflowPill(
+            Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,
+            BitmapFont font, int x, int pillY, bool dimmed, List<Panel> pillPanels)
+        {
+            string text = OverflowPillText(fit.HiddenCount);
+            int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
+
+            PillColors.GetPillColors(PillKind.Locked, false, out Color borderColor, out Color fillColor);
+            Color textColor = Color.White * PillColors.NonInteractiveTextAlpha;
+            if (dimmed)
+            {
+                borderColor *= PillColors.DimmedPillFactor;
+                fillColor *= PillColors.DimmedPillFactor;
+                textColor *= PillColors.DimmedPillFactor;
+            }
+
+            var hiddenTexts = new List<string>(fit.HiddenCount);
+            for (int i = fit.VisibleCount; i < specs.Count; i++)
+            {
+                hiddenTexts.Add(specs[i].Text);
+            }
+            string tooltipText = $"No room to show: {string.Join(", ", hiddenTexts)}";
+
+            var outer = CreatePillPanel(
+                rowPanel, text, font, fit.OverflowPillWidth, textWidth, x, pillY,
+                borderColor, fillColor, textColor, out Panel inner, out Label label);
+
+            outer.BasicTooltipText = tooltipText;
+            inner.BasicTooltipText = tooltipText;
+            label.BasicTooltipText = tooltipText;
+
+            pillPanels.Add(outer);
+        }
+
+        private static string OverflowPillText(int hiddenCount)
+        {
+            return "+" + hiddenCount;
+        }
+
+        /// <summary>
+        /// Width of the "+N" pill. A method group, not a lambda over the
+        /// row's font local: RenderDecisionPills runs once per tree row, so
+        /// a capturing closure would be one allocation per row on the
+        /// render path for a callback most rows never invoke.
+        /// </summary>
+        private static int MeasureOverflowPillWidth(int hiddenCount)
+        {
+            var font = GameService.Content.DefaultFont12;
+            return (int)System.Math.Ceiling(
+                font.MeasureString(OverflowPillText(hiddenCount)).Width) + TightPillPadding;
+        }
+
+        /// <summary>
+        /// One pill's three nested controls (border panel, inset fill
+        /// panel, centered label) - shared by the decision pills and the
+        /// trailing "+N" pill so the two can never disagree about pill
+        /// chrome. Border simulated as an outer colored panel with a
+        /// 1px-inset fill panel, the same nesting technique
+        /// IconControls.CreateRarityFramedIcon uses.
+        /// </summary>
+        private static Panel CreatePillPanel(
+            Panel rowPanel, string text, BitmapFont font, int pillWidth, int textWidth,
+            int x, int pillY, Color borderColor, Color fillColor, Color textColor,
+            out Panel inner, out Label label)
+        {
+            var outer = new Panel()
+            {
+                Size = new Point(pillWidth, PillHeight),
+                Location = new Point(x, pillY),
+                BackgroundColor = borderColor,
+                Parent = rowPanel
+            };
+            inner = new Panel()
+            {
+                Size = new Point(pillWidth - 2, PillHeight - 2),
+                Location = new Point(1, 1),
+                BackgroundColor = fillColor,
+                Parent = outer
+            };
+            // Clamped: a decision pill's width is its text plus padding, so
+            // the offset is always positive there, but the "+N" pill's
+            // width was reserved before its final N was known - a
+            // digit-count change would otherwise start its label left of
+            // its own pill.
+            int labelX = (pillWidth - 2 - textWidth) / 2;
+            if (labelX < 0) labelX = 0;
+            label = new Label()
+            {
+                Text = text,
+                Font = font,
+                TextColor = textColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(labelX, 2),
+                Parent = inner
+            };
+            return outer;
         }
     }
 }

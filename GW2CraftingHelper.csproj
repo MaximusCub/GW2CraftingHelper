@@ -80,6 +80,7 @@
     <Compile Include="Models\PlanSolveContext.cs" />
     <Compile Include="Models\PlanRequestItem.cs" />
     <Compile Include="Models\OwnMaterialsMode.cs" />
+    <Compile Include="Services\TopRegionLayoutMath.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
@@ -88,6 +89,7 @@
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
+    <Compile Include="Services\TreeCostColumnMath.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
@@ -137,6 +139,7 @@
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
+    <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
@@ -170,6 +173,7 @@
     <Compile Include="Views\Rendering\IconNameRowHelpers.cs" />
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
+    <Compile Include="Views\Rendering\TreeToolbarCommands.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />

@@ -36,6 +36,13 @@ namespace GW2CraftingHelper.Views.Rendering
     // shape).
     internal sealed class ShoppingListSectionRenderer
     {
+        // Gap between the name label and its source tag, and between the
+        // name column and the Amount column - both were bare literals at
+        // three call sites each before the tag started eating into the
+        // name's ellipsis budget.
+        private const int TagGap = 8;
+        private const int NameToQtyGap = 12;
+
         private readonly ISectionRelayoutSink _sink;
 
         internal ShoppingListSectionRenderer(ISectionRelayoutSink sink)
@@ -140,24 +147,6 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        // Moved verbatim from CraftingPlanView.ShoppingSourceTag - only one
-        // call site (CreateShoppingRow below), unlike GetPillColors, so no
-        // shared-class extraction was needed for this helper.
-        private static string ShoppingSourceTag(PlanRowViewModel row)
-        {
-            switch (row.RowType)
-            {
-                case PlanRowType.ShoppingVendor: return "VENDOR";
-                case PlanRowType.ShoppingCurrency: return "CURRENCY";
-                case PlanRowType.ShoppingUnknown:
-                    // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
-                    // "EXPLORE") when one exists - "UNKNOWN" remains the
-                    // fallback for no-source items with no seeded hint.
-                    return !string.IsNullOrEmpty(row.BadgeText) ? row.BadgeText : "UNKNOWN";
-                default: return null; // ShoppingBuy: plain TP purchase, no tag needed
-            }
-        }
-
         // A ValueCellHandle's own
         // controls (the coin/currency icon+label segments, or the single
         // DashLabel for an unpriceable row) have no BasicTooltipText of
@@ -201,13 +190,26 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
+            // The source tag sits immediately right of the name, so its
+            // width has to come out of the name's ellipsis budget - it is
+            // resolved before the name is built, not after. Previously only
+            // the minority VENDOR/CURRENCY/UNKNOWN rows carried a tag and
+            // the budget ignored it, so a long name pushed its own tag into
+            // the Amount column; now that every row is badged that would be
+            // the common case, not the rare one.
+            string sourceTag = ShoppingSourceBadge.ForRow(row);
+            int tagReserve = string.IsNullOrEmpty(sourceTag)
+                ? 0
+                : LabelHelpers.MeasureSmallTagWidth(sourceTag) + TagGap;
+
             // Icon y=0 (was 1) - see the identical note in
             // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
             // shape, same 1px shortfall against the new 2px divider.
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, edges.QtyRightEdge, qtyWidth, 12, nameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
+                edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, nameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
             // Owned/needed split for this row's currency cost(s),
@@ -223,13 +225,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // the two can never diverge on a resize.
             var currencyLines = ShoppingRowTooltipFormatter.BuildCurrencyLines(row.CurrencyCosts);
 
-            string sourceTag = ShoppingSourceTag(row);
             Panel tagPanel = null;
             if (!string.IsNullOrEmpty(sourceTag))
             {
                 PillColors.GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
                 tagPanel = LabelHelpers.CreateSmallTag(
-                    rowPanel, sourceTag, nameX + nameLabel.Width + 8, 9, tagBorder, tagFill);
+                    rowPanel, sourceTag, nameX + nameLabel.Width + TagGap, 9, tagBorder, tagFill);
             }
 
             var qtyLabel = new Label()
@@ -304,13 +305,14 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddReellipsis(w =>
             {
                 var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
-                if (IconNameRowHelpers.ReellipsizeName(nameHandle, font, e.QtyRightEdge, qtyWidth, 12))
+                if (IconNameRowHelpers.ReellipsizeName(
+                    nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve))
                 {
                     BuildTooltip();
                 }
                 if (tagPanel != null)
                 {
-                    tagPanel.Location = new Point(nameX + nameLabel.Width + 8, 9);
+                    tagPanel.Location = new Point(nameX + nameLabel.Width + TagGap, 9);
                 }
             });
         }

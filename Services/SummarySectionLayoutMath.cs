@@ -42,9 +42,11 @@ namespace GW2CraftingHelper.Services
         /// PlanContentHeightMath's own class doc comment for why this
         /// matters), so it must stay in exact agreement with what that
         /// renderer actually builds:
-        ///   - at most one CostTileRowHeight-tall row for the cost formula
+        ///   - at most one CostBandHeight-tall row for the cost formula
         ///     band (always present - 1 or 3 CostFormulaTile rows both
-        ///     render as ONE tile row, per the collapse rule);
+        ///     render as ONE tile row, per the collapse rule), taller
+        ///     again when the plan carries currency costs the coin figure
+        ///     cannot speak for (see CostBandHeight);
         ///   - at most one CostTileRowHeight-tall row for the profit
         ///     formula band (present only when ProfitFormulaTile rows
         ///     exist - always exactly 3 when present);
@@ -89,7 +91,7 @@ namespace GW2CraftingHelper.Services
             }
 
             int height = 0;
-            if (hasCostBand) height += PlanContentHeightMath.CostTileRowHeight;
+            if (hasCostBand) height += CostBandHeight(currencyRowCount > 0);
             if (hasProfitBand) height += PlanContentHeightMath.CostTileRowHeight;
             if (currencyRowCount > 0)
             {
@@ -99,6 +101,80 @@ namespace GW2CraftingHelper.Services
             height += noteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             height += footnoteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             return height;
+        }
+
+        // --- Cost formula band (the plan's headline figure) ---
+        //
+        // The cost band's result tile is the one number a user comes to
+        // this section for, so it renders at a promoted amount font
+        // (PlanContentHeightMath.PromotedCostTileRowHeight) rather than
+        // sharing DefaultFont16 with the two derived tiles beside it.
+        //
+        // In a currency-bearing plan that gold figure is not the whole
+        // cost: PlanViewModelBuilder.BuildCostFormulaBand sources it from
+        // Plan.TotalCoinCost, which by construction excludes every
+        // CurrencyCost row the table below lists. The band therefore
+        // carries an extra disclosure line under the result caption, and
+        // the band grows by exactly one line's worth to hold it. Both the
+        // renderer's row height and BodyHeight's count come from
+        // CostBandHeight so they cannot disagree about that growth.
+
+        /// <summary>Extra band height reserved for the disclosure line.</summary>
+        public const int CostBandCurrencyNoteHeight = 18;
+
+        /// <summary>
+        /// Height of the cost formula band's single tile row.
+        /// hasCurrencyNote must be "this Summary section has at least one
+        /// CurrencyCost row" - the same condition
+        /// Views/Rendering/SummarySectionRenderer.Render uses to decide
+        /// whether to draw the disclosure line at all.
+        /// </summary>
+        public static int CostBandHeight(bool hasCurrencyNote)
+        {
+            return PlanContentHeightMath.PromotedCostTileRowHeight
+                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0);
+        }
+
+        /// <summary>
+        /// The disclosure line's text, or null when the plan has no
+        /// currency costs (in which case the coin figure genuinely IS the
+        /// whole cost and no line is drawn). Pure copy rather than
+        /// geometry, kept beside CostBandHeight because the two are one
+        /// decision - the same precedent
+        /// RequiredRecipesVisibility.BuildHeaderTitle already set for
+        /// honest, count-derived header copy living in Services.
+        /// </summary>
+        public static string CurrencyRequirementNote(int currencyRowCount)
+        {
+            if (currencyRowCount <= 0) return null;
+            // Deliberately short: it sits under a caption inside one tile
+            // slice of a three-tile band, and the reason WHY it matters
+            // lives in the hover text rather than widening this line past
+            // its tile.
+            return currencyRowCount == 1
+                ? "+ 1 currency required"
+                : $"+ {currencyRowCount} currencies required";
+        }
+
+        /// <summary>
+        /// Hover text for the disclosure line: the currency names
+        /// themselves, in the order the table below lists them. Null when
+        /// there is nothing to disclose. Never shows currency IDs (repo
+        /// invariant: IDs are internal-only).
+        /// </summary>
+        public static string CurrencyRequirementNoteTooltip(IReadOnlyList<PlanRowViewModel> currencyRows)
+        {
+            if (currencyRows == null || currencyRows.Count == 0) return null;
+
+            var names = new List<string>(currencyRows.Count);
+            foreach (var row in currencyRows)
+            {
+                if (!string.IsNullOrEmpty(row.Label)) names.Add(row.Label);
+            }
+            if (names.Count == 0) return null;
+
+            return string.Join(", ", names)
+                + "\nThese are spent on top of the coin cost shown - see the Currency table below.";
         }
 
         // --- Currency table column geometry ---

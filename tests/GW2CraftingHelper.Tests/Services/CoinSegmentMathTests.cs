@@ -192,5 +192,71 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(coinWidth, currencyWidth);
         }
+
+        // --- FormatSegmentTexts ---
+        //
+        // The exact strings a coin amount renders as. Two consumers depend
+        // on them agreeing: CoinCurrencyRenderer.BuildCoinSegments (what is
+        // drawn) and the recipe tree's cost-column pre-scan (how wide each
+        // denomination's sub-column is reserved).
+
+        [Fact]
+        public void FormatSegmentTexts_FullAmount_PadsSilverAndCopperOnce_GoldPrecedesThem()
+        {
+            var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(412680L);
+
+            Assert.Equal("41", gold);
+            Assert.Equal("26", silver);
+            Assert.Equal("80", copper);
+        }
+
+        [Fact]
+        public void FormatSegmentTexts_PadsSingleDigitSilverAndCopperUnderGold()
+        {
+            var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(10203L);
+
+            Assert.Equal("1", gold);
+            Assert.Equal("02", silver);
+            Assert.Equal("03", copper);
+        }
+
+        [Fact]
+        public void FormatSegmentTexts_SubGoldAmount_OmitsGoldAndLeavesSilverUnpadded()
+        {
+            var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(539L);
+
+            Assert.Null(gold);
+            Assert.Equal("5", silver);
+            Assert.Equal("39", copper);
+        }
+
+        [Fact]
+        public void FormatSegmentTexts_SubSilverAmount_OmitsBothLeadingUnits()
+        {
+            var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(7L);
+
+            Assert.Null(gold);
+            Assert.Null(silver);
+            Assert.Equal("7", copper);
+        }
+
+        [Fact]
+        public void FormatSegmentTexts_Zero_StillRendersACopperUnit()
+        {
+            // A zero total must never be a blank cell.
+            var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(0L);
+
+            Assert.Null(gold);
+            Assert.Null(silver);
+            Assert.Equal("0", copper);
+        }
+
+        [Fact]
+        public void FormatSegmentTexts_Negative_ClampsLikeSplit()
+        {
+            Assert.Equal(
+                CoinSegmentMath.FormatSegmentTexts(0L),
+                CoinSegmentMath.FormatSegmentTexts(-500L));
+        }
     }
 }
