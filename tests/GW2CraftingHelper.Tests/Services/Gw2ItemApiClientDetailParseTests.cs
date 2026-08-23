@@ -1,10 +1,5 @@
-using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
@@ -18,40 +13,10 @@ namespace GW2CraftingHelper.Tests.Services
     /// </summary>
     public class Gw2ItemApiClientDetailParseTests
     {
-        private class StubHandler : HttpMessageHandler
-        {
-            private readonly string _body;
-
-            public StubHandler(string body)
-            {
-                _body = body;
-            }
-
-            protected override Task<HttpResponseMessage> SendAsync(
-                HttpRequestMessage request, CancellationToken cancellationToken)
-            {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(_body)
-                });
-            }
-        }
-
-        private static async Task<Dictionary<int, RawItem>> ParseAsync(params string[] itemJson)
-        {
-            using (var handler = new StubHandler(RealItemJson.Array(itemJson)))
-            using (var http = new HttpClient(handler))
-            {
-                var client = new Gw2ItemApiClient(http);
-                var items = await client.GetItemsAsync(new[] { 1 }, CancellationToken.None);
-                return items.ToDictionary(i => i.Id);
-            }
-        }
-
         [Fact]
         public async Task FixedStatArmor_CarriesDefenseWeightAndInfixAttributes()
         {
-            var items = await ParseAsync(RealItemJson.ZojjasWarfists);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.ZojjasWarfists);
             var item = items[48074];
 
             Assert.Equal("Armor", item.ItemType);
@@ -77,7 +42,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task StatSelectableWeapon_CarriesPowerRangeAndStatChoicesButNoInfixAttributes()
         {
-            var items = await ParseAsync(RealItemJson.Bolt);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.Bolt);
             var detail = items[30699].Detail;
 
             Assert.Equal("Sword", detail.SubType);
@@ -93,7 +58,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task CraftingMaterial_HasNoDetailsBlockAtAll()
         {
-            var items = await ParseAsync(RealItemJson.MithrilOre);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.MithrilOre);
             var item = items[19700];
 
             Assert.Null(item.Detail);
@@ -105,7 +70,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task Rune_CarriesItsSixPreformattedBonusLines()
         {
-            var items = await ParseAsync(RealItemJson.RuneOfTheScholar);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.RuneOfTheScholar);
             var detail = items[24836].Detail;
 
             Assert.Equal("Rune", detail.SubType);
@@ -118,7 +83,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task Sigil_CarriesItsBuffDescription()
         {
-            var items = await ParseAsync(RealItemJson.SigilOfForce);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.SigilOfForce);
             var detail = items[24615].Detail;
 
             Assert.Equal("Sigil", detail.SubType);
@@ -129,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task Infusion_CarriesBothItsBuffAndItsAgonyResistanceAttribute()
         {
-            var items = await ParseAsync(RealItemJson.AgonyInfusion);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.AgonyInfusion);
             var detail = items[49424].Detail;
 
             Assert.Equal("+1 Agony Resistance", detail.BuffDescription);
@@ -141,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task FineFood_CarriesItsNourishmentBlock_AscendedFoodCarriesNone()
         {
-            var items = await ParseAsync(RealItemJson.LotusFries, RealItemJson.CilantroSteak);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.LotusFries, RealItemJson.CilantroSteak);
 
             var fine = items[12472].Detail;
             Assert.Equal("Food", fine.SubType);
@@ -159,7 +124,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task NoSellFlagAndDescriptionMarkupSurviveTheParseUntouched()
         {
-            var items = await ParseAsync(RealItemJson.Bolt, RealItemJson.Sunrise);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.Bolt, RealItemJson.Sunrise);
 
             Assert.Contains("NoSell", items[30699].Flags);
             Assert.StartsWith("<c=@flavor>", items[30703].Description);
@@ -169,7 +134,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task ExistingNameIconRarityFlagsParseIsUnchanged()
         {
-            var items = await ParseAsync(RealItemJson.Rebreather);
+            var items = await RealItemFixtures.ParseAsync(RealItemJson.Rebreather);
             var item = items[68357];
 
             Assert.Equal("Rime-Rimmed Mariner's Rebreather", item.Name);
