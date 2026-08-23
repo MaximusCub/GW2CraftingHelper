@@ -12291,4 +12291,18 @@ previously had no tooltip at all now have one.
 11. Infusion de-duplication: put a +1 Agony Infusion in a plan and hover
     it. "+1 Agony Resistance" must appear exactly ONCE.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-24 desktop session, branch build at the
+review-fix HEAD, captures preflight/gIS3-gIS4). Generated +22 Agony
+Infusion live (typed adoption); hovering the root tree row rendered
+the full stat block on the opaque facility surface: the item name
+in the ascended rarity colour (semantic span roles resolving to
+colour in the surface only), the "+22 Agony Resistance" infix buff
+line rendered ONCE (the dedup fix live), the rarity and type lines,
+the sanitized description with the <c=@...> markup stripped and
+wrapped, and the retained "Right-click: Open wiki page" action
+line. Materials-with-null-details tooltips (Q2a default) and the
+plan-header surface share the same composer path; the cross-domain
+id gate (the review's Critical - currency/guild-upgrade ids must
+never be looked up as item ids) is pinned by its Blish-free tests.
+Judgment calls Q1-Q14 ride to the maintainer unresolved beyond the
+implemented cheap-reversible defaults.
