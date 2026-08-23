@@ -326,13 +326,36 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CellInputWidth_FitsItsPlaceholder()
+        public void CellInputWidth_FitsEveryDefaultEstimatePlaceholder()
         {
-            // Blish's TextBox insets the placeholder 10px a side and draws it
-            // untruncated, so only the inset region is legible.
+            // The box now hints with the currency's own default value
+            // instead of the unit word "copper", which read as a label on a
+            // read-only field. Blish's TextBox insets the placeholder 10px a
+            // side and draws it untruncated, so only the inset region is
+            // legible - and the real defaults table, not a sample, is what
+            // has to fit it.
             int textRegion = SettingsCurrencyGridLayout.CellInputWidth - 20;
 
-            Assert.True("copper".Length * MaxCharWidthPx <= textRegion);
+            foreach (var kvp in CurrencyDecisionDefaults.DefaultCopperPerUnit)
+            {
+                string placeholder = kvp.Value.ToString(CultureInfo.InvariantCulture);
+                Assert.True(
+                    placeholder.Length * MaxCharWidthPx <= textRegion,
+                    $"Placeholder \"{placeholder}\" does not fit the {textRegion}px text region");
+            }
+        }
+
+        [Fact]
+        public void CurrencyColumnHeader_FitsBetweenTheInputAndTagColumns()
+        {
+            // "Copper per unit" sits on the input column's own X and is what
+            // now carries the unit for the whole column. It may run over the
+            // Ignore checkbox beside it (that column has no header of its
+            // own), but not into the tag slot, whose three states are the
+            // rightmost thing in the cell.
+            int headerRegion = SettingsCurrencyGridLayout.CellTagX - SettingsCurrencyGridLayout.CellInputX;
+
+            Assert.True("Copper per unit".Length * MaxCharWidthPx <= headerRegion);
         }
     }
 }

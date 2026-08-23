@@ -154,6 +154,15 @@ namespace GW2CraftingHelper.Views
         private TextBox _currencyFilterInput;
         private Label _currencyCountLabel;
 
+        // Column header over that grid: one "Currency"/"Copper per unit"
+        // pair per grid column, repositioned with the columns themselves.
+        // The unit belongs here rather than inside each 70px box - as a
+        // placeholder it read as a label naming the box, not as a prompt to
+        // type a number into it (field test, bug 2).
+        private Panel _currencyHeaderPanel;
+        private readonly Label[] _currencyHeaderNames = new Label[2];
+        private readonly Label[] _currencyHeaderUnits = new Label[2];
+
         // Reused per filter pass (one entry per row, in _rows order) rather
         // than reallocated per keystroke: the rows whose amount did not
         // parse, which stay on screen through any filter.
@@ -207,6 +216,7 @@ namespace GW2CraftingHelper.Views
             _currencyGridPanel = null;
             _currencyFilterInput = null;
             _currencyCountLabel = null;
+            _currencyHeaderPanel = null;
             _statusLabel = null;
 
             // Module.cs's Settings tab reuses this
@@ -285,6 +295,7 @@ namespace GW2CraftingHelper.Views
             if (_currencyGridPanel == null) return;
 
             _currencyGridPanel.Width = panelWidth;
+            LayoutCurrencyGridHeader();
 
             int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
             foreach (var row in _rows)
@@ -322,6 +333,11 @@ namespace GW2CraftingHelper.Views
         {
             AddSectionHeader("Currency Valuations", panelWidth);
             AddInfoLine("Coin value per unit of each currency, used to compare vendor offers.", panelWidth);
+            // The one sentence that names the interaction. Field test, bug
+            // 2: with the unit inside the box and only a grey "default N"
+            // beside it, the row read as three read-only labels - nothing
+            // said an amount could be typed over the default at all.
+            AddInfoLine("Type a whole number of copper in a currency's box and press Save to override its default.", panelWidth);
             AddInfoLine("Leave a currency unset to keep it out of price comparisons.", panelWidth);
             // A currency with a curated
             // default (see CurrencyDecisionDefaults) is used automatically
@@ -344,6 +360,7 @@ namespace GW2CraftingHelper.Views
             AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
 
             AddCurrencyFilterRow(panelWidth);
+            AddCurrencyGridHeader(panelWidth);
 
             _currencyGridPanel = new Panel()
             {
@@ -912,6 +929,69 @@ namespace GW2CraftingHelper.Views
             };
         }
 
+        private const int CurrencyHeaderRowHeight = 24;
+        private const int CurrencyHeaderTextY = 4;
+
+        /// <summary>
+        /// One "Currency"/"Copper per unit" pair per grid column, sitting on
+        /// the same X's as the cells below it. Both pairs are built once and
+        /// the second is simply hidden in the one-column layout - the grid's
+        /// column count only ever changes with the panel width, and building
+        /// two labels costs less than rebuilding them per resize tick.
+        /// </summary>
+        private void AddCurrencyGridHeader(int panelWidth)
+        {
+            _currencyHeaderPanel = new Panel()
+            {
+                Size = new Point(panelWidth, CurrencyHeaderRowHeight),
+                Parent = _rootPanel
+            };
+            _fullWidthPanels.Add(_currencyHeaderPanel);
+
+            for (int i = 0; i < _currencyHeaderNames.Length; i++)
+            {
+                _currencyHeaderNames[i] = new Label()
+                {
+                    Text = "Currency",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(CellNameX, CurrencyHeaderTextY),
+                    Parent = _currencyHeaderPanel
+                };
+                _currencyHeaderUnits[i] = new Label()
+                {
+                    Text = "Copper per unit",
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(CellInputX, CurrencyHeaderTextY),
+                    Parent = _currencyHeaderPanel
+                };
+            }
+
+            LayoutCurrencyGridHeader();
+        }
+
+        private void LayoutCurrencyGridHeader()
+        {
+            if (_currencyHeaderPanel == null) return;
+
+            int columnCount = SettingsCurrencyGridLayout.ComputeColumnCount(_panelWidth);
+            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(_panelWidth);
+
+            for (int i = 0; i < _currencyHeaderNames.Length; i++)
+            {
+                bool visible = i < columnCount;
+                _currencyHeaderNames[i].Visible = visible;
+                _currencyHeaderUnits[i].Visible = visible;
+                if (!visible) continue;
+
+                _currencyHeaderNames[i].Location =
+                    new Point((i * columnWidth) + CellNameX, CurrencyHeaderTextY);
+                _currencyHeaderUnits[i].Location =
+                    new Point((i * columnWidth) + CellInputX, CurrencyHeaderTextY);
+            }
+        }
+
         private void AddCurrencyRow(int currencyId, int columnWidth)
         {
             string name = Gw2Constants.ResolveCurrencyName(currencyId);
@@ -943,19 +1023,27 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(CellInputWidth, 26),
                 Location = new Point(CellInputX, CellInputY),
-                // The unit, on every row: a 70px box leaves ~50px of text
+                // Digits, not the unit: "copper" named what the box HELD
+                // and so read as a unit label on a read-only field (field
+                // test, bug 2). The greyed default is the number currently
+                // in effect for this currency, which both prompts the shape
+                // of the input and states what typing over it replaces. A
+                // currency with no default has nothing to suggest and shows
+                // an empty box; "Copper per unit" over the column carries
+                // the unit for both. The 70px box leaves ~50px of text
                 // region (Blish's TextBox insets the placeholder by 10px a
-                // side and does not truncate it), which "copper" fits and
-                // "default: 3600" does not - the default estimate is shown
-                // by DefaultLabel below instead.
-                PlaceholderText = "copper",
+                // side and does not truncate it), which every value in
+                // CurrencyDecisionDefaults - 3600 is the largest - fits.
+                PlaceholderText = hasDefault
+                    ? defaultCopperPerUnit.ToString(CultureInfo.InvariantCulture)
+                    : "",
                 Parent = cellPanel
             };
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
             TooltipFacility.ApplyPlain(input, hasDefault
-                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or tick Ignore to suppress it."
-                : "Coin value of one unit, in copper.");
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it."
+                : "Coin value of one unit, in copper. Type an amount here and press Save.");
 
             var defaultLabel = new Label()
             {
