@@ -9810,4 +9810,20 @@ What the desktop gate should look at:
    followed by the gold/silver/copper figures, with each coin icon still
    to the RIGHT of its number.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-fix HEAD, captures preflight/gH1-gH3). (1) The dead gutter is
+visibly closed across the plan's scroll column on the restored x77
+plan: Used Materials quantities sit directly beside the names
+(x~338 vs the old ~955), Shopping List's Amount/Each/Total columns
+pulled in with their HEADERS tracking the moved positions, tree
+pills beside the names, and - the fix-round's work - the row
+dividers end at their table's right edge instead of running the
+full panel. (2) Snapshot header: the dim "Coin" caption renders
+before the total, and with the 10-source test roster the checkbox
+run correctly took the fall-back-below-the-search-row path (the
+run does not fit in the shared-row width at 1400px), preserving
+the wrap + cap behavior - the shared-row density win applies to
+smaller rosters and was not demonstrable with this fixture.
+Recipes/Disciplines sections have no live coverage in the fixture
+plans (Mystic Forge plans render neither) - their migration stands
+on the shared RightBlockX primitive and its per-table tests.
