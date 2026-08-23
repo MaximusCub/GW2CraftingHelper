@@ -1745,6 +1745,16 @@ namespace GW2CraftingHelper.Views
                     message = trimmedSearch.Length == 0
                         ? "No items match the selected sources."
                         : $"No items match \"{trimmedSearch}\" in the selected sources.";
+
+                    // Only reachable on the items side: character-name
+                    // matching does not exist for the Wallet filter above,
+                    // so the hint would be an offer this tab cannot keep.
+                    string hint = SnapshotSearchResultBuilder.ShortQueryCharacterHint(
+                        trimmedSearch, _characterNames, _uncheckedCharacters);
+                    if (hint != null)
+                    {
+                        message += "\n" + hint;
+                    }
                 }
 
                 new Label()

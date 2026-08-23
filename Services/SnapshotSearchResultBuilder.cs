@@ -33,6 +33,76 @@ namespace GW2CraftingHelper.Services
         private const int MinCharacterSearchLength = 2;
 
         /// <summary>
+        /// The extra line the Snapshot tab's "No items match ..." message
+        /// carries when <see cref="MinCharacterSearchLength"/> is the reason
+        /// the list is empty, and null in every other case.
+        /// <para>
+        /// The hold-back is deliberate but invisible: a one-letter query
+        /// that a character's name does contain looks like a plain
+        /// no-results, so the user reads the tab as broken rather than as
+        /// waiting for a second letter. The line is emitted ONLY on that
+        /// exact case - a query shorter than the minimum, and a roster
+        /// character whose name really would match it at the next keystroke
+        /// - so it never appears as boilerplate under an ordinary empty
+        /// result.
+        /// </para>
+        /// <para>
+        /// A character the source filter has unchecked is not a match:
+        /// typing another letter would still not surface it, and a hint
+        /// that promises otherwise is worse than none. That is why the
+        /// exclusion set is a parameter rather than assumed empty - it is
+        /// the same set <see cref="SnapshotSourceFilter.UncheckedCharacters"/>
+        /// carries, taken directly so the caller need not build a whole
+        /// filter for a read. No id is involved: the hint names no
+        /// character at all, and this tab already shows character NAMES in
+        /// its own checkboxes and row breakdowns.
+        /// </para>
+        /// </summary>
+        public static string ShortQueryCharacterHint(
+            string searchText, IReadOnlyList<string> characterNames,
+            ICollection<string> uncheckedCharacterNames = null)
+        {
+            string trimmed = (searchText ?? string.Empty).Trim();
+            if (trimmed.Length == 0 || trimmed.Length >= MinCharacterSearchLength)
+            {
+                return null;
+            }
+
+            if (characterNames == null)
+            {
+                return null;
+            }
+
+            foreach (string name in characterNames)
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                if (uncheckedCharacterNames != null && uncheckedCharacterNames.Contains(name))
+                {
+                    continue;
+                }
+
+                if (name.IndexOf(trimmed, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return ShortQueryCharacterHintText;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Wording of <see cref="ShortQueryCharacterHint"/>. States the
+        /// action, not the rule: "minimum query length" is this class's
+        /// vocabulary, "type another letter" is the reader's.
+        /// </summary>
+        public const string ShortQueryCharacterHintText =
+            "Type another letter to match character names.";
+
+        /// <summary>
         /// Builds one representative <see cref="SnapshotItemEntry"/> per
         /// distinct itemId in <paramref name="items"/> (name/icon are
         /// resolved identically for every entry sharing an itemId - see
