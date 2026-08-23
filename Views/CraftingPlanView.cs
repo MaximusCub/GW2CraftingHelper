@@ -453,7 +453,17 @@ namespace GW2CraftingHelper.Views
         // call site checks the setting before doing any work, so the
         // disabled cost is a single bool read. Diagnostics only observe -
         // never fed back into any scroll/guard/restore decision.
-        private const string ScrollDiagTag = "[scrolldiag]";
+        // Two spellings of one tag, for two sinks with different shapes:
+        // ModuleLogEntry carries the tag as a FIELD (the Log tab renders it
+        // as "[scrolldiag]" in its own prefix column), while Blish's Logger
+        // has no tag column and needs it inside the message. Every call
+        // site used to prepend the bracketed form to the message text AND
+        // hand it to ModuleLog under the same tag, so every Log tab line
+        // read "[scrolldiag] [scrolldiag] wheel frame=..." - fixed here, in
+        // the one place that writes to both sinks, rather than at fourteen
+        // call sites.
+        private const string ScrollDiagLogTag = "scrolldiag";
+        private const string ScrollDiagTag = "[" + ScrollDiagLogTag + "]";
 
         // Monotonic frame index shared by every scroll-diagnostic log line
         // (wheel handler, SyncRestore, Verify) so a human reading the log can
@@ -495,8 +505,8 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void LogScrollDiag(string message)
         {
-            Logger.Debug(message);
-            ModuleLog.Shared.Write(ModuleLogLevel.Debug, "scrolldiag", message);
+            Logger.Debug($"{ScrollDiagTag} {message}");
+            ModuleLog.Shared.Write(ModuleLogLevel.Debug, ScrollDiagLogTag, message);
         }
 
         #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
@@ -923,7 +933,7 @@ namespace GW2CraftingHelper.Views
 
             if (diagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=SyncRestore frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffset} generation={capturedGeneration}");
+                LogScrollDiag($"write writer=SyncRestore frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             StartScrollVerify(capturedPanel, capturedGeneration, savedOffset, scrollbar);
@@ -977,7 +987,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} verify-armed frame={ScrollDiagFrame()} savedOffset={savedOffset} generation={capturedGeneration}");
+                LogScrollDiag($"verify-armed frame={ScrollDiagFrame()} savedOffset={savedOffset} generation={capturedGeneration}");
             }
 
             bool VerifyTick(GameTime gameTime)
@@ -994,7 +1004,7 @@ namespace GW2CraftingHelper.Views
                 {
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
+                        LogScrollDiag($"verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
                     }
                     return false;
                 }
@@ -1011,7 +1021,7 @@ namespace GW2CraftingHelper.Views
                     {
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
+                            LogScrollDiag($"verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
                         }
                         return false;
                     }
@@ -1036,14 +1046,14 @@ namespace GW2CraftingHelper.Views
 
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} write writer=Verify/zeroReassert frame={ScrollDiagFrame()} realFrame={frame} before={current:0.0000} after={target:0.0000} contentHeight={contentHeight} bounceCount={zeroReassert}");
+                            LogScrollDiag($"write writer=Verify/zeroReassert frame={ScrollDiagFrame()} realFrame={frame} before={current:0.0000} after={target:0.0000} contentHeight={contentHeight} bounceCount={zeroReassert}");
                         }
 
                         if (zeroReassert >= ScrollVerifyZeroReassertCap)
                         {
                             if (diagEnabled)
                             {
-                                LogScrollDiag($"{ScrollDiagTag} verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
+                                LogScrollDiag($"verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
                             }
                             return false;
                         }
@@ -1056,7 +1066,7 @@ namespace GW2CraftingHelper.Views
                         // re-assert over legitimate user input.
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
+                            LogScrollDiag($"verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -1070,7 +1080,7 @@ namespace GW2CraftingHelper.Views
                         // fighting the restore.
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
+                            LogScrollDiag($"verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                         }
                         return false;
                     }
@@ -1082,7 +1092,7 @@ namespace GW2CraftingHelper.Views
 
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
+                        LogScrollDiag($"verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                     }
                     return false;
                 }
@@ -1093,7 +1103,7 @@ namespace GW2CraftingHelper.Views
                     Logger.Warn(ex, "Scroll verify stopped by exception");
                     if (diagEnabled)
                     {
-                        LogScrollDiag($"{ScrollDiagTag} verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
+                        LogScrollDiag($"verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
                     }
                     return false;
                 }
@@ -1232,7 +1242,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix frame={ScrollDiagFrame()} rawIn={rawIn} intendedDelta={intendedDelta} before={before:0.0000} after={after:0.0000}");
+                LogScrollDiag($"write writer=WheelWrapFix frame={ScrollDiagFrame()} rawIn={rawIn} intendedDelta={intendedDelta} before={before:0.0000} after={after:0.0000}");
             }
 
             StartWheelWrapVerify(scrollbar, after);
@@ -1275,7 +1285,7 @@ namespace GW2CraftingHelper.Views
                         scrollbar.ScrollDistance = target;
                         if (diagEnabled)
                         {
-                            LogScrollDiag($"{ScrollDiagTag} write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
+                            LogScrollDiag($"write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
                         }
                         return false;
                     }
@@ -1317,7 +1327,7 @@ namespace GW2CraftingHelper.Views
             int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
             bool verifyLive = _scrollVerifyTicker != null && _scrollVerifyTicker.IsActive;
 
-            LogScrollDiag($"{ScrollDiagTag} wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
+            LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
         #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
@@ -2153,7 +2163,7 @@ namespace GW2CraftingHelper.Views
 
             if (ScrollDiagEnabled)
             {
-                LogScrollDiag($"{ScrollDiagTag} write writer=ResizePreserve frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffsetPx} newHeight={newContentPanelHeight}");
+                LogScrollDiag($"write writer=ResizePreserve frame={ScrollDiagFrame()} before={before:0.0000} after={ratio:0.0000} contentHeight={contentHeight} savedOffset={savedOffsetPx} newHeight={newContentPanelHeight}");
             }
         }
 
