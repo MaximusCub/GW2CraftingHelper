@@ -10399,13 +10399,16 @@ stale and three of its claims no longer held.
 - **M9, quantity notation - DONE.** The Snapshot tab spelled a quantity
   three ways: the recipe tree's prefix ("47x Mystic Clover"), the item
   row's suffix ("Mystic Clover x30") and the wallet row's colon
-  ("Spirit Shards: 50"). All three are the tree's prefix form now,
-  including the per-source breakdown line under an item ("20x Bank
-  12x Vault") - which was the third spelling sitting on the same row
-  as the second. Tabular Amount columns keep bare numbers: a column
-  under an "Amount" header is already labelled by its header. The
-  wallet row keeps its thousands separator, since balances run to
-  seven figures where an item count does not.
+  ("Spirit Shards: 50"). All three are the tree's prefix form now.
+  Two exemptions, both because the number is not counting the thing
+  the label names: a tabular Amount column, whose header already
+  labels its bare numbers, and the per-source breakdown line under an
+  item, whose labels are LOCATIONS - "20x Bank" parses as twenty banks
+  and "10x Character: Maximus Test" collides the multiplier with the
+  label's own colon, so that line keeps "Bank 20   Character: Maximus
+  Test 10" (fix round 1; the sweep had reached it). The wallet row
+  keeps its thousands separator, since balances run to seven figures
+  where an item count does not.
 - **M10, status lines - DONE.** `StatusText.Stamp(verb, when)` is now
   the only place a "&lt;verb&gt; &lt;separator&gt; &lt;timestamp&gt;"
   line is composed; MainView's cache-cleared/updated/failed lines,
@@ -10417,11 +10420,15 @@ stale and three of its claims no longer held.
   clause moved to a colon for the same reason.
   The Snapshot line's two-times-read-as-one confusion is fixed by
   `ForSnapshotAgeSuffix`: "(snapshot 29d old)" instead of a bare
-  "(29d ago)" straight after an absolute timestamp. It shares
-  `ForSnapshotAge`'s bucket ladder through a private `AgeMagnitude`, so
-  the two wordings cannot drift about when minutes become hours - pinned
-  by a Theory that asserts the agreement directly. Placement was NOT
-  touched: which row a status lives in was settled by batches F/I/G.
+  "(29d ago)" straight after an absolute timestamp. It is now the
+  module's ONLY age wording: the older `ForSnapshotAge` was left
+  standing with no caller and nine tests holding it up, one of them a
+  Theory that only mirrored the two formatters against each other -
+  the contract-mirror shape the repo invariant forbids. Deleted in fix
+  round 1, with the bucket coverage retargeted onto
+  `ForSnapshotAgeSuffix` as literal boundary assertions. Placement was
+  NOT touched: which row a status lives in was settled by batches
+  F/I/G.
 - **M12, label vocabulary - DONE**, all four parts. Placeholders are one
   "Search {scope}..." shape (the Log tab's bare "Search..." names its
   scope; Settings' "Filter currencies..." was the lone "Filter"
@@ -10453,6 +10460,18 @@ stale and three of its claims no longer held.
   writing `Size` into controls that visit had already disposed. Also
   shown after a rolled-back plan render, which used to leave the tab
   blank.
+  Two fix-round-1 corrections. It is shown only when the status board
+  reports nothing in flight: a solver started before a tab switch is
+  still running on the way back, and "No plan yet... click Generate
+  Plan." beside a "Generating..." strip told the user to do the thing
+  already happening. And its own relayout closure was dead - both
+  `ReplayRelayout` call sites were gated on `_currentPlan != null`,
+  which is exactly when the empty state does NOT exist, so a no-plan
+  tab dragged narrower kept the label centered on the build-time width
+  and overflowed the panel. The per-tick replay dropped that gate
+  (`ReplayRelayout` already no-ops on an empty registry); the settle
+  ticker keeps it, since every job in that pass is about rendered plan
+  content.
 - **L2, counts - DONE; L2, Used Materials header - DONE (the audit's
   "batch H already did this" was wrong).** Rule adopted: ALL-COUNTABLE.
   Every section whose body is a list of like rows names how many,
@@ -10498,11 +10517,17 @@ stale and three of its claims no longer held.
   Plan) and 24 (the five tree actions - re-checked, they did move to the
   strip in batch E but kept their 24 - and the item row's +/- pair)
   become one `UiMetrics.ButtonHeight = 28` applied at the construction
-  sites. 28 is both the majority and the height of this module's TextBox
-  and Dropdown controls, so a button sharing a row with either now
-  shares its baseline. The Snapshot pair's y is derived from the header
-  height rather than rewritten; the tree toolbar's y already derived
-  from its row height.
+  sites. 28 wins on button count, and is the height of the one input row
+  a button already shares - the plan's item row, whose search and
+  quantity boxes are both 28 beside its +/- pair. It is NOT the module's
+  input height, and fix round 1 corrected the constant's doc comment
+  which claimed it was: TextBoxes are 26 at nine of eleven sites and the
+  two Dropdowns outside the plan tab are 30, so the Log toolbar still
+  runs three input heights and a button on it does not share a baseline
+  with the search box beside it. Bringing the inputs to 28 is a separate,
+  unmade decision, recorded here rather than implied by the constant.
+  The Snapshot pair's y is derived from the header height rather than
+  rewritten; the tree toolbar's y already derived from its row height.
 - **L5, missing wallet icon - DONE**, root cause first. `IconUrl` is
   empty for that entry. Live it comes from
   `Gw2AccountSnapshotService.ResolveCurrencyDetailsAsync`, which
@@ -10564,10 +10589,23 @@ stale and three of its claims no longer held.
   a shortened line carries the full text through the tooltip facility's
   plain path - stamped on the Label itself as well as the row Panel,
   because Blish resolves a tooltip on the deepest control under the
-  cursor and does not bubble. A width change re-fits the rows through
-  the EXISTING 150ms search debounce rather than a per-row resize walk,
-  so a drag costs nothing per frame and a widened window stops showing
+  cursor and does not bubble. A width change re-fits the rows in place -
+  each row Panel takes the new width and each line is re-ellipsized
+  against it, tooltip re-decided - so a widened window stops showing
   "..." on text that now fits; a height-only drag arms nothing.
+  Fix round 1 replaced the first attempt, which routed the resize
+  through the EXISTING search debounce and claimed "a drag costs nothing
+  per frame". It cost a CancellationTokenSource allocated, cancelled and
+  disposed, plus a thrown-and-caught cancellation exception, on EVERY
+  drag frame, on the UI thread's own event path - and its callback then
+  disposed and recreated every row inside a scrolling FlowPanel,
+  re-running the whole search and risking the scroll position, to change
+  nothing but text. The trailing wait is now armed once per drag (later
+  events only stamp the last-event time and the single pending waiter
+  re-arms itself, the bounded shape the plan tab's settle ticker uses)
+  and is gated on the width the rows were actually laid out at, so a
+  drag ending where it started re-fits nothing. Build-time fit and
+  resize re-fit share one rule, `FitRowTextLabel`.
 - **P3, doubled log tag - DONE, at the root.** Two sinks with different
   shapes: `ModuleLogEntry` carries the tag as a FIELD, which
   `LogLineFormat` renders in the row's own prefix column, while Blish's
@@ -10599,8 +10637,10 @@ stale and three of its claims no longer held.
 ### Validation
 
 Build 0 errors and the full suite green per commit. Suite 2168 baseline
--> 2192 (24 new Blish-free tests: 11 on `StatusText`'s stamp and the two
-age wordings including the agreement Theory, 5 on the tree scan's node
+-> 2192 after the batch, then -> 2186 after fix round 1 deleted the
+caller-less age formatter's nine tests and retargeted its bucket
+coverage onto `ForSnapshotAgeSuffix` (net +18 Blish-free tests over the
+baseline: `StatusText`'s stamp and age suffix, 5 on the tree scan's node
 count, 1 pinning two currency columns at the window minimum, and the
 rest folded into the reworked `PlanContentHeightMath` header
 assertions). No new test references Blish.
@@ -10629,7 +10669,11 @@ heights are fixed constants, and the tree's node count is text.
    word, and hovering it - and the row's own name line, and the bare
    strip beside them - must show the full text. Then drag the window
    wider: about a fifth of a second after the drag settles the rows must
-   re-fit and the "..." disappear on lines that now fit.
+   re-fit and the "..." disappear on lines that now fit. Scroll the
+   result list part-way down FIRST and confirm the drag does not move
+   the scroll position, and that the drag itself stays smooth (the
+   re-fit is in place now - no row is rebuilt and the search does not
+   re-run).
 3. **Log tags single:** turn diagnostics on, scroll the Crafting Plan
    tab, then read the Log tab at Debug+. Every scrolldiag line must show
    "[scrolldiag]" exactly once, in the dim prefix column. Copy a few
@@ -10637,9 +10681,11 @@ heights are fixed constants, and the tree's node count is text.
 4. **About wording:** the About tab's Source, Author, Version and Data
    directory rows must each read either a real value or "Not available"
    - no "unknown", no "Not set in manifest.json".
-5. **Snapshot quantity notation:** item rows read "30x Mystic Clover",
-   wallet rows "50x Spirit Shards", breakdown lines "20x Bank" - no
-   suffix "x30" and no "Name: value" colon anywhere on the tab. The
+5. **Snapshot quantity notation:** item rows read "30x Mystic Clover"
+   and wallet rows "50x Spirit Shards" - no suffix "x30" and no
+   "Name: value" colon anywhere on the tab. The breakdown line beneath
+   an item is the exemption and must read "Bank 20   Character: Maximus
+   Test 10", counting the item at each location, NOT "20x Bank". The
    Spirit Shards row's icon slot must show the dim placeholder mark with
    its "No icon available" tooltip rather than an empty hole.
 6. **Empty plan state:** open the Crafting Plan tab with no plan (a
@@ -10647,7 +10693,11 @@ heights are fixed constants, and the tree's node count is text.
    yet..." line must be centered in the content area, and must vanish
    the instant the first plan renders. Generate, then switch tabs away
    and back - the plan must still be there and the empty state must NOT
-   reappear.
+   reappear. Two more: with no plan, drag the window narrower and wider
+   and confirm the line stays centered and never overflows the panel.
+   Then click Generate Plan, switch to the Snapshot tab while it is
+   still solving, and switch back - the content area must show the
+   spinner's status only, never "No plan yet..." beside "Generating".
 7. **Chrome, the two visible costs:** the Shopping List's header is now
    a dark band with white Font14 labels like every other table, and Used
    Materials has an Item/Amount header it did not have. Confirm both
@@ -10658,10 +10708,13 @@ heights are fixed constants, and the tree's node count is text.
    Tree (N)" and that N does not change when branches are expanded or
    collapsed.
 8. **Button heights:** on the Snapshot header, the Log toolbar, the plan
-   controls row and the Recipe Tree strip, every button must be the same
-   height and share a baseline with the textboxes and dropdowns beside
-   it. The item row's "+"/"-" pair must line up with the quantity box,
-   not sit short of it.
+   controls row and the Recipe Tree strip, every BUTTON must be the same
+   height. The item row's "+"/"-" pair must line up with the quantity
+   box, not sit short of it. Buttons are NOT expected to share a
+   baseline with the textboxes and dropdowns beside them - those are
+   still 26 and 30 outside the plan tab. Record how bad the Log
+   toolbar's three-height run actually looks; that is the evidence for
+   whether the inputs should follow to 28.
 9. **Settings "Ignore":** the per-currency checkbox reads "Ignore",
    fits without touching the tag beside it, and ticking it still shows
    "ignored" in that tag and still suppresses the default on save. At
@@ -10671,5 +10724,40 @@ heights are fixed constants, and the tree's node count is text.
     access not ready" in full with clear space before the close X, and
     the checklist must wrap inside the wider window with the buttons
     centered.
+
+### Fix round 1 (review findings)
+
+Six Must Fix findings, all re-located against this HEAD first and all
+fixed; the affected item bullets above are rewritten rather than
+appended to, so they describe what the code does now.
+
+1. The Snapshot tab's resize path armed the search debounce per drag
+   frame (CTS churn plus a thrown cancellation exception per frame) and
+   rebuilt every row. Now a bounded once-per-drag wait and an in-place
+   re-fit. See P2 above.
+2. M9's prefix sweep had reached the location breakdown, where "20x
+   Bank" reads as twenty banks. Exempted, alongside tabular Amount
+   columns. See M9 above.
+3. `UiMetrics.ButtonHeight`'s doc claimed 28 was the module's TextBox
+   and Dropdown height. It is not; the comment now records the real
+   reason and names the input-height decision as unmade. See L3 above.
+4. The plan's empty state contradicted an in-flight generation.
+5. The plan's empty state registered a relayout closure that could
+   never run. Both in L1 above.
+6. `StatusText.ForSnapshotAge` had no production caller and nine tests,
+   one of them a pure contract mirror. Deleted, coverage retargeted.
+   See M10 above.
+
+Nice to Have items from the same review are not addressed here and stay
+open: the duplicated header-band rule
+(`ShoppingListSectionRenderer.HeaderBandWidth` vs
+`CTableHeaderRenderer.BandWidth`), `IconControls`' run-on comment block,
+`ModalBackdrop`'s over-broad "other modules' windows stay live" claim,
+`ApiAccessDialog` having no backdrop, the redundant
+`ResetContentPanelToEmpty` on the rollback path, `SettingsTabContent`'s
+stale "Clear checkbox" doc wording, the 2px input-to-checkbox gap, the
+plan header's "x N needed" suffix versus M9's prefix rule, the
+single-fetch currency cache behind L5's placeholder, and `UiMetrics`
+living in `Views.Rendering`.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
