@@ -127,8 +127,9 @@ namespace GW2CraftingHelper.Services
             }
 
             // Single wrap seam (see TooltipTextFormat): the opportunity-cost
-            // sentence above is 76 characters, past the point where Blish's
-            // own 500px cap is the only thing bounding the tooltip.
+            // sentence above is 76 characters, just past the budget, so the
+            // break lands where this module put it instead of wherever
+            // Blish's own 500px cap happens to fall.
             tooltipText = TooltipTextFormat.Wrap(sb.ToString());
             return true;
         }

@@ -207,8 +207,9 @@ namespace GW2CraftingHelper.Services
             }
 
             // Single wrap seam (see TooltipTextFormat): the vendor
-            // price-side caveats above run past 80 characters, wider than
-            // anything Blish's own 500px cap keeps inside this window. An
+            // price-side caveats above run to 82 characters, past the
+            // budget, so the break lands where this module put it rather
+            // than wherever Blish's own 500px cap happens to fall. An
             // over-budget line becomes several list entries, which is what
             // the caller's newline join already renders.
             return TooltipTextFormat.WrapLines(extraTooltipLines);

@@ -7,35 +7,46 @@ namespace GW2CraftingHelper.Services
     /// The single wrap seam for composed tooltip text (Blish-free, so it is
     /// unit-testable alongside the composers that call it).
     ///
-    /// Blish's basic tooltip does cap its own content, but at a fixed 500px
-    /// that knows nothing about the module window (930px minimum) or the
-    /// screen, and its wrapper splits on spaces only, so an over-long
-    /// unbroken token overflows the cap outright - measured against
-    /// BlishHUD 1.3.0, recorded in docs/KNOWN-ISSUES.md under "Audit batches
-    /// A+B+C tier 1". A tooltip anchored on a tree row therefore still
-    /// spills well past the window it belongs to. Constraining content width
-    /// to something the module chose is the module's job, and it is done
-    /// here once rather than at each call site: every composer routes its
-    /// finished text through <see cref="Wrap"/> or <see cref="WrapLines"/>
-    /// at its return seam, so future callers inherit the wrap without having
-    /// to know it exists.
+    /// Blish's basic tooltip already caps its own content width, at a fixed
+    /// 500px - measured against BlishHUD 1.3.0, recorded in
+    /// docs/KNOWN-ISSUES.md under "Audit batches A+B+C tier 1" - so this
+    /// seam is NOT what keeps a tooltip inside the module window (930px
+    /// clamped minimum); 500px already does. What it adds is control over
+    /// where the break lands and what happens to a token that cannot break:
+    /// Blish's wrapper (DrawUtil.WrapText) splits on spaces only and never
+    /// splits an over-long single token, so an unbroken run wider than 500px
+    /// overflows the cap outright, while TextWrapMath hard-splits it. The
+    /// budget is therefore set at, not under, Blish's own effective width
+    /// (see <see cref="LineBudgetChars"/>) - narrowing it further would only
+    /// add lines to a tooltip that Blish positions with no clamp on the
+    /// bottom screen edge.
+    ///
+    /// It is done here once rather than at each call site: every composer
+    /// routes its finished text through <see cref="Wrap"/> or
+    /// <see cref="WrapLines"/> at its return seam, so future callers inherit
+    /// the wrap without having to know it exists.
     ///
     /// The budget is a CHARACTER count, not pixels: a tooltip string is
     /// composed in Services, far from any font, and the alternative -
     /// threading a measured <c>Func&lt;string, int&gt;</c> down from
     /// Views/Rendering - would put a Blish dependency on the seam this class
-    /// exists to keep Blish-free. Blish's tooltip font is close enough to
-    /// fixed-advance for prose that a character budget bounds the rendered
-    /// width well within the window.
+    /// exists to keep Blish-free.
     /// </summary>
     public static class TooltipTextFormat
     {
         /// <summary>
-        /// Characters per wrapped line. Sized so the widest tooltip line
-        /// stays inside the module window at its clamped minimum width
-        /// (930px) with room for the tooltip's own padding.
+        /// Characters per wrapped line, derived from the one width Blish
+        /// itself enforces: BasicTooltipView.MAX_WIDTH is 500px (measured),
+        /// and DefaultFont14 averages roughly 6.5px per character on prose,
+        /// so 500px is about 76 characters. 75 sits just inside that, which
+        /// makes this wrap a no-op on width - it reproduces the break Blish
+        /// would have made anyway, at a point the module controls - rather
+        /// than a narrowing that adds lines. Height matters here: Blish
+        /// places a tooltip that does not fit above the cursor 36px BELOW it
+        /// and never clamps to the bottom screen edge, so every extra
+        /// wrapped line is a line that can fall off the screen.
         /// </summary>
-        public const int LineBudgetChars = 60;
+        public const int LineBudgetChars = 75;
 
         // Character-count stand-in for TextWrapMath's font measurement -
         // the whole reason the wrapper takes a measure function rather than

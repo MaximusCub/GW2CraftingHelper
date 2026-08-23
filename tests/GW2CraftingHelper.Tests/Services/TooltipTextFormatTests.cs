@@ -7,9 +7,10 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     // The single wrap seam both tooltip composers return through. Blish's
-    // own cap is a fixed 500px that knows nothing about this module's window
-    // (see docs/KNOWN-ISSUES.md), so these tests are the only guarantee that
-    // composed tooltip text stays inside a width the module chose.
+    // own 500px cap already bounds width (see docs/KNOWN-ISSUES.md); what
+    // these tests pin is what that cap does not give - a break point the
+    // module controls, an over-long token hard-split instead of overflowing,
+    // and no silent truncation of a long tooltip's tail.
     public class TooltipTextFormatTests
     {
         [Fact]
