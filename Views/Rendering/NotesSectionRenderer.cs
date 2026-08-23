@@ -220,7 +220,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             foreach (var linePanel in linePanels)
             {
-                linePanel.BasicTooltipText = tooltip;
+                TooltipFacility.ApplyPlain(linePanel, tooltip);
             }
         }
     }

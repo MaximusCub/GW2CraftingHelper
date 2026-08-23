@@ -921,18 +921,18 @@ namespace GW2CraftingHelper.Views
 
             string shortName = LabelHelpers.EllipsizeToWidth(
                 GameService.Content.DefaultFont14, name, CellNameWidth);
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = shortName,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Width = CellNameWidth,
-                // Only when the name did not fit - an always-on tooltip
-                // repeating the visible text is noise.
-                BasicTooltipText = shortName == name ? null : name,
                 Location = new Point(CellNameX, CellTextY),
                 Parent = cellPanel
             };
+            // Only when the name did not fit - an always-on tooltip
+            // repeating the visible text is noise.
+            TooltipFacility.ApplyPlain(nameLabel, shortName == name ? null : name);
 
             bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
 
@@ -946,13 +946,13 @@ namespace GW2CraftingHelper.Views
                 // "default: 3600" does not - the default estimate is shown
                 // by DefaultLabel below instead.
                 PlaceholderText = "copper",
-                // Feature 1 spec: the estimate is labeled as such, with
-                // attribution/editable/clearable spelled out on hover.
-                BasicTooltipText = hasDefault
-                    ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or use Clear to suppress it."
-                    : "Coin value of one unit, in copper.",
                 Parent = cellPanel
             };
+            // Feature 1 spec: the estimate is labeled as such, with
+            // attribution/editable/clearable spelled out on hover.
+            TooltipFacility.ApplyPlain(input, hasDefault
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here, or use Clear to suppress it."
+                : "Coin value of one unit, in copper.");
 
             var defaultLabel = new Label()
             {
@@ -960,12 +960,12 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                BasicTooltipText = hasDefault
-                    ? "This currency is valued automatically at its default estimate unless you type your own amount or check Clear."
-                    : null,
                 Location = new Point(CellTagX, CellTextY),
                 Parent = cellPanel
             };
+            TooltipFacility.ApplyPlain(defaultLabel, hasDefault
+                ? "This currency is valued automatically at its default estimate unless you type your own amount or check Clear."
+                : null);
 
             var errorLabel = new Label()
             {
@@ -985,9 +985,11 @@ namespace GW2CraftingHelper.Views
                 {
                     Text = "Clear",
                     Location = new Point(CellClearX, CellTextY),
-                    BasicTooltipText = "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.",
                     Parent = cellPanel
                 };
+                TooltipFacility.ApplyPlain(
+                    clearCheckbox,
+                    "Suppress this currency's default estimate - it will not be valued unless you enter your own amount.");
             }
 
             // Appended in the same step as the row it names - the filter

@@ -825,6 +825,14 @@ namespace GW2CraftingHelper
             _cornerIcon?.Dispose();
             _mainWindow?.Dispose();
 
+            // The module's ONE rich tooltip surface. Like the tickers
+            // above it is parented to the SpriteScreen (only while
+            // visible), never to a view's control tree, so disposing the
+            // window does not reach it - see Views/Rendering/
+            // TooltipFacility for why there is one instance rather than
+            // one per tooltip'd control.
+            Views.Rendering.TooltipFacility.Shutdown();
+
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush
             // queue, never on the calling thread (see ModuleLog's own class

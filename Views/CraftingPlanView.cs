@@ -1679,8 +1679,10 @@ namespace GW2CraftingHelper.Views
                 // The tooltip also mentions the 15% force-buy guard and
                 // the MaterialOpportunityCost deduction, both of which
                 // change numbers this plan displays.
-                BasicTooltipText = "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free."
             };
+            TooltipFacility.ApplyPlain(
+                _valueOwnMaterialsCheckbox,
+                "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free.");
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
                 _valueOwnMaterials = e.Checked;
@@ -1858,9 +1860,9 @@ namespace GW2CraftingHelper.Views
                 {
                     Text = text,
                     Size = new Point(width, TreeToolbarButtonHeight),
-                    BasicTooltipText = tooltipText,
                     Parent = _treeToolbarPanel
                 };
+                TooltipFacility.ApplyPlain(button, tooltipText);
                 button.Click += (_, __) =>
                 {
                     var commands = _treeToolbarCommands;
@@ -3706,9 +3708,11 @@ namespace GW2CraftingHelper.Views
                 Checked = _hideUnlockedRecipes,
                 Size = new Point(checkboxWidth, 24),
                 Location = new Point(panelWidth - checkboxWidth, 3),
-                Parent = headerPanel,
-                BasicTooltipText = "Hide recipes you already know (Learned/Auto-learned) - show only the ones you are missing."
+                Parent = headerPanel
             };
+            TooltipFacility.ApplyPlain(
+                hideUnlockedCheckbox,
+                "Hide recipes you already know (Learned/Auto-learned) - show only the ones you are missing.");
             _relayoutActions.Add(w => hideUnlockedCheckbox.Location = new Point(w - checkboxWidth, 3));
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>

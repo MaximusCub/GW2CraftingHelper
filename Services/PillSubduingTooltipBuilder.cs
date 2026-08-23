@@ -17,32 +17,51 @@ namespace GW2CraftingHelper.Services
             IReadOnlyDictionary<int, ItemMetadata> itemMetadata,
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
         {
+            return BuildContent(result, itemMetadata, currencyMetadata)?.ToPlainText();
+        }
+
+        /// <summary>
+        /// The structured form <see cref="Build"/> is a plain-text view of.
+        /// The gold margin stays a coin span so the rich tooltip surface
+        /// can draw it with real coin icons; every other part is prose.
+        /// Unwrapped - the caller's path decides its own wrap (the plain
+        /// path through <c>TooltipTextFormat</c>, the rich path against a
+        /// real font at a real pixel width).
+        /// </summary>
+        public static TooltipContent BuildContent(
+            PillSubduingResult result,
+            IReadOnlyDictionary<int, ItemMetadata> itemMetadata,
+            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+        {
             if (result == null || result.Rule == PillSubduingRule.None)
             {
                 return null;
             }
+
+            var builder = new TooltipContentBuilder();
 
             if (result.Rule == PillSubduingRule.Weighted)
             {
                 // Only mention "your current currency values" when a
                 // non-coin cost actually participated - a plain-gold
                 // difference never touched a currency valuation.
-                if (!result.HasNonCoinCost)
+                builder.Text(result.HasNonCoinCost
+                    ? "More expensive at your current currency values"
+                    : "More expensive");
+                if (result.ValueMarginCopper.HasValue)
                 {
-                    return result.ValueMarginCopper.HasValue
-                        ? $"More expensive ({FormatCoin(result.ValueMarginCopper.Value)} more)"
-                        : "More expensive";
+                    AppendCoin(builder.Text(" ("), result.ValueMarginCopper.Value).Text(" more)");
                 }
-                return result.ValueMarginCopper.HasValue
-                    ? $"More expensive at your current currency values ({FormatCoin(result.ValueMarginCopper.Value)} more)"
-                    : "More expensive at your current currency values";
+                return builder.Build();
             }
 
             // StrictDomination: "needs everything the selected option
             // needs, plus N more X" - no valuation needed. Deliberately
             // not "same currencies": a kind absent on the selected side
             // reads as zero, so the two sides need not share currencies.
-            var parts = new List<string>();
+            builder.Text("Always more expensive - needs everything the selected option needs, plus ");
+
+            int written = 0;
             if (result.Deltas != null)
             {
                 foreach (var delta in result.Deltas)
@@ -50,20 +69,38 @@ namespace GW2CraftingHelper.Services
                     switch (delta.Kind)
                     {
                         case "Coin":
-                            parts.Add($"{FormatCoin(delta.Amount)} more");
+                            AppendCoin(AppendSeparator(builder, written), delta.Amount).Text(" more");
+                            written++;
                             break;
                         case "Currency":
-                            parts.Add($"{delta.Amount} more {CurrencyDisplayResolver.ResolveName(delta.Id, currencyMetadata)}");
+                            AppendSeparator(builder, written).Text(
+                                $"{delta.Amount} more {CurrencyDisplayResolver.ResolveName(delta.Id, currencyMetadata)}");
+                            written++;
                             break;
                         case "Item":
-                            parts.Add($"{delta.Amount} more {PlanViewModelBuilder.ResolveName(delta.Id, itemMetadata)}");
+                            AppendSeparator(builder, written).Text(
+                                $"{delta.Amount} more {PlanViewModelBuilder.ResolveName(delta.Id, itemMetadata)}");
+                            written++;
                             break;
                     }
                 }
             }
 
-            string suffix = parts.Count > 0 ? string.Join(", ", parts) : "always more expensive";
-            return $"Always more expensive - needs everything the selected option needs, plus {suffix}";
+            if (written == 0)
+            {
+                builder.Text("always more expensive");
+            }
+            return builder.Build();
+        }
+
+        private static TooltipContentBuilder AppendSeparator(TooltipContentBuilder builder, int written)
+        {
+            return written > 0 ? builder.Text(", ") : builder;
+        }
+
+        private static TooltipContentBuilder AppendCoin(TooltipContentBuilder builder, long copper)
+        {
+            return builder.Coin(copper, FormatCoin(copper));
         }
 
         // Shares CoinSegmentMath.Split with every other coin display site,

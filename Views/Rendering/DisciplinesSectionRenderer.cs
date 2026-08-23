@@ -234,7 +234,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 };
                 if (charLabel.Text != fullCharText)
                 {
-                    rowPanel.BasicTooltipText = fullCharText;
+                    TooltipFacility.ApplyPlain(rowPanel, fullCharText);
                 }
             }
 
@@ -268,7 +268,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     if (charLabel.Text != newDisplayText)
                     {
                         charLabel.Text = newDisplayText;
-                        rowPanel.BasicTooltipText = newDisplayText != fullCharText ? fullCharText : null;
+                        TooltipFacility.ApplyPlain(rowPanel, newDisplayText != fullCharText ? fullCharText : null);
                     }
                 });
             }

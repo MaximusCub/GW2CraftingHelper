@@ -42,10 +42,35 @@ namespace GW2CraftingHelper.Services
             string captionText,
             PlanViewModel currentPlan)
         {
-            var extraTooltipLines = new List<string>();
+            // Single wrap seam (see TooltipTextFormat): the vendor
+            // price-side caveats run to 83 characters, past the budget, so
+            // the break lands where this module put it rather than wherever
+            // Blish's own 500px cap happens to fall. An over-budget line
+            // becomes several list entries, which is what the caller's
+            // newline join already renders. Applied HERE and not in
+            // BuildExtraTooltipContent because the rich path wraps the same
+            // content against a real font at a real pixel width - one wrap
+            // policy per path, never both on one string.
+            return TooltipTextFormat.WrapLines(
+                BuildExtraTooltipContent(node, captionText, currentPlan).ToPlainLines());
+        }
+
+        /// <summary>
+        /// The structured form <see cref="BuildExtraTooltipLines"/> is a
+        /// plain-text view of. The unit-price line keeps its gold figure as
+        /// a coin span so the rich tooltip surface can draw it with real
+        /// coin icons instead of spelling it "1g 23s 45c". Deliberately
+        /// UNWRAPPED - see <see cref="BuildExtraTooltipLines"/>.
+        /// </summary>
+        public static TooltipContent BuildExtraTooltipContent(
+            CraftingTreeNode node,
+            string captionText,
+            PlanViewModel currentPlan)
+        {
+            var extraTooltipLines = new List<TooltipLine>();
             if (node == null)
             {
-                return extraTooltipLines;
+                return TooltipContent.Empty;
             }
 
             if (node.Quantity > 1 &&
@@ -63,7 +88,9 @@ namespace GW2CraftingHelper.Services
                 bool hasCurrencyCosts = node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0;
                 if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasCurrencyCosts))
                 {
-                    extraTooltipLines.Add("Unit price: " + FormatCoin(node.UnitCost.Value));
+                    extraTooltipLines.Add(TooltipContent.Line(
+                        TooltipSpan.FromText("Unit price: "),
+                        TooltipSpan.FromCoin(node.UnitCost.Value, FormatCoin(node.UnitCost.Value))));
                 }
                 if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
                 {
@@ -74,7 +101,7 @@ namespace GW2CraftingHelper.Services
                         foreach (var amount in unitCurrencyAmounts)
                         {
                             string amountText = amount.BundleLabel ?? amount.Amount.ToString();
-                            extraTooltipLines.Add($"Unit price: {amountText} {amount.Name}");
+                            extraTooltipLines.Add(TooltipContent.TextLine($"Unit price: {amountText} {amount.Name}"));
                         }
                     }
                 }
@@ -155,19 +182,19 @@ namespace GW2CraftingHelper.Services
             if (node.PriceSideFellBack &&
                 (node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent))
             {
-                extraTooltipLines.Add(currentPlan == null
+                extraTooltipLines.Add(TooltipContent.TextLine(currentPlan == null
                     ? "Other trading post price side shown"
                     : currentPlan.PriceBasis == PriceBasis.BuyOrder
                         ? "Buy-order price unavailable - instant-buy price shown"
-                        : "Instant-buy price unavailable - buy-order price shown");
+                        : "Instant-buy price unavailable - buy-order price shown"));
             }
             else if (node.PriceSideFellBack && node.Decision == CraftingDecision.BuyFromVendor)
             {
-                extraTooltipLines.Add(currentPlan == null
+                extraTooltipLines.Add(TooltipContent.TextLine(currentPlan == null
                     ? "A vendor cost item's other trading post price side shown"
                     : currentPlan.PriceBasis == PriceBasis.BuyOrder
                         ? "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"
-                        : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used");
+                        : "A vendor cost item's instant-buy price is unavailable - its buy-order price is used"));
             }
 
             // guildupgrade-ingredients fix: a GuildUpgrade node's
@@ -178,7 +205,7 @@ namespace GW2CraftingHelper.Services
             if ((node.Decision == CraftingDecision.Unknown || node.Decision == CraftingDecision.GuildUpgrade) &&
                 !string.IsNullOrEmpty(node.AcquisitionHint))
             {
-                extraTooltipLines.Add(node.AcquisitionHint);
+                extraTooltipLines.Add(TooltipContent.TextLine(node.AcquisitionHint));
             }
 
             // UI-bundle milestone, Feature C (receipt/what-if captions):
@@ -190,7 +217,7 @@ namespace GW2CraftingHelper.Services
             // reads second, after the name line, not first.
             if (!string.IsNullOrEmpty(captionText))
             {
-                extraTooltipLines.Insert(0, captionText);
+                extraTooltipLines.Insert(0, TooltipContent.TextLine(captionText));
             }
 
             // The tooltip-line
@@ -203,16 +230,10 @@ namespace GW2CraftingHelper.Services
             // real page at all.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
-                extraTooltipLines.Add("Right-click: Open wiki page");
+                extraTooltipLines.Add(TooltipContent.TextLine("Right-click: Open wiki page"));
             }
 
-            // Single wrap seam (see TooltipTextFormat): the vendor
-            // price-side caveats above run to 83 characters, past the
-            // budget, so the break lands where this module put it rather
-            // than wherever Blish's own 500px cap happens to fall. An
-            // over-budget line becomes several list entries, which is what
-            // the caller's newline join already renders.
-            return TooltipTextFormat.WrapLines(extraTooltipLines);
+            return TooltipContent.FromLines(extraTooltipLines);
         }
 
         // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
