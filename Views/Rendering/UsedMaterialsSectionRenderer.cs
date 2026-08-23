@@ -44,27 +44,65 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
+        // Left x of the name column (past the row's 32px icon at x=8), and
+        // the gap the ellipsis budget keeps between the name and the
+        // Amount column.
+        private const int NameX = 50;
+        private const int NameToQtyGap = 12;
+
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateUsedMaterialsBody.
+        /// Moved verbatim from CraftingPlanView.CreateUsedMaterialsBody,
+        /// then given the one-pass pre-scan every other plan table already
+        /// had (audit batch H): the widest rendered "Nx" string and the
+        /// widest UNTRUNCATED name extent, which together let the Amount
+        /// column be pulled in beside the names rather than pinned to the
+        /// panel edge with a growing empty band between them. Both are
+        /// data-derived, so they are measured once here and reused by every
+        /// row's relayout closure rather than re-measured per resize tick.
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
+            var font = GameService.Content.DefaultFont14;
+            int maxQtyWidth = 0;
+            int widestNameEnd = 0;
+            foreach (var row in section.Rows)
+            {
+                int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
+                if (qtyWidth > maxQtyWidth) maxQtyWidth = qtyWidth;
+
+                int nameEnd = NameX + (int)System.Math.Ceiling(font.MeasureString(row.Label ?? "").Width);
+                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
+            }
+
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateUsedMaterialRow(section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
+                CreateUsedMaterialRow(
+                    section.Rows[i], contentFlow, panelWidth, maxQtyWidth, widestNameEnd,
+                    i == section.Rows.Count - 1);
             }
+        }
+
+        /// <summary>
+        /// Right edge of the Amount column at a given panel width - the one
+        /// formula the build pass and both resize closures share.
+        /// </summary>
+        private static int QtyRightEdge(int panelWidth, int maxQtyWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.RightBlockX(panelWidth - 8 - maxQtyWidth, widestNameEnd) + maxQtyWidth;
         }
 
         // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
         // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
-        private void CreateUsedMaterialRow(PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast)
+        private void CreateUsedMaterialRow(
+            PlanRowViewModel row, FlowPanel parent, int panelWidth,
+            int maxQtyWidth, int widestNameEnd, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            const int nameX = 50;
-            int qtyRightEdge = panelWidth - 8;
+            const int nameX = NameX;
+            int qtyRightEdge = QtyRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
@@ -78,7 +116,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // with no overlap.
             string fullName = row.Label ?? "";
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, 12, nameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, nameX, 9);
             if (nameHandle.NameLabel.Text != fullName)
             {
                 rowPanel.BasicTooltipText = fullName;
@@ -107,11 +145,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // need would reintroduce the icon/divider overlap.
             RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
             {
-                qtyLabel.Location = new Point(w - 8 - qtyWidth, 9);
+                qtyLabel.Location = new Point(QtyRightEdge(w, maxQtyWidth, widestNameEnd) - qtyWidth, 9);
             });
             _sink.AddReellipsis(w =>
             {
-                if (IconNameRowHelpers.ReellipsizeName(nameHandle, font, w - 8, qtyWidth, 12))
+                if (IconNameRowHelpers.ReellipsizeName(
+                    nameHandle, font, QtyRightEdge(w, maxQtyWidth, widestNameEnd), qtyWidth, NameToQtyGap))
                 {
                     rowPanel.BasicTooltipText = nameHandle.NameLabel.Text != fullName ? fullName : null;
                 }

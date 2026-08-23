@@ -259,13 +259,49 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static CurrencyColumnEdges ComputeCurrencyColumnEdges(int panelWidth, int widestNumberWidth = 0)
         {
-            int numberColumnWidth = EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
-            int rightEdge = panelWidth - 8;
+            return EdgesFromRightEdge(panelWidth - 8, EffectiveCurrencyNumberColumnWidth(widestNumberWidth));
+        }
+
+        private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
+        {
             int markerX = rightEdge - CurrencyMarkerWidth;
             int neededRightEdge = markerX - CurrencyColumnGap;
             int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
+        }
+
+        /// <summary>
+        /// Width the Required/Have/Needed/marker block occupies: the three
+        /// number bands, the marker band, and the three gaps between them -
+        /// i.e. from the Required column's left edge to the marker's right
+        /// edge.
+        /// </summary>
+        public static int CurrencyBlockWidth(int widestNumberWidth)
+        {
+            return (3 * EffectiveCurrencyNumberColumnWidth(widestNumberWidth))
+                + (3 * CurrencyColumnGap)
+                + CurrencyMarkerWidth;
+        }
+
+        /// <summary>
+        /// <see cref="ComputeCurrencyColumnEdges"/> with the dead gutter
+        /// between the currency NAME column and the numbers closed: the
+        /// Required column starts relative to the widest name the table
+        /// renders instead of wherever the panel edge leaves it (audit
+        /// batch H). The whole block moves together, so the numbers keep
+        /// their existing relative geometry and the full-coverage marker
+        /// stays at the block's right end rather than at the panel's.
+        /// widestNameEnd must come from untruncated names - see
+        /// PlanRelayoutMath.RightBlockX.
+        /// </summary>
+        public static CurrencyColumnEdges ComputeCurrencyColumnEdgesForPanel(
+            int panelWidth, int widestNumberWidth, int widestNameEnd)
+        {
+            int numberColumnWidth = EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
+            int blockWidth = CurrencyBlockWidth(widestNumberWidth);
+            int blockX = PlanRelayoutMath.RightBlockX(panelWidth - 8 - blockWidth, widestNameEnd);
+            return EdgesFromRightEdge(blockX + blockWidth, numberColumnWidth);
         }
     }
 }

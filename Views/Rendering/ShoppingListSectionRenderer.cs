@@ -43,6 +43,9 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TagGap = 8;
         private const int NameToQtyGap = 12;
 
+        // Left x of the name column (past the row's 32px icon at x=8).
+        private const int NameX = 50;
+
         private readonly ISectionRelayoutSink _sink;
 
         internal ShoppingListSectionRenderer(ISectionRelayoutSink sink)
@@ -81,8 +84,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
+            // The same pass also measures the widest "Nx" amount string and
+            // the widest UNTRUNCATED name+tag extent, which is what lets the
+            // Amount/Each/Total block be pulled in beside the names instead
+            // of pinned to the panel edge (audit batch H) - see
+            // ShoppingColumnMath.ComputeEdgesForPanel. The tag rides in the
+            // name extent because it sits between the name and the Amount
+            // column, exactly as the ellipsis budget already treats it.
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
+            int maxQtyWidth = 0;
+            int widestNameEnd = 0;
             foreach (var row in section.Rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
@@ -90,29 +102,77 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 int totalW = CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
                 if (totalW > maxTotalWidth) maxTotalWidth = totalW;
+
+                int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
+                if (qtyW > maxQtyWidth) maxQtyWidth = qtyW;
+
+                int nameEnd = NameX
+                    + (int)System.Math.Ceiling(coinFont.MeasureString(row.Label ?? "").Width)
+                    + TagReserve(row);
+                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
             }
 
-            int totalRightEdge = panelWidth - 8;
-            var edges = ShoppingColumnMath.ComputeEdges(totalRightEdge, maxEachWidth, maxTotalWidth);
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth, maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
 
             // Both the header and every data row are handed this SAME
             // ColumnEdges instance (for the build), and the same cached
-            // maxEachWidth/maxTotalWidth (for their relayout closures) - a
-            // relayout tick re-invokes ShoppingColumnMath.ComputeEdges with
+            // pre-scan values (for their relayout closures) - a relayout
+            // tick re-invokes ShoppingColumnMath.ComputeEdgesForPanel with
             // the new panelWidth but these SAME data-derived maxima (the
             // pre-scan above depends only on row data, never on
             // panelWidth, so it does not need to re-run on resize at all).
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth);
+            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, edges, scan);
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, maxEachWidth, maxTotalWidth, i == section.Rows.Count - 1);
+                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, edges, scan, i == section.Rows.Count - 1);
             }
+        }
+
+        // The four data-derived (panelWidth-invariant) measurements every
+        // row and header closure needs to recompute its column edges -
+        // grouped so a fifth cannot be added to one call site and forgotten
+        // at another.
+        private readonly struct ColumnScan
+        {
+            internal readonly int MaxEachWidth;
+            internal readonly int MaxTotalWidth;
+            internal readonly int MaxQtyWidth;
+            internal readonly int WidestNameEnd;
+
+            internal ColumnScan(int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int widestNameEnd)
+            {
+                MaxEachWidth = maxEachWidth;
+                MaxTotalWidth = maxTotalWidth;
+                MaxQtyWidth = maxQtyWidth;
+                WidestNameEnd = widestNameEnd;
+            }
+
+            internal ShoppingColumnMath.ColumnEdges EdgesFor(int panelWidth)
+            {
+                return ShoppingColumnMath.ComputeEdgesForPanel(
+                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, WidestNameEnd);
+            }
+        }
+
+        /// <summary>
+        /// Width the row's source tag takes out of the name column, or 0
+        /// when it carries none - resolved identically by the pre-scan and
+        /// by the row builder itself.
+        /// </summary>
+        private static int TagReserve(PlanRowViewModel row)
+        {
+            string sourceTag = ShoppingSourceBadge.ForRow(row);
+            return string.IsNullOrEmpty(sourceTag)
+                ? 0
+                : LabelHelpers.MeasureSmallTagWidth(sourceTag) + TagGap;
         }
 
         // Moved verbatim from CraftingPlanView.CreateShoppingListHeaderRow.
         // Only change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, int maxEachWidth, int maxTotalWidth)
+            FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges, ColumnScan scan)
         {
             var rowPanel = new Panel()
             {
@@ -126,7 +186,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = "Item", Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(50, 4), Parent = rowPanel
+                Location = new Point(NameX, 4), Parent = rowPanel
             };
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
@@ -134,13 +194,13 @@ namespace GW2CraftingHelper.Views.Rendering
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
-            // the SAME cached maxEachWidth/maxTotalWidth ComputeEdges was
-            // built with (ShoppingColumnMath is the single source of truth
-            // both paths call).
+            // the SAME cached pre-scan ComputeEdgesForPanel was built with
+            // (ShoppingColumnMath is the single source of truth both paths
+            // call).
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, PlanContentHeightMath.ShoppingHeaderRowHeight);
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                var e = scan.EdgesFor(w);
                 amountLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), 4);
                 eachLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), 4);
                 totalLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), 4);
@@ -179,12 +239,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ShoppingColumnMath.ColumnEdges edges,
-            int maxEachWidth, int maxTotalWidth, bool isLast)
+            ColumnScan scan, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            const int nameX = 50;
+            const int nameX = NameX;
             var font = GameService.Content.DefaultFont14;
 
             string qtyText = $"{row.Quantity}x";
@@ -198,9 +258,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // the Amount column; now that every row is badged that would be
             // the common case, not the rare one.
             string sourceTag = ShoppingSourceBadge.ForRow(row);
-            int tagReserve = string.IsNullOrEmpty(sourceTag)
-                ? 0
-                : LabelHelpers.MeasureSmallTagWidth(sourceTag) + TagGap;
+            int tagReserve = TagReserve(row);
 
             // Icon y=0 (was 1) - see the identical note in
             // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
@@ -297,14 +355,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // slack; see the identical note in CreateUsedMaterialRow.
             RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
             {
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                var e = scan.EdgesFor(w);
                 qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
             });
             _sink.AddReellipsis(w =>
             {
-                var e = ShoppingColumnMath.ComputeEdges(w - 8, maxEachWidth, maxTotalWidth);
+                var e = scan.EdgesFor(w);
                 if (IconNameRowHelpers.ReellipsizeName(
                     nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve))
                 {
