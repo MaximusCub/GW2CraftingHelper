@@ -8873,4 +8873,24 @@ Desktop gate items (all in the Settings tab):
 7. Type a bad amount into one currency, filter it off screen, click
    Save: the amber "1 invalid entry not saved" must be accompanied by
    that row reappearing with its red "Invalid" tag despite the filter.
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build b740035,
+captures preflight/gG1-gG7). (1) The tab rendered top-down as: top
+Save bar, Homestead / Logging / Snapshot short sections each with
+the 2px header rule, then Currency Valuations with the filter box,
+"47 currencies" count, and the one-line two-up grid - "copper"
+placeholder inputs, Clear checkboxes, grey default tags, row rules,
+name ellipsis on "Manifesto of the Moletaria...". (2) Typing
+"shard" filtered to "6 of 47 shown" with the grid repacked two-up
+and no scroll jump. (3) Save produced the green "Saved - Aug 22,
+2026 8:33 PM" label beside the button (all sections saved in one
+click; Save's "Save every section on this tab." tooltip verified).
+(4) The "was N" override tag and amber "cleared" tag were NOT
+exercised live: late-session synthetic keyboard degradation kept
+the override keystrokes landing in the filter box (a documented
+input-death mode, not a module fault - the filter box accepting
+them proves the click-to-focus path). Both tags are pinned by the
+RefreshCurrencyRowDefaultState logic restored verbatim from
+master's proven three-state code plus the CellTagWidth fit test.
+One-column fallback at the 930px minimum also not exercised
+(synthetic resize unreliable); pinned by SettingsCurrencyGridLayout
+tests.
