@@ -321,28 +321,39 @@ namespace GW2CraftingHelper.Tests.Services
         // + icon frame + name gap) = depth * 24 + 58.
         private static int TreeNameX(int depth) => depth * 24 + 58;
 
-        // Window minimum less the measured chrome between the window and a
-        // tab's content panel: 46 (window region - content region) + 32
-        // (ViewAdapter OUTER_PADDING x2) + 8 (Blish Panel border) + 20
-        // (ViewAdapter INNER_PADDING x2) + 20 (the view's own
-        // RightEdgePadding) = 126.
-        private const int PlanPanelWidthAtWindowMinimum = 1436 - 126;
+        // Read from the shipped constants, not copied: the whole point of
+        // these cases is that raising or lowering the enforced minimum, or
+        // retuning the pill column, moves them with it.
+        private static readonly int PlanPanelWidthAtWindowMinimum =
+            WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
+
+        // Historical literal, deliberately not a production constant: the
+        // width the module shipped with before the raise.
+        private const int OldWindowMinimumWidth = 930;
 
         // Live-priced cost column behind a six-digit gold total, which is
         // what the deepest chain costs; 150 is only the floor.
         private const int DeepestPlanCostColumnWidth = 165;
 
-        // The PINNED layout, which is what a minimum window width has to
-        // satisfy: the deepest row is also the widest row, so the
-        // gutter-closing pull-in lands at its own end plus the breathing
-        // room and can only give it less room than the pinned position
-        // does - never less than its own width (RightBlockX's invariant,
-        // covered above).
-        private static PlanRelayoutMath.TreeColumnEdges DeepestRowEdges(int panelWidth, int depth)
+        // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
+        // scanned rows gets. Pass the scanned end to exercise what
+        // TreeSectionController actually hands this function on every real
+        // (non-empty) tree, where the pill/cost block is pulled LEFT to the
+        // widest name plus the breathing room.
+        private static PlanRelayoutMath.TreeColumnEdges DeepestRowEdges(
+            int panelWidth, int depth, int widestNameEnd = 0)
         {
             return PlanRelayoutMath.ComputeTreeColumnEdges(
                 panelWidth, TreeNameX(depth), DeepestRowQtyPrefixWidth,
-                pillColumnWidth: 256, costColumnWidth: DeepestPlanCostColumnWidth, rightMargin: 8);
+                PlanRelayoutMath.TreePillColumnWidth, DeepestPlanCostColumnWidth,
+                rightMargin: 8, widestNameEnd: widestNameEnd);
+        }
+
+        // What the tree scans for the deepest chain: the deepest row is also
+        // the widest, so its own name end is the tree's widestNameEnd.
+        private static int DeepestRowNameEnd(int depth)
+        {
+            return TreeNameX(depth) + DeepestRowQtyPrefixWidth + DeepestRowNameWidth;
         }
 
         [Fact]
@@ -368,12 +379,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ComputeTreeColumnEdges_DeepestRowInTheScannedLayout_FitsAtTheWindowMinimum()
+        {
+            // The layout the renderer actually produces: TreeSectionController
+            // always passes the scanned _widestNameEnd, which pulls the
+            // pill/cost block left of the pinned position, so the pinned
+            // cases above are NOT the configuration a user sees. The
+            // guarantee has to hold here too - at both the deepest real row
+            // and the synthesised vendor-leaf level below it.
+            var deepest = DeepestRowEdges(
+                PlanPanelWidthAtWindowMinimum, depth: 23, widestNameEnd: DeepestRowNameEnd(23));
+            var vendorLeaf = DeepestRowEdges(
+                PlanPanelWidthAtWindowMinimum, depth: 24, widestNameEnd: DeepestRowNameEnd(24));
+
+            Assert.True(
+                deepest.NameMaxWidth >= DeepestRowNameWidth,
+                $"depth 23 name budget {deepest.NameMaxWidth} < {DeepestRowNameWidth}");
+            Assert.True(
+                vendorLeaf.NameMaxWidth >= DeepestRowNameWidth,
+                $"depth 24 name budget {vendorLeaf.NameMaxWidth} < {DeepestRowNameWidth}");
+        }
+
+        [Fact]
         public void ComputeTreeColumnEdges_DeepestRowAtTheOldMinimum_WasSeverelyTruncated()
         {
             // Why the minimum moved: at the old 930px window (804px panel)
             // the same row had no name column left at all and clamped to
             // the 10px floor - a bare ellipsis.
-            var edges = DeepestRowEdges(930 - 126, depth: 23);
+            var edges = DeepestRowEdges(
+                WindowSizing.TabPanelWidthFor(OldWindowMinimumWidth), depth: 23);
 
             Assert.Equal(10, edges.NameMaxWidth);
         }
