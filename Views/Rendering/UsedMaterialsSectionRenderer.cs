@@ -27,11 +27,20 @@ namespace GW2CraftingHelper.Views.Rendering
     // only two rows across the extracted renderers that actually share the
     // ellipsis shape (see IconNameRowHelpers' own doc comment for why
     // Crafting Steps/Disciplines/Recipes rows do not).
+    //
+    // sortState/onSortChanged carry the maintainer-requested clickable
+    // column headers: this renderer only reads the state (to order its
+    // rows and mark the active header) and asks the view to re-render when
+    // a header is clicked - the state itself outlives every render, so a
+    // regenerate keeps the sort the user chose.
     internal sealed class UsedMaterialsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
+        private readonly TableSortState<PlanTableColumn> _sortState;
+        private readonly Action _onSortChanged;
 
-        internal UsedMaterialsSectionRenderer(ISectionRelayoutSink sink)
+        internal UsedMaterialsSectionRenderer(
+            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged)
         {
             // Mirrors the constructor-null-guard convention already used
             // for injected dependencies elsewhere in Views/ (ViewAdapter's
@@ -42,6 +51,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // this same pattern should fail loud, not with a deferred NRE
             // inside CreateUsedMaterialRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
+            _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
         }
 
         // Left x of the name column (past the row's 32px icon at x=8), and
@@ -63,9 +74,15 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = GameService.Content.DefaultFont14;
+
+            // Row ORDER only - the pre-scan below sees the same rows either
+            // way, so every column edge (and PlanContentHeightMath's row
+            // count) is identical sorted or not.
+            var rows = PlanTableSorter.Sort(section.Rows, _sortState);
+
             int maxQtyWidth = 0;
             int widestNameEnd = 0;
-            foreach (var row in section.Rows)
+            foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
                 if (qtyWidth > maxQtyWidth) maxQtyWidth = qtyWidth;
@@ -84,15 +101,25 @@ namespace GW2CraftingHelper.Views.Rendering
             // longer pinned to the panel edge (batch H) - it has to track
             // the same QtyRightEdge its rows do.
             CTableHeaderRenderer.CreateCTableHeaderRow(
-                contentFlow, panelWidth, "Item", NameX, "Amount", _sink,
-                rightXForWidth: w => QtyRightEdge(w, maxQtyWidth, widestNameEnd));
+                contentFlow, panelWidth,
+                SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
+                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount)), _sink,
+                rightXForWidth: w => QtyRightEdge(w, maxQtyWidth, widestNameEnd),
+                onLeftClick: () => SortBy(PlanTableColumn.Item),
+                onRightClick: () => SortBy(PlanTableColumn.Amount));
 
-            for (int i = 0; i < section.Rows.Count; i++)
+            for (int i = 0; i < rows.Count; i++)
             {
                 CreateUsedMaterialRow(
-                    section.Rows[i], contentFlow, panelWidth, maxQtyWidth, widestNameEnd,
-                    i == section.Rows.Count - 1);
+                    rows[i], contentFlow, panelWidth, maxQtyWidth, widestNameEnd,
+                    i == rows.Count - 1);
             }
+        }
+
+        private void SortBy(PlanTableColumn column)
+        {
+            _sortState.Cycle(column);
+            _onSortChanged();
         }
 
         /// <summary>

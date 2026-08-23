@@ -48,7 +48,15 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private readonly ISectionRelayoutSink _sink;
 
-        internal ShoppingListSectionRenderer(ISectionRelayoutSink sink)
+        // Clickable column headers - see the identical fields on
+        // UsedMaterialsSectionRenderer. This table sorts on all four of
+        // its columns; Each/Total are coin+currency mixes, whose ordering
+        // rule lives in PlanTableSorter.CompareValue.
+        private readonly TableSortState<PlanTableColumn> _sortState;
+        private readonly Action _onSortChanged;
+
+        internal ShoppingListSectionRenderer(
+            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged)
         {
             // Mirrors the constructor-null-guard convention already used
             // for injected dependencies elsewhere in Views/ (ViewAdapter's
@@ -60,6 +68,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // with a deferred NRE inside CreateShoppingRow's first
             // AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
+            _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
+        }
+
+        private void SortBy(PlanTableColumn column)
+        {
+            _sortState.Cycle(column);
+            _onSortChanged();
         }
 
         // Right-aligned price columns for the shopping list's Each and
@@ -91,11 +107,16 @@ namespace GW2CraftingHelper.Views.Rendering
             // ShoppingColumnMath.ComputeEdgesForPanel. The tag rides in the
             // name extent because it sits between the name and the Amount
             // column, exactly as the ellipsis budget already treats it.
+            // Row ORDER only - the pre-scan sees the same rows either way,
+            // so every column edge (and the row count PlanContentHeightMath
+            // measures this section by) is identical sorted or not.
+            var rows = PlanTableSorter.Sort(section.Rows, _sortState);
+
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
             int maxQtyWidth = 0;
             int widestNameEnd = 0;
-            foreach (var row in section.Rows)
+            foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
                 if (eachW > maxEachWidth) maxEachWidth = eachW;
@@ -119,9 +140,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // at all and no two rows can anchor the table differently.
             var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
             CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
-            for (int i = 0; i < section.Rows.Count; i++)
+            for (int i = 0; i < rows.Count; i++)
             {
-                CreateShoppingRow(section.Rows[i], contentFlow, panelWidth, scan, i == section.Rows.Count - 1);
+                CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
             }
         }
 
@@ -184,18 +205,30 @@ namespace GW2CraftingHelper.Views.Rendering
             // through CTableHeaderRenderer, so "Item" has to opt into the
             // same box treatment its Amount/Each/Total siblings get for
             // free from CreateRightAlignedLabel.
-            LabelHelpers.WithDescenderClearance(new Label()
+            // Each label carries its own sort indicator inside its text, so
+            // the right-aligned three keep right-aligning off their own
+            // Width exactly as before (below, and on every resize tick).
+            var itemLabel = LabelHelpers.WithDescenderClearance(new Label()
             {
-                Text = "Item", Font = font, TextColor = color,
+                Text = SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)),
+                Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Amount", font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
+                rowPanel, SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount)),
+                font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Each", font, color, edges.EachRightEdge, TableHeaderStyle.LabelY);
+                rowPanel, SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each)),
+                font, color, edges.EachRightEdge, TableHeaderStyle.LabelY);
             var totalLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, "Total", font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
+                rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
+                font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
+
+            SortableHeaderLabel.MakeClickable(itemLabel, () => SortBy(PlanTableColumn.Item));
+            SortableHeaderLabel.MakeClickable(amountLabel, () => SortBy(PlanTableColumn.Amount));
+            SortableHeaderLabel.MakeClickable(eachLabel, () => SortBy(PlanTableColumn.Each));
+            SortableHeaderLabel.MakeClickable(totalLabel, () => SortBy(PlanTableColumn.Total));
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from

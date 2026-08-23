@@ -201,6 +201,7 @@ namespace GW2CraftingHelper.Services
                 {
                     Amount = evenly ? line.Count / divisor : 0,
                     BundleLabel = evenly ? null : $"{line.Count} for {divisor}",
+                    UnitRate = (double)line.Count / divisor,
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
                 });

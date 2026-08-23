@@ -204,6 +204,16 @@ namespace GW2CraftingHelper.Models
         // (non-"Each") amount - see CurrencyDisplayResolver.ResolveUnitAmounts.
         public string BundleLabel { get; set; }
 
+        // The exact per-unit rate behind a "Each" amount, as a number
+        // nothing renders: set by CurrencyDisplayResolver alongside every
+        // per-unit amount (equal to Amount when the division was even,
+        // the true fraction behind BundleLabel when it was not, e.g. 9.9
+        // for "912 for 92"). Null for a Total (non-"Each") amount, where
+        // Amount is already the exact figure. Exists because Amount is
+        // deliberately 0 on a bundle-labelled row, which makes it useless
+        // as a sort key - see PlanTableSorter.
+        public double? UnitRate { get; set; }
+
         // Owned/needed split for a shopping-row currency Total amount
         // (gw2e parity - mirrors PlanRowViewModel.
         // CurrencyOwnedQuantity's doc comment): min(Amount, wallet amount)
