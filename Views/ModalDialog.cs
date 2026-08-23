@@ -146,20 +146,22 @@ namespace GW2CraftingHelper.Views
                 LabelHelpers.MeasureWith(font),
                 MessageAreaHeight / lineHeight);
 
-            // The label still spans the whole content width so
-            // HorizontalAlignment centers the wrapped block inside the
-            // dialog rather than around its own midpoint.
+            // Auto-size BOTH axes and parent last - ApiAccessDialog's
+            // proven AddWrappedLine shape. A fixed Width with
+            // AutoSizeHeight takes Blish's stale-layout-pass measure and
+            // clipped the second wrapped line mid-glyph (gate capture
+            // gA6w). The block centers by its measured width instead.
             var messageLabel = new Label()
             {
                 Text = string.Join("\n", wrapped.Lines),
                 Font = font,
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = ContentWidth,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Location = new Point(0, MessageTopMargin),
-                Parent = _window
+                AutoSizeWidth = true,
+                AutoSizeHeight = true
             };
+            messageLabel.Location = new Point(
+                System.Math.Max(0, (ContentWidth - messageLabel.Width) / 2),
+                MessageTopMargin);
+            messageLabel.Parent = _window;
 
             // Only when text was actually dropped - a tooltip repeating the
             // visible sentence is noise.
