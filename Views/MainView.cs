@@ -1786,20 +1786,24 @@ namespace GW2CraftingHelper.Views
             // tree, the shopping list and Used Materials. This row used to
             // suffix it ("Mystic Clover x30") and the wallet row below used
             // a colon ("Spirit Shards: 50"), so one tab spelled the same
-            // fact three ways (audit batch J, M9). Tabular Amount columns
-            // are deliberately NOT swept into this: a column of bare
-            // numbers under an "Amount" header is already labelled by its
-            // header.
+            // fact three ways (audit batch J, M9). Two things are
+            // deliberately NOT swept into this: a tabular Amount column,
+            // whose header already labels its bare numbers, and the
+            // location breakdown below.
             string nameText = $"{row.TotalCount}x {row.Name}";
             var nameLabel = CreateRowTextLabel(rowPanel, nameText, panelWidth, 4, null, out bool nameShortened);
 
-            // Same prefix notation as the row's own total above - a
-            // breakdown reading "Bank 20   Vault 12" under a total reading
-            // "32x Mystic Clover" was the third spelling of one fact on a
-            // single row.
+            // NOT the prefix notation the name line above uses, and the one
+            // deliberate exemption from M9's sweep beside the tabular Amount
+            // columns: these labels are LOCATIONS, not items
+            // (SnapshotSearchResultBuilder.FormatSourceLabel returns "Bank",
+            // "Material Storage", "Shared Inventory", "Character: <name>").
+            // "20x Bank" parses as twenty banks, and "10x Character:
+            // Maximus Test" collides the multiplier with the label's own
+            // colon. The count follows its location, as it did before.
             string breakdown = row.Breakdown == null || row.Breakdown.Count == 0
                 ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Count}x {b.Label}"));
+                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
 
             var breakdownLabel =
                 CreateRowTextLabel(rowPanel, breakdown, panelWidth, 24, InfoTextColor, out bool breakdownShortened);
