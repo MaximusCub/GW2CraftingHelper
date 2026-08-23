@@ -29,6 +29,12 @@ namespace GW2CraftingHelper.Views
         private readonly AutocompleteTextBox _textBox;
         private readonly IItemSearchProvider _searchProvider;
 
+        // How far right of the text box the list opens. Dropping straight
+        // under the box put it over the row's own quantity field and the
+        // rows below it; the caller passes the offset that clears them (see
+        // CraftingPlanView.CreateItemRowControls).
+        private readonly int _anchorOffsetX;
+
         private Panel _panel;
         private FlowPanel _rowContainer;
         private IReadOnlyList<ItemSearchResult> _results = Array.Empty<ItemSearchResult>();
@@ -42,10 +48,12 @@ namespace GW2CraftingHelper.Views
 
         public SuggestionPanel(
             AutocompleteTextBox textBox,
-            IItemSearchProvider searchProvider)
+            IItemSearchProvider searchProvider,
+            int anchorOffsetX = 0)
         {
             _textBox = textBox;
             _searchProvider = searchProvider;
+            _anchorOffsetX = anchorOffsetX;
 
             _textBox.TextChanged += OnTextChanged;
             _textBox.ArrowPressed += OnArrowPressed;
@@ -280,7 +288,16 @@ namespace GW2CraftingHelper.Views
             int yBelow = (int)tbBounds.Bottom;
             bool fitBelow = (yBelow + panelHeight) <= screen.Height;
             int y = fitBelow ? yBelow : Math.Max(0, (int)tbBounds.Top - panelHeight);
-            int x = (int)tbBounds.X;
+
+            // Offset right of the text box, then held on screen: the
+            // offset is measured against a row whose window may since have
+            // been dragged to the right edge.
+            int x = (int)tbBounds.X + _anchorOffsetX;
+            int maxX = Math.Max(0, screen.Width - _panel.Width);
+            if (x > maxX)
+            {
+                x = maxX;
+            }
 
             _panel.Location = new Point(x, y);
         }

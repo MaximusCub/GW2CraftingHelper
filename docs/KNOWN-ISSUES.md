@@ -8765,6 +8765,511 @@ floor lifting at two). The reviewer's noted empty-state wording gap
 floor) was observed as accurate-but-unexplained live; left as the
 recorded maintainer call.
 
+## Audit batch I: log entry readability (audit-i-log)
+
+UX audit finding (M7): every Log tab entry was ONE `AutoSizeWidth`
+Label built from the whole flat line, tinted end to end by
+`ColorForLevel`, hard-clipped at the panel's right edge with no wrap,
+no ellipsis and no indication that text had been lost - a WARN
+carrying a long path plus an exception simply lost its tail, and the
+level tint was the only structure in a wall of same-shaped text.
+
+**Row split.** Each entry is now a fixed-height row `Panel` holding two
+columns:
+
+- a prefix Label at x=0 showing `[LEVEL] timestamp [tag]`, dimmed to
+  70% alpha (this repo's existing `Color.White * 0.35f` idiom) but
+  still carrying the level color, so severity still reads at a glance
+  down the column while the chrome recedes behind the message;
+- the message Label at the shared message-column x, with an explicit
+  width (row width minus the prefix column, the 8px gap and the 8px
+  right pad).
+
+Both columns run through the existing `LabelHelpers.EllipsizeToWidth`,
+and a row that had to shorten EITHER column gets `BasicTooltipText`
+with the full line - assigned to the row Panel AND to both Labels,
+because Blish resolves a tooltip on the control under the mouse and
+does not bubble to the parent (the swallowed-hover class already
+recorded for `ShoppingListSectionRenderer` in this file). The `...`
+plus that tooltip are the truncation indicator the audit asked for.
+
+The prefix column is sized from a worst-case template - the widest
+level name, a timestamp built from the widest decimal digit, and a
+14-character tag allowance - rather than from the rows currently on
+screen. That is load-bearing, not decoration: the incremental
+`AppendNewRows` path only ever sees the new entries, so a width derived
+from what a pass can see would drift away from the rows the last full
+`RebuildRows` produced and stagger the message column.
+
+The tag allowance is counted in `'w'` glyphs and sized off the longest
+tag actually written anywhere in the tree - `snapshot-fetch`, 14
+characters. The margin is the glyph: every tag in the module is
+lowercase ASCII plus `-`, all narrower than `'w'`, so 14 `'w'`s clear a
+14-character tag with room to spare. The first draft reserved 10 on the
+stated (wrong) belief that `scrolldiag` was the longest tag; at that
+width `[snapshot-fetch]`, the module's most common WARN source, risked
+rendering permanently truncated AND permanently tooltip-flagged at every
+window width, in the very column this change exists to make readable.
+
+**Ellipsize, not wrap (decision).** Wrapping reads better for a long
+exception, but it makes row height a function of content, and this
+tab's whole row model is built on uniform rows: the eviction trim, the
+append path and the Follow tail-scroll (`VerticalScrollOffset =
+int.MaxValue`, an overshoot that clamps) all assume the panel's content
+height is settled at the moment they run. Blish measures a wrapped
+`AutoSizeHeight` label during its own deferred layout pass, so the
+overshoot would fire against a stale height and Follow would land short
+of the bottom. Wrapping also lets one stack-trace ERROR fill the whole
+viewport in what is meant to be a tail view. Ellipsize + tooltip
+preserves fixed row heights, leaves every one of those mechanisms
+untouched, and is what the audit accepts as the minimum.
+
+**Resize.** The container's `Resized` handler re-fits every visible row
+after resizing the content panel, walking `_renderedRows` (the same
+FIFO the eviction trim uses) - the same shape the recent status-row
+rework in this file uses for the toolbar/status/content panels. Two
+cheap outs keep a resize drag off the hot path: a vertical-only drag
+leaves the content width unchanged and returns before touching a single
+row, and a row already showing its untruncated text whose column only
+grew skips the `MeasureString` binary search inside `EllipsizeToWidth`.
+
+The walk itself is wrapped in `_contentPanel.SuspendLayout()` /
+`ResumeLayout(false)`, the same pair `CraftingPlanView.ReplayRelayout`
+uses and for the same reason - and the reason the first draft's "worst
+case is still bounded by the ring's 2000 entries" was the wrong cost
+model. Assigning a row Panel's `Size` fires that Panel's own `Resized`,
+which `FlowPanel` wires to a full reflow of every sibling, so an
+unsuspended loop over a full ring is O(rows^2) position writes plus a
+fresh children array per reflow - on every frame of a horizontal drag,
+on the UI thread - not O(rows). Suspending the parent propagates down
+(Blish's `IsLayoutSuspended` walks the parent chain) and
+`ResumeLayout(false)` leaves the single coalesced reflow to Blish's own
+next-frame `UpdateLayout`. With the suspend in place the per-drag-frame
+cost is back to linear in the ring's 2000 entries.
+
+`RebuildRows` re-parents up to 2000 rows on every search-box keystroke
+and carries the same unsuspended-reflow shape. That is pre-existing (the
+old label-per-row build did the same) and is deliberately left alone
+here; it is the obvious next candidate if the Log tab ever needs a
+second perf pass.
+
+**Extraction.** `LogTabContent.FormatLine` moved to the Blish-free
+`Services/LogLineFormat`, which also splits an entry into its prefix
+and message halves; `Line()` recomposes them into exactly the string
+`FormatLine` produced, so the search filter, the Copy button and the
+tooltip all still work in one unchanged flat line (Copy still emits
+full lines - unaffected by the split).
+
+`Message()` has one deliberate departure from the old `FormatLine`
+output: every run of CR/LF/TAB collapses to a single space (leading runs
+dropped, no trailing whitespace kept). Without it a multi-line message
+lost everything after its first line, silently - a fixed-height row Panel
+clips lines 2..n, and `BitmapFont.MeasureString` reports a multi-line
+string's WIDEST LINE rather than its full extent, so `EllipsizeToWidth`
+sees a string that "fits", returns it unchanged, and the row is marked
+neither shortened nor tooltipped. No in-tree call site embeds a newline
+today, but any `ex.Message` interpolation is one BCL/HTTP/serialization
+exception away from one (e.g. `CraftingPlanPipeline`'s generation-failure
+WARN). Flattening in the formatter rather than at the label also keeps
+Copy's `Environment.NewLine` join at one line per entry.
+
+`Services/LogRowLayout` carries
+the column arithmetic, so the degenerate widths that would otherwise
+blank every row (a message column ellipsized to zero) are pinned by
+tests rather than only observable live. Row virtualization/build
+behavior - `RebuildRows`, `AppendNewRows`, the eviction trim,
+`RebuildRowsIfBuilt`, the `_buildComplete` gate - is untouched; this is
+a per-row presentation change.
+
+The class doc comment's "label-per-row, no multi-column ellipsized rows
+that must reflow live during a resize drag" claim is now false and was
+rewritten: rows ARE multi-column and DO reflow, but the tab still does
+not opt into the `PlanContentHeightMath`/relayout-registry contract,
+and the comment now says why (uniform row heights, overshoot scroll -
+no per-section height math and no settle/verify pass to defer into).
+
+**Validation per commit:** module build 0 errors (pre-existing StyleCop
+warnings only; no new warning class in the edited files). Suite 1886
+baseline -> 1900 after commit 1 (14 new Blish-free tests:
+`LogLineFormatTests` pins that prefix + " " + message is byte-identical
+to the old flat line, including the no-tag and null-message cases;
+`LogRowLayoutTests` pins the narrow-row prefix cap and the
+never-collapse floor) -> 1900 after commit 2 (view-only) -> 1904 after
+the review-fix commit (4 more, pinning the CR/LF/TAB flattening and the
+unchanged-reference fast path).
+
+**Desktop gate items** (rendered surface, outside the test-runnable
+Blish-free layer):
+
+1. A long WARN line (long path + exception) shows a dim
+   `[WARN] timestamp [tag]` prefix, an ellipsized message ending in
+   `...`, and a tooltip carrying the full untruncated line - hovering
+   the prefix, the message and the row's empty right edge all raise it.
+2. Narrowing and widening the module window re-fits the rows: the
+   message re-ellipsizes to the new width, previously-truncated rows
+   recover their full text when the window grows, and the tooltip
+   appears/disappears with the truncation. Do this with the level filter
+   on `Debug+` and a full ring (2000 entries) and watch for drag stutter -
+   that is the case the `SuspendLayout` wrap above exists for, and it has
+   only ever been reasoned about, never measured on hardware.
+3. The level tint is still legible at a glance - ERROR/WARN rows read
+   red/amber down the prefix column, and the message keeps the full
+   (undimmed) level color.
+4. Follow still snaps: with Follow checked, new entries append at the
+   bottom and the view stays pinned there; unchecking Follow freezes it.
+5. Copy still writes the full untruncated lines to the clipboard, not
+   the ellipsized display text.
+
+Gate: PASS (2026-08-22 evening desktop batch, branch build 8026242,
+captures preflight/gI1-gI3). At Debug+ with the seeded session log:
+every entry rendered as a dim level-tinted prefix column ([WARN]
+orange, [INFO] white, [DEBUG] grey) plus an aligned message column;
+the long plan-timing line ended in a visible "..." instead of the
+old hard clip; hovering a row that fits showed no tooltip (correct
+narrowed semantics) while hovering the ellipsized row showed the
+full line in a multi-line tooltip. Follow was on and the newest
+entry sat at the bottom. Drag-resize refit not exercised live
+(synthetic resize drags unreliable); covered by the SuspendLayout
+fix, the width-guard early-outs, and the Blish-free layout tests.
+
+## Audit batch F: input flow (audit-f-input-flow)
+
+Four maintainer-approved UX-audit findings on the Crafting Plan tab's
+input flow, plus one regression the first of them exposed.
+
+- **H4, stale resolved item (the correctness bug):** a row's item id was
+  set only by a suggestion pick and never cleared, and nothing else ever
+  assigned it. Editing the search box afterwards therefore left the plan
+  generating for the previously picked item while the box read the new
+  name - "Mystic Clover" on screen, Deldrimor Steel Ingot in the plan.
+  Three parts: (1) a search-box `TextChanged` handler drops the row's
+  resolved item once the text diverges from the resolved name, with case
+  and surrounding whitespace not counting as divergence; (2) Generate
+  first resolves typed-but-unpicked rows against the item search
+  provider, adopting an exact case-insensitive name match only - a
+  partial name stays unresolved rather than planning for whatever ranked
+  first, and the adoption is re-checked on the main thread against what
+  the row holds at that moment, so a pick or a further keystroke landing
+  during the search cannot be overwritten by a result describing older
+  text; (3) with nothing resolved, the status now distinguishes "Select
+  at least one item before generating." (every row blank) from "No item
+  matched what you typed - pick an item from the suggestion list."
+  (text that resolved to nothing), where the old copy told someone
+  staring at a filled-in box to select an item.
+  A name that belongs to **several items** is a third case, and the one
+  with no way to notice it: GW2 reuses item names freely (4136 of the
+  14762 seeded names are shared, and three distinct items are called
+  "Amethyst Gold Ring"), the provider sorts by name so they all land in
+  one result window, and item ids are never displayed - adopting the
+  first would have generated a full plan for an arbitrary one of them
+  with nothing on screen to say which. Such a name now stays unresolved
+  and says so: "More than one item has that name - pick the one you want
+  from the suggestion list."
+  A Generate where only SOME rows resolved no longer drops the rest in
+  silence either: the plan is still generated from the rows that
+  resolved, and the strip carries "N row(s) has/have no item selected and
+  is/are not in this plan." for as long as that plan is on screen.
+  While the resolution pass runs, Generate is disabled and the strip
+  reads "Resolving items..." - the pass is awaited, and nothing
+  downstream disables the button until a generation actually starts, so
+  clicks during it would otherwise be silent and each would start another
+  full generation.
+  The decisions live in the new Blish-free `Services/ItemRowSelection.cs`
+  (staleness rule, exact/ambiguous name match, status copy), covered by
+  20 tests. `TriggerGenerate` is now a thin wrapper that owns the
+  resolution await, the Generate button for its duration, and the marshal
+  back to the main thread before the generate body, which touches
+  controls from its first line; the body is `GenerateFromResolvedRows`.
+- **Typed text across a row add/remove (regression from H4):** rebuilt
+  rows seeded their search box from `ItemName`, which H4 now clears, so
+  typing a name and pressing "+" wiped it. Rows keep the text they last
+  showed (`ItemRowState.TypedText`) and seed from that.
+- **M1, deferred controls honesty:** the Prices dropdown, Value Own
+  Materials, and Use Own Materials on the no-plan path now put
+  "Settings changed - press Generate Plan to update" on the status strip
+  as they change - they look like the instant-apply controls on other
+  tabs but only affect the next plan. (Use Own Materials with a plan on
+  screen already regenerates behind a confirm, so it is not deferred.)
+  The warning is standing state, not a one-shot status write, and is
+  appended to whatever the status board says: a generation in flight
+  re-renders the strip about seven times a second and would otherwise
+  have erased it within 150ms, ending on "Plan generated - &lt;time&gt;"
+  for a plan built with the price basis the user had just changed away
+  from. It survives a tab switch for the same reason, and is cleared when
+  a generation actually starts - which is the run that includes it. The
+  "rows not in this plan" notice above rides the same mechanism.
+  A generation also dims the plan area to 0.45 opacity, restored in the
+  `finally` that already covers success, failure and cancellation alike;
+  a superseded generation returns at its `myGen` check and leaves the dim
+  to the newer generation that owns it.
+- **M15, suggestion list occlusion:** the list opened directly under the
+  search box, over this row's quantity field and every row below it.
+  `SuggestionPanel` takes an anchor offset and opens that far right of
+  the text box - right of the Qty stepper - clamped so a window at the
+  right screen edge cannot push it off. It still overlaps part of the
+  persistent controls row (the Prices dropdown's right half and Value Own
+  Materials) and this row's own +/- buttons while open; anchoring cannot
+  clear a full-width controls row, and this is the position the finding
+  approved.
+- **M16, the "+" button:** moved right of the quantity field so it no
+  longer abuts it and reads as a Qty stepper, and given the tooltip "Add
+  another item to this plan". The "-" button beside it got the same
+  treatment ("Remove this item from the plan") rather than leaving the
+  sibling half-fixed.
+
+Validation: build 0 errors and the full suite green per commit (1906,
+up from 1886 with the 20 new ItemRowSelection tests). No new test
+references Blish.
+
+What the desktop gate should look at:
+
+1. **Stale-pick invalidation, live:** pick an item from the suggestion
+   list, then edit the box to a different item's name and press Generate.
+   The plan must be for what the box says (or, for a partial name, the
+   "pick an item from the suggestion list" status) - never for the
+   earlier pick. Also: type a full item name without ever opening the
+   list and press Generate; it should plan that item.
+2. **Shared name:** type "Amethyst Gold Ring" in full, do not open the
+   suggestion list, press Generate. No plan may be generated - the status
+   must read "More than one item has that name - pick the one you want
+   from the suggestion list." Picking one of the three from the list and
+   pressing Generate must then plan normally.
+3. **Partly resolved Generate:** row 1 picked from the suggestion list,
+   row 2 typed with a name that matches nothing ("Mystic Clove"), press
+   Generate. The plan must be generated for row 1 AND the strip must
+   carry "1 row has no item selected and is not in this plan." for as
+   long as that plan is on screen - the old behavior planned row 1 and
+   said nothing at all about row 2.
+4. **Settings-changed status:** change Prices or Value Own Materials with
+   a plan on screen; the status line under the toolbar must switch to
+   "Settings changed - press Generate Plan to update" instead of leaving
+   the "Plan generated - <time>" line up. Then the harder case: press
+   Generate and change Prices WHILE it runs. The warning must appear
+   immediately, survive the whole run (the spinner re-renders the strip
+   about seven times a second), and still be there beside
+   "Plan generated - <time>" when the run finishes - the plan on screen
+   was built with the old basis. It must also survive a tab switch away
+   and back, and disappear the moment the next Generate starts.
+5. **Dimmed stale plan:** press Generate with a plan already on screen -
+   the plan area should visibly dim for the run and return to full
+   opacity when it finishes, on a successful run and on a failing one
+   (an offline/error run is the one worth checking).
+6. **Suggestion list position:** open the list on the first of two rows
+   and confirm the second row's search box and quantity field stay
+   visible and clickable, and that the list stays inside the window at
+   minimum window width (930).
+7. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
+   plainly and do not clip.
+
+Gate: PASS (2026-08-22 evening desktop batch, branch build 454681b,
+captures preflight/gF0-gF5). (1) Typed "mystic clover" lowercase,
+never opened the suggestion list, pressed Generate: the module log
+recorded "Plan for Mystic Clover x1" - unique-exact-name adoption
+working end to end. (2) The suggestion list opened to the right of
+the qty stepper, no longer covering Use Own Materials or the Prices
+label (the documented partial-overlap tradeoff visible and
+acceptable). (3) Toggling Value Own Materials appended the standing
+notice "Settings changed - press Generate Plan to update" after the
+board status with a separator; it survived subsequent renders and
+was still standing alongside a later honest-status line. (4) The
+"+" button showed "Add another item to this plan" on hover at its
+separated position. (5) Appending "xx" to the resolved name and
+pressing Generate produced "No item matched what you typed - pick
+an item from the suggestion list." with the previous plan untouched
+- stale-pick invalidation plus the honest empty status, no wrong
+plan. Ambiguous-name and multi-row partial-resolution statuses were
+not staged live (no duplicate-named craftable in the fixture path);
+both are pinned by the ItemRowSelection tests. Bonus: the x1
+all-owned plan rendered the HAVE pill and a 0c cost tile - the
+zero-cost plan state previously uncaptured.
+
+## Audit batch G: Settings restructure (audit-g-settings)
+
+Commits on audit-g-settings off master 47bb2c5, covering the three
+maintainer-approved UX audit findings against Views/SettingsTabContent.
+cs (M4 currency-list density, M5 save buttons + empty heading, M6
+visual structure), plus the review round that followed them. Persistence semantics are untouched - every setting
+is written by the same code, with the same validation, the same
+"invalid rows keep their persisted value" contract and the same
+three-state currency precedence as before; only layout, control
+placement and the confirmation surface changed.
+
+**Supersedes B14** (backlog-cleanup, gate PASS 2026-08-17): that batch
+deduplicated the four per-section save rows into one AddSaveRow helper
+and live-verified all four rendering identically with their green
+dated "Saved" labels. Under the maintainer-approved M5 the four rows
+and their four status labels are gone entirely, replaced by one Save,
+so that gate observation no longer describes the shipping UI. The
+dated green confirmation pattern itself is kept, once.
+
+- **One line per currency, two-up (M4):** each currency was a 54px
+  two-line row spanning the full panel while using only its left
+  portion - name/input/hint/error on line one, a default-state label
+  and Clear checkbox on line two - stacked 47 deep. Each is now a 30px
+  cell: name (ellipsized to 170px, full name on hover only when it did
+  not fit), input, Clear, and one tag slot at the right of the cell.
+  That slot shows the persisted default state ("default N", or
+  "cleared" when suppressed) and is taken over by the red "Invalid"
+  warning while an amount will not parse - only ever one of the two, so
+  a half-width cell needs room for one. The gw2efficiency attribution +
+  editable/clearable wording is on the input's tooltip. The input's
+  placeholder is the unit ("copper") on every row: Blish's TextBox
+  insets a placeholder 10px a side and draws it untruncated inside the
+  control's own scissor, so a 70px box shows ~50px of it - enough for
+  "copper", not for "default: 3600", which is why the default estimate
+  is a label and not the placeholder it briefly was. Cells are packed
+  left-to-right, top-to-bottom into an absolutely-positioned grid
+  panel. Section height: ~2,690px -> ~880px two-up (the row block
+  itself 2,538 -> 720).
+- **Filter box (M4):** a "Filter currencies..." TextBox above the grid
+  hides non-matching cells and re-packs the rest, with a "N of 47
+  shown" counter beside it. Hidden rows are still read and written by
+  Save - filtering is display-only, nothing is dropped. A row whose
+  amount did not parse is forced back on screen by the next filter pass
+  whatever the query says (SettingsCurrencyGridLayout.Compute's
+  alwaysShow), so the save bar's "N invalid entries not saved" can
+  never point at a tag the filter is concealing.
+- **The grid panel holds its unfiltered height (M4):** Blish's
+  Scrollbar zeroes ScrollDistance/TargetScrollDistance whenever the
+  scrolling container's content height changes - its RecalculateLayout
+  captures the previous scrollbar percent, recomputes it from the
+  visible children, and resets on any difference - and it does so a
+  frame later, so the reset cannot be undone in place. Sizing the grid
+  to the match count therefore snapped the tab back to scroll-top on
+  every filter keystroke that changed the count. The grid panel is now
+  fixed at SettingsCurrencyGridLayout.ComputeHeight (the full 47-row
+  height for the current column count) and only the cells move; the
+  cost is trailing blank space under a filtered list, which is why the
+  grid is deliberately the last thing in the panel and the Astral
+  Acclaim note moved above it.
+- **Width changes are re-laid out (M4):** the row/header panels, the
+  header rules, the grid panel and every cell + cell rule are re-sized
+  from container.Resized (ApplyPanelWidth, early-out when the width did
+  not move, so a height-only resize or a vertical drag costs nothing).
+  Without it the tab kept the width it was first opened at: narrowing
+  the window left the second column of cells beyond the panel's right
+  edge, invisible and untypeable until the tab was closed and
+  re-opened.
+- **Section order (M4):** the three short sections (Homestead
+  Refinement, Logging, Snapshot) now build before the long currency
+  section, so the tab opens on controls rather than on a wall of
+  currency rows.
+- **One Save for the tab (M5):** the four per-section Save buttons are
+  replaced by a single Save in a bar that is a sibling of the scrolling
+  FlowPanel, so it never scrolls away. SaveAll runs all four persists
+  in order - currency valuations (with its defensive "Save failed - see
+  log" branch), Homestead tiers, log max size (including the live
+  ModuleLog.MaxFileSizeBytes push) + retention days, snapshot refresh
+  interval - sums their invalid-entry counts and writes one status:
+  green "Saved - <date>" when everything parsed, amber "Saved - N
+  invalid entries not saved" otherwise. Per-row error labels are
+  unchanged. Placement note: the audit suggested a fixed footer; the
+  bar is anchored at the TOP instead, because LogTabContent already
+  builds a fixed toolbar this way above its own CanScroll FlowPanel
+  and a top bar needs only ContentRegion.Width, while a bottom footer
+  would also depend on ContentRegion.Height being final at Build time
+  (its failure mode being a Save bar floating over the rows).
+- **Empty heading demoted (M5):** "Plan Defaults" was a section header
+  with three info lines and no controls at all. It is now a single note
+  line under Currency Valuations, the pricing section it points at.
+- **Dividers (M6):** AddSectionHeader draws the same 2px
+  SectionDividerColor rule CraftingPlanView's section headers do
+  (bottom-anchored with 1px clearance in the 30px header), and each
+  currency cell carries a LabelHelpers.CreateRowDivider rule, hidden on
+  the cells of the last populated grid row so it re-anchors as the
+  filter re-packs the list. The cell's input sits at y=1 so it ends
+  clear of the rule at y=27.
+- **Layout math is Blish-free (M4):** Services/
+  SettingsCurrencyGridLayout.cs owns the filter predicate, the packing
+  math (column count, column width, per-cell X/Y/row, grid height) AND
+  the cell's horizontal constants; the view aliases those constants at
+  compile time and only copies placements onto controls. MinColumnWidth
+  is now derived (CellTagX + CellTagWidth = 424) rather than
+  hand-estimated: the previous 340 was short of the cell it claimed to
+  size, so a two-up column between 680 and ~722px clipped the invalid
+  tag. Two-up now needs a 848px panel, below which the grid falls back
+  to one column - including at the window's 930px minimum, where the
+  section is 1,410px of rows rather than 720. 42 tests cover the
+  one/two-column boundary, blank/trimmed/case-insensitive matching,
+  re-packing around hidden entries, alwaysShow overrides (including a
+  short array), the empty result, null names, non-positive
+  width/height, the fixed height, and the width budgets - the tag
+  budget against every real value in CurrencyDecisionDefaults, so a
+  future six-figure default fails the suite instead of clipping.
+- **Review-pass fixes (own commit):** Build now nulls the currency
+  grid/filter/count/status fields alongside the row lists it already
+  cleared (same stale-disposed-control class as the _homesteadRows
+  comment records); the scroll panel's height is clamped at 0 now that
+  the save bar is subtracted from it; the demoted note was shortened to
+  fit the panel width at the window's 930px minimum.
+- **Measured, not assumed:** the filter's re-flow relies on FlowPanel
+  subscribing to each child's Resized and skipping invisible children -
+  both confirmed by decompiling the shipped Blish HUD 1.3.0 binary
+  (FlowPanel.OnChildAdded -> ChangedChildOnResized ->
+  ReflowChildLayout, which filters on c.Visible), so setting the grid
+  panel's Height is enough and the first draft's extra Invalidate was
+  removed as a second reflow per keystroke.
+
+Validation: build 0 errors and the full suite green before each commit
+(1886 baseline -> 1928 with the new layout tests; the increase is all
+new tests, zero regressions).
+
+Desktop gate items (all in the Settings tab):
+1. Currency rows are one line each, with Clear on the same line and a
+   readable "default N" tag at the right of every defaulted cell (the
+   whole number, not a clipped one) - check a 4-digit default such as
+   Guild Commendation or Spirit Shard. Two cells per line once the
+   window is wide enough (panel >= 848px); one per line at the 930px
+   window minimum. The whole section fits in roughly a screen and a
+   half two-up instead of four-plus screens.
+2. Typing in the filter box hides non-matching currencies and re-packs
+   the rest with no gaps; the counter reads "N of 47 shown"; clearing
+   the box restores all 47. Scroll down to the filter box first: the
+   panel must NOT jump back to the top on any keystroke, including
+   backspaces. The grid keeps its full height, so a short match list
+   leaves blank space below it.
+3. One Save button, visible without scrolling from any scroll position,
+   and one green dated "Saved - <date>" confirmation. Change one value
+   in EVERY section (a currency amount, a Homestead tier, log max size,
+   log retention, snapshot interval), click Save once, reopen the tab
+   and confirm all five persisted. Enter one bad value and confirm the
+   amber "1 invalid entry not saved" wording plus the per-row tag.
+4. A 2px rule under every section header, and a rule between currency
+   rows with none dangling under the last populated row (check both
+   unfiltered and with a filter that leaves an odd number of matches).
+5. Section order top to bottom: Homestead Refinement, Logging,
+   Snapshot, Currency Valuations; no "Plan Defaults" header anywhere,
+   with its note present under Currency Valuations.
+6. Resize the window while the Settings tab is open, both wider and
+   back down to the 930px minimum, and confirm every currency cell
+   stays inside the panel and stays typeable, the columns switch
+   between one-up and two-up, and the section-header rules span the new
+   width.
+7. Type a bad amount into one currency, filter it off screen, click
+   Save: the amber "1 invalid entry not saved" must be accompanied by
+   that row reappearing with its red "Invalid" tag despite the filter.
+Gate: PASS (2026-08-22 evening desktop batch, branch build b740035,
+captures preflight/gG1-gG7). (1) The tab rendered top-down as: top
+Save bar, Homestead / Logging / Snapshot short sections each with
+the 2px header rule, then Currency Valuations with the filter box,
+"47 currencies" count, and the one-line two-up grid - "copper"
+placeholder inputs, Clear checkboxes, grey default tags, row rules,
+name ellipsis on "Manifesto of the Moletaria...". (2) Typing
+"shard" filtered to "6 of 47 shown" with the grid repacked two-up
+and no scroll jump. (3) Save produced the green "Saved - Aug 22,
+2026 8:33 PM" label beside the button (all sections saved in one
+click; Save's "Save every section on this tab." tooltip verified).
+(4) The "was N" override tag and amber "cleared" tag were NOT
+exercised live: late-session synthetic keyboard degradation kept
+the override keystrokes landing in the filter box (a documented
+input-death mode, not a module fault - the filter box accepting
+them proves the click-to-focus path). Both tags are pinned by the
+RefreshCurrencyRowDefaultState logic restored verbatim from
+master's proven three-state code plus the CellTagWidth fit test.
+One-column fallback at the 930px minimum also not exercised
+(synthetic resize unreliable); pinned by SettingsCurrencyGridLayout
+tests.
+
 ## Audit batch K: Plan Notes wrapping (audit-k-notes)
 
 UX audit finding M14. `Views/Rendering/NotesSectionRenderer` locked each

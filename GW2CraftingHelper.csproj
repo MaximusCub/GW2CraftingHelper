@@ -91,6 +91,7 @@
     <Compile Include="Services\TextWrapMath.cs" />
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
+    <Compile Include="Services\ItemRowSelection.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Models\AcquisitionSource.cs" />
@@ -180,11 +181,14 @@
     <Compile Include="Services\ModuleSettings.cs" />
     <Compile Include="Services\CurrencyValuationSerializer.cs" />
     <Compile Include="Services\SettingsInputParser.cs" />
+    <Compile Include="Services\SettingsCurrencyGridLayout.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />
     <Compile Include="Services\ModuleLogEntry.cs" />
     <Compile Include="Services\ModuleLog.cs" />
     <Compile Include="Services\ModuleLogStore.cs" />
     <Compile Include="Services\LogViewFloor.cs" />
+    <Compile Include="Services\LogLineFormat.cs" />
+    <Compile Include="Services\LogRowLayout.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
     <Compile Include="Models\PillSourceCostBreakdown.cs" />

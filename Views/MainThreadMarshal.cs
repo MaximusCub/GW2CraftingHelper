@@ -32,10 +32,15 @@ namespace GW2CraftingHelper.Views
         /// <paramref name="action"/> are caught and logged rather than
         /// propagated, since an unhandled exception inside the queued
         /// callback would otherwise take down Blish HUD's update loop.
+        /// <para>
+        /// Returns false when the action was dropped rather than queued, so
+        /// a caller holding state the callback was meant to release (a
+        /// disabled button, say) can tell that it will never run.
+        /// </para>
         /// </summary>
-        public static void Run(Action action)
+        public static bool Run(Action action)
         {
-            if (action == null) return;
+            if (action == null) return false;
 
             var overlay = GameService.Overlay;
             if (overlay == null)
@@ -45,7 +50,7 @@ namespace GW2CraftingHelper.Views
                 // has nowhere to run. Previously dropped silently - logged
                 // here so a caller who expected this to fire has a trail.
                 Logger.Debug("MainThreadMarshal.Run dropped an action - GameService.Overlay was null");
-                return;
+                return false;
             }
 
             overlay.QueueMainThreadUpdate(_ =>
@@ -59,6 +64,7 @@ namespace GW2CraftingHelper.Views
                     Logger.Warn(ex, "MainThreadMarshal queued action threw");
                 }
             });
+            return true;
         }
     }
 }
