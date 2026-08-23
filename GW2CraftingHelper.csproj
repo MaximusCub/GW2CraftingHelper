@@ -125,6 +125,8 @@
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
+    <Compile Include="Models\ItemStatBlock.cs" />
+    <Compile Include="Models\ItemAttributeLine.cs" />
     <Compile Include="Models\CurrencyMetadata.cs" />
     <Compile Include="Models\CraftingPlanResult.cs" />
     <Compile Include="Models\ExcessCraftOutput.cs" />
@@ -134,6 +136,8 @@
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\ItemStatMath.cs" />
+    <Compile Include="Services\ItemDescriptionSanitizer.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
     <Compile Include="Services\CostLineValuation.cs" />
     <Compile Include="Services\SeasonalOfferFilter.cs" />
