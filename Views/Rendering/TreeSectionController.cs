@@ -548,6 +548,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
         private const int TreeNameGap = 6;
         private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
+
         // 240 until the minimum-width research measured the standard
         // CRAFT/TP/VENDOR/IGNORE run at 222px against a 236px budget: any
         // slightly wider label ran the row through the tightened-padding

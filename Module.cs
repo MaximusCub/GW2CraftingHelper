@@ -39,17 +39,6 @@ namespace GW2CraftingHelper
     [Export(typeof(Blish_HUD.Modules.Module))]
     public class Module : Blish_HUD.Modules.Module
     {
-        private static readonly Logger Logger = Logger.GetLogger<Module>();
-
-        // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
-        // shared inventory, materials, one call per character) so a full
-        // network outage fails fast instead of stacking several ~100s HTTP
-        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
-        // mirrors CurrencyMetadataService's own internal-timeout pattern,
-        // just with a larger budget since this fetch does far more work on
-        // a genuine success than a single /v2/currencies call.
-        private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
-
         // Narrowest window the recipe tree stays readable in, measured (not
         // estimated) in docs/research/minimum-window-width.md: the deepest
         // chain in the game is "+24 Agony Infusion" at depth 23, whose
@@ -70,6 +59,17 @@ namespace GW2CraftingHelper
         // width (the tree/table renderers take panelWidth only), so raising
         // the width leaves the vertical budget exactly as it was.
         private const int MinWindowHeight = 710;
+
+        private static readonly Logger Logger = Logger.GetLogger<Module>();
+
+        // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
+        // shared inventory, materials, one call per character) so a full
+        // network outage fails fast instead of stacking several ~100s HTTP
+        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
+        // mirrors CurrencyMetadataService's own internal-timeout pattern,
+        // just with a larger budget since this fetch does far more work on
+        // a genuine success than a single /v2/currencies call.
+        private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
 
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
@@ -560,6 +560,7 @@ namespace GW2CraftingHelper
                 Title = "GW2 Crafting Helper",
                 Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_MainWindow",
+
                 // Clamped at 0: the minimum is now wider than a 1366px
                 // screen, and a negative centered x would put the title bar
                 // (and its close button) off the left edge with no way to
