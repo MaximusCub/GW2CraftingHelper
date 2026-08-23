@@ -305,20 +305,39 @@ namespace GW2CraftingHelper.Views
             _onConfirm = null;
             _onCancel = null;
 
-            // Dropped before the window, and before either callback runs -
-            // a confirm callback that opens another dialog re-raises it,
-            // and one that touches the module window must not be doing so
-            // through a live input blocker.
-            _backdrop?.Hide();
-            _window.Hide();
-
-            if (confirmed)
+            try
             {
-                onConfirm?.Invoke();
+                if (confirmed)
+                {
+                    onConfirm?.Invoke();
+                }
+                else
+                {
+                    onCancel?.Invoke();
+                }
             }
-            else
+            finally
             {
-                onCancel?.Invoke();
+                // The window is dropped AFTER the callback, and only if the
+                // callback did not re-arm this dialog by calling Show().
+                // Measured in the vendored 1.3.0 binary: WindowBase2.Hide()
+                // does NOT set Visible=false - it resumes the shared 0.2s
+                // reflecting fade tween, whose OnComplete sets Visible=false
+                // and raises Hidden - while WindowBase2.Show() begins
+                // "BringWindowToFront(); if (Visible) return;". Hiding first
+                // therefore made a re-raised dialog paint its new children
+                // into a window already fading out: Show() early-returned,
+                // the fade finished ~0.2s later, and the Hidden event
+                // dismissed the replacement as a cancel. It read as a flash.
+                // Leaving the window visible lets Show()'s early return hand
+                // the second request the same on-screen window with the
+                // replaced content. try/finally so a throwing callback still
+                // closes the dialog.
+                if (!_isShowing)
+                {
+                    _backdrop?.Hide();
+                    _window.Hide();
+                }
             }
         }
 

@@ -681,8 +681,9 @@ namespace GW2CraftingHelper
         // status label is unparented by then and renders nowhere, so a
         // rejected entry would vanish with no explanation at all. Raising a
         // second dialog from the first one's callback is supported:
-        // ModalDialog.Dismiss clears its state and hides the window before
-        // running the callback.
+        // ModalDialog.Dismiss clears its pending state before running the
+        // callback and skips its own Hide when the callback re-armed it, so
+        // this message lands in the window that is already on screen.
         private void ReportSaveOutcome(SettingsTabContent.SaveOutcome outcome)
         {
             if (outcome.AllSaved) return;
