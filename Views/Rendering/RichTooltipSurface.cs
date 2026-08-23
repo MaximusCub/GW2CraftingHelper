@@ -172,8 +172,8 @@ namespace GW2CraftingHelper.Views.Rendering
             };
 
             // Fixed-size coin icons centred against a taller number font,
-            // the same correction the Summary band's promoted tile makes -
-            // without it the icons stick to the top of their row.
+            // the same correction the Summary band's tiles make - without
+            // it the icons stick to the top of their row.
             int iconYOffset = System.Math.Max(0, (rowHeight - CoinSegmentMath.CoinIconSize) / 2);
             for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
             {

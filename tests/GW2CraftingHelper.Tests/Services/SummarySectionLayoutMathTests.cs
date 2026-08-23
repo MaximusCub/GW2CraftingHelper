@@ -154,33 +154,123 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- CostBandHeight + the currency disclosure line ---
         //
-        // The cost band's result tile is the plan's headline figure and
-        // renders at a promoted amount font, so the band is taller than
-        // the profit band beside it; when the plan also has currency costs
-        // the band carries a disclosure line and grows again. Both numbers
-        // are pinned absolutely here (not recomputed from the same
-        // constants the production formula reads, which could never fail):
-        // a deliberate geometry change re-baselines these literals.
+        // Re-baselined for the cost-band restyle: the result tile no
+        // longer carries a promoted DefaultFont32 amount (which is what
+        // made the band 76 tall), it carries a highlight box at the band's
+        // one shared amount font, so the band's height is now the box's
+        // margin+padding around a caption line, an optional disclosure
+        // line and one coin run. When the plan has currency costs the band
+        // still grows by exactly that disclosure line. Both numbers are
+        // pinned absolutely here (not recomputed from the same constants
+        // the production formula reads, which could never fail): a
+        // deliberate geometry change re-baselines these literals.
 
         [Fact]
-        public void CostBandHeight_NoCurrencyNote_IsThePromotedTileRowHeight()
+        public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            Assert.Equal(76, SummarySectionLayoutMath.CostBandHeight(false));
+            // 6 margin + 6 pad + 20 caption line + 4 gap + 20 coin run
+            // + 6 pad + 6 margin.
+            Assert.Equal(68, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
         [Fact]
         public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
         {
-            Assert.Equal(76 + 18, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(68 + 18, SummarySectionLayoutMath.CostBandHeight(true));
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
                 SummarySectionLayoutMath.CostBandHeight(true));
         }
 
         [Fact]
-        public void CostBandHeight_IsTallerThanTheUnpromotedProfitBand()
+        public void CostBandHeight_IsTallerThanTheProfitBand_ByTheHighlightBoxsOwnRoom()
         {
+            // The whole reason the cost band is still the taller of the
+            // two: its result tile is boxed and the box needs its own
+            // margin and padding, top and bottom. Nothing about the
+            // amount font differs between the bands any more.
             Assert.True(SummarySectionLayoutMath.CostBandHeight(false) > PlanContentHeightMath.CostTileRowHeight);
+            Assert.Equal(
+                2 * (SummarySectionLayoutMath.CostBandBoxMarginY + SummarySectionLayoutMath.CostBandBoxPadY),
+                SummarySectionLayoutMath.CostBandHeight(false)
+                    - (SummarySectionLayoutMath.CostBandCaptionLineHeight
+                        + SummarySectionLayoutMath.CostBandCaptionToAmountGap
+                        + CoinSegmentMath.CoinIconSize));
+        }
+
+        [Fact]
+        public void CostBandHeight_LeavesTheHighlightBoxInsideTheBand()
+        {
+            // The geometry the renderer actually builds, through the same
+            // functions it calls: BandAmountY places the amount, the box
+            // spans CostBandBoxTop to one pad below it, and that bottom
+            // edge - the band's lowest ink - must sit inside the height the
+            // math reserved. The renderer's DEBUG assert fails loud
+            // otherwise, but only at runtime and only in DEBUG.
+            //
+            // captionBlockBottom is a MEASURED input (the caption font's
+            // real metrics), so it is swept from the tightest plausible
+            // value up to the full reserve rather than assumed: the clamp
+            // inside BandAmountY is exactly what has to hold across it.
+            foreach (bool hasNote in new[] { false, true })
+            {
+                int rowHeight = SummarySectionLayoutMath.CostBandHeight(hasNote);
+                int reserve = SummarySectionLayoutMath.CostBandCaptionY
+                    + SummarySectionLayoutMath.CostBandCaptionLineHeight
+                    + (hasNote ? SummarySectionLayoutMath.CostBandCurrencyNoteHeight : 0);
+
+                Assert.True(SummarySectionLayoutMath.CostBandBoxTop >= 0);
+
+                for (int captionBlockBottom = SummarySectionLayoutMath.CostBandCaptionY;
+                    captionBlockBottom <= reserve;
+                    captionBlockBottom++)
+                {
+                    int amountY = SummarySectionLayoutMath.BandAmountY(
+                        rowHeight,
+                        CoinSegmentMath.CoinIconSize,
+                        captionBlockBottom,
+                        SummarySectionLayoutMath.CostBandAmountBottomPad);
+                    int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(
+                        amountY, CoinSegmentMath.CoinIconSize);
+
+                    // The caption block must clear the amount run rather
+                    // than be overprinted by it.
+                    Assert.True(amountY >= captionBlockBottom);
+                    Assert.True(SummarySectionLayoutMath.CostBandBoxTop + boxHeight <= rowHeight);
+                }
+            }
+        }
+
+        [Fact]
+        public void CostBandBoxWidth_AddsExactlyOnePadEachSide_AndFitsItsTileSlice()
+        {
+            // The box is never clamped to its tile slice (Blish clips a
+            // container's children, so a narrow box would cut the amount
+            // off), which makes the padding its only margin for error.
+            // These are the band's own arguments to ComputeCostTileGeometry
+            // - see Views/Rendering/SummarySectionRenderer.CreateFormulaBand.
+            const int totalMargin = 40;
+            const int minTileWidth = 80;
+
+            // The narrowest three-tile band the module can present: the
+            // 930px minimum window less the plan view's own chrome, taken
+            // pessimistically.
+            var geometry = PlanRelayoutMath.ComputeCostTileGeometry(860, 3, totalMargin, minTileWidth);
+
+            Assert.Equal(
+                2 * SummarySectionLayoutMath.CostBandBoxPadX,
+                SummarySectionLayoutMath.CostBandBoxWidth(0));
+
+            // The widest run a real result tile carries is the disclosure
+            // line ("+ N currencies required") at DefaultFont12, which
+            // measures well under 160px; the box must clear that with both
+            // pads even in the narrowest tile slice.
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(160) <= geometry.TileWidth);
+
+            // And the boundary itself, so a later pad bump is caught.
+            int widestThatFits = geometry.TileWidth - 2 * SummarySectionLayoutMath.CostBandBoxPadX;
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(widestThatFits) <= geometry.TileWidth);
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(widestThatFits + 1) > geometry.TileWidth);
         }
 
         [Fact]
@@ -414,6 +504,80 @@ namespace GW2CraftingHelper.Tests.Services
             // The point of the fix: at 1600px the band no longer runs ~1000px
             // past the last column it is supposed to bound.
             Assert.True(band < 1600 / 2);
+        }
+
+        // --- CurrencyTableOffsetX (the field test's "the currency table
+        // under total cost needs to be centered") ---
+
+        [Fact]
+        public void CurrencyTableOffsetX_PinnedTable_IsZero()
+        {
+            // A table already spanning the panel has nothing to centre, and
+            // must lay out byte-identically to the pre-centring version.
+            Assert.Equal(
+                0,
+                SummarySectionLayoutMath.CurrencyTableOffsetX(
+                    panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780));
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_PulledInTable_SplitsTheLeftoverSpaceEvenly()
+        {
+            const int panelWidth = 1600;
+            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 120;
+
+            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, 0, widestNameEnd);
+            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(panelWidth, 0, widestNameEnd);
+
+            Assert.True(offset > 0);
+            // Same margin either side, to the odd pixel integer division
+            // leaves on the right.
+            Assert.Equal(panelWidth - band - offset, offset + (panelWidth - band) % 2);
+            // And the table still ends inside the panel.
+            Assert.True(offset + band <= panelWidth);
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_NarrowPanel_NeverGoesNegative()
+        {
+            // A panel narrower than the block itself: the table stays at
+            // the left edge rather than being pushed off it.
+            Assert.Equal(
+                0,
+                SummarySectionLayoutMath.CurrencyTableOffsetX(
+                    panelWidth: 120, widestNumberWidth: 0, widestNameEnd: 0));
+        }
+
+        [Fact]
+        public void CurrencyTableOffsetX_LeavesEveryColumnInsideTheCentredTable()
+        {
+            // Centring must move the table, not reshape it: the columns
+            // are still laid out against the same width the offset is
+            // derived from, so the name column starts inside the table's
+            // left edge and the marker still ends one shared table margin
+            // inside its right edge. This is what lets the renderer centre
+            // header and rows by moving one panel each.
+            const int panelWidth = 1400;
+            const int widestNumberWidth = 90;
+            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 200;
+
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
+                panelWidth, widestNumberWidth, widestNameEnd);
+            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(
+                panelWidth, widestNumberWidth, widestNameEnd);
+            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(
+                panelWidth, widestNumberWidth, widestNameEnd);
+
+            Assert.True(offset > 0);
+            Assert.Equal(
+                band,
+                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth
+                    + PlanRelayoutMath.TableRightMargin);
+            Assert.True(SummarySectionLayoutMath.CurrencyIconX >= 0);
+            Assert.True(
+                edges.RequiredRightEdge
+                    - SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth)
+                    > SummarySectionLayoutMath.CurrencyNameX);
         }
 
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
