@@ -14,12 +14,21 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Snapshot tab's Clear Cache / Refresh Now, 28 on the Log tab's
         /// three buttons, Settings' Save and the plan's Generate Plan, and
         /// 24 on the plan's five Recipe Tree actions and its per-row +/-
-        /// pair. 28 wins on count, and on fit: it is exactly the height of
-        /// this module's TextBox and Dropdown controls, so a button sharing
-        /// a row with either now lines up with it instead of sitting 2px
-        /// proud or 4px shallow - which is the visible half of the
-        /// complaint, the Recipe Tree strip and the item row each mixing
-        /// two heights in one run.
+        /// pair. 28 wins on button count, and it is the height of the one
+        /// input row a button already shares - the plan's item row, whose
+        /// AutocompleteTextBox and quantity TextBox are both 28, beside its
+        /// +/- pair.
+        /// </para>
+        ///
+        /// <para>
+        /// It is NOT the module's input height: TextBoxes are 26 at nine of
+        /// their eleven sites (Settings' six, the Snapshot and Log search
+        /// boxes, About's), and the two Dropdowns outside the plan tab are
+        /// 30. So a button on the Log toolbar still does not share a
+        /// baseline with the search box and level dropdown beside it. That
+        /// run is three input heights wide before any button is placed and
+        /// is a separate decision from this one - do not read this constant
+        /// as having settled it.
         /// </para>
         ///
         /// <para>
