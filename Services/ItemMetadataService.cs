@@ -25,6 +25,20 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, ItemMetadata> _cache = new Dictionary<int, ItemMetadata>();
         private readonly Dictionary<int, ItemNameEntry> _seedById;
 
+        // Item stat blocks, filled from the SAME /v2/items response the
+        // metadata above comes from - zero additional requests. A side
+        // table rather than a field on ItemMetadata because ItemMetadata is
+        // reachable from PersistedPlan and guarded against its schema
+        // version; see ItemStatBlock's own doc comment.
+        //
+        // LOCKED, unlike _cache, and only this one: _cache is read back
+        // inside GetMetadataAsync and handed to callers as a fresh
+        // dictionary, whereas stat blocks are read straight out of here by
+        // the UI thread at render time (a tree row's tooltip) while a
+        // background generation may be writing the next plan's items in.
+        private readonly object _statBlocksLock = new object();
+        private readonly Dictionary<int, ItemStatBlock> _statBlocks = new Dictionary<int, ItemStatBlock>();
+
         // Ids confirmed absent from the API after a first-wave + retry
         // round trip. Skipped on every later toFetch so a genuinely-missing
         // id does not pay the double round-trip cost on every plan
@@ -149,12 +163,42 @@ namespace GW2CraftingHelper.Services
             return result;
         }
 
+        /// <summary>
+        /// This session's stat block for an item, or null when nothing has
+        /// fetched it yet. A PURE CACHE READ - it never fetches, because
+        /// its caller is a hover on the UI thread and a network round trip
+        /// inside a hover window is not something the tooltip facility can
+        /// cancel. Stats ride the plan's own metadata fetch instead.
+        /// <para>
+        /// Null is the normal answer for a plan restored from disk (nothing
+        /// re-fetched its items), and callers must degrade to their
+        /// pre-existing tooltip rather than showing an empty box - see
+        /// docs/KNOWN-ISSUES.md, "Item stat tooltips".
+        /// </para>
+        /// </summary>
+        public ItemStatBlock GetCachedStatBlock(int itemId)
+        {
+            lock (_statBlocksLock)
+            {
+                return _statBlocks.TryGetValue(itemId, out var block) ? block : null;
+            }
+        }
+
         private async Task FetchBatchIntoCacheAsync(List<int> batch, CancellationToken ct)
         {
             var entries = await _api.GetItemsAsync(batch, ct);
 
             foreach (var entry in entries)
             {
+                var statBlock = ItemStatBlockFactory.Build(entry);
+                if (statBlock != null)
+                {
+                    lock (_statBlocksLock)
+                    {
+                        _statBlocks[entry.Id] = statBlock;
+                    }
+                }
+
                 var meta = new ItemMetadata
                 {
                     ItemId = entry.Id,

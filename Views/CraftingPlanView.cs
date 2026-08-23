@@ -82,6 +82,11 @@ namespace GW2CraftingHelper.Views
         private readonly Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> _generateAsync;
         private readonly Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> _resolveOverridesSync;
         private readonly ModalDialog _modalDialog;
+        // Session-scoped item stat lookup (ItemMetadataService's own cache -
+        // never a fetch), or null when the host did not wire one. Null and
+        // a null RESULT both mean the same thing here: fall back to the
+        // tooltip this surface had before stat tooltips existed.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -544,7 +549,8 @@ namespace GW2CraftingHelper.Views
             IItemSearchProvider itemSearchProvider,
             ModuleSettings settings,
             PlanStripStatusBoard statusBoard,
-            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> resolveOverridesSync = null)
+            Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> resolveOverridesSync = null,
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -552,6 +558,7 @@ namespace GW2CraftingHelper.Views
             _settings = settings;
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
+            _getItemStatBlock = getItemStatBlock;
 
             // Seed the per-plan default from the persisted setting so a
             // user who turned "Value own materials" off is not silently
@@ -583,8 +590,10 @@ namespace GW2CraftingHelper.Views
                     var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
                     return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
                 },
-                commands => _treeToolbarCommands = commands);
+                commands => _treeToolbarCommands = commands,
+                getItemStatBlock);
         }
+
 
         public void SetStatus(string status)
         {
@@ -3484,12 +3493,12 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateRarityFramedIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 
             int textX = headerX + frameSize + iconPad;
-            new Label()
+            var nameLabel = new Label()
             {
                 Text = nameText,
                 Font = titleFont,
@@ -3502,9 +3511,27 @@ namespace GW2CraftingHelper.Views
                 Parent = titlePanel
             };
 
+            // PlanViewModel carries no target item id of its own, so the
+            // tree root - the very item this header names - is the id. A
+            // multi-item batch has no single target and no single tooltip
+            // either (TreeRoot is null there by design).
+            var statContent = TreeRowTooltipComposer.BuildStatTooltipContent(vm.TreeRoot, _getItemStatBlock);
+            if (!statContent.IsEmpty)
+            {
+                // Stamped on the Label and the icon as well as the panel:
+                // anything lying over the panel wins the hover outright
+                // (Control.ActiveControl is the deepest capturing control),
+                // the same swallowed-hover class already fixed on tree
+                // rows. The 44px icon is the header's largest target and
+                // the most natural one to point at.
+                TooltipFacility.ApplyRich(titlePanel, statContent);
+                TooltipFacility.ApplyRich(nameLabel, statContent);
+                IconControls.ApplyRichToIconTree(iconFrame, statContent);
+            }
+
             if (qtyText.Length > 0)
             {
-                new Label()
+                var qtyLabel = new Label()
                 {
                     Text = qtyText,
                     Font = qtyFont,
@@ -3514,6 +3541,10 @@ namespace GW2CraftingHelper.Views
                     Location = new Point(textX + nameWidth, qtyY),
                     Parent = titlePanel
                 };
+                if (!statContent.IsEmpty)
+                {
+                    TooltipFacility.ApplyRich(qtyLabel, statContent);
+                }
             }
 
             // Every x here is now a constant or a font-only measurement,

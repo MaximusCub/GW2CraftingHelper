@@ -82,12 +82,116 @@ namespace GW2CraftingHelper.Services
                         Name = item.Value<string>("name") ?? "",
                         Icon = item.Value<string>("icon") ?? "",
                         Rarity = item.Value<string>("rarity") ?? "",
-                        Flags = flags
+                        Flags = flags,
+                        ItemType = item.Value<string>("type") ?? "",
+                        Level = item.Value<int>("level"),
+                        VendorValue = item.Value<int>("vendor_value"),
+                        Description = item.Value<string>("description"),
+                        Restrictions = ReadStringArray(item["restrictions"] as JArray),
+                        Detail = ParseDetail(item["details"] as JObject)
                     });
                 }
 
                 return results;
             }
+        }
+
+        /// <summary>
+        /// The "details" block, or null when the item has none. A null
+        /// return is the normal case for crafting materials (measured on
+        /// 19700/19685/46683), not an error - see RawItem.Detail.
+        /// </summary>
+        private static RawItemDetail ParseDetail(JObject details)
+        {
+            if (details == null)
+            {
+                return null;
+            }
+
+            var detail = new RawItemDetail
+            {
+                SubType = details.Value<string>("type"),
+                WeightClass = details.Value<string>("weight_class"),
+                Defense = details.Value<int?>("defense"),
+                MinPower = details.Value<int?>("min_power"),
+                MaxPower = details.Value<int?>("max_power"),
+                DamageType = details.Value<string>("damage_type"),
+                AttributeAdjustment = details.Value<double?>("attribute_adjustment") ?? 0d,
+                Bonuses = ReadStringArray(details["bonuses"] as JArray),
+                StatChoiceIds = ReadIntArray(details["stat_choices"] as JArray),
+                NourishmentDurationMs = details.Value<int?>("duration_ms"),
+                NourishmentDescription = details.Value<string>("description"),
+                InfixAttributes = new List<RawItemAttribute>()
+            };
+
+            var slots = details["infusion_slots"] as JArray;
+            detail.InfusionSlotCount = slots == null ? 0 : slots.Count;
+
+            var infix = details["infix_upgrade"] as JObject;
+            if (infix != null)
+            {
+                detail.InfixStatId = infix.Value<int?>("id");
+                detail.BuffDescription = (infix["buff"] as JObject)?.Value<string>("description");
+
+                var attributes = infix["attributes"] as JArray;
+                if (attributes != null)
+                {
+                    foreach (var attribute in attributes)
+                    {
+                        var obj = attribute as JObject;
+                        var name = obj?.Value<string>("attribute");
+                        if (string.IsNullOrEmpty(name))
+                        {
+                            continue;
+                        }
+                        detail.InfixAttributes.Add(new RawItemAttribute
+                        {
+                            Attribute = name,
+                            Modifier = obj.Value<int?>("modifier") ?? 0
+                        });
+                    }
+                }
+            }
+
+            return detail;
+        }
+
+        // Malformed elements are dropped rather than injected as nulls -
+        // same rule the "flags" walk above applies for the same reason.
+        private static List<string> ReadStringArray(JArray array)
+        {
+            var values = new List<string>();
+            if (array == null)
+            {
+                return values;
+            }
+            foreach (var token in array)
+            {
+                var value = token.Value<string>();
+                if (value != null)
+                {
+                    values.Add(value);
+                }
+            }
+            return values;
+        }
+
+        private static List<int> ReadIntArray(JArray array)
+        {
+            var values = new List<int>();
+            if (array == null)
+            {
+                return values;
+            }
+            foreach (var token in array)
+            {
+                var value = token.Value<int?>();
+                if (value.HasValue)
+                {
+                    values.Add(value.Value);
+                }
+            }
+            return values;
         }
     }
 }

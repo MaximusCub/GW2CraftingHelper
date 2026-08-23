@@ -184,7 +184,10 @@ namespace GW2CraftingHelper.Services
                             continue;
                         }
                         int pieceWidth = Math.Max(0, measureText(piece));
-                        current.Add(new PlacedSpan(TooltipSpan.FromText(piece), x, pieceWidth));
+                        // WithText, not FromText: a wrapped piece keeps the
+                        // original span's role, so a long rarity-coloured
+                        // item name stays coloured past its first line.
+                        current.Add(new PlacedSpan(span.WithText(piece), x, pieceWidth));
                         x += pieceWidth;
                     }
 
@@ -193,7 +196,7 @@ namespace GW2CraftingHelper.Services
                         int trailingWidth = Math.Max(0, measureText(trailingSpaces));
                         if (x + trailingWidth <= effectiveMax)
                         {
-                            current.Add(new PlacedSpan(TooltipSpan.FromText(trailingSpaces), x, trailingWidth));
+                            current.Add(new PlacedSpan(span.WithText(trailingSpaces), x, trailingWidth));
                             x += trailingWidth;
                         }
                     }

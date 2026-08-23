@@ -360,11 +360,17 @@ namespace GW2CraftingHelper
 
             var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
 
+            // Hoisted out of the pipeline's argument list so the plan view
+            // can read its session item-stat cache for tooltips - the same
+            // instance, so the stats the plan already fetched are the ones
+            // a hover reads. Never a fetch (GetCachedStatBlock).
+            var itemMetadataService = new ItemMetadataService(itemApi, itemNameSeed);
+
             _craftingPipeline = new CraftingPlanPipeline(
                 new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
                 new PlanSolver(),
-                new ItemMetadataService(itemApi, itemNameSeed),
+                itemMetadataService,
                 _vendorOfferStore,
                 reducer: new InventoryReducer(),
                 accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
@@ -500,7 +506,8 @@ namespace GW2CraftingHelper
                     // PersistResolvedPlanInBackground).
                     PersistResolvedPlanInBackground(result, overrides, ignoredItemIds);
                     return result;
-                }
+                },
+                itemMetadataService.GetCachedStatBlock
             );
 
             _settingsContent = new SettingsTabContent(_settings);
