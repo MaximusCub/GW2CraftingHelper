@@ -373,10 +373,12 @@ namespace GW2CraftingHelper.Views
                 Text = "Clear Cache",
                 Size = new Point(100, 30),
                 Location = new Point(w - 220, 5),
-                BasicTooltipText = "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.",
                 Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
+            TooltipFacility.ApplyPlain(
+                _clearButton,
+                "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.");
 
             _refreshButton = new StandardButton()
             {

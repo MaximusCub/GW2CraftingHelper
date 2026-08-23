@@ -216,18 +216,18 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             if (cell.DashLabel != null)
             {
-                cell.DashLabel.BasicTooltipText = tooltipText;
+                TooltipFacility.ApplyPlain(cell.DashLabel, tooltipText);
                 return;
             }
             foreach (var (label, icon) in cell.CoinSegments.Controls)
             {
-                label.BasicTooltipText = tooltipText;
-                icon.BasicTooltipText = tooltipText;
+                TooltipFacility.ApplyPlain(label, tooltipText);
+                TooltipFacility.ApplyPlain(icon, tooltipText);
             }
             foreach (var (label, icon) in cell.CurrencySegments.Controls)
             {
-                label.BasicTooltipText = tooltipText;
-                icon.BasicTooltipText = tooltipText;
+                TooltipFacility.ApplyPlain(label, tooltipText);
+                TooltipFacility.ApplyPlain(icon, tooltipText);
             }
         }
 
@@ -333,8 +333,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 tooltipParts.AddRange(currencyLines);
                 string tooltipText = tooltipParts.Count > 0 ? string.Join("\n", tooltipParts) : null;
-                rowPanel.BasicTooltipText = tooltipText;
-                nameLabel.BasicTooltipText = tooltipText;
+                TooltipFacility.ApplyPlain(rowPanel, tooltipText);
+                TooltipFacility.ApplyPlain(nameLabel, tooltipText);
                 SetValueCellTooltip(totalCell, tooltipText);
             }
             BuildTooltip();

@@ -857,7 +857,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // Only the Blish-bound right-click event wiring below stays
             // here.
             var currentPlan = _getCurrentPlan();
-            var extraTooltipLines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, captionText, currentPlan);
+            var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(node, captionText, currentPlan);
 
             // This module's only external-URL launch - a context action
             // (right-click), not a visible icon. Every tree
@@ -918,7 +918,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 };
             }
 
-            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipLines);
+            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1104,7 +1104,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipLines);
+                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipContent);
                 }
             });
         }
@@ -1114,19 +1114,26 @@ namespace GW2CraftingHelper.Views.Rendering
         /// display name plus its width-invariant extra lines - shared by
         /// RenderTreeNode's initial build and its settle re-ellipsis
         /// closure so the two can never disagree about tooltip content.
+        /// <para>
+        /// Rich, not <c>BasicTooltipText</c>: a row's unit-price line
+        /// carries a gold figure, which only the rich surface can draw with
+        /// coin icons - see <see cref="TooltipFacility"/>.
+        /// </para>
         /// </summary>
-        // Moved verbatim from CraftingPlanView.UpdateTreeRowTooltip. No
-        // edits - references no view state, only its own parameters.
         private static void UpdateTreeRowTooltip(
-            Panel rowPanel, string displayName, string fullName, List<string> extraLines)
+            Panel rowPanel, string displayName, string fullName, TooltipContent extraContent)
         {
-            var parts = new List<string>();
+            var builder = new TooltipContentBuilder();
             if (displayName != fullName)
             {
-                parts.Add(fullName);
+                // The full item name, the one line of this tooltip that was
+                // never routed through any wrap - an item name is
+                // arbitrarily long and used to be prepended raw. It now
+                // goes through the facility with everything else.
+                builder.Text(fullName).EndLine();
             }
-            parts.AddRange(extraLines);
-            rowPanel.BasicTooltipText = parts.Count > 0 ? string.Join("\n", parts) : null;
+            builder.Append(extraContent);
+            TooltipFacility.ApplyRich(rowPanel, builder.Build());
         }
 
         // --- Decision pills ---
@@ -1228,13 +1235,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
                     borderColor, fillColor, textColor, out Panel inner, out Label label);
 
-                // tooltipText is resolved once below, then stamped onto
-                // outer/inner/label together - the inner fill panel and
-                // its label cover almost the entire pill, so a tooltip on
-                // outer alone is swallowed by whichever child is under
-                // the cursor (labels capture mouse). Click/MouseEntered/MouseLeft
-                // stay on outer only - unlike tooltip lookup, those already
-                // work correctly today.
+                // The pill's head prose. Resolved by the branches below,
+                // then composed with the subduing/value-detail/dead-click
+                // blocks and stamped onto outer/inner/label at the bottom
+                // of this loop - the inner fill panel and its label cover
+                // almost the entire pill, so a tooltip on outer alone is
+                // swallowed by whichever child is under the cursor (labels
+                // capture mouse). Click/MouseEntered/MouseLeft stay on
+                // outer only - unlike tooltip lookup, those already work
+                // correctly today.
                 string tooltipText = null;
 
                 // The dimmed-only difference between this and the two flags
@@ -1250,10 +1259,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 // row's pills are exactly the ones that are not. Pure text
                 // derived from the spec, so it costs nothing to resolve
                 // here and null for every other kind.
-                string subduingText = spec.Kind == PillKind.Subdued
-                    ? PillSubduingTooltipBuilder.Build(
+                TooltipContent subduingContent = spec.Kind == PillKind.Subdued
+                    ? PillSubduingTooltipBuilder.BuildContent(
                         spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata)
                     : null;
+                bool appendSubduing = false;
 
                 if (interactive)
                 {
@@ -1263,10 +1273,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     // tooltip gains the "why" explanation, appended after
                     // the ordinary "Switch to X" line rather than replacing
                     // it, since clicking still does exactly that.
-                    if (subduingText != null)
-                    {
-                        tooltipText += "\n\n" + subduingText;
-                    }
+                    appendSubduing = subduingContent != null;
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
@@ -1304,7 +1311,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     // row, or no re-solve callback at all. The pill still
                     // shows why this option loses; the dead-click line
                     // below is appended after it, never over it.
-                    tooltipText = subduingText;
+                    appendSubduing = subduingContent != null;
                 }
                 else if (spec.Kind == PillKind.Locked)
                 {
@@ -1449,13 +1456,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // every other Kind's node.Decision is never Craft/
                 // BuyFromVendor (Currency/GuildUpgrade/Have/etc. all use
                 // their own distinct CraftingDecision values).
+                TooltipContent valueDetailContent = null;
                 if ((spec.Kind == PillKind.Selected || spec.Kind == PillKind.Locked) &&
-                    (node.Decision == CraftingDecision.Craft || node.Decision == CraftingDecision.BuyFromVendor) &&
-                    ValueDetailTooltipBuilder.TryBuild(node, plan?.VendorCapsByItemId, out string valueDetailText))
+                    (node.Decision == CraftingDecision.Craft || node.Decision == CraftingDecision.BuyFromVendor))
                 {
-                    tooltipText = tooltipText == null
-                        ? valueDetailText
-                        : tooltipText + "\n\n" + valueDetailText;
+                    ValueDetailTooltipBuilder.TryBuildContent(
+                        node, plan?.VendorCapsByItemId, out valueDetailContent);
                 }
 
                 // A dimmed row's would-be-clickable pills are inert: the
@@ -1470,18 +1476,39 @@ namespace GW2CraftingHelper.Views.Rendering
                 // arm never runs on a dimmed row), and a dimmed committed
                 // pill can carry the value-detail hover - neither may be
                 // clobbered.
+                //
+                // Composed as CONTENT, not by string concatenation: the
+                // value-detail block and a Weighted pill's margin both
+                // carry gold figures the rich surface draws with coin
+                // icons, and a "\n\n" join would have flattened them back
+                // into text. Separator() is the blank line that join used
+                // to produce, and is a no-op when nothing precedes it -
+                // which is what the old "tooltipText == null ? x : y"
+                // ternaries were doing by hand.
+                var pillTooltip = new TooltipContentBuilder();
+                pillTooltip.Text(tooltipText);
+                if (appendSubduing)
+                {
+                    pillTooltip.Separator().Append(subduingContent);
+                }
+                if (valueDetailContent != null)
+                {
+                    pillTooltip.Separator().Append(valueDetailContent);
+                }
                 if (dimmed && clickableWhenActive)
                 {
-                    tooltipText = tooltipText == null
-                        ? DimmedPillTooltip
-                        : tooltipText + "\n\n" + DimmedPillTooltip;
+                    pillTooltip.Separator().Text(DimmedPillTooltip);
                 }
 
-                if (tooltipText != null)
+                // All three controls point at the ONE shared rich surface
+                // - see TooltipFacility for why there is one instance for
+                // the whole module rather than one per tooltip'd control.
+                var pillContent = pillTooltip.Build();
+                if (!pillContent.IsEmpty)
                 {
-                    outer.BasicTooltipText = tooltipText;
-                    inner.BasicTooltipText = tooltipText;
-                    label.BasicTooltipText = tooltipText;
+                    TooltipFacility.ApplyRich(outer, pillContent);
+                    TooltipFacility.ApplyRich(inner, pillContent);
+                    TooltipFacility.ApplyRich(label, pillContent);
                 }
 
                 pillPanels.Add(outer);
@@ -1544,9 +1571,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, text, font, fit.OverflowPillWidth, textWidth, x, pillY,
                 borderColor, fillColor, textColor, out Panel inner, out Label label);
 
-            outer.BasicTooltipText = tooltipText;
-            inner.BasicTooltipText = tooltipText;
-            label.BasicTooltipText = tooltipText;
+            TooltipFacility.ApplyPlain(outer, tooltipText);
+            TooltipFacility.ApplyPlain(inner, tooltipText);
+            TooltipFacility.ApplyPlain(label, tooltipText);
 
             pillPanels.Add(outer);
         }

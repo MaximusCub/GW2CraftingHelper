@@ -58,26 +58,26 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             // Missing icon: render a neutral empty-slot square, not the
             // alarming red error texture - a data gap is not a failure.
-            if (string.IsNullOrEmpty(iconUrl))
-            {
-                return new Panel()
+            Panel icon = string.IsNullOrEmpty(iconUrl)
+                ? new Panel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
-                    BasicTooltipText = tooltipText,
+                    Parent = parent
+                }
+                : new Panel()
+                {
+                    Size = new Point(size, size),
+                    Location = new Point(x, y),
+                    BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
                     Parent = parent
                 };
-            }
 
-            return new Panel()
-            {
-                Size = new Point(size, size),
-                Location = new Point(x, y),
-                BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
-                BasicTooltipText = tooltipText,
-                Parent = parent
-            };
+            // An icon's tooltip is almost always an item name, which is
+            // unbounded - through the facility, not assigned raw.
+            TooltipFacility.ApplyPlain(icon, tooltipText);
+            return icon;
         }
     }
 }

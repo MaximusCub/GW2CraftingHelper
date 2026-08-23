@@ -319,9 +319,9 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(ContentX(lone, tileX, geometry.TileWidth, captionWidth), BandCaptionY),
-                    Parent = rowPanel,
-                    BasicTooltipText = row.TooltipText
+                    Parent = rowPanel
                 };
+                TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
                 var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, tileAmountFont);
                 int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
@@ -352,9 +352,9 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(ContentX(lone, resultTileX, geometry.TileWidth, noteWidth), noteY),
-                    Parent = rowPanel,
-                    BasicTooltipText = currencyNoteTooltip
+                    Parent = rowPanel
                 };
+                TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
             }
 
             // One operator per boundary between two tiles: "-" for every
@@ -630,8 +630,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 // captures the mouse before a tooltip on a control
                 // underneath it is ever reached, so a tooltip on rowPanel
                 // alone only fires on the blank strip beside the name.
-                nameLabel.BasicTooltipText = fullName;
-                rowPanel.BasicTooltipText = fullName;
+                TooltipFacility.ApplyPlain(nameLabel, fullName);
+                TooltipFacility.ApplyPlain(rowPanel, fullName);
             }
 
             var numberColor = new Color(220, 220, 220);
@@ -686,8 +686,8 @@ namespace GW2CraftingHelper.Views.Rendering
                     // Both controls, same reasoning as the
                     // build-time tooltip assignment above.
                     string tooltip = newDisplayName != fullName ? fullName : null;
-                    nameLabel.BasicTooltipText = tooltip;
-                    rowPanel.BasicTooltipText = tooltip;
+                    TooltipFacility.ApplyPlain(nameLabel, tooltip);
+                    TooltipFacility.ApplyPlain(rowPanel, tooltip);
                 }
             });
         }

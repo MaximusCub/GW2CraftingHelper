@@ -118,7 +118,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, NameX, 9);
             if (nameHandle.NameLabel.Text != fullName)
             {
-                rowPanel.BasicTooltipText = fullName;
+                TooltipFacility.ApplyPlain(rowPanel, fullName);
             }
 
             var qtyLabel = new Label()
@@ -154,7 +154,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (IconNameRowHelpers.ReellipsizeName(
                     nameHandle, font, QtyRightEdge(w, maxQtyWidth, widestNameEnd), qtyWidth, NameToQtyGap))
                 {
-                    rowPanel.BasicTooltipText = nameHandle.NameLabel.Text != fullName ? fullName : null;
+                    TooltipFacility.ApplyPlain(rowPanel, nameHandle.NameLabel.Text != fullName ? fullName : null);
                 }
             });
         }

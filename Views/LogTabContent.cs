@@ -209,7 +209,10 @@ namespace GW2CraftingHelper.Views
         /// column. The full strings are kept alongside the controls because
         /// both are needed again on every resize - re-ellipsizing from
         /// Label.Text would compound "..." onto already-truncated text - and
-        /// <see cref="FullLine"/> is the tooltip a shortened row carries.
+        /// <see cref="FullLine"/> is the tooltip a shortened row carries,
+        /// stored already wrapped through the tooltip facility's seam so the
+        /// per-render change guard in UpdateRow can compare against it
+        /// directly.
         /// </summary>
         private sealed class LogRow
         {
@@ -296,9 +299,11 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Clear view",
                 Size = new Point(ButtonWidth, 28),
-                BasicTooltipText = "Hide current entries from this view. New entries still appear; the log file keeps everything.",
                 Parent = _toolbarPanel
             };
+            TooltipFacility.ApplyPlain(
+                _clearViewButton,
+                "Hide current entries from this view. New entries still appear; the log file keeps everything.");
             _clearViewButton.Click += (_, __) => ClearView();
 
             _copyButton = new StandardButton
@@ -313,9 +318,11 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Delete Log File",
                 Size = new Point(DeleteButtonWidth, 28),
-                BasicTooltipText = "Permanently delete the log file from disk and clear the in-memory log. Cannot be undone.",
                 Parent = _toolbarPanel
             };
+            TooltipFacility.ApplyPlain(
+                _deleteFileButton,
+                "Permanently delete the log file from disk and clear the in-memory log. Cannot be undone.");
             _deleteFileButton.Click += (_, __) => ConfirmDeleteLogFile();
 
             _statusPanel = new Panel
@@ -934,7 +941,7 @@ namespace GW2CraftingHelper.Views
                 AbsoluteIndex = absoluteIndex,
                 FullPrefix = LogLineFormat.Prefix(entry),
                 FullMessage = LogLineFormat.Message(entry),
-                FullLine = line
+                FullLine = TooltipTextFormat.Wrap(line)
             };
 
             row.Panel = new Panel
@@ -1013,12 +1020,18 @@ namespace GW2CraftingHelper.Views
             bool shortened =
                 !string.Equals(prefixText, row.FullPrefix, StringComparison.Ordinal) ||
                 !string.Equals(messageText, row.FullMessage, StringComparison.Ordinal);
+            //
+            // FullLine is stored already wrapped (see CreateRow), so this
+            // per-render guard still compares like with like and the
+            // facility call below only runs when the tooltip actually
+            // changed - this method runs for every visible row on every
+            // resize and scroll.
             string tooltip = shortened ? row.FullLine : null;
             if (!string.Equals(row.Panel.BasicTooltipText, tooltip, StringComparison.Ordinal))
             {
-                row.Panel.BasicTooltipText = tooltip;
-                row.PrefixLabel.BasicTooltipText = tooltip;
-                row.MessageLabel.BasicTooltipText = tooltip;
+                TooltipFacility.ApplyPlain(row.Panel, tooltip);
+                TooltipFacility.ApplyPlain(row.PrefixLabel, tooltip);
+                TooltipFacility.ApplyPlain(row.MessageLabel, tooltip);
             }
         }
 
