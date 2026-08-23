@@ -11277,4 +11277,19 @@ Desktop gate items:
    indicators showing. Scroll down to the Shopping List, click a header
    there, and the view stays where it was rather than jumping to the top.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-fix HEAD, captures preflight/gD1-gD3, restored x77 plan).
+Clicking the Shopping List's Amount header sorted ascending with the
+"^" indicator (111x Mystic Coin, 136x Obsidian Shard, 136x Glob of
+Ectoplasm, 816x Philosopher's Stone - the 136x tie kept source
+order, stability live); the second click flipped to "v" descending
+with the tie STILL in source order both directions; scroll position
+held across both rebuilds and the label-disposing click handler
+(the repo's first Label doing the rebuild-from-own-event pattern)
+survived repeatedly. Used Materials' headers carry the same wiring
+(same factory path); the bundle-rate Each ordering ("1 for 10"
+Philosopher's Stone keyed on its true 0.1/unit rate) is pinned by
+the new comparator tests and visible implicitly in the ascending
+capture (816x at 82 currency total sorts within its currency
+block). Third-click reset-to-plan-order not captured (two clicks
+shown); pinned by TableSortStateTests.
