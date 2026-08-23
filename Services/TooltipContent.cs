@@ -124,6 +124,32 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>
+    /// What a span MEANS, not what colour it is. The rich surface resolves
+    /// a role to a colour (<c>RichTooltipSurface.RenderRow</c>); this file
+    /// - and every composer that builds content - stays XNA-free, which is
+    /// what keeps composer tests Blish-free (repo invariant). Only
+    /// <c>Views/Rendering/RarityColors</c> knows a
+    /// <c>Microsoft.Xna.Framework.Color</c>.
+    /// </summary>
+    public enum TooltipSpanRole
+    {
+        /// <summary>Ordinary tooltip prose.</summary>
+        Default,
+
+        /// <summary>An item name, coloured by the rarity carried on the
+        /// span itself (<see cref="TooltipSpan.RarityKey"/>).</summary>
+        Rarity,
+
+        /// <summary>An upgrade's granted bonus - a rune bonus line, a sigil
+        /// or infusion buff, a food nourishment line.</summary>
+        Bonus,
+
+        /// <summary>Subdued secondary text: flavour prose, and the
+        /// rarity/type/level/binding block under the stats.</summary>
+        Muted
+    }
+
+    /// <summary>
     /// Prose, or a coin amount that still knows its copper value.
     /// <see cref="Text"/> is populated in both cases: for a coin span it is
     /// the caller's own plain rendering, used by the plain tooltip path and
@@ -131,11 +157,13 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public readonly struct TooltipSpan
     {
-        private TooltipSpan(string text, long coinCopper, bool isCoin)
+        private TooltipSpan(string text, long coinCopper, bool isCoin, TooltipSpanRole role, string rarityKey)
         {
             Text = text ?? "";
             CoinCopper = coinCopper;
             IsCoin = isCoin;
+            Role = role;
+            RarityKey = rarityKey;
         }
 
         public string Text { get; }
@@ -144,14 +172,48 @@ namespace GW2CraftingHelper.Services
 
         public bool IsCoin { get; }
 
+        public TooltipSpanRole Role { get; }
+
+        /// <summary>
+        /// GW2 API rarity string, meaningful only when
+        /// <see cref="Role"/> is <see cref="TooltipSpanRole.Rarity"/>. A
+        /// rarity STRING rather than a colour, for the reason on
+        /// <see cref="TooltipSpanRole"/>; null/unknown renders the same
+        /// neutral grey RarityColors already falls back to.
+        /// </summary>
+        public string RarityKey { get; }
+
         public static TooltipSpan FromText(string text)
         {
-            return new TooltipSpan(text, 0, false);
+            return new TooltipSpan(text, 0, false, TooltipSpanRole.Default, null);
+        }
+
+        public static TooltipSpan Styled(string text, TooltipSpanRole role)
+        {
+            return new TooltipSpan(text, 0, false, role, null);
+        }
+
+        public static TooltipSpan RarityText(string text, string rarity)
+        {
+            return new TooltipSpan(text, 0, false, TooltipSpanRole.Rarity, rarity);
         }
 
         public static TooltipSpan FromCoin(long copper, string plainText)
         {
-            return new TooltipSpan(plainText, copper, true);
+            return new TooltipSpan(plainText, copper, true, TooltipSpanRole.Default, null);
+        }
+
+        /// <summary>
+        /// The same span carrying different text - how the wrapper splits a
+        /// prose span into rows without losing its role. Re-creating the
+        /// piece with <see cref="FromText"/> instead would silently reset
+        /// every wrapped line to <see cref="TooltipSpanRole.Default"/>,
+        /// i.e. a long item name would lose its rarity colour the moment it
+        /// wrapped.
+        /// </summary>
+        internal TooltipSpan WithText(string text)
+        {
+            return new TooltipSpan(text, CoinCopper, IsCoin, Role, RarityKey);
         }
     }
 
@@ -175,6 +237,25 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public TooltipContentBuilder Text(string text)
         {
+            return AppendText(text, TooltipSpan.FromText(""));
+        }
+
+        /// <summary>Prose that means something (see <see cref="TooltipSpanRole"/>).</summary>
+        public TooltipContentBuilder Styled(string text, TooltipSpanRole role)
+        {
+            return AppendText(text, TooltipSpan.Styled("", role));
+        }
+
+        /// <summary>An item name coloured by its GW2 rarity string.</summary>
+        public TooltipContentBuilder RarityText(string text, string rarity)
+        {
+            return AppendText(text, TooltipSpan.RarityText("", rarity));
+        }
+
+        // template carries the role/rarity every piece of this text
+        // inherits; only its text differs per hard break.
+        private TooltipContentBuilder AppendText(string text, TooltipSpan template)
+        {
             if (string.IsNullOrEmpty(text))
             {
                 return this;
@@ -188,7 +269,7 @@ namespace GW2CraftingHelper.Services
                 string piece = brk < 0 ? normalized.Substring(start) : normalized.Substring(start, brk - start);
                 if (piece.Length > 0)
                 {
-                    Current().Add(TooltipSpan.FromText(piece));
+                    Current().Add(template.WithText(piece));
                 }
                 if (brk < 0)
                 {
