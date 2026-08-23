@@ -10,20 +10,53 @@ namespace GW2CraftingHelper.Tests.Services
         // WindowSizing's chain is the one SnapshotItemGridLayout applies
         // itself - i.e. the grid width at the window minimum is exactly the
         // panel width the rest of the module's layout math is derived
-        // against.
-        private static readonly int ContentWidthAtWindowMinimum =
-            WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth)
+        // against. That last step is a fact about the VIEW and so cannot be
+        // asserted from a Blish-free test; step 1 of the desktop gate checks
+        // it live (the rightmost column's text stopping clear of the
+        // scrollbar). What IS asserted here is the arithmetic hanging off
+        // it: move MinColumnWidth or WindowToTabPanelChrome and the
+        // threshold test below fails with the documented window widths.
+        private static int ContentPanelWidthFor(int windowWidth)
+        {
+            return WindowSizing.TabPanelWidthFor(windowWidth)
                 + SnapshotItemGridLayout.ScrollbarAllowance;
+        }
+
+        private static int ColumnCountAtWindow(int windowWidth)
+        {
+            return SnapshotItemGridLayout.ComputeColumnCount(
+                SnapshotItemGridLayout.ComputeGridWidth(ContentPanelWidthFor(windowWidth)));
+        }
 
         private static readonly int GridWidthAtWindowMinimum =
-            SnapshotItemGridLayout.ComputeGridWidth(ContentWidthAtWindowMinimum);
+            SnapshotItemGridLayout.ComputeGridWidth(ContentPanelWidthFor(WindowSizing.MinWindowWidth));
 
         [Fact]
-        public void GridWidth_AtWindowMinimum_MatchesTheSharedChromeChain()
+        public void ColumnThresholds_ThroughTheChromeChain_AreTheDocumentedWindowWidths()
         {
-            Assert.Equal(
-                WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth),
-                GridWidthAtWindowMinimum);
+            // The window widths the table in docs/KNOWN-ISSUES.md ("Snapshot
+            // item grid") quotes, derived rather than copied: N columns need
+            // N * MinColumnWidth of grid, and the chrome between the window
+            // and the grid is WindowToTabPanelChrome (this tab spends on the
+            // scrollbar the 20px the chain's last term spends on padding).
+            int windowForTwoColumns = 2 * SnapshotItemGridLayout.MinColumnWidth
+                + WindowSizing.WindowToTabPanelChrome;
+            int windowForThreeColumns = 3 * SnapshotItemGridLayout.MinColumnWidth
+                + WindowSizing.WindowToTabPanelChrome;
+
+            Assert.Equal(1054, windowForTwoColumns);
+            Assert.Equal(1518, windowForThreeColumns);
+
+            // The enforced minimum sits between them, which is the whole
+            // claim: every client that can hold the minimum is at least
+            // two-up, and the one-column fallback is only reachable below it.
+            Assert.True(windowForTwoColumns < WindowSizing.MinWindowWidth);
+            Assert.True(WindowSizing.MinWindowWidth < windowForThreeColumns);
+
+            Assert.Equal(1, ColumnCountAtWindow(windowForTwoColumns - 1));
+            Assert.Equal(2, ColumnCountAtWindow(windowForTwoColumns));
+            Assert.Equal(2, ColumnCountAtWindow(windowForThreeColumns - 1));
+            Assert.Equal(3, ColumnCountAtWindow(windowForThreeColumns));
         }
 
         [Fact]
