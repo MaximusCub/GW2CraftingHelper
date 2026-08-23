@@ -8,10 +8,19 @@ namespace GW2CraftingHelper.Services
     /// search row - was empty for everything right of the content-type
     /// dropdown.
     /// <para>
+    /// They share it only while the whole run fits beside the search box in
+    /// ONE row. Sharing halves the width the run has to flow into, so a
+    /// roster that used to fit inside the 4-row cap can wrap past it and
+    /// hide filters behind a scrollbar - paying a third of the filter set
+    /// for 38px of header. Past one row the run falls back to its own
+    /// full-width row below the search box, which is exactly the layout it
+    /// had before it moved up.
+    /// </para>
+    /// <para>
     /// The checkbox flow itself is unchanged
     /// (<see cref="SourceFilterFlowLayout"/> still wraps it, still caps it,
-    /// still scrolls past the cap); it is handed a reduced width here and
-    /// positioned at its own start offset by the panel that holds it.
+    /// still scrolls past the cap); it is handed the placement's width here
+    /// and positioned at its start offset by the panel that holds it.
     /// </para>
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
@@ -31,15 +40,71 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Height of the combined search band: the search row and the
-        /// source-filter run sit side by side, so the band is as tall as
-        /// the taller of them. A filter run that fits beside the search box
-        /// therefore costs the header exactly nothing - which is the whole
-        /// saving - and a wrapped run pushes the rows below down by only
-        /// what it needs beyond the search row's own height.
+        /// Whether a run that flowed into <paramref name="flowedRowCount"/>
+        /// rows beside the search box may stay there. One row (or none at
+        /// all, before the first snapshot) shares; anything that wrapped
+        /// takes its own full-width row instead - see the class doc comment.
         /// </summary>
-        public static int SearchBandHeight(int searchRowHeight, int sourceFilterHeight)
+        public static bool SharesSearchRow(int flowedRowCount)
         {
+            return flowedRowCount <= 1;
+        }
+
+        /// <summary>
+        /// Where the source-filter run sits, and how much width it has to
+        /// flow into, in each of the two modes. OffsetY is measured from the
+        /// search row's own y.
+        /// </summary>
+        public readonly struct SourceFilterPlacement
+        {
+            public readonly bool SharesSearchRow;
+            public readonly int X;
+            public readonly int OffsetY;
+            public readonly int Width;
+
+            public SourceFilterPlacement(bool sharesSearchRow, int x, int offsetY, int width)
+            {
+                SharesSearchRow = sharesSearchRow;
+                X = x;
+                OffsetY = offsetY;
+                Width = width;
+            }
+        }
+
+        /// <summary>
+        /// The placement for one mode. Callers flow the run at the shared
+        /// placement's width first and re-place it here when
+        /// <see cref="SharesSearchRow(int)"/> rejects the resulting row
+        /// count - the mode cannot be decided before the flow, since it IS
+        /// the flow's outcome.
+        /// </summary>
+        public static SourceFilterPlacement PlaceSourceFilterRun(
+            int panelWidth, int startX, int searchRowHeight, int rowGap, bool sharesSearchRow)
+        {
+            if (sharesSearchRow)
+            {
+                return new SourceFilterPlacement(true, startX, 0, SourceFilterWidth(panelWidth, startX));
+            }
+
+            return new SourceFilterPlacement(
+                false, 0, searchRowHeight + rowGap, panelWidth > 0 ? panelWidth : 0);
+        }
+
+        /// <summary>
+        /// Height of the search band. A shared run sits beside the search
+        /// box, so the band is as tall as the taller of the two and a run
+        /// that fits there costs the header exactly nothing - which is the
+        /// whole saving. A run on its own row costs the search row plus the
+        /// gap plus itself, i.e. exactly what the header spent before.
+        /// </summary>
+        public static int SearchBandHeight(
+            int searchRowHeight, int sourceFilterHeight, SourceFilterPlacement placement)
+        {
+            if (!placement.SharesSearchRow)
+            {
+                return placement.OffsetY + sourceFilterHeight;
+            }
+
             return searchRowHeight > sourceFilterHeight ? searchRowHeight : sourceFilterHeight;
         }
     }
