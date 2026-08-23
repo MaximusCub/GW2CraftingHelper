@@ -77,6 +77,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Contents.Remove(control);
                 control.Tooltip = null;
                 control.BasicTooltipText = null;
+                _surface?.RefreshShowing(control);
                 return;
             }
 
@@ -92,7 +93,15 @@ namespace GW2CraftingHelper.Views.Rendering
             // changes, so assigning the surface and then any basic text
             // would silently drop the surface.
             control.BasicTooltipText = null;
-            control.Tooltip = Surface();
+            var surface = Surface();
+            control.Tooltip = surface;
+
+            // Content can be re-applied to a control the surface is ALREADY
+            // showing (the tree's settle re-ellipsis does exactly that under a
+            // stationary cursor). Blish's plain path refreshes a visible basic
+            // tooltip on every text change; the rich path would otherwise keep
+            // drawing the previous content until the pointer left.
+            surface.RefreshShowing(control);
         }
 
         /// <summary>

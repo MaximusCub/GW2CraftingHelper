@@ -88,6 +88,35 @@ namespace GW2CraftingHelper.Views.Rendering
             Reposition();
         }
 
+        /// <summary>
+        /// Redraws the box when the content registered for the control it is
+        /// already showing has been replaced. Blish's plain path refreshes
+        /// itself on a content change - the <c>BasicTooltipText</c> setter
+        /// either writes the new text straight into the live
+        /// <c>BasicTooltipView</c> or drops <c>_tooltip</c> so the next hover
+        /// rebuilds - and <c>Tooltip.HandleMouseMoved</c> calls <c>Show</c>
+        /// only while the tooltip is HIDDEN, so without this the rich path
+        /// would keep drawing the previous content for as long as the cursor
+        /// stayed on the control.
+        /// </summary>
+        internal void RefreshShowing(Control control)
+        {
+            if (control == null || !Visible || CurrentControl != control)
+            {
+                return;
+            }
+
+            var content = _resolveContent(control);
+            if (content == null || content.IsEmpty)
+            {
+                Hide();
+                return;
+            }
+
+            BuildContent(content);
+            Reposition();
+        }
+
         public override void UpdateContainer(GameTime gameTime)
         {
             // base re-runs Blish's own unclamped positioning on every tick
