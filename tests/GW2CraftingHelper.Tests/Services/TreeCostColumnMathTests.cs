@@ -365,6 +365,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(58 + 24 + "A Very Long Ingredient Name".Length, ScanNames(roots).WidestNameEnd);
         }
 
+        // --- ScanColumns node count (audit batch J, L2: the Recipe Tree
+        // section header's parenthesised count) ---
+
+        [Fact]
+        public void ScanColumns_NodeCount_CountsEveryNodeAtEveryDepth()
+        {
+            var roots = new[]
+            {
+                NamedNode(1, "Root", children: new[]
+                {
+                    NamedNode(2, "Child", children: new[] { NamedNode(3, "Grandchild") }),
+                    NamedNode(4, "Sibling")
+                })
+            };
+
+            Assert.Equal(4, ScanNames(roots).NodeCount);
+        }
+
+        // Rows are built lazily, so a count taken from what is on screen
+        // would change under the reader on every caret click. The count is
+        // the whole tree - what Expand All reveals.
+        [Fact]
+        public void ScanColumns_NodeCount_IsIndependentOfAnyExpansionState()
+        {
+            var deep = new[]
+            {
+                NamedNode(1, "Root", children: new[]
+                {
+                    NamedNode(2, "Child", children: new[] { NamedNode(3, "Grandchild") })
+                })
+            };
+            var flat = new[] { NamedNode(1, "A"), NamedNode(2, "B"), NamedNode(3, "C") };
+
+            Assert.Equal(3, ScanNames(deep).NodeCount);
+            Assert.Equal(3, ScanNames(flat).NodeCount);
+        }
+
+        [Fact]
+        public void ScanColumns_NodeCount_CountsEveryRootOfAMultiItemBatch()
+        {
+            var roots = new[] { NamedNode(1, "First"), NamedNode(2, "Second") };
+
+            Assert.Equal(2, ScanNames(roots).NodeCount);
+        }
+
+        [Fact]
+        public void ScanColumns_NoRoots_ReportsZeroNodes()
+        {
+            Assert.Equal(0, ScanNames(new CraftingTreeNode[0]).NodeCount);
+            Assert.Equal(0, TreeCostColumnMath.TreeColumnScan.Empty.NodeCount);
+        }
+
+        // A null child is skipped by the walk, and must not be counted as a
+        // row the section will never render.
+        [Fact]
+        public void ScanColumns_NullChild_IsNotCounted()
+        {
+            var roots = new[] { NamedNode(1, "Root", children: new CraftingTreeNode[] { null }) };
+
+            Assert.Equal(1, ScanNames(roots).NodeCount);
+        }
+
         [Fact]
         public void ScanColumns_CostWidths_MatchTheCostOnlyScan()
         {
