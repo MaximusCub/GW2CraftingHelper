@@ -1335,28 +1335,38 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private async void RunRowRefitAfterSettleAsync()
         {
-            while (true)
+            try
             {
-                long elapsedMs =
-                    (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResizeEventTicks)) / TimeSpan.TicksPerMillisecond;
-                if (elapsedMs >= ResizeSettleMs)
+                while (true)
                 {
-                    break;
+                    long elapsedMs =
+                        (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResizeEventTicks)) / TimeSpan.TicksPerMillisecond;
+                    if (elapsedMs >= ResizeSettleMs)
+                    {
+                        break;
+                    }
+
+                    // Clamped: a stamp landing between the two reads above
+                    // can make this negative, which Task.Delay rejects.
+                    int remaining = (int)(ResizeSettleMs - elapsedMs);
+                    await Task.Delay(remaining > 0 ? remaining : 1);
                 }
 
-                // Clamped: a stamp landing between the two reads above can
-                // make this negative, which Task.Delay rejects.
-                int remaining = (int)(ResizeSettleMs - elapsedMs);
-                await Task.Delay(remaining > 0 ? remaining : 1);
+                // A dropped queue attempt (overlay gone) would otherwise
+                // leave the pending flag set forever and starve every later
+                // drag of a re-fit. Cleared from this thread only in that
+                // case, when no main-thread work can be racing it.
+                if (!MainThreadMarshal.Run(RefitResultRows))
+                {
+                    _rowRefitPending = false;
+                }
             }
-
-            // A dropped queue attempt (overlay gone) would otherwise leave
-            // the pending flag set forever and starve every later drag of a
-            // re-fit. Cleared from this thread only in that case, when no
-            // main-thread work can be racing it.
-            if (!MainThreadMarshal.Run(RefitResultRows))
+            catch (Exception ex)
             {
+                // async void: an escaping exception has no caller to reach
+                // and would take down the host rather than this one wait.
                 _rowRefitPending = false;
+                Logger.Warn(ex, "Snapshot row re-fit wait failed");
             }
         }
 
