@@ -221,6 +221,23 @@ namespace GW2CraftingHelper.Views
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
+        /// <summary>
+        /// Announces, on the caller's thread, that a rebuild has been
+        /// committed to. <see cref="Build"/> clears the same flag, but Blish
+        /// only queues Build (ShowView does
+        /// <c>view.DoLoad(...).ContinueWith(BuildView)</c>) after the main
+        /// thread has already switched tabs - so between the switch and
+        /// Build's first statement the flag would still read true from the
+        /// PREVIOUS build, and a dirty check in that gap would enumerate the
+        /// row lists the queued Build is about to clear. Called from the
+        /// Settings tab's view factory, which TabbedWindow2.OnTabChanged
+        /// evaluates on the main thread before either of those.
+        /// </summary>
+        public void BeginRebuild()
+        {
+            _buildComplete = false;
+        }
+
         public void Build(Container container)
         {
             _buildComplete = false;

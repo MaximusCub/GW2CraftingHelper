@@ -574,7 +574,14 @@ namespace GW2CraftingHelper
 
             _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
-                () => new ViewAdapter("Settings", c => _settingsContent.Build(c)),
+                () =>
+                {
+                    // Main thread, and the last step before Blish queues the
+                    // off-thread Build - which is the whole point of doing it
+                    // here rather than in Build (see BeginRebuild).
+                    _settingsContent.BeginRebuild();
+                    return new ViewAdapter("Settings", c => _settingsContent.Build(c));
+                },
                 "Settings");
             _mainWindow.Tabs.Add(_settingsTab);
 
