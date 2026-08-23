@@ -395,7 +395,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _headerPanel
             };
 
-            _clearButton = new StandardButton()
+            _clearButton = new FeedbackButton()
             {
                 Text = "Clear Cache",
                 Size = new Point(100, UiMetrics.ButtonHeight),
@@ -407,7 +407,7 @@ namespace GW2CraftingHelper.Views
                 _clearButton,
                 "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.");
 
-            _refreshButton = new StandardButton()
+            _refreshButton = new FeedbackButton()
             {
                 Text = "Refresh Now",
                 Size = new Point(100, UiMetrics.ButtonHeight),

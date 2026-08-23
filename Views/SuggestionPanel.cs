@@ -241,6 +241,8 @@ namespace GW2CraftingHelper.Views
                     UpdateHighlights();
                 };
 
+                PressFeedback.Wire(row);
+
                 row.Click += (_, __) =>
                 {
                     SelectItem(index);

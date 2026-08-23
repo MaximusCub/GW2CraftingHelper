@@ -1093,6 +1093,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         RefreshTreeContainerHeights();
                     });
                 };
+                PressFeedback.Wire(rowPanel);
                 rowPanel.Click += toggleHandler;
             }
 
@@ -1343,6 +1344,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Color restingBorder = borderColor;
                     outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
                     outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                    PressFeedback.Wire(outer);
                 }
                 else if (ignoreInteractive)
                 {
@@ -1364,6 +1366,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Color restingBorder = borderColor;
                     outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
                     outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                    PressFeedback.Wire(outer);
                 }
                 else if (spec.Kind == PillKind.Subdued)
                 {

@@ -1494,7 +1494,7 @@ namespace GW2CraftingHelper.Views
             int nextX = RowButtonsX;
             if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
             {
-                var removeButton = new StandardButton()
+                var removeButton = new FeedbackButton()
                 {
                     Text = "-",
                     Size = new Point(RowButtonSize, RowButtonSize),
@@ -1508,7 +1508,7 @@ namespace GW2CraftingHelper.Views
 
             if (index == _itemRows.Count - 1)
             {
-                var addButton = new StandardButton()
+                var addButton = new FeedbackButton()
                 {
                     Text = "+",
                     Size = new Point(RowButtonSize, RowButtonSize),
@@ -1735,7 +1735,7 @@ namespace GW2CraftingHelper.Views
             // constructed - see the comment at that construction site.
             _ownMaterialsCheckbox.CheckedChanged += OnOwnMaterialsToggled;
 
-            _generateButton = new StandardButton()
+            _generateButton = new FeedbackButton()
             {
                 Text = "Generate Plan",
                 Size = new Point(120, UiMetrics.ButtonHeight),
@@ -1913,7 +1913,7 @@ namespace GW2CraftingHelper.Views
             void PlaceRight(string text, int width, int gapToLeft, string tooltipText,
                 Func<TreeToolbarCommands, Action> pick)
             {
-                var button = new StandardButton()
+                var button = new FeedbackButton()
                 {
                     Text = text,
                     Size = new Point(width, TreeToolbarButtonHeight),
@@ -3570,6 +3570,7 @@ namespace GW2CraftingHelper.Views
             };
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
+            PressFeedback.Wire(headerPanel);
 
             // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
             // pixel-level screenshot scans showed the triangles failing to
