@@ -10971,4 +10971,15 @@ nothing pushed.
    band is shorter by exactly one line, and the box still fits inside it
    with no clipping at the top or bottom.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-fix HEAD, capture preflight/gWB1-cost-band.png, restored
+Mystic Clover x77 plan). All three tiles' coin runs render at one
+size; the Actual Cost to Craft tile sits in the gold-tinted
+translucent box with the parchment texture visibly reading through
+its interior and a discernible ring (the review's recomposited
+edge-strip construction working as intended); the "+ 3 currencies
+required" note renders inside the box; the Currency table is
+centered in the section with its internal column alignment and
+header band intact. Narrow-width box-vs-operator overlap and the
+resize relayout of the boxed tile were not staged live; both are
+pinned by the new SummarySectionLayoutMath box-geometry tests.
