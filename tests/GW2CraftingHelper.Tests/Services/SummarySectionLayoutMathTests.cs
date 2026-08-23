@@ -154,33 +154,76 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- CostBandHeight + the currency disclosure line ---
         //
-        // The cost band's result tile is the plan's headline figure and
-        // renders at a promoted amount font, so the band is taller than
-        // the profit band beside it; when the plan also has currency costs
-        // the band carries a disclosure line and grows again. Both numbers
-        // are pinned absolutely here (not recomputed from the same
-        // constants the production formula reads, which could never fail):
-        // a deliberate geometry change re-baselines these literals.
+        // Re-baselined for the cost-band restyle: the result tile no
+        // longer carries a promoted DefaultFont32 amount (which is what
+        // made the band 76 tall), it carries a highlight box at the band's
+        // one shared amount font, so the band's height is now the box's
+        // margin+padding around a caption line, an optional disclosure
+        // line and one coin run. When the plan has currency costs the band
+        // still grows by exactly that disclosure line. Both numbers are
+        // pinned absolutely here (not recomputed from the same constants
+        // the production formula reads, which could never fail): a
+        // deliberate geometry change re-baselines these literals.
 
         [Fact]
-        public void CostBandHeight_NoCurrencyNote_IsThePromotedTileRowHeight()
+        public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            Assert.Equal(76, SummarySectionLayoutMath.CostBandHeight(false));
+            // 6 margin + 6 pad + 20 caption line + 4 gap + 20 coin run
+            // + 6 pad + 6 margin.
+            Assert.Equal(68, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
         [Fact]
         public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
         {
-            Assert.Equal(76 + 18, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(68 + 18, SummarySectionLayoutMath.CostBandHeight(true));
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
                 SummarySectionLayoutMath.CostBandHeight(true));
         }
 
         [Fact]
-        public void CostBandHeight_IsTallerThanTheUnpromotedProfitBand()
+        public void CostBandHeight_IsTallerThanTheProfitBand_ByTheHighlightBoxsOwnRoom()
         {
+            // The whole reason the cost band is still the taller of the
+            // two: its result tile is boxed and the box needs its own
+            // margin and padding, top and bottom. Nothing about the
+            // amount font differs between the bands any more.
             Assert.True(SummarySectionLayoutMath.CostBandHeight(false) > PlanContentHeightMath.CostTileRowHeight);
+            Assert.Equal(
+                2 * (SummarySectionLayoutMath.CostBandBoxMarginY + SummarySectionLayoutMath.CostBandBoxPadY),
+                SummarySectionLayoutMath.CostBandHeight(false)
+                    - (SummarySectionLayoutMath.CostBandCaptionLineHeight
+                        + SummarySectionLayoutMath.CostBandCaptionToAmountGap
+                        + CoinSegmentMath.CoinIconSize));
+        }
+
+        [Fact]
+        public void CostBandHeight_LeavesTheHighlightBoxInsideTheBand()
+        {
+            // The geometry the renderer actually builds: the box starts one
+            // pad above the caption and ends one pad below the amount run,
+            // and both edges must sit inside the band the height math
+            // reserved - the renderer's DEBUG assert fails loud otherwise.
+            foreach (bool hasNote in new[] { false, true })
+            {
+                int rowHeight = SummarySectionLayoutMath.CostBandHeight(hasNote);
+                int boxTop = SummarySectionLayoutMath.CostBandCaptionY - SummarySectionLayoutMath.CostBandBoxPadY;
+                int amountY = rowHeight - SummarySectionLayoutMath.CostBandAmountBottomPad
+                    - CoinSegmentMath.CoinIconSize;
+                int boxBottom = amountY + CoinSegmentMath.CoinIconSize + SummarySectionLayoutMath.CostBandBoxPadY;
+
+                Assert.True(boxTop >= 0);
+                Assert.True(boxBottom <= rowHeight);
+
+                // The caption block (caption line, plus the disclosure line
+                // when there is one) must clear the amount run rather than
+                // be overprinted by it.
+                int captionBlockBottom = SummarySectionLayoutMath.CostBandCaptionY
+                    + SummarySectionLayoutMath.CostBandCaptionLineHeight
+                    + (hasNote ? SummarySectionLayoutMath.CostBandCurrencyNoteHeight : 0);
+                Assert.True(amountY >= captionBlockBottom);
+            }
         }
 
         [Fact]

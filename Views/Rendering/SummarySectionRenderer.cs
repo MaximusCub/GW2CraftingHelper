@@ -84,8 +84,8 @@ namespace GW2CraftingHelper.Views.Rendering
 
             if (costBandRows.Count > 0)
             {
-                // The cost band is the plan's headline: promoted result
-                // font, plus the "the gold figure is not the whole cost"
+                // The cost band is the plan's headline: its result tile is
+                // boxed, plus the "the gold figure is not the whole cost"
                 // disclosure line whenever currency rows follow it. Both
                 // its row height and the height BodyHeight counts for it
                 // come from SummarySectionLayoutMath.CostBandHeight with
@@ -93,20 +93,20 @@ namespace GW2CraftingHelper.Views.Rendering
                 // whether the line is drawn.
                 CreateFormulaBand(
                     costBandRows, contentFlow, panelWidth,
-                    GameService.Content.DefaultFont32,
                     SummarySectionLayoutMath.CostBandHeight(currencyRows.Count > 0),
-                    SummarySectionLayoutMath.CurrencyRequirementNote(currencyRows.Count),
-                    SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(currencyRows));
+                    highlightResult: true,
+                    currencyNoteText: SummarySectionLayoutMath.CurrencyRequirementNote(currencyRows.Count),
+                    currencyNoteTooltip: SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(currencyRows));
             }
 
             if (profitBandRows.Count > 0)
             {
-                // Derived stats, not the headline - unpromoted result font
-                // and the unchanged CostTileRowHeight band.
+                // Derived stats, not the headline - no highlight box and
+                // the unchanged CostTileRowHeight band.
                 CreateFormulaBand(
                     profitBandRows, contentFlow, panelWidth,
-                    GameService.Content.DefaultFont16,
-                    PlanContentHeightMath.CostTileRowHeight);
+                    PlanContentHeightMath.CostTileRowHeight,
+                    highlightResult: false);
             }
 
             if (currencyRows.Count > 0)
@@ -141,11 +141,17 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             public Label CaptionLabel;
             public CoinCurrencyRenderer.SegmentLayoutHandle Segments;
+            public Label NoteLabel;
 
-            // Each tile's own amount y - the result tile's promoted font
-            // is bottom-anchored at a different y than its siblings', and
-            // the relayout closure only moves runs horizontally.
+            // Band-space y of this tile's amount run and disclosure line.
             public int AmountY;
+            public int NoteY;
+
+            // The highlight box, on the result tile of a highlighted band
+            // only. Its caption/note/amount are its CHILDREN, laid out
+            // once against the box's own width, so a resize moves the box
+            // and nothing inside it - see CreateFormulaBand.
+            public Panel Box;
         }
 
         // Left edge a collapsed one-tile band's contents start at - the
@@ -153,11 +159,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // footnote row already use, so the section reads as one left edge.
         private const int LoneTileContentX = 8;
 
+        // Caption y and amount bottom pad of an UNHIGHLIGHTED band (the
+        // profit band); 4/6 reproduce the fixed y=30 a CostTileRowHeight
+        // band has always drawn its amounts at (56 - 6 - 20 == 30). A
+        // highlighted band uses SummarySectionLayoutMath's box-derived
+        // pair instead - see CreateFormulaBand.
         private const int BandCaptionY = 4;
-
-        // Amounts are bottom-anchored this far above the band's bottom
-        // edge; 6 reproduces the previous fixed y=30 exactly for an
-        // unpromoted CostTileRowHeight band (56 - 6 - 20 == 30).
         private const int BandAmountBottomPad = 6;
 
         private static readonly Color BandCaptionColor = new Color(153, 153, 153);
@@ -165,7 +172,18 @@ namespace GW2CraftingHelper.Views.Rendering
         // The result tile's caption is the one a user is actually looking
         // for; it stays the same size as its siblings (so the band still
         // reads as one formula) but is lifted out of the dim grey.
-        private static readonly Color PromotedCaptionColor = new Color(235, 235, 235);
+        private static readonly Color HighlightedCaptionColor = new Color(235, 235, 235);
+
+        // The result tile's highlight box. Warm gold, the coin band's own
+        // hue - the eye lands on it without a second colour entering the
+        // section. Both are scaled down from one tint rather than written
+        // as two literals, the same premultiplied "Color * f" idiom
+        // FullCoverageFill below already uses: Blish composites a Panel's
+        // BackgroundColor over whatever is behind it, so the window's
+        // parchment texture still reads through the fill.
+        private static readonly Color ResultHighlightTint = new Color(214, 176, 96);
+        private static readonly Color ResultHighlightFill = ResultHighlightTint * 0.14f;
+        private static readonly Color ResultHighlightBorder = ResultHighlightTint * 0.5f;
 
         // Warm, not red: the disclosure is a caveat about scope, not an
         // error, and it must not read as an alarm on an ordinary plan.
@@ -173,8 +191,8 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Vertical space an amount run occupies: its own text height, or
-        /// the coin icon's if that is taller (an unpromoted DefaultFont16
-        /// run, where the 20px icons are the tallest thing in the row).
+        /// the coin icon's if that is taller (at DefaultFont16 the 20px
+        /// icons are the tallest thing in the row).
         /// </summary>
         private static int AmountBlockHeight(BitmapFont font)
         {
@@ -204,20 +222,21 @@ namespace GW2CraftingHelper.Views.Rendering
         /// in whitespace, and it is the only tile in this section that
         /// does not align with anything else in it (the currency table's
         /// icon column, the footnote and every section title all start at
-        /// the left). Left-aligning it is preferred over the alternative
-        /// of shrinking the band: this tile carries the promoted result
-        /// font precisely because it is the plan's headline figure, so
-        /// making its band SHORTER would fight the promotion. It gets the
-        /// same band height as the three-tile case and simply starts where
-        /// everything else in the section starts.
+        /// the left). It gets the same band height as the three-tile case
+        /// and simply starts where everything else in the section starts.
         ///
-        /// resultAmountFont is the amount font for the band's RIGHTMOST
-        /// (result) tile only; every other tile keeps DefaultFont16. A
-        /// collapsed one-tile band is all result, so it is promoted too.
+        /// Every tile's amount renders at the SAME font. The cost band's
+        /// result tile used to be promoted to DefaultFont32; the
+        /// maintainer's field test replaced that with highlightResult - a
+        /// tinted, semi-transparent box around the result tile's
+        /// caption+note+amount, which draws the eye without breaking the
+        /// band's visual balance. The box is a real Panel and the result
+        /// tile's controls are its CHILDREN, so the fill is painted behind
+        /// them by the container's own paint order (no z-index games) and a
+        /// resize moves one control instead of re-centring three runs.
         /// Amounts are bottom-anchored inside rowHeight rather than pinned
-        /// to a fixed y, so tiles of different amount fonts share one
-        /// bottom line and no font metric can push a taller amount out of
-        /// the band the caller's height math reserved.
+        /// to a fixed y, so no font metric can push an amount out of the
+        /// band the caller's height math reserved.
         ///
         /// currencyNoteText, when non-null, draws a small disclosure line
         /// under the RESULT tile's caption - the plan has costs the coin
@@ -248,7 +267,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private void CreateFormulaBand(
             List<PlanRowViewModel> tileRows, FlowPanel parent, int panelWidth,
-            BitmapFont resultAmountFont, int rowHeight,
+            int rowHeight, bool highlightResult,
             string currencyNoteText = null, string currencyNoteTooltip = null)
         {
             int tileCount = tileRows.Count;
@@ -276,26 +295,31 @@ namespace GW2CraftingHelper.Views.Rendering
             var captionFont = GameService.Content.DefaultFont12;
             var amountFont = GameService.Content.DefaultFont16;
 
+            // A highlighted band carries its result tile's box, so its
+            // caption starts one box margin+padding down and its amount
+            // stops the same distance above the band's bottom edge; both
+            // numbers are the ones CostBandHeight reserved room for.
+            int captionY = highlightResult ? SummarySectionLayoutMath.CostBandCaptionY : BandCaptionY;
+            int amountBottomPad = highlightResult
+                ? SummarySectionLayoutMath.CostBandAmountBottomPad
+                : BandAmountBottomPad;
+
             int captionHeight = (int)System.Math.Ceiling(captionFont.MeasureString("0").Height);
-            int noteY = BandCaptionY + captionHeight + 2;
-            int captionBlockBottom = (currencyNoteText != null ? noteY + captionHeight : BandCaptionY + captionHeight) + 2;
+            int noteY = captionY + captionHeight + 2;
+            int captionBlockBottom = (currencyNoteText != null ? noteY + captionHeight : captionY + captionHeight) + 2;
 
-            int smallAmountHeight = AmountBlockHeight(amountFont);
-            int resultAmountHeight = AmountBlockHeight(resultAmountFont);
-
-            // A band is promoted only when its caller actually handed it a
-            // bigger result font - the profit band passes DefaultFont16
-            // and must keep the dim caption it already had, rather than
-            // inheriting a brightening meant for the headline figure.
-            bool promoted = resultAmountHeight > smallAmountHeight;
+            int amountHeight = AmountBlockHeight(amountFont);
+            int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
 
             // Clamped below the caption block: rowHeight is a fixed
-            // constant while the promoted font's real metrics come from
-            // whatever Blish loaded, so a font taller than the band was
-            // sized for must overflow downward (loud - the DEBUG assert
-            // below catches it) rather than silently overprint the caption.
-            int smallAmountY = AmountY(rowHeight, smallAmountHeight, captionBlockBottom);
-            int resultAmountY = AmountY(rowHeight, resultAmountHeight, captionBlockBottom);
+            // constant while the font's real metrics come from whatever
+            // Blish loaded, so a font taller than the band was sized for
+            // must overflow downward (loud - the DEBUG assert below catches
+            // it) rather than silently overprint the caption.
+            int amountY = AmountY(rowHeight, amountHeight, captionBlockBottom, amountBottomPad);
+
+            int boxTop = captionY - SummarySectionLayoutMath.CostBandBoxPadY;
+            int boxHeight = amountY + amountHeight + SummarySectionLayoutMath.CostBandBoxPadY - boxTop;
 
             var tiles = new List<CostTileHandle>(tileCount);
             for (int i = 0; i < tileCount; i++)
@@ -303,58 +327,93 @@ namespace GW2CraftingHelper.Views.Rendering
                 int tileX = geometry.StartX + i * geometry.TileWidth;
                 var row = tileRows[i];
                 bool isResult = i == tileCount - 1;
+                bool boxed = isResult && highlightResult;
 
-                var tileAmountFont = isResult ? resultAmountFont : amountFont;
-                int tileAmountY = isResult ? resultAmountY : smallAmountY;
-                int tileAmountHeight = isResult ? resultAmountHeight : smallAmountHeight;
-                int iconYOffset = (tileAmountHeight - CoinSegmentMath.CoinIconSize) / 2;
+                // The disclosure line sits under the RESULT tile's caption -
+                // it qualifies that tile's number, not the band as a whole.
+                string noteText = isResult ? currencyNoteText : null;
 
                 string caption = row.Label ?? "";
                 int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
+                int noteWidth = noteText != null
+                    ? (int)System.Math.Ceiling(captionFont.MeasureString(noteText).Width)
+                    : 0;
+                var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, amountFont);
+                int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
+
+                // Where this tile's runs are centred, and what they are
+                // centred INSIDE: the box for a boxed tile (whose own x
+                // then carries the tile centring), the tile slice
+                // otherwise. Never clamped to the tile width - Blish clips
+                // a container's children, so a box narrower than its
+                // content would cut the amount off where an unboxed tile
+                // merely overlaps its neighbour.
+                Panel box = null;
+                Panel host = rowPanel;
+                int hostTop = 0;
+                int hostWidth = 0;
+                if (boxed)
+                {
+                    int widest = captionWidth;
+                    if (noteWidth > widest) widest = noteWidth;
+                    if (segmentsWidth > widest) widest = segmentsWidth;
+                    int boxWidth = widest + 2 * SummarySectionLayoutMath.CostBandBoxPadX;
+
+                    box = CreateHighlightBox(
+                        rowPanel,
+                        ContentX(lone, tileX, geometry.TileWidth, boxWidth),
+                        boxTop, boxWidth, boxHeight,
+                        out host);
+                    hostTop = boxTop + HighlightBoxBorder;
+                    hostWidth = boxWidth - 2 * HighlightBoxBorder;
+                }
+
                 var captionLabel = new Label()
                 {
                     Text = caption,
                     Font = captionFont,
-                    TextColor = isResult && promoted ? PromotedCaptionColor : BandCaptionColor,
+                    TextColor = boxed ? HighlightedCaptionColor : BandCaptionColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(ContentX(lone, tileX, geometry.TileWidth, captionWidth), BandCaptionY),
-                    Parent = rowPanel
+                    Location = new Point(
+                        TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, captionWidth),
+                        captionY - hostTop),
+                    Parent = host
                 };
                 TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
-                var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, tileAmountFont);
-                int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
-                int coinStartX = ContentX(lone, tileX, geometry.TileWidth, segmentsWidth);
+                Label noteLabel = null;
+                if (noteText != null)
+                {
+                    noteLabel = new Label()
+                    {
+                        Text = noteText,
+                        Font = captionFont,
+                        TextColor = CurrencyNoteColor,
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(
+                            TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, noteWidth),
+                            noteY - hostTop),
+                        Parent = host
+                    };
+                    TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
+                }
+
                 var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(
-                    rowPanel, segments, coinStartX, tileAmountY, tileAmountFont, 1f, iconYOffset);
+                    host, segments,
+                    TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, segmentsWidth),
+                    amountY - hostTop, amountFont, 1f, iconYOffset);
 
                 tiles.Add(new CostTileHandle
                 {
                     CaptionLabel = captionLabel,
                     Segments = segmentHandle,
-                    AmountY = tileAmountY
+                    NoteLabel = noteLabel,
+                    AmountY = amountY,
+                    NoteY = noteY,
+                    Box = box
                 });
-            }
-
-            // The disclosure line sits under the RESULT tile's caption -
-            // it qualifies that tile's number, not the band as a whole.
-            Label noteLabel = null;
-            if (currencyNoteText != null)
-            {
-                int noteWidth = (int)System.Math.Ceiling(captionFont.MeasureString(currencyNoteText).Width);
-                int resultTileX = geometry.StartX + (tileCount - 1) * geometry.TileWidth;
-                noteLabel = new Label()
-                {
-                    Text = currencyNoteText,
-                    Font = captionFont,
-                    TextColor = CurrencyNoteColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(ContentX(lone, resultTileX, geometry.TileWidth, noteWidth), noteY),
-                    Parent = rowPanel
-                };
-                TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
             }
 
             // One operator per boundary between two tiles: "-" for every
@@ -381,7 +440,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         TextColor = BandCaptionColor,
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
-                        Location = new Point(boundaryX - symbolWidth / 2, smallAmountY),
+                        Location = new Point(boundaryX - symbolWidth / 2, amountY),
                         Parent = rowPanel
                     };
                     operatorLabels.Add(operatorLabel);
@@ -391,6 +450,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // [FANOUT]: every tile's caption + coin segments are
             // font-only (invariant to panelWidth) - only tileWidth/startX
             // and each tile's own centering offset move. No MeasureString.
+            // A boxed tile is one control: its runs are centred inside the
+            // box, whose width never changes, so moving the box moves them.
             // A lone tile's anchor is a constant, so its closure is a
             // no-op beyond the row's own width.
             _sink.AddRelayout(w =>
@@ -402,18 +463,25 @@ namespace GW2CraftingHelper.Views.Rendering
                     int tileX = g.StartX + i * g.TileWidth;
                     var tile = tiles[i];
 
+                    if (tile.Box != null)
+                    {
+                        tile.Box.Location = new Point(
+                            ContentX(lone, tileX, g.TileWidth, tile.Box.Width), boxTop);
+                        continue;
+                    }
+
                     tile.CaptionLabel.Location = new Point(
-                        ContentX(lone, tileX, g.TileWidth, tile.CaptionLabel.Width), BandCaptionY);
+                        ContentX(lone, tileX, g.TileWidth, tile.CaptionLabel.Width), captionY);
+
+                    if (tile.NoteLabel != null)
+                    {
+                        tile.NoteLabel.Location = new Point(
+                            ContentX(lone, tileX, g.TileWidth, tile.NoteLabel.Width), tile.NoteY);
+                    }
 
                     int segmentsWidth = ShoppingColumnMath.SegmentRunWidth(tile.Segments.TextWidths, CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinLabelIconGap, CoinSegmentMath.CoinSegmentGap);
                     int coinStartX = ContentX(lone, tileX, g.TileWidth, segmentsWidth);
                     CoinCurrencyRenderer.RepositionSegments(tile.Segments, coinStartX, tile.AmountY);
-                }
-
-                if (noteLabel != null)
-                {
-                    int resultTileX = g.StartX + (tileCount - 1) * g.TileWidth;
-                    noteLabel.Location = new Point(ContentX(lone, resultTileX, g.TileWidth, noteLabel.Width), noteY);
                 }
 
                 if (operatorLabels != null)
@@ -422,7 +490,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         int boundaryX = g.StartX + (i + 1) * g.TileWidth;
                         var operatorLabel = operatorLabels[i];
-                        operatorLabel.Location = new Point(boundaryX - operatorLabel.Width / 2, smallAmountY);
+                        operatorLabel.Location = new Point(boundaryX - operatorLabel.Width / 2, amountY);
                     }
                 }
             });
@@ -434,11 +502,58 @@ namespace GW2CraftingHelper.Views.Rendering
             // contents are placed from measured font metrics, so this is
             // the one place the two can diverge - fail loud here rather
             // than let contentFlow reserve a height the band overflows.
+            // The highlight box is the taller of the two, so a highlighted
+            // band is asserted on the box's own bottom edge.
             System.Diagnostics.Debug.Assert(
-                resultAmountY + resultAmountHeight <= rowHeight && smallAmountY + smallAmountHeight <= rowHeight,
-                "SummarySectionRenderer: a formula band's amounts must fit inside the row height " +
-                "SummarySectionLayoutMath reserved for it - see CostBandHeight.");
+                (highlightResult ? boxTop + boxHeight : amountY + amountHeight) <= rowHeight,
+                "SummarySectionRenderer: a formula band's amounts (and its highlight box) must fit " +
+                "inside the row height SummarySectionLayoutMath reserved for it - see CostBandHeight.");
 #endif
+        }
+
+        // The highlight box's 1px border, drawn the way
+        // LabelHelpers.CreateSmallTag draws a pill's: an outer panel in the
+        // border colour with the fill panel inset inside it.
+        private const int HighlightBoxBorder = 1;
+
+        /// <summary>
+        /// The result tile's highlight box. Returns the OUTER panel (what a
+        /// resize moves) and hands back the inner fill panel every control
+        /// inside the box is parented to - children paint over their
+        /// container's background, so nothing here depends on sibling
+        /// z-order.
+        /// </summary>
+        private static Panel CreateHighlightBox(
+            Panel parent, int x, int y, int width, int height, out Panel content)
+        {
+            var outer = new Panel()
+            {
+                Size = new Point(width, height),
+                Location = new Point(x, y),
+                BackgroundColor = ResultHighlightBorder,
+                Parent = parent
+            };
+            content = new Panel()
+            {
+                Size = new Point(width - 2 * HighlightBoxBorder, height - 2 * HighlightBoxBorder),
+                Location = new Point(HighlightBoxBorder, HighlightBoxBorder),
+                BackgroundColor = ResultHighlightFill,
+                Parent = outer
+            };
+            return outer;
+        }
+
+        /// <summary>
+        /// Left x of one run inside its tile: centred in the highlight box
+        /// for a boxed tile (the box's own x carries the tile centring),
+        /// otherwise <see cref="ContentX"/> against the tile slice.
+        /// </summary>
+        private static int TileContentX(
+            bool boxed, int boxContentWidth, bool lone, int tileX, int tileWidth, int contentWidth)
+        {
+            return boxed
+                ? PlanRelayoutMath.CenterX(boxContentWidth, contentWidth)
+                : ContentX(lone, tileX, tileWidth, contentWidth);
         }
 
         /// <summary>
@@ -456,9 +571,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Top y of an amountHeight-tall amount run: bottom-anchored
         /// inside rowHeight, never allowed above the caption block.
         /// </summary>
-        private static int AmountY(int rowHeight, int amountHeight, int captionBlockBottom)
+        private static int AmountY(int rowHeight, int amountHeight, int captionBlockBottom, int bottomPad)
         {
-            int y = rowHeight - BandAmountBottomPad - amountHeight;
+            int y = rowHeight - bottomPad - amountHeight;
             return y > captionBlockBottom ? y : captionBlockBottom;
         }
 

@@ -106,9 +106,14 @@ namespace GW2CraftingHelper.Services
         // --- Cost formula band (the plan's headline figure) ---
         //
         // The cost band's result tile is the one number a user comes to
-        // this section for, so it renders at a promoted amount font
-        // (PlanContentHeightMath.PromotedCostTileRowHeight) rather than
-        // sharing DefaultFont16 with the two derived tiles beside it.
+        // this section for. It used to say so with a promoted DefaultFont32
+        // amount; the maintainer's field test replaced that with a tinted,
+        // semi-transparent highlight box around the result tile, so all
+        // three tiles now share ONE amount font and the band reads as one
+        // formula again. The band's height is therefore no longer a
+        // promoted font's leading - it is the box's own padding around a
+        // caption line, an optional disclosure line and one ordinary
+        // amount run, which is what the constants below spell out.
         //
         // In a currency-bearing plan that gold figure is not the whole
         // cost: PlanViewModelBuilder.BuildCostFormulaBand sources it from
@@ -119,11 +124,49 @@ namespace GW2CraftingHelper.Services
         // renderer's row height and BodyHeight's count come from
         // CostBandHeight so they cannot disagree about that growth.
 
+        /// <summary>Gap between the band's own edge and the highlight box.</summary>
+        public const int CostBandBoxMarginY = 6;
+
+        /// <summary>Highlight box padding above the caption / below the amount.</summary>
+        public const int CostBandBoxPadY = 6;
+
+        /// <summary>Highlight box padding left and right of its widest line.</summary>
+        public const int CostBandBoxPadX = 14;
+
+        /// <summary>
+        /// Caption y inside the cost band - the box's top edge plus its own
+        /// padding, so the box never starts above the band.
+        /// </summary>
+        public const int CostBandCaptionY = CostBandBoxMarginY + CostBandBoxPadY;
+
+        /// <summary>
+        /// Bottom pad under the cost band's amount run, symmetric with
+        /// <see cref="CostBandCaptionY"/>: the box's padding plus its margin.
+        /// </summary>
+        public const int CostBandAmountBottomPad = CostBandBoxPadY + CostBandBoxMarginY;
+
+        /// <summary>
+        /// Height reserved for one DefaultFont12 caption line. 20, not the
+        /// ~17 the font actually measures: the renderer places the caption
+        /// from real font metrics and clamps the amount below it, so this
+        /// reserve has to cover the tallest plausible metric or the band
+        /// clips its own amount (the renderer's DEBUG assert is what
+        /// catches that).
+        /// </summary>
+        public const int CostBandCaptionLineHeight = 20;
+
+        /// <summary>Gap between the caption block and the amount run.</summary>
+        public const int CostBandCaptionToAmountGap = 4;
+
         /// <summary>Extra band height reserved for the disclosure line.</summary>
         public const int CostBandCurrencyNoteHeight = 18;
 
         /// <summary>
-        /// Height of the cost formula band's single tile row.
+        /// Height of the cost formula band's single tile row: the highlight
+        /// box's margin+padding, a caption line, the disclosure line when
+        /// there is one, the gap, and one amount run (a coin run is never
+        /// shorter than CoinSegmentMath.CoinIconSize, which is what makes
+        /// that the amount block's reserved height).
         /// hasCurrencyNote must be "this Summary section has at least one
         /// CurrencyCost row" - the same condition
         /// Views/Rendering/SummarySectionRenderer.Render uses to decide
@@ -131,8 +174,12 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int CostBandHeight(bool hasCurrencyNote)
         {
-            return PlanContentHeightMath.PromotedCostTileRowHeight
-                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0);
+            return CostBandCaptionY
+                + CostBandCaptionLineHeight
+                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
+                + CostBandCaptionToAmountGap
+                + CoinSegmentMath.CoinIconSize
+                + CostBandAmountBottomPad;
         }
 
         /// <summary>
