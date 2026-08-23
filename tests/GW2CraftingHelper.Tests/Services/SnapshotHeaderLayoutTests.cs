@@ -125,7 +125,14 @@ namespace GW2CraftingHelper.Tests.Services
         public void RosterThatWouldWrapBesideTheSearchBox_TakesItsOwnRowInstead()
         {
             // The 15-character account the audit measured: 19 cells at the
-            // window's minimum content width. Beside the search box that is
+            // 884px panel the audit ran at. 884 was never the minimum tab
+            // panel - it is the window's content region, before the
+            // ViewAdapter's own 60px of padding (see
+            // SettingsCurrencyGridLayoutTests' chrome derivation) - and the
+            // minimum panel is 1310px since the window minimum moved to
+            // 1436. Kept as the narrow sample the audit's cell counts were
+            // taken at; the assertions below are about the wrap decision at
+            // whatever width they are handed. Beside the search box that is
             // several rows deep; on its own row it is far fewer, which is the
             // whole point - the same cells, visible rather than scrolled.
             var widths = new List<int> { 70, 150, 150, 140 };

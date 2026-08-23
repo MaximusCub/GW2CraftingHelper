@@ -512,9 +512,27 @@ namespace GW2CraftingHelper
             // view instance.
             _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
 
-            // Minimum size (930x710) matches the window region intentionally.
+            // SpriteScreen is the GW2 CLIENT area, not the monitor, so a
+            // windowed player can legitimately be narrower than the minimum.
+            // Enforcing the full minimum there would put the window's right
+            // edge - cost column, Generate button, and the bottom-right
+            // resize grip - off-screen with no way to drag it back, so on
+            // such a client the enforced minimum falls back to the client's
+            // own width and deep rows ellipsize as they used to.
+            int minWindowWidth = WindowSizing.EffectiveMinWindowWidth(
+                GameService.Graphics.SpriteScreen.Width);
+
+            // The window/content regions below stay at the 930x710 pair the
+            // 1024x1024 background texture (502049) was authored against -
+            // they are texture-space regions, and Blish grows the content
+            // region by the same delta it grows the window by, so the 46px
+            // horizontal chrome they encode holds at every size. Only the
+            // minimum (WindowSizing) moved; the window opens at it because
+            // ResizableTabbedWindow clamps the constructed size up, on the
+            // same paths that clamp a drag and a size persisted by an
+            // earlier session.
             // Validated in-game to align with Event Table / Blish HUD's own
-            // TabbedWindow dimensions and the 1024x1024 background texture (502049).
+            // TabbedWindow dimensions.
             // contentRegion must end above the window bottom: flush would be
             // contentRegion.Y + contentRegion.Height == windowRegion.Height
             // (11 + 699 == 710), but texture 502049 also fades to transparent
@@ -525,15 +543,20 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
                 new Rectangle(81, 11, 884, 684),
-                new Point(930, 710))
+                new Point(WindowSizing.MinWindowWidth, WindowSizing.MinWindowHeight))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper",
                 Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_MainWindow",
+
+                // Clamped at 0: on a client narrower than even the 930
+                // fallback a negative centered x would put the title bar
+                // (and its close button) off the left edge with no way to
+                // drag it back.
                 Location = new Point(
-                    (GameService.Graphics.SpriteScreen.Width - 930) / 2,
-                    (GameService.Graphics.SpriteScreen.Height - 710) / 2),
+                    Math.Max(0, (GameService.Graphics.SpriteScreen.Width - minWindowWidth) / 2),
+                    Math.Max(0, (GameService.Graphics.SpriteScreen.Height - WindowSizing.MinWindowHeight) / 2)),
                 SavesPosition = true
             };
 

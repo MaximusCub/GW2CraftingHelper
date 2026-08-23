@@ -283,16 +283,57 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // The cell's total extent is what decides whether the grid gets two
-        // columns at the window's 930px minimum, so a label rename that
-        // needs more room must take it from inside the cell - never from
-        // MinColumnWidth. 884px content region - 20px right padding = 864.
-        [Fact]
-        public void MinColumnWidth_StillFitsTwoColumnsAtTheWindowMinimum()
-        {
-            const int SettingsPanelWidthAtWindowMinimum = 864;
+        // columns at the window's minimum, so a label rename that needs
+        // more room must take it from inside the cell - never from
+        // MinColumnWidth.
+        //
+        // The panel width is derived through the WHOLE chain, not just the
+        // window's own content region. The previous constant here (864 =
+        // "884px content region - 20px right padding") skipped the
+        // ViewAdapter, so it overstated the panel by 60px and asserted a
+        // two-column grid at the old 930px minimum where the real 804px
+        // panel gave ONE column - see docs/research/minimum-window-width.md
+        // and the "Minimum width raise" section of docs/KNOWN-ISSUES.md.
+        //
+        // The chain is WindowSizing's, read from the shipped constants
+        // rather than copied here, so a change to the enforced minimum or
+        // to the chrome moves these cases with it.
+        private static readonly int SettingsPanelWidthAtWindowMinimum =
+            WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
 
+        // Historical literal, deliberately not a production constant.
+        private const int OldWindowMinimumWidth = 930;
+
+        [Fact]
+        public void MinColumnWidth_FitsTwoColumnsAtTheWindowMinimum()
+        {
             Assert.Equal(2, SettingsCurrencyGridLayout.ComputeColumnCount(SettingsPanelWidthAtWindowMinimum));
             Assert.True(2 * SettingsCurrencyGridLayout.MinColumnWidth <= SettingsPanelWidthAtWindowMinimum);
+        }
+
+        [Fact]
+        public void TwoColumnGrid_NeedsAWindowFarNarrowerThanTheMinimum()
+        {
+            // How much of the raise the grid actually needed: two columns
+            // want a 848px panel, i.e. a 974px window. The old 930px
+            // minimum was short of that, which is why the grid really did
+            // fall back to one column there.
+            int windowWidthForTwoColumns =
+                2 * SettingsCurrencyGridLayout.MinColumnWidth + WindowSizing.WindowToTabPanelChrome;
+
+            Assert.True(windowWidthForTwoColumns < WindowSizing.MinWindowWidth);
+            Assert.Equal(
+                2,
+                SettingsCurrencyGridLayout.ComputeColumnCount(
+                    WindowSizing.TabPanelWidthFor(windowWidthForTwoColumns)));
+            Assert.Equal(
+                1,
+                SettingsCurrencyGridLayout.ComputeColumnCount(
+                    WindowSizing.TabPanelWidthFor(windowWidthForTwoColumns - 1)));
+            Assert.Equal(
+                1,
+                SettingsCurrencyGridLayout.ComputeColumnCount(
+                    WindowSizing.TabPanelWidthFor(OldWindowMinimumWidth)));
         }
 
         [Fact]

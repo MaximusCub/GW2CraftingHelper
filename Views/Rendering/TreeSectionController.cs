@@ -548,7 +548,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
         private const int TreeNameGap = 6;
         private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
-        private const int TreePillColumnWidth = 240;
+
+        // Defined in PlanRelayoutMath, which owns the column arithmetic and
+        // the measurement behind the width.
+        private const int TreePillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
 
@@ -1205,11 +1208,12 @@ namespace GW2CraftingHelper.Views.Rendering
         /// the row's expand/collapse click handler can exclude them from
         /// its own hit-test (a pill click is a decision, not a toggle).
         ///
-        /// TreePillColumnWidth (240px) is
+        /// TreePillColumnWidth (256px) is
         /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
         /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
         /// applicable) to every ordinary node, on top of its 1-3 source
-        /// pills - realistic combinations regularly exceed 240px. Rather
+        /// pills - realistic combinations still exceed it (a measured
+        /// "HAVE n/m NEEDED" annotation run reaches 436px). Rather
         /// than let trailing pills render on top of the right-aligned cost
         /// column (this row has no wrap/second-line support - TreeRowHeight
         /// is a fixed per-row height shared by every layout/scroll-height

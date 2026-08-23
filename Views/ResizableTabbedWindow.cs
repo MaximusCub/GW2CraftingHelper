@@ -8,12 +8,36 @@ namespace GW2CraftingHelper.Views
     /// <summary>
     /// TabbedWindow2 subclass that enforces a minimum window size,
     /// matching the behavior of ResizableModuleWindow for StandardWindow.
-    /// Also clamps persisted sizes on layout so the window never opens
-    /// smaller than the minimum.
+    /// Also clamps at construction and on every layout pass, so neither the
+    /// texture-derived constructed size nor a size persisted by an earlier
+    /// session can open the window below the minimum.
     /// </summary>
-    public class ResizableTabbedWindow : TabbedWindow2
+    /// <remarks>
+    /// Sealed: the constructor clamps, which writes <c>Size</c> and so runs
+    /// the virtual OnResized/RecalculateLayout chain. Sealing keeps that off
+    /// any subclass override, which would otherwise run against a
+    /// half-constructed instance.
+    /// </remarks>
+    public sealed class ResizableTabbedWindow : TabbedWindow2
     {
-        private readonly Point _minSize;
+        private readonly Point _designMinSize;
+
+        // The screen-fitted floor is re-derived on EVERY clamp rather than
+        // captured at construction: at module-build time the sprite screen
+        // has not necessarily settled to the real client size (measured
+        // live 2026-08-23 - a one-shot capture froze the floor near the
+        // unsettled backbuffer width and a persisted 990px window was
+        // never clamped up to 1436), so each clamp asks
+        // WindowSizing.EffectiveMinWindowWidth for the floor the CURRENT
+        // screen supports and the first layout pass after the screen
+        // settles grows the window the rest of the way.
+        private Point EffectiveMinSize()
+        {
+            int screenWidth = Blish_HUD.GameService.Graphics.SpriteScreen?.Width ?? 0;
+            return new Point(
+                Services.WindowSizing.EffectiveMinWindowWidth(screenWidth),
+                _designMinSize.Y);
+        }
 
         public ResizableTabbedWindow(
             AsyncTexture2D background,
@@ -22,30 +46,71 @@ namespace GW2CraftingHelper.Views
             Point minSize)
             : base(background, windowRegion, contentRegion)
         {
-            _minSize = minSize;
+            _designMinSize = minSize;
             CanResize = true;
             SavesSize = true;
+
+            // Blish adopts the game client's size AFTER modules load (the
+            // sprite screen resizes once the overlay attaches), and no
+            // window layout pass runs on its own after that - measured
+            // live 2026-08-23: without this, a launch on a wide client
+            // kept the smaller floor computed against the unsettled
+            // screen. Re-clamp whenever the screen itself changes size;
+            // unhooked in DisposeControl.
+            Blish_HUD.GameService.Graphics.SpriteScreen.Resized += OnScreenResized;
+
+            // The base constructor sizes the window from windowRegion, a
+            // region of the background texture, which is narrower than the
+            // minimum. Clamping here means the window is never below the
+            // floor at any observable point - including its first draw -
+            // rather than depending on an invalidation ordering this repo
+            // has not measured. (Tabs are registered as lazy factories, so
+            // no hosted view exists in the gap either way.)
+            ClampToMinimum();
         }
 
         protected override Point HandleWindowResize(Point newSize)
         {
+            var min = EffectiveMinSize();
             return new Point(
-                Math.Max(newSize.X, _minSize.X),
-                Math.Max(newSize.Y, _minSize.Y));
+                Math.Max(newSize.X, min.X),
+                Math.Max(newSize.Y, min.Y));
         }
 
         public override void RecalculateLayout()
         {
             base.RecalculateLayout();
 
-            // Enforce minimum size on initial layout. Persisted sizes
-            // from earlier sessions may be below the current minimum.
-            if (this.Width < _minSize.X || this.Height < _minSize.Y)
+            // Persisted sizes from earlier sessions may be below the current
+            // minimum - a saved 930px window has to come back at the raised
+            // one. Blish restores the size after construction, so this pass
+            // is what catches it; the clamp only ever grows a window, so a
+            // saved size above the minimum is left exactly as it was.
+            ClampToMinimum();
+        }
+
+        private void OnScreenResized(object sender, ResizedEventArgs e)
+        {
+            ClampToMinimum();
+        }
+
+        protected override void DisposeControl()
+        {
+            Blish_HUD.GameService.Graphics.SpriteScreen.Resized -= OnScreenResized;
+            base.DisposeControl();
+        }
+
+        private void ClampToMinimum()
+        {
+            var min = EffectiveMinSize();
+            if (this.Width >= min.X && this.Height >= min.Y)
             {
-                this.Size = new Point(
-                    Math.Max(this.Width, _minSize.X),
-                    Math.Max(this.Height, _minSize.Y));
+                return;
             }
+
+            this.Size = new Point(
+                Math.Max(this.Width, min.X),
+                Math.Max(this.Height, min.Y));
         }
     }
 }
