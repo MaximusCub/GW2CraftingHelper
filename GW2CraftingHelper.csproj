@@ -203,6 +203,7 @@
     <Compile Include="Services\CurrencyValuationSerializer.cs" />
     <Compile Include="Services\SettingsInputParser.cs" />
     <Compile Include="Services\SettingsCurrencyGridLayout.cs" />
+    <Compile Include="Services\SnapshotItemGridLayout.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />
     <Compile Include="Services\ModuleLogEntry.cs" />
     <Compile Include="Services\ModuleLog.cs" />

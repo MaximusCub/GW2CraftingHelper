@@ -96,17 +96,19 @@ namespace GW2CraftingHelper.Views
         private const int SearchDebounceMs = 150;
         private CancellationTokenSource _searchDebounceCts;
 
-        // Width-driven re-fit of the rows already on screen - see
+        // Width-driven repack of the rows already on screen - see
         // ScheduleRowRefit. Deliberately NOT the search debounce above: that
         // one is cancel-and-replace, so routing a resize drag through it
         // allocated a CancellationTokenSource and threw a cancellation
         // exception per drag FRAME, and its callback disposes and rebuilds
         // every row (re-running the search, and putting the scroll position
-        // at risk) to change nothing but text that no longer fits.
-        // _lastRowLayoutWidth is the width the rows on screen were actually
-        // laid out at, so a drag that ends where it started re-fits nothing.
+        // at risk) to change nothing but the cells' placement and the text
+        // that no longer fits. _lastRowLayoutWidth is the width the rows on
+        // screen were actually laid out at, so a drag that ends where it
+        // started repacks nothing.
         private const int ResizeSettleMs = 150;
-        private readonly List<Action<int>> _rowRefitActions = new List<Action<int>>();
+        private readonly List<ResultCell> _itemCells = new List<ResultCell>();
+        private readonly List<ResultCell> _walletCells = new List<ResultCell>();
         private int _lastRowLayoutWidth = -1;
         private bool _rowRefitPending;
         private long _lastResizeEventTicks;
@@ -254,6 +256,20 @@ namespace GW2CraftingHelper.Views
         private Panel _filterPanel;
         private Panel _sourceFilterPanel;
         private FlowPanel _contentPanel;
+
+        // The result grid: ONE fixed-height panel inside the scrolling
+        // content panel, holding the item run and then the wallet run
+        // beneath it. The two runs keep their own cell heights
+        // (ItemRowHeight vs WalletRowHeight) - a single uniform height would
+        // have to stretch every wallet row to the taller of the two - but
+        // they are laid out as two sections of one panel rather than two
+        // sibling panels, so the wallet run's position is this file's own
+        // arithmetic (LayoutResultGrid) and not a bet on Blish's FlowPanel
+        // re-flowing a later sibling when an earlier one changes height.
+        // Null until the first rebuild, and whenever the result set is empty
+        // enough to render a message instead.
+        private Panel _resultGridPanel;
+
         private TextBox _searchBox;
         private Dropdown _filterDropdown;
         private Checkbox _charactersMasterCheckbox;
@@ -1409,12 +1425,26 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Re-fits the rows already on screen to the content panel's current
-        /// width, in place: each row's Panel takes the new width and each of
-        /// its text lines is re-ellipsized against it (with its tooltip
-        /// re-decided). No search re-run, no dispose-and-recreate, so the
-        /// user's scroll position is untouched - the reason a width change
-        /// no longer goes through RebuildContent.
+        /// Repacks the rows already on screen against the content panel's
+        /// current width, in place: the grid is recomputed (a wider window
+        /// can gain a column, a narrower one drop back to the single-column
+        /// fallback), every cell moves to its new slot, and each of its text
+        /// lines is re-ellipsized against the new COLUMN width - not the
+        /// panel width - with its tooltip re-decided. No search re-run and no
+        /// dispose-and-recreate, which is why a width change no longer goes
+        /// through RebuildContent.
+        /// <para>
+        /// The scroll position survives a repack that KEEPS the column count
+        /// - the grid panel's width moves, its height does not. A repack that
+        /// changes the column count writes a new grid-panel height, and
+        /// Blish's Scrollbar zeroes the scroll position a frame after any
+        /// content-height change (measured: docs/KNOWN-ISSUES.md, "The grid
+        /// panel holds its unfiltered height"), so the list snaps to top.
+        /// Not defended against here: the tab has no scroll-restore
+        /// machinery (CraftingPlanView.PreserveScrollAcross is the module's
+        /// only one), and a column-count change re-flows every row anyway, so
+        /// there is no old position left to hold.
+        /// </para>
         /// </summary>
         private void RefitResultRows()
         {
@@ -1433,21 +1463,64 @@ namespace GW2CraftingHelper.Views
 
             try
             {
-                foreach (var refit in _rowRefitActions)
-                {
-                    refit(width);
-                }
-
+                LayoutResultGrid(refitText: true);
                 _lastRowLayoutWidth = width;
             }
             catch (Exception ex)
             {
-                // The registry is cleared by RebuildContent, so its closures
-                // outlive their controls only between a fresh Build's
-                // ThreadPool body swapping _contentPanel and that build's own
-                // marshaled RebuildContent tail. Whichever build is current
-                // renders its rows at its own width regardless.
+                // The cell lists are cleared by RebuildContent, so their
+                // closures outlive their controls only between a fresh
+                // Build's ThreadPool body swapping _contentPanel and that
+                // build's own marshaled RebuildContent tail. Whichever build
+                // is current renders its rows at its own width regardless.
                 Logger.Warn(ex, "Snapshot row re-fit skipped");
+            }
+        }
+
+        /// <summary>
+        /// The single writer for the result grid's geometry: places the item
+        /// run and then the wallet run beneath it, both in reading order at
+        /// the current column count, and gives the grid panel exactly the
+        /// height the two need (nothing here auto-sizes, and a short panel
+        /// would clip its own last row). Shared by the rebuild path - which
+        /// has just created the cells at this same column width, hence
+        /// <paramref name="refitText"/> false there - and the resize repack,
+        /// which must also re-ellipsize.
+        /// </summary>
+        private void LayoutResultGrid(bool refitText)
+        {
+            // Parent-null means the panel this field points at was disposed
+            // by a fresh Build cycle whose own RebuildContent tail has not
+            // landed yet - the window in which a resize would otherwise
+            // repack the PREVIOUS cycle's dead controls. RefitResultRows'
+            // catch would survive that; this simply never enters it.
+            if (_contentPanel == null || _resultGridPanel == null || _resultGridPanel.Parent == null) return;
+
+            int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
+
+            var itemGrid = SnapshotItemGridLayout.Compute(_itemCells.Count, gridWidth, ItemRowHeight);
+            var walletGrid = SnapshotItemGridLayout.Compute(
+                _walletCells.Count, gridWidth, WalletRowHeight, itemGrid.Height);
+
+            _resultGridPanel.Size = new Point(gridWidth, itemGrid.Height + walletGrid.Height);
+
+            PlaceCells(_itemCells, itemGrid, ItemRowHeight, refitText);
+            PlaceCells(_walletCells, walletGrid, WalletRowHeight, refitText);
+        }
+
+        private static void PlaceCells(
+            List<ResultCell> cells, SnapshotItemGridLayout.Grid grid, int rowHeight, bool refitText)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                cell.Panel.Location = new Point(grid.Cells[i].X, grid.Cells[i].Y);
+                cell.Panel.Size = new Point(grid.ColumnWidth, rowHeight);
+
+                if (refitText)
+                {
+                    cell.Fit(grid.ColumnWidth);
+                }
             }
         }
 
@@ -1563,11 +1636,15 @@ namespace GW2CraftingHelper.Views
             // a redundant extra rebuild landing a moment after this one.
             CancelSearchDebounce();
 
-            // The rows about to be disposed own every registered re-fit
-            // closure; the fresh ones register their own below. Cleared
-            // before the disposal loop so no window exists in which a
-            // closure could be replayed against a disposed row.
-            _rowRefitActions.Clear();
+            // The rows about to be disposed own every registered cell and
+            // its re-fit closure; the fresh ones register their own below.
+            // Cleared before the disposal loop so no window exists in which
+            // a closure could be replayed against a disposed row - and the
+            // grid panel is dropped with them, since the disposal loop below
+            // destroys the very panel that field points at.
+            _itemCells.Clear();
+            _walletCells.Clear();
+            _resultGridPanel = null;
             _lastRowLayoutWidth = _contentPanel.Width;
 
             foreach (var child in _contentPanel.Children.ToArray())
@@ -1667,21 +1744,45 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
+            // Both runs are laid out in the width the content panel has left
+            // once its scrollbar is accounted for, so the rightmost column
+            // ellipsizes before it runs under the bar rather than behind it.
+            // A panel too narrow for two columns gets the single-column
+            // fallback, which is the list this tab shipped with.
+            int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
+            int columnWidth = SnapshotItemGridLayout.ComputeColumnWidth(gridWidth);
+
+            _resultGridPanel = new Panel()
+            {
+                Size = new Point(gridWidth, 0),
+                Parent = _contentPanel
+            };
+
             if (itemRows != null)
             {
                 foreach (var row in itemRows)
                 {
-                    CreateItemRow(row);
+                    CreateItemRow(row, columnWidth);
                 }
             }
 
+            // After the item cells, and laid out below them by
+            // LayoutResultGrid - the order the single-column list had.
             if (walletRows != null)
             {
                 foreach (var entry in walletRows)
                 {
-                    CreateWalletRow(entry);
+                    CreateWalletRow(entry, columnWidth);
                 }
             }
+
+            // Places the cells the two loops just created and gives the grid
+            // panel its height. refitText: false - every cell was built at
+            // this same columnWidth, and re-ellipsizing each label a second
+            // time would double the MeasureString work of a rebuild that
+            // already runs once per pause in typing over a list that can
+            // reach into the thousands of rows.
+            LayoutResultGrid(refitText: false);
         }
 
         /// <summary>
@@ -1725,9 +1826,29 @@ namespace GW2CraftingHelper.Views
         }
 
         // Left edge of a result row's text column (past the 32px icon at
-        // x=2) and the gap kept clear of the row's right edge.
-        private const int RowTextX = 40;
-        private const int RowTextRightPad = 8;
+        // x=2) and the gap kept clear of the row's right edge. Both live in
+        // SnapshotItemGridLayout so the minimum column width is derived from
+        // the same numbers the cells are placed with - the Settings tab's
+        // currency grid shares its own cell constants the same way.
+        private const int RowTextX = SnapshotItemGridLayout.CellTextX;
+        private const int RowTextRightPad = SnapshotItemGridLayout.CellTextRightPad;
+
+        /// <summary>
+        /// One placed result cell: the row Panel the grid moves and sizes,
+        /// and the closure that re-ellipsizes its text lines (re-deciding
+        /// their tooltips) against a new column width.
+        /// </summary>
+        private sealed class ResultCell
+        {
+            public readonly Panel Panel;
+            public readonly Action<int> Fit;
+
+            public ResultCell(Panel panel, Action<int> fit)
+            {
+                Panel = panel;
+                Fit = fit;
+            }
+        }
 
         /// <summary>
         /// One result-row text line, ellipsized to the width the row
@@ -1739,7 +1860,7 @@ namespace GW2CraftingHelper.Views
         /// Log tab's rows and the plan's tables use.
         /// </summary>
         private static Label CreateRowTextLabel(
-            Panel rowPanel, string text, int panelWidth, int y, Color? color, out bool shortened)
+            Panel rowPanel, string text, int cellWidth, int y, Color? color, out bool shortened)
         {
             var label = new Label()
             {
@@ -1753,7 +1874,7 @@ namespace GW2CraftingHelper.Views
                 label.TextColor = color.Value;
             }
 
-            shortened = FitRowTextLabel(label, text, panelWidth);
+            shortened = FitRowTextLabel(label, text, cellWidth);
 
             // Both lines of a snapshot row - the item name and the
             // "Character: ..." source caption - carry names nobody here
@@ -1764,9 +1885,10 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Ellipsizes one line to the row width and re-decides its tooltip,
-        /// returning whether it had to shorten. The single rule, so the
-        /// build-time fit and the resize-time re-fit
+        /// Ellipsizes one line to the width of the CELL it sits in - one
+        /// grid column, not the whole content panel - and re-decides its
+        /// tooltip, returning whether it had to shorten. The single rule, so
+        /// the build-time fit and the resize-time repack
         /// (<see cref="RefitResultRows"/>) cannot drift.
         /// <para>
         /// The label is the deepest control under the cursor, and Blish
@@ -1777,11 +1899,11 @@ namespace GW2CraftingHelper.Views
         /// now fits has its tooltip cleared rather than left stale.
         /// </para>
         /// </summary>
-        private static bool FitRowTextLabel(Label label, string text, int panelWidth)
+        private static bool FitRowTextLabel(Label label, string text, int cellWidth)
         {
             var font = GameService.Content.DefaultFont14;
             string full = text ?? "";
-            string shown = LabelHelpers.EllipsizeToWidth(font, full, panelWidth - RowTextX - RowTextRightPad);
+            string shown = LabelHelpers.EllipsizeToWidth(font, full, cellWidth - RowTextX - RowTextRightPad);
 
             label.Text = shown;
 
@@ -1816,14 +1938,12 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyPlain(rowPanel, text);
         }
 
-        private void CreateItemRow(SnapshotSearchRow row)
+        private void CreateItemRow(SnapshotSearchRow row, int columnWidth)
         {
-            int panelWidth = _contentPanel?.Width ?? 400;
-
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, ItemRowHeight),
-                Parent = _contentPanel
+                Size = new Point(columnWidth, ItemRowHeight),
+                Parent = _resultGridPanel
             };
 
             // A missing IconUrl is a data gap (e.g. the API dropped it),
@@ -1845,7 +1965,7 @@ namespace GW2CraftingHelper.Views
             // whose header already labels its bare numbers, and the
             // location breakdown below.
             string nameText = $"{row.TotalCount}x {row.Name}";
-            var nameLabel = CreateRowTextLabel(rowPanel, nameText, panelWidth, 4, null, out bool nameShortened);
+            var nameLabel = CreateRowTextLabel(rowPanel, nameText, columnWidth, 4, null, out bool nameShortened);
 
             // NOT the prefix notation the name line above uses, and the one
             // deliberate exemption from M9's sweep beside the tabular Amount
@@ -1860,27 +1980,26 @@ namespace GW2CraftingHelper.Views
                 : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
 
             var breakdownLabel =
-                CreateRowTextLabel(rowPanel, breakdown, panelWidth, 24, InfoTextColor, out bool breakdownShortened);
+                CreateRowTextLabel(rowPanel, breakdown, columnWidth, 24, InfoTextColor, out bool breakdownShortened);
 
             ApplyRowStripTooltip(rowPanel, nameText, nameShortened, breakdown, breakdownShortened);
 
-            _rowRefitActions.Add(w =>
+            // The cell's own Size is the grid's to write (LayoutGridSection),
+            // so this closure only re-fits what the new column width changed.
+            _itemCells.Add(new ResultCell(rowPanel, w =>
             {
-                rowPanel.Size = new Point(w, ItemRowHeight);
                 bool nameNowShortened = FitRowTextLabel(nameLabel, nameText, w);
                 bool breakdownNowShortened = FitRowTextLabel(breakdownLabel, breakdown, w);
                 ApplyRowStripTooltip(rowPanel, nameText, nameNowShortened, breakdown, breakdownNowShortened);
-            });
+            }));
         }
 
-        private void CreateWalletRow(SnapshotWalletEntry entry)
+        private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth)
         {
-            int panelWidth = _contentPanel?.Width ?? 400;
-
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, WalletRowHeight),
-                Parent = _contentPanel
+                Size = new Point(columnWidth, WalletRowHeight),
+                Parent = _resultGridPanel
             };
 
             // See CreateItemRow's matching comment -
@@ -1896,15 +2015,14 @@ namespace GW2CraftingHelper.Views
             // an item count does not.
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
             string text = $"{entry.Value:N0}x {name}";
-            var label = CreateRowTextLabel(rowPanel, text, panelWidth, 6, null, out bool shortened);
+            var label = CreateRowTextLabel(rowPanel, text, columnWidth, 6, null, out bool shortened);
             TooltipFacility.ApplyPlain(rowPanel, shortened ? text : null);
 
-            _rowRefitActions.Add(w =>
+            _walletCells.Add(new ResultCell(rowPanel, w =>
             {
-                rowPanel.Size = new Point(w, WalletRowHeight);
                 bool nowShortened = FitRowTextLabel(label, text, w);
                 TooltipFacility.ApplyPlain(rowPanel, nowShortened ? text : null);
-            });
+            }));
         }
 
         // This used to carry its own
