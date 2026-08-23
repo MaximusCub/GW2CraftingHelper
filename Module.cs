@@ -62,6 +62,7 @@ namespace GW2CraftingHelper
         private CraftingPlanView _craftingContent;
         private LogTabContent _logContent;
         private Tab _logTab;
+        private Tab _settingsTab;
 
         // The Log tab's "Clear View" floor lives on Module, not
         // LogTabContent: Blish reconstructs LogTabContent on every tab
@@ -571,10 +572,11 @@ namespace GW2CraftingHelper
                 () => new ViewAdapter("Crafting Ranker", BuildPlaceholder),
                 "Crafting Ranker"));
 
-            _mainWindow.Tabs.Add(new Tab(
+            _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
                 () => new ViewAdapter("Settings", c => _settingsContent.Build(c)),
-                "Settings"));
+                "Settings");
+            _mainWindow.Tabs.Add(_settingsTab);
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(157097),
@@ -584,9 +586,30 @@ namespace GW2CraftingHelper
             // Refresh log content when switching to the Log tab
             _mainWindow.TabChanged += (s, e) =>
             {
+                // AFTER the switch, not before it: TabbedWindow2 exposes no
+                // cancellable pre-change hook - see PromptForUnsavedSettings.
+                if (e.PreviousValue == _settingsTab)
+                {
+                    PromptForUnsavedSettings();
+                }
+
                 if (_mainWindow.SelectedTab == _logTab && _logContent != null)
                 {
                     _logContent.Refresh();
+                }
+            };
+
+            // Closing the window while the Settings tab is open never
+            // raises TabChanged, so the same prompt is hung off the
+            // window's own hide transition. Blish nulls the Hidden event
+            // as the first act of Control.Dispose (measured in the
+            // vendored 1.3.0 binary), so Unload's _mainWindow.Dispose()
+            // cannot re-enter this after _modalDialog has been disposed.
+            _mainWindow.Hidden += (s, e) =>
+            {
+                if (_mainWindow.SelectedTab == _settingsTab)
+                {
+                    PromptForUnsavedSettings();
                 }
             };
 
@@ -602,6 +625,49 @@ namespace GW2CraftingHelper
             {
                 _mainWindow.ToggleWindow();
             };
+        }
+
+        /// <summary>
+        /// Asks whether to keep or drop unsaved Settings edits, once the
+        /// user has already left the tab (or closed the window).
+        ///
+        /// <para>
+        /// The prompt is after the fact because Blish 1.3.0 has nowhere to
+        /// put it earlier. Measured from the vendored binary:
+        /// TabbedWindow2.SelectedTab's setter assigns the backing field via
+        /// SetProperty and only then calls OnTabChanged, which itself calls
+        /// ShowView (tearing down the old view) BEFORE raising the public
+        /// TabChanged event. There is no pre-change event, nothing the
+        /// handler can set to veto, and the one virtual member in the chain
+        /// already runs after the assignment - so by the time any module
+        /// code is reached, the tab has changed and cannot be changed back
+        /// without triggering a second switch. See KNOWN-ISSUES "Settings
+        /// dirty prompt" for the alternatives that were measured and
+        /// rejected.
+        /// </para>
+        ///
+        /// <para>
+        /// Blish only unparents the outgoing view's controls
+        /// (Container.ClearChildren sets Parent = null; it does not
+        /// dispose), so the Settings TextBoxes still hold the user's typed
+        /// text when this runs and Save persists exactly what was on
+        /// screen.
+        /// </para>
+        /// </summary>
+        private void PromptForUnsavedSettings()
+        {
+            if (_settingsContent == null || _modalDialog == null) return;
+
+            int unsaved = _settingsContent.UnsavedChangeCount();
+            if (unsaved <= 0) return;
+
+            string changeWord = unsaved == 1 ? "change" : "changes";
+            _modalDialog.Show(
+                $"You have {unsaved} unsaved {changeWord} on the Settings tab. Save them, or discard them and keep the last saved values?",
+                () => _settingsContent.SaveAll(),
+                () => _settingsContent.DiscardChanges(),
+                "Save",
+                "Discard");
         }
 
         // Reads Blish's FestivalContext and projects it to plain strings,

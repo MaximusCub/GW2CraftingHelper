@@ -112,10 +112,17 @@ namespace GW2CraftingHelper.Views
         // confirmText is required so every caller states its own verb
         // ("Regenerate", "Delete") - a default here would hand an
         // unrelated caller the wrong label on a destructive confirm.
+        // cancelText is optional and defaults to the plain "Cancel" every
+        // existing caller wants: for those, the second button really does
+        // abandon the operation. It exists for the callers whose second
+        // button is a CHOICE rather than an escape - the Settings tab's
+        // unsaved-changes prompt cannot put the user back where they were
+        // (see KNOWN-ISSUES "Settings dirty prompt"), so a button labelled
+        // "Cancel" there would promise something it does not do.
         // Returns false when another caller's dialog is already on screen,
         // so a caller that arms state for the dialog's lifetime (MainView
         // disables its Snapshot buttons) knows not to arm it.
-        public bool Show(string message, Action onConfirm, Action onCancel, string confirmText)
+        public bool Show(string message, Action onConfirm, Action onCancel, string confirmText, string cancelText = "Cancel")
         {
             if (_isShowing) return false;
             _isShowing = true;
@@ -170,7 +177,12 @@ namespace GW2CraftingHelper.Views
             // Buttons: centered horizontally, on the fixed bottom line so
             // every caller's dialog puts them in the same place.
             int btnW = 100;
-            int cancelW = 70;
+            // 70 is the width every caller had before cancelText existed
+            // and is the floor, so "Cancel" is pixel-identical to what it
+            // was; a longer label grows the button instead of being
+            // clipped by StandardButton's own scissor.
+            string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
+            int cancelW = System.Math.Max(70, LabelHelpers.MeasureWith(font)(cancelLabel) + 24);
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;
@@ -187,7 +199,7 @@ namespace GW2CraftingHelper.Views
 
             var cancelBtn = new StandardButton()
             {
-                Text = "Cancel",
+                Text = cancelLabel,
                 Size = new Point(cancelW, ButtonHeight),
                 Location = new Point(btnX + btnW + btnGap, btnY),
                 Parent = _window
