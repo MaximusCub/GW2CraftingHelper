@@ -8988,4 +8988,30 @@ What the desktop gate should look at:
    unclickable, then both must come back at full strength when the new
    plan lands - including on a cancelled or failed run.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-22 evening desktop batch, branch build at the
+review-fix HEAD, captures preflight/gDE1-gDE4) - this is the live
+desktop verification the maintainer required before this batch may
+merge. Verified on the restored Mystic Clover x77 plan: (1) plan
+header as one left-aligned Font32 "Mystic Clover x 42 needed" line,
+no in-scroll timestamp; (2) promoted Actual Cost to Craft tile with
+"+ 3 currencies required" under its caption, three tiles sharing a
+bottom line, section headers demoted below the title; (3) the tree's
+Item / Source / Cost header row with per-denomination sub-columns -
+coin and currency icons forming straight vertical rules down the
+cost column; (4) the five tree actions in the fixed strip
+("Recipe Tree:" cluster with the wider gap before Expand/Collapse);
+Collapse All clicked from the strip WHILE SCROLLED TO THE BOTTOM
+collapsed the tree with the viewport staying put - the M3 scenario
+end to end; (5) a live "+2" overflow pill on the root row (its cost
+cell spans three denominations, narrowing the pill column exactly as
+L6 predicted); (6) dimmed subtree pills at the raised dim floor with
+the value-detail tooltip still served on the dimmed selected pill
+("Only available source / Crafting gold price ... Optimization
+price"); (7) every Shopping List row badged - VENDOR rows and the
+Glob of Ectoplasm TP badge. Not exercised live: gate item 7's
+mid-generate toolbar fade (the restored-plan session did not run a
+fresh generate on this build; the dim shares SetContentDimmed's
+single restore funnel review-verified in batch F) and the narrow-
+width pill-drop escalation beyond the +2 case. Suite 1969/1969 at
+HEAD; the height-math contract was re-walked clean by the verify
+round.
