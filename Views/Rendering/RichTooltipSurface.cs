@@ -31,11 +31,14 @@ namespace GW2CraftingHelper.Views.Rendering
     {
         /// <summary>
         /// Blish's own <c>Tooltip._contentEdgeBuffer</c> horizontal total
-        /// (left 4 + right 3, measured), the chrome
-        /// <c>Tooltip.RecalculateLayout</c> adds around whatever this
-        /// surface's content panel measures.
+        /// (left 6 + right 4), the chrome <c>Tooltip.RecalculateLayout</c>
+        /// adds around whatever this surface's content panel measures.
+        /// <c>Tooltip.EnableTooltips</c> builds the buffer as
+        /// <c>new Thickness(4f, 4f, 3f, 6f)</c>, and that overload's argument
+        /// order is (top, right, bottom, left): the 4 and 3 that look like a
+        /// horizontal pair are the VERTICAL edges.
         /// </summary>
-        private const int ChromeWidth = 7;
+        private const int ChromeWidth = 10;
 
         /// <summary>
         /// Fully opaque, and drawn as the content panel's own background so

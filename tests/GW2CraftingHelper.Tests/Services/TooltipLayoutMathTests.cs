@@ -188,7 +188,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(
                 TooltipLayoutMath.PreferredMaxContentWidth,
-                TooltipLayoutMath.MaxContentWidth(1920, 7));
+                TooltipLayoutMath.MaxContentWidth(1920, 10));
         }
 
         [Fact]
@@ -196,16 +196,16 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // The part Blish's hard 500 cannot do: it knows nothing about
             // the screen it is drawn on.
-            int width = TooltipLayoutMath.MaxContentWidth(400, 7);
+            int width = TooltipLayoutMath.MaxContentWidth(400, 10);
 
-            Assert.Equal(400 - 8 - 7, width);
+            Assert.Equal(400 - 8 - 10, width);
             Assert.True(width < TooltipLayoutMath.PreferredMaxContentWidth);
         }
 
         [Fact]
         public void MaxContentWidth_AbsurdlyNarrowScreen_StopsAtTheFloor()
         {
-            Assert.Equal(TooltipLayoutMath.MinContentWidth, TooltipLayoutMath.MaxContentWidth(60, 7));
+            Assert.Equal(TooltipLayoutMath.MinContentWidth, TooltipLayoutMath.MaxContentWidth(60, 10));
         }
 
         // --- Placement (the four-edge clamp) ---
