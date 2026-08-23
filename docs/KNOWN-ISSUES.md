@@ -10267,6 +10267,19 @@ Both are on the rich path, so they are wrapped against the real font at
 the real pixel width rather than at the 75-character approximation of
 it.
 
+### Swallowed hover on the tree row (found migrating it)
+
+The tree row tooltip was assigned to the row Panel only, and Blish
+resolves a tooltip on the control under the cursor without bubbling to
+the parent - so the row's own name and quantity Labels swallowed it. The
+tooltip fired only over the bare strip of Panel beside them, which is
+the one place a reader is not pointing. That is the same swallowed-hover
+class already fixed in `ShoppingListSectionRenderer`, in `LogTabContent`'s
+rows, and in this same file's pill outer/inner/label stamping; the tree
+row was the remaining instance, and it hid exactly the full-item-name
+line the tooltip exists to show. Both Labels now carry the content
+alongside the Panel.
+
 ### Deliberately out of scope
 
 The confirm-dialog-across-tab-switch callback hazard the ABC review
@@ -10289,7 +10302,10 @@ making `BasicTooltipView`'s max width relative to the screen.
 2. **Tree row tooltip, coin icons and the name line:** hover a
    quantity>1 TP row - its "Unit price" line must show coin icons. Hover
    a row whose NAME is ellipsized: the tooltip must open with the full
-   item name, wrapped if long, above the other lines.
+   item name, wrapped if long, above the other lines. Hover directly over
+   the row's NAME TEXT and over its quantity prefix, not just the empty
+   strip beside them - the tooltip must appear over all three (before
+   this branch it appeared over none of the text).
 3. **Stays inside the screen on all four edges:** drag the module window
    so a tree row sits near the BOTTOM of the screen and hover a pill
    with a tall tooltip - the tooltip must stay fully on screen (this is

@@ -816,9 +816,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 nameColor = Color.Lerp(nameColor, Color.White, 0.30f) * 0.50f;
             }
 
+            Label qtyLabel = null;
             if (qtyPrefix.Length > 0)
             {
-                new Label()
+                qtyLabel = new Label()
                 {
                     Text = qtyPrefix,
                     Font = nameFont,
@@ -918,7 +919,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 };
             }
 
-            UpdateTreeRowTooltip(rowPanel, displayName, fullName, extraTooltipContent);
+            UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, displayName, fullName, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1104,7 +1105,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(rowPanel, newDisplayName, fullName, extraTooltipContent);
+                    UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, newDisplayName, fullName, extraTooltipContent);
                 }
             });
         }
@@ -1121,7 +1122,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </para>
         /// </summary>
         private static void UpdateTreeRowTooltip(
-            Panel rowPanel, string displayName, string fullName, TooltipContent extraContent)
+            Panel rowPanel, Label nameLabel, Label qtyLabel,
+            string displayName, string fullName, TooltipContent extraContent)
         {
             var builder = new TooltipContentBuilder();
             if (displayName != fullName)
@@ -1133,7 +1135,21 @@ namespace GW2CraftingHelper.Views.Rendering
                 builder.Text(fullName).EndLine();
             }
             builder.Append(extraContent);
-            TooltipFacility.ApplyRich(rowPanel, builder.Build());
+            var content = builder.Build();
+
+            // The name and quantity Labels get it too, not just the row
+            // Panel. Blish resolves a tooltip on the control under the
+            // cursor and does not bubble to the parent, so a Label lying
+            // over the row swallows the row's hover - the same
+            // swallowed-hover class already fixed in
+            // ShoppingListSectionRenderer, in LogTabContent's rows, and in
+            // this file's own pill outer/inner/label stamping. On the tree
+            // it bit the worst spot: the item NAME, which is exactly what a
+            // reader points at to find out what the row is, and exactly
+            // what the tooltip's full-name line exists to expand.
+            TooltipFacility.ApplyRich(rowPanel, content);
+            TooltipFacility.ApplyRich(nameLabel, content);
+            TooltipFacility.ApplyRich(qtyLabel, content);
         }
 
         // --- Decision pills ---
