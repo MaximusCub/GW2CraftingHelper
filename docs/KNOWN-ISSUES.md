@@ -11412,4 +11412,17 @@ Desktop gate:
     Confirm and on Cancel, and Escape/X still cancels, with the module
     window interactive again afterwards.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-round-2 HEAD, captures preflight/gF2a-gF2d). Typed 7 into
+Karma's box and tabbed to Snapshot: the prompt appeared with the
+exact dirty count ("You have 1 unsaved change on the Settings tab.
+Save now, or discard and keep the last saved values?") and
+Save/Discard verbs, body fully wrapped. Discard returned the tab to
+the persisted state (Karma back to the greyed default-1 placeholder,
+"default 1" tag). A clean tab-away raised no prompt
+(dialog-region luma probe). Not staged live: the Save-from-prompt
+path (mechanically the same SaveAll the Settings button runs,
+live-proven in the field-fixes-1 gate), the window-close prompt, and
+the invalid-entry rejection message; all pinned by
+SettingsFormStateTests plus the review rounds' binary-verified
+teardown ordering.
