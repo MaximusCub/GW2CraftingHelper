@@ -80,6 +80,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 return;
             }
 
+            // Remove-then-Add, because net472's ConditionalWeakTable has no
+            // AddOrUpdate and Add throws on a duplicate key. A control is
+            // usually brand new here (rows and pills are rebuilt per
+            // render), so the Remove is normally a miss.
             Contents.Remove(control);
             Contents.Add(control, content);
 
