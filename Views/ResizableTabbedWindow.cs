@@ -8,8 +8,9 @@ namespace GW2CraftingHelper.Views
     /// <summary>
     /// TabbedWindow2 subclass that enforces a minimum window size,
     /// matching the behavior of ResizableModuleWindow for StandardWindow.
-    /// Also clamps persisted sizes on layout so the window never opens
-    /// smaller than the minimum.
+    /// Also clamps at construction and on every layout pass, so neither the
+    /// texture-derived constructed size nor a size persisted by an earlier
+    /// session can open the window below the minimum.
     /// </summary>
     public class ResizableTabbedWindow : TabbedWindow2
     {
@@ -25,6 +26,13 @@ namespace GW2CraftingHelper.Views
             _minSize = minSize;
             CanResize = true;
             SavesSize = true;
+
+            // The base constructor sizes the window from windowRegion, which
+            // is a region of the background texture and is narrower than the
+            // minimum. Clamping here rather than waiting for the first
+            // layout pass means the hosted views are never built against a
+            // content region they will immediately be resized out of.
+            ClampToMinimum();
         }
 
         protected override Point HandleWindowResize(Point newSize)
@@ -38,14 +46,24 @@ namespace GW2CraftingHelper.Views
         {
             base.RecalculateLayout();
 
-            // Enforce minimum size on initial layout. Persisted sizes
-            // from earlier sessions may be below the current minimum.
-            if (this.Width < _minSize.X || this.Height < _minSize.Y)
+            // Persisted sizes from earlier sessions may be below the current
+            // minimum - a saved 930px window has to come back at the raised
+            // one. Blish restores the size after construction, so this pass
+            // is what catches it; the clamp only ever grows a window, so a
+            // saved size above the minimum is left exactly as it was.
+            ClampToMinimum();
+        }
+
+        private void ClampToMinimum()
+        {
+            if (this.Width >= _minSize.X && this.Height >= _minSize.Y)
             {
-                this.Size = new Point(
-                    Math.Max(this.Width, _minSize.X),
-                    Math.Max(this.Height, _minSize.Y));
+                return;
             }
+
+            this.Size = new Point(
+                Math.Max(this.Width, _minSize.X),
+                Math.Max(this.Height, _minSize.Y));
         }
     }
 }

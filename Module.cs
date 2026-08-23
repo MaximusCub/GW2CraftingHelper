@@ -539,9 +539,9 @@ namespace GW2CraftingHelper
             // region by the same delta it grows the window by, so the 46px
             // horizontal chrome they encode holds at every size. Only the
             // minimum (MinWindowWidth x MinWindowHeight) moved; the window
-            // opens at it because ResizableTabbedWindow.RecalculateLayout
-            // clamps the constructed size up, the same path that clamps a
-            // persisted size from an earlier session.
+            // opens at it because ResizableTabbedWindow clamps the
+            // constructed size up, on the same paths that clamp a drag and a
+            // size persisted by an earlier session.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions.
             // contentRegion must end above the window bottom: flush would be

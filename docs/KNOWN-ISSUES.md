@@ -11194,12 +11194,20 @@ rule, and the truncation threshold verified by replaying
   texture-space regions and Blish grows the content region by the same
   delta as the window, so the 46px of horizontal chrome they encode holds
   at every size.
-- **Nothing new enforces the minimum.** `ResizableTabbedWindow` already
-  clamped in both directions - `HandleWindowResize` for a drag,
-  `RecalculateLayout` for the constructed size AND for a size persisted by
-  an earlier session (`SavesSize = true`). A user whose saved window is
-  1100px wide therefore opens at 1436 and keeps their saved height; the
-  clamp only ever grows a window, never shrinks one.
+- **The minimum is enforced on three paths, one of them new.**
+  `ResizableTabbedWindow` already clamped a drag (`HandleWindowResize`) and
+  every layout pass (`RecalculateLayout`, which is what catches a size
+  persisted by an earlier session - `SavesSize = true`). Added: the same
+  clamp in the constructor. Until now the constructed size EQUALLED the
+  minimum, so the layout clamp had never actually had to fire for it;
+  with the minimum above the texture-derived constructed size, the window
+  would otherwise have existed at 930px for the frames between
+  construction and its first layout pass, and a view built in that window
+  would have been laid out against an 804px panel and then resized out of
+  it. Clamping in the constructor removes the transient rather than
+  relying on the resize registry to repair it. The clamp only ever grows a
+  window: a user whose saved window is 1100px wide opens at 1436 and keeps
+  their saved height, and a saved 1900px window is untouched.
 - **The centered launch position is now clamped at 0.** 1436 is wider than
   a 1366px screen, where the old centering arithmetic would have produced
   a negative x and put the title bar (and its close button) off the left
