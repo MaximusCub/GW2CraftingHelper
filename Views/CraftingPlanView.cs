@@ -161,9 +161,15 @@ namespace GW2CraftingHelper.Views
         // internal guards, and SpinnerTick/RenderFromBoard/Build()'s
         // re-arm block all PULL from it.
         private readonly PlanStripStatusBoard _statusBoard;
-        private int _spinnerFrameIndex;
         private DateTime _lastSpinnerTickUtc;
-        private static readonly char[] SpinnerFrames = { '|', '/', '-', '\\' };
+
+        // How often the strip re-renders itself from the status board while
+        // a generation is in flight. The whirly part is Blish's own
+        // LoadingSpinner control, which animates off global game time and
+        // needs no help from here (see InlineSpinner); this throttle exists
+        // only to keep the ticker from rewriting an AutoSizeWidth Label's
+        // Text - and re-triggering its text measure - 60x/sec for the whole
+        // of every generation.
         private static readonly TimeSpan SpinnerTickInterval = TimeSpan.FromMilliseconds(150);
 
         // The toolbar's Use Own Materials / Prices / Value Own Materials
@@ -269,6 +275,11 @@ namespace GW2CraftingHelper.Views
         private Checkbox _valueOwnMaterialsCheckbox;
         private StandardButton _generateButton;
         private Label _statusLabel;
+
+        // Trails _statusLabel while a generation is in flight. A sibling of
+        // the label rather than a decoration inside it: it is a Control that
+        // paints a texture, not a glyph the label could carry.
+        private LoadingSpinner _statusSpinner;
         private Panel _separator;
         private FlowPanel _contentPanel;
 
@@ -580,6 +591,14 @@ namespace GW2CraftingHelper.Views
             if (_statusLabel != null)
             {
                 _statusLabel.Text = status ?? "";
+
+                // The label is AutoSizeWidth, so its right edge moves with
+                // every text change and the spinner has to follow it. Done
+                // here rather than only in RenderFromBoard because the
+                // strip has several other writers (Resolving..., the
+                // invalid-quantity notice, the section renderers' own
+                // SetStatus callback) and any of them can land mid-flight.
+                InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             }
         }
 
@@ -1558,6 +1577,7 @@ namespace GW2CraftingHelper.Views
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             _separator.Location = new Point(0, layout.SeparatorY);
             _contentPanel.Location = new Point(0, layout.ContentY);
             _contentPanel.Size = new Point(w, h - layout.TopRegionHeight);
@@ -1735,6 +1755,9 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, layout.StatusRowY),
                 Parent = buildPanel
             };
+
+            _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Static separator between controls and content
             _separator = new Panel()
@@ -2016,6 +2039,7 @@ namespace GW2CraftingHelper.Views
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
             PlaceTreeToolbarRow(w, layout.TreeToolbarRowY);
             _statusLabel.Location = new Point(0, layout.StatusRowY);
+            InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
             _separator.Size = new Point(w - RightEdgePadding, 2);
             _separator.Location = new Point(0, layout.SeparatorY);
             _contentPanel.Location = new Point(0, layout.ContentY);
@@ -3039,24 +3063,24 @@ namespace GW2CraftingHelper.Views
         {
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
+            // The spinner is shown on exactly the condition the old ASCII
+            // glyph was appended on, and every branch below re-anchors it
+            // through SetStatus.
+            if (_statusSpinner != null)
+            {
+                _statusSpinner.Visible = snapshot.InFlight;
+            }
+
             if (snapshot.InFlight)
             {
                 string text = string.IsNullOrEmpty(snapshot.PhaseText) ? "Generating..." : snapshot.PhaseText;
-                // The glyph goes at the END
-                // of the string, not the start. SpinnerFrames' proportional-
-                // font glyphs ('|' '/' '-' '\') each have a different
-                // advance width; with the glyph first, every character
-                // after it in the same AutoSizeWidth label shifts
-                // horizontally by that width delta ~7x/sec
-                // (SpinnerTickInterval), making the phase text visibly
-                // jitter left-right during generation even though the
-                // label's own Location never changes. Putting the glyph
-                // last means the phase text is always laid out identically
-                // from the label's fixed x=0 origin - only the trailing
-                // glyph (and the label's overall AutoSizeWidth) moves,
-                // which reads as a normal spinner rather than shifting
-                // text.
-                SetStatus(WithStandingNotices($"{text} {SpinnerFrames[_spinnerFrameIndex]}"));
+                // The spinner trails the text rather than leading it, as
+                // the ASCII glyph did before it: the phase text then always
+                // lays out from the label's fixed x=0 origin, and only the
+                // spinner moves as the text changes. Leading it would shift
+                // every character of the phase text horizontally whenever
+                // the standing notices changed the label's leading run.
+                SetStatus(WithStandingNotices(text));
             }
             else if (!string.IsNullOrEmpty(snapshot.FinalStatusText))
             {
@@ -3119,12 +3143,12 @@ namespace GW2CraftingHelper.Views
         /// decision itself lives there (Blish-free, so the "finish landed
         /// before/between ticks" orderings are directly testable); this
         /// method only carries out whatever it returns and owns the
-        /// spinner-glyph throttling.
+        /// re-render throttling.
         /// <see cref="PlanStripTickAction.RenderFinalAndStop"/> is what
         /// makes "the board reports finished -> render final status and
         /// stop" true without any separate completion-callback write into
-        /// this control ever being needed. The spinner glyph itself only
-        /// advances (and only then re-renders) once per SpinnerTickInterval,
+        /// this control ever being needed. The strip re-renders once per
+        /// SpinnerTickInterval,
         /// not every frame - DoUpdate fires ~60x/sec, and writing to an
         /// AutoSizeWidth Label's Text re-triggers a text measure/layout
         /// pass even when the string is unchanged, so re-rendering every
@@ -3148,7 +3172,6 @@ namespace GW2CraftingHelper.Views
                     if (now - _lastSpinnerTickUtc >= SpinnerTickInterval)
                     {
                         _lastSpinnerTickUtc = now;
-                        _spinnerFrameIndex = (_spinnerFrameIndex + 1) % SpinnerFrames.Length;
                         RenderFromBoard(snapshot);
                     }
                     return true;
@@ -3177,7 +3200,6 @@ namespace GW2CraftingHelper.Views
         private void ArmSpinnerTicker(int myGen)
         {
             _spinnerTicker?.Cancel();
-            _spinnerFrameIndex = 0;
             _lastSpinnerTickUtc = DateTime.UtcNow;
             _spinnerTicker = new FrameTicker(gameTime => SpinnerTick(myGen, gameTime));
             RenderFromBoard(_statusBoard.Snapshot());
