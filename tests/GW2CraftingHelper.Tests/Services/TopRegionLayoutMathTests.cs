@@ -19,14 +19,20 @@ namespace GW2CraftingHelper.Tests.Services
             // are the offsets the strip had before it was parameterised at
             // all, so a constant changing must fail here rather than
             // silently move the strip.
+            //
+            // Re-baselined once, by two pixels, for the +2pt body bump:
+            // StatusToSeparatorGap went 21 -> 23 so the status label's
+            // Font16 descenders clear the separator beneath them. Every row
+            // ABOVE the status label is unmoved, which is the point of
+            // listing them all here.
             var layout = TopRegionLayoutMath.Compute(rowCount: 1, treeToolbarVisible: false);
 
             Assert.Equal(35, layout.InputPanelHeight);
             Assert.Equal(43, layout.ControlsRowY);
             Assert.Equal(81, layout.StatusRowY);
-            Assert.Equal(102, layout.SeparatorY);
-            Assert.Equal(107, layout.ContentY);
-            Assert.Equal(112, layout.TopRegionHeight);
+            Assert.Equal(104, layout.SeparatorY);
+            Assert.Equal(109, layout.ContentY);
+            Assert.Equal(114, layout.TopRegionHeight);
         }
 
         [Fact]

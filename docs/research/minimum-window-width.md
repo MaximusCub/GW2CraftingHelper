@@ -1,33 +1,41 @@
 # Minimum module width for the deepest recipe trees (GW2CraftingHelper master v0.2.0)
 
-> **Status - acted on.** Written 2026-08-23 against master `aa80382`, then
-> implemented by branch `min-width-1436`: the module minimum is now
-> **1436 x 710** (`Services/WindowSizing.cs`) and
+> **Status - acted on, twice.** Written 2026-08-23 against master
+> `aa80382`, then implemented by branch `min-width-1436`, and the +2pt
+> variant taken by branch `font-and-polish` (see the paragraph at the end
+> of this block). The module minimum is now
+> **1472 x 710** (`Services/WindowSizing.cs`) and
 > `PlanRelayoutMath.TreePillColumnWidth` is **256**
 > (section 6's suggestion, taken at the current fonts rather than only
 > after a font bump).
 >
 > The window figures in the tables below are computed with the **240px**
 > pill column this report measured. The shipped 256px column spends 16 of
-> those pixels, so at 1436: the depth-23 row carries the full 24px designed
-> gutter past its complete name, and the depth-24 row - the one vendor-leaf
-> indent level of headroom section 7 recommends - fits **exactly**, with no
-> gutter. (With the report's 240px column, 1436 would have left that
-> depth-24 row 16px of slack instead.) Those edges are pinned by
-> `PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRow*`, which read
-> the shipped constants rather than copies of them.
+> those pixels, so at the minimum: the depth-23 row carries the full 24px
+> designed gutter past its complete name, and the depth-24 row - the one
+> vendor-leaf indent level of headroom section 7 recommends - fits
+> **exactly**, with no gutter. (With the report's 240px column, the minimum
+> would have left that depth-24 row 16px of slack instead.) Those edges are
+> pinned by `PlanRelayoutMathTests.ComputeTreeColumnEdges_DeepestRow*`,
+> which read the shipped constants rather than copies of them.
 >
 > The minimum is **fitted to the game client**: on a client narrower than
-> 1436 (an ordinary windowed 1280x720 or 1366x768) the enforced minimum
+> 1472 (an ordinary windowed 1280x720 or 1366x768) the enforced minimum
 > falls back to the client's own width, floor 930, so the resize grip and
 > the right-hand columns stay on-screen. Deep rows ellipsize there as they
 > did before.
 >
-> The **+2pt variant (1472) is a pending maintainer decision and is NOT
-> implemented**; `WindowSizing.MinWindowWidth` is a single constant so
-> that bump stays a one-line change. Section 7's "repo assumption looks wrong"
-> finding was confirmed and fixed. See the "Minimum width raise
-> (min-width-1436)" section of [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md).
+> The **+2pt variant landed** on `font-and-polish`: the maintainer took the
+> bump after a field test, so row/body text is now Menomonia 16 and
+> small/caption/pill text Menomonia 14 (`Views/Rendering/UiFonts`), and
+> `WindowSizing.MinWindowWidth` moved 1436 -> **1472** exactly as this
+> report's section 7 predicted (1448 + one `TreeIndentPer`). The pill
+> column stayed at 256: section 6's f14 four-pill run measures 242px
+> against the 252px budget a 256px column leaves. Section 7's "repo
+> assumption looks wrong" finding was confirmed and fixed. See the
+> "Minimum width raise (min-width-1436)" and "Font bump and decision-round
+> polish (font-and-polish)" sections of
+> [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md).
 
 ## Answer
 

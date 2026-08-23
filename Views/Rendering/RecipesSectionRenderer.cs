@@ -79,8 +79,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var font = GameService.Content.DefaultFont14;
-            var sublabelFont = GameService.Content.DefaultFont12;
+            var font = UiFonts.Body;
+            var sublabelFont = UiFonts.Caption;
             int maxStatusWidth = 0;
             int widestNameEnd = 0;
             foreach (var row in section.Rows)
@@ -212,7 +212,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
 
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             int nameY = hasSublabel ? 4 : 8;
             LabelHelpers.WithDescenderClearance(
                 new Label()
@@ -234,11 +234,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     new Label()
                     {
                         Text = row.Sublabel,
-                        Font = GameService.Content.DefaultFont12,
+                        Font = UiFonts.Caption,
                         TextColor = new Color(170, 170, 170),
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
-                        Location = new Point(NameX, 22),
+                        Location = new Point(NameX, 24),
                         Parent = rowPanel
                     });
             }

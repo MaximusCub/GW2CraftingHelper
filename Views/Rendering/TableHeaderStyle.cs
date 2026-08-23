@@ -60,6 +60,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal const int LabelY = 5;
 
-        internal static BitmapFont Font => GameService.Content.DefaultFont14;
+        internal static BitmapFont Font => UiFonts.Body;
     }
 }

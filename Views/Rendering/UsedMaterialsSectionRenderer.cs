@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             // Row ORDER only - the pre-scan below sees the same rows either
             // way, so every column edge (and PlanContentHeightMath's row
@@ -142,7 +142,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             int qtyRightEdge = QtyRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);

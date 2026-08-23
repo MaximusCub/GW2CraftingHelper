@@ -82,7 +82,9 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SaveBarHeight = 40;
         private const int RowHeight = 30;
-        private const int InfoRowHeight = 20;
+        // 22, not 20: an info line sits at y=2 and its lowest Font16 ink is
+        // y=23, so 22 leaves the same 1px overhang 20 left Font14's y=21.
+        private const int InfoRowHeight = 22;
         private const int NameColumnX = 16;
         private const int NameColumnWidth = 220;
         private const int InputWidth = 80;
@@ -548,6 +550,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = materialLabel,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -565,6 +568,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "tier (0-2)",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -575,6 +579,7 @@ namespace GW2CraftingHelper.Views
 
             var errorLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -687,6 +692,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -707,6 +713,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Log max size",
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -724,6 +731,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "MB (1-1000)",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -734,6 +742,7 @@ namespace GW2CraftingHelper.Views
 
             _logMaxSizeErrorLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -754,6 +763,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Log retention",
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -771,6 +781,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "days (1-365)",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -781,6 +792,7 @@ namespace GW2CraftingHelper.Views
 
             _logRetentionDaysErrorLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -893,6 +905,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Refresh interval",
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -910,6 +923,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "minutes (1-120)",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -920,6 +934,7 @@ namespace GW2CraftingHelper.Views
 
             _snapshotRefreshIntervalErrorLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -974,7 +989,7 @@ namespace GW2CraftingHelper.Views
             new Label()
             {
                 Text = title,
-                Font = GameService.Content.DefaultFont18,
+                Font = UiFonts.Title,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX, 4),
@@ -1005,6 +1020,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = text,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1020,7 +1036,10 @@ namespace GW2CraftingHelper.Views
         // MinColumnWidth (the one/two-column threshold) is derived from the
         // same numbers, not hand-copied from them; these are compile-time
         // aliases, not a second copy.
-        private const int CurrencyRowHeight = 30;
+        // 32, not 30: the cell's labels sit at y=6, whose lowest Font16 ink
+        // is y=27 - exactly the top of the 30px row's own divider
+        // (30 - 2 - CellDividerClearance).
+        private const int CurrencyRowHeight = 32;
         private const int CellNameX = SettingsCurrencyGridLayout.CellNameX;
         private const int CellNameWidth = SettingsCurrencyGridLayout.CellNameWidth;
         private const int CellInputX = SettingsCurrencyGridLayout.CellInputX;
@@ -1029,7 +1048,8 @@ namespace GW2CraftingHelper.Views
         private const int CellTagX = SettingsCurrencyGridLayout.CellTagX;
         private const int CellTextY = 6;
         // 1, not 2: the input then ends at y=27, clear of the row rule
-        // LabelHelpers.CreateRowDivider puts at 30 - 2 - 1.
+        // LabelHelpers.CreateRowDivider puts at
+        // CurrencyRowHeight - 2 - CellDividerClearance.
         private const int CellInputY = 1;
         private const int CellDividerClearance = 1;
         private const int CurrencyFilterWidth = 200;
@@ -1057,6 +1077,7 @@ namespace GW2CraftingHelper.Views
 
             _currencyCountLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1066,7 +1087,9 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        private const int CurrencyHeaderRowHeight = 24;
+        // 26, not 24: the header labels sit at CurrencyHeaderTextY and
+        // their lowest Font16 ink is y=25.
+        private const int CurrencyHeaderRowHeight = 26;
         private const int CurrencyHeaderTextY = 4;
 
         /// <summary>
@@ -1089,6 +1112,7 @@ namespace GW2CraftingHelper.Views
             {
                 _currencyHeaderNames[i] = new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = "Currency",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1097,6 +1121,7 @@ namespace GW2CraftingHelper.Views
                 };
                 _currencyHeaderUnits[i] = new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = "Copper per unit",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1140,9 +1165,10 @@ namespace GW2CraftingHelper.Views
             };
 
             string shortName = LabelHelpers.EllipsizeToWidth(
-                GameService.Content.DefaultFont14, name, CellNameWidth);
+                UiFonts.Body, name, CellNameWidth);
             var nameLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = shortName,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -1187,6 +1213,7 @@ namespace GW2CraftingHelper.Views
 
             var defaultLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1200,6 +1227,7 @@ namespace GW2CraftingHelper.Views
 
             var errorLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1379,6 +1407,7 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,

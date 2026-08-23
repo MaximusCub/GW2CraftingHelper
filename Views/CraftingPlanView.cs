@@ -57,6 +57,12 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
+        // Was 30, against a Font16 title. The +2pt bump promoted that title
+        // to Font18, whose lowest measured ink at y=5 is y=28 - one pixel
+        // into the 30px panel's divider. Two more pixels restore the
+        // clearance the 30px panel had.
+        private const int SectionHeaderRowHeight = 32;
+
         // Section divider grey, readable against the parchment texture, one
         // tier below the 180-grey structural separators (window chrome,
         // unrelated to this). The row-divider twin (RowDividerColor) moved
@@ -1474,6 +1480,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Qty:",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1678,6 +1685,7 @@ namespace GW2CraftingHelper.Views
             // Price basis selector; applies on the next Generate.
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Prices:",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1749,6 +1757,7 @@ namespace GW2CraftingHelper.Views
             // Status label
             _statusLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1899,6 +1908,7 @@ namespace GW2CraftingHelper.Views
             // would be five verbs attached to nothing.
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Recipe Tree:",
                 TextColor = new Color(170, 170, 170),
                 AutoSizeWidth = true,
@@ -3309,6 +3319,7 @@ namespace GW2CraftingHelper.Views
 
             var label = new Label()
             {
+                Font = UiFonts.Body,
                 Text = EmptyPlanText,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -3447,8 +3458,8 @@ namespace GW2CraftingHelper.Views
 
             int frameSize = iconSize + iconBorder * 2;
 
-            var titleFont = GameService.Content.DefaultFont32;
-            var qtyFont = GameService.Content.DefaultFont18;
+            var titleFont = UiFonts.Display;
+            var qtyFont = UiFonts.Title;
 
             string nameText = vm.TargetItemName ?? "Unknown Item";
 
@@ -3568,7 +3579,7 @@ namespace GW2CraftingHelper.Views
 
             var headerPanel = new Panel()
             {
-                Size = new Point(panelWidth, 30),
+                Size = new Point(panelWidth, SectionHeaderRowHeight),
                 BackgroundColor = Color.Transparent,
                 Parent = _contentPanel
             };
@@ -3583,6 +3594,7 @@ namespace GW2CraftingHelper.Views
             // Unicode without a fresh render check.
             var headerArrow = new Label()
             {
+                Font = UiFonts.Body,
                 Text = expanded ? "v" : ">",
                 TextColor = Color.White,
                 AutoSizeWidth = true,
@@ -3591,14 +3603,16 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            // DefaultFont16, not 18: the plan title above now owns
-            // Font18-and-up (it renders at Font32), so a section header
-            // sharing Font18 with it would flatten the page back into one
-            // typographic level - see CreatePlanHeader.
+            // Title, not Body: a section header has to read one step above
+            // the rows under it, and the +2pt bump moved Body onto the 16
+            // this header used to sit at. Font18 no longer collides with
+            // the plan title (it renders at Font32 - see CreatePlanHeader),
+            // and it is what the Settings and About tabs already use for
+            // their own section headers.
             new Label()
             {
                 Text = title,
-                Font = GameService.Content.DefaultFont16,
+                Font = UiFonts.Title,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(22, 5),
@@ -3606,8 +3620,8 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
-            // 2px, bottom-anchored inside the 30px headerPanel
-            // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
+            // 2px, bottom-anchored inside the SectionHeaderRowHeight
+            // headerPanel - see
             // LabelHelpers.CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform.
             // NOT built via LabelHelpers.CreateRowDivider (headerPanel is not a row of a
@@ -3618,12 +3632,13 @@ namespace GW2CraftingHelper.Views
             // shows a bottom-flush 2px line under H=30 is immune at the
             // default 0.897 scale but vulnerable (~16-17%) at the "Small"
             // 0.81 scale, so it gets the same 1px bottom clearance as the
-            // vulnerable row types (y = 30 - 2 - 1 = 27). Title text sits
-            // at y=5 with DefaultFont16 and remains clear of y=27.
+            // vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
+            // at y=5 and its lowest measured ink at Font18 is y=28, which
+            // is what SectionHeaderRowHeight's own two extra pixels buy.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
-                Location = new Point(0, 27),
+                Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
@@ -3669,7 +3684,7 @@ namespace GW2CraftingHelper.Views
             _relayoutActions.Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
-                headerPanel.Size = new Point(w, 30);
+                headerPanel.Size = new Point(w, SectionHeaderRowHeight);
                 headerDivider.Size = new Point(w, 2);
                 contentFlow.Size = new Point(w, contentFlow.Height);
             });

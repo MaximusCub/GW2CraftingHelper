@@ -123,7 +123,7 @@ namespace GW2CraftingHelper.Views
                 child.Dispose();
             }
 
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             int y = 4;
 
             foreach (var check in Checks)

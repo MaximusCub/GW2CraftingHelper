@@ -180,6 +180,7 @@
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
     <Compile Include="Views\Rendering\SortableHeaderLabel.cs" />
+    <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
     <Compile Include="Views\Rendering\CTableHeaderRenderer.cs" />

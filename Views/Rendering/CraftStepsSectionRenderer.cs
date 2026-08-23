@@ -69,8 +69,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var textFont = GameService.Content.DefaultFont16;
-            var sublabelFont = GameService.Content.DefaultFont12;
+            var textFont = UiFonts.Body;
+            var sublabelFont = UiFonts.Caption;
             int maxSublabelWidth = 0;
             int widestNameEnd = 0;
             foreach (var row in section.Rows)
@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = rowPanel
             };
             string numberText = stepNumber.ToString();
-            var numberFont = GameService.Content.DefaultFont18;
+            var numberFont = UiFonts.Title;
             var numberMeasure = numberFont.MeasureString(numberText);
             int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
             int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);
@@ -178,7 +178,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
 
-            var textFont = GameService.Content.DefaultFont16;
+            var textFont = UiFonts.Body;
             var greyColor = new Color(170, 170, 170);
             int x = TextX;
 
@@ -216,7 +216,7 @@ namespace GW2CraftingHelper.Views.Rendering
             if (!string.IsNullOrEmpty(row.Sublabel))
             {
                 sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
-                    rowPanel, row.Sublabel, GameService.Content.DefaultFont12,
+                    rowPanel, row.Sublabel, UiFonts.Caption,
                     new Color(153, 153, 153),
                     SublabelRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd), 16);
             }

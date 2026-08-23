@@ -80,8 +80,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var font = GameService.Content.DefaultFont14;
-            var charFont = GameService.Content.DefaultFont12;
+            var font = UiFonts.Body;
+            var charFont = UiFonts.Caption;
             int maxNameWidth = 0;
             int maxCharWidth = 0;
             int maxLevelWidth = 0;
@@ -193,7 +193,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             LabelHelpers.WithDescenderClearance(
                 new Label()
@@ -219,7 +219,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // row.CharacterAvailabilityText is null (the snapshot never
             // captured this data - see that field's own doc comment): no
             // label, no tooltip, no claim either way.
-            var charFont = GameService.Content.DefaultFont12;
+            var charFont = UiFonts.Caption;
             var charColor = new Color(170, 170, 170);
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;

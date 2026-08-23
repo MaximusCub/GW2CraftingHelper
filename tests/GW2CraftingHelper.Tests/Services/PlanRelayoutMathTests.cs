@@ -308,14 +308,19 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(edges.NameMaxWidth >= nameWidth);
         }
 
-        // The measurement the 1436px window minimum and the 256px pill
+        // The measurement the 1472px window minimum and the 256px pill
         // column were derived from - docs/research/minimum-window-width.md.
         // "+24 Agony Infusion" is the deepest chain in the game (23 forced
         // levels, one recipe each); its deepest row renders "4194304x
-        // Thermocatalytic Reagent", measured at Menomonia 14 against the
-        // installed font: 65px of quantity prefix, 174px of name.
-        private const int DeepestRowQtyPrefixWidth = 65;
-        private const int DeepestRowNameWidth = 174;
+        // Thermocatalytic Reagent".
+        //
+        // Re-measured at Menomonia 16 for the +2pt body bump, against the
+        // same installed XNBs and in the same convention the Font14 figures
+        // (65 / 174) were taken in: the name run measures 192 directly, and
+        // the quantity prefix scales by that string's own measured Font16 /
+        // Font14 ratio (77 / 68 = 1.132), 65 * 1.132 = 73.6 -> 73.
+        private const int DeepestRowQtyPrefixWidth = 73;
+        private const int DeepestRowNameWidth = 192;
 
         // Tree row geometry: nameX = depth * TreeIndentPer + (caret column
         // + icon frame + name gap) = depth * 24 + 58.
@@ -333,7 +338,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         // Live-priced cost column behind a six-digit gold total, which is
         // what the deepest chain costs; 150 is only the floor.
-        private const int DeepestPlanCostColumnWidth = 165;
+        //
+        // 175 at Font16, from 165 at Font14: only the three digit runs in
+        // the column scale with the font (a six-digit gold plus two
+        // two-digit units, 90px at the measured Font14 digit advance of 9,
+        // 100px at Font16's 10), while the 75px of coin-icon and gap chrome
+        // around them is fixed pixels.
+        private const int DeepestPlanCostColumnWidth = 175;
 
         // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
         // scanned rows gets. Pass the scanned end to exercise what

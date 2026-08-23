@@ -28,7 +28,12 @@ namespace GW2CraftingHelper.Views
         // control (see ApiAccessDialog's own measurement note), so window
         // width is the only lever either dialog has over the title bar.
         private const int WindowWidth = 560;
-        private const int WindowHeight = 170;
+        // 190, not 170. The message area is capped to whole lines of the
+        // body font (see MessageAreaHeight), and the +2pt bump made that
+        // text ~11% wider while growing its line box 18 -> 20 - the same
+        // sentence needs a line it did not need before. 20px is exactly one
+        // Font16 line, which takes the cap from three lines back to four.
+        private const int WindowHeight = 190;
         private const int ContentX = 10;
         private const int ContentY = 35;
         private const int ContentWidth = WindowWidth - (2 * ContentX);
@@ -150,7 +155,7 @@ namespace GW2CraftingHelper.Views
             // count, which is what keeps the buttons in the content region
             // (see ButtonY) - the same greedy wrap plus ellipsized tail the
             // notes section already renders with.
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             var measure = LabelHelpers.MeasureWith(font);
             int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
             var wrapped = TextWrapMath.Wrap(

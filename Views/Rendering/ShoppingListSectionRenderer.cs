@@ -92,7 +92,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // Moved verbatim from CraftingPlanView.CreateShoppingListBody.
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var coinFont = GameService.Content.DefaultFont14;
+            var coinFont = UiFonts.Body;
 
             // Pre-scan: widest actual coin+currency value width per column
             // this render (CoinCurrencyRenderer.MeasureValueWidth accounts for a currency-only
@@ -299,7 +299,7 @@ namespace GW2CraftingHelper.Views.Rendering
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);

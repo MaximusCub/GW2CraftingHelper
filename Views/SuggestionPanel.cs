@@ -228,6 +228,7 @@ namespace GW2CraftingHelper.Views
                 // Item name
                 new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = item.Name,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,

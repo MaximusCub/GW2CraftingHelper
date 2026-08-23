@@ -247,7 +247,14 @@ namespace GW2CraftingHelper.Views
         private const int CoinCaptionGap = 8;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
-        private const int ItemRowHeight = 52;
+        // 56, not 52. An item cell stacks a name line at y=4 and a
+        // breakdown line under it; at Font16 the name's line box ends at
+        // y=24, so the breakdown moved from y=24 to y=26 and its lowest ink
+        // from y=43 to y=47. 56 keeps the 9px of bottom slack the 52px cell
+        // had. The wallet cell is unchanged: it is ICON-driven (a 32px icon
+        // at y=2 plus 2), and its single Font16 line's ink (y=27) still sits
+        // well inside 36.
+        private const int ItemRowHeight = 56;
         private const int WalletRowHeight = 36;
 
         // UI controls (stored for resize handler)
@@ -404,6 +411,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Account Snapshot",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -452,14 +460,16 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 // Y=2 (not 4) inside this 24px _statusPanel -
                 // matches the coin row's own precedent
                 // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
-                // in the same 24px height), leaving DefaultFont14 the same
-                // clearance the coin row already relies on.
+                // in the same 24px height), leaving the body font the same
+                // clearance the coin row already relies on (its lowest
+                // Font16 ink is y=23).
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
@@ -825,7 +835,11 @@ namespace GW2CraftingHelper.Views
 
         private static int MeasureCheckboxWidth(string text)
         {
-            var font = GameService.Content.DefaultFont14;
+            // Caption, not Body: Blish_HUD.Controls.Checkbox draws its label
+            // in DefaultFont14 and exposes no Font seam to change that, so
+            // measuring in Body would reserve ~11% more width than the
+            // control ever paints. See UiFonts' note on the exclusions.
+            var font = UiFonts.Caption;
             int textWidth = (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
             return textWidth + CheckboxChromeWidth;
         }
@@ -1656,6 +1670,7 @@ namespace GW2CraftingHelper.Views
             {
                 new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = "No snapshot available. Click Refresh Now.",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1734,6 +1749,7 @@ namespace GW2CraftingHelper.Views
 
                 new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = message,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1864,6 +1880,7 @@ namespace GW2CraftingHelper.Views
         {
             var label = new Label()
             {
+                Font = UiFonts.Body,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(RowTextX, y),
@@ -1901,7 +1918,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static bool FitRowTextLabel(Label label, string text, int cellWidth)
         {
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             string full = text ?? "";
             string shown = LabelHelpers.EllipsizeToWidth(font, full, cellWidth - RowTextX - RowTextRightPad);
 
@@ -1980,7 +1997,7 @@ namespace GW2CraftingHelper.Views
                 : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
 
             var breakdownLabel =
-                CreateRowTextLabel(rowPanel, breakdown, columnWidth, 24, InfoTextColor, out bool breakdownShortened);
+                CreateRowTextLabel(rowPanel, breakdown, columnWidth, 26, InfoTextColor, out bool breakdownShortened);
 
             ApplyRowStripTooltip(rowPanel, nameText, nameShortened, breakdown, breakdownShortened);
 
@@ -2072,8 +2089,8 @@ namespace GW2CraftingHelper.Views
 
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
-            var font = GameService.Content.DefaultFont14;
-            var captionFont = GameService.Content.DefaultFont12;
+            var font = UiFonts.Body;
+            var captionFont = UiFonts.Caption;
             new Label()
             {
                 Text = CoinCaption,

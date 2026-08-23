@@ -37,16 +37,26 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Characters per wrapped line, derived from the one width Blish
         /// itself enforces: BasicTooltipView.MAX_WIDTH is 500px (measured),
-        /// and DefaultFont14 averages roughly 6.5px per character on prose,
-        /// so 500px is about 76 characters. 75 sits just inside that, which
-        /// makes this wrap a no-op on width - it reproduces the break Blish
-        /// would have made anyway, at a point the module controls - rather
-        /// than a narrowing that adds lines. Height matters here: Blish
-        /// places a tooltip that does not fit above the cursor 36px BELOW it
-        /// and never clamps to the bottom screen edge, so every extra
-        /// wrapped line is a line that can fall off the screen.
+        /// and the tooltip body font averages roughly 6.5px per character
+        /// on prose, so 500px is about 76 characters. The budget sits just
+        /// inside that, which makes this wrap a no-op on width - it
+        /// reproduces the break Blish would have made anyway, at a point
+        /// the module controls - rather than a narrowing that adds lines.
+        /// Height matters here: Blish places a tooltip that does not fit
+        /// above the cursor 36px BELOW it and never clamps to the bottom
+        /// screen edge, so every extra wrapped line is a line that can fall
+        /// off the screen.
+        /// <para>
+        /// 67, not the 75 that budget held when the body font was Font14.
+        /// The same prose measures 1.11x wider at Font16 (measured against
+        /// the installed Menomonia XNBs on three real strings: 730 -> 810,
+        /// 174 -> 192, 263 -> 292), and 75 / 1.11 = 67. Scaling the shipped
+        /// budget by a measured factor keeps whatever calibration prose the
+        /// original 6.5px figure came from, which re-deriving from a fresh
+        /// sample sentence would silently replace.
+        /// </para>
         /// </summary>
-        public const int LineBudgetChars = 75;
+        public const int LineBudgetChars = 67;
 
         // Character-count stand-in for TextWrapMath's font measurement -
         // the whole reason the wrapper takes a measure function rather than
