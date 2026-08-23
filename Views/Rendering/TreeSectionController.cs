@@ -817,7 +817,11 @@ namespace GW2CraftingHelper.Views.Rendering
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
                 panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
             int pillColX = edges.PillColX;
-            var costEdges = TreeCostColumnMath.ComputeEdges(edges.CostRightEdge, columnWidths);
+            // Whether this row fills the shared currency band, which is what
+            // decides where its coin run ends - see
+            // TreeCostColumnMath.ComputeRowEdges. Assigned with the cost
+            // cell below and read again by the relayout closure.
+            bool rowDrawsCurrency = false;
 
             string fullName = node.Name ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
@@ -945,10 +949,10 @@ namespace GW2CraftingHelper.Views.Rendering
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
             // render's pre-scan of the whole tree, so the coin ICONS land
-            // on the same x on every row - see
-            // Services/TreeCostColumnMath. Right-aligning the run as a
-            // whole (the previous shape) lined up only the run's right
-            // edge, which a mixed coin/currency row shares with nothing.
+            // on the same x on every row drawing the same bands - see
+            // Services/TreeCostColumnMath, whose ComputeRowEdges also
+            // covers why a row with no currency of its own ends on the
+            // column's right edge rather than short of it.
             // Only rendered
             // when this node has a real committed decision with a cost
             // figure at all (SubtreeCost.HasValue) - HAVE/CURRENCY/UNKNOWN
@@ -982,8 +986,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? CurrencyDisplayResolver.ResolveAmounts(
                         node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata)
                     : null;
+                rowDrawsCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
                 costCell = CoinCurrencyRenderer.RenderValueCellInSubColumns(
-                    rowPanel, node.SubtreeCost.Value, currencyAmounts, costEdges, 12, costFont, dimmed ? 0.35f : 1f);
+                    rowPanel, node.SubtreeCost.Value, currencyAmounts,
+                    TreeCostColumnMath.ComputeRowEdges(edges.CostRightEdge, columnWidths, rowDrawsCurrency),
+                    12, costFont, dimmed ? 0.35f : 1f);
             }
 
             // Child container. Children of a non-Craft decision are this
@@ -1106,7 +1113,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (costCell != null)
                 {
                     CoinCurrencyRenderer.RepositionValueCellInSubColumns(
-                        costCell, TreeCostColumnMath.ComputeEdges(e.CostRightEdge, columnWidths), 12);
+                        costCell,
+                        TreeCostColumnMath.ComputeRowEdges(e.CostRightEdge, columnWidths, rowDrawsCurrency),
+                        12);
                 }
                 if (childFlow != null)
                 {

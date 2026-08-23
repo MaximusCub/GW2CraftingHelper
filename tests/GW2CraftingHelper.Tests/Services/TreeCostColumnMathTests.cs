@@ -244,6 +244,99 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ComputeRowEdges_CoinOnlyRow_EndsOnTheColumnRightEdge()
+        {
+            // Field test, bug 4: the "Cost" header right-aligns on the
+            // column's own right edge, so a row that never fills the shared
+            // currency band must not stop short of it - a gold figure
+            // sitting a whole currency band left of the header is what the
+            // user saw.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88);
+
+            var coinOnly = TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: false);
+
+            Assert.Equal(1000, coinOnly.CopperRightEdge);
+            Assert.Equal(1000, coinOnly.CurrencyRightEdge);
+        }
+
+        [Fact]
+        public void ComputeRowEdges_CurrencyRow_KeepsTheSharedBand()
+        {
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88);
+
+            var withCurrency = TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: true);
+
+            Assert.Equal(1000, withCurrency.CurrencyRightEdge);
+            Assert.Equal(1000 - 88 - 6, withCurrency.CopperRightEdge);
+            Assert.Equal(
+                TreeCostColumnMath.ComputeEdges(1000, widths).GoldRightEdge,
+                withCurrency.GoldRightEdge);
+        }
+
+        [Fact]
+        public void ComputeRowEdges_EveryRowShape_EndsOnTheSameRightEdge()
+        {
+            // The header is right-aligned to costRightEdge, so every row's
+            // rightmost segment has to end there whatever it renders:
+            // coin-only, currency-only, mixed, and the unpriceable dash
+            // (which is placed on the copper edge).
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88);
+
+            var coinOnly = TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: false);
+            var mixed = TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: true);
+
+            Assert.Equal(1000, coinOnly.CopperRightEdge);
+            Assert.Equal(1000, mixed.CurrencyRightEdge);
+        }
+
+        [Fact]
+        public void ComputeRowEdges_NoCurrencyInTheWholeTree_MatchesComputeEdges()
+        {
+            // Nothing reserved a currency band in the first place, so both
+            // row shapes are the pre-existing layout, unchanged.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 0);
+            var shared = TreeCostColumnMath.ComputeEdges(1000, widths);
+
+            foreach (bool drawsCurrency in new[] { false, true })
+            {
+                var row = TreeCostColumnMath.ComputeRowEdges(1000, widths, drawsCurrency);
+
+                Assert.Equal(shared.GoldRightEdge, row.GoldRightEdge);
+                Assert.Equal(shared.SilverRightEdge, row.SilverRightEdge);
+                Assert.Equal(shared.CopperRightEdge, row.CopperRightEdge);
+                Assert.Equal(shared.CurrencyRightEdge, row.CurrencyRightEdge);
+            }
+        }
+
+        [Fact]
+        public void ComputeRowEdges_ReportsTheWholeColumnsReservedWidth()
+        {
+            // TotalWidth is the budget the tree reserves so a wide row
+            // cannot run back into the decision pills - a property of the
+            // tree, not of the row being placed, so collapsing a row's
+            // currency band must not shrink it.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88);
+
+            Assert.Equal(
+                TreeCostColumnMath.TotalWidth(widths),
+                TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: false).TotalWidth);
+        }
+
+        [Fact]
+        public void ComputeRowEdges_CoinOnlyRow_StaysInsideTheReservedColumn()
+        {
+            // Pulling a coin-only run right must not push its leftmost
+            // segment past the column's own left boundary and into the
+            // pills.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88);
+            var row = TreeCostColumnMath.ComputeRowEdges(1000, widths, rowDrawsCurrency: false);
+
+            int leftmostX = row.GoldRightEdge - TreeCostColumnMath.SegmentWidth(widths.GoldTextWidth);
+
+            Assert.True(leftmostX >= 1000 - TreeCostColumnMath.TotalWidth(widths));
+        }
+
+        [Fact]
         public void TotalWidth_IsEveryPopulatedBandPlusItsGaps()
         {
             Assert.Equal(0, TreeCostColumnMath.TotalWidth(TreeCostColumnMath.CostColumnWidths.Empty));
