@@ -129,7 +129,7 @@ namespace GW2CraftingHelper.Views
         // every row below shifts down by StatusRowHeight + the same 5px
         // gap the header already used before SearchRowY.
         private const int StatusRowY = HeaderRowY + HeaderHeight + 5;
-        private const int StatusRowHeight = 24;
+        private const int StatusRowHeight = SnapshotHeaderLayout.StatusRowHeight;
         private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
 

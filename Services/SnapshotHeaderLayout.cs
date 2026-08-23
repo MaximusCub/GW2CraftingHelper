@@ -27,6 +27,14 @@ namespace GW2CraftingHelper.Services
     public static class SnapshotHeaderLayout
     {
         /// <summary>
+        /// Height of the status row beneath the header buttons. MainView
+        /// sizes that panel from here rather than from a literal of its own,
+        /// so anything that has to fit inside the row (the inline spinner)
+        /// can be checked against the value the row is actually built from.
+        /// </summary>
+        public const int StatusRowHeight = 24;
+
+        /// <summary>
         /// Width available to the source-filter flow once it starts at
         /// startX instead of the panel's left edge. Floors at 0 rather than
         /// going negative - SourceFilterFlowLayout already degrades a

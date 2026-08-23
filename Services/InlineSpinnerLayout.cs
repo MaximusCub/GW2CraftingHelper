@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Spinner edge for the Snapshot tab's status row, which is its own
-        /// 24px panel (MainView.StatusRowHeight).
+        /// panel of <see cref="SnapshotHeaderLayout.StatusRowHeight"/>.
         /// </summary>
         public const int SnapshotStatusSize = 20;
 

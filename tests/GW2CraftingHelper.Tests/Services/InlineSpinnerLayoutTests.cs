@@ -79,13 +79,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SnapshotStatusSpinnerFitsTheSnapshotTabsStatusRow()
         {
-            // MainView.StatusRowHeight - a private const in a Blish view, so
-            // its measured value is restated here rather than referenced.
-            const int SnapshotStatusRowHeight = 24;
-
             Assert.True(
-                InlineSpinnerLayout.SnapshotStatusSize <= SnapshotStatusRowHeight,
-                "Snapshot-tab spinner must fit inside its 24px status panel.");
+                InlineSpinnerLayout.SnapshotStatusSize <= SnapshotHeaderLayout.StatusRowHeight,
+                "Snapshot-tab spinner must fit inside the status panel it sits in.");
         }
     }
 }
