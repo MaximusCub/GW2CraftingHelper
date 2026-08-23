@@ -75,18 +75,19 @@ namespace GW2CraftingHelper.Views.Rendering
 
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(rightEdge, qtyWidth, nameGap, nameX);
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX, nameY),
-                Parent = rowPanel
-            };
+            var nameLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = displayName,
+                    Font = font,
+                    TextColor = RarityColors.GetRarityNameColor(rarity),
+                    ShowShadow = true,
+                    ShadowColor = Color.Black * 0.8f,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(nameX, nameY),
+                    Parent = rowPanel
+                });
 
             return new IconNameHandle { NameLabel = nameLabel, FullName = fullName, NameX = nameX };
         }

@@ -850,18 +850,19 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = rowPanel
                 };
             }
-            var nameLabel = new Label()
-            {
-                Text = displayName,
-                Font = nameFont,
-                TextColor = nameColor,
-                ShowShadow = true,
-                ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(nameX + qtyWidth, 12),
-                Parent = rowPanel
-            };
+            var nameLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = displayName,
+                    Font = nameFont,
+                    TextColor = nameColor,
+                    ShowShadow = true,
+                    ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(nameX + qtyWidth, 12),
+                    Parent = rowPanel
+                });
 
             // ExtraTooltipLines never depends on panelWidth (unit
             // price / acquisition hint text is fixed), so it is computed

@@ -214,31 +214,33 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var font = GameService.Content.DefaultFont14;
             int nameY = hasSublabel ? 4 : 8;
-            new Label()
-            {
-                Text = row.Label ?? "",
-                Font = font,
-                TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(NameX, nameY),
-                Parent = rowPanel
-            };
+            LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = row.Label ?? "",
+                    Font = font,
+                    TextColor = RarityColors.GetRarityNameColor(row.Rarity),
+                    ShowShadow = true,
+                    ShadowColor = Color.Black * 0.8f,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(NameX, nameY),
+                    Parent = rowPanel
+                });
 
             if (hasSublabel)
             {
-                new Label()
-                {
-                    Text = row.Sublabel,
-                    Font = GameService.Content.DefaultFont12,
-                    TextColor = new Color(170, 170, 170),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(NameX, 22),
-                    Parent = rowPanel
-                };
+                LabelHelpers.WithDescenderClearance(
+                    new Label()
+                    {
+                        Text = row.Sublabel,
+                        Font = GameService.Content.DefaultFont12,
+                        TextColor = new Color(170, 170, 170),
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(NameX, 22),
+                        Parent = rowPanel
+                    });
             }
 
             Label statusLabel = null;

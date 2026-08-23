@@ -311,7 +311,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 string caption = row.Label ?? "";
                 int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
-                var captionLabel = new Label()
+                var captionLabel = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = caption,
                     Font = captionFont,
@@ -320,7 +320,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeHeight = true,
                     Location = new Point(ContentX(lone, tileX, geometry.TileWidth, captionWidth), BandCaptionY),
                     Parent = rowPanel
-                };
+                });
                 TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
                 var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, tileAmountFont);
@@ -344,7 +344,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 int noteWidth = (int)System.Math.Ceiling(captionFont.MeasureString(currencyNoteText).Width);
                 int resultTileX = geometry.StartX + (tileCount - 1) * geometry.TileWidth;
-                noteLabel = new Label()
+                noteLabel = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = currencyNoteText,
                     Font = captionFont,
@@ -353,7 +353,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeHeight = true,
                     Location = new Point(ContentX(lone, resultTileX, geometry.TileWidth, noteWidth), noteY),
                     Parent = rowPanel
-                };
+                });
                 TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
             }
 
@@ -545,13 +545,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
             var font = TableHeaderStyle.Font;
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
                 Parent = rowPanel
-            };
+            });
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                 panelWidth, widestNumberWidth, widestNameEnd);
@@ -625,12 +625,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 edges.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
             string fullName = row.Label ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
+            var nameLabel = LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = displayName, Font = font, TextColor = Color.White,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(nameX, 4), Parent = rowPanel
-            };
+            });
             if (displayName != fullName)
             {
                 // Stamp BOTH the label AND its containing panel - a label
@@ -713,7 +713,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent
             };
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "  " + text,
                 Font = GameService.Content.DefaultFont12,
@@ -722,7 +722,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeHeight = true,
                 Location = new Point(8, 7),
                 Parent = rowPanel
-            };
+            });
 
             // Not width-dependent beyond the row's own cosmetic width (m2
             // 3.6): fixed left-anchored text, same as TextRowRenderer.

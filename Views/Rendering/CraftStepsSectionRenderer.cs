@@ -198,13 +198,14 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             x += qtyLabel.Width;
 
-            new Label()
-            {
-                Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
+            LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
+                    ShowShadow = true, ShadowColor = Color.Black * 0.8f,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(x, 13), Parent = rowPanel
+                });
 
             Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
