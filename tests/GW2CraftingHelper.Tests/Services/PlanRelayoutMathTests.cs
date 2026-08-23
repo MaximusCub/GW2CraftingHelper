@@ -173,7 +173,10 @@ namespace GW2CraftingHelper.Tests.Services
         public void RightBlockRightEdge_NarrowPanel_NeverOverrunsThePinnedEdge()
         {
             // The degenerate direction that matters: long names in a small
-            // window must not push the numbers off the panel.
+            // window must not push the numbers off the panel. 930 is now
+            // BELOW the enforced window minimum (Module.MinWindowWidth,
+            // 1436) - kept deliberately narrow, since the invariant has to
+            // hold at any panel width the arithmetic can be handed.
             int pinned = 930 - PlanRelayoutMath.TableRightMargin - 60;
 
             Assert.Equal(
@@ -186,16 +189,18 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ComputeTreeColumnEdges_TypicalPanelWidth_MatchesManualArithmetic()
         {
-            // Mirrors CraftingPlanView's real tree constants: pillColumnWidth
-            // 240, costColumnWidth 150, rightMargin 8.
+            // Mirrors TreeSectionController's real tree constants:
+            // TreePillColumnWidth 256, TreeCostColumnWidth 150 (its floor),
+            // TreeRightMargin 8. The other cases below keep 240 - they
+            // exercise the arithmetic, not the tree's current sizing.
             int panelWidth = 792;
             int nameX = 24 + 18 + 34 + 6; // depth-1 indent + caret col + icon frame + name gap
             int qtyPrefixWidth = 30;
 
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyPrefixWidth, pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8);
+                panelWidth, nameX, qtyPrefixWidth, pillColumnWidth: 256, costColumnWidth: 150, rightMargin: 8);
 
-            int expectedPillColX = panelWidth - (8 + 150) - 240;
+            int expectedPillColX = panelWidth - (8 + 150) - 256;
             int expectedCostRightEdge = panelWidth - 8;
             int expectedNameMax = System.Math.Max(20, expectedPillColX - nameX - 8) - qtyPrefixWidth;
 
@@ -301,6 +306,76 @@ namespace GW2CraftingHelper.Tests.Services
                 pillColumnWidth: 240, costColumnWidth: 150, rightMargin: 8, widestNameEnd: widestNameEnd);
 
             Assert.True(edges.NameMaxWidth >= nameWidth);
+        }
+
+        // The measurement the 1436px window minimum and the 256px pill
+        // column were derived from - docs/research/minimum-window-width.md.
+        // "+24 Agony Infusion" is the deepest chain in the game (23 forced
+        // levels, one recipe each); its deepest row renders "4194304x
+        // Thermocatalytic Reagent", measured at Menomonia 14 against the
+        // installed font: 65px of quantity prefix, 174px of name.
+        private const int DeepestRowQtyPrefixWidth = 65;
+        private const int DeepestRowNameWidth = 174;
+
+        // Tree row geometry: nameX = depth * TreeIndentPer + (caret column
+        // + icon frame + name gap) = depth * 24 + 58.
+        private static int TreeNameX(int depth) => depth * 24 + 58;
+
+        // Window minimum less the measured chrome between the window and a
+        // tab's content panel: 46 (window region - content region) + 32
+        // (ViewAdapter OUTER_PADDING x2) + 8 (Blish Panel border) + 20
+        // (ViewAdapter INNER_PADDING x2) + 20 (the view's own
+        // RightEdgePadding) = 126.
+        private const int PlanPanelWidthAtWindowMinimum = 1436 - 126;
+
+        // Live-priced cost column behind a six-digit gold total, which is
+        // what the deepest chain costs; 150 is only the floor.
+        private const int DeepestPlanCostColumnWidth = 165;
+
+        // The PINNED layout, which is what a minimum window width has to
+        // satisfy: the deepest row is also the widest row, so the
+        // gutter-closing pull-in lands at its own end plus the breathing
+        // room and can only give it less room than the pinned position
+        // does - never less than its own width (RightBlockX's invariant,
+        // covered above).
+        private static PlanRelayoutMath.TreeColumnEdges DeepestRowEdges(int panelWidth, int depth)
+        {
+            return PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, TreeNameX(depth), DeepestRowQtyPrefixWidth,
+                pillColumnWidth: 256, costColumnWidth: DeepestPlanCostColumnWidth, rightMargin: 8);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_DeepestRowInTheGame_KeepsTheDesignedGutterAtTheWindowMinimum()
+        {
+            var edges = DeepestRowEdges(PlanPanelWidthAtWindowMinimum, depth: 23);
+
+            Assert.Equal(
+                DeepestRowNameWidth + PlanRelayoutMath.TableGutterBreathingRoom,
+                edges.NameMaxWidth);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_OneVendorLeafBelowTheDeepestRow_StillFitsAtTheWindowMinimum()
+        {
+            // CraftingTreeBuilder.BuildVendorCostComponentLeaves can
+            // synthesise a leaf one indent level below the recipe graph.
+            // That level is the headroom the minimum was rounded up for: it
+            // spends the gutter exactly, and nothing is ellipsized.
+            var edges = DeepestRowEdges(PlanPanelWidthAtWindowMinimum, depth: 24);
+
+            Assert.Equal(DeepestRowNameWidth, edges.NameMaxWidth);
+        }
+
+        [Fact]
+        public void ComputeTreeColumnEdges_DeepestRowAtTheOldMinimum_WasSeverelyTruncated()
+        {
+            // Why the minimum moved: at the old 930px window (804px panel)
+            // the same row had no name column left at all and clamped to
+            // the 10px floor - a bare ellipsis.
+            var edges = DeepestRowEdges(930 - 126, depth: 23);
+
+            Assert.Equal(10, edges.NameMaxWidth);
         }
 
         // --- ComputeCostTileGeometry ---
