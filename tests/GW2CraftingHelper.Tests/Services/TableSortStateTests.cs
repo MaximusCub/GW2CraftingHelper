@@ -1,3 +1,4 @@
+using System;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -105,6 +106,74 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(TableSortDirection.None, state.Direction);
             Assert.Null(state.Column);
             Assert.False(state.IsActive(PlanTableColumn.Total));
+        }
+
+        // Reset is what a NEW plan generation runs on both sortable tables
+        // (CraftingPlanView.ResetPerPlanSortState, called at TriggerGenerate's
+        // commit point beside the section-expansion reset). The cases below
+        // pin the property that decision depends on: after it, the table is
+        // indistinguishable from one that was never clicked - which is what
+        // "reset to defaults when you gen a new plan" means for a reader
+        // looking at the header row.
+
+        [Fact]
+        public void Reset_FromDescending_AlsoClears()
+        {
+            var state = NewState();
+
+            state.Cycle(PlanTableColumn.Amount);
+            state.Cycle(PlanTableColumn.Amount);
+            Assert.Equal(TableSortDirection.Descending, state.Direction);
+
+            state.Reset();
+
+            Assert.Equal(TableSortDirection.None, state.Direction);
+            Assert.Null(state.Column);
+        }
+
+        [Fact]
+        public void Reset_LeavesNoColumnCarryingAnIndicator()
+        {
+            var state = NewState();
+            state.Cycle(PlanTableColumn.Each);
+
+            state.Reset();
+
+            foreach (PlanTableColumn column in Enum.GetValues(typeof(PlanTableColumn)))
+            {
+                Assert.Equal(string.Empty, state.IndicatorFor(column));
+                Assert.False(state.IsActive(column));
+            }
+        }
+
+        [Fact]
+        public void Reset_ThenAClick_StartsTheCycleAtAscending()
+        {
+            // The user's next click on the fresh plan's header must behave
+            // like a first click, not like the fourth click of a cycle the
+            // previous plan left half-finished.
+            var state = NewState();
+            state.Cycle(PlanTableColumn.Item);
+            state.Cycle(PlanTableColumn.Item);
+
+            state.Reset();
+            state.Cycle(PlanTableColumn.Item);
+
+            Assert.Equal(TableSortDirection.Ascending, state.Direction);
+            Assert.Equal("^", state.IndicatorFor(PlanTableColumn.Item));
+        }
+
+        [Fact]
+        public void Reset_IsIdempotent()
+        {
+            var state = NewState();
+            state.Cycle(PlanTableColumn.Total);
+
+            state.Reset();
+            state.Reset();
+
+            Assert.Equal(TableSortDirection.None, state.Direction);
+            Assert.Null(state.Column);
         }
 
         [Fact]

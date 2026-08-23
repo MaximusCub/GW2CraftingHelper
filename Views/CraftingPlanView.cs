@@ -243,15 +243,40 @@ namespace GW2CraftingHelper.Views
         private bool _hideUnlockedRecipes = true;
 
         // Click-to-sort state for the two sortable plan tables. Session
-        // state like _sectionExpansion, and for the same reason: it must
-        // survive every RenderPlan rebuild, including the one a regenerate
-        // triggers, so a user who sorted by Amount stays sorted by Amount.
+        // state with exactly the lifetime _sectionExpansion has, and it is
+        // reset in the same place for the same reason: it survives every
+        // RenderPlan rebuild a re-sort, a pill override or a re-solve
+        // triggers - those all re-render the SAME plan, and a user who
+        // sorted by Amount must stay sorted by Amount through them - but a
+        // NEW plan generation clears it back to None.
+        //
+        // Why a new plan is different: the sort described a table that no
+        // longer exists. A fresh Generate can carry an entirely different
+        // row set, so an inherited sort silently re-orders rows the user
+        // never sorted, and the header indicator on a table they did not
+        // touch this plan reads as the module's own doing rather than
+        // theirs (maintainer decision, field-test round). The reset sits at
+        // TriggerGenerate's commit point, which the override/re-solve paths
+        // do not run through at all - see ResetPerPlanSortState.
+        //
         // TableSortState/PlanTableSorter (Blish-free) own the click cycle
         // and the comparators; these fields are only the live state.
         private readonly TableSortState<PlanTableColumn> _usedMaterialsSort =
             new TableSortState<PlanTableColumn>();
         private readonly TableSortState<PlanTableColumn> _shoppingListSort =
             new TableSortState<PlanTableColumn>();
+
+        /// <summary>
+        /// Clears BOTH tables' sort back to
+        /// <see cref="TableSortDirection.None"/>. One method so a future
+        /// third sortable table cannot be added to one reset site and
+        /// forgotten at another.
+        /// </summary>
+        private void ResetPerPlanSortState()
+        {
+            _usedMaterialsSort.Reset();
+            _shoppingListSort.Reset();
+        }
 
         #endregion // 7. Section builders (state: section expand/collapse)
 
@@ -2925,6 +2950,7 @@ namespace GW2CraftingHelper.Views
                     // ResetForNewPlan's own doc comment.
                     _treeController.ResetForNewPlan(result);
                     _sectionExpansion.Clear();
+                    ResetPerPlanSortState();
                     _lastDebugLog = result.DebugLog;
                     _currentPlan = vm;
                     _planGeneratedAt = DateTime.Now;

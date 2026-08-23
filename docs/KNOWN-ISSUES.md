@@ -11244,9 +11244,17 @@ the plan's own, with no indicator drawn anywhere.
   deferred mechanism. Row COUNT and row heights are identical before and
   after, so `PlanContentHeightMath` lands on exactly the same section
   height and the reader keeps their scroll position.
-- **Sort state survives a regenerate.** It lives on the view for the
-  session (never persisted), unlike `_sectionExpansion`, which a new
-  Generate deliberately resets to the section defaults.
+- **Sort state survives a re-render of the SAME plan, and only that.**
+  ~~It lives on the view for the session (never persisted), unlike
+  `_sectionExpansion`, which a new Generate deliberately resets to the
+  section defaults.~~ **Superseded by the font-and-polish round** - the
+  maintainer's field test asked for "reset to defaults when you gen a new
+  plan", and the claim above was the behaviour being complained about. It
+  now has exactly `_sectionExpansion`'s lifetime and resets in the same
+  place: a re-sort, a tree pill override and a re-solve all keep it (they
+  re-render the same plan and never reach TriggerGenerate's commit
+  point), a new Generate clears both tables to `None`. Still never
+  persisted. See the "Font bump and decision-round polish" section.
 
 Build 0 errors, 2147 StyleCop warnings (2135 before; the 12 added sit in
 the same rule families the codebase trips throughout). Suite 2229 passed
