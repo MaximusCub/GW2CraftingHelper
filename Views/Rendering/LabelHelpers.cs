@@ -1,5 +1,6 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
+using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
 
@@ -148,36 +149,24 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Truncates text to fit maxWidth, appending "..." when it doesn't
-        /// fit whole. Binary-searches the longest prefix (rather than
-        /// trimming one character at a time) since MeasureString is not
-        /// free and item names can run long.
+        /// fit whole. The arithmetic itself lives in the Blish-free
+        /// TextWrapMath.Ellipsize (moved there so the Notes wrapper can
+        /// reach the same truncation without a font); this is the font
+        /// adapter every existing call site keeps calling.
         /// </summary>
         internal static string EllipsizeToWidth(BitmapFont font, string text, int maxWidth)
         {
-            if (string.IsNullOrEmpty(text)) return text ?? "";
-            if (maxWidth <= 0) return "";
+            return TextWrapMath.Ellipsize(text, maxWidth, MeasureWith(font));
+        }
 
-            int fullWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
-            if (fullWidth <= maxWidth) return text;
-
-            const string ellipsis = "...";
-            int ellipsisWidth = (int)System.Math.Ceiling(font.MeasureString(ellipsis).Width);
-            if (ellipsisWidth >= maxWidth)
-            {
-                // Degenerate (extremely narrow column): still show the
-                // ellipsis rather than nothing, so the row reads as
-                // "truncated" instead of "blank/broken".
-                return ellipsis;
-            }
-
-            int lo = 0, hi = text.Length;
-            while (lo < hi)
-            {
-                int mid = (lo + hi + 1) / 2;
-                int width = (int)System.Math.Ceiling(font.MeasureString(text.Substring(0, mid)).Width) + ellipsisWidth;
-                if (width <= maxWidth) lo = mid; else hi = mid - 1;
-            }
-            return lo <= 0 ? ellipsis : text.Substring(0, lo) + ellipsis;
+        /// <summary>
+        /// The measurement seam TextWrapMath takes in place of a font -
+        /// same Ceiling(MeasureString(...).Width) every label-width
+        /// calculation in this namespace already uses.
+        /// </summary>
+        internal static System.Func<string, int> MeasureWith(BitmapFont font)
+        {
+            return s => (int)System.Math.Ceiling(font.MeasureString(s ?? "").Width);
         }
     }
 }
