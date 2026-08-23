@@ -12086,7 +12086,7 @@ literals (the tests assert against the constants, not copies):
 |---|---|---|---|---|
 | 1436 (the minimum) | 1330 | 1310 | 2 | 655 |
 | ~1518 | 1412 | 1392 | 3 | 464 |
-| under ~1034 | - | under 928 | 1 | the whole grid |
+| under ~1054 | under 948 | under 928 | 1 | the whole grid |
 
 The single-column case is byte-for-byte the list the tab shipped with, so
 the narrow path is unchanged rather than newly special-cased. It is only
@@ -12168,7 +12168,7 @@ toggle, and the coin row above the list are all untouched.
    the second line ends in an ellipsis and hovering the row shows the
    FULL breakdown text in a tooltip. Confirm the same for a long item
    name on the first line.
-4. Drag the window narrower than ~1034px (only possible on a client that
+4. Drag the window narrower than ~1054px (only possible on a client that
    cannot enforce the 1436 minimum): the grid falls back to one column,
    every row full width, nothing clipped at the right edge, and the
    tooltips still carry whatever no longer fits.
