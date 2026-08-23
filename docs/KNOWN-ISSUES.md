@@ -9623,3 +9623,171 @@ single restore funnel review-verified in batch F) and the narrow-
 width pill-drop escalation beyond the +2 case. Suite 1969/1969 at
 HEAD; the height-math contract was re-walked clean by the verify
 round.
+
+## Audit batches A+B+C tier 1 (audit-abc)
+
+Three maintainer-approved audit items, each surgical: the tree's invisible
+row carets (H1), an unconfirmed destructive Clear Cache (H5), and unwrapped
+tooltip lines (H6 tier 1). Tooltip-container work is explicitly DEFERRED -
+only the module-side content wrap is in scope here.
+
+### A - visible tree carets (H1)
+
+`Views/Rendering/TreeSectionController` set its expand/collapse caret to
+`U+25BC`/`U+25B6` at four sites (Expand All, Collapse All, initial row
+render, per-row toggle). Blish's font does not render those triangles, so
+the caret column painted blank at every depth: nothing on a row said it was
+expandable, and nothing said which state it was in.
+
+The triangles date to the tree's original implementation (`d82d596`). When
+`8e1ea34` moved the plan's SECTION headers to ASCII `"v"`/`">"` - after
+pixel-level screenshot scans showed the triangles failing to render, a
+finding `CraftingPlanView.cs` still records in a "do not re-attempt Unicode
+without a fresh render check" comment - the row carets were left behind.
+This branch completes that migration; both caret vocabularies now match
+exactly.
+
+No layout or height change: the caret Label is `AutoSizeWidth`, and the
+icon column sits at a fixed `indent + TreeCaretColWidth` offset that never
+consulted the caret's own width.
+
+### B - Clear Cache confirmation (H5)
+
+`Views/MainView`'s Clear Cache button destroyed the only cached account
+snapshot on a single click - no confirm, no tooltip, no undo. The snapshot
+can only be rebuilt from a reachable GW2 API, which is frequently the very
+condition a user is stuck on when they reach for that button, so a misclick
+could leave the module with no data at all until the API came back.
+
+- The click now routes through the existing `Views/ModalDialog` behind an
+  **unconditional** confirm (body: "Discard the cached account snapshot? It
+  can only be rebuilt when the GW2 API is reachable.", verb: **Discard**),
+  the same gate `LogTabContent`'s Delete Log File uses. `MainView` receives
+  the shared dialog instance from `Module.Initialize` exactly the way
+  `LogTabContent` already does - one `ModalDialog` for the module, disposed
+  once, no second window.
+- The button gains `BasicTooltipText` stating the consequence before the
+  click, matching Delete Log File's own tooltip.
+- Status casing drift fixed: "Cache Cleared" -> "Cache cleared", matching
+  every other status string in the module.
+
+The destructive work is deliberately unchanged and stays **inline on the
+main thread**, unlike Delete Log File's `Task.Run`. `Module.ClearCache` is a
+`CancellationTokenSource` cancel plus one `SnapshotStore.Delete` and three
+field resets inside `SnapshotCommitGate.Clear` - no flush-queue drain, no
+lock a background loop can hold - and the `SetSnapshot(null)`/`SetStatus`
+tail is control mutation that must run on the main thread regardless.
+
+### C tier 1 - centrally wrapped tooltips (H6)
+
+`Services/ValueDetailTooltipBuilder` and `Services/TreeRowTooltipComposer`
+compose multi-line tooltip text whose individual lines were unbounded: the
+opportunity-cost sentence is 76 characters, the vendor price-side caveats
+82.
+
+`Services/TooltipTextFormat` (new, Blish-free) is the single wrap seam.
+It wraps each line of a composed tooltip to a **60-character** budget at
+word boundaries by reusing `TextWrapMath` - batch K's tested wrapper -
+through a character-count measure function; no wrap logic is duplicated.
+Both composers route their finished output through it at their **return
+seam**, so every present and future caller inherits the wrap without
+knowing it exists. Existing hard breaks and blank separator lines are
+preserved, short lines are returned untouched, and an unbreakable
+over-budget token is hard-split rather than ellipsized.
+
+The budget is characters, not pixels, because a tooltip string is composed
+in `Services`, far from any font; threading a measured `Func<string,int>`
+down from `Views/Rendering` would put a Blish dependency on the very seam
+this class exists to keep Blish-free.
+
+Wrapping is applied **per source line** rather than by handing the whole
+composed string to `TextWrapMath.Wrap` in one call: that method caps a
+single wrap at `MaxWrappedLines` (24) and ellipsizes the tail past it - a
+cap sized for one note in a fixed-height panel. A tooltip is many
+independent lines, and dropping its tail would be exactly the silent text
+loss this wrap exists to remove.
+
+### Measured: what Blish itself does about tooltip position and width
+
+Decompiled from `packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe` with
+`ilspycmd` (repo precedent). These are **measured** readings of BlishHUD
+1.3.0, not inference, and they are what justifies doing content width in
+the module today.
+
+**(a) POSITION - two one-sided flips, no clamp.**
+`Blish_HUD.Controls.Tooltip.UpdateTooltipPosition` is the only positioning
+logic (it runs on every `MouseMoved` and every `UpdateContainer` tick):
+
+```
+int y = (mouse.Y - 36 - tooltip.Height > 0) ? (-36 - tooltip.Height) : 36;
+int x = (mouse.X + tooltip.Width >= SpriteScreen.Width) ? (-tooltip.Width) : 0;
+tooltip.Location = mouse.Position + new Point(x, y);
+```
+
+- Vertical: places the tooltip above the cursor when it fits, else 36px
+  BELOW it. That protects the top screen edge only - a tall tooltip near
+  the bottom of the screen is placed below the cursor and is never clamped
+  to the bottom edge.
+- Horizontal: shifts left by the tooltip's full width at the right edge.
+  That protects the right edge only - the result is never clamped to
+  `>= 0`, so a tooltip wider than the cursor's X lands at a NEGATIVE X.
+  With the 500px content cap plus chrome that needs the cursor within
+  ~510px of the left edge AND within a tooltip-width of the right edge, so
+  it is unreachable above roughly 1020px of screen width; the unclamped
+  BOTTOM edge is the reachable one.
+
+**(b) WIDTH - a fixed 500px cap, space-split wrapping, no indication.**
+`Blish_HUD.Common.UI.Views.BasicTooltipView` (the view `Control`
+auto-creates for any `BasicTooltipText`) holds `MAX_WIDTH = 500`. On every
+text assignment it measures unwrapped at `AutoSizeWidth`, and if the
+measured label exceeds 500px it flips to `AutoSizeWidth = false;
+WrapText = true; Width = 500`. So Blish does cap width - but:
+
+- 500px is an absolute constant. It knows nothing about the module window
+  (930px clamped minimum) or the screen, so a tooltip anchored on a tree
+  row inside that window routinely spills past the window it belongs to.
+- The wrapper, `Blish_HUD.DrawUtil.WrapText`, splits each `\n` segment on
+  `' '` only and never splits an over-long single token, so an unbroken
+  run wider than 500px overflows the cap outright. The module's
+  `TextWrapMath` hard-splits instead.
+- Nothing indicates the cap was hit - no ellipsis, no marker.
+- `LabelBase.GetTextDimensions` wraps against
+  `LabelRegion.X > 0 ? LabelRegion.X : _size.X`, and `LabelRegion.X` is
+  still the OLD unwrapped width on the pass that follows the 500px clamp,
+  so the auto-height for a freshly-set tooltip is measured against the
+  wrong wrap width for one layout pass.
+
+**Deferred - possible future upstream Blish PR (note only, not scoped
+here).** Two candidates, both small and both upstream: clamp
+`UpdateTooltipPosition`'s result to the `SpriteScreen` bounds on all four
+edges rather than flipping on two, and make `BasicTooltipView`'s max width
+relative to the screen (or settable) instead of a hard 500. Neither is
+attempted in this repo; recorded so a future contributor does not have to
+re-derive the readings above.
+
+### Desktop gate (live, required)
+
+1. **Tree carets visible and flipping:** generate any plan with a
+   multi-level tree. Every expandable row must show an ASCII `>` when
+   collapsed and `v` when expanded, in the same vocabulary as the section
+   headers above it. Click a row: its caret must flip. Click Expand All
+   then Collapse All: every row's caret must flip with it, at every depth,
+   with no row left showing a blank caret column and no row shifting
+   vertically.
+2. **Clear Cache dialog, both paths + tooltip:** on the Snapshot tab, hover
+   Clear Cache - the tooltip must state that the snapshot can only be
+   rebuilt when the GW2 API is reachable. Click it: the confirm dialog must
+   appear with the verb **Discard**. Press **Cancel** - the snapshot must
+   be completely untouched (same items, same coin total, unchanged status
+   line). Click Clear Cache again and press **Discard** - the snapshot must
+   clear, the status must read "Cache cleared" (lowercase "cleared") ahead of
+   its dash and timestamp, and Refresh Now must still rebuild it.
+3. **Value-detail tooltip inside the window:** generate a
+   currency-bearing plan (a Mystic Clover / spirit-shard chain, anything
+   whose committed CRAFT or VENDOR pill diverges) and hover that pill. The
+   value-detail tooltip must show the opportunity-cost sentence wrapped
+   across lines, entirely inside the module window, with no line running
+   past the window edge and no text cut off. Hover a vendor row whose
+   price-side caveat fires and confirm the same for its longer sentence.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
