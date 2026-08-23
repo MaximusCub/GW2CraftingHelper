@@ -1034,6 +1034,9 @@ namespace GW2CraftingHelper.Views
                 // region (Blish's TextBox insets the placeholder by 10px a
                 // side and does not truncate it), which every value in
                 // CurrencyDecisionDefaults - 3600 is the largest - fits.
+                // Set once here for the pre-load state;
+                // RefreshCurrencyRowDefaultState owns it from then on, and
+                // clears it while the currency is ignored.
                 PlaceholderText = hasDefault
                     ? defaultCopperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "",
@@ -1158,7 +1161,8 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Refreshes one row's Clear checkbox and its default/cleared tag
+        /// Refreshes one row's Clear checkbox, its input placeholder and its
+        /// default/cleared tag
         /// from the given already-loaded or just-saved valuation - shared by
         /// LoadCurrentValuations and SaveValuations so the two can never
         /// disagree about how to render the same state. The tag is a label,
@@ -1179,6 +1183,15 @@ namespace GW2CraftingHelper.Views
             bool hasOverride = valuation.TryGetCopperValue(row.CurrencyId, out _);
 
             row.ClearCheckbox.Checked = isCleared;
+
+            // The placeholder states the number in effect (see
+            // AddCurrencyRow), so it has to follow the same state the tag
+            // does: an ignored currency has NO number in effect, and a
+            // greyed default left in the box there would contradict the
+            // "ignored" tag beside it.
+            row.Input.PlaceholderText = isCleared
+                ? ""
+                : row.DefaultCopperPerUnit.ToString(CultureInfo.InvariantCulture);
             row.DefaultLabel.Text = isCleared
                 ? "ignored"
                 : hasOverride
