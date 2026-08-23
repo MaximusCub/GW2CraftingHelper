@@ -198,6 +198,12 @@ namespace GW2CraftingHelper.Views
         private TextBox _snapshotRefreshIntervalInput;
         private Label _snapshotRefreshIntervalErrorLabel;
 
+        // The control values as of the last load or successful save - what
+        // an edit is measured against (see UnsavedChangeCount). Null until
+        // the tab has been built once, which SettingsFormState reads as
+        // "nothing to compare", not as "everything changed".
+        private SettingsFormState _baseline;
+
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -218,6 +224,13 @@ namespace GW2CraftingHelper.Views
             _currencyCountLabel = null;
             _currencyHeaderPanel = null;
             _statusLabel = null;
+
+            // Dropped before the controls it describes are replaced: a
+            // baseline left over from the previous Build cycle would be
+            // compared against a freshly loaded form and report the
+            // difference between two sessions as unsaved edits. LoadAll
+            // below takes the new one.
+            _baseline = null;
 
             // Module.cs's Settings tab reuses this
             // SAME SettingsTabContent instance across every tab re-open
@@ -256,10 +269,93 @@ namespace GW2CraftingHelper.Views
             BuildSnapshotSection(panelWidth);
             BuildCurrencyValuationsSection(panelWidth);
 
+            LoadAll();
+        }
+
+        /// <summary>
+        /// Loads every section from persisted settings and takes the
+        /// baseline the dirty check compares against. Shared by Build and
+        /// DiscardChanges so a discard restores exactly the state a fresh
+        /// build would show.
+        /// </summary>
+        private void LoadAll()
+        {
             LoadCurrentValuations();
             LoadCurrentHomesteadTiers();
             LoadCurrentLoggingSettings();
             LoadCurrentSnapshotSettings();
+
+            // LoadCurrentValuations clears the per-row error tags, so the
+            // rows a failed Save forced past the filter have to be
+            // re-evaluated - otherwise a discard leaves them pinned.
+            ApplyCurrencyFilter();
+
+            _baseline = CaptureFormState();
+        }
+
+        /// <summary>
+        /// Every save-gated control value on the tab, as the Blish-free
+        /// SettingsFormState. The Diagnostics checkbox is absent by
+        /// design - see that type's own doc comment.
+        /// </summary>
+        private SettingsFormState CaptureFormState()
+        {
+            var state = new SettingsFormState();
+
+            foreach (var row in _rows)
+            {
+                state.AddText(
+                    SettingsFormState.CurrencyAmountKey(row.CurrencyId),
+                    row.Input?.Text);
+                state.AddFlag(
+                    SettingsFormState.CurrencyIgnoreKey(row.CurrencyId),
+                    row.ClearCheckbox != null && row.ClearCheckbox.Checked);
+            }
+
+            foreach (var row in _homesteadRows)
+            {
+                state.AddText(
+                    SettingsFormState.HomesteadTierKey(row.MaterialItemId),
+                    row.Input?.Text);
+            }
+
+            // Captured through null-conditionals rather than skipped when
+            // the control is missing: the key set has to be identical
+            // between baseline and capture, or an absent control would
+            // itself read as a change.
+            state.AddText(SettingsFormState.LogMaxSizeMbKey, _logMaxSizeInput?.Text);
+            state.AddText(SettingsFormState.LogRetentionDaysKey, _logRetentionDaysInput?.Text);
+            state.AddText(
+                SettingsFormState.SnapshotRefreshIntervalMinutesKey,
+                _snapshotRefreshIntervalInput?.Text);
+
+            return state;
+        }
+
+        /// <summary>
+        /// How many fields differ from the last load or successful save.
+        /// Returns the count rather than the changed keys because those
+        /// keys carry currency and item ids, which are internal-only and
+        /// must never reach a caller that might display them.
+        /// </summary>
+        public int UnsavedChangeCount()
+        {
+            return CaptureFormState().ChangedKeys(_baseline).Count;
+        }
+
+        /// <summary>
+        /// Restores the last loaded/saved values into the controls and
+        /// clears the save bar's status line, which would otherwise still
+        /// report the outcome of a save the user has just walked back.
+        /// </summary>
+        public void DiscardChanges()
+        {
+            LoadAll();
+
+            if (_statusLabel != null)
+            {
+                _statusLabel.Text = "";
+            }
         }
 
         private static Point ContentSizeBelowSaveBar(Container container)
@@ -1259,12 +1355,27 @@ namespace GW2CraftingHelper.Views
         /// error labels and its own "invalid rows are left as previously
         /// persisted" contract; only the confirmation is shared.
         /// </summary>
-        private void SaveAll()
+        public void SaveAll()
         {
             bool valuationsSaved = SaveValuations(out int invalidCount);
             invalidCount += SaveHomesteadTiers();
             invalidCount += SaveLoggingSettings();
             invalidCount += SaveSnapshotSettings();
+
+            if (valuationsSaved)
+            {
+                // Rebased on the CONTROLS, not on what reached disk. An
+                // entry that would not parse keeps its previously
+                // persisted value but its text stays in the box, so a
+                // baseline taken from persisted state would leave the tab
+                // permanently dirty and re-prompt on every later tab
+                // switch to save a value that can never be saved. The
+                // status line below already tells the user those entries
+                // were not saved. A failed valuation write is the one case
+                // that does NOT rebase - there the edits really are still
+                // unsaved, and the next prompt should say so.
+                _baseline = CaptureFormState();
+            }
 
             if (_statusLabel == null) return;
 
