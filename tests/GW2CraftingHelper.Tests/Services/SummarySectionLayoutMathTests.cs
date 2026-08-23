@@ -385,6 +385,37 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(budget >= nameWidth);
         }
 
+        [Fact]
+        public void CurrencyHeaderBandWidth_PinnedTable_IsStillTheWholePanel()
+        {
+            // The header's dark band only narrows where the block actually
+            // moved; a table whose names already reach the numbers keeps the
+            // full-width band it drew before.
+            Assert.Equal(
+                800,
+                SummarySectionLayoutMath.CurrencyHeaderBandWidth(
+                    panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780));
+        }
+
+        [Fact]
+        public void CurrencyHeaderBandWidth_PulledInTable_EndsJustPastTheMarkerColumn()
+        {
+            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 120;
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
+                panelWidth: 1600, widestNumberWidth: 0, widestNameEnd: widestNameEnd);
+
+            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(1600, 0, widestNameEnd);
+
+            Assert.Equal(
+                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth
+                    + PlanRelayoutMath.TableRightMargin,
+                band);
+
+            // The point of the fix: at 1600px the band no longer runs ~1000px
+            // past the last column it is supposed to bound.
+            Assert.True(band < 1600 / 2);
+        }
+
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
         // ComputeCurrencyColumnEdges (a large unclamped Have value, e.g. a
         // 6-7 digit Karma balance, must not intrude into the Required

@@ -349,13 +349,16 @@ namespace GW2CraftingHelper.Views.Rendering
             // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
             // doc comment) and its icon frame is flush-fit with zero
             // slack; see the identical note in CreateUsedMaterialRow.
-            RowRelayoutHelpers.FinishRow(rowPanel, panelWidth, rowHeight, isLast, 0, _sink, w =>
-            {
-                var e = scan.EdgesFor(w);
-                qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
-                CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
-                CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-            });
+            RowRelayoutHelpers.FinishRow(
+                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
+                w =>
+                {
+                    var e = scan.EdgesFor(w);
+                    qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
+                },
+                w => scan.EdgesFor(w).TotalRightEdge + PlanRelayoutMath.TableRightMargin);
             _sink.AddReellipsis(w =>
             {
                 var e = scan.EdgesFor(w);

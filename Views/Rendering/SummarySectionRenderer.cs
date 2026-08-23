@@ -538,7 +538,9 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, PlanContentHeightMath.CTableHeaderRowHeight),
+                Size = new Point(
+                    SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd),
+                    PlanContentHeightMath.CTableHeaderRowHeight),
                 BackgroundColor = new Color(35, 35, 35),
                 Parent = parent
             };
@@ -563,7 +565,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // maxTotalWidth).
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(w, PlanContentHeightMath.CTableHeaderRowHeight);
+                rowPanel.Size = new Point(
+                    SummarySectionLayoutMath.CurrencyHeaderBandWidth(w, widestNumberWidth, widestNameEnd),
+                    PlanContentHeightMath.CTableHeaderRowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                     w, widestNumberWidth, widestNameEnd);
                 requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 5);

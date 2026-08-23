@@ -300,8 +300,25 @@ namespace GW2CraftingHelper.Services
         {
             int numberColumnWidth = EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
             int blockWidth = CurrencyBlockWidth(widestNumberWidth);
-            int blockX = PlanRelayoutMath.RightBlockX(panelWidth - 8 - blockWidth, widestNameEnd);
-            return EdgesFromRightEdge(blockX + blockWidth, numberColumnWidth);
+            int blockRightEdge = PlanRelayoutMath.RightBlockRightEdge(panelWidth, blockWidth, widestNameEnd);
+            return EdgesFromRightEdge(blockRightEdge, numberColumnWidth);
+        }
+
+        /// <summary>
+        /// Width of the currency table's dark header band. It ends one
+        /// PlanRelayoutMath.TableRightMargin past the marker column rather
+        /// than at the panel's edge: once the block is pulled in beside the
+        /// names (see <see cref="ComputeCurrencyColumnEdgesForPanel"/>), a
+        /// full-width band stops bounding the columns it belongs to and
+        /// simply advertises the space to their right. Equals panelWidth
+        /// exactly whenever the block is still pinned.
+        /// </summary>
+        public static int CurrencyHeaderBandWidth(int panelWidth, int widestNumberWidth, int widestNameEnd)
+        {
+            var edges = ComputeCurrencyColumnEdgesForPanel(panelWidth, widestNumberWidth, widestNameEnd);
+            int width = edges.MarkerX + CurrencyMarkerWidth + PlanRelayoutMath.TableRightMargin;
+            if (width > panelWidth) width = panelWidth;
+            return width > 0 ? width : 0;
         }
     }
 }
