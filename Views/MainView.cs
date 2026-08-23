@@ -1550,18 +1550,31 @@ namespace GW2CraftingHelper.Views
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
+            //
+            // Quantity PREFIX ("30x Mystic Clover"), matching the recipe
+            // tree, the shopping list and Used Materials. This row used to
+            // suffix it ("Mystic Clover x30") and the wallet row below used
+            // a colon ("Spirit Shards: 50"), so one tab spelled the same
+            // fact three ways (audit batch J, M9). Tabular Amount columns
+            // are deliberately NOT swept into this: a column of bare
+            // numbers under an "Amount" header is already labelled by its
+            // header.
             new Label()
             {
-                Text = $"{row.Name} x{row.TotalCount}",
+                Text = $"{row.TotalCount}x {row.Name}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(40, 4),
                 Parent = rowPanel
             };
 
+            // Same prefix notation as the row's own total above - a
+            // breakdown reading "Bank 20   Vault 12" under a total reading
+            // "32x Mystic Clover" was the third spelling of one fact on a
+            // single row.
             string breakdown = row.Breakdown == null || row.Breakdown.Count == 0
                 ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
+                : string.Join("   ", row.Breakdown.Select(b => $"{b.Count}x {b.Label}"));
 
             new Label()
             {
@@ -1590,10 +1603,15 @@ namespace GW2CraftingHelper.Views
             IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
 
             // Never display raw currency IDs (repo invariant).
+            // Quantity prefix, matching CreateItemRow above and the plan's
+            // own tables - this row used to be the module's only
+            // "Name: value" colon form (audit batch J, M9). The thousands
+            // separator stays: wallet balances run to seven figures where
+            // an item count does not.
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
             new Label()
             {
-                Text = $"{name}: {entry.Value:N0}",
+                Text = $"{entry.Value:N0}x {name}",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(40, 6),
