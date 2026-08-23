@@ -540,23 +540,27 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(
                     SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd),
-                    PlanContentHeightMath.CTableHeaderRowHeight),
-                BackgroundColor = new Color(35, 35, 35),
+                    TableHeaderStyle.RowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = parent
             };
-            var font = GameService.Content.DefaultFont14;
+            var font = TableHeaderStyle.Font;
             new Label()
             {
-                Text = "Currency", Font = font, TextColor = Color.White,
+                Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, 5), Parent = rowPanel
+                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
+                Parent = rowPanel
             };
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                 panelWidth, widestNumberWidth, widestNameEnd);
-            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Required", font, Color.White, edges.RequiredRightEdge, 5);
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Have", font, Color.White, edges.HaveRightEdge, 5);
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Needed", font, Color.White, edges.NeededRightEdge, 5);
+            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Required", font, TableHeaderStyle.LabelColor, edges.RequiredRightEdge, TableHeaderStyle.LabelY);
+            var haveLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Have", font, TableHeaderStyle.LabelColor, edges.HaveRightEdge, TableHeaderStyle.LabelY);
+            var neededLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Needed", font, TableHeaderStyle.LabelColor, edges.NeededRightEdge, TableHeaderStyle.LabelY);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -567,12 +571,15 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(
                     SummarySectionLayoutMath.CurrencyHeaderBandWidth(w, widestNumberWidth, widestNameEnd),
-                    PlanContentHeightMath.CTableHeaderRowHeight);
+                    TableHeaderStyle.RowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                     w, widestNumberWidth, widestNameEnd);
-                requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 5);
-                haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), 5);
-                neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 5);
+                requiredLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), TableHeaderStyle.LabelY);
+                haveLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), TableHeaderStyle.LabelY);
+                neededLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), TableHeaderStyle.LabelY);
             });
         }
 

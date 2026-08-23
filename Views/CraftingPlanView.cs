@@ -48,6 +48,14 @@ namespace GW2CraftingHelper.Views
         private const int QtyInputX = 240;
         private const int QtyInputWidth = 50;
         private const int RowButtonsX = 320;
+
+        // The row's +/- pair: square, and the same height as every other
+        // button in the module - which is also the height of the search and
+        // quantity boxes they sit beside, so the run now shares one baseline
+        // instead of mixing 28px inputs with 24px buttons.
+        private const int RowButtonSize = UiMetrics.ButtonHeight;
+        private const int RowButtonGap = 8;
+        private const int RowButtonY = 3;
         private const int SuggestionAnchorGap = 12;
 
         private const int RightEdgePadding = 20;
@@ -1472,13 +1480,13 @@ namespace GW2CraftingHelper.Views
                 var removeButton = new StandardButton()
                 {
                     Text = "-",
-                    Size = new Point(24, 24),
-                    Location = new Point(nextX, 3),
+                    Size = new Point(RowButtonSize, RowButtonSize),
+                    Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
                     BasicTooltipText = "Remove this item from the plan"
                 };
                 removeButton.Click += (_, __) => RemoveItemRow(row);
-                nextX += 24 + 8;
+                nextX += RowButtonSize + RowButtonGap;
             }
 
             if (index == _itemRows.Count - 1)
@@ -1486,8 +1494,8 @@ namespace GW2CraftingHelper.Views
                 var addButton = new StandardButton()
                 {
                     Text = "+",
-                    Size = new Point(24, 24),
-                    Location = new Point(nextX, 3),
+                    Size = new Point(RowButtonSize, RowButtonSize),
+                    Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
                     // Sitting next to the quantity field, a bare "+" reads
                     // as a stepper. Say what it actually adds.
@@ -1712,7 +1720,7 @@ namespace GW2CraftingHelper.Views
             _generateButton = new StandardButton()
             {
                 Text = "Generate Plan",
-                Size = new Point(120, 28),
+                Size = new Point(120, UiMetrics.ButtonHeight),
                 Location = new Point(w - 120 - RightEdgePadding, 3),
                 Parent = _controlsPanel
             };
@@ -1819,7 +1827,7 @@ namespace GW2CraftingHelper.Views
 
         // Toolbar row geometry. The five widths are the ones the buttons
         // carried in the section header; only their home changed.
-        private const int TreeToolbarButtonHeight = 24;
+        private const int TreeToolbarButtonHeight = UiMetrics.ButtonHeight;
         private const int TreeToolbarButtonY =
             (TopRegionLayoutMath.TreeToolbarRowHeight - TreeToolbarButtonHeight) / 2;
         private const int TreeToolbarButtonGap = 4;

@@ -173,21 +173,25 @@ namespace GW2CraftingHelper.Views.Rendering
             var edges = scan.EdgesFor(panelWidth);
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, PlanContentHeightMath.ShoppingHeaderRowHeight),
+                Size = new Point(HeaderBandWidth(panelWidth, edges), TableHeaderStyle.RowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = parent
             };
-            var font = GameService.Content.DefaultFont12;
-            var color = new Color(153, 153, 153);
+            var font = TableHeaderStyle.Font;
+            var color = TableHeaderStyle.LabelColor;
 
             new Label()
             {
                 Text = "Item", Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(NameX, 4), Parent = rowPanel
+                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
             };
-            var amountLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Amount", font, color, edges.QtyRightEdge, 4);
-            var eachLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Each", font, color, edges.EachRightEdge, 4);
-            var totalLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, "Total", font, color, edges.TotalRightEdge, 4);
+            var amountLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Amount", font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
+            var eachLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Each", font, color, edges.EachRightEdge, TableHeaderStyle.LabelY);
+            var totalLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, "Total", font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
@@ -196,12 +200,29 @@ namespace GW2CraftingHelper.Views.Rendering
             // call).
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(w, PlanContentHeightMath.ShoppingHeaderRowHeight);
                 var e = scan.EdgesFor(w);
-                amountLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), 4);
-                eachLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), 4);
-                totalLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), 4);
+                rowPanel.Size = new Point(HeaderBandWidth(w, e), TableHeaderStyle.RowHeight);
+                amountLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), TableHeaderStyle.LabelY);
+                eachLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), TableHeaderStyle.LabelY);
+                totalLabel.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
             });
+        }
+
+        /// <summary>
+        /// Width of the header's band: up to the Total column plus the
+        /// margin every plan table keeps past its block, never wider than
+        /// the panel. Same rule CTableHeaderRenderer.BandWidth applies -
+        /// a band that runs past its own last column stopped bounding the
+        /// table it belongs to once batch H pulled the columns in.
+        /// </summary>
+        private static int HeaderBandWidth(int panelWidth, ShoppingColumnMath.ColumnEdges edges)
+        {
+            int width = edges.TotalRightEdge + PlanRelayoutMath.TableRightMargin;
+            if (width > panelWidth) width = panelWidth;
+            return width > 0 ? width : 0;
         }
 
         // A ValueCellHandle's own

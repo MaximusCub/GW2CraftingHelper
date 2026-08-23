@@ -40,8 +40,13 @@ namespace GW2CraftingHelper.Views.Rendering
     // Omitting it keeps the previous panelWidth-8 anchor for every other
     // caller.
     //
+    // Chrome (band color, font, label color, height, label y) comes from
+    // the shared TableHeaderStyle - see that class for the L3 inventory and
+    // the reason the band, rather than the Shopping List's lighter
+    // treatment, is the one every plan table now uses.
+    //
     // It also bounds the header BAND: this row's whole point is the dark
-    // (35,35,35) background behind the column names, and a band spanning the
+    // background behind the column names, and a band spanning the
     // full panel width no longer bounds the columns it belongs to once those
     // columns have been pulled in (audit batch H fix round). The band ends
     // one TableRightMargin past the right column, which is exactly the panel
@@ -55,43 +60,45 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             var rowPanel = new Panel()
             {
-                Size = new Point(BandWidth(rightXForWidth, panelWidth), PlanContentHeightMath.CTableHeaderRowHeight),
-                BackgroundColor = new Color(35, 35, 35),
+                Size = new Point(BandWidth(rightXForWidth, panelWidth), TableHeaderStyle.RowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = parent
             };
-            var font = GameService.Content.DefaultFont14;
+            var font = TableHeaderStyle.Font;
             new Label()
             {
-                Text = leftLabel, Font = font, TextColor = Color.White,
+                Text = leftLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(leftX, 5), Parent = rowPanel
+                Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
             };
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
                 middleLabelControl = new Label()
                 {
-                    Text = middleLabel, Font = font, TextColor = Color.White,
+                    Text = middleLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, 5),
+                    Location = new Point(
+                        middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, TableHeaderStyle.LabelY),
                     Parent = rowPanel
                 };
             }
             var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, rightLabel, font, Color.White,
+                rowPanel, rightLabel, font, TableHeaderStyle.LabelColor,
                 rightXForWidth != null
                     ? rightXForWidth(panelWidth)
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
-                5);
+                TableHeaderStyle.LabelY);
 
             sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(BandWidth(rightXForWidth, w), PlanContentHeightMath.CTableHeaderRowHeight);
+                rowPanel.Size = new Point(BandWidth(rightXForWidth, w), TableHeaderStyle.RowHeight);
                 int rightEdge = rightXForWidth != null ? rightXForWidth(w) : w - PlanRelayoutMath.TableRightMargin;
-                rightLabelControl.Location = new Point(PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width), 5);
+                rightLabelControl.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width), TableHeaderStyle.LabelY);
                 if (middleLabelControl != null && middleXForWidth != null)
                 {
-                    middleLabelControl.Location = new Point(middleXForWidth(w), 5);
+                    middleLabelControl.Location = new Point(middleXForWidth(w), TableHeaderStyle.LabelY);
                 }
             });
         }

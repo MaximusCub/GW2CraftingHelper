@@ -171,6 +171,8 @@
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
+    <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
     <Compile Include="Views\Rendering\CTableHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\CraftStepsSectionRenderer.cs" />

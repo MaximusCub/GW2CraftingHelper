@@ -1132,7 +1132,7 @@ namespace GW2CraftingHelper.Views
             var saveButton = new StandardButton()
             {
                 Text = "Save",
-                Size = new Point(80, 28),
+                Size = new Point(80, UiMetrics.ButtonHeight),
                 Location = new Point(NameColumnX, 6),
                 BasicTooltipText = "Save every section on this tab.",
                 Parent = barPanel

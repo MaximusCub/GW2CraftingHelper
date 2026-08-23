@@ -302,7 +302,7 @@ namespace GW2CraftingHelper.Views
             _clearViewButton = new StandardButton
             {
                 Text = "Clear View",
-                Size = new Point(ButtonWidth, 28),
+                Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
                 Parent = _toolbarPanel
             };
             TooltipFacility.ApplyPlain(
@@ -313,7 +313,7 @@ namespace GW2CraftingHelper.Views
             _copyButton = new StandardButton
             {
                 Text = "Copy",
-                Size = new Point(ButtonWidth, 28),
+                Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
                 Parent = _toolbarPanel
             };
             _copyButton.Click += (_, __) => CopyToClipboard();
@@ -321,7 +321,7 @@ namespace GW2CraftingHelper.Views
             _deleteFileButton = new StandardButton
             {
                 Text = "Delete Log File",
-                Size = new Point(DeleteButtonWidth, 28),
+                Size = new Point(DeleteButtonWidth, UiMetrics.ButtonHeight),
                 Parent = _toolbarPanel
             };
             TooltipFacility.ApplyPlain(

@@ -101,6 +101,13 @@ namespace GW2CraftingHelper.Views
         private const int HeaderRowY = 5;
         private const int HeaderHeight = 40;
 
+        // Vertically centred in the 40px header panel, derived rather than
+        // written down: these two buttons were the module's only 30px ones
+        // and dropping them to the shared UiMetrics.ButtonHeight would
+        // otherwise have left them sitting 2px high against the "Account
+        // Snapshot" label beside them.
+        private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
+
         // The status label gets its own full-width row beneath the
         // header rather than sharing _headerPanel with the buttons - a
         // long status string slid under the button row at the window's
@@ -371,8 +378,8 @@ namespace GW2CraftingHelper.Views
             _clearButton = new StandardButton()
             {
                 Text = "Clear Cache",
-                Size = new Point(100, 30),
-                Location = new Point(w - 220, 5),
+                Size = new Point(100, UiMetrics.ButtonHeight),
+                Location = new Point(w - 220, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
@@ -383,8 +390,8 @@ namespace GW2CraftingHelper.Views
             _refreshButton = new StandardButton()
             {
                 Text = "Refresh Now",
-                Size = new Point(100, 30),
-                Location = new Point(w - 110, 5),
+                Size = new Point(100, UiMetrics.ButtonHeight),
+                Location = new Point(w - 110, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _refreshAsync != null
             };
@@ -657,8 +664,8 @@ namespace GW2CraftingHelper.Views
             _containerHeight = h;
 
             _headerPanel.Size = new Point(w, HeaderHeight);
-            _clearButton.Location = new Point(w - 220, 5);
-            _refreshButton.Location = new Point(w - 110, 5);
+            _clearButton.Location = new Point(w - 220, HeaderButtonY);
+            _refreshButton.Location = new Point(w - 110, HeaderButtonY);
             _statusPanel.Size = new Point(w, StatusRowHeight);
 
             // Re-flows the source-filter checkboxes at the new width (a
