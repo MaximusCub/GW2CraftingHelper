@@ -89,8 +89,17 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result);
             Assert.Contains("Crafting gold price: 0g 50s 0c", text);
             Assert.Contains("Currencies: 2g 50s 0c", text);
-            Assert.Contains("This is an estimated opportunity cost for the used currencies in the recipe.", text);
             Assert.Contains("Optimization price: 3g 0s 0c", text);
+
+            // The opportunity-cost sentence is 76 characters, so the
+            // builder's TooltipTextFormat seam wraps it - the words survive
+            // across the break, and no line exceeds the budget.
+            Assert.Contains(
+                "This is an estimated opportunity cost for the used currencies in the recipe.",
+                text.Replace("\n", " "));
+            Assert.All(
+                text.Split('\n'),
+                l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars, l));
         }
 
         [Fact]

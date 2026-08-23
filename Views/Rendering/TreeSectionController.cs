@@ -434,7 +434,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     s.IsExpanded = true;
                     _nodeExpansion[s.Node.NodeId] = true;
                     s.ChildContainer.Visible = true;
-                    s.ArrowLabel.Text = "\u25BC";
+                    s.ArrowLabel.Text = "v";
                 }
                 RefreshTreeContainerHeights();
             });
@@ -449,7 +449,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     s.IsExpanded = false;
                     _nodeExpansion[s.Node.NodeId] = false;
                     s.ChildContainer.Visible = false;
-                    s.ArrowLabel.Text = "\u25B6";
+                    s.ArrowLabel.Text = ">";
                 }
                 RefreshTreeContainerHeights();
             });
@@ -713,7 +713,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 Color arrowColor = dimmed ? Color.White * 0.35f : Color.White;
                 arrowLabel = new Label()
                 {
-                    Text = isExpanded ? "\u25BC" : "\u25B6",
+                    // ASCII, matching the section headers - the U+25BC/U+25B6
+                    // triangles do not render in Blish's font.
+                    Text = isExpanded ? "v" : ">",
                     TextColor = arrowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1022,7 +1024,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         state.IsExpanded = !state.IsExpanded;
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
-                        state.ArrowLabel.Text = state.IsExpanded ? "\u25BC" : "\u25B6";
+                        state.ArrowLabel.Text = state.IsExpanded ? "v" : ">";
                         RefreshTreeContainerHeights();
                     });
                 };

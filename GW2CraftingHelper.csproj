@@ -141,6 +141,7 @@
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
     <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />
+    <Compile Include="Services\TooltipTextFormat.cs" />
     <Compile Include="Models\AcquisitionHint.cs" />
     <Compile Include="Services\AcquisitionHintService.cs" />
     <Compile Include="Models\DailyCooldownItem.cs" />
