@@ -39,27 +39,6 @@ namespace GW2CraftingHelper
     [Export(typeof(Blish_HUD.Modules.Module))]
     public class Module : Blish_HUD.Modules.Module
     {
-        // Narrowest window the recipe tree stays readable in, measured (not
-        // estimated) in docs/research/minimum-window-width.md: the deepest
-        // chain in the game is "+24 Agony Infusion" at depth 23, whose
-        // deepest row is "4194304x Thermocatalytic Reagent". At this width
-        // that row keeps the tree's designed 24px name-to-column gutter, and
-        // one further indent level (the vendor-cost component leaves
-        // CraftingTreeBuilder can synthesise below the recipe graph) still
-        // renders untruncated. Below it deep rows ellipsize; the previous
-        // 930 minimum ellipsized them from roughly depth 6 down.
-        //
-        // Font-size dependent: the research's +2pt row-text variant needs
-        // 1472. That bump is a pending maintainer decision and is
-        // deliberately a one-constant change here if it lands.
-        private const int MinWindowWidth = 1436;
-
-        // Unchanged by the width raise. The research prescribed no height,
-        // and no layout math in the module derives a height from the window
-        // width (the tree/table renderers take panelWidth only), so raising
-        // the width leaves the vertical budget exactly as it was.
-        private const int MinWindowHeight = 710;
-
         private static readonly Logger Logger = Logger.GetLogger<Module>();
 
         // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
@@ -533,15 +512,25 @@ namespace GW2CraftingHelper
             // view instance.
             _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
 
+            // SpriteScreen is the GW2 CLIENT area, not the monitor, so a
+            // windowed player can legitimately be narrower than the minimum.
+            // Enforcing the full minimum there would put the window's right
+            // edge - cost column, Generate button, and the bottom-right
+            // resize grip - off-screen with no way to drag it back, so on
+            // such a client the enforced minimum falls back to the client's
+            // own width and deep rows ellipsize as they used to.
+            int minWindowWidth = WindowSizing.EffectiveMinWindowWidth(
+                GameService.Graphics.SpriteScreen.Width);
+
             // The window/content regions below stay at the 930x710 pair the
             // 1024x1024 background texture (502049) was authored against -
             // they are texture-space regions, and Blish grows the content
             // region by the same delta it grows the window by, so the 46px
             // horizontal chrome they encode holds at every size. Only the
-            // minimum (MinWindowWidth x MinWindowHeight) moved; the window
-            // opens at it because ResizableTabbedWindow clamps the
-            // constructed size up, on the same paths that clamp a drag and a
-            // size persisted by an earlier session.
+            // minimum (WindowSizing) moved; the window opens at it because
+            // ResizableTabbedWindow clamps the constructed size up, on the
+            // same paths that clamp a drag and a size persisted by an
+            // earlier session.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions.
             // contentRegion must end above the window bottom: flush would be
@@ -554,20 +543,20 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(502049),
                 new Rectangle(35, 26, 930, 710),
                 new Rectangle(81, 11, 884, 684),
-                new Point(MinWindowWidth, MinWindowHeight))
+                new Point(minWindowWidth, WindowSizing.MinWindowHeight))
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 Crafting Helper",
                 Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_MainWindow",
 
-                // Clamped at 0: the minimum is now wider than a 1366px
-                // screen, and a negative centered x would put the title bar
+                // Clamped at 0: on a client narrower than even the 930
+                // fallback a negative centered x would put the title bar
                 // (and its close button) off the left edge with no way to
                 // drag it back.
                 Location = new Point(
-                    Math.Max(0, (GameService.Graphics.SpriteScreen.Width - MinWindowWidth) / 2),
-                    Math.Max(0, (GameService.Graphics.SpriteScreen.Height - MinWindowHeight) / 2)),
+                    Math.Max(0, (GameService.Graphics.SpriteScreen.Width - minWindowWidth) / 2),
+                    Math.Max(0, (GameService.Graphics.SpriteScreen.Height - WindowSizing.MinWindowHeight) / 2)),
                 SavesPosition = true
             };
 

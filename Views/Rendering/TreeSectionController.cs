@@ -549,14 +549,9 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeNameGap = 6;
         private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
 
-        // 240 until the minimum-width research measured the standard
-        // CRAFT/TP/VENDOR/IGNORE run at 222px against a 236px budget: any
-        // slightly wider label ran the row through the tightened-padding
-        // pass. 256 gives that run its comfort margin (budget 252) at the
-        // current fonts. Cost: 16px off every row's name column, which the
-        // 1436 minimum window was chosen to absorb - see
-        // docs/research/minimum-window-width.md.
-        private const int TreePillColumnWidth = 256;
+        // Defined in PlanRelayoutMath, which owns the column arithmetic and
+        // the measurement behind the width.
+        private const int TreePillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
 
