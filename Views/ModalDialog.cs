@@ -145,12 +145,13 @@ namespace GW2CraftingHelper.Views
             // (see ButtonY) - the same greedy wrap plus ellipsized tail the
             // notes section already renders with.
             var font = GameService.Content.DefaultFont14;
+            var measure = LabelHelpers.MeasureWith(font);
             int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
             var wrapped = TextWrapMath.Wrap(
                 message ?? "",
                 ContentWidth,
                 ContentWidth,
-                LabelHelpers.MeasureWith(font),
+                measure,
                 MessageAreaHeight / lineHeight);
 
             // Auto-size BOTH axes and parent last - ApiAccessDialog's
@@ -182,7 +183,7 @@ namespace GW2CraftingHelper.Views
             // was; a longer label grows the button instead of being
             // clipped by StandardButton's own scissor.
             string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
-            int cancelW = System.Math.Max(70, LabelHelpers.MeasureWith(font)(cancelLabel) + 24);
+            int cancelW = System.Math.Max(70, measure(cancelLabel) + 24);
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;

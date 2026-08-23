@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace GW2CraftingHelper.Models
 {
@@ -91,17 +92,17 @@ namespace GW2CraftingHelper.Models
 
         public static string CurrencyAmountKey(int currencyId)
         {
-            return "currency." + currencyId.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".amount";
+            return "currency." + currencyId.ToString(CultureInfo.InvariantCulture) + ".amount";
         }
 
         public static string CurrencyIgnoreKey(int currencyId)
         {
-            return "currency." + currencyId.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".ignore";
+            return "currency." + currencyId.ToString(CultureInfo.InvariantCulture) + ".ignore";
         }
 
         public static string HomesteadTierKey(int materialItemId)
         {
-            return "homestead." + materialItemId.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".tier";
+            return "homestead." + materialItemId.ToString(CultureInfo.InvariantCulture) + ".tier";
         }
 
         public const string LogMaxSizeMbKey = "log.maxSizeMb";
