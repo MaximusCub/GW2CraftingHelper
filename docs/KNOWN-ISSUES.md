@@ -9678,6 +9678,59 @@ field resets inside `SnapshotCommitGate.Clear` - no flush-queue drain, no
 lock a background loop can hold - and the `SetSnapshot(null)`/`SetStatus`
 tail is control mutation that must run on the main thread regardless.
 
+Interposing a dialog does open an interleaving the single-click version
+could not have: Refresh Now disables Clear Cache for its whole duration,
+but not the reverse, so a user could open the confirm, click Refresh Now
+behind it, and then Discard. `Module.ClearCache` resets `_pendingSnapshot`/
+`_snapshotDirty` under `SnapshotCommitGate`, which covers the BACKGROUND
+refresh path - but `MainView.RefreshNowAsync`'s own awaited continuation
+runs outside that gate and would either repaint the snapshot the user just
+discarded (printing "Updated - ..." over "Cache cleared") or, on the
+cancellation `ClearCache` itself causes, overwrite the status with a
+classified refresh failure. Two guards, because either alone has a hole:
+
+- **Both buttons are disabled for the confirm's lifetime**, re-enabled from
+  the confirm callback and from the cancel callback alike (the cancel
+  callback now also runs on X/Escape - see below). A `_clearConfirmOpen`
+  flag, not just the buttons' `Enabled` flags, is what holds the gate:
+  `Build()` recreates both buttons on every tab visit, so a tab switch
+  while the dialog is open would otherwise hand back a live Refresh Now.
+- **A `_clearGeneration` counter**, bumped by the confirm callback and
+  captured by `RefreshNowAsync` before it awaits. An in-flight refresh whose
+  generation changed drops its own tail - no persist, no repaint, no failure
+  status - and lets the "Cache cleared" the user asked for stand. The field
+  is `volatile`: every write is a main-thread click, but the comparison runs
+  on a continuation Blish's context-less XNA host may resume on a
+  ThreadPool thread, so it is re-checked inside the marshalled block too.
+
+`ModalDialog.Show` now returns `bool` so a caller that arms state for the
+dialog's lifetime can tell an opened dialog from a request refused because
+another caller's dialog is already on screen.
+
+### B2 - the shared ModalDialog could be stranded closed (regression class)
+
+`Views/ModalDialog` had the exact defect item 37 already found and fixed in
+`Views/ApiAccessDialog` (see "Fix 2" above): `_isShowing` was cleared only
+by the Confirm/Cancel `StandardButton` handlers, while `CanClose` and
+`CanCloseWithEscape` both default true and `WindowBase2.OnLeftMouseButtonPressed`
+calls `Hide()` directly on a title-bar X click. Dismissing the dialog with X
+or Escape therefore left `_isShowing` stuck true, and because this is ONE
+instance shared by the whole module, every later `Show()` from every caller
+- Clear Cache, the Log tab's Delete Log File, the Crafting Plan tab's
+regenerate gate - silently no-op'd for the rest of the session. The fix was
+written up for the sibling class and never applied here.
+
+`ModalDialog` now subscribes `_window.Hidden += OnWindowHidden` the same
+way, and both button handlers and the X/Escape path funnel through one
+private `Dismiss(bool confirmed)` that clears `_isShowing`, reads the
+callbacks into locals and nulls the fields before invoking either. X and
+Escape therefore behave as **Cancel**, which is what the callers already
+want: `CraftingPlanView`'s cancel callback reverts and re-enables the
+own-materials checkbox (previously left disabled forever by an X dismissal),
+and Clear Cache's re-enables the Snapshot buttons. `Dispose()` unsubscribes
+BEFORE hiding so module teardown cannot fire a caller's cancel callback into
+controls already being disposed.
+
 ### C tier 1 - centrally wrapped tooltips (H6)
 
 `Services/ValueDetailTooltipBuilder` and `Services/TreeRowTooltipComposer`
@@ -9686,7 +9739,7 @@ opportunity-cost sentence is 76 characters, the vendor price-side caveats
 82.
 
 `Services/TooltipTextFormat` (new, Blish-free) is the single wrap seam.
-It wraps each line of a composed tooltip to a **60-character** budget at
+It wraps each line of a composed tooltip to a **75-character** budget at
 word boundaries by reusing `TextWrapMath` - batch K's tested wrapper -
 through a character-count measure function; no wrap logic is duplicated.
 Both composers route their finished output through it at their **return
@@ -9694,6 +9747,23 @@ seam**, so every present and future caller inherits the wrap without
 knowing it exists. Existing hard breaks and blank separator lines are
 preserved, short lines are returned untouched, and an unbreakable
 over-budget token is hard-split rather than ellipsized.
+
+**What this seam is and is not for.** It is NOT what keeps a tooltip inside
+the module window: the measured 500px `BasicTooltipView.MAX_WIDTH` below is
+already comfortably inside the window's 930px clamped minimum, and Blish
+applies it unconditionally. What the seam adds is a break point the module
+controls and, more importantly, `TextWrapMath`'s hard split for a token that
+Blish's space-only wrapper would let overflow the cap outright.
+
+That is also why the budget is **75 and not lower**. 500px at
+`DefaultFont14`'s roughly 6.5px-per-character prose average is about 76
+characters, so 75 reproduces the break Blish would have made anyway instead
+of narrowing to it. A narrower budget (the 60 this branch first shipped,
+~390px) would have added lines to every over-budget tooltip - and height is
+the axis with the real defect: per (a) below, a tooltip that does not fit
+above the cursor is placed 36px BELOW it and never clamped to the bottom
+screen edge, so extra wrapped lines are extra lines that can fall off the
+screen.
 
 The budget is characters, not pixels, because a tooltip string is composed
 in `Services`, far from any font; threading a measured `Func<string,int>`
@@ -9743,9 +9813,11 @@ text assignment it measures unwrapped at `AutoSizeWidth`, and if the
 measured label exceeds 500px it flips to `AutoSizeWidth = false;
 WrapText = true; Width = 500`. So Blish does cap width - but:
 
-- 500px is an absolute constant. It knows nothing about the module window
-  (930px clamped minimum) or the screen, so a tooltip anchored on a tree
-  row inside that window routinely spills past the window it belongs to.
+- 500px is an absolute constant: it knows nothing about the module window
+  (930px clamped minimum) or the screen. It happens to sit inside that
+  window, so it does keep a tree-row tooltip within it - but by coincidence
+  of two unrelated numbers, and it would not on a narrower window or a
+  window the user can shrink further.
 - The wrapper, `Blish_HUD.DrawUtil.WrapText`, splits each `\n` segment on
   `' '` only and never splits an over-long single token, so an unbroken
   run wider than 500px overflows the cap outright. The module's
@@ -9782,7 +9854,25 @@ re-derive the readings above.
    line). Click Clear Cache again and press **Discard** - the snapshot must
    clear, the status must read "Cache cleared" (lowercase "cleared") ahead of
    its dash and timestamp, and Refresh Now must still rebuild it.
-3. **Value-detail tooltip inside the window:** generate a
+3. **Dialog dismissed by X/Escape does not strand the module:** click Clear
+   Cache and dismiss the confirm with the title-bar **X**, then again with
+   **Escape**. Each time the snapshot must be untouched and BOTH Snapshot
+   buttons must come back enabled. Then, without reloading the module,
+   confirm all three ModalDialog callers still open: Clear Cache again, the
+   Log tab's Delete Log File, and the Crafting Plan tab's own-materials
+   regenerate prompt. Any one failing to appear is the stranded-`_isShowing`
+   regression. Also dismiss the own-materials prompt with X: the checkbox
+   must revert to its previous state and be re-enabled, not left greyed.
+4. **Clear Cache while the confirm is open:** click Clear Cache - Refresh
+   Now must go disabled with it while the dialog is up, and both must
+   re-enable on Cancel. Then switch tabs with the dialog still open, come
+   back, and confirm Refresh Now is still disabled. With both guards in
+   place the overlap should be unreachable from the UI; the check is that
+   the disabling actually holds across the tab switch. The `_clearGeneration`
+   guard behind it has no live gesture left to exercise - if one is ever
+   found, its expected result is that the status settles on "Cache cleared",
+   never "Updated - ..." and never a refresh-failure line.
+5. **Value-detail tooltip inside the window:** generate a
    currency-bearing plan (a Mystic Clover / spirit-shard chain, anything
    whose committed CRAFT or VENDOR pill diverges) and hover that pill. The
    value-detail tooltip must show the opportunity-cost sentence wrapped
