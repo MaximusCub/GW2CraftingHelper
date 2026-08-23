@@ -26,11 +26,18 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Gap between the amount box and the "Ignore" checkbox. Was 6, with
         /// the checkbox on 70; the label rename needed four more pixels and
-        /// they came from here rather than from the cell's total extent -
-        /// MinColumnWidth below is load-bearing at the window's 930px
-        /// minimum (2 * 424 = 848 against an 864px settings panel), so
-        /// growing the cell would drop the grid from two columns to one
-        /// there.
+        /// they came from here rather than from the cell's total extent.
+        /// <para>
+        /// Two columns need a 848px panel (2 * MinColumnWidth), i.e. a 974px
+        /// window once the 126px of window-to-panel chrome is counted. At
+        /// the old 930px minimum that made the cell extent load-bearing -
+        /// and in fact the grid was already falling back to one column
+        /// there, the "864px settings panel" this comment used to cite
+        /// having been derived without the ViewAdapter's own padding. The
+        /// 1436px minimum clears the two-column threshold by ~460px, so
+        /// the cell has room to grow now; it is still derived rather than
+        /// estimated (see MinColumnWidth).
+        /// </para>
         /// </summary>
         public const int CellInputToClearGap = 2;
 
