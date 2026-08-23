@@ -12013,4 +12013,22 @@ tooltips, not press wiring.
    `audio/button-click.wav`, 22,616 bytes uncompressed) and that the
    name passed is the unprefixed one Blish's own working callers use.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-24 desktop sessions, captures
+preflight/gC1-gC14). (1) SPINNER: "Building recipe tree..." rendered
+with Blish's golden circular spinner inline in the plan strip, and
+two captures ~350ms apart show DIFFERENT rotation frames - the
+atlas animation live. (2) PRESS FEEDBACK, measured numerically on
+the Expand All FeedbackButton: hover luma 165.6 -> held 143.3
+(~13% press-dim while the mouse is down) -> released 165.6, an
+exact restore. A pill press was not stageable (the session's plan
+was all-owned - its only pill is the HAVE chrome, correctly
+non-interactive); pill wiring shares the same PressFeedback helper
+verified on the button. (3) Sound not verifiable in the muted dummy
+session (PlaySoundEffectByName no-ops without an audio device) -
+the corrected unprefixed asset name is measured fact; the
+maintainer's first real click is the audio gate. BONUS gate-found
+fix folded into this branch: the persisted +24 Agony plan exceeded
+Newtonsoft's default read MaxDepth of 64 and silently failed to
+restore - raised to 512 with a mutation-checked 30-level real
+pipeline round-trip test, and the deep plan then RESTORED live
+("Recipe Tree (47)", 147,639g total) in this gate's own session.
