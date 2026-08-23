@@ -105,9 +105,9 @@ namespace GW2CraftingHelper.Views.Rendering
             /// <summary>
             /// Extra y applied to the ICONS only, so a run whose number
             /// labels are taller than CoinSegmentMath.CoinIconSize (the
-            /// Summary cost band's promoted result tile) can centre its
-            /// fixed-size coin icons against the text instead of leaving
-            /// them stuck to the text's top edge. Cached on the handle so
+            /// rich tooltip's coin rows) can centre its fixed-size coin
+            /// icons against the text instead of leaving them stuck to
+            /// the text's top edge. Cached on the handle so
             /// RepositionSegments reproduces the same offset without the
             /// caller having to remember it. 0 everywhere else, which is
             /// exactly the prior behaviour.

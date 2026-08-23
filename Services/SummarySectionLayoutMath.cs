@@ -106,9 +106,14 @@ namespace GW2CraftingHelper.Services
         // --- Cost formula band (the plan's headline figure) ---
         //
         // The cost band's result tile is the one number a user comes to
-        // this section for, so it renders at a promoted amount font
-        // (PlanContentHeightMath.PromotedCostTileRowHeight) rather than
-        // sharing DefaultFont16 with the two derived tiles beside it.
+        // this section for. It used to say so with a promoted DefaultFont32
+        // amount; the maintainer's field test replaced that with a tinted,
+        // semi-transparent highlight box around the result tile, so all
+        // three tiles now share ONE amount font and the band reads as one
+        // formula again. The band's height is therefore no longer a
+        // promoted font's leading - it is the box's own padding around a
+        // caption line, an optional disclosure line and one ordinary
+        // amount run, which is what the constants below spell out.
         //
         // In a currency-bearing plan that gold figure is not the whole
         // cost: PlanViewModelBuilder.BuildCostFormulaBand sources it from
@@ -119,11 +124,49 @@ namespace GW2CraftingHelper.Services
         // renderer's row height and BodyHeight's count come from
         // CostBandHeight so they cannot disagree about that growth.
 
+        /// <summary>Gap between the band's own edge and the highlight box.</summary>
+        public const int CostBandBoxMarginY = 6;
+
+        /// <summary>Highlight box padding above the caption / below the amount.</summary>
+        public const int CostBandBoxPadY = 6;
+
+        /// <summary>Highlight box padding left and right of its widest line.</summary>
+        public const int CostBandBoxPadX = 14;
+
+        /// <summary>
+        /// Caption y inside the cost band - the box's top edge plus its own
+        /// padding, so the box never starts above the band.
+        /// </summary>
+        public const int CostBandCaptionY = CostBandBoxMarginY + CostBandBoxPadY;
+
+        /// <summary>
+        /// Bottom pad under the cost band's amount run, symmetric with
+        /// <see cref="CostBandCaptionY"/>: the box's padding plus its margin.
+        /// </summary>
+        public const int CostBandAmountBottomPad = CostBandBoxPadY + CostBandBoxMarginY;
+
+        /// <summary>
+        /// Height reserved for one DefaultFont12 caption line. 20, not the
+        /// ~17 the font actually measures: the renderer places the caption
+        /// from real font metrics and clamps the amount below it, so this
+        /// reserve has to cover the tallest plausible metric or the band
+        /// clips its own amount (the renderer's DEBUG assert is what
+        /// catches that).
+        /// </summary>
+        public const int CostBandCaptionLineHeight = 20;
+
+        /// <summary>Gap between the caption block and the amount run.</summary>
+        public const int CostBandCaptionToAmountGap = 4;
+
         /// <summary>Extra band height reserved for the disclosure line.</summary>
         public const int CostBandCurrencyNoteHeight = 18;
 
         /// <summary>
-        /// Height of the cost formula band's single tile row.
+        /// Height of the cost formula band's single tile row: the highlight
+        /// box's margin+padding, a caption line, the disclosure line when
+        /// there is one, the gap, and one amount run (a coin run is never
+        /// shorter than CoinSegmentMath.CoinIconSize, which is what makes
+        /// that the amount block's reserved height).
         /// hasCurrencyNote must be "this Summary section has at least one
         /// CurrencyCost row" - the same condition
         /// Views/Rendering/SummarySectionRenderer.Render uses to decide
@@ -131,8 +174,58 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int CostBandHeight(bool hasCurrencyNote)
         {
-            return PlanContentHeightMath.PromotedCostTileRowHeight
-                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0);
+            return CostBandCaptionY
+                + CostBandCaptionLineHeight
+                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
+                + CostBandCaptionToAmountGap
+                + CoinSegmentMath.CoinIconSize
+                + CostBandAmountBottomPad;
+        }
+
+        /// <summary>
+        /// Top y of an amountHeight-tall amount run inside a band of
+        /// rowHeight: bottom-anchored above bottomPad, never allowed above
+        /// the caption block. rowHeight is a fixed constant while
+        /// captionBlockBottom comes from whatever font metrics Blish
+        /// loaded, so a font taller than the band was sized for overflows
+        /// downward (loud - the renderer's DEBUG assert catches it) rather
+        /// than silently overprinting the caption.
+        /// </summary>
+        public static int BandAmountY(int rowHeight, int amountHeight, int captionBlockBottom, int bottomPad)
+        {
+            int y = rowHeight - bottomPad - amountHeight;
+            return y > captionBlockBottom ? y : captionBlockBottom;
+        }
+
+        /// <summary>
+        /// Band-space top edge of the highlight box: one pad above the
+        /// caption, which by <see cref="CostBandCaptionY"/>'s construction
+        /// is exactly one margin below the band's own top edge.
+        /// </summary>
+        public const int CostBandBoxTop = CostBandCaptionY - CostBandBoxPadY;
+
+        /// <summary>
+        /// Height of the highlight box around an amountHeight-tall amount
+        /// run whose top sits at band-space amountY: from
+        /// <see cref="CostBandBoxTop"/> down to one pad below the amount.
+        /// The box is the band's lowest ink, so this - not the amount run -
+        /// is what has to fit inside <see cref="CostBandHeight"/>.
+        /// </summary>
+        public static int CostBandBoxHeight(int amountY, int amountHeight)
+        {
+            return amountY + amountHeight + CostBandBoxPadY - CostBandBoxTop;
+        }
+
+        /// <summary>
+        /// Width of the highlight box around its widest measured line
+        /// (caption, disclosure line or coin run). Never clamped to the
+        /// tile slice: Blish clips a container's children, so a box
+        /// narrower than its content would cut the amount off where an
+        /// unboxed tile merely overlaps its neighbour.
+        /// </summary>
+        public static int CostBandBoxWidth(int widestContentWidth)
+        {
+            return widestContentWidth + 2 * CostBandBoxPadX;
         }
 
         /// <summary>
@@ -305,7 +398,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Width of the currency table's dark header band. It ends one
+        /// Width of the currency table: its dark header band, and the span
+        /// each data row's content occupies. It ends one
         /// PlanRelayoutMath.TableRightMargin past the marker column rather
         /// than at the panel's edge: once the block is pulled in beside the
         /// names (see <see cref="ComputeCurrencyColumnEdgesForPanel"/>), a
@@ -319,6 +413,29 @@ namespace GW2CraftingHelper.Services
             int width = edges.MarkerX + CurrencyMarkerWidth + PlanRelayoutMath.TableRightMargin;
             if (width > panelWidth) width = panelWidth;
             return width > 0 ? width : 0;
+        }
+
+        /// <summary>
+        /// Left x the whole currency table sits at so it is CENTRED in the
+        /// section rather than left-pinned. Batch H pulled the numeric
+        /// block in beside the names, which left the finished table sitting
+        /// against the section's left edge with all the recovered space
+        /// dead to its right; the maintainer's field test asked for that
+        /// space split evenly instead.
+        /// <para>
+        /// Every coordinate the table lays out - icon, name,
+        /// <see cref="ComputeCurrencyColumnEdgesForPanel"/>'s four edges -
+        /// stays relative to this one offset, so the columns' internal
+        /// alignment and the header's tracking of them are untouched by
+        /// centring, and a table already spanning the panel
+        /// (<see cref="CurrencyHeaderBandWidth"/> == panelWidth) gets 0,
+        /// i.e. exactly the pre-centring layout.
+        /// </para>
+        /// </summary>
+        public static int CurrencyTableOffsetX(int panelWidth, int widestNumberWidth, int widestNameEnd)
+        {
+            return PlanRelayoutMath.CenterX(
+                panelWidth, CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd));
         }
     }
 }
