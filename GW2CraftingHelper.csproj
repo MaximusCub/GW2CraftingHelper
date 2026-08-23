@@ -163,6 +163,8 @@
     <Compile Include="Views\Rendering\IconControls.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
+    <Compile Include="Views\Rendering\RichTooltipSurface.cs" />
+    <Compile Include="Views\Rendering\TooltipFacility.cs" />
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
