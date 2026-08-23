@@ -124,6 +124,24 @@ namespace GW2CraftingHelper.Services
         public const int TableRightMargin = 8;
 
         /// <summary>
+        /// Width of the recipe tree's decision-pill column, the
+        /// pillColumnWidth every tree caller passes
+        /// <see cref="ComputeTreeColumnEdges"/>. Lives here, next to the
+        /// function that consumes it, so the Blish-free width tests assert
+        /// against the shipped column rather than a copy of it.
+        /// <para>
+        /// 240 until the minimum-width research measured the standard
+        /// CRAFT/TP/VENDOR/IGNORE run at 222px against the 236px budget a
+        /// 240px column leaves: any slightly wider label ran the row through
+        /// the tightened-padding pass. 256 gives that run its comfort margin
+        /// (budget 252). Cost: 16px off every row's name column, which the
+        /// window minimum was raised to absorb - see
+        /// docs/research/minimum-window-width.md.
+        /// </para>
+        /// </summary>
+        public const int TreePillColumnWidth = 256;
+
+        /// <summary>
         /// Right edge of a blockWidth-wide right-hand block once
         /// <see cref="RightBlockX"/> has closed the dead gutter before it -
         /// i.e. the anchor every column inside the block derives from. The

@@ -10,8 +10,8 @@ namespace GW2CraftingHelper.Services
     /// Blish's basic tooltip already caps its own content width, at a fixed
     /// 500px - measured against BlishHUD 1.3.0, recorded in
     /// docs/KNOWN-ISSUES.md under "Audit batches A+B+C tier 1" - so this
-    /// seam is NOT what keeps a tooltip inside the module window (930px
-    /// clamped minimum); 500px already does. What it adds is control over
+    /// seam is NOT what keeps a tooltip inside the module window (1436px
+    /// clamped minimum, and 930px before that); 500px already does. What it adds is control over
     /// where the break lands and what happens to a token that cannot break:
     /// Blish's wrapper (DrawUtil.WrapText) splits on spaces only and never
     /// splits an over-long single token, so an unbroken run wider than 500px

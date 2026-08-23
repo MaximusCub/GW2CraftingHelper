@@ -39,6 +39,12 @@ directory exists:
   findings - KNOWN-ISSUES #31.
 - `aa-tier-findings.md` - Wizard's Vault (Astral Acclaim) tiered-pricing
   investigation - KNOWN-ISSUES #33.
+- `minimum-window-width.md` - how wide the window has to be for the
+  deepest recipe tree in the game to render untruncated (exact graph
+  depths from the committed seeds, text widths measured from the
+  installed Menomonia bitmap fonts) - the basis for the 1436px minimum.
+  The one report here that studies this module's own layout rather than
+  an external source.
 
 The normative gw2efficiency behavior spec these reports feed into lives one
 level up, at [`docs/gw2e-parity-spec.md`](../gw2e-parity-spec.md); the

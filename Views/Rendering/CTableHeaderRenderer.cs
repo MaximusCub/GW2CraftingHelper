@@ -51,12 +51,19 @@ namespace GW2CraftingHelper.Views.Rendering
     // columns have been pulled in (audit batch H fix round). The band ends
     // one TableRightMargin past the right column, which is exactly the panel
     // width for a caller whose columns are still pinned.
+    // onLeftClick/onRightClick turn those two labels into sort controls
+    // for the one caller that has a sortable table (Used Materials).
+    // Omitted everywhere else, which leaves the label inert exactly as
+    // before. The label text a sortable caller passes already carries its
+    // sort indicator (SortableHeaderLabel.Decorate), so the right label's
+    // x-tracking below - which right-aligns off the control's own Width -
+    // accounts for the indicator without knowing about it.
     internal static class CTableHeaderRenderer
     {
         internal static void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
-            Func<int, int> rightXForWidth = null)
+            Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null)
         {
             var rowPanel = new Panel()
             {
@@ -65,12 +72,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
             var font = TableHeaderStyle.Font;
-            LabelHelpers.WithDescenderClearance(new Label()
+            var leftLabelControl = LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = leftLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
+            SortableHeaderLabel.MakeClickable(leftLabelControl, onLeftClick);
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
@@ -89,6 +97,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? rightXForWidth(panelWidth)
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
                 TableHeaderStyle.LabelY);
+            SortableHeaderLabel.MakeClickable(rightLabelControl, onRightClick);
 
             sink.AddRelayout(w =>
             {

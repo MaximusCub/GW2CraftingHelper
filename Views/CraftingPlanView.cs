@@ -230,6 +230,17 @@ namespace GW2CraftingHelper.Views
         // field is only the live toggle state.
         private bool _hideUnlockedRecipes = true;
 
+        // Click-to-sort state for the two sortable plan tables. Session
+        // state like _sectionExpansion, and for the same reason: it must
+        // survive every RenderPlan rebuild, including the one a regenerate
+        // triggers, so a user who sorted by Amount stays sorted by Amount.
+        // TableSortState/PlanTableSorter (Blish-free) own the click cycle
+        // and the comparators; these fields are only the live state.
+        private readonly TableSortState<PlanTableColumn> _usedMaterialsSort =
+            new TableSortState<PlanTableColumn>();
+        private readonly TableSortState<PlanTableColumn> _shoppingListSort =
+            new TableSortState<PlanTableColumn>();
+
         #endregion // 7. Section builders (state: section expand/collapse)
 
         #region 2. Generate orchestration (state, continued)
@@ -3644,6 +3655,30 @@ namespace GW2CraftingHelper.Views
             };
         }
 
+        /// <summary>
+        /// Rebuilds the plan after a sortable column header was clicked.
+        /// The rows of a section are a FlowPanel's children in flow order,
+        /// which is not reorderable in place, so the sort is applied the
+        /// one way it can be - by rebuilding - and the rebuild goes through
+        /// PreserveScrollAcross like every other one, so the reader keeps
+        /// their scroll position. Row COUNT and row heights are identical
+        /// before and after, so PlanContentHeightMath lands on exactly the
+        /// same section height.
+        /// <para>
+        /// Rebuilding synchronously from inside a control's own click, and
+        /// so disposing that control, is the established shape here - the
+        /// "Hide Unlocked Recipes" checkbox rebuilds the same way from its
+        /// own CheckedChanged, and a tree pill's re-solve from its own
+        /// Click. No second, deferred mechanism is introduced for this one.
+        /// </para>
+        /// </summary>
+        private void RerenderForSortChange()
+        {
+            if (_currentPlan == null) return;
+
+            PreserveScrollAcross(() => RenderPlan(_currentPlan));
+        }
+
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
         {
             // Required Recipes is the only section whose header needs
@@ -3687,12 +3722,14 @@ namespace GW2CraftingHelper.Views
                 case PlanSectionType.UsedMaterials:
                     // Row rendering moved to
                     // Views/Rendering/UsedMaterialsSectionRenderer.
-                    new UsedMaterialsSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    new UsedMaterialsSectionRenderer(this, _usedMaterialsSort, RerenderForSortChange)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.ShoppingList:
                     // Row rendering moved to
                     // Views/Rendering/ShoppingListSectionRenderer.
-                    new ShoppingListSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    new ShoppingListSectionRenderer(this, _shoppingListSort, RerenderForSortChange)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
                     // Row rendering (including the TimegatedNotice

@@ -252,9 +252,11 @@ namespace GW2CraftingHelper.Tests.Services
             const int totalMargin = 40;
             const int minTileWidth = 80;
 
-            // The narrowest three-tile band the module can present: the
-            // 930px minimum window less the plan view's own chrome, taken
-            // pessimistically.
+            // Deliberately narrower than any band the module can now
+            // present: the plan panel at the 1436px window minimum is
+            // 1310px wide (see PlanRelayoutMathTests' chrome derivation),
+            // so 860 leaves the three-tile arithmetic tested with ~450px in
+            // hand rather than at the boundary.
             var geometry = PlanRelayoutMath.ComputeCostTileGeometry(860, 3, totalMargin, minTileWidth);
 
             Assert.Equal(
