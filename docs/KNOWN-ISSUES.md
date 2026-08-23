@@ -12214,4 +12214,19 @@ toggle, and the coin row above the list are all untouched.
    nonsense text - both messages span the panel at the top left, not
    inside a column-width cell.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-24 desktop session, branch build at the
+review-fix HEAD, captures preflight/gSG1-gSG3). At the 1436 window
+minimum the result list rendered as TWO ~655px columns in
+left-to-right reading order (Augur's Stone | Green Wood Log /
+Mystic Clover | Mystic Coin / ...), the wallet run starting its own
+row below the items with its shorter cells, and the whole
+7-item + 4-wallet fixture occupying roughly half its former
+vertical space. Green Wood Log's six-holder breakdown ellipsized at
+the COLUMN edge with the row tooltip carrying the full text
+(gSG2). Filtering "essence" repacked to three wallet cells in
+reading order with no scroll jump at the unchanged column count
+(gSG3). Not staged live: the 3-column layout (needs a >1518px
+window - the dummy maxes near 1490 effective), the one-column
+fallback (unreachable at the enforced minimum), and the documented
+scroll-reset-on-column-count-change (accepted, recorded with its
+measured Blish cause rather than defended against).
