@@ -190,6 +190,30 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ProfessionRestrictionsAreListedOnOneLine()
+        {
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Restricted Thing",
+                Restrictions = new[] { "Guardian", "Warrior" }
+            });
+
+            Assert.Contains("Restricted to: Guardian, Warrior", content.ToPlainLines());
+        }
+
+        [Fact]
+        public void AnEmptyRestrictionListProducesNoLineAtAll()
+        {
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Unrestricted Thing",
+                Restrictions = new string[0]
+            });
+
+            Assert.DoesNotContain(content.ToPlainLines(), l => l.StartsWith("Restricted"));
+        }
+
+        [Fact]
         public void ANegativeAttributeKeepsItsOwnSignRatherThanGainingAPlus()
         {
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
