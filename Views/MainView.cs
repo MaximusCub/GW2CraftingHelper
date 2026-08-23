@@ -218,6 +218,19 @@ namespace GW2CraftingHelper.Views
         private StandardButton _clearButton;
         private StandardButton _refreshButton;
 
+        // Bumped on every completed Clear Cache. RefreshNowAsync captures it
+        // before awaiting and drops its own status/snapshot tail if it
+        // changed while the fetch was in flight - see ConfirmClearCache.
+        // volatile because the capture is compared on the awaited
+        // continuation, which Blish's context-less XNA host may resume on a
+        // ThreadPool thread, while every write is a main-thread click.
+        private volatile int _clearGeneration;
+
+        // True for the Clear Cache confirm dialog's lifetime. Survives the
+        // tab switch that recreates both buttons, which is why the gate
+        // lives here and not only in the buttons' Enabled flags.
+        private bool _clearConfirmOpen;
+
         private Panel _coinPanel;
         private Label _statusLabel;
         private Color _defaultStatusColor;
@@ -345,6 +358,11 @@ namespace GW2CraftingHelper.Views
             _clearButton.Click += (_, __) => ConfirmClearCache();
 
             _refreshButton.Click += async (_, __) => await RefreshNowAsync();
+
+            // Re-applies the confirm-dialog gate to the buttons this call
+            // just recreated: a tab switch while the Clear Cache confirm is
+            // open must not hand the user back a live Refresh Now.
+            SetSnapshotActionsEnabled(true);
 
             // Full-width status row beneath the header buttons - see
             // StatusRowY.
@@ -881,23 +899,73 @@ namespace GW2CraftingHelper.Views
         /// loop can hold - and SetSnapshot/SetStatus below are control
         /// mutations that must run on the main thread anyway.
         /// </para>
+        /// <para>
+        /// Interposing a dialog opens a window in which a refresh can start,
+        /// which the single-click version could not: Refresh Now disables
+        /// Clear Cache for its whole duration, but not the reverse. Both
+        /// buttons are therefore disabled for the dialog's lifetime, and
+        /// because Build() recreates them on every tab visit (which would
+        /// re-enable them mid-dialog), the confirm also bumps
+        /// _clearGeneration so an already-in-flight refresh drops its own
+        /// tail instead of repainting the snapshot the user just discarded.
+        /// </para>
         /// </summary>
         private void ConfirmClearCache()
         {
-            if (_clearCache == null) return;
+            if (_clearCache == null)
+            {
+                return;
+            }
 
-            _modalDialog.Show(
+            bool shown = _modalDialog.Show(
                 "Discard the cached account snapshot? It can only be rebuilt when the GW2 API is reachable.",
                 () =>
                 {
+                    _clearConfirmOpen = false;
+                    _clearGeneration++;
+                    SetSnapshotActionsEnabled(true);
                     _clearCache();
                     SetSnapshot(null);
                     var status = $"Cache cleared \u2014 {DateTime.Now.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                     SetStatus(status);
                     _saveStatus(status);
                 },
-                null,
+                () =>
+                {
+                    // Runs on Cancel AND on the window's own X/Escape, which
+                    // is what stops a dismissed dialog from leaving both
+                    // buttons dead for the session - see ModalDialog.Dismiss.
+                    _clearConfirmOpen = false;
+                    SetSnapshotActionsEnabled(true);
+                },
                 confirmText: "Discard");
+
+            // False means another caller's dialog is already on screen, so
+            // this request never opened and nothing must be armed for it.
+            if (shown)
+            {
+                _clearConfirmOpen = true;
+                SetSnapshotActionsEnabled(false);
+            }
+        }
+
+        // Both Snapshot-tab actions move together: each invalidates the
+        // other's work. Null-tolerant because Build() may not have run yet,
+        // and each button keeps its own "was this action wired at all"
+        // condition from Build so re-enabling never revives a dead button.
+        private void SetSnapshotActionsEnabled(bool enabled)
+        {
+            bool allow = enabled && !_clearConfirmOpen;
+
+            if (_clearButton != null)
+            {
+                _clearButton.Enabled = allow && _clearCache != null;
+            }
+
+            if (_refreshButton != null)
+            {
+                _refreshButton.Enabled = allow && _refreshAsync != null;
+            }
         }
 
         /// <summary>
@@ -917,18 +985,37 @@ namespace GW2CraftingHelper.Views
         /// just gets a more specific status label than the old bare
         /// "Refresh failed" - see StatusText.ForRefreshFailure.
         /// </para>
+        /// <para>
+        /// A Clear Cache that completes while this fetch is in flight wins:
+        /// Module.ClearCache cancels the refresh token and deletes the store
+        /// under SnapshotCommitGate, but this continuation is outside that
+        /// gate, so the captured _clearGeneration is what keeps it from
+        /// repainting a discarded snapshot or overwriting "Cache cleared"
+        /// with a cancellation status.
+        /// </para>
         /// </summary>
         private async Task RefreshNowAsync()
         {
             if (_refreshAsync == null) return;
 
-            _refreshButton.Enabled = false;
-            _clearButton.Enabled = false;
+            int generation = _clearGeneration;
+
+            SetSnapshotActionsEnabled(false);
             SetStatus("Refreshing...");
 
             try
             {
                 var snapshot = await _refreshAsync();
+
+                // A Clear Cache landed while this was in flight: the store is
+                // already gone and the status already reads "Cache cleared",
+                // so neither the persist below nor the repaint after it has
+                // anything valid left to say. The finally still re-enables.
+                if (_clearGeneration != generation)
+                {
+                    return;
+                }
+
                 string status = snapshot != null
                     ? $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}"
                     : null;
@@ -967,6 +1054,15 @@ namespace GW2CraftingHelper.Views
                     // real, just no-longer-visible, header panel.
                     if (_headerPanel == null || _headerPanel.Parent == null) return;
 
+                    // Re-checked here, not just before the persist above:
+                    // the clear runs on the main thread while this
+                    // continuation may still be on a ThreadPool one, so a
+                    // Discard can land between the two points.
+                    if (_clearGeneration != generation)
+                    {
+                        return;
+                    }
+
                     if (snapshot != null)
                     {
                         SetSnapshot(snapshot);
@@ -982,6 +1078,16 @@ namespace GW2CraftingHelper.Views
             {
                 Logger.Warn(ex, "Refresh Now failed");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot", $"Refresh Now failed: {ex.GetType().Name} - {ex.Message}");
+
+                // Module.ClearCache cancels _refreshCts, so a Discard during
+                // an in-flight refresh surfaces here as a cancellation. The
+                // log line above is kept - the failure did happen - but the
+                // user-facing status must stay "Cache cleared", which is
+                // what they actually asked for.
+                if (_clearGeneration != generation)
+                {
+                    return;
+                }
 
                 var classification = SnapshotFailureClassifier.Classify(ex);
                 string cause = StatusText.ForRefreshFailure(classification.Kind, classification.FailedSourceCount, classification.TotalSourceCount);
@@ -1015,8 +1121,7 @@ namespace GW2CraftingHelper.Views
                 MainThreadMarshal.Run(() =>
                 {
                     if (_headerPanel == null || _headerPanel.Parent == null) return;
-                    _refreshButton.Enabled = true;
-                    _clearButton.Enabled = true;
+                    SetSnapshotActionsEnabled(true);
                 });
             }
         }
