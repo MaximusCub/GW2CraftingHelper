@@ -12147,7 +12147,28 @@ regression gate, and every pre-existing tooltip test passes untouched.
   field MEANS.
 - `ItemStatTooltipComposer` - the in-game line order, Blish-free.
 - `ItemMetadataService.GetCachedStatBlock` - the session side cache.
-- Wiring on the recipe-tree rows and the plan header only.
+- Wiring on the recipe-tree rows and the plan header only - row panel,
+  name Label, quantity Label AND the framed icon, since Blish resolves a
+  tooltip on the deepest control under the cursor and never bubbles to
+  the parent.
+
+### The id-space gate
+
+`CraftingTreeNode.ItemId` is one numeric slot shared by three id spaces
+(see `CraftingDecision`): real item ids, wallet currency ids, and guild
+upgrade ids. Id 24 is BOTH a real vendor-offer output item and the
+currency "Pristine Fractal Relics", and `CraftingPlanPipeline`'s
+metadata id union can put the genuine item-24 entry into the very
+dictionary the stat cache is filled from.
+
+An item-keyed stat lookup on a currency row is therefore the same
+cross-domain collision `CraftingTreeBuilder` already guards icon and
+rarity against - only worse, because a stat block's FIRST line is the
+item's name in its rarity colour, and it displaces the row's own name
+line. `TreeRowTooltipComposer.RowIdIsAnItemId` is the single gate: it
+rejects `Currency`, `GuildUpgrade` and `UnrecognizedIngredient` rows,
+plus vendor cost-component leaves with no `SubtreeCost` (the
+currency half of a barter offer - the item half carries its gold value).
 
 ### What is stubbed, and behind which judgment call
 
@@ -12213,6 +12234,12 @@ previously had no tooltip at all now have one.
 - `ItemStatBlockFactory`'s shared empty `NoAttributes`/`NoStrings` lists
   are exposed as `IReadOnlyList` and could in principle be cast and
   mutated by a caller.
+- An agony infusion reports the same fact twice - as
+  `infix_upgrade.buff.description` and as an `infix_upgrade.attributes`
+  entry that renders to the identical string. The composer suppresses
+  the buff line when an attribute line already said it VERBATIM; a buff
+  description that summarises several attributes is distinct wording and
+  still renders.
 
 ### Desktop gate (live, required)
 
@@ -12223,8 +12250,10 @@ previously had no tooltip at all now have one.
    ICONS to the RIGHT of their numbers, then the item's description.
    Confirm the coin icons are icons, not the text "0g 0s 7c".
 2. Hover the plan header's target item name AND its " x N needed"
-   suffix: both show the same stat tooltip (the suffix Label must not
-   swallow the hover and show nothing).
+   suffix AND the 44px ICON to their left: all three show the same stat
+   tooltip (nothing lying over the panel may swallow the hover and show
+   nothing). Repeat on a tree row's 34px icon, including a dimmed
+   not-crafted reference row, whose scrim overlays the icon.
 3. Hover a tree row whose name is ELLIPSIZED: the tooltip's first line
    must be the FULL name, exactly once - not twice. Resize the window
    narrower and wider across the truncation boundary with the cursor
@@ -12253,5 +12282,13 @@ previously had no tooltip at all now have one.
    block appears.
 9. Confirm no tooltip anywhere shows a raw item id, currency id or
    vendor id.
+10. Id-space gate: generate a plan whose tree contains a CURRENCY row
+    (a vendor offer paid in karma / fractal relics / spirit shards) and
+    hover it, plus a currency cost-component leaf under a vendor node.
+    The tooltip must be the pre-feature one - the row's own currency
+    name and its plan lines - and must never open with an unrelated
+    ITEM's name, rarity colour, type or vendor value.
+11. Infusion de-duplication: put a +1 Agony Infusion in a plan and hover
+    it. "+1 Agony Resistance" must appear exactly ONCE.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
