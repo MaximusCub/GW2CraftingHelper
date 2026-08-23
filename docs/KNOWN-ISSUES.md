@@ -10873,6 +10873,29 @@ Blish clips a container's children, so a box narrower than its content
 would CUT the amount off, where an unboxed run merely overlaps its
 neighbour.
 
+The box panel IS the fill, and the 1px frame is four edge panels drawn
+ON it. The first draft instead copied `LabelHelpers.CreateSmallTag` - a
+border-coloured OUTER panel with the fill inset inside it - which is
+wrong here: that idiom under-paints the whole interior with the border
+colour, and every existing caller only gets away with it because its
+border is OPAQUE, so the under-paint is invisible by construction. This
+is the first caller with a translucent border, and the under-paint made
+the interior composite at `1 - 0.5 * 0.86 ~= 0.57` instead of the
+documented `0.14`: a near-solid gold slab with no discernible ring,
+i.e. the exact opposite of what the directive asked for. With nothing
+beneath the fill, the interior is 0.14 (parchment reads through at 86%)
+and an edge - frame over fill - lands at ~0.57, four times the
+interior's density, which is what makes a 1px ring read as an edge. The
+edges are siblings of the tile's labels but can never overlap them:
+content is inset by `CostBandBoxPadX`/`PadY`, both larger than the
+border width.
+
+The box's geometry (`CostBandBoxTop`, `CostBandBoxHeight`,
+`CostBandBoxWidth`) and the amount's bottom-anchoring clamp
+(`BandAmountY`) live in `SummarySectionLayoutMath` beside the constants
+they are built from, not inline in the Blish-bound renderer, so the
+tests below call the production expressions rather than restating them.
+
 **The centred currency table.** Batch H pulled the Required/Have/Needed
 block in beside the currency names, which closed the dead gutter but
 left the finished table pinned against the section's left edge with all
@@ -10917,11 +10940,14 @@ a different size.
 
 ### Validation
 
-Build 0 errors, suite 2191 passed / 0 failed (2186 baseline, +5: the two
-re-baselined `CostBandHeight` literals rewritten, one new test pinning
-the highlight box inside the band the height math reserves, and four new
-`CurrencyTableOffsetX` tests - pinned/centred/narrow-panel/geometry-
-preserved). Tree clean, nothing pushed.
+Build 0 errors, suite 2192 passed / 0 failed (2186 baseline, +6: the two
+re-baselined `CostBandHeight` literals rewritten, four new
+`CurrencyTableOffsetX` tests (pinned/centred/narrow-panel/geometry-
+preserved), one test driving `BandAmountY` + `CostBandBoxHeight` to pin
+the box inside the reserved band across the whole plausible range of
+measured caption heights, and one pinning `CostBandBoxWidth` against its
+tile slice at the narrowest panel the module can present). Tree clean,
+nothing pushed.
 
 ### What the desktop gate should look at
 

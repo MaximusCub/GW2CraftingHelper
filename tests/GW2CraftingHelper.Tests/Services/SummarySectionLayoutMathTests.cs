@@ -201,29 +201,76 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostBandHeight_LeavesTheHighlightBoxInsideTheBand()
         {
-            // The geometry the renderer actually builds: the box starts one
-            // pad above the caption and ends one pad below the amount run,
-            // and both edges must sit inside the band the height math
-            // reserved - the renderer's DEBUG assert fails loud otherwise.
+            // The geometry the renderer actually builds, through the same
+            // functions it calls: BandAmountY places the amount, the box
+            // spans CostBandBoxTop to one pad below it, and that bottom
+            // edge - the band's lowest ink - must sit inside the height the
+            // math reserved. The renderer's DEBUG assert fails loud
+            // otherwise, but only at runtime and only in DEBUG.
+            //
+            // captionBlockBottom is a MEASURED input (the caption font's
+            // real metrics), so it is swept from the tightest plausible
+            // value up to the full reserve rather than assumed: the clamp
+            // inside BandAmountY is exactly what has to hold across it.
             foreach (bool hasNote in new[] { false, true })
             {
                 int rowHeight = SummarySectionLayoutMath.CostBandHeight(hasNote);
-                int boxTop = SummarySectionLayoutMath.CostBandCaptionY - SummarySectionLayoutMath.CostBandBoxPadY;
-                int amountY = rowHeight - SummarySectionLayoutMath.CostBandAmountBottomPad
-                    - CoinSegmentMath.CoinIconSize;
-                int boxBottom = amountY + CoinSegmentMath.CoinIconSize + SummarySectionLayoutMath.CostBandBoxPadY;
-
-                Assert.True(boxTop >= 0);
-                Assert.True(boxBottom <= rowHeight);
-
-                // The caption block (caption line, plus the disclosure line
-                // when there is one) must clear the amount run rather than
-                // be overprinted by it.
-                int captionBlockBottom = SummarySectionLayoutMath.CostBandCaptionY
+                int reserve = SummarySectionLayoutMath.CostBandCaptionY
                     + SummarySectionLayoutMath.CostBandCaptionLineHeight
                     + (hasNote ? SummarySectionLayoutMath.CostBandCurrencyNoteHeight : 0);
-                Assert.True(amountY >= captionBlockBottom);
+
+                Assert.True(SummarySectionLayoutMath.CostBandBoxTop >= 0);
+
+                for (int captionBlockBottom = SummarySectionLayoutMath.CostBandCaptionY;
+                    captionBlockBottom <= reserve;
+                    captionBlockBottom++)
+                {
+                    int amountY = SummarySectionLayoutMath.BandAmountY(
+                        rowHeight,
+                        CoinSegmentMath.CoinIconSize,
+                        captionBlockBottom,
+                        SummarySectionLayoutMath.CostBandAmountBottomPad);
+                    int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(
+                        amountY, CoinSegmentMath.CoinIconSize);
+
+                    // The caption block must clear the amount run rather
+                    // than be overprinted by it.
+                    Assert.True(amountY >= captionBlockBottom);
+                    Assert.True(SummarySectionLayoutMath.CostBandBoxTop + boxHeight <= rowHeight);
+                }
             }
+        }
+
+        [Fact]
+        public void CostBandBoxWidth_AddsExactlyOnePadEachSide_AndFitsItsTileSlice()
+        {
+            // The box is never clamped to its tile slice (Blish clips a
+            // container's children, so a narrow box would cut the amount
+            // off), which makes the padding its only margin for error.
+            // These are the band's own arguments to ComputeCostTileGeometry
+            // - see Views/Rendering/SummarySectionRenderer.CreateFormulaBand.
+            const int totalMargin = 40;
+            const int minTileWidth = 80;
+
+            // The narrowest three-tile band the module can present: the
+            // 930px minimum window less the plan view's own chrome, taken
+            // pessimistically.
+            var geometry = PlanRelayoutMath.ComputeCostTileGeometry(860, 3, totalMargin, minTileWidth);
+
+            Assert.Equal(
+                2 * SummarySectionLayoutMath.CostBandBoxPadX,
+                SummarySectionLayoutMath.CostBandBoxWidth(0));
+
+            // The widest run a real result tile carries is the disclosure
+            // line ("+ N currencies required") at DefaultFont12, which
+            // measures well under 160px; the box must clear that with both
+            // pads even in the narrowest tile slice.
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(160) <= geometry.TileWidth);
+
+            // And the boundary itself, so a later pad bump is caught.
+            int widestThatFits = geometry.TileWidth - 2 * SummarySectionLayoutMath.CostBandBoxPadX;
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(widestThatFits) <= geometry.TileWidth);
+            Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(widestThatFits + 1) > geometry.TileWidth);
         }
 
         [Fact]
