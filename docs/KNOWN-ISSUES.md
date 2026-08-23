@@ -10791,4 +10791,26 @@ L3 bullet above corrected. Doc-only - no control height changed.
 Build 0 errors (2082 pre-existing StyleCop warnings), suite 2186 passed
 / 0 failed, tree clean, nothing pushed.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the
+review-fix HEAD, captures preflight/gJ1-gJ6). (L1) With plan.json
+moved aside, the Crafting Plan tab rendered the centered dim empty
+state. (M9) Snapshot rows read "75x Green Wood Log", the wallet
+"50x Spirit Shards" - prefix notation throughout. (P2) The
+multi-character breakdown line ellipsized and its hover showed the
+FULL breakdown wrapped in the opaque facility tooltip. (M10) The
+status line read "... Aug 23, 2026 12:23 AM (snapshot 32d old)" -
+the failure timestamp and the snapshot age no longer read as one
+moment; the fix-round breakdown format kept "Character: Maximus
+Test 10" label-first (no "20x Bank"). (L5) Spirit Shards rendered a
+placeholder icon instead of a column hole. (P4) The widened
+ApiAccessDialog title sits clear of its close button. (P1) With the
+Clear Cache confirm open, a click on the Bank checkbox behind it
+was eaten by the backdrop - Bank stayed checked, where the
+2026-08-22 photography session proved such clicks used to land.
+(P3) Zero doubled tags in module_log.jsonl and fresh entries write
+single tags - fixed at the write site. Observed, tolerable, noted:
+ModalDialog can stack on top of an open ApiAccessDialog (different
+dialog classes; backdrop still gates the module beneath both). Not
+staged live: L3's unified header bands and button heights across
+every tab (spot-checked on the surfaces above; pinned by the
+re-baselined height tests), M12's Log row-order swap (code-reviewed).
