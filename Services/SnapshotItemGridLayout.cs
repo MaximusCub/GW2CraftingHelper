@@ -149,10 +149,16 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// One placement per cell, in input order, packed left-to-right then
         /// top-to-bottom - reading order, so the single-column list the tab
-        /// shipped with is exactly the one-column case of this grid and the
-        /// item run still reads before the wallet run below it.
+        /// shipped with is exactly the one-column case of this grid.
         /// </summary>
-        public static Grid Compute(int count, int gridWidth, int rowHeight)
+        /// <param name="offsetY">
+        /// Y the section starts at. The wallet run is laid out at the item
+        /// run's <see cref="Grid.Height"/> so it still reads after the items
+        /// above it, in the same grid panel and at the same column count.
+        /// <see cref="Grid.Height"/> is the section's OWN height and never
+        /// includes this offset.
+        /// </param>
+        public static Grid Compute(int count, int gridWidth, int rowHeight, int offsetY = 0)
         {
             int columnCount = ComputeColumnCount(gridWidth);
             int columnWidth = ComputeColumnWidth(gridWidth);
@@ -164,7 +170,8 @@ namespace GW2CraftingHelper.Services
             {
                 int row = i / columnCount;
                 int column = i % columnCount;
-                cells[i] = new CellPlacement(column * columnWidth, row * safeRowHeight, column, row);
+                cells[i] = new CellPlacement(
+                    column * columnWidth, offsetY + (row * safeRowHeight), column, row);
             }
 
             int rowCount = (safeCount + columnCount - 1) / columnCount;

@@ -137,6 +137,46 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void WalletRunIsOffsetBelowTheItemRun_AtTheSameColumnCount()
+        {
+            // How MainView composes the two runs into one grid panel: the
+            // items first, the wallet at the item run's own height, so the
+            // reading order of the single-column list survives the repack.
+            var items = SnapshotItemGridLayout.Compute(3, 1310, 52);
+            var wallet = SnapshotItemGridLayout.Compute(3, 1310, 36, items.Height);
+
+            Assert.Equal(2, items.ColumnCount);
+            Assert.Equal(items.ColumnCount, wallet.ColumnCount);
+            Assert.Equal(items.ColumnWidth, wallet.ColumnWidth);
+
+            // Items occupy two rows of 52; the wallet run starts under them.
+            Assert.Equal(104, items.Height);
+            Assert.Equal(104, wallet.Cells[0].Y);
+            Assert.Equal(104, wallet.Cells[1].Y);
+            Assert.Equal(140, wallet.Cells[2].Y);
+
+            // The offset never leaks into the section's own height, which is
+            // what the grid panel's total is summed from.
+            Assert.Equal(72, wallet.Height);
+            Assert.Equal(176, items.Height + wallet.Height);
+
+            // Highest cell bottom edge stays inside that total.
+            Assert.Equal(176, wallet.Cells[2].Y + 36);
+        }
+
+        [Fact]
+        public void EmptyItemRun_LeavesTheWalletRunAtTheTop()
+        {
+            var items = SnapshotItemGridLayout.Compute(0, 1310, 52);
+            var wallet = SnapshotItemGridLayout.Compute(2, 1310, 36, items.Height);
+
+            Assert.Equal(0, items.Height);
+            Assert.Equal(0, wallet.Cells[0].Y);
+            Assert.Equal(0, wallet.Cells[1].Y);
+            Assert.Equal(655, wallet.Cells[1].X);
+        }
+
+        [Fact]
         public void Compute_EmptyOrNegativeCount_IsAnEmptyZeroHeightGrid()
         {
             foreach (int count in new[] { 0, -3 })
