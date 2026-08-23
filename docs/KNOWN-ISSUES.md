@@ -11277,6 +11277,20 @@ last of `LoadAll`, makes `UnsavedChangeCount` return 0 for that window.
 The cost is a missed prompt for a switch within a frame or two of the tab
 building, which is the same benign outcome the null baseline already had.
 
+Clearing it in `Build` is not early enough on its own. `OnTabChanged`
+commits to the rebuild on the MAIN thread - it evaluates the tab's view
+factory and calls `ShowView`, which queues `BuildView` off an
+already-completed `DoLoad` - and only afterwards raises `TabChanged`. In
+the ThreadPool scheduling gap between those two, `Build` has not run its
+first statement yet and the flag still reads true from the PREVIOUS
+build, so a second tab click landing there would enumerate the row lists
+the queued `Build` is about to clear. `SettingsTabContent.BeginRebuild`
+therefore clears the flag from the Settings tab's view factory, which is
+evaluated on the main thread inside `OnTabChanged` before either the
+queued build or the event. Only the tab-entry path calls it, so it
+cannot suppress the leave-the-tab prompt (leaving Settings evaluates the
+INCOMING tab's factory, not this one).
+
 **Prompt shape.** The existing `ModalDialog` has exactly two buttons, and
 no third was added. Confirm = Save, cancel = Discard, and `cancelText` is
 now an optional `Show` parameter (defaulting to the "Cancel" every
@@ -11300,6 +11314,27 @@ uses the status label), and the prompt raises a second dialog when the
 outcome is not `AllSaved`, offering "Open Settings" / "Dismiss". Note
 that reopening rebuilds the form from persisted settings, so the message
 says "re-enter" rather than promising the rejected text back.
+
+**Re-raising the shared dialog needed a fix in `ModalDialog` itself.**
+The second prompt is raised from inside the first one's confirm callback,
+and `Dismiss` used to hide the window BEFORE running that callback. That
+does not work, for reasons measured in the vendored binary:
+`WindowBase2.Hide()` does not set `Visible = false` - it resumes the
+0.2s reflecting fade tween built in the constructor, and only that
+tween's `OnComplete` sets `Visible = false` and raises `Hidden`. Meanwhile
+`WindowBase2.Show()` begins `BringWindowToFront(); if (Visible) return;`.
+So the re-raised dialog's `Show()` early-returned into a window that was
+already fading out: it painted the second message for ~0.2s, faded to
+nothing, and its own `Hidden` event ran `Dismiss(confirmed: false)` -
+a flash, then the same silent partial save the second dialog exists to
+prevent. `Dismiss` now runs the callback first and skips its own
+`Hide()` when that callback re-armed the dialog (`_isShowing` true
+again), inside a `try`/`finally` so a throwing callback still closes it.
+The early return then does the right thing: the still-visible window
+carries the replacement's content. Nothing else changes for the four
+single-shot callers - their callbacks do not re-arm, so the window is
+hidden the moment the callback returns, one main-thread statement later
+than before and with no frame drawn in between.
 
 **Accepted limits.**
 
@@ -11359,12 +11394,22 @@ Desktop gate:
     AND a valid number into a second one, switch away, choose Save. A
     second dialog appears reading "1 Settings entry could not be saved -
     the value was not a valid number. Everything else was saved. Open the
-    Settings tab to re-enter it?" with Open Settings / Dismiss. Choose
+    Settings tab to re-enter it?" with Open Settings / Dismiss. It must
+    STAY on screen until a button is pressed - watch it for a few seconds
+    and confirm it neither fades out nor closes itself. Choose
     Open Settings: the tab is selected, the valid edit is persisted, and
     the "abc" box is back to its persisted value. Restore the fixture
     (clear the second box, Save).
 11. Dismiss on that second dialog closes it and leaves the module window
     interactive (the backdrop is gone), with the tab the user switched to
     still selected.
+12. Rapid switching: click Settings and immediately another tab, back and
+    forth several times without editing anything. No crash, no prompt, and
+    the Settings tab still renders correctly when it settles.
+13. The other three confirm dialogs still behave (the Dismiss reordering
+    is shared chrome): Clear Cache on the main tab, Delete log file on the
+    Log tab, and the own-materials Regenerate confirm - each closes on
+    Confirm and on Cancel, and Escape/X still cancels, with the module
+    window interactive again afterwards.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
