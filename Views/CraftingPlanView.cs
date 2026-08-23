@@ -1812,8 +1812,16 @@ namespace GW2CraftingHelper.Views
                     RollBackFailedPlanRender(ex, "on tab visit");
                 }
             }
-            else
+            else if (!boardSnapshot.InFlight)
             {
+                // Only when nothing is running. A solver started before the
+                // user switched tabs is still in flight on the way back, and
+                // "No plan yet. Search for an item above, then click
+                // Generate Plan." beside a status strip reading
+                // "Generating..." instructs the user to do the thing that is
+                // already happening. The spinner armed above is the whole
+                // message in that case; the content area stays empty until
+                // the render the board's own completion drives.
                 ShowEmptyPlanState();
             }
         }
@@ -2029,7 +2037,15 @@ namespace GW2CraftingHelper.Views
             // when the width genuinely did not change (e.g. a height-only
             // resize, or a duplicate event) so an idle window never pays
             // for a registry walk.
-            if (_currentPlan != null && widthChanged)
+            //
+            // NOT gated on _currentPlan: the empty state registers relayout
+            // closures too (its centered label and the spacer above it are
+            // width-sized), and gating this on a plan left them dead - a
+            // no-plan tab dragged narrower kept the label centered on the
+            // build-time width and overflowed the panel. ReplayRelayout
+            // already returns immediately on an empty registry, which is
+            // the same guard for the same cost.
+            if (widthChanged)
             {
                 _lastRenderedWidth = w;
 
@@ -2047,7 +2063,11 @@ namespace GW2CraftingHelper.Views
             // regression was found under. Bounded to a single in-flight
             // ticker (_resizeSettlePending) so repeated ticks during a drag
             // just extend _lastResizeEventUtc rather than spawning parallel
-            // tickers - see ResizeSettleStep.
+            // tickers - see ResizeSettleStep. Still gated on _currentPlan,
+            // unlike the replay above: every job this pass does (re-ellipsis,
+            // the defensive replay, the scroll verify, the notes re-render)
+            // is about rendered plan content, so a no-plan tab would spawn a
+            // ticker per drag to do nothing.
             if (_currentPlan != null && (widthChanged || heightChanged))
             {
                 _lastResizeEventUtc = DateTime.UtcNow;
