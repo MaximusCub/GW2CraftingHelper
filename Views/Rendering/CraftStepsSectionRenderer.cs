@@ -182,29 +182,35 @@ namespace GW2CraftingHelper.Views.Rendering
             var greyColor = new Color(170, 170, 170);
             int x = TextX;
 
-            var craftLabel = new Label()
-            {
-                Text = CraftPrefix, Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
+            // "Craft ", "12x " and the item name are one sentence on one
+            // baseline: every label on it gets the same box treatment, so
+            // the clearance can never make the three disagree.
+            var craftLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = CraftPrefix, Font = textFont, TextColor = greyColor,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(x, 13), Parent = rowPanel
+                });
             x += craftLabel.Width;
 
-            var qtyLabel = new Label()
-            {
-                Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
+            var qtyLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(x, 13), Parent = rowPanel
+                });
             x += qtyLabel.Width;
 
-            new Label()
-            {
-                Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
-                ShowShadow = true, ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(x, 13), Parent = rowPanel
-            };
+            LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
+                    ShowShadow = true, ShadowColor = Color.Black * 0.8f,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(x, 13), Parent = rowPanel
+                });
 
             Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))

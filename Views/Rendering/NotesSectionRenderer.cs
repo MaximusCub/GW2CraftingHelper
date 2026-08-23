@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < lineCount; i++)
             {
                 var linePanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-                var label = new Label()
+                var label = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = wrapped.Lines[i],
                     Font = font,
@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeHeight = true,
                     Location = new Point(labelX, 4),
                     Parent = linePanel
-                };
+                });
 
                 if (i == 0 && hasCoin)
                 {

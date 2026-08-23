@@ -23,14 +23,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent
             };
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "  " + text,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),
                 Parent = rowPanel
-            };
+            });
 
             // Not width-dependent beyond the row's own cosmetic width (fixed
             // left-anchored text, m2 3.6's "no relayout needed" case).

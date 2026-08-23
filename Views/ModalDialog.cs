@@ -4,6 +4,7 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
@@ -11,6 +12,46 @@ namespace GW2CraftingHelper.Views
     public class ModalDialog : IDisposable
     {
         private const string WindowId = "GW2CraftingHelper_ModalDialog_c4f19a";
+
+        // 400x150 before, with the message in an unwrapped 380px-wide
+        // centered Label: a sentence wider than the label (Clear Cache's is
+        // ~640px at DefaultFont14) was centered on the label's midpoint and
+        // clipped at BOTH ends by the label's own scissor, so the dialog
+        // showed the middle of the sentence and nothing else. The width also
+        // squeezed WindowBase2's left title-bar texture into ~200px, which
+        // rasterized as coloured streaks behind the title.
+        //
+        // 560 is ApiAccessDialog's width, whose title bar renders clean and
+        // whose wrapped body is the shape copied below - the two dialogs are
+        // now the same size for the same reasons. Blish draws the title
+        // itself at a fixed 80px indent in DefaultFont32 with no alignment
+        // control (see ApiAccessDialog's own measurement note), so window
+        // width is the only lever either dialog has over the title bar.
+        private const int WindowWidth = 560;
+        private const int WindowHeight = 170;
+        private const int ContentX = 10;
+        private const int ContentY = 35;
+        private const int ContentWidth = WindowWidth - (2 * ContentX);
+        private const int ContentHeight = WindowHeight - ContentY - 10;
+        private const int MessageTopMargin = 6;
+        private const int MessageToButtonGap = 16;
+        private const int ButtonHeight = 25;
+        private const int ButtonBottomMargin = 10;
+
+        // The button line is FIXED, not measured against the message, and
+        // the message is capped to the lines that fit above it instead.
+        // The window cannot grow to fit a longer sentence: WindowBase2
+        // derives ContentRegion from the region passed to its protected
+        // ConstructWindow, and Container.ContentRegion has no public
+        // setter, so a Height written from here would leave the content
+        // region where it was. Pushing the buttons down instead (what the
+        // previous Math.Max did) walks them out of that region - at five
+        // wrapped lines they land almost entirely outside it and stop
+        // taking clicks, leaving the title-bar X as the only exit. A capped
+        // message keeps Confirm/Cancel reachable for any input; the full
+        // text stays available on the label's tooltip.
+        private const int ButtonY = ContentHeight - ButtonHeight - ButtonBottomMargin;
+        private const int MessageAreaHeight = ButtonY - MessageToButtonGap - MessageTopMargin;
 
         private readonly StandardWindow _window;
         private readonly ModuleSettings _settings;
@@ -42,8 +83,8 @@ namespace GW2CraftingHelper.Views
             // built-in textures and does not depend on the background parameter.
             _window = new StandardWindow(
                 new AsyncTexture2D(ContentService.Textures.Pixel),
-                new Rectangle(0, 0, 400, 150),
-                new Rectangle(10, 35, 380, 105))
+                new Rectangle(0, 0, WindowWidth, WindowHeight),
+                new Rectangle(ContentX, ContentY, ContentWidth, ContentHeight))
             {
                 BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
@@ -87,30 +128,58 @@ namespace GW2CraftingHelper.Views
                 child.Dispose();
             }
 
-            // Message label (centered horizontally)
-            new Label()
-            {
-                Text = message,
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = 380,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Location = new Point(0, 4),
-                Parent = _window
-            };
+            // Pre-wrapped, not left to the Label control's WrapText
+            // property, for the reason ApiAccessDialog documents: that
+            // property pins its wrap width at the control's first internal
+            // layout pass, which runs before a Width assigned later in the
+            // same object initializer takes effect. TextWrapMath rather
+            // than DrawUtil.WrapText because only the former caps the line
+            // count, which is what keeps the buttons in the content region
+            // (see ButtonY) - the same greedy wrap plus ellipsized tail the
+            // notes section already renders with.
+            var font = GameService.Content.DefaultFont14;
+            int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
+            var wrapped = TextWrapMath.Wrap(
+                message ?? "",
+                ContentWidth,
+                ContentWidth,
+                LabelHelpers.MeasureWith(font),
+                MessageAreaHeight / lineHeight);
 
-            // Buttons: centered horizontally, placed in lower half of content
+            // Auto-size BOTH axes and parent last - ApiAccessDialog's
+            // proven AddWrappedLine shape. A fixed Width with
+            // AutoSizeHeight takes Blish's stale-layout-pass measure and
+            // clipped the second wrapped line mid-glyph (gate capture
+            // gA6w). The block centers by its measured width instead.
+            var messageLabel = new Label()
+            {
+                Text = string.Join("\n", wrapped.Lines),
+                Font = font,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true
+            };
+            messageLabel.Location = new Point(
+                System.Math.Max(0, (ContentWidth - messageLabel.Width) / 2),
+                MessageTopMargin);
+            messageLabel.Parent = _window;
+
+            // Only when text was actually dropped - a tooltip repeating the
+            // visible sentence is noise.
+            TooltipFacility.ApplyPlain(messageLabel, wrapped.Truncated ? message : null);
+
+            // Buttons: centered horizontally, on the fixed bottom line so
+            // every caller's dialog puts them in the same place.
             int btnW = 100;
             int cancelW = 70;
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
-            int btnX = (380 - totalBtnW) / 2;
-            int btnY = 55;
+            int btnX = (ContentWidth - totalBtnW) / 2;
+            int btnY = ButtonY;
 
             var confirmBtn = new StandardButton()
             {
                 Text = confirmText,
-                Size = new Point(btnW, 25),
+                Size = new Point(btnW, ButtonHeight),
                 Location = new Point(btnX, btnY),
                 Parent = _window
             };
@@ -119,7 +188,7 @@ namespace GW2CraftingHelper.Views
             var cancelBtn = new StandardButton()
             {
                 Text = "Cancel",
-                Size = new Point(cancelW, 25),
+                Size = new Point(cancelW, ButtonHeight),
                 Location = new Point(btnX + btnW + btnGap, btnY),
                 Parent = _window
             };

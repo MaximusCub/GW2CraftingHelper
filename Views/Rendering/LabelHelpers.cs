@@ -85,11 +85,63 @@ namespace GW2CraftingHelper.Views.Rendering
             };
         }
 
+        /// <summary>
+        /// Extra height a text label needs on top of its font's measured
+        /// text height so a descender ('y', 'g', 'p') survives to the
+        /// screen. AutoSizeHeight sizes a Label to exactly that measured
+        /// height, and Blish then clips the label's own paint to its own
+        /// bounds - so the descender lands in the last row or two of the
+        /// clip window, where the floor/ceil scissor round trip documented
+        /// on <see cref="CreateRowDivider"/> can shave it off - so whether a
+        /// given descender survives depends on the scroll phase and the GW2
+        /// UI scale, which is why it reads as intermittent. Field test, bug
+        /// 5: character names in Required Disciplines lost the tail of
+        /// their 'y'. Two pixels, matching the Log tab's row metrics, which
+        /// have measured their own rows as Measure(font, "Ag").Height + 2
+        /// since they were written.
+        /// </summary>
+        internal const int DescenderClearance = 2;
+
+        /// <summary>
+        /// Pins a label to its measured text height plus
+        /// <see cref="DescenderClearance"/> in place of AutoSizeHeight, and
+        /// returns it so it can wrap an object initializer in place.
+        /// Measured with the label's own font, so a call site cannot pass
+        /// one font and render in another. Width is untouched
+        /// (AutoSizeWidth still governs it), so nothing that measures or
+        /// right-aligns against a label's width moves. Single-line labels
+        /// only - a later Text assignment of the same one-line shape keeps
+        /// this height, which is the point.
+        ///
+        /// VerticalAlignment is pinned to Top, and that is what makes the
+        /// extra height safe to apply to some labels in a row and not
+        /// others. Blish_HUD.Controls.Label.VerticalAlignment is a public
+        /// settable property whose default this module does not control; if
+        /// it were Middle, growing a box by 2 would push its glyphs down by
+        /// 1 while an unswept sibling on the same row stayed put, and a
+        /// ragged baseline inside one sentence ("Craft 12x " + item name)
+        /// is worse than the clip this fixes. Top makes the two pixels land
+        /// entirely BELOW the glyphs, so a swept label renders at exactly
+        /// the y it rendered at before - the change is additive clearance,
+        /// never motion.
+        /// </summary>
+        internal static Label WithDescenderClearance(Label label)
+        {
+            var font = label?.Font;
+            if (font == null) return label;
+
+            label.VerticalAlignment = VerticalAlignment.Top;
+            label.AutoSizeHeight = false;
+            label.Height =
+                (int)System.Math.Ceiling(font.MeasureString(label.Text ?? "").Height) + DescenderClearance;
+            return label;
+        }
+
         internal static Label CreateRightAlignedLabel(
             Panel parent, string text, BitmapFont font, Color color, int rightEdgeX, int y)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
-            return new Label()
+            return WithDescenderClearance(new Label()
             {
                 Text = text ?? "",
                 Font = font,
@@ -98,7 +150,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeHeight = true,
                 Location = new Point(rightEdgeX - width, y),
                 Parent = parent
-            };
+            });
         }
 
         /// <summary>

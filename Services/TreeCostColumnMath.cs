@@ -16,7 +16,9 @@ namespace GW2CraftingHelper.Services
     /// widest value ANY row in the tree puts in it. Because every segment
     /// is "number, gap, icon" and each is right-aligned to its own
     /// sub-column's right edge, the fixed-width icons land on the same x
-    /// on every row: three straight vertical rules down the column.
+    /// on every row that fills the same bands: straight vertical rules
+    /// down the column. Which bands a given row fills is
+    /// <see cref="ComputeRowEdges"/>'s business.
     ///
     /// Scanned over the WHOLE tree, not just the currently expanded rows.
     /// Rows are built lazily (TreeSectionController.RenderTreeNode's
@@ -127,6 +129,42 @@ namespace GW2CraftingHelper.Services
 
             return new CostSubColumnEdges(
                 goldRightEdge, silverRightEdge, copperRightEdge, currencyRightEdge, TotalWidth(widths));
+        }
+
+        /// <summary>
+        /// The sub-column edges ONE row draws into. A row that renders no
+        /// currency segments collapses the trailing currency band for
+        /// itself, so its coin run - or its unpriceable dash - ends on the
+        /// cost column's own right edge, which is the edge the "Cost"
+        /// header is right-aligned to.
+        /// <para>
+        /// Field test, bug 4: with a shared band reserved for the widest
+        /// currency run in the tree, every coin-only row stopped short of
+        /// that edge by the width of a band it never filled, so gold
+        /// figures sat visibly left of the header while currency rows lined
+        /// up under it. Rows that DO draw currency keep the shared band, so
+        /// their coin runs still line up with each other; the reserved
+        /// width (<see cref="TotalWidth"/>) is unchanged either way, so no
+        /// row can now reach further right than the column already owned.
+        /// </para>
+        /// </summary>
+        public static CostSubColumnEdges ComputeRowEdges(
+            int costRightEdge, CostColumnWidths widths, bool rowDrawsCurrency)
+        {
+            if (rowDrawsCurrency) return ComputeEdges(costRightEdge, widths);
+
+            var collapsed = ComputeEdges(
+                costRightEdge,
+                new CostColumnWidths(
+                    widths.GoldTextWidth, widths.SilverTextWidth, widths.CopperTextWidth, 0));
+
+            // TotalWidth stays the WHOLE column's reserved width, not this
+            // row's: it is what the caller reserves so a wide row cannot run
+            // back into the pills, and that budget is a property of the
+            // tree, not of whichever row is being placed.
+            return new CostSubColumnEdges(
+                collapsed.GoldRightEdge, collapsed.SilverRightEdge, collapsed.CopperRightEdge,
+                collapsed.CurrencyRightEdge, TotalWidth(widths));
         }
 
         /// <summary>

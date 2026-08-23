@@ -41,9 +41,7 @@ namespace GW2CraftingHelper.Views
         // Item-row geometry, left to right: search box, "Qty:" label,
         // quantity field, then the add/remove buttons. The buttons keep a
         // clear gap from the quantity field so "+" does not read as its
-        // stepper, and the suggestion list opens SuggestionAnchorGap right
-        // of that field so it drops over scrollable content instead of the
-        // row's own inputs and the rows below it.
+        // stepper.
         private const int QtyInputX = 240;
         private const int QtyInputWidth = 50;
         private const int RowButtonsX = 320;
@@ -55,7 +53,6 @@ namespace GW2CraftingHelper.Views
         private const int RowButtonSize = UiMetrics.ButtonHeight;
         private const int RowButtonGap = 8;
         private const int RowButtonY = 3;
-        private const int SuggestionAnchorGap = 12;
 
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
@@ -1416,12 +1413,9 @@ namespace GW2CraftingHelper.Views
             };
             row.SearchBox = searchBox;
 
-            // The list opens right of the Qty stepper rather than straight
-            // under the search box, where it used to cover this row's own
-            // quantity field and every row below it. The offset is measured
-            // from the search box's left edge, which is the row's origin.
-            var suggestionPanel = new SuggestionPanel(
-                searchBox, _itemSearchProvider, QtyInputX + QtyInputWidth + SuggestionAnchorGap);
+            // The list drops straight under this box (see
+            // SuggestionPanel.PositionPanel).
+            var suggestionPanel = new SuggestionPanel(searchBox, _itemSearchProvider);
             suggestionPanel.ItemSelected += (_, args) =>
             {
                 row.ItemId = args.ItemId;

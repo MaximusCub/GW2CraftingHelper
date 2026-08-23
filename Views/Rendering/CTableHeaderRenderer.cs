@@ -65,23 +65,23 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
             var font = TableHeaderStyle.Font;
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = leftLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
-            };
+            });
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
-                middleLabelControl = new Label()
+                middleLabelControl = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = middleLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
                     Location = new Point(
                         middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, TableHeaderStyle.LabelY),
                     Parent = rowPanel
-                };
+                });
             }
             var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, rightLabel, font, TableHeaderStyle.LabelColor,

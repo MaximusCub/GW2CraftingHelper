@@ -368,7 +368,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     hostWidth = boxWidth;
                 }
 
-                var captionLabel = new Label()
+                var captionLabel = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = caption,
                     Font = captionFont,
@@ -379,13 +379,13 @@ namespace GW2CraftingHelper.Views.Rendering
                         TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, captionWidth),
                         captionY - hostTop),
                     Parent = host
-                };
+                });
                 TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
                 Label noteLabel = null;
                 if (noteText != null)
                 {
-                    noteLabel = new Label()
+                    noteLabel = LabelHelpers.WithDescenderClearance(new Label()
                     {
                         Text = noteText,
                         Font = captionFont,
@@ -396,7 +396,7 @@ namespace GW2CraftingHelper.Views.Rendering
                             TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, noteWidth),
                             noteY - hostTop),
                         Parent = host
-                    };
+                    });
                     TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
                 }
 
@@ -715,13 +715,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 parent, panelWidth, TableHeaderStyle.RowHeight, widestNumberWidth, widestNameEnd,
                 TableHeaderStyle.BandColor, out var headerRowPanel);
             var font = TableHeaderStyle.Font;
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
                 Parent = band
-            };
+            });
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
                 panelWidth, widestNumberWidth, widestNameEnd);
@@ -796,12 +796,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 edges.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
             string fullName = row.Label ?? "";
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
-            var nameLabel = new Label()
+            var nameLabel = LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = displayName, Font = font, TextColor = Color.White,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(nameX, 4), Parent = rowPanel
-            };
+            });
             if (displayName != fullName)
             {
                 // Stamp BOTH the label AND the row's content panel - a
@@ -887,7 +887,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent
             };
-            new Label()
+            LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "  " + text,
                 Font = GameService.Content.DefaultFont12,
@@ -896,7 +896,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeHeight = true,
                 Location = new Point(8, 7),
                 Parent = rowPanel
-            };
+            });
 
             // Not width-dependent beyond the row's own cosmetic width (m2
             // 3.6): fixed left-anchored text, same as TextRowRenderer.

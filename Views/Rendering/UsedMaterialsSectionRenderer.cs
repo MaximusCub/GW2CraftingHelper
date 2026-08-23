@@ -134,16 +134,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 TooltipFacility.ApplyPlain(rowPanel, fullName);
             }
 
-            var qtyLabel = new Label()
-            {
-                Text = qtyText,
-                Font = font,
-                TextColor = new Color(200, 200, 200),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(qtyRightEdge - qtyWidth, 9),
-                Parent = rowPanel
-            };
+            var qtyLabel = LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = qtyText,
+                    Font = font,
+                    TextColor = new Color(200, 200, 200),
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(qtyRightEdge - qtyWidth, 9),
+                    Parent = rowPanel
+                });
 
             // Qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and

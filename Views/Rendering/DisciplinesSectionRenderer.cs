@@ -195,12 +195,13 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = GameService.Content.DefaultFont14;
 
-            new Label()
-            {
-                Text = row.Label ?? "", Font = font,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(8, 7), Parent = rowPanel
-            };
+            LabelHelpers.WithDescenderClearance(
+                new Label()
+                {
+                    Text = row.Label ?? "", Font = font,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(8, 7), Parent = rowPanel
+                });
             int levelRightEdge = LevelRightEdge(panelWidth, levelColumnWidth, widestNameEnd);
             var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, levelRightEdge, 7);
 
@@ -226,12 +227,16 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(levelRightEdge, levelLabel.Width, CharGap, charX);
                 string charDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, charMaxWidth);
-                charLabel = new Label()
-                {
-                    Text = charDisplayText, Font = charFont, TextColor = charColor,
-                    AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(charX, 9), Parent = rowPanel
-                };
+                // The reported site: "Anna (500), Bobby (400/450)" - the one
+                // label in this row carrying character names, which are the
+                // only text here a user picks the letters of.
+                charLabel = LabelHelpers.WithDescenderClearance(
+                    new Label()
+                    {
+                        Text = charDisplayText, Font = charFont, TextColor = charColor,
+                        AutoSizeWidth = true, AutoSizeHeight = true,
+                        Location = new Point(charX, 9), Parent = rowPanel
+                    });
                 if (charLabel.Text != fullCharText)
                 {
                     TooltipFacility.ApplyPlain(rowPanel, fullCharText);
