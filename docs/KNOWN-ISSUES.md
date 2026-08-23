@@ -11164,3 +11164,101 @@ unchanged. (5) Zoomed crop confirms full descenders on "Log",
 Blish's fixed 80px title indent (title cannot be centered without
 reimplementing window chrome) is recorded as the accepted limit;
 the Emblem option noted for a future maintainer call.
+
+## Sortable plan tables (sortable-tables)
+
+Maintainer field-test directive, verbatim: "the used materials section
+should be column sortable by clicking the column headers and have visual
+indicators - sort by item, sort by amount. shopping list too - column
+sortable."
+
+Both tables' column headers are now their own sort controls. Used
+Materials sorts on Item/Amount, the Shopping List on Item/Amount/Each/
+Total. One click cycle per column - **None -> Ascending -> Descending ->
+None**: the third click restores the plan's own emission order rather
+than stranding a reader in a sort they cannot undo, and clicking a
+different column starts that column ascending and abandons the previous
+one (a table has exactly one active sort column). The default order is
+the plan's own, with no indicator drawn anywhere.
+
+- **State and comparators are Blish-free.**
+  `Services/TableSortState<TColumn>` holds one table's active column and
+  direction plus the click cycle; `Services/PlanTableSorter` orders the
+  already-built `PlanRowViewModel`s. Sorting never mutates the caller's
+  list and hands the same instance back when no sort is active, so the
+  default path allocates nothing. 24 tests.
+- **Item sorts ordinal-ignore-case; Amount sorts numerically.** A string
+  sort would put 111 before 9; the Amount test pins 9/111/136/816 in
+  both directions. Ties keep their original relative order (stable) in
+  both directions.
+- **The Shopping List's Each/Total columns are not one scale, so they
+  sort in three blocks.** A cell there is a coin price, a price paid in
+  some non-coin currency (spirit shards, karma), or a genuinely
+  unpriceable dash - and a copper amount is not comparable to a
+  spirit-shard amount, since the module refuses to invent an exchange
+  rate between them. The order is: coin rows (including mixed
+  coin+currency rows, keyed on their copper part - the one magnitude
+  every coin row shares), then currency-only rows (keyed by currency
+  name, then amount within that currency, so every karma row lands
+  beside every other karma row), then the unpriceable rows. The BLOCK
+  order is deliberately direction-invariant and only the order WITHIN a
+  block flips: reversing the blocks would express nothing - 5 spirit
+  shards is neither more nor less than 3 gold - and it would float the
+  dash rows to the top, where they are pure noise. A row carrying more
+  than one currency keys on its ordinally-first currency name and that
+  entry's amount, which is stable regardless of the order the resolver
+  emitted them in; no attempt is made to add amounts across currencies.
+- **The indicator rides inside the clickable header label.** The label
+  IS the click target, and its text carries the ASCII "^"/"v" (the
+  tree's caret vocabulary - M12 unified the module on ASCII). That keeps
+  `CTableHeaderRenderer`'s and the Shopping List header's relayout
+  closures correct for free: both right-align off the label control's
+  own `Width`, which already includes the indicator, so the x-tracking
+  that follows a drag-resize never sees a separate control to miss.
+  `CTableHeaderRenderer` gained two optional click actions, omitted by
+  every other c-table caller (Required Recipes, Required Disciplines,
+  the tree), whose labels stay inert exactly as before. Since an
+  unsorted column deliberately shows no indicator, a hover tint and a
+  one-line tooltip are what say "clickable" before the first click.
+- **A click re-renders the plan.** Section rows are a `FlowPanel`'s
+  children in flow order, which is not reorderable in place, so the
+  sort is applied the one way it can be: `PreserveScrollAcross(() =>
+  RenderPlan(_currentPlan))` - the same synchronous full rebuild the
+  "Hide Unlocked Recipes" checkbox and a tree pill's re-solve already
+  run from inside their own event handlers, rather than a second
+  deferred mechanism. Row COUNT and row heights are identical before and
+  after, so `PlanContentHeightMath` lands on exactly the same section
+  height and the reader keeps their scroll position.
+- **Sort state survives a regenerate.** It lives on the view for the
+  session (never persisted), unlike `_sectionExpansion`, which a new
+  Generate deliberately resets to the section defaults.
+
+Build 0 errors, 2146 StyleCop warnings (2135 before; the 11 added sit in
+the same rule families the codebase trips throughout). Suite 2227 passed
+/ 0 failed (2203 baseline, +24: eight on the click cycle, sixteen on the
+comparators), tree clean, nothing pushed.
+
+Desktop gate items:
+
+1. Generate a plan with a long Used Materials list. Click the "Item"
+   header: the rows reorder A-Z and the header reads "Item ^". Click it
+   again: the order reverses and the header reads "Item v". Click a
+   third time: the plan's own order is back and no header carries an
+   indicator. Hovering any of the two headers tints it before any click.
+2. Click "Amount" on the same table: rows sort by quantity NUMERICALLY -
+   the fixture's 111x/136x/816x rows land in that order ascending and
+   816/136/111 descending, and a single-digit row (9x) sorts below 111x,
+   never above it. The Amount column and its header stay aligned on the
+   same right edge as before, and still do after a window drag-resize.
+3. Shopping List: each of Item / Amount / Each / Total sorts on click and
+   shows its indicator, and only one header carries an indicator at a
+   time. On Each/Total, coin-priced rows come first ordered by value,
+   then rows priced in a currency (grouped per currency), then any dash
+   row - and the dash rows stay at the BOTTOM when the direction is
+   flipped to descending.
+4. With a sort active on both tables, press Generate again for the same
+   item: both tables come back sorted the same way with the same
+   indicators showing. Scroll down to the Shopping List, click a header
+   there, and the view stays where it was rather than jumping to the top.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
