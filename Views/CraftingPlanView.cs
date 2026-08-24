@@ -3663,14 +3663,16 @@ namespace GW2CraftingHelper.Views
             // LabelHelpers.CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform.
             // NOT built via LabelHelpers.CreateRowDivider (headerPanel is not a row of a
-            // list, it has its own fixed 30px height) but it is built the
+            // list, it has its own fixed SectionHeaderRowHeight) but it is built the
             // SAME way (a Panel child bottom-anchored near its parent's
             // bottom edge) and is subject to the identical Container.Paint
             // scissor round-trip defect. Simulation (M36b investigation)
-            // shows a bottom-flush 2px line under H=30 is immune at the
-            // default 0.897 scale but vulnerable (~16-17%) at the "Small"
-            // 0.81 scale, so it gets the same 1px bottom clearance as the
-            // vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
+            // showed a bottom-flush 2px line under the header's then-30px
+            // height immune at the default 0.897 scale but vulnerable
+            // (~16-17%) at the "Small" 0.81 scale; the Font18 promotion
+            // raised it to 32, which that investigation lists as vulnerable
+            // outright. Either way it gets the same 1px bottom clearance as
+            // the vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
             // at y=5 and its lowest measured ink at Font18 is y=28, which
             // is what SectionHeaderRowHeight's own two extra pixels buy.
             var headerDivider = new Panel()

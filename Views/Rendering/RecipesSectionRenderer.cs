@@ -261,13 +261,18 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             // M36b: bottomClearance depends on which rowHeight this branch
-            // used. hasSublabel (44px, RecipeRowHeightWithSublabel) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment) - icon frame bottom (1 + 34 =
-            // 35) leaves ample headroom below rowHeight-3 (41). The
-            // no-sublabel branch (36px, RecipeRowHeightNoSublabel) is
-            // immune and flush-fit with zero slack; giving it
-            // clearance it doesn't need would reintroduce that overlap.
+            // used. hasSublabel is now 48px
+            // (RecipeRowHeightWithSublabel, raised from the 44px M36b
+            // simulated as VULNERABLE to the Container.Paint round-trip
+            // defect - see LabelHelpers.CreateRowDivider's doc comment).
+            // 48 is a height that simulation never covered, so the 1px is
+            // carried forward from 44 rather than proven for 48; it stays
+            // because it costs nothing here - the divider top (rowHeight -
+            // 3 = 45) clears both the icon frame bottom (1 + 34 = 35) and
+            // the sublabel's lowest ink (y=43). The no-sublabel branch
+            // (36px, RecipeRowHeightNoSublabel) is on the proven-immune
+            // list and flush-fit with zero slack; giving it clearance it
+            // doesn't need would reintroduce that overlap.
             RowRelayoutHelpers.FinishRow(
                 rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink,
                 w =>
