@@ -22,12 +22,15 @@ namespace GW2CraftingHelper.Views.Rendering
     /// <para>
     /// Blish's own Label default is DefaultFont14, so a Label this module
     /// builds without an explicit Font renders one step below Body. Every
-    /// label site therefore sets one. Three control types are excluded and
-    /// stay at Blish's own default: Checkbox exposes no Font property at
-    /// all, and TextBox and Dropdown have internal padding Blish authors
-    /// against DefaultFont14 while holding typed values rather than module
-    /// prose. Anything MEASURING one of those three measures in
-    /// <see cref="Caption"/>, which is the size they actually paint.
+    /// label site therefore sets one. Four control types are excluded and
+    /// stay at Blish's own default: Checkbox and StandardButton (which
+    /// FeedbackButton derives from) expose no Font property at all, and
+    /// TextBox and Dropdown have internal padding Blish authors against
+    /// DefaultFont14 while holding typed values rather than module prose.
+    /// Anything MEASURING one of those four measures in
+    /// <see cref="Caption"/>, which is the size they actually paint - and
+    /// so does anything sizing a tooltip Blish renders itself
+    /// (Services.TooltipTextFormat).
     /// </para>
     /// </summary>
     internal static class UiFonts

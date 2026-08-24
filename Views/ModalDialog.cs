@@ -194,9 +194,15 @@ namespace GW2CraftingHelper.Views
             // grows the button instead of being clipped by StandardButton's
             // own scissor (it centres text with zero side padding, so the
             // breathing room has to be added here).
+            // Measured in Caption, not in the message's Body: StandardButton
+            // (FeedbackButton's base) draws its own label in DefaultFont14
+            // and exposes no Font seam, exactly like Checkbox - see UiFonts'
+            // note on the exclusions. Measuring in Body would pad every
+            // over-floor button by ~11% of a width it never paints.
+            var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
             string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
-            int btnW = System.Math.Max(100, measure(confirmText ?? "") + ButtonSidePadding);
-            int cancelW = System.Math.Max(70, measure(cancelLabel) + ButtonSidePadding);
+            int btnW = System.Math.Max(100, buttonMeasure(confirmText ?? "") + ButtonSidePadding);
+            int cancelW = System.Math.Max(70, buttonMeasure(cancelLabel) + ButtonSidePadding);
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;
