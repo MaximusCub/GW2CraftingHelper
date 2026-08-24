@@ -13261,7 +13261,11 @@ rationale that keeps its suffix from reading as noise. Moved back.
     ITEM's name, rarity, type or vendor value.
 12. Resize the window across a row's truncation boundary with the cursor
     held still on that row: the tooltip's name must appear exactly once,
-    never twice, on either side of the boundary.
+    never twice, on either side of the boundary. Do it once on a
+    Snapshot row whose stat block has NOT arrived (restart so the plan
+    restores from disk, and hover before the Q13 top-up lands): once the
+    row is wide enough to show its name in full, hovering it must show
+    NOTHING rather than that same name repeated as a tooltip.
 13. Q13: restart Blish so the plan restores from disk WITHOUT
     regenerating. Within a few seconds of the tab opening, hovering a
     tree row shows the full stat block - no Generate needed. Confirm the

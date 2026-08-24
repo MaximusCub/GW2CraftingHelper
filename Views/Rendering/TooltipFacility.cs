@@ -102,6 +102,15 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Wraps composed prose and assigns it as a plain tooltip. A null
         /// or empty text clears the tooltip, which is what every caller
         /// already means by "no tooltip here".
+        /// <para>
+        /// The same call also records the caller's intent as the rich
+        /// fallback of whatever source the control already carries, CLEARS
+        /// INCLUDED. Without it a deliberate clear could not be told from
+        /// the null <see cref="Register"/> itself writes, and the next
+        /// re-stamp would carry a note the caller had just retracted back
+        /// in - a row whose label now fits would show its own full text as
+        /// a tooltip over the text it is already showing in full.
+        /// </para>
         /// </summary>
         internal static void ApplyPlain(Control control, string text)
         {
@@ -109,7 +118,13 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return;
             }
-            control.BasicTooltipText = string.IsNullOrEmpty(text) ? null : TooltipTextFormat.Wrap(text);
+
+            string wrapped = string.IsNullOrEmpty(text) ? null : TooltipTextFormat.Wrap(text);
+            if (Contents.TryGetValue(control, out var source))
+            {
+                source.FallbackText = wrapped;
+            }
+            control.BasicTooltipText = wrapped;
         }
 
         /// <summary>
@@ -182,7 +197,10 @@ namespace GW2CraftingHelper.Views.Rendering
             // control's own text was nulled below on the FIRST stamp, so
             // reading it again would find nothing and lose the note. A
             // caller that has since assigned real plain text wins, because
-            // that text is what the control says now.
+            // that text is what the control says now - and one that has
+            // since CLEARED it wins too, because ApplyPlain wrote that
+            // clear onto the previous source rather than leaving it to be
+            // inferred from a field this method zeroes.
             source.FallbackText = string.IsNullOrEmpty(control.BasicTooltipText)
                 ? previous?.FallbackText
                 : control.BasicTooltipText;
