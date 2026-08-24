@@ -12309,14 +12309,14 @@ Real strings measure **1.10-1.11x** wider at 16 than at 14 (730 -> 810,
 
 | constant | old | new | basis |
 |---|---|---|---|
-| `WindowSizing.MinWindowWidth` | 1436 | **1472** | the research's +2pt variant (1448, measured at Menomonia 16, not scaled) plus one `TreeIndentPer` of vendor-leaf headroom |
+| `WindowSizing.MinWindowWidth` | 1436 | **1478** | the research's +2pt variant (measured at Menomonia 16, not scaled), plus one `TreeIndentPer` of vendor-leaf headroom, plus the widest-digit rather than example-digit cost column (see below) |
 | `TooltipTextFormat.LineBudgetChars` | 75 | **71** | NOT a body-bump consequence: this budget sizes text Blish renders itself, in its own `BasicTooltipView` at DefaultFont14, which the module has no seam to re-font. Re-measured at **Font14** over every >=55-character prose string the module builds (73 of them): 7.03px/char average, so Blish's 500px cap is 71 characters, not the 76 the shipped 6.5px/char estimate assumed |
 | `SnapshotItemGridLayout.MaxCharWidthPx` | 8 | **9** | item names measure ~8.4px/char at Font16 (192px over 23 characters), rounded up |
 | `SnapshotItemGridLayout.MinColumnWidth` | 464 | **516** | derived: `40 + 52*9 + 8`. Two columns at 1158px, three at 1674px |
 | `SettingsCurrencyGridLayout.CellNameWidth` | 170 | **190** | 170 x 1.11, so the same currency names still fit before ellipsis |
 | `SettingsCurrencyGridLayout.CellTagWidth` | 100 | **110** | "default 3600" measures 98px at Font16; keeps the ~11% slack the 100px slot gave its 89px at Font14 |
 | `SettingsCurrencyGridLayout.CellClearWidth` | 74 | **74** | unchanged - it sizes a `Checkbox` label Blish keeps at Font14 |
-| `SettingsCurrencyGridLayout.MinColumnWidth` | 424 | **454** | derived from the three above. Two columns need a 908px panel (a 1034px window), clearing the 1472 minimum by ~426px |
+| `SettingsCurrencyGridLayout.MinColumnWidth` | 424 | **454** | derived from the three above. Two columns need a 908px panel (a 1034px window), clearing the 1478 minimum by ~432px |
 | `PlanContentHeightMath.CTableHeaderRowHeight` | 26 | **28** | header label at `LabelY` 5, lowest Font16 ink y=26 - exactly the old band |
 | `PlanContentHeightMath.DisciplineRowHeight` | 32 | **36** | two labels at y=7/y=9, ink y=28, divider top was y=29. 36 is what every other single-line table row uses and is on `CreateRowDivider`'s proven-immune list |
 | `PlanContentHeightMath.RecipeRowHeightWithSublabel` | 44 | **48** | name line box 18 -> 20 pushed the sublabel y=22 -> 24, and the sublabel's own font grew: ink y=43 against a divider at y=41 |
@@ -12375,7 +12375,7 @@ constant, not just here):
   the button line near y=193 inside a ~255px content region, i.e. ~60px
   of headroom. Gate item 1 is what actually confirms it.
 
-#### Modelling honesty on the 1472 figure
+#### Modelling honesty on the 1478 figure
 
 The window minimum is **measured for the fonts and inferred for the
 chrome**, exactly as it was at 1436: the 126px window-to-panel chain has
@@ -12383,7 +12383,7 @@ one ~8px term (Blish's `Panel` border) taken from this repo's own comment
 rather than a decompile, so the whole figure carries +/-2px there. That
 is the **only** uncertainty in the figure.
 
-Both deepest-row constants in `PlanRelayoutMathTests` are direct
+All three deepest-row constants in `PlanRelayoutMathTests` are direct
 measurements in the one convention the production code uses -
 MonoGame.Extended's advance / `XOffset+Width` rule, which is what
 `TreeSectionController`'s `nameFont.MeasureString` and
@@ -12394,19 +12394,42 @@ research's `65` for `4194304x ` and `174` for `Thermocatalytic Reagent`:
 depth-24 vendor leaf's exact zero-gutter fit are measured facts, not
 approximations.
 
-`DeepestPlanCostColumnWidth` 165 -> **175** is the one scaled figure, and
-it scales the research's own digit-ADVANCE derivation (three digit runs,
-90px at the Font14 digit advance of 9, 100px at Font16's 10, plus 75px of
-fixed coin-icon and gap chrome). Advances run ~4px over the inked rect
-for the same run (161 at Font14, 171 at Font16), which errs in the safe
-direction: a wider cost column leaves the name column less room, not
-more.
+`DeepestPlanCostColumnWidth` 165 -> **181** is the constant that moved
+the window minimum past the research's own +2pt prediction, and it is
+worth stating why. Menomonia's digits are **not one width**: at Font16
+`9` advances 9px and inks 11, while `0`, `2` and `7` advance 10 and ink
+12. The cost column is the three digit runs' measured widths plus 78px of
+fixed chrome (`TreeCostColumnMath.SegmentWidth` = text +
+`CoinLabelIconGap` 2 + `CoinIconSize` 20, three segments, two
+`CoinSegmentGap` 6 between them), so a six-digit gold total plus two
+two-digit units measures:
 
-An earlier draft of this section recorded two extra caveats - a Font16
+| gold digits | Font14 | Font16 |
+|---|---|---|
+| all nines (narrowest wide digit) | 161 | 171 |
+| all 0 / 2 / 7 (widest) | 171 | **181** |
+| the research's live example, ~174,000 gold | 166 | 176 |
+
+The constant is now the **worst case**, 181, and the minimum is derived
+from it - 1472 -> **1478**. A figure taken at any one example total
+would be light by up to 6px for a plan whose gold happens to be
+`0`/`2`/`7`-heavy, which is exactly the kind of digit-choice artifact
+this section already withdrew once; at 1472 such a plan would have spent
+the depth-24 vendor leaf's headroom and cut the depth-23 gutter to 18px.
+There is no residual term here to trade against the +/-2px chrome
+uncertainty: the constant covers every total the module can price.
+
+An earlier draft of this section recorded two other caveats - a Font16
 quantity prefix of 76-77 and a "3px cost-column convention gap". Both
 were artifacts of summing `xAdvance` instead of measuring the inked rect,
 which is not what either call site does. They are withdrawn rather than
 left to send a future maintainer chasing a gap that is not there.
+
+`docs/research/minimum-window-width.md` derived the original Font14 cost
+column as `76+6+40+6+40 = 165`, whose components in fact sum to 168 (and
+to 171 measured on the inked rect the renderer uses). The report's
+arithmetic is corrected in place; the shipped 1436 minimum was derived
+from the slipped 165 and is superseded by this section either way.
 
 ### 2. The one-letter empty-state hint ("add a hint")
 
@@ -12506,9 +12529,11 @@ Things a reviewer should look at hardest, stated rather than buried:
 3. **`ModalDialog.WindowHeight` 170 -> 190 is the one growth not forced
    by a clipping calculation** - three lines still fit at 170. It buys
    back the line ~11% wider text can now need.
-4. **The 1472 minimum's +/-2px chrome term** is the figure's one soft
+4. **The 1478 minimum's +/-2px chrome term** is the figure's one soft
    spot, described above rather than papered over. Everything else in the
-   chain is measured in the convention the renderer itself measures in.
+   chain is measured in the convention the renderer itself measures in,
+   and the cost column is taken at its widest digits rather than at an
+   example total - which is the 6px that separates 1478 from 1472.
 5. **The spinner wiring has no automated coverage.** `Module` and
    `MainView` are Blish-bound; the two-flag OR and the `Update()` drain
    are argued from source and pinned only by desktop gate item 4.
@@ -12521,7 +12546,7 @@ Things a reviewer should look at hardest, stated rather than buried:
 
 ### Desktop gate
 
-1. At the **1472** minimum, read a plan and a snapshot end to end on
+1. At the **1478** minimum, read a plan and a snapshot end to end on
    every tab. Row text is legibly larger than before and nothing is
    clipped: check the Required Disciplines character line (the reported
    descender site), Required Recipes rows WITH a sublabel, the Summary

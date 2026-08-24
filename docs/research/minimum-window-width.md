@@ -4,7 +4,7 @@
 > `aa80382`, then implemented by branch `min-width-1436`, and the +2pt
 > variant taken by branch `font-and-polish` (see the paragraph at the end
 > of this block). The module minimum is now
-> **1472 x 710** (`Services/WindowSizing.cs`) and
+> **1478 x 710** (`Services/WindowSizing.cs`) and
 > `PlanRelayoutMath.TreePillColumnWidth` is **256**
 > (section 6's suggestion, taken at the current fonts rather than only
 > after a font bump).
@@ -20,7 +20,7 @@
 > which read the shipped constants rather than copies of them.
 >
 > The minimum is **fitted to the game client**: on a client narrower than
-> 1472 (an ordinary windowed 1280x720 or 1366x768) the enforced minimum
+> 1478 (an ordinary windowed 1280x720 or 1366x768) the enforced minimum
 > falls back to the client's own width, floor 930, so the resize grip and
 > the right-hand columns stay on-screen. Deep rows ellipsize there as they
 > did before.
@@ -28,8 +28,11 @@
 > The **+2pt variant landed** on `font-and-polish`: the maintainer took the
 > bump after a field test, so row/body text is now Menomonia 16 and
 > small/caption/pill text Menomonia 14 (`Views/Rendering/UiFonts`), and
-> `WindowSizing.MinWindowWidth` moved 1436 -> **1472** exactly as this
-> report's section 7 predicted (1448 + one `TreeIndentPer`). The pill
+> `WindowSizing.MinWindowWidth` moved 1436 -> **1478**: section 7's
+> prediction (1448 + one `TreeIndentPer` = 1472) plus 6px, because the
+> cost column below is derived from one example gold total and Menomonia's
+> digits are not one width - see the cost-column paragraph in the
+> "Font bump and decision-round polish" section of KNOWN-ISSUES. The pill
 > column stayed at 256: section 6's f14 four-pill run measures 242px
 > against the 252px budget a 256px column leaves. Section 7's "repo
 > assumption looks wrong" finding was confirmed and fixed. See the
@@ -110,6 +113,11 @@ Cost column (live prices 2026-08-23: reagent 177c sell, +1 infusion 31c sell -> 
 ```
 gold 54+2+20=76, silver 18+2+20=40, copper 40  ->  76+6+40+6+40 = 165   (>150 floor)   [f16: 175]
 ```
+**Errata (`font-and-polish`).** Two defects in that one line, left in place because sections 4-7 below carry `165` downstream and rewriting the chain would misrepresent what the report concluded:
+
+1. The printed sum slips - `76+6+40+6+40` is **168**, not 165.
+2. `54`/`18`/`18` are `xAdvance` sums. `BitmapFont.MeasureString`, which is what `TreeCostColumnMath`'s pre-scan actually calls, returns the inked rect, and Menomonia's digits are not one width: six-digit gold plus two two-digit units measures **161 (f14) / 171 (f16)** of all-nines and **171 / 181** of `0`, `2` or `7`. The shipped constant is the worst case, **181**, and `WindowSizing.MinWindowWidth` is **1478** rather than section 7's predicted 1472.
+
 Formula:
 ```
 panelWidth_min = widestNameEnd + gutter + 240 + costColW + 8
