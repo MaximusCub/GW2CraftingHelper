@@ -47,7 +47,7 @@ namespace GW2CraftingHelper.Services
                 string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name,
                 stats.Rarity);
 
-            var facts = BuildFacts(stats, out bool hasCombatFacts);
+            var facts = BuildFacts(stats, out bool bodyOpensUnderHeader);
 
             // Blocks are collected first and joined with exactly one blank
             // line each, so an empty block never leaves a separator behind
@@ -60,13 +60,18 @@ namespace GW2CraftingHelper.Services
 
             for (int i = 0; i < blocks.Count; i++)
             {
-                // Measured: a tooltip whose item has no combat facts opens
-                // with one blank line (xyaren.png, and FWDekker's
-                // UpgradeComponent builder emits the same break before a
-                // rune's bonus lines); one that HAS them starts them
-                // immediately under the header with no extra gap
-                // (warhelm.jpg, steak.png). Gap G15.
-                if (i > 0 || !hasCombatFacts)
+                // Measured, and it splits on what the body OPENS with, not
+                // on combat facts alone. A body that opens with the item's
+                // combat facts or with its nourishment block runs straight
+                // on under the header (steak.png: icon bottom y=37, first
+                // text band y=39; warhelm.jpg: 37 -> 38). One that opens
+                // with the identity block gets a blank first (xyaren.png:
+                // icon bottom y=34, first text band y=53), and so does an
+                // upgrade component, whose bonus lines FWDekker's
+                // UpgradeComponent builder breaks before - inferred, no
+                // unequipped-rune capture exists. Gap G15; the warhelm
+                // divergence this leaves is in docs/KNOWN-ISSUES.md.
+                if (i > 0 || !bodyOpensUnderHeader)
                 {
                     builder.Separator();
                 }
@@ -85,16 +90,22 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// What the item does: weapon strength / defense / attributes
-        /// (<paramref name="hasCombatFacts"/> reports whether any of those
-        /// three appeared), then the granted bonuses and nourishment that
-        /// sit contiguously under them.
+        /// What the item does: weapon strength / defense / attributes, then
+        /// the granted bonuses and nourishment that sit contiguously under
+        /// them.
+        /// <para>
+        /// <paramref name="bodyOpensUnderHeader"/> reports whether this
+        /// block leads with content the game runs straight on under the
+        /// header - the combat facts, or the nourishment block - as opposed
+        /// to a bonus run, which the game breaks before. It decides the
+        /// header's blank line; see <see cref="BuildContent"/>.
+        /// </para>
         /// </summary>
-        private static TooltipContent BuildFacts(ItemStatBlock stats, out bool hasCombatFacts)
+        private static TooltipContent BuildFacts(ItemStatBlock stats, out bool bodyOpensUnderHeader)
         {
             var facts = new TooltipContentBuilder();
             bool buffAlreadyShown = false;
-            hasCombatFacts = false;
+            bool hasCombatFacts = false;
 
             if (stats.MinPower.HasValue && stats.MaxPower.HasValue)
             {
@@ -125,7 +136,15 @@ namespace GW2CraftingHelper.Services
             }
 
             AppendUpgradeEffects(facts, stats, buffAlreadyShown);
+
+            // Only when the nourishment block is what OPENS the body: an
+            // item carrying a bonus run above it opens with the bonus, and
+            // the game breaks before one.
+            bool nourishmentOpensTheBody = facts.IsEmpty;
             AppendNourishment(facts, stats);
+            nourishmentOpensTheBody = nourishmentOpensTheBody && !facts.IsEmpty;
+
+            bodyOpensUnderHeader = hasCombatFacts || nourishmentOpensTheBody;
             return facts.Build();
         }
 

@@ -144,12 +144,68 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = await LinesFor(RealItemJson.LotusFries);
 
+            // No blank under the header: a body that OPENS with the
+            // nourishment block runs straight on, measured on steak.png
+            // (icon bottom y=37, first text band y=39) and matching
+            // FWDekker's Consumable builder, which emits its
+            // getConsumableDescription() with no leading break.
             Assert.Equal("Cup of Lotus Fries", lines[0]);
+            Assert.Equal("30% Magic Find", lines[1]);
+            Assert.Equal("+70 Condition Damage", lines[2]);
+            Assert.Equal("+10% Experience from Kills", lines[3]);
+            Assert.Equal("Duration: 30 m", lines[4]);
+        }
+
+        [Fact]
+        public void ABodyThatOpensWithTheIdentityBlockKeepsItsBlankUnderTheHeader()
+        {
+            // The other side of the rule above, measured on xyaren.png
+            // (icon bottom y=34, first text band y=53 - one 16px pitch of
+            // empty space).
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Toymaker's Bag",
+                Rarity = "Exotic",
+                ItemType = "Back"
+            }).ToPlainLines();
+
+            Assert.Equal("Toymaker's Bag", lines[0]);
             Assert.Equal("", lines[1]);
-            Assert.Equal("30% Magic Find", lines[2]);
-            Assert.Equal("+70 Condition Damage", lines[3]);
-            Assert.Equal("+10% Experience from Kills", lines[4]);
-            Assert.Equal("Duration: 30 m", lines[5]);
+            Assert.Equal("Exotic", lines[2]);
+        }
+
+        [Fact]
+        public void ADurationOnlyNourishmentBlockAlsoOpensTheBodyUnderTheHeader()
+        {
+            // The nourishment block is one block whichever of its two lines
+            // the item actually carries.
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Timed Snack",
+                NourishmentDurationMs = 1800000
+            }).ToPlainLines();
+
+            Assert.Equal("Timed Snack", lines[0]);
+            Assert.Equal("Duration: 30 m", lines[1]);
+        }
+
+        [Fact]
+        public void ABonusRunStillTakesItsBlankEvenWhenNourishmentFollowsIt()
+        {
+            // The flag is about which block OPENS the body. FWDekker's
+            // UpgradeComponent builder breaks before its buffs, so a bonus
+            // run keeps the blank even when a nourishment line sits under
+            // it (inferred - no unequipped-rune capture exists).
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Odd Hybrid",
+                BuffDescription = "+5% Damage",
+                NourishmentDurationMs = 1800000
+            }).ToPlainLines();
+
+            Assert.Equal("Odd Hybrid", lines[0]);
+            Assert.Equal("", lines[1]);
+            Assert.Equal("+5% Damage", lines[2]);
         }
 
         [Fact]
