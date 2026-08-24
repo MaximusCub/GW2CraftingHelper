@@ -33,6 +33,8 @@ namespace GW2CraftingHelper.Views
     /// </remarks>
     internal static class FocusRelease
     {
+        private const int MaxReleaseAttempts = 3;
+
         /// <summary>
         /// Releases focus, if this box holds it, before Blish's own
         /// soft unfocus in <c>DisposeControl</c> can strand the global slot.
@@ -94,12 +96,38 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
+            var keyboard = GameService.Input.Keyboard;
+
             // The focus slot is shared with every other module, so only the
             // box that holds focus - or the one the slot already names - may
             // null it.
-            if (input.Focused || ReferenceEquals(GameService.Input.Keyboard.FocusedControl, input))
+            if (!input.Focused && !ReferenceEquals(keyboard.FocusedControl, input))
             {
-                input.UnsetFocus();
+                return;
+            }
+
+            input.UnsetFocus();
+
+            // UnsetFocus is not atomic: it is `Focused = false`, which raises
+            // InputFocusChanged synchronously, and only then
+            // `FocusedControl = null`. A handler that re-focuses from inside
+            // that notification therefore ends the call with the box focused
+            // and no slot naming it - holding KeyboardHandler's
+            // _textInputDelegate, invisible to its ancestor heal sweep, which
+            // is the swallowed-keyboard state this type exists to prevent.
+            // The attempt count is bounded because a handler that re-focuses
+            // on every notification cannot be out-waited.
+            for (int attempt = 0; input.Focused && attempt < MaxReleaseAttempts; attempt++)
+            {
+                input.Focused = false;
+            }
+
+            // Invariant: the slot names the box that holds focus, or nothing.
+            // A box that will not let go keeps the slot - a live focus Blish
+            // can still heal beats a slot naming nobody.
+            if (!input.Focused && ReferenceEquals(keyboard.FocusedControl, input))
+            {
+                keyboard.FocusedControl = null;
             }
         }
     }
