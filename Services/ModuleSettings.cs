@@ -106,22 +106,8 @@ namespace GW2CraftingHelper.Services
         // GetClampedLogMaxSizeBytes/GetClampedLogRetentionDays above).
         public SettingEntry<int> SnapshotRefreshIntervalMinutes { get; private set; }
 
-        // How loud this module's own UI click plays, 0-100, where 0 is no
-        // sound at all and 100 is the click asset at full scale. Covers
-        // every click this module plays itself (PressFeedback.Wire) and
-        // nothing else: Blish's Checkbox and CornerIcon play their own
-        // sound from inside their own event overrides, at Blish's
-        // game-derived volume, and no setting here reaches them - see
-        // KNOWN-ISSUES for the measured reason and the deferred fix. Read
-        // live
-        // by Views/Rendering/ClickSound (pushed there by Module at load and
-        // by the Settings tab's slider on every drag - idiom (a),
-        // immediate-apply, like LogDiagnosticsEnabled above), never by the
-        // plan pipeline. The percent-to-volume mapping and its clamp live
-        // on the Blish-free Services/ClickSoundVolume so they are testable;
-        // that type also owns the default, so retuning it after the field
-        // test is a one-line change there rather than a second number to
-        // keep in sync here.
+        // How loud this module's own UI click plays, 0-100. Reaches only the
+        // clicks this module plays itself - see PressFeedback.PlayClick.
         public SettingEntry<int> ClickSoundVolumePercent { get; private set; }
 
         public ModuleSettings(SettingCollection settings)
@@ -309,11 +295,8 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Clamped ClickSoundVolumePercent for actual use. Same contract as
-        /// the clamped accessors above: a hand-edited settings file must
-        /// never hand an out-of-range percent to the player, whose
-        /// SoundEffect.Play argument THROWS rather than clamps outside
-        /// [0,1] - see ClickSoundVolume's own comment.
+        /// Clamped ClickSoundVolumePercent for actual use - same contract
+        /// as the clamped accessors above.
         /// </summary>
         public int GetClampedClickSoundVolumePercent()
         {

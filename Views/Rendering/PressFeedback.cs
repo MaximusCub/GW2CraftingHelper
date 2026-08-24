@@ -41,28 +41,12 @@ namespace GW2CraftingHelper.Views.Rendering
         internal const float PressedOpacityFactor = 0.8f;
 
         /// <summary>
-        /// Plays Blish's own UI click sound - the one its Checkbox,
-        /// GlowButton and CornerIcon play - at the user's configured
-        /// volume, and nothing at all at 0 or with no audio device.
-        /// <para>
-        /// This no longer goes through
-        /// <c>GameService.Content.PlaySoundEffectByName("button-click")</c>:
-        /// that overload plays at Blish's game-derived audio volume, capped
-        /// at 0.4 and usually far below it, which the field test reported as
-        /// inaudible over a physical mouse click. See
-        /// <see cref="ClickSound"/> for the measured path and for what
-        /// playing it ourselves gives up.
-        /// </para>
-        /// <para>
-        /// Reaches only the controls this module wires. Blish's Checkbox
-        /// and CornerIcon play "button-click" themselves, from inside
-        /// OnLeftMouseButtonReleased / OnClick, guarded by nothing but
-        /// Enabled - so those clicks stay at Blish's volume and the setting
-        /// does not silence them. A subclass cannot intercept it: the sound
-        /// sits ahead of the base call that raises Click, so skipping the
-        /// base to skip the sound would break the control. KNOWN-ISSUES
-        /// carries the full sweep and the deferred fix.
-        /// </para>
+        /// Plays Blish's own UI click sound at the user's configured volume
+        /// (see <see cref="ClickSound"/> for why not PlaySoundEffectByName).
+        /// Reaches only the controls this module wires: Blish's Checkbox and
+        /// CornerIcon play the click themselves, ahead of the base call a
+        /// subclass would have to skip to silence it, so those stay at
+        /// Blish's volume - KNOWN-ISSUES carries the sweep and deferred fix.
         /// </summary>
         internal static void PlayClick()
         {

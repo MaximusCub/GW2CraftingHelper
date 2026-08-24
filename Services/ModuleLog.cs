@@ -206,9 +206,8 @@ namespace GW2CraftingHelper.Services
         /// Exposed as its own settable property (not just a Configure(...)
         /// parameter) so a changed setting can be pushed live, the same way
         /// <see cref="DiagnosticsEnabled"/> already is, without needing to
-        /// re-supply the store/onError callback Configure also takes. The
-        /// one writer is Module's SettingChanged handler, so every UI that
-        /// can change the setting reaches this by one path. Guarded by
+        /// re-supply the store/onError callback Configure also takes.
+        /// Guarded by
         /// <see cref="_fileGate"/>, not <see cref="_gate"/> - see the class
         /// doc comment.
         /// </summary>
