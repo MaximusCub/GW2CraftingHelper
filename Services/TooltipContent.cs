@@ -213,8 +213,10 @@ namespace GW2CraftingHelper.Services
         /// span itself (<see cref="TooltipSpan.RarityKey"/>).</summary>
         Rarity,
 
-        /// <summary>An upgrade's granted bonus - a rune bonus line, a sigil
-        /// or infusion buff, a food nourishment line.</summary>
+        /// <summary>An upgrade's granted bonus - a rune bonus line, a
+        /// sigil or infusion buff. NOT a food's nourishment line, which
+        /// the one capture of one measures white (spec section 1.4,
+        /// steak.png).</summary>
         Bonus,
 
         /// <summary>

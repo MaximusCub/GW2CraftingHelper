@@ -157,6 +157,49 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task AFoodsNourishmentLinesAreWhite_NotTheUpgradeBonusBlue()
+        {
+            // Measured on steak.png: its two nourishment bands read
+            // (252,254,253) and (252,255,255), the same white as "Food"
+            // (251,255,252) and "Required Level: 10" (254,254,251) below
+            // them. That line IS details.description, the field this
+            // renders, so the measurement is of this line and not of a
+            // neighbour. The blue is measured on runes and sigils only.
+            var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.LotusFries);
+            var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
+            var spans = content.Lines.SelectMany(l => l.Spans).ToArray();
+
+            var effects = spans
+                .Where(s => s.Text == "30% Magic Find" || s.Text == "+70 Condition Damage" ||
+                            s.Text == "+10% Experience from Kills")
+                .ToArray();
+
+            Assert.Equal(3, effects.Length);
+            Assert.All(effects, s => Assert.Equal(TooltipSpanRole.Default, s.Role));
+            Assert.DoesNotContain(spans, s => s.Role == TooltipSpanRole.Bonus);
+        }
+
+        [Fact]
+        public void ARunesBonusLinesKeepTheUpgradeBonusRole()
+        {
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Superior Rune of the Scholar",
+                ItemType = "UpgradeComponent",
+                SubType = "Rune",
+                UpgradeBonuses = new[] { "+25 Power", "+35 Ferocity" }
+            });
+
+            var bonuses = content.Lines
+                .SelectMany(l => l.Spans)
+                .Where(s => s.Text.StartsWith("("))
+                .ToArray();
+
+            Assert.Equal(2, bonuses.Length);
+            Assert.All(bonuses, s => Assert.Equal(TooltipSpanRole.Bonus, s.Role));
+        }
+
+        [Fact]
         public void ABodyThatOpensWithTheIdentityBlockKeepsItsBlankUnderTheHeader()
         {
             // The other side of the rule above, measured on xyaren.png
