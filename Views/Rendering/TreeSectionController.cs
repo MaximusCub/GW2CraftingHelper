@@ -332,9 +332,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // Column pre-scan: ONE walk of the whole tree per render
             // pass, before any row is built, so every row (including the
             // ones an expand click builds later) anchors to the same
-            // sub-columns and the same gutter-closing block x. Never re-run
-            // per row draw or per resize tick - both results are
-            // data-derived, not panelWidth-derived.
+            // sub-columns. Never re-run per row draw or per resize tick -
+            // the result is data-derived, not panelWidth-derived.
             //
             // Hoisted above the header because the header's title now
             // carries the tree's node count, which comes out of this same
@@ -1271,10 +1270,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// TreePillColumnWidth - 4, whatever the panel width, because both
         /// endpoints move together. That is why the fit is resolved once at
         /// build time and the resize closure only repositions - there is no
-        /// window width at which a hidden pill would have fit. Closing the
-        /// tree's dead gutter does not change that: the pill and cost
-        /// columns are pulled in as one block, so pillColX moves and the
-        /// budget does not.
+        /// window width at which a hidden pill would have fit.
         /// </para>
         /// </summary>
         // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only

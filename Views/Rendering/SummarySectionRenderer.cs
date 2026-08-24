@@ -645,7 +645,14 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        private static readonly string[] CurrencyHeaderLabels = { "Required", "Have", "Needed" };
+        private const string RequiredHeaderText = "Required";
+        private const string HaveHeaderText = "Have";
+        private const string NeededHeaderText = "Needed";
+
+        // The same three strings the header row draws, so the floor they
+        // set can never be measured from a label that is no longer there.
+        private static readonly string[] CurrencyHeaderLabels =
+            { RequiredHeaderText, HaveHeaderText, NeededHeaderText };
 
         /// <summary>
         /// Widest of the currency table's three number-column headers, in
@@ -737,11 +744,14 @@ namespace GW2CraftingHelper.Views.Rendering
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
                 panelWidth, widestNumberWidth);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, "Required", font, TableHeaderStyle.LabelColor, edges.RequiredRightEdge, TableHeaderStyle.LabelY);
+                band, RequiredHeaderText, font, TableHeaderStyle.LabelColor,
+                edges.RequiredRightEdge, TableHeaderStyle.LabelY);
             var haveLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, "Have", font, TableHeaderStyle.LabelColor, edges.HaveRightEdge, TableHeaderStyle.LabelY);
+                band, HaveHeaderText, font, TableHeaderStyle.LabelColor,
+                edges.HaveRightEdge, TableHeaderStyle.LabelY);
             var neededLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, "Needed", font, TableHeaderStyle.LabelColor, edges.NeededRightEdge, TableHeaderStyle.LabelY);
+                band, NeededHeaderText, font, TableHeaderStyle.LabelColor,
+                edges.NeededRightEdge, TableHeaderStyle.LabelY);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never

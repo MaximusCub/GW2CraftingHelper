@@ -111,10 +111,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     if (!anyCharacterText)
                     {
-                        // The column's own header is part of its extent: it
-                        // starts at the same charX and can be wider than a
-                        // short availability string, and the Level column
-                        // must not be pulled in over it.
+                        // The column's own header is part of its extent:
+                        // it starts at the same charX and can be wider than
+                        // a short availability string.
                         anyCharacterText = true;
                         maxCharWidth = MeasureWidth(TableHeaderStyle.Font, CharactersHeaderText);
                     }

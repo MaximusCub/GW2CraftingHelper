@@ -29,10 +29,9 @@ namespace GW2CraftingHelper.Services
     /// already-materialised tree and buys a column that never shifts
     /// under the user.
     ///
-    /// That same walk now also reports the widest name extent in the tree
-    /// (<see cref="ScanColumns"/>), which is what lets the pill+cost block
-    /// be pulled in beside the names instead of pinned to the panel edge -
-    /// same stability argument, same single pass.
+    /// That same walk reports the tree's node count
+    /// (<see cref="ScanColumns"/>), which the section header shows - same
+    /// stability argument, same single pass.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
     public static class TreeCostColumnMath

@@ -62,20 +62,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Moved verbatim from CraftingPlanView.CreateRecipesBody, plus the
         /// CreateCTableHeaderRow call this renderer now owns directly (see
-        /// the class doc comment above), then given the same one-pass
-        /// pre-scan the other plan tables carry (audit batch H): the widest
-        /// status tag - which is this table's whole right-hand block - and
-        /// the widest UNTRUNCATED name extent, so the Status column can be
-        /// pulled in beside the names rather than pinned to the panel edge
-        /// with a growing empty band between them. This row's name has no
-        /// ellipsis at all (see the class doc comment), so the scan measures
-        /// both the name line and the optional sublabel line beneath it;
-        /// pulling the block in past the widest of them is what keeps a long
-        /// name from running under the status tag.
-        /// <para>
-        /// A section where no row carries a status tag has no right-hand
-        /// block to pull in, and stays pinned exactly as before.
-        /// </para>
+        /// the class doc comment above). The Status column is pinned to the
+        /// panel edge and this row's name has no ellipsis at all (see the
+        /// class doc comment), so this section measures nothing per render.
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {

@@ -33,24 +33,21 @@ namespace GW2CraftingHelper.Views.Rendering
     // see ISectionRelayoutSink.AddRelayout's doc comment.
     //
     // rightXForWidth is the same escape hatch for the right label: the
-    // Recipe Tree's "Cost" header sits over a cost column that is no longer
-    // pinned to the panel edge (audit batch H pulls the whole pill+cost
-    // block in beside the names), so it has to track the same
-    // PlanRelayoutMath.ComputeTreeColumnEdges arithmetic its rows do.
-    // Omitting it keeps the previous panelWidth-8 anchor for every other
-    // caller.
+    // Recipe Tree's "Cost" header sits over a column whose x is derived
+    // through PlanRelayoutMath.ComputeTreeColumnEdges rather than straight
+    // off the panel edge, so it tracks the same arithmetic its rows do.
+    // Omitting it anchors the label at PlanRelayoutMath.PinnedRightEdge,
+    // which is what every flat table wants.
     //
     // Chrome (band color, font, label color, height, label y) comes from
     // the shared TableHeaderStyle - see that class for the L3 inventory and
     // the reason the band, rather than the Shopping List's lighter
     // treatment, is the one every plan table now uses.
     //
-    // It also bounds the header BAND: this row's whole point is the dark
-    // background behind the column names, and a band spanning the
-    // full panel width no longer bounds the columns it belongs to once those
-    // columns have been pulled in (audit batch H fix round). The band ends
-    // one TableRightMargin past the right column, which is exactly the panel
-    // width for a caller whose columns are still pinned.
+    // It also sizes the header BAND, which ends one TableRightMargin past
+    // the right column - the full panel width for every caller whose
+    // columns are pinned, i.e. all of them, and clamped to the panel for a
+    // caller whose derived edge ever landed past it.
     // onLeftClick/onRightClick turn those two labels into sort controls
     // for the one caller that has a sortable table (Used Materials).
     // Omitted everywhere else, which leaves the label inert exactly as

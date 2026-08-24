@@ -50,16 +50,11 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody,
-        /// then given the one-pass pre-scan the other plan tables carry
-        /// (audit batch H): the widest sublabel - this table's whole
-        /// right-hand block - and the widest UNTRUNCATED extent of the
-        /// "Craft Nx Name" run, so the sublabel column can be pulled in
-        /// beside that run rather than pinned to the panel edge. The run is
-        /// built by cumulative cursor-x concatenation and never ellipsized
-        /// (see the class doc comment), so the scan reproduces exactly that
-        /// concatenation; pulling the column in past it is what stops a long
-        /// name running under the sublabel.
+        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody.
+        /// The sublabel column is pinned to the panel edge and the
+        /// "Craft Nx Name" run is built by cumulative cursor-x
+        /// concatenation and never ellipsized (see the class doc comment),
+        /// so this section measures nothing per render at all.
         /// <para>
         /// TimegatedNotice rows are plain full-width text rows with no
         /// columns of their own, so they take no part in the scan. A section
