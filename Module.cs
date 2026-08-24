@@ -16,6 +16,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Recipes;
 using GW2CraftingHelper.Views;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -1454,6 +1455,7 @@ namespace GW2CraftingHelper
             new Label()
             {
                 Text = "Coming Soon",
+                Font = UiFonts.Body,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(20, 20),
