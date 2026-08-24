@@ -114,10 +114,10 @@ namespace GW2CraftingHelper.Tests.Services
                 TooltipSpanRole.Warning,
                 ItemDescriptionSanitizer.SanitizeToSpans("<c=@warning>Do not eat.</c>").Single().Role);
 
-            // gw2efficiency's reminder grey is this module's Muted; no
-            // separate role is minted for it.
+            // Its own role, not Muted: reminder is gw2efficiency's #afafaf
+            // (175) and the annotation grey is the measured #939496 (150).
             Assert.Equal(
-                TooltipSpanRole.Muted,
+                TooltipSpanRole.Reminder,
                 ItemDescriptionSanitizer.SanitizeToSpans("<c=@reminder>(Rounded down.)</c>").Single().Role);
         }
 

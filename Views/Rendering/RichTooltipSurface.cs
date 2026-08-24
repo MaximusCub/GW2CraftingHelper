@@ -401,6 +401,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Warning:
                     return new Color(255, 0, 0);
 
+                // gw2efficiency's .desc-reminder (#afafaf = 175) - inferred,
+                // and 25 levels per channel lighter than the annotation grey
+                // below, which is measured. Two sources, two constants.
+                case TooltipSpanRole.Reminder:
+                    return new Color(175, 175, 175);
+
                 // Genuine secondary annotations only ("0/500 in Material
                 // Storage", measured #939496). The identity block is white.
                 case TooltipSpanRole.Muted:

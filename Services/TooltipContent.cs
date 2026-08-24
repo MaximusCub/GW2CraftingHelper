@@ -237,6 +237,15 @@ namespace GW2CraftingHelper.Services
         Warning,
 
         /// <summary>
+        /// The item's <c>&lt;c=@reminder&gt;</c> run. Its own role rather
+        /// than a second user of <see cref="Muted"/>: the two greys have
+        /// different sources and differ by 25 levels per channel (spec
+        /// section 1.4 - reminder `#afafaf`, inferred from gw2efficiency;
+        /// the annotation grey `#939496`, measured on xyaren.png).
+        /// </summary>
+        Reminder,
+
+        /// <summary>
         /// A genuine secondary annotation - the game's own grey, e.g.
         /// "0/500 in Material Storage". NOT the identity block, which the
         /// game renders white (spec section 1.4, gap G4).

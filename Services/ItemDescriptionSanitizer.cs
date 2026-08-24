@@ -154,11 +154,8 @@ namespace GW2CraftingHelper.Services
                     return TooltipSpanRole.AbilityType;
                 case "warning":
                     return TooltipSpanRole.Warning;
-                // gw2efficiency renders reminder text at #afafaf, which is
-                // this module's Muted grey to within two levels - no
-                // separate role earns its keep for it.
                 case "reminder":
-                    return TooltipSpanRole.Muted;
+                    return TooltipSpanRole.Reminder;
                 default:
                     return TooltipSpanRole.Default;
             }
