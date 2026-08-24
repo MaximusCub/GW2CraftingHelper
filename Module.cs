@@ -237,12 +237,29 @@ namespace GW2CraftingHelper
             // failed).
             var logStore = new ModuleLogStore(dataDir, (message, ex) => Logger.Warn(ex, message));
             ModuleLog.Shared.Configure(logStore, _settings.GetClampedLogMaxSizeBytes(), (message, ex) => Logger.Warn(ex, message));
+            // Setting-first for the same reason the click volume below is -
+            // Blish renders this same entry as its own checkbox in Manage
+            // Modules, and a toggle there used to persist without taking
+            // effect until the next relaunch.
+            _settings.LogDiagnosticsEnabled.SettingChanged += OnLogDiagnosticsEnabledChanged;
             ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
 
             // Same immediate-apply shape as the line above: the click
-            // player holds the live percent on a static, and the Settings
-            // tab's slider re-pushes it on every change, so this is the
-            // only place the persisted value is read at startup.
+            // player holds the live percent on a static, seeded here from
+            // the persisted value.
+            //
+            // The subscription is what keeps it live, and it is not
+            // redundant with the Settings tab's own slider handler. This
+            // module never overrides Module.GetSettingsView, so Blish's
+            // default (a SettingsView over every SettingEntry defined here)
+            // renders this setting a SECOND time in Manage Modules, as its
+            // own draggable TrackBar (SettingEntry<int> -> IntSettingView ->
+            // NumericSettingView.BuildSetting - measured from the 1.3.0
+            // binary). Dragging THAT one only writes the setting, so
+            // without this the click would keep playing at the old volume
+            // until the next relaunch. Setting-first, not control-first, so
+            // both sliders reach the player by the same one path.
+            _settings.ClickSoundVolumePercent.SettingChanged += OnClickSoundVolumeChanged;
             Views.Rendering.ClickSound.VolumePercent = _settings.GetClampedClickSoundVolumePercent();
 
             // Once-per-session age-based retention enforcement, BEFORE the
@@ -988,6 +1005,15 @@ namespace GW2CraftingHelper
         {
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
 
+            // Not optional: the SettingEntry outlives this module instance.
+            // Measured - SettingsManager hands out module.State.Settings,
+            // and SettingCollection.DefineSetting returns the EXISTING
+            // entry for a key it already holds, so a disable/re-enable
+            // cycle re-defines onto the same objects. An unsubscribed
+            // handler would root each dead Module instance in turn.
+            _settings.LogDiagnosticsEnabled.SettingChanged -= OnLogDiagnosticsEnabledChanged;
+            _settings.ClickSoundVolumePercent.SettingChanged -= OnClickSoundVolumeChanged;
+
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
 
@@ -1016,6 +1042,13 @@ namespace GW2CraftingHelper
             // one Blish session.
             Views.Rendering.ClickSound.Unload();
 
+            // And the same reason once more, from the other direction: the
+            // Settings tab's click-volume TrackBar subscribes to Blish's
+            // STATIC mouse handler and is never reached by the window
+            // dispose above - see SettingsTabContent.
+            // DisposeClickVolumeSlider for the measured teardown path.
+            _settingsContent?.Teardown();
+
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush
             // queue, never on the calling thread (see ModuleLog's own class
@@ -1031,6 +1064,38 @@ namespace GW2CraftingHelper
             // disable) - never by any in-tab user action. The on-disk file
             // is untouched (survives across sessions by design).
             ModuleLog.Shared.Clear();
+        }
+
+        /// <summary>
+        /// Pushes a click-volume change to the player, whichever of the two
+        /// sliders made it - this module's Settings tab or the one Blish
+        /// renders in Manage Modules. See where this is subscribed for why
+        /// the second one exists. The player's own setter clamps, which is
+        /// what makes a hand-edited settings.json safe here.
+        /// </summary>
+        private void OnClickSoundVolumeChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            Views.Rendering.ClickSound.VolumePercent = e.NewValue;
+        }
+
+        /// <summary>
+        /// The same setting-first wiring as the click volume above, for the
+        /// one sibling setting that shared its defect: this one is pushed
+        /// into a live object (ModuleLog.Shared) rather than re-read per
+        /// use, so a toggle made anywhere had to reach it.
+        /// <para>
+        /// Swept the rest and excluded them, each for a real reason.
+        /// SnapshotRefreshIntervalMinutes and ScrollDiagnosticsEnabled are
+        /// re-read from the setting at every use (the stale-check tick and
+        /// CraftingPlanView respectively), so they were never stale.
+        /// LogMaxSizeBytes and LogRetentionDays are once-per-session by
+        /// design - Configure and the retention prune both run at startup -
+        /// so they apply next session no matter which UI changes them.
+        /// </para>
+        /// </summary>
+        private void OnLogDiagnosticsEnabledChanged(object sender, ValueChangedEventArgs<bool> e)
+        {
+            ModuleLog.Shared.DiagnosticsEnabled = e.NewValue;
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)

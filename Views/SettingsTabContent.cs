@@ -192,12 +192,17 @@ namespace GW2CraftingHelper.Views
         private TextBox _logRetentionDaysInput;
         private Label _logRetentionDaysErrorLabel;
 
-        // The click-volume slider, held for ONE reason: to dispose the
-        // previous build's instance - see Build. Its value is never read
-        // back from here (the row is immediate-apply, so the setting is
-        // always already current), and it is deliberately absent from
-        // CaptureFormState - see BuildSoundSection.
+        // The click-volume slider, held for ONE reason: to dispose it -
+        // from Build for the previous cycle's instance, and from Teardown
+        // for the last one, which nothing else ever reaches. Its value is
+        // never read back from here (the row is immediate-apply, so the
+        // setting is always already current), and it is deliberately
+        // absent from CaptureFormState - see BuildSoundSection.
         private TrackBar _clickVolumeSlider;
+
+        // Mirrors the click-volume SETTING, never the slider's raw float -
+        // see OnClickVolumeSettingChanged. Null between builds.
+        private Label _clickVolumeReadout;
 
         // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
@@ -228,6 +233,10 @@ namespace GW2CraftingHelper.Views
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
+            // Subscribed for the module's lifetime, not per build, because
+            // the entry outlives every build of this tab; Teardown drops it.
+            _settings.ClickSoundVolumePercent.SettingChanged += OnClickVolumeSettingChanged;
         }
 
         /// <summary>
@@ -245,6 +254,74 @@ namespace GW2CraftingHelper.Views
         public void BeginRebuild()
         {
             _buildComplete = false;
+        }
+
+        /// <summary>
+        /// Releases what outlives this tab's own control tree. Called from
+        /// Module.Unload; safe to call when the tab was never opened, and
+        /// safe to call twice.
+        /// </summary>
+        public void Teardown()
+        {
+            _settings.ClickSoundVolumePercent.SettingChanged -= OnClickVolumeSettingChanged;
+            DisposeClickVolumeSlider();
+            _clickVolumeReadout = null;
+        }
+
+        /// <summary>
+        /// Keeps this tab's slider and readout showing the click volume
+        /// actually in force. Needed because this module does not override
+        /// Module.GetSettingsView, so Blish renders the same SettingEntry a
+        /// second time - as its own TrackBar - in Manage Modules, and a drag
+        /// there would otherwise leave this tab displaying a value no longer
+        /// true. Terminates rather than ping-pongs: the slider write below
+        /// is skipped when the slider already rounds to this percent, and
+        /// even when it is not, the ValueChanged it raises writes back an
+        /// unchanged setting, which SettingEntry does not re-announce.
+        /// </summary>
+        private void OnClickVolumeSettingChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            int percent = ClickSoundVolume.Clamp(e.NewValue);
+
+            var slider = _clickVolumeSlider;
+            if (slider != null
+                && ClickSoundVolume.TryPercentFromSliderValue(slider.Value, out int shown)
+                && shown != percent)
+            {
+                slider.Value = percent;
+            }
+
+            if (_clickVolumeReadout != null)
+            {
+                _clickVolumeReadout.Text = ClickSoundVolume.FormatPercent(percent);
+            }
+        }
+
+        /// <summary>
+        /// Disposed, not just dropped, and the slider is the only control
+        /// on this tab that needs to be. Measured from the 1.3.0 binary:
+        /// <c>TrackBar</c>'s constructor subscribes to the STATIC
+        /// <c>Control.Input.Mouse.LeftMouseButtonReleased</c> and drops it
+        /// only in its <c>DisposeControl</c> override, and nothing in a
+        /// Blish teardown reaches it - <c>ViewContainer.DisposeControl</c>
+        /// runs <c>Clear()</c> (-&gt; <c>ClearChildren</c>, which only
+        /// re-parents each child to null) BEFORE <c>base.DisposeControl</c>,
+        /// and <c>Container.GetDescendants</c> is a lazy iterator that
+        /// enqueues a container's children only after the caller has
+        /// already disposed it, so the walk that disposes the ViewContainer
+        /// then finds it empty. Disposing the host window therefore
+        /// disposes nothing on this tab. Left alone, every Settings tab
+        /// re-open AND every module unload would strand another live
+        /// slider - and, through its ValueChanged closure, this whole
+        /// SettingsTabContent - on Blish's mouse handler for the rest of
+        /// the session. Other control types used here are safe:
+        /// TextInputBase's global hooks are taken on focus and released on
+        /// unfocus, and Checkbox/StandardButton/Panel/Label take none.
+        /// </summary>
+        private void DisposeClickVolumeSlider()
+        {
+            _clickVolumeSlider?.Dispose();
+            _clickVolumeSlider = null;
         }
 
         public void Build(Container container)
@@ -265,20 +342,11 @@ namespace GW2CraftingHelper.Views
             _currencyHeaderPanel = null;
             _statusLabel = null;
 
-            // Disposed, not just dropped, and it is the only control on
-            // this tab that needs to be. Measured: Blish tears a view down
-            // with ViewContainer.Clear -> Container.ClearChildren, which
-            // only sets each child's Parent to null - it never disposes
-            // them - and TrackBar is the one control type used here that
-            // subscribes to a STATIC event in its constructor
-            // (Control.Input.Mouse.LeftMouseButtonReleased, dropped only in
-            // its DisposeControl override; TextInputBase's global hooks are
-            // taken on focus and released on unfocus, and Checkbox/
-            // StandardButton/Panel/Label take none). Left alone, every
-            // Settings tab re-open would strand another live slider on
-            // Blish's mouse handler for the rest of the session.
-            _clickVolumeSlider?.Dispose();
-            _clickVolumeSlider = null;
+            // The previous cycle's slider. Teardown handles the last one -
+            // see DisposeClickVolumeSlider for why either is needed. The
+            // readout is only dropped, like the stale controls above it.
+            DisposeClickVolumeSlider();
+            _clickVolumeReadout = null;
 
             // Dropped before the controls it describes are replaced: a
             // baseline left over from the previous Build cycle would be
@@ -637,7 +705,7 @@ namespace GW2CraftingHelper.Views
                 Parent = rowPanel
             };
 
-            var readout = new Label()
+            _clickVolumeReadout = new Label()
             {
                 Font = UiFonts.Body,
                 Text = ClickSoundVolume.FormatPercent(percent),
@@ -652,20 +720,24 @@ namespace GW2CraftingHelper.Views
             // Subscribed AFTER the initial Value assignment above, which
             // would otherwise fire this handler during Build - on Blish's
             // build thread, before _settings has anything new to hear.
+            //
+            // The setting is ALL this writes. Readout and live player both
+            // hang off SettingEntry.SettingChanged instead (here and in
+            // Module.Initialize), so the two sliders that can move this
+            // value - this one and the one Blish renders in Manage Modules,
+            // see OnClickVolumeSettingChanged - drive them by one path.
+            //
+            // The write is cheap even during a drag: SettingEntry.Value
+            // ignores an unchanged value, the TrackBar snaps to whole
+            // numbers (SmallStep is off), and Blish's SettingsService.Save
+            // only flags the collection dirty - the actual JSON write is
+            // debounced 4 seconds past the last change (all measured from
+            // the 1.3.0 binary).
             _clickVolumeSlider.ValueChanged += (_, e) =>
             {
                 if (!ClickSoundVolume.TryPercentFromSliderValue(e.Value, out int newPercent)) return;
 
-                readout.Text = ClickSoundVolume.FormatPercent(newPercent);
-
-                // Persisted AND pushed live. The write is cheap even during
-                // a drag: SettingEntry.Value ignores an unchanged value, the
-                // TrackBar snaps to whole numbers (SmallStep is off), and
-                // Blish's SettingsService.Save only flags the collection
-                // dirty - the actual JSON write is debounced 4 seconds past
-                // the last change (all measured from the 1.3.0 binary).
                 _settings.ClickSoundVolumePercent.Value = newPercent;
-                ClickSound.VolumePercent = newPercent;
             };
 
             // The audition IS this button's own press feedback: every
@@ -849,10 +921,13 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, 7),
                 Parent = rowPanel
             };
+
+            // Writes the setting and nothing else: Module.Initialize pushes
+            // it on to ModuleLog from SettingChanged, so this checkbox and
+            // the one Blish renders in Manage Modules take the same path.
             _logDiagnosticsCheckbox.CheckedChanged += (_, e) =>
             {
                 _settings.LogDiagnosticsEnabled.Value = e.Checked;
-                ModuleLog.Shared.DiagnosticsEnabled = e.Checked;
             };
 
             new Label()
