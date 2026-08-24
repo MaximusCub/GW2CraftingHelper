@@ -207,11 +207,12 @@ namespace GW2CraftingHelper.Services
         /// = Actual Cost to Craft"). When MaterialOpportunityCost is null
         /// or 0 the middle term does not exist, so the band collapses to a
         /// single "Actual Cost to Craft" tile - unless the plan costs
-        /// nothing either, in which case the full band renders at zero
-        /// (a lone tile reading "0c" with the formula around it gone looks
-        /// like a broken section, not a free plan). Actual Cost to Craft
-        /// is result.Plan.TotalCoinCost; the price-basis qualifier lives
-        /// in this tile's tooltip.
+        /// nothing either AND the zero middle term is a KNOWN zero rather
+        /// than an unmeasured one, in which case the full band renders at
+        /// zero (a lone tile reading "0c" with the formula around it gone
+        /// looks like a broken section, not a free plan). Actual Cost to
+        /// Craft is result.Plan.TotalCoinCost; the price-basis qualifier
+        /// lives in this tile's tooltip.
         /// </summary>
         private static void BuildCostFormulaBand(PlanSectionViewModel section, CraftingPlanResult result)
         {
@@ -235,12 +236,24 @@ namespace GW2CraftingHelper.Services
                 ? result.MaterialOpportunityCost.Value
                 : 0L;
 
+            // MaterialOpportunityCost is null by contract outside
+            // OwnMaterialsMode.Valued (see SellSideEconomics), so a
+            // Free-mode plan that consumed owned materials has a middle
+            // term nobody computed - printing it as 0 would assert a
+            // valuation the pipeline deliberately declined to make. Only a
+            // KNOWN zero (Valued mode computed 0, or nothing was consumed
+            // at all) qualifies.
+            bool materialsUsedIsKnownZero =
+                result.MaterialOpportunityCost.HasValue ||
+                result.UsedMaterials == null ||
+                result.UsedMaterials.Count == 0;
+
             // The band collapses only when there is a real cost to show.
-            // A plan that costs nothing AND consumes no owned materials
-            // (every node ignored or already in hand) renders the whole
-            // formula at zero instead of a lone "0c" result tile with the
-            // rest of the band missing.
-            bool zeroPlan = actualCost == 0 && materialsUsed == 0;
+            // A plan that costs nothing AND provably consumed no owned
+            // value (every node ignored or already in hand) renders the
+            // whole formula at zero instead of a lone "0c" result tile
+            // with the rest of the band missing.
+            bool zeroPlan = actualCost == 0 && materialsUsed == 0 && materialsUsedIsKnownZero;
             if (materialsUsed > 0 || zeroPlan)
             {
                 section.Rows.Add(new PlanRowViewModel

@@ -161,6 +161,54 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed()
+        {
+            // OwnMaterialsMode.Free leaves MaterialOpportunityCost null BY
+            // CONTRACT (see SellSideEconomics) even though owned materials
+            // really were consumed - "Use Own Materials" on with "Value Own
+            // Materials" off, inventory covering the whole plan. Rendering
+            // the band here would print "Your Materials Used 0c" directly
+            // above a Used Materials section listing the real materials:
+            // a valuation the pipeline deliberately declined to make. Only
+            // a KNOWN zero unlocks the band.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            Assert.Null(result.MaterialOpportunityCost);
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithMaterialsConsumedAndValuedAtZero_RendersFullBand()
+        {
+            // The Valued-mode counterpart: materials were consumed AND
+            // priced, and the priced total genuinely came out 0 (nothing
+            // consumed had a sell price). That IS a known zero, so the
+            // band renders - the distinction is measured-vs-unmeasured,
+            // not consumed-vs-not.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
         public void CostBand_ZeroCostWithMaterialsUsed_StillRendersFullBand()
         {
             // Nothing to pay out of pocket because owned materials cover
