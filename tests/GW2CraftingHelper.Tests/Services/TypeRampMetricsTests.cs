@@ -15,14 +15,12 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void PromotedTiers_AreARealStepOverBody_NotTheFlatRampTheyReplaced()
         {
-            // The rule the old 14/16/18-regular ramp failed: a hierarchy
-            // step is at least 1.25x, and it is carried by cap height, not
-            // just by nominal point size.
-            const int bodyPointSize = 16;
-
-            Assert.True(
-                TypeRampMetrics.ColumnHeaderPointSize >= bodyPointSize * 1.25,
-                $"column header {TypeRampMetrics.ColumnHeaderPointSize}pt is under a 1.25 step over body");
+            // The rule the old 14/16/18-regular ramp failed, stated as the
+            // RELATION it actually is. Deliberately not "at least 1.25x
+            // over 16pt": that gate reads as an invariant while really
+            // encoding one of the two tier seats the maintainer chose
+            // between, and it fails by construction on the 18/22 retreat
+            // decisions.md ordered kept one commit away.
             Assert.True(
                 TypeRampMetrics.SectionTitlePointSize > TypeRampMetrics.ColumnHeaderPointSize,
                 "section titles must outrank column headers");
@@ -32,6 +30,36 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(
                 TypeRampMetrics.ColumnHeaderInk.CapHeight > TypeRampMetrics.BodyInk.CapHeight,
                 "the body/header step has to survive in ink, not only in nominal size");
+        }
+
+        [Fact]
+        public void EachTierSeat_CarriesTheInkMeasuredForItsOwnPointSize()
+        {
+            // The half of a tier swap with no other alarm: move
+            // ColumnHeaderPointSize to 18 and leave ColumnHeaderInk on
+            // Bold20, and every height constant derived from it is derived
+            // from a font the view has stopped drawing in. Nothing on
+            // screen says so, and nothing else here would.
+            Assert.Equal(
+                BoldInkFor(TypeRampMetrics.ColumnHeaderPointSize), TypeRampMetrics.ColumnHeaderInk);
+            Assert.Equal(
+                BoldInkFor(TypeRampMetrics.SectionTitlePointSize), TypeRampMetrics.SectionTitleInk);
+            Assert.Equal(
+                BoldInkFor(TypeRampMetrics.StatusPointSize), TypeRampMetrics.StatusInk);
+        }
+
+        [Fact]
+        public void TheOneRegularWeightSeat_SitsOnAFaceThatCanBeDrawnWith()
+        {
+            // SmallHeading is the ramp's only regular-weight promoted
+            // role, so this is the only seat that can land on one of the
+            // two measured font defects. At 18 the plan header's
+            // " x 42 needed" would render with 4px word gaps; at 22 it
+            // would silently render at 24. UiFonts.Regular throws on both,
+            // which is a runtime alarm - this is the one that fires first.
+            Assert.True(
+                TypeRampMetrics.HasUsableRegularFace(TypeRampMetrics.SmallHeadingPointSize),
+                $"{TypeRampMetrics.SmallHeadingPointSize}pt has no usable regular face");
         }
 
         [Fact]
@@ -99,11 +127,24 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 case 14: return TypeRampMetrics.Regular14;
                 case 16: return TypeRampMetrics.Regular16;
+                case 20: return TypeRampMetrics.Regular20;
+                case 32: return TypeRampMetrics.Regular32;
+                default: return BoldInkFor(pointSize);
+            }
+        }
+
+        /// <summary>
+        /// The measured bold ink at a size, by size - every promoted tier
+        /// seat is bold, so this is what a seat's ink is checked against.
+        /// </summary>
+        private static TypeRampMetrics.FontInk BoldInkFor(int pointSize)
+        {
+            switch (pointSize)
+            {
                 case 18: return TypeRampMetrics.Bold18;
                 case 20: return TypeRampMetrics.Bold20;
                 case 22: return TypeRampMetrics.Bold22;
-                case 24: return TypeRampMetrics.Bold24;
-                default: return TypeRampMetrics.Regular32;
+                default: return TypeRampMetrics.Bold24;
             }
         }
     }

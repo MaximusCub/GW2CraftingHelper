@@ -85,13 +85,23 @@ namespace GW2CraftingHelper.Services
         //
         // The two promoted tiers are named ONCE, here, so the maintainer's
         // "let's try 20/24 and if it's too big we can go 18/22" is a
-        // two-line swap (point size + FontInk) with the height constants
-        // and their tests following from it, rather than a hunt through
-        // renderers. The 18/22 retreat is:
-        //     ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk  Bold20 -> Bold18
-        //     SectionTitlePointSize 24 -> 22, SectionTitleInk  Bold24 -> Bold22
-        // and the constants in PlanContentHeightMath / SummarySectionLayoutMath
-        // that are asserted against these in the tests.
+        // constant swap rather than a hunt through renderers. The retreat,
+        // MEASURED by applying it and running the suite - six constants,
+        // no test edits, every band height unchanged:
+        //     ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk Bold20 -> Bold18
+        //     SectionTitlePointSize 24 -> 22, SectionTitleInk Bold24 -> Bold22
+        //     PlanContentHeightMath.CTableHeaderLabelY   4 -> 5
+        //     PlanContentHeightMath.SectionHeaderCaretY 10 -> 9
+        // The last two are not free-standing choices: a label y is one
+        // half of a band's arithmetic and the shorter font's cap top and
+        // baseline both move, so both follow from the seat. Each is named
+        // by the assertion that fails without it, so a retreat that
+        // forgets one is told which number to write.
+        //
+        // No absolute point size is asserted anywhere. A test that pinned
+        // 20 as a floor would read as an invariant while really encoding
+        // one of the two seats the maintainer is choosing between, and it
+        // would fail by construction on his own documented fallback.
 
         /// <summary>Every column header, and the Total Cost tile captions.</summary>
         public const int ColumnHeaderPointSize = 20;
@@ -111,6 +121,19 @@ namespace GW2CraftingHelper.Services
         /// (bold, digits only). Both exist to retire 18-regular entirely.
         /// </summary>
         public const int SmallHeadingPointSize = 20;
+
+        /// <summary>
+        /// Whether the installed Menomonia REGULAR face at this size can
+        /// be drawn with at all. The two exclusions are the measured
+        /// defects in this class's own doc comment, named ONCE here:
+        /// Views/Rendering/UiFonts.Regular refuses the same two at the
+        /// seam, and the ramp's tests refuse to seat a regular-weight
+        /// role on one.
+        /// </summary>
+        public static bool HasUsableRegularFace(int pointSize)
+        {
+            return pointSize != 18 && pointSize != 22;
+        }
 
         public static FontInk ColumnHeaderInk => Bold20;
 

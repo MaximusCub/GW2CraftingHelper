@@ -25,8 +25,10 @@ namespace GW2CraftingHelper.Views.Rendering
     /// Blish surfaces five sizes as DefaultFontNN properties; every other
     /// size in the installed Menomonia inventory (8-36, bold at 8-24 and
     /// 36) loads through <c>ContentService.GetFont</c>. Two entries of that
-    /// inventory are unusable and are documented in TypeRampMetrics:
-    /// 18-regular collapses word gaps, and 22-regular is really a 24.
+    /// inventory are unusable - 18-regular collapses word gaps, and
+    /// 22-regular is really a 24 - measured in TypeRampMetrics and
+    /// ENFORCED in <see cref="Regular"/>, so a tier seat cannot reach
+    /// either by moving a point size.
     /// </para>
     ///
     /// <para>
@@ -103,8 +105,31 @@ namespace GW2CraftingHelper.Views.Rendering
                 ContentService.FontFace.Menomonia, SizeOf(pointSize), ContentService.FontStyle.Bold);
         }
 
+        /// <summary>
+        /// Regular weight, at the promoted sizes that HAVE a usable
+        /// regular face. The two that do not are refused here rather than
+        /// in <see cref="SizeOf"/> because the ban is on the FACE, not on
+        /// the size: 18-bold and 22-bold are both fine, and both are
+        /// loaded.
+        /// <para>
+        /// Without this, a tier seat moved from 20 to 18 would turn
+        /// <see cref="SmallHeading"/> into 18-regular and render
+        /// " x 42 needed" at exactly the collapsed word gaps this ramp
+        /// exists to escape - with no build error, no failing test and
+        /// nothing on screen to name the cause. See TypeRampMetrics for
+        /// both measurements.
+        /// </para>
+        /// </summary>
         private static BitmapFont Regular(int pointSize)
         {
+            if (!TypeRampMetrics.HasUsableRegularFace(pointSize))
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(pointSize), pointSize,
+                    "No usable Menomonia regular face at this size: 18-regular's space glyph "
+                        + "advances 4px, and 22-regular is metrically a 24. Use the bold face.");
+            }
+
             return GameService.Content.GetFont(
                 ContentService.FontFace.Menomonia, SizeOf(pointSize), ContentService.FontStyle.Regular);
         }
@@ -114,7 +139,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// else: an unmapped size is a size TypeRampMetrics has no measured
         /// ink for, so the height constants derived from it would be
         /// guesses. Fail loudly at the seam rather than silently render at
-        /// a size no constant was sized for.
+        /// a size no constant was sized for. Weight is <see cref="Bold"/>'s
+        /// and <see cref="Regular"/>'s own concern - only one of the two
+        /// can load all four.
         /// </summary>
         private static ContentService.FontSize SizeOf(int pointSize)
         {

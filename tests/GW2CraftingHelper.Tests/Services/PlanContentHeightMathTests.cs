@@ -42,12 +42,21 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ColumnHeaderBand_KeepsTheOpticalPlacementTheBodyHeaderHad()
         {
-            // Cap top 8px below the band's top edge, which is where a
-            // Body-16 header at LabelY 5 put it. The band grew by exactly
-            // what the taller font's descenders needed, not by an arbitrary
-            // amount, and the label did not drift up the band.
+            // The placement being kept is the Body-16 header's: it sat at
+            // LabelY 5, so its cap top was that far below the band's top
+            // edge. The band grew by exactly what the taller font's
+            // descenders needed, and the label did not drift up the band.
+            //
+            // Read out of the ink rather than written as the literal 8,
+            // because 8 is only what THIS tier seat happens to make it. A
+            // seat swap moves CTableHeaderLabelY with it (18/22 wants 5,
+            // not 4), and this has to name the required value instead of
+            // reading as "the other seat is a regression".
+            const int bodyHeaderLabelY = 5;
+            int inheritedCapTop = bodyHeaderLabelY + TypeRampMetrics.BodyInk.CapTopY;
+
             Assert.Equal(
-                8,
+                inheritedCapTop,
                 PlanContentHeightMath.CTableHeaderLabelY + TypeRampMetrics.ColumnHeaderInk.CapTopY);
         }
 
