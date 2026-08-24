@@ -12956,7 +12956,8 @@ lines in the same rewritten identity block.
 [icon] <Name>                     rarity colour
 Weapon Strength / Defense         white   (thousands-separated, G19)
 +<N> <Attribute>                  white
-<buff> / (N): <bonus> / nourishment   upgrade-bonus blue
+<buff> / (N): <bonus>              upgrade-bonus blue
+<nourishment> / Duration          white   (measured, steak.png)
 (blank)
 Infusion Slot                     white   (one line per slot, G16)
 (blank)
@@ -13144,7 +13145,9 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   because a re-stamp - `MainView.ApplyItemRowTooltip` runs again on every
   column resize - reads a `BasicTooltipText` the FIRST stamp already
   nulled; the fallback is carried forward from the previous source unless
-  the control has since been given real plain text. The `row.ItemId > 0`
+  the control has since been given real plain text, or has since had it
+  deliberately cleared (`ApplyPlain` records both - see "Post-review
+  corrections, round 2"). The `row.ItemId > 0`
   gates that remain are about a currency icon naming its own currency,
   NOT about emptiness - they never prevented it (see "Post-review
   corrections").
@@ -13218,6 +13221,65 @@ rationale that keeps its suffix from reading as noise. Moved back.
 - FIXED.** `#afafaf` is 175, not "within two levels" of `Muted`'s 150.
 `Reminder` is now its own role at the spec's `Color(175,175,175)`.
 
+### Post-review corrections, round 2
+
+A second adversarial review raised three Must Fix findings. All three
+were re-verified against the captures before being acted on, and all
+three held.
+
+**1. A food's nourishment line was painted upgrade-bonus BLUE - FIXED.**
+Re-measured on `steak.png` (PIL, median RGB of pixels at or above 88% of
+each band's peak): the two nourishment bands read (252,254,253) and
+(252,255,255), against "Food" (251,255,252) and "Required Level: 10"
+(254,254,251) on the same capture and the Fine-blue name (106,150,209)
+above them. That line IS `details.description` - the field
+`ItemStatBlock.NourishmentDescription` carries
+(`Gw2ItemApiClient.ParseDetail`) - so the measurement is of this line,
+not of a neighbour. The blue is measured on RUNE and SIGIL bonuses only
+(`Rune_effects_*.jpg`, FWDekker `#5599ff`), and step 1's re-colouring
+swept the food line up with them. `TooltipSpanRole.Bonus`'s own doc
+comment asserted the same wrong thing and no longer does.
+
+*Judgment call, flagged.* The 2012 capture's nourishment line is a prose
+sentence ("Meal: Double-click to gain +10 power. Lasts 30 minutes.").
+The modern API returns an EFFECT LIST in the same field (measured on
+12452, 12457, 12345-12348, 9440, 50082 - e.g. "30% Magic Find\n40% Gold
+from Monsters\n+10% Experience from Kills", with no `<c=@...>` markup in
+any of the eight samples, which is why the factory's flat `Sanitize`
+still serves this field). No modern capture of a food tooltip exists on
+the wiki, so nobody has measured what the game paints an effect LIST.
+White is the only measurement that exists for the field, and it is what
+ships; one live sandbox capture of any food item would settle it.
+
+**2. An unconditional blank above the vendor value - FIXED.** Asserted
+here as the game's shape and contradicted by the only capture of a value
+line. `steak.png` re-measured: body bands at 39, 57, 75 (blank), 93
+("Food"), 111 ("Required Level: 10"), 129 (the coin row - number band
+y=130-139 at x4-23, coin icon x23-41). Row 128 carries no glyph and rows
+122-127 only the `q` descender of "Required": 111 -> 129 is ONE 18px
+pitch, contiguous. FWDekker agrees for twelve of its thirteen builders.
+The blank now splits on the item's shape - see the line-order block
+above - and desktop gate step 6 was corrected, since it had told the
+tester to confirm the divergence.
+
+**3. A tooltip CLEAR could be undone by the next re-stamp - FIXED.**
+`TooltipFacility.Register` inferred a source's fallback text from
+`control.BasicTooltipText`, a field the facility itself nulls on the
+first stamp, so a null could not be told from a deliberate clear and the
+previous source's note was carried forward over it.
+`MainView.FitRowTextLabel` clears a row line's tooltip the moment the
+line fits and then re-stamps the row's deferred builder, so widening the
+window past a Snapshot row's truncation boundary resurrected the full
+item name - and with no stat block for that item yet (a plan restored
+from disk before the Q13 top-up) the builder returns empty content, so
+the row showed its own full name as a tooltip over the name it was
+already showing in full. `ApplyPlain` now records the caller's intent -
+clears included - on any source the control already carries. It costs
+one `ConditionalWeakTable` lookup per plain tooltip assignment, on the
+render path. Not unit-testable: `TooltipFacility` takes a Blish
+`Control` and tests stay Blish-free, so desktop gate step 12 carries the
+check and now names the no-stat-block precondition it needs.
+
 ### Desktop gate (live, required)
 
 1. Hover a crafting material row in the recipe tree. The box opens with a
@@ -13273,11 +13335,13 @@ rationale that keeps its suffix from reading as noise. Moved back.
     empty or flickering box.
 14. Confirm no tooltip anywhere shows a raw item id, currency id or
     vendor id.
-15. Hover a FOOD item (a Cup of Lotus Fries, any feast). Its nourishment
-    lines start on the line immediately under the header - no blank
-    between the name and the first effect. An item with no combat facts
-    and no nourishment (a back item, a crafting material) still opens
-    with one blank.
+15. Hover a FOOD item (a Cup of Lotus Fries, any feast) and a UTILITY
+    consumable (a sharpening stone). Its nourishment lines start on the
+    line immediately under the header - no blank between the name and
+    the first effect - and they are WHITE, the same white as the type
+    and level lines below them, NOT the runes' light blue. An item with
+    no combat facts and no nourishment (a back item, a crafting
+    material) still opens with one blank.
 16. Hover an item whose icon never loads or whose entry has no icon at
     all. The header shows the neutral dark empty-slot square with its
     "-" mark, the name sits beside it in the same column every other
