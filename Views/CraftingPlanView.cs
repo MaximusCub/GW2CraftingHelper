@@ -2517,11 +2517,16 @@ namespace GW2CraftingHelper.Views
                 x -= gapToLeft;
             }
 
-            // The walk above places the same slots ChipLimitX sums, so the
-            // limit is the walk's own end x less the group gap - taken from
-            // TreeToolbarRowLayout so the tests can assert the boundary
-            // against the widths that actually ship.
-            _treeChipLimitX = TreeToolbarRowLayout.ChipLimitX(w);
+            // Invariant: the strip never reaches past the buttons ACTUALLY
+            // placed. The walk's own end x is the self-correcting term - a
+            // button placed with a slot missing from
+            // TreeToolbarRowLayout.RightButtons moves it and not
+            // ChipLimitX - and the modelled limit the tests assert is the
+            // cap. Taking the lower of the two means a divergence between
+            // them can only cost the chips room, never overlap a button
+            // with a live click target.
+            _treeChipLimitX = Math.Min(
+                x - TreeToolbarRowLayout.GroupGap, TreeToolbarRowLayout.ChipLimitX(w));
             RefreshTreeStateChips();
         }
 

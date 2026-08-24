@@ -20,7 +20,10 @@ namespace GW2CraftingHelper.Services
     /// <para>
     /// Invariant: <see cref="RightButtons"/> is exactly the set of buttons
     /// the row places, in the right-to-left order it places them.
-    /// <see cref="ChipLimitX"/> is only correct while that holds.
+    /// <see cref="ChipLimitX"/> is only correct while that holds. The view
+    /// clamps its chip limit to the buttons it actually placed as well, so
+    /// a slot missing from this list costs the chips room rather than
+    /// putting them on top of a live click target.
     /// </para>
     /// </summary>
     public static class TreeToolbarRowLayout
