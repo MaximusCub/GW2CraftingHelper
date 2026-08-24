@@ -731,7 +731,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(InputWidth, 26),
                 Location = new Point(NameColumnX + NameColumnWidth, 3),
                 Parent = rowPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
 
             new Label()
             {
@@ -894,7 +894,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(InputWidth, 26),
                 Location = new Point(NameColumnX + NameColumnWidth, 3),
                 Parent = rowPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
 
             new Label()
             {
@@ -944,7 +944,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(InputWidth, 26),
                 Location = new Point(NameColumnX + NameColumnWidth, 3),
                 Parent = rowPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
 
             new Label()
             {
@@ -1073,7 +1073,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(InputWidth, 26),
                 Location = new Point(NameColumnX + NameColumnWidth, 3),
                 Parent = rowPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
 
             new Label()
             {
@@ -1226,7 +1226,7 @@ namespace GW2CraftingHelper.Views
                 // M12). This box was the lone "Filter ..." spelling.
                 PlaceholderText = "Search currencies...",
                 Parent = rowPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
             _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
 
             _currencyCountLabel = new Label()
@@ -1358,7 +1358,7 @@ namespace GW2CraftingHelper.Views
                     ? defaultCopperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "",
                 Parent = cellPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
             TooltipFacility.ApplyPlain(input, hasDefault

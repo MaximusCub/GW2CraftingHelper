@@ -1,4 +1,5 @@
 using System.Linq;
+using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -113,6 +114,37 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.True(TooltipContent.FromText(null).IsEmpty);
             Assert.True(TooltipContent.FromText("").IsEmpty);
+        }
+
+        [Fact]
+        public void OrText_KeepsRealContentAndFallsBackToTheNoteWhenThereIsNone()
+        {
+            var real = new TooltipContentBuilder().Text("Mithril Ore").Build();
+
+            Assert.Same(real, TooltipContent.OrText(real, "No icon available for this entry."));
+            Assert.Equal(
+                "No icon available for this entry.",
+                TooltipContent.OrText(TooltipContent.Empty, "No icon available for this entry.").ToPlainText());
+            Assert.Equal(
+                "No icon available for this entry.",
+                TooltipContent.OrText(null, "No icon available for this entry.").ToPlainText());
+            Assert.True(TooltipContent.OrText(TooltipContent.Empty, null).IsEmpty);
+        }
+
+        [Fact]
+        public void OrText_CoversTheRestoredPlanRowThatComposesNothingYet()
+        {
+            // The case the icon tree actually hits: a plan restored from
+            // disk has no stat block for the row yet, and a name short
+            // enough not to ellipsize adds no line either - so the deferred
+            // builder is empty and the icon's own note has to survive.
+            var composed = ItemRowTooltipComposer.BuildRowContent(
+                (ItemStatBlock)null, "Short", nameTruncated: false, extraLines: null);
+
+            Assert.True(composed.IsEmpty);
+            Assert.Equal(
+                "No icon available for this entry.",
+                TooltipContent.OrText(composed, "No icon available for this entry.").ToPlainText());
         }
     }
 }

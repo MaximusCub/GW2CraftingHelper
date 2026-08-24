@@ -105,6 +105,19 @@ namespace GW2CraftingHelper.Models
         // names/icons before render.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; set; }
 
+        // True only on a node CraftingTreeBuilder.BuildTree returned: the
+        // single-item plan's target, or one of a batch's N requested roots
+        // (the synthetic multi-item wrapper never becomes a
+        // CraftingTreeNode). The plan's own target is the thing being
+        // planned, not an acquisition decision to opt out of, so
+        // DecisionPillPlanner offers no IGNORE toggle here.
+        // Internal, not public: Newtonsoft's default contract serializes
+        // public properties only, so this stays out of the persisted graph
+        // and needs no PersistedPlan schema bump (a bump discards every
+        // existing user's saved plan). PlanStoreHelpers re-derives it on
+        // restore - see DeserializePersistedPlan.
+        internal bool IsPlanRoot { get; set; }
+
         // True when this node was bought but also has a known recipe, so
         // Children holds the "what it would cost to craft instead"
         // reference branch - rendered dimmed and collapsed. For a vendor

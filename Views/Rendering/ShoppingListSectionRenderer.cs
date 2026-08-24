@@ -55,8 +55,14 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly TableSortState<PlanTableColumn> _sortState;
         private readonly Action _onSortChanged;
 
+        // See the identical field on UsedMaterialsSectionRenderer: the
+        // session item-stat lookup, optional, degrading to the row's
+        // pre-stats tooltip when it has nothing for this item.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
         internal ShoppingListSectionRenderer(
-            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged)
+            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             // Mirrors the constructor-null-guard convention already used
             // for injected dependencies elsewhere in Views/ (ViewAdapter's
@@ -70,6 +76,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         private void SortBy(PlanTableColumn column)
@@ -270,22 +277,23 @@ namespace GW2CraftingHelper.Views.Rendering
         // comment. Segment counts are always small (one row's worth of
         // coin/currency denominations), so this is cheap even called on
         // every BuildTooltip rebuild.
-        private static void SetValueCellTooltip(CoinCurrencyRenderer.ValueCellHandle cell, string tooltipText)
+        private static void SetValueCellTooltip(
+            CoinCurrencyRenderer.ValueCellHandle cell, Func<TooltipContent> build)
         {
             if (cell.DashLabel != null)
             {
-                TooltipFacility.ApplyPlain(cell.DashLabel, tooltipText);
+                TooltipFacility.ApplyRichDeferred(cell.DashLabel, build);
                 return;
             }
             foreach (var (label, icon) in cell.CoinSegments.Controls)
             {
-                TooltipFacility.ApplyPlain(label, tooltipText);
-                TooltipFacility.ApplyPlain(icon, tooltipText);
+                TooltipFacility.ApplyRichDeferred(label, build);
+                TooltipFacility.ApplyRichDeferred(icon, build);
             }
             foreach (var (label, icon) in cell.CurrencySegments.Controls)
             {
-                TooltipFacility.ApplyPlain(label, tooltipText);
-                TooltipFacility.ApplyPlain(icon, tooltipText);
+                TooltipFacility.ApplyRichDeferred(label, build);
+                TooltipFacility.ApplyRichDeferred(icon, build);
             }
         }
 
@@ -324,19 +332,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, NameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
-            // Owned/needed split for this row's currency cost(s),
-            // cosmetic-only tooltip (avoids new inline layout math for a
-            // fixed-height shopping row - see PlanContentHeightMath).
-            // shoplist-have-format: line text now built by the Blish-free
-            // ShoppingRowTooltipFormatter (its own doc comment covers the
-            // HAVE/NEED wording and why "plan requires" was dropped -
-            // cc.Amount is this row's own total, never the whole plan's
-            // requirement for that currency id, which this renderer is
-            // never handed). currencyLines is captured once and reused by
-            // both BuildTooltip below and the AddReellipsis rebuild, so
-            // the two can never diverge on a resize.
-            var currencyLines = ShoppingRowTooltipFormatter.BuildCurrencyLines(row.CurrencyCosts);
-
             Panel tagPanel = null;
             if (!string.IsNullOrEmpty(sourceTag))
             {
@@ -366,37 +361,41 @@ namespace GW2CraftingHelper.Views.Rendering
             var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
-            // TOOLTIP SWALLOWED BY
-            // CHILD CONTROLS: a container's BasicTooltipText never fires
-            // when a child control with no tooltip of its own covers the
-            // hover point - the row's children (nameLabel, tagPanel,
-            // qtyLabel, the Each/Total cells) all capture the mouse before
-            // rowPanel's own tooltip is ever reached. The HAVE/NEED text is
-            // therefore stamped on nameLabel and the Total cell's own
-            // controls too - the two places a user hovering "do I have
-            // enough?" actually looks - not just the row's blank gaps.
-            // BuildTooltip/SetValueCellTooltip below and the initial call
-            // are deliberately placed AFTER nameLabel/totalCell exist so
-            // both are in scope for every (re)build, including the
-            // AddReellipsis rebuild further down.
-            void BuildTooltip()
+            // TOOLTIP SWALLOWED BY CHILD CONTROLS: a container's tooltip
+            // never fires when a child control with no tooltip of its own
+            // covers the hover point - the row's children (the icon,
+            // nameLabel, tagPanel, qtyLabel, the Each/Total cells) all
+            // capture the mouse before rowPanel's own tooltip is reached,
+            // so every one of them carries the row's tooltip. Stamped
+            // AFTER those controls exist, which is why this sits here.
+            //
+            // Composed at HOVER time (see UsedMaterialsSectionRenderer's
+            // matching note): the row's ellipsis state is read when the
+            // box is drawn, so the AddReellipsis rebuild that used to
+            // re-stamp four controls is gone, and a stat block that lands
+            // after this render (Q13) is picked up on the next hover.
+            Func<TooltipContent> buildTooltip = () => ShoppingRowTooltipFormatter.BuildRowContent(
+                _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
+                fullName,
+                nameLabel.Text != fullName,
+                hintText,
+                row.CurrencyCosts);
+            TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
+            TooltipFacility.ApplyRichDeferred(nameLabel, buildTooltip);
+            TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
+            IconControls.ApplyRichDeferredToIconTree(tagPanel, buildTooltip);
+
+            // The icon only when the row has a real item id: a currency
+            // row's icon names its own currency, and an item builder has
+            // nothing better to say about it. (An EMPTY payload is no
+            // longer the hazard here - ApplyRichDeferredToIconTree keeps
+            // the control's own note as the builder's fallback.)
+            if (row.ItemId > 0)
             {
-                var tooltipParts = new List<string>();
-                if (nameLabel.Text != fullName)
-                {
-                    tooltipParts.Add(fullName);
-                }
-                if (!string.IsNullOrEmpty(hintText))
-                {
-                    tooltipParts.Add(hintText);
-                }
-                tooltipParts.AddRange(currencyLines);
-                string tooltipText = tooltipParts.Count > 0 ? string.Join("\n", tooltipParts) : null;
-                TooltipFacility.ApplyPlain(rowPanel, tooltipText);
-                TooltipFacility.ApplyPlain(nameLabel, tooltipText);
-                SetValueCellTooltip(totalCell, tooltipText);
+                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
             }
-            BuildTooltip();
+            SetValueCellTooltip(eachCell, buildTooltip);
+            SetValueCellTooltip(totalCell, buildTooltip);
 
             // Qty + Each/Total cells reposition every drag tick
             // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
@@ -418,14 +417,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
                 },
                 w => scan.EdgesFor(w).TotalRightEdge + PlanRelayoutMath.TableRightMargin);
+            // No tooltip re-stamp on settle: the deferred builder reads
+            // the label's current text when the box is drawn.
             _sink.AddReellipsis(w =>
             {
                 var e = scan.EdgesFor(w);
-                if (IconNameRowHelpers.ReellipsizeName(
-                    nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve))
-                {
-                    BuildTooltip();
-                }
+                IconNameRowHelpers.ReellipsizeName(
+                    nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve);
                 if (tagPanel != null)
                 {
                     tagPanel.Location = new Point(NameX + nameLabel.Width + TagGap, 9);

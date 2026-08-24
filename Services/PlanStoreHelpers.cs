@@ -96,7 +96,40 @@ namespace GW2CraftingHelper.Services
                     $"Persisted plan failed structural validation ({invalidReason}) - corrupt or degraded file.");
             }
 
+            MarkPlanRoots(plan.Result);
             return plan;
+        }
+
+        /// <summary>
+        /// Re-derives CraftingTreeNode.IsPlanRoot, which is internal and
+        /// therefore never serialized (see the member's own comment for
+        /// why it is kept off the persisted graph). Restore is the one path
+        /// that produces a CraftingPlanResult without going through
+        /// CraftingTreeBuilder.BuildTree, so without this a restored plan's
+        /// root rows would offer the IGNORE pill the flag exists to
+        /// suppress until the next Generate or override re-solve. The roots
+        /// are exactly what BuildTree was called with: CraftingTree for a
+        /// single-item plan, every MultiItemRoots entry for a batch.
+        /// </summary>
+        private static void MarkPlanRoots(CraftingPlanResult result)
+        {
+            if (result.CraftingTree != null)
+            {
+                result.CraftingTree.IsPlanRoot = true;
+            }
+
+            if (result.MultiItemRoots == null)
+            {
+                return;
+            }
+
+            foreach (var root in result.MultiItemRoots)
+            {
+                if (root != null)
+                {
+                    root.IsPlanRoot = true;
+                }
+            }
         }
     }
 }
