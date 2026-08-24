@@ -88,8 +88,14 @@ namespace GW2CraftingHelper.Models
         /// either.</summary>
         public long? VendorValue { get; set; }
 
-        /// <summary>Flavour text with its colour/break markup already
-        /// resolved (see ItemDescriptionSanitizer).</summary>
-        public string FlavorText { get; set; }
+        /// <summary>
+        /// The API's own description string, markup INTACT. The
+        /// <c>&lt;c=@...&gt;</c> runs are the only thing that tells plain
+        /// description prose (white) apart from flavour (teal) inside one
+        /// string, so the split into roles happens at compose time via
+        /// <see cref="Services.ItemDescriptionSanitizer.SanitizeToSpans"/>
+        /// rather than being flattened away here.
+        /// </summary>
+        public string Description { get; set; }
     }
 }

@@ -180,6 +180,31 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task TheIdentityBlockIsWhiteAndTheFlavourRunIsNot()
+        {
+            // Measured twice in-game (spec section 1.6): nothing in the
+            // identity block is grey, and the rarity WORD is white even
+            // though the name line carries the rarity colour. The
+            // description's own <c=@flavor> run is the only coloured prose.
+            var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.ZojjasWarfists);
+            var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
+
+            var identity = content.Lines
+                .SelectMany(l => l.Spans)
+                .Where(s => s.Text == "Ascended" || s.Text == "Gloves" ||
+                            s.Text == "Heavy Armor" || s.Text == "Account Bound on Use")
+                .ToArray();
+
+            Assert.Equal(4, identity.Length);
+            Assert.All(identity, s => Assert.Equal(TooltipSpanRole.Default, s.Role));
+
+            var flavor = content.Lines
+                .SelectMany(l => l.Spans)
+                .Single(s => s.Text.StartsWith("Crafted in the style"));
+            Assert.Equal(TooltipSpanRole.Flavor, flavor.Role);
+        }
+
+        [Fact]
         public void NullBlockYieldsEmptyContentSoTheSurfaceStaysHidden()
         {
             Assert.True(ItemStatTooltipComposer.BuildContent(null).IsEmpty);

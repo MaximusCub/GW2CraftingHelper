@@ -52,7 +52,7 @@ namespace GW2CraftingHelper.Services
                 Restrictions = raw.Restrictions ?? NoStrings,
                 Binding = ResolveBinding(flags),
                 VendorValue = ResolveVendorValue(raw.VendorValue, flags),
-                FlavorText = ItemDescriptionSanitizer.Sanitize(raw.Description),
+                Description = raw.Description ?? "",
                 Attributes = NoAttributes,
                 UpgradeBonuses = NoStrings
             };

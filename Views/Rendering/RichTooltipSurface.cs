@@ -247,16 +247,38 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
 
-                // The game's own green for granted bonuses (rune lines,
-                // sigil/infusion buffs, food nourishment).
+                // Light blue, not green: measured on the wiki's
+                // Rune_effects_*.jpg captures (per-row peaks
+                // 95-115/118-138/148-180) and corroborated by FWDekker's
+                // #5599ff replica - see docs/KNOWN-ISSUES.md,
+                // "Tooltip authenticity", gap G3. The exact triple is the
+                // spec's recommendation, not a measurement.
                 case TooltipSpanRole.Bonus:
-                    return new Color(140, 200, 140);
+                    return new Color(120, 170, 235);
 
-                // Secondary block (rarity/type/level/binding/flavour) -
-                // matches the qty and footnote grey used elsewhere in the
-                // plan rather than introducing a third neutral.
+                // A tier above the wearer's equipped count. Unreachable
+                // today - see TooltipSpanRole.BonusInactive.
+                case TooltipSpanRole.BonusInactive:
+                    return new Color(150, 150, 150);
+
+                // Pale aquamarine, measured off File:User Xyaren
+                // Tooltip.png rows 149-177 (median #B1D7D2). Upright, not
+                // italic - the game does not italicise flavour.
+                case TooltipSpanRole.Flavor:
+                    return new Color(170, 210, 205);
+
+                // gw2efficiency's .desc-abilitytype (#fea) - inferred, no
+                // in-game capture of an abilitytype run exists.
+                case TooltipSpanRole.AbilityType:
+                    return new Color(255, 238, 170);
+
+                case TooltipSpanRole.Warning:
+                    return new Color(255, 0, 0);
+
+                // Genuine secondary annotations only ("0/500 in Material
+                // Storage", measured #939496). The identity block is white.
                 case TooltipSpanRole.Muted:
-                    return new Color(170, 170, 170);
+                    return new Color(150, 150, 150);
 
                 default:
                     return Color.White;

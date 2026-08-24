@@ -43,7 +43,7 @@ namespace GW2CraftingHelper.Services
             AppendUpgradeEffects(builder, stats, buffAlreadyShown);
             AppendNourishment(builder, stats);
             AppendIdentityBlock(builder, stats);
-            AppendFlavor(builder, stats);
+            AppendDescription(builder, stats);
 
             return builder.Build();
         }
@@ -97,7 +97,7 @@ namespace GW2CraftingHelper.Services
                 // player's own copy is instance state /v2/items cannot
                 // know, and claiming the slots are empty would be a guess.
                 string label = stats.InfusionSlotCount == 1 ? "Infusion Slot" : "Infusion Slots";
-                builder.Styled($"{stats.InfusionSlotCount} {label}", TooltipSpanRole.Muted).EndLine();
+                builder.Text($"{stats.InfusionSlotCount} {label}").EndLine();
             }
 
             return buffAlreadyShown;
@@ -141,57 +141,57 @@ namespace GW2CraftingHelper.Services
 
             if (stats.NourishmentDurationMs.HasValue && stats.NourishmentDurationMs.Value > 0)
             {
-                builder.Styled(
-                    "Duration: " + FormatDuration(stats.NourishmentDurationMs.Value),
-                    TooltipSpanRole.Muted).EndLine();
+                builder.Text("Duration: " + FormatDuration(stats.NourishmentDurationMs.Value)).EndLine();
             }
         }
 
         private static void AppendIdentityBlock(TooltipContentBuilder builder, ItemStatBlock stats)
         {
+            // Every line here is WHITE in the game - nothing in the
+            // identity block is grey, and the rarity WORD is white even
+            // though the name line above it is not (spec section 1.6,
+            // gaps G4/G5).
             var identity = new TooltipContentBuilder();
 
             if (!string.IsNullOrEmpty(stats.Rarity))
             {
-                identity.RarityText(stats.Rarity, stats.Rarity).EndLine();
+                identity.Text(stats.Rarity).EndLine();
             }
 
             string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
             if (!string.IsNullOrEmpty(type))
             {
-                identity.Styled(SpaceCamelCase(type), TooltipSpanRole.Muted).EndLine();
+                identity.Text(SpaceCamelCase(type)).EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.WeightClass))
             {
-                identity.Styled(stats.WeightClass + " Armor", TooltipSpanRole.Muted).EndLine();
+                identity.Text(stats.WeightClass + " Armor").EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.DamageType))
             {
-                identity.Styled("Damage Type: " + stats.DamageType, TooltipSpanRole.Muted).EndLine();
+                identity.Text("Damage Type: " + stats.DamageType).EndLine();
             }
 
             if (stats.RequiredLevel > 0)
             {
-                identity.Styled($"Required Level: {stats.RequiredLevel}", TooltipSpanRole.Muted).EndLine();
+                identity.Text($"Required Level: {stats.RequiredLevel}").EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.Binding))
             {
-                identity.Styled(stats.Binding, TooltipSpanRole.Muted).EndLine();
+                identity.Text(stats.Binding).EndLine();
             }
 
             if (stats.Restrictions != null && stats.Restrictions.Count > 0)
             {
-                identity.Styled(
-                    "Restricted to: " + string.Join(", ", stats.Restrictions),
-                    TooltipSpanRole.Muted).EndLine();
+                identity.Text("Restricted to: " + string.Join(", ", stats.Restrictions)).EndLine();
             }
 
             if (stats.VendorValue.HasValue)
             {
-                identity.Styled("Vendor value: ", TooltipSpanRole.Muted)
+                identity.Text("Vendor value: ")
                     .Coin(stats.VendorValue.Value, FormatCoin(stats.VendorValue.Value))
                     .EndLine();
             }
@@ -203,12 +203,27 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static void AppendFlavor(TooltipContentBuilder builder, ItemStatBlock stats)
+        /// <summary>
+        /// The description's own <c>&lt;c=@...&gt;</c> runs decide the
+        /// colours here: unmarked prose stays white, a flavour run goes
+        /// teal, an abilitytype lead-in pale yellow (gap G7). Flattening
+        /// the whole string to one role is what made "A gift bag!"
+        /// indistinguishable from the quoted flavour after it.
+        /// </summary>
+        private static void AppendDescription(TooltipContentBuilder builder, ItemStatBlock stats)
         {
-            if (!string.IsNullOrEmpty(stats.FlavorText))
+            var spans = ItemDescriptionSanitizer.SanitizeToSpans(stats.Description);
+            if (spans.Count == 0)
             {
-                builder.Separator().Styled(stats.FlavorText, TooltipSpanRole.Muted).EndLine();
+                return;
             }
+
+            builder.Separator();
+            foreach (var span in spans)
+            {
+                builder.Styled(span.Text, span.Role);
+            }
+            builder.EndLine();
         }
 
         /// <summary>

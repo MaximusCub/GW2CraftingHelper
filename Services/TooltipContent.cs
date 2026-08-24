@@ -144,8 +144,30 @@ namespace GW2CraftingHelper.Services
         /// or infusion buff, a food nourishment line.</summary>
         Bonus,
 
-        /// <summary>Subdued secondary text: flavour prose, and the
-        /// rarity/type/level/binding block under the stats.</summary>
+        /// <summary>
+        /// A bonus tier the wearer has not reached. Reserved and unused:
+        /// greying a tier needs the character's equipped count, which is
+        /// instance state /v2/items cannot carry (spec section 3.2). It
+        /// exists so an equipped-aware surface does not have to re-plumb
+        /// the role through every composer to get it.
+        /// </summary>
+        BonusInactive,
+
+        /// <summary>The item's <c>&lt;c=@flavor&gt;</c> prose.</summary>
+        Flavor,
+
+        /// <summary>The item's <c>&lt;c=@abilitytype&gt;</c> lead-in
+        /// ("Element: ").</summary>
+        AbilityType,
+
+        /// <summary>The item's <c>&lt;c=@warning&gt;</c> run.</summary>
+        Warning,
+
+        /// <summary>
+        /// A genuine secondary annotation - the game's own grey, e.g.
+        /// "0/500 in Material Storage". NOT the identity block, which the
+        /// game renders white (spec section 1.4, gap G4).
+        /// </summary>
         Muted
     }
 
