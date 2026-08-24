@@ -13872,8 +13872,11 @@ move.
    within a pixel. Cheap to swap.
 3. Whether 20/24 is in fact too big. Every height above is derived from
    `TypeRampMetrics`' tier seats, and the tests assert derivations
-   rather than literals, so the 18/22 retreat is a two-line change plus
-   whatever the test failures then name.
+   rather than literals, so the 18/22 retreat is a constant swap plus
+   whatever the test failures then name. MEASURED after the review
+   corrections below: applying it and running the suite gives 2501 green
+   on six constants and no test edits - see "Post-review corrections",
+   finding 2.
 3a. **The tree-preserving render path is the highest-risk change in
    this milestone and has had no live run.** It detaches three
    `_contentPanel` children, disposes the rest, and re-parents them
@@ -13889,7 +13892,10 @@ move.
    the click simply stays slow. If the field test says clicks are
    still dropped, instrument the gate before changing anything else:
    the node-count and cost-width checks are the two most likely to
-   reject a case that would have been fine.
+   reject a case that would have been fine. `TreeRowIdentity` is a
+   third rejector now (post-review finding 1) and the one to check
+   LAST - it is measured on both sides, rejecting the vendor-leaf
+   collision and accepting the ordinary ignore.
 3c. **The Shopping List's Source band is floored at its own header for
    the OPPOSITE reason to every other column.** It is left-ruled, so a
    header wider than its widest badge overhangs RIGHT into Amount, not
@@ -13901,6 +13907,138 @@ move.
    outlive a module reload and hold a disposed font.
 5. The 1378 figure spends 146px on a rider that only the widest
    two-currency vendor offer needs. 1232 is one constant away.
+
+### Post-review corrections
+
+Five findings from the adversarial review of this milestone, all
+verified against the code before being fixed. Every one reproduced.
+
+**1 (critical). The in-place tree refresh trusted `NodeId` as item
+identity, which is false for synthetic cost-component leaves.**
+`MatchRows` paired a built row to a fresh node on `NodeId` alone and
+`RepaintRow` then deliberately never re-derived Name, IconUrl or Rarity.
+That premise holds for a real recipe node - `RecipeNodeIds.Assign` gives
+it a stable pre-order id - but `CraftingTreeBuilder.cs:371,406` assign
+`NodeId = SyntheticComponentNodeId(parentNodeId, componentIndex++)`, so
+a vendor cost-component leaf's id is its POSITION in the offer's cost
+lines while its display strings come from that line's own `ItemId`. A
+re-solve picking a different offer of the same shape (`{item,
+currency}` becoming `{other item, currency}`) keeps every id, depth,
+children count and column width, and the row would have kept one item's
+name and icon over another item's quantity, cost cell and tooltip - a
+state a fresh render disagrees with, which is the second-use rule
+outright.
+
+Fixed by `Services/TreeRowIdentity.SameRow`, which the pairing now asks:
+item id, cost-component-ness and the three display strings the refresh
+keeps, plus the structural pair (`Children.Count`, quantity-presence)
+that used to be inline. The hazard is not asserted from a hand-built
+model - the first test BUILDS it through the real `PlanSolver` and
+`CraftingTreeBuilder` and shows the two leaves sharing a `NodeId` while
+naming different items. A second test pins the other direction:
+ignoring a leaf material still leaves every row repaintable, so the
+stricter gate did not quietly take back the click fix it guards.
+
+**2 (must fix). The 18/22 retreat decisions.md ordered kept "one commit
+away" was blocked by a test asserting it is wrong.**
+`TypeRampMetricsTests` asserted `ColumnHeaderPointSize >= 16 * 1.25`,
+i.e. `>= 20`, so JC-1's own documented fallback failed by construction;
+and `PlanContentHeightMathTests` pinned the literal `8` for the header's
+cap top, which reads as "the other seat is a regression" rather than
+naming the `CTableHeaderLabelY` that seat needs.
+
+The absolute gate is gone. What survives is the relation it was
+pretending to be - the title/header/body steps in INK, which is what a
+hierarchy actually is - and the optical placement is read out of the ink
+it was inherited from (a Body-16 header at LabelY 5). A new test pins
+each tier seat's ink to its own point size, so a half-done swap fails
+instead of silently deriving every band height from a font the view has
+stopped drawing in.
+
+The retreat is now recorded as MEASURED rather than asserted: applied,
+suite run, 2501 green. Six constants, no test edits, every band height
+unchanged:
+
+    ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk Bold20 -> Bold18
+    SectionTitlePointSize 24 -> 22, SectionTitleInk Bold24 -> Bold22
+    PlanContentHeightMath.CTableHeaderLabelY   4 -> 5
+    PlanContentHeightMath.SectionHeaderCaretY 10 -> 9
+
+The last two are not free-standing choices - a label y is one half of a
+band's arithmetic, and the shorter font's cap top and baseline both move
+- and each is named by the assertion that fails without it. Removing
+them from the swap and re-running gives exactly two failures, both
+naming the number to write.
+
+**3 (must fix). `UiFonts`' "fail loudly at the seam" guard blocked
+neither banned font face.** `SizeOf()` validated the point SIZE only, so
+`Regular(18)` and `Regular(22)` - the two measured defects the milestone
+exists to escape - resolved happily, while the file's own doc comment
+and `TypeRampMetrics` both stated the ban. Moving `SmallHeadingPointSize`
+to 18 during a retreat would have rendered " x 42 needed" at 4px word
+gaps with no build error, no test failure and nothing on screen to name
+the cause.
+
+The ban now lives once, in `TypeRampMetrics.HasUsableRegularFace`:
+`UiFonts.Regular` throws on it at the seam (Bold keeps all four sizes,
+because the defect is in the FACE, not the size), and a test refuses to
+seat the ramp's one regular-weight role on either - so CI fires before a
+screenshot would.
+
+**4 (must fix). The two new chips could overlap the five right-anchored
+toolbar buttons, and the guard built for it was never called.**
+`TreeChipStripLayout.Slots.EndX` was documented as "what a caller checks
+the right-hand button cluster against" and grep found it only in its own
+tests. The chips replaced a fixed ~90px grey caption with up to ~438px
+of live content against a button cluster starting at `rowWidth - 466`;
+below a ~924px row they overlap, and two live buttons on the same pixels
+is a click landing on whichever Blish hit-tests last. Reachable inside
+the module's supported range: `EffectiveMinWindowWidth` falls back to
+the client width below 1378, so a 1024x768 windowed client renders an
+918px row and the 930 narrow-screen floor renders 824.
+
+`Fit()` is now the only way to place the strip - `Compute` is deleted,
+since a public entry with no production caller is one nothing
+re-measures when it drifts. It degrades once, dropping the two clear
+buttons and keeping both counts: what the plan's state IS is the
+information, and the actions that change it stay reachable through
+Generate Plan (clears both) and Best Path (clears overrides), so nothing
+becomes unreachable on a window already below the designed floor.
+`PlaceTreeToolbarRow` publishes where the button cluster starts - it is
+the only place that knows the row's width - and re-fits on every resize
+tick, which the chips previously never saw.
+
+**5 (must fix). Craft All / Buy All reported a no-op for a state that is
+actually unavailable.** `PresetWouldChange` returned FALSE when
+`_lastResult.SolveContext` was null and `ConfirmPreset` read any
+non-true answer as "nothing to do", so a plan restored without its solve
+context - a real state, since `PlanStructuralValidator` only validates a
+`SolveContext` when one is present - answered a Craft All click with
+"Already crafting everything craftable". A confident statement about a
+plan nothing had examined, on the one line this milestone rebuilt around
+a dead click having to say why.
+
+The predicate is tri-state now (true / false / null = cannot be
+answered), and the class rather than the instance:
+`ApplyOverridesAndResolve`'s silent return on the same condition made
+EVERY local change dead in that state - each decision pill, Best Path,
+both chip clears - so it reports `StatusText.ReSolveUnavailable` too,
+and the confirms ask `CanReSolve` before opening a dialog whose action
+cannot run. The new line deliberately claims nothing about the plan's
+contents, which is exactly what cannot be known there.
+
+**6 (must fix). `TryRefreshInPlace`'s doc comment described a mechanism
+the code does not implement.** It claimed that "keeping the pill's own
+instance alive across the re-solve removes the priming hazard outright";
+`RepaintRow` disposes and rebuilds every pill Panel, Label and click
+handler on a matched row, and only the `List<Panel>` the hover guard
+closes over survives. The frame-shortening half is the real argument and
+the whole of it. The clause is deleted rather than softened - the
+surrounding prose is a measured argument, so a wrong sentence in it
+carries a wrong constant's weight, and this is the sentence a maintainer
+would trust if the field test still reported dropped clicks.
+`HoverChainResync` states the mechanism correctly and is now the wording
+of record, pointed at from here.
 
 ### Desktop gate checklist (live Blish, real plan)
 
@@ -13957,5 +14095,19 @@ move.
     the tree scrolled and partly expanded. Expansion state, scroll
     position and column tracking must all be exactly as they were, and
     a window drag afterwards must still move every tree column.
+14. **Narrow client, which steps 1-13 never reach.** Run the game
+    windowed at 1024x768 (and again at the 930 floor) so
+    `EffectiveMinWindowWidth` falls back below 1378. With BOTH counts
+    non-zero, the two clear buttons disappear and the two counts remain,
+    and nothing in the left cluster paints on "Best Path" or any other
+    toolbar button. Drag back out to 1378+ and the buttons return in the
+    same click. Post-review finding 4.
+15. **A vendor node whose offer carries an item cost AND a currency
+    cost** (two synthesised cost-component leaves - expand one). Ignore
+    a sibling material so the re-solve can change which bulk offer the
+    node takes, then read the two leaves: each name and icon must match
+    the quantity, cost cell and tooltip beside it. If a leaf ever names
+    one item and prices another, the row-identity gate has a hole.
+    Post-review finding 1.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
