@@ -331,6 +331,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.All(layout.Rows, r => Assert.True(r.Width <= 109));
             Assert.Equal("icon.png", layout.Rows[0].IconUrl);
             Assert.Null(layout.Rows[1].IconUrl);
+
+            // Only the icon-bearing first row is icon-tall; a wrapped
+            // continuation is an ordinary text row at the line pitch, so
+            // the box does not grow icon-height per wrapped name row.
+            Assert.Equal(34, layout.Rows[0].Height);
+            Assert.Equal(20, layout.Rows[1].Height);
+            Assert.Equal(54, layout.Height);
         }
 
         [Fact]

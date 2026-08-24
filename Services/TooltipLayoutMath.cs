@@ -191,7 +191,9 @@ namespace GW2CraftingHelper.Services
                 {
                     rows.Add(new LaidOutRow(current, x, y, lineHeight, iconUrl));
                     y += lineHeight;
-                    lineHeight = isHeader ? headerHeight : rowHeight;
+                    // Continuations are ordinary text rows: only the FIRST
+                    // row of a header line carries the icon and its height.
+                    lineHeight = rowHeight;
                     iconUrl = null;
                     current = new List<PlacedSpan>();
                     x = indent;
