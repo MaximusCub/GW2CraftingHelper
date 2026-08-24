@@ -4,8 +4,8 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// An item's tooltip-ready facts: already-resolved attribute lines,
-    /// already-decided binding wording, already-sanitized flavour text.
-    /// The API soup (infix_upgrade, stat_choices, attribute_adjustment)
+    /// already-decided binding wording, the description as the API wrote
+    /// it. The API soup (infix_upgrade, stat_choices, attribute_adjustment)
     /// stops at <see cref="Services.ItemStatBlockFactory"/>.
     ///
     /// <para>
@@ -31,6 +31,15 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>GW2 API rarity string; null/empty = unknown.</summary>
         public string Rarity { get; set; }
+
+        /// <summary>
+        /// The item's render-service icon URL, for the tooltip's own
+        /// header row. Same field ItemMetadata.IconUrl is filled from, out
+        /// of the same /v2/items response - carried here rather than read
+        /// back off the metadata dictionary so the composer stays a pure
+        /// function of one stat block.
+        /// </summary>
+        public string IconUrl { get; set; }
 
         /// <summary>Top-level /v2/items "type" ("Armor", "Weapon", ...).</summary>
         public string ItemType { get; set; }

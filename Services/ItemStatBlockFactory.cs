@@ -47,6 +47,7 @@ namespace GW2CraftingHelper.Services
                 ItemId = raw.Id,
                 Name = raw.Name ?? "",
                 Rarity = raw.Rarity,
+                IconUrl = raw.Icon,
                 ItemType = raw.ItemType,
                 RequiredLevel = raw.Level,
                 Restrictions = raw.Restrictions ?? NoStrings,

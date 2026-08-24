@@ -67,6 +67,21 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static readonly Color ShadowColor = Color.Black * 0.8f;
 
+        /// <summary>
+        /// The header icon: ~34x34 including its 1px frame, ~32px of art,
+        /// with the name ~5px to its right - all measured off the xyaren
+        /// capture (spec section 1.2, gap G11).
+        /// </summary>
+        private const int HeaderIconSize = 32;
+
+        private const int HeaderIconBorder = 1;
+
+        private const int HeaderIconFrameSize = HeaderIconSize + (2 * HeaderIconBorder);
+
+        private const int HeaderIconGap = 5;
+
+        private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
+
         private readonly Func<Control, TooltipContent> _resolveContent;
 
         private Panel _contentPanel;
@@ -192,21 +207,26 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void BuildContent(TooltipContent content)
         {
+            var font = UiFonts.Body;
+            int lineHeight = font.LineHeight;
+            int coinIconSize = CoinSegmentMath.CoinIconSize;
+
             DisposeContent();
 
-            var font = UiFonts.Body;
-            // Never shorter than a coin icon: the content panel clips its
-            // children, and a row that cannot hold a 20px icon would clip
-            // the bottom off every coin run on the last line.
-            int rowHeight = System.Math.Max(font.LineHeight, CoinSegmentMath.CoinIconSize);
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
                 GameService.Graphics.SpriteScreen.Width, ChromeWidth);
 
             var layout = TooltipLayoutMath.LayoutContent(
-                content, maxWidth, rowHeight,
+                content, maxWidth, lineHeight,
                 s => (int)System.Math.Ceiling(font.MeasureString(s).Width),
                 copper => CoinSegmentMath.TotalCoinSegmentsWidth(
-                    CoinCurrencyRenderer.BuildCoinSegments(copper, font)));
+                    CoinCurrencyRenderer.BuildCoinSegments(copper, font)),
+                // Only a coin row needs icon clearance, and only a header
+                // row is icon-tall; a prose row is one line pitch, as the
+                // game's 16px pitch is (gap G21).
+                coinRowHeight: System.Math.Max(lineHeight, coinIconSize),
+                headerRowHeight: System.Math.Max(lineHeight, HeaderIconFrameSize),
+                headerIndent: HeaderIconFrameSize + HeaderIconGap);
 
             _contentPanel = new Panel()
             {
@@ -221,13 +241,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = this
             };
 
-            // Fixed-size coin icons centred against a taller number font,
-            // the same correction the Summary band's tiles make - without
-            // it the icons stick to the top of their row.
-            int iconYOffset = System.Math.Max(0, (rowHeight - CoinSegmentMath.CoinIconSize) / 2);
-            for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
+            foreach (var row in layout.Rows)
             {
-                RenderRow(layout.Rows[rowIndex], rowIndex * rowHeight, font, iconYOffset);
+                RenderRow(row, font, lineHeight, coinIconSize);
             }
 
             // Sized NOW rather than on the next update tick. The content
@@ -239,8 +255,24 @@ namespace GW2CraftingHelper.Views.Rendering
             RecalculateLayout();
         }
 
-        private void RenderRow(TooltipLayoutMath.LaidOutRow row, int y, BitmapFont font, int iconYOffset)
+        private void RenderRow(
+            TooltipLayoutMath.LaidOutRow row, BitmapFont font, int lineHeight, int coinIconSize)
         {
+            if (row.IconUrl != null)
+            {
+                // The game frames the icon in a 1px light grey (measured
+                // (166,175,174) on the xyaren capture's left edge) rather
+                // than in the rarity colour the module frames its ROWS
+                // with - the name beside it already carries the rarity.
+                IconControls.CreateRarityFramedIcon(
+                    _contentPanel, row.IconUrl, HeaderIconFrameColor,
+                    0, row.Y, HeaderIconSize, HeaderIconBorder);
+            }
+
+            // The name is centred on the icon, not top-aligned (measured,
+            // spec section 1.2); every other row kind sits at its top.
+            int textY = row.Y + System.Math.Max(0, (row.Height - lineHeight) / 2);
+
             foreach (var placed in row.Spans)
             {
                 if (placed.Span.IsCoin)
@@ -252,10 +284,14 @@ namespace GW2CraftingHelper.Views.Rendering
                         _contentPanel,
                         CoinCurrencyRenderer.BuildCoinSegments(placed.Span.CoinCopper, font),
                         placed.X,
-                        y,
+                        textY,
                         font,
                         1f,
-                        iconYOffset,
+                        // Fixed-size coin icons centred against a taller
+                        // number font, the same correction the Summary
+                        // band's tiles make - without it the icons stick
+                        // to the top of their row.
+                        System.Math.Max(0, (lineHeight - coinIconSize) / 2),
                         showShadow: true);
                     continue;
                 }
@@ -279,7 +315,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     ShadowColor = ShadowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(placed.X, y),
+                    Location = new Point(placed.X, textY),
                     Parent = _contentPanel
                 });
             }

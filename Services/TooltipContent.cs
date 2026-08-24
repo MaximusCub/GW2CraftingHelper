@@ -60,6 +60,21 @@ namespace GW2CraftingHelper.Services
             return new TooltipLine(new List<TooltipSpan> { TooltipSpan.FromText(text ?? "") });
         }
 
+        /// <summary>
+        /// The icon+name row every in-game item tooltip opens with: a
+        /// ~34x34 framed item icon with the name set to its right and
+        /// vertically centred on it (spec section 1.5, gap G11). A taller
+        /// row than a prose one, and the only line kind that carries an
+        /// icon - which is why it is a KIND rather than another span role.
+        /// </summary>
+        public static TooltipLine HeaderLine(string iconUrl, string name, string rarity)
+        {
+            return new TooltipLine(
+                new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", rarity) },
+                TooltipLineKind.Header,
+                iconUrl);
+        }
+
         public static TooltipLine Line(params TooltipSpan[] spans)
         {
             return new TooltipLine(spans ?? new TooltipSpan[0]);
@@ -103,16 +118,42 @@ namespace GW2CraftingHelper.Services
         }
     }
 
+    /// <summary>What a line IS, structurally. Prose unless stated.</summary>
+    public enum TooltipLineKind
+    {
+        /// <summary>An ordinary prose row, one line height tall.</summary>
+        Text,
+
+        /// <summary>The icon+name header row - see
+        /// <see cref="TooltipContent.HeaderLine"/>.</summary>
+        Header
+    }
+
     public sealed class TooltipLine
     {
         private readonly IReadOnlyList<TooltipSpan> _spans;
 
-        internal TooltipLine(IReadOnlyList<TooltipSpan> spans)
+        internal TooltipLine(
+            IReadOnlyList<TooltipSpan> spans,
+            TooltipLineKind kind = TooltipLineKind.Text,
+            string iconUrl = null)
         {
             _spans = spans ?? new List<TooltipSpan>();
+            Kind = kind;
+            IconUrl = iconUrl;
         }
 
         public IReadOnlyList<TooltipSpan> Spans => _spans;
+
+        public TooltipLineKind Kind { get; }
+
+        /// <summary>
+        /// The item icon drawn at the head of a
+        /// <see cref="TooltipLineKind.Header"/> row. Null or empty renders
+        /// the module's neutral empty-slot square, never an error texture -
+        /// a missing icon is a data gap, not a failure.
+        /// </summary>
+        public string IconUrl { get; }
 
         internal void AppendPlainText(StringBuilder sb)
         {
@@ -272,6 +313,21 @@ namespace GW2CraftingHelper.Services
         public TooltipContentBuilder RarityText(string text, string rarity)
         {
             return AppendText(text, TooltipSpan.RarityText("", rarity));
+        }
+
+        /// <summary>
+        /// The icon+name header row - see
+        /// <see cref="TooltipContent.HeaderLine"/>. Commits whatever line
+        /// was open first: a header is a whole row, never a run inside one.
+        /// </summary>
+        public TooltipContentBuilder Header(string iconUrl, string name, string rarity)
+        {
+            if (_current != null)
+            {
+                EndLine();
+            }
+            _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
+            return this;
         }
 
         // template carries the role/rarity every piece of this text

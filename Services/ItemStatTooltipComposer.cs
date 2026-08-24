@@ -38,9 +38,14 @@ namespace GW2CraftingHelper.Services
                 return TooltipContent.Empty;
             }
 
+            // The icon+name header row every in-game item tooltip opens
+            // with (gap G11). The standing comment claiming the game shows
+            // no icon was simply wrong - all three wiki captures show one.
             var builder = new TooltipContentBuilder();
-            builder.RarityText(string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name, stats.Rarity)
-                .EndLine();
+            builder.Header(
+                stats.IconUrl,
+                string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name,
+                stats.Rarity);
 
             var facts = BuildFacts(stats, out bool hasCombatFacts);
 
