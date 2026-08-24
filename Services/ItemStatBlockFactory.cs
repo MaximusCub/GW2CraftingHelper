@@ -51,6 +51,7 @@ namespace GW2CraftingHelper.Services
                 RequiredLevel = raw.Level,
                 Restrictions = raw.Restrictions ?? NoStrings,
                 Binding = ResolveBinding(flags),
+                IsUnique = flags.Contains("Unique"),
                 VendorValue = ResolveVendorValue(raw.VendorValue, flags),
                 Description = raw.Description ?? "",
                 Attributes = NoAttributes,

@@ -31,16 +31,17 @@ namespace GW2CraftingHelper.Tests.Services
                 "+47 Power",
                 "+34 Precision",
                 "+34 Ferocity",
-                "1 Infusion Slot",
+                "",
+                "Infusion Slot",
                 "",
                 "Ascended",
-                "Gloves",
-                "Heavy Armor",
+                "Heavy",
+                "Gloves Armor",
                 "Required Level: 80",
+                "Crafted in the style of the renowned asuran genius, Zojja.",
                 "Account Bound on Use",
-                "Vendor value: 0g 2s 40c",
                 "",
-                "Crafted in the style of the renowned asuran genius, Zojja."
+                "2s 40c"
             }, await LinesFor(RealItemJson.ZojjasWarfists));
         }
 
@@ -50,15 +51,21 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = await LinesFor(RealItemJson.Bolt);
 
             Assert.Equal("Bolt", lines[0]);
-            Assert.Equal("Weapon Strength: 950 - 1050", lines[1]);
-            Assert.Equal("Select stats", lines[2]);
-            Assert.Equal("1 Infusion Slot", lines[3]);
+            Assert.Equal("Weapon Strength: 950 - 1,050", lines[1]);
+            Assert.Equal("", lines[2]);
+            Assert.Equal("Infusion Slot", lines[3]);
+            // The game's own string for an unassigned stat-selectable
+            // item, in the DESCRIPTION position inside the identity block.
+            Assert.Contains("Double-click to select stats.", lines);
+            Assert.Contains("(Main Hand)", lines);
             Assert.Contains("Damage Type: Lightning", lines);
             Assert.Contains("Legendary", lines);
             Assert.Contains("Sword", lines);
 
-            // NoSell, and a weapon's defense:0 - neither may appear.
-            Assert.DoesNotContain(lines, l => l.StartsWith("Vendor value"));
+            // NoSell, and a weapon's defense:0 - neither may appear. The
+            // value line is omitted ENTIRELY, so there is no last line to
+            // hold it and no blank separator in front of one.
+            Assert.False(await HasCoinSpan(RealItemJson.Bolt));
             Assert.DoesNotContain(lines, l => l.StartsWith("Defense"));
             // No attribute lines at all - a stat-selectable item has no
             // resolved numbers until a combination is chosen.
@@ -68,15 +75,15 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task CraftingMaterial_GetsANameRarityTypeValueAndDescription()
         {
+            // No "Basic" line: the game suppresses that rarity word (G20).
             Assert.Equal(new[]
             {
                 "Mithril Ore",
                 "",
-                "Basic",
                 "Crafting Material",
-                "Vendor value: 0g 0s 7c",
+                "Refine into Ingots.",
                 "",
-                "Refine into Ingots."
+                "7c"
             }, await LinesFor(RealItemJson.MithrilOre));
         }
 
@@ -85,11 +92,15 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = await LinesFor(RealItemJson.RuneOfTheScholar);
 
+            // Header, one blank, then all six positional bonuses - the
+            // shape FWDekker's UpgradeComponent builder emits and the one
+            // the game shows for an unequipped rune (spec section 3.2).
             Assert.Equal("Superior Rune of the Scholar", lines[0]);
-            Assert.Equal("(1): +25 Power", lines[1]);
-            Assert.Equal("(6): +125 Ferocity", lines[6]);
+            Assert.Equal("", lines[1]);
+            Assert.Equal("(1): +25 Power", lines[2]);
+            Assert.Equal("(6): +125 Ferocity", lines[7]);
             Assert.Contains("Rune", lines);
-            Assert.Contains("Vendor value: 0g 0s 65c", lines);
+            Assert.Equal("65c", lines[lines.Length - 1]);
         }
 
         [Fact]
@@ -134,10 +145,11 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = await LinesFor(RealItemJson.LotusFries);
 
             Assert.Equal("Cup of Lotus Fries", lines[0]);
-            Assert.Equal("30% Magic Find", lines[1]);
-            Assert.Equal("+70 Condition Damage", lines[2]);
-            Assert.Equal("+10% Experience from Kills", lines[3]);
-            Assert.Equal("Duration: 30 m", lines[4]);
+            Assert.Equal("", lines[1]);
+            Assert.Equal("30% Magic Find", lines[2]);
+            Assert.Equal("+70 Condition Damage", lines[3]);
+            Assert.Equal("+10% Experience from Kills", lines[4]);
+            Assert.Equal("Duration: 30 m", lines[5]);
         }
 
         [Fact]
@@ -158,9 +170,53 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Contains("Soulbound on Use", lines);
             Assert.Contains("Defense: 73", lines);
-            Assert.Contains("Select stats", lines);
-            Assert.Contains("Helm Aquatic", lines);
-            Assert.DoesNotContain(lines, l => l.StartsWith("Vendor value"));
+            Assert.Contains("Double-click to select stats.", lines);
+            Assert.Contains("Helm Aquatic Armor", lines);
+            Assert.False(await HasCoinSpan(RealItemJson.Rebreather));
+        }
+
+        [Fact]
+        public void UniqueSitsOnItsOwnLineAboveTheBindingLine()
+        {
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Unique Thing",
+                IsUnique = true,
+                Binding = "Account Bound"
+            }).ToPlainLines();
+
+            Assert.Equal(lines.IndexOf("Unique") + 1, lines.IndexOf("Account Bound"));
+        }
+
+        [Theory]
+        [InlineData("Greatsword", "(Two-Handed)")]
+        [InlineData("Focus", "(Off Hand)")]
+        [InlineData("Trident", "(Aquatic)")]
+        [InlineData("LargeBundle", null)]
+        public void AWeaponNamesTheHandItIsHeldIn(string subType, string expected)
+        {
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Weapon",
+                ItemType = "Weapon",
+                SubType = subType
+            }).ToPlainLines();
+
+            if (expected == null)
+            {
+                // An unknown weapon type renders no hand line rather than
+                // a guessed one.
+                Assert.DoesNotContain(lines, l => l.StartsWith("("));
+                return;
+            }
+            Assert.Contains(expected, lines);
+        }
+
+        private static async Task<bool> HasCoinSpan(string itemJson)
+        {
+            var raw = await RealItemFixtures.ParseOneAsync(itemJson);
+            return ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw))
+                .Lines.SelectMany(l => l.Spans).Any(s => s.IsCoin);
         }
 
         [Fact]
@@ -191,8 +247,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             var identity = content.Lines
                 .SelectMany(l => l.Spans)
-                .Where(s => s.Text == "Ascended" || s.Text == "Gloves" ||
-                            s.Text == "Heavy Armor" || s.Text == "Account Bound on Use")
+                .Where(s => s.Text == "Ascended" || s.Text == "Gloves Armor" ||
+                            s.Text == "Heavy" || s.Text == "Account Bound on Use")
                 .ToArray();
 
             Assert.Equal(4, identity.Length);

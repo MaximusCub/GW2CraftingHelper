@@ -83,6 +83,10 @@ namespace GW2CraftingHelper.Models
         /// <summary>Profession/race restrictions; empty, never null.</summary>
         public IReadOnlyList<string> Restrictions { get; set; }
 
+        /// <summary>The Unique flag, which the game prints on its own line
+        /// above the binding line.</summary>
+        public bool IsUnique { get; set; }
+
         /// <summary>Vendor sale value in copper, or null when the item
         /// carries NoSell - which is exactly when the game shows no value
         /// either.</summary>

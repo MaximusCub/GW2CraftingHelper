@@ -6,10 +6,12 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the
-    /// order the in-game item tooltip uses: what the item DOES first
-    /// (strength/defense, attributes, slots, granted bonuses), then a
-    /// subdued identity block (rarity, type, level, binding, restrictions,
-    /// vendor value), then flavour.
+    /// line order the in-game item tooltip uses (spec section 1.6,
+    /// docs/KNOWN-ISSUES.md "Tooltip authenticity"): the icon+name header,
+    /// what the item DOES (strength/defense, attributes, granted bonuses),
+    /// its infusion slots, then the white identity block - rarity, type,
+    /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
+    /// all, alone after a blank, the unlabelled vendor value.
     ///
     /// <para>
     /// Blish-free, so the whole line-by-line contract is directly testable
@@ -18,15 +20,16 @@ namespace GW2CraftingHelper.Services
     /// field means - <see cref="ItemStatBlockFactory"/> already did, and
     /// this class only ever asks "is it present".
     /// </para>
-    /// <para>
-    /// No item icon: GW2's own item tooltips have none, and the hovered
-    /// surface already shows one a few pixels away.
-    /// </para>
     /// </summary>
     public static class ItemStatTooltipComposer
     {
         private static readonly IReadOnlyList<ItemAttributeLine> EmptyAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();
+
+        /// <summary>The game's own description string on a piece of gear
+        /// whose stats have not been chosen yet (spec section 2.2, gap
+        /// G12). Emitted verbatim rather than approximated.</summary>
+        private const string SelectStatsPrompt = "Double-click to select stats.";
 
         public static TooltipContent BuildContent(ItemStatBlock stats)
         {
@@ -39,32 +42,66 @@ namespace GW2CraftingHelper.Services
             builder.RarityText(string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name, stats.Rarity)
                 .EndLine();
 
-            bool buffAlreadyShown = AppendCombatFacts(builder, stats);
-            AppendUpgradeEffects(builder, stats, buffAlreadyShown);
-            AppendNourishment(builder, stats);
-            AppendIdentityBlock(builder, stats);
-            AppendDescription(builder, stats);
+            var facts = BuildFacts(stats, out bool hasCombatFacts);
+
+            // Blocks are collected first and joined with exactly one blank
+            // line each, so an empty block never leaves a separator behind
+            // and a name-only block never ends on a stray blank row.
+            var blocks = new List<TooltipContent>(4);
+            AddBlock(blocks, facts);
+            AddBlock(blocks, BuildInfusionSlots(stats));
+            AddBlock(blocks, BuildIdentityBlock(stats));
+            AddBlock(blocks, BuildVendorValue(stats));
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                // Measured: a tooltip whose item has no combat facts opens
+                // with one blank line (xyaren.png, and FWDekker's
+                // UpgradeComponent builder emits the same break before a
+                // rune's bonus lines); one that HAS them starts them
+                // immediately under the header with no extra gap
+                // (warhelm.jpg, steak.png). Gap G15.
+                if (i > 0 || !hasCombatFacts)
+                {
+                    builder.Separator();
+                }
+                builder.Append(blocks[i]);
+            }
 
             return builder.Build();
         }
 
-        /// <summary>
-        /// Returns whether one of the attribute lines it emitted already
-        /// says, verbatim, what <see cref="ItemStatBlock.BuffDescription"/>
-        /// says - see <see cref="AppendUpgradeEffects"/>.
-        /// </summary>
-        private static bool AppendCombatFacts(TooltipContentBuilder builder, ItemStatBlock stats)
+        private static void AddBlock(List<TooltipContent> blocks, TooltipContent block)
         {
+            if (!block.IsEmpty)
+            {
+                blocks.Add(block);
+            }
+        }
+
+        /// <summary>
+        /// What the item does: weapon strength / defense / attributes
+        /// (<paramref name="hasCombatFacts"/> reports whether any of those
+        /// three appeared), then the granted bonuses and nourishment that
+        /// sit contiguously under them.
+        /// </summary>
+        private static TooltipContent BuildFacts(ItemStatBlock stats, out bool hasCombatFacts)
+        {
+            var facts = new TooltipContentBuilder();
             bool buffAlreadyShown = false;
+            hasCombatFacts = false;
 
             if (stats.MinPower.HasValue && stats.MaxPower.HasValue)
             {
-                builder.Text($"Weapon Strength: {stats.MinPower.Value} - {stats.MaxPower.Value}").EndLine();
+                facts.Text($"Weapon Strength: {FormatCount(stats.MinPower.Value)} - " +
+                    FormatCount(stats.MaxPower.Value)).EndLine();
+                hasCombatFacts = true;
             }
 
             if (stats.Defense.HasValue)
             {
-                builder.Text($"Defense: {stats.Defense.Value}").EndLine();
+                facts.Text($"Defense: {FormatCount(stats.Defense.Value)}").EndLine();
+                hasCombatFacts = true;
             }
 
             // Null-tolerant even though ItemStatBlockFactory never leaves
@@ -77,30 +114,14 @@ namespace GW2CraftingHelper.Services
                 // its "+" added, as the game shows it.
                 string sign = attribute.Value < 0 ? "" : "+";
                 string line = $"{sign}{attribute.Value} {attribute.DisplayName}";
-                builder.Text(line).EndLine();
+                facts.Text(line).EndLine();
+                hasCombatFacts = true;
                 buffAlreadyShown = buffAlreadyShown || line == stats.BuffDescription;
             }
 
-            if (stats.StatChoiceCount > 0)
-            {
-                // No numbers: which of the combinations to show is an open
-                // judgment call (docs/KNOWN-ISSUES.md, "Item stat
-                // tooltips", Q4) and the only part of this feature that
-                // would need a /v2/itemstats request. The game shows the
-                // same prompt on an unassigned item.
-                builder.Text("Select stats").EndLine();
-            }
-
-            if (stats.InfusionSlotCount > 0)
-            {
-                // The COUNT, never "unused": what is socketed in the
-                // player's own copy is instance state /v2/items cannot
-                // know, and claiming the slots are empty would be a guess.
-                string label = stats.InfusionSlotCount == 1 ? "Infusion Slot" : "Infusion Slots";
-                builder.Text($"{stats.InfusionSlotCount} {label}").EndLine();
-            }
-
-            return buffAlreadyShown;
+            AppendUpgradeEffects(facts, stats, buffAlreadyShown);
+            AppendNourishment(facts, stats);
+            return facts.Build();
         }
 
         private static void AppendUpgradeEffects(
@@ -121,6 +142,10 @@ namespace GW2CraftingHelper.Services
 
             // A rune's bonuses are positional - the Nth entry is the bonus
             // at N pieces equipped - so the index IS data, not decoration.
+            // All of them, none greyed and no (x/6) counter: that needs the
+            // character's equipped set, which is instance state /v2/items
+            // cannot carry, and an unequipped rune in a bag is exactly what
+            // the game shows this way (spec section 3.2).
             var bonuses = stats.UpgradeBonuses ?? EmptyStrings;
             for (int i = 0; i < bonuses.Count; i++)
             {
@@ -145,7 +170,28 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static void AppendIdentityBlock(TooltipContentBuilder builder, ItemStatBlock stats)
+        /// <summary>
+        /// The slot block: its own block between blanks, one line per slot
+        /// so the block's height matches the game's (gap G16).
+        /// </summary>
+        private static TooltipContent BuildInfusionSlots(ItemStatBlock stats)
+        {
+            var slots = new TooltipContentBuilder();
+
+            // The COUNT, never "unused": what is socketed in the player's
+            // own copy is instance state /v2/items cannot know, and
+            // claiming the slots are empty would be a guess. That wording
+            // difference is an accepted divergence from the game's
+            // "Unused Infusion Slot" - see docs/KNOWN-ISSUES.md.
+            for (int i = 0; i < stats.InfusionSlotCount; i++)
+            {
+                slots.Text("Infusion Slot").EndLine();
+            }
+
+            return slots.Build();
+        }
+
+        private static TooltipContent BuildIdentityBlock(ItemStatBlock stats)
         {
             // Every line here is WHITE in the game - nothing in the
             // identity block is grey, and the rarity WORD is white even
@@ -153,20 +199,33 @@ namespace GW2CraftingHelper.Services
             // gaps G4/G5).
             var identity = new TooltipContentBuilder();
 
-            if (!string.IsNullOrEmpty(stats.Rarity))
+            // Basic is suppressed outright, as the game suppresses it (G20).
+            if (!string.IsNullOrEmpty(stats.Rarity) && stats.Rarity != "Basic")
             {
                 identity.Text(stats.Rarity).EndLine();
             }
 
             string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
-            if (!string.IsNullOrEmpty(type))
+            bool isArmor = !string.IsNullOrEmpty(stats.WeightClass);
+
+            // Armour is the one shape where the game splits these two: the
+            // weight class alone, then the SLOT plus the word "Armor"
+            // ("Heavy" / "Head Armor", measured on warhelm.jpg). The slot
+            // word is the API's own (details.type), never a mapping table.
+            if (isArmor)
             {
-                identity.Text(SpaceCamelCase(type)).EndLine();
+                identity.Text(stats.WeightClass).EndLine();
             }
 
-            if (!string.IsNullOrEmpty(stats.WeightClass))
+            if (!string.IsNullOrEmpty(type))
             {
-                identity.Text(stats.WeightClass + " Armor").EndLine();
+                identity.Text(SpaceCamelCase(type) + (isArmor ? " Armor" : "")).EndLine();
+            }
+
+            string hand = WeaponHand(stats);
+            if (hand != null)
+            {
+                identity.Text(hand).EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.DamageType))
@@ -179,6 +238,14 @@ namespace GW2CraftingHelper.Services
                 identity.Text($"Required Level: {stats.RequiredLevel}").EndLine();
             }
 
+            AppendDescription(identity, stats);
+
+            // Above the binding line, which is where the game puts it (G18).
+            if (stats.IsUnique)
+            {
+                identity.Text("Unique").EndLine();
+            }
+
             if (!string.IsNullOrEmpty(stats.Binding))
             {
                 identity.Text(stats.Binding).EndLine();
@@ -189,41 +256,104 @@ namespace GW2CraftingHelper.Services
                 identity.Text("Restricted to: " + string.Join(", ", stats.Restrictions)).EndLine();
             }
 
-            if (stats.VendorValue.HasValue)
-            {
-                identity.Text("Vendor value: ")
-                    .Coin(stats.VendorValue.Value, FormatCoin(stats.VendorValue.Value))
-                    .EndLine();
-            }
-
-            var content = identity.Build();
-            if (!content.IsEmpty)
-            {
-                builder.Separator().Append(content);
-            }
+            return identity.Build();
         }
 
         /// <summary>
+        /// The description sits INSIDE the identity block, after the
+        /// type/level lines and before the binding flags - not appended
+        /// after everything as a trailer (gap G13).
+        /// <para>
         /// The description's own <c>&lt;c=@...&gt;</c> runs decide the
-        /// colours here: unmarked prose stays white, a flavour run goes
-        /// teal, an abilitytype lead-in pale yellow (gap G7). Flattening
-        /// the whole string to one role is what made "A gift bag!"
-        /// indistinguishable from the quoted flavour after it.
+        /// colours: unmarked prose stays white, a flavour run goes teal, an
+        /// abilitytype lead-in pale yellow (gap G7). Flattening the whole
+        /// string to one role is what made "A gift bag!" indistinguishable
+        /// from the quoted flavour after it.
+        /// </para>
         /// </summary>
         private static void AppendDescription(TooltipContentBuilder builder, ItemStatBlock stats)
         {
+            // A stat-selectable item's description in the game IS this
+            // string. It is emitted ahead of whatever description the API
+            // carries rather than instead of it, so nothing the item
+            // actually says is lost.
+            if (stats.StatChoiceCount > 0)
+            {
+                builder.Text(SelectStatsPrompt).EndLine();
+            }
+
             var spans = ItemDescriptionSanitizer.SanitizeToSpans(stats.Description);
             if (spans.Count == 0)
             {
                 return;
             }
 
-            builder.Separator();
             foreach (var span in spans)
             {
                 builder.Styled(span.Text, span.Role);
             }
             builder.EndLine();
+        }
+
+        /// <summary>
+        /// The vendor value the way the game shows it: unlabelled, alone on
+        /// the last line after a blank, and absent entirely when the item
+        /// cannot be sold (<see cref="ItemStatBlock.VendorValue"/> is null
+        /// exactly then). Gap G14.
+        /// </summary>
+        private static TooltipContent BuildVendorValue(ItemStatBlock stats)
+        {
+            if (!stats.VendorValue.HasValue)
+            {
+                return TooltipContent.Empty;
+            }
+
+            return new TooltipContentBuilder()
+                .Coin(stats.VendorValue.Value, FormatCoin(stats.VendorValue.Value))
+                .Build();
+        }
+
+        /// <summary>
+        /// The game's hand line under a weapon's type - "(Two-Handed)",
+        /// "(Main Hand)", "(Off Hand)", "(Aquatic)" (gap G17). A weapon
+        /// type this table does not know renders no line at all rather than
+        /// a guessed one.
+        /// </summary>
+        private static string WeaponHand(ItemStatBlock stats)
+        {
+            if (stats.ItemType != "Weapon" || string.IsNullOrEmpty(stats.SubType))
+            {
+                return null;
+            }
+
+            switch (stats.SubType)
+            {
+                case "Greatsword":
+                case "Hammer":
+                case "LongBow":
+                case "Rifle":
+                case "ShortBow":
+                case "Staff":
+                    return "(Two-Handed)";
+                case "Axe":
+                case "Dagger":
+                case "Mace":
+                case "Pistol":
+                case "Scepter":
+                case "Sword":
+                    return "(Main Hand)";
+                case "Focus":
+                case "Shield":
+                case "Torch":
+                case "Warhorn":
+                    return "(Off Hand)";
+                case "Harpoon":
+                case "Speargun":
+                case "Trident":
+                    return "(Aquatic)";
+                default:
+                    return null;
+            }
         }
 
         /// <summary>
@@ -259,14 +389,33 @@ namespace GW2CraftingHelper.Services
             return minutes == 0 ? $"{hours} h" : $"{hours} h {minutes} m";
         }
 
-        // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
-        // plain format rather than referencing it - that class is
-        // Blish-coupled and this one must stay Blish-free. Same split,
-        // same precedent as TreeRowTooltipComposer.FormatCoin.
+        // Thousands-separated, as the game shows a four-figure weapon
+        // strength ("1,045 - 1,155" - gap G19). Invariant culture, the
+        // module's standing policy for its English-only strings.
+        private static string FormatCount(int value)
+        {
+            return value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // Deliberately duplicates the plain coin FORMAT rather than
+        // referencing CoinCurrencyRenderer - that class is Blish-coupled
+        // and this one must stay Blish-free. The SPLIT and the
+        // leading-zero-unit rule are shared via CoinSegmentMath, so this
+        // plain rendering cannot drift from the icons the rich path draws:
+        // the game prints "10c", never "0g 0s 10c" (gap G14).
         private static string FormatCoin(long copper)
         {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
+            var (gold, silver, cop) = CoinSegmentMath.FormatSegmentTexts(copper);
+            var sb = new StringBuilder(16);
+            if (gold != null)
+            {
+                sb.Append(gold).Append("g ");
+            }
+            if (silver != null)
+            {
+                sb.Append(silver).Append("s ");
+            }
+            return sb.Append(cop).Append('c').ToString();
         }
     }
 }
