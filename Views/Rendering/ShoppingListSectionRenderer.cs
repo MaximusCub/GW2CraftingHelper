@@ -9,8 +9,8 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Views.Rendering
 {
     // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Shopping List row list, its header row, and
-    // its ShoppingSourceTag helper. Behavior is unchanged: same row
+    // (continued)" region - the Shopping List row list and its header
+    // row. Behavior is unchanged: same row
     // geometry, same PlanContentHeightMath/PlanRelayoutMath/
     // ShoppingColumnMath calls, same LabelHelpers.CreateRowDivider usage
     // (divider math and its 1px scissor clearance
@@ -31,9 +31,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // the only two rows across the extracted renderers that actually share
     // the ellipsis shape (see IconNameRowHelpers' own doc comment for why).
     // Everything this row does AFTER the name label - the tooltip-parts
-    // build, the source-tag Panel, the qty label, the Each/Total coin cells -
-    // is unchanged, still hand-rolled here (it does not match either shared
-    // shape).
+    // build, the source badge, the qty label, the Each/Total coin cells -
+    // is hand-rolled here (it does not match either shared shape).
     internal sealed class ShoppingListSectionRenderer
     {
         // Gap the name's ellipsis budget keeps before the Source column.
@@ -45,9 +44,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly ISectionRelayoutSink _sink;
 
         // Clickable column headers - see the identical fields on
-        // UsedMaterialsSectionRenderer. This table sorts on all four of
+        // UsedMaterialsSectionRenderer. This table sorts on all five of
         // its columns; Each/Total are coin+currency mixes, whose ordering
-        // rule lives in PlanTableSorter.CompareValue.
+        // rule lives in PlanTableSorter.CompareValue, and Source orders by
+        // the badge TEXT the column actually shows.
         private readonly TableSortState<PlanTableColumn> _sortState;
         private readonly Action _onSortChanged;
 
@@ -103,12 +103,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
-            // The same pass measures the widest "Nx" amount string, which
-            // is the Amount column's reserved band and therefore where the
-            // Item column's ellipsis budget stops. Its floor is the
-            // "Amount" header label: the header right-aligns onto the same
-            // edge as the rows and at the ColumnHeader tier is routinely
-            // wider than a short "12x".
+            // The same pass measures the widest "Nx" amount string and the
+            // widest source badge - both BAND widths, so the Source
+            // column's own left edge (where the Item column's ellipsis
+            // budget now stops) is one x for the whole table. Every band's
+            // floor is its own header label: at the ColumnHeader tier a
+            // header routinely out-measures the data under it.
             // Row ORDER only - the pre-scan sees the same rows either way,
             // so every column edge (and the row count PlanContentHeightMath
             // measures this section by) is identical sorted or not.
@@ -361,10 +361,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // TOOLTIP SWALLOWED BY CHILD CONTROLS: a container's tooltip
             // never fires when a child control with no tooltip of its own
             // covers the hover point - the row's children (the icon,
-            // nameLabel, tagPanel, qtyLabel, the Each/Total cells) all
-            // capture the mouse before rowPanel's own tooltip is reached,
-            // so every one of them carries the row's tooltip. Stamped
-            // AFTER those controls exist, which is why this sits here.
+            // nameLabel, qtyLabel, the Each/Total cells) all capture the
+            // mouse before rowPanel's own tooltip is reached, so every one
+            // of them carries the row's tooltip. Stamped AFTER those
+            // controls exist, which is why this sits here. The source
+            // badge is the one child that carries something else - its
+            // own prose, below.
             //
             // Composed at HOVER time (see UsedMaterialsSectionRenderer's
             // matching note): the row's ellipsis state is read when the
