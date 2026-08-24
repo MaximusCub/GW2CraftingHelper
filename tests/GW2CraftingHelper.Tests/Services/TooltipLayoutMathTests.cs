@@ -334,6 +334,32 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void AHeaderWithNoIconUrlStillHasAnIconToDrawInTheColumnItReserves()
+        {
+            // An item whose /v2/items response carries no "icon" reaches
+            // here with null. The row reserves the name indent either way,
+            // so the url has to survive as EMPTY - which the surface draws
+            // as the module's neutral empty-slot square - rather than as
+            // null, which draws nothing and leaves the name floating over
+            // the reserved column.
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.HeaderLine(null, "Iconless Thing", "Basic"),
+                TooltipContent.TextLine("Basic")
+            });
+
+            Assert.Equal("", content.Lines[0].IconUrl);
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth,
+                headerRowHeight: 34, headerIndent: 39);
+
+            Assert.Equal("", layout.Rows[0].IconUrl);
+            Assert.Equal(39, layout.Rows[0].Spans[0].X);
+            Assert.Null(layout.Rows[1].IconUrl);
+        }
+
+        [Fact]
         public void OnlyTheCoinRowTakesTheCoinHeight()
         {
             var content = TooltipContent.FromLines(new[]

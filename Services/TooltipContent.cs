@@ -66,13 +66,20 @@ namespace GW2CraftingHelper.Services
         /// vertically centred on it (spec section 1.5, gap G11). A taller
         /// row than a prose one, and the only line kind that carries an
         /// icon - which is why it is a KIND rather than another span role.
+        /// <para>
+        /// A null url is normalised to empty here, so a header row ALWAYS
+        /// has an icon to draw. The row reserves the name's indent whether
+        /// or not one arrives; leaving the url null drew nothing into that
+        /// reserved column and left the name floating over empty black
+        /// while the body below it started at x=0.
+        /// </para>
         /// </summary>
         public static TooltipLine HeaderLine(string iconUrl, string name, string rarity)
         {
             return new TooltipLine(
                 new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", rarity) },
                 TooltipLineKind.Header,
-                iconUrl);
+                iconUrl ?? "");
         }
 
         public static TooltipLine Line(params TooltipSpan[] spans)
@@ -149,9 +156,13 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// The item icon drawn at the head of a
-        /// <see cref="TooltipLineKind.Header"/> row. Null or empty renders
-        /// the module's neutral empty-slot square, never an error texture -
-        /// a missing icon is a data gap, not a failure.
+        /// <see cref="TooltipLineKind.Header"/> row. Empty renders the
+        /// module's neutral empty-slot square, never an error texture - a
+        /// missing icon is a data gap, not a failure - and
+        /// <see cref="TooltipContent.HeaderLine"/> normalises null to empty
+        /// so the two can never diverge. Null means "this row draws no
+        /// icon": the continuation rows of a wrapped header name, and every
+        /// prose row.
         /// </summary>
         public string IconUrl { get; }
 

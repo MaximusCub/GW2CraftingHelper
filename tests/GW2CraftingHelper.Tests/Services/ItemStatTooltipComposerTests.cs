@@ -317,6 +317,16 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void AnItemWithNoIconStillOpensWithAHeaderThatDrawsTheEmptySlotSquare()
+        {
+            var content = ItemStatTooltipComposer.BuildContent(
+                new ItemStatBlock { ItemId = 1, Name = "Iconless Thing", IconUrl = null });
+
+            Assert.Equal(TooltipLineKind.Header, content.Lines[0].Kind);
+            Assert.Equal("", content.Lines[0].IconUrl);
+        }
+
+        [Fact]
         public void NullBlockYieldsEmptyContentSoTheSurfaceStaysHidden()
         {
             Assert.True(ItemStatTooltipComposer.BuildContent(null).IsEmpty);
