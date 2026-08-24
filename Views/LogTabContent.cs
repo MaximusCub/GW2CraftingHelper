@@ -644,7 +644,7 @@ namespace GW2CraftingHelper.Views
                 // the using.
                 string text = string.Join(Environment.NewLine, result.Filtered.Select(f => f.Line));
                 System.Windows.Forms.Clipboard.SetText(text);
-                SetStatus($"Copied {result.Filtered.Count} line{(result.Filtered.Count == 1 ? "" : "s")}", isError: false);
+                SetStatus("Copied " + StatusText.Count(result.Filtered.Count, "line"), isError: false);
             }
             catch (Exception ex)
             {

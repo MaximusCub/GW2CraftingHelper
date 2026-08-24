@@ -26,6 +26,36 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", StatusText.Normalize(""));
         }
 
+        // Count: the module's one spelling of a counted noun. "(s)" is
+        // banned from user-facing text, and every count the plan view is
+        // about to show (overrides, ignored items, copied lines) goes
+        // through here.
+
+        [Theory]
+        [InlineData(0, "0 overrides")]
+        [InlineData(1, "1 override")]
+        [InlineData(2, "2 overrides")]
+        [InlineData(147, "147 overrides")]
+        public void Count_PluralizesOnOneAndNothingElse(int n, string expected)
+        {
+            Assert.Equal(expected, StatusText.Count(n, "override"));
+        }
+
+        [Fact]
+        public void Count_IrregularPlural_IsPassedExplicitly()
+        {
+            Assert.Equal("1 entry", StatusText.Count(1, "entry", "entries"));
+            Assert.Equal("2 entries", StatusText.Count(2, "entry", "entries"));
+        }
+
+        [Fact]
+        public void Count_NegativeCount_StillReadsAsAPlural()
+        {
+            // Not reachable from any current caller, but a count that went
+            // negative must not read "-1 override" as though it were one.
+            Assert.Equal("-1 overrides", StatusText.Count(-1, "override"));
+        }
+
         // The ignore toggle (and every other
         // non-Best-Path re-solve trigger) must never produce the Best
         // Path preset's own label, regardless of the current override

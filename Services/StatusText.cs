@@ -49,6 +49,22 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// A counted noun, always correctly pluralized: "1 override",
+        /// "3 overrides", "0 overrides". The module's one spelling of a
+        /// count, so no user-facing string reaches for "(s)" - which is a
+        /// developer's shorthand leaking into the interface, and which the
+        /// module wrote in exactly one place before this existed.
+        /// <para>
+        /// A plural that is not the singular plus "s" is passed
+        /// explicitly; the default covers every count this module shows.
+        /// </para>
+        /// </summary>
+        public static string Count(int n, string singular, string plural = null)
+        {
+            return n + " " + (n == 1 ? singular : plural ?? singular + "s");
+        }
+
+        /// <summary>
         /// The re-solve status line for
         /// CraftingPlanView.ApplyOverridesAndResolve. "Best path restored"
         /// is the Best Path preset's own label and must only be written
