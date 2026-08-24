@@ -726,7 +726,8 @@ namespace GW2CraftingHelper.Services
                 result.DebugLog = new List<string>();
             }
             result.DebugLog.Insert(0,
-                $"Local re-solve with {overrides?.Count ?? 0} override(s), {ignoredItemIds?.Count ?? 0} ignored item(s)");
+                "Local re-solve with " + StatusText.Count(overrides?.Count ?? 0, "override") +
+                ", " + StatusText.Count(ignoredItemIds?.Count ?? 0, "ignored item"));
 
             return result;
         }

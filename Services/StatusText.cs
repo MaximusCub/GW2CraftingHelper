@@ -66,18 +66,75 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// The re-solve status line for
-        /// CraftingPlanView.ApplyOverridesAndResolve. "Best path restored"
-        /// is the Best Path preset's own label and must only be written
-        /// when that preset is the trigger - every other re-solve trigger
-        /// (Craft All, Buy All, per-node craft/tp/vendor pill cycling, the
-        /// ignore toggle) gets the neutral "Decisions updated" family,
-        /// regardless of how many overrides happen to remain afterward.
+        /// TreeSectionController.ApplyOverridesAndResolve.
+        ///
+        /// <para>
+        /// It reports the EVENT and nothing else. It used to carry the
+        /// standing override count - "Decisions updated (3 override(s))" -
+        /// which is a different kind of fact: how many decisions you have
+        /// overridden is the plan's STATE, true until you change it, while
+        /// this line says what just happened and is replaced by the next
+        /// thing that does. The two are not connected, and a line that
+        /// mixed them made the count vanish the moment anything else
+        /// happened. The count lives in the top strip's Overrides chip now
+        /// (see StatusText.ForOverridesChip), where it persists and can be
+        /// acted on.
+        /// </para>
+        ///
+        /// <para>
+        /// "Best path restored" is the Best Path preset's own label and
+        /// must only be written when that preset is the trigger - never
+        /// inferred from a zero override count, which every other trigger
+        /// (Clear Overrides, a per-node pill, the ignore toggle) can also
+        /// produce.
+        /// </para>
         /// </summary>
-        public static string ForOverrideResolve(bool isBestPathPreset, int overrideCount)
+        public static string ForOverrideResolve(bool isBestPathPreset)
         {
-            return isBestPathPreset
-                ? "Best path restored"
-                : $"Decisions updated ({overrideCount} override(s))";
+            return isBestPathPreset ? "Best path restored" : "Plan updated";
+        }
+
+        /// <summary>
+        /// The top strip's two per-plan STATE chips. A labeled count, not
+        /// a sentence: it is a gauge the reader glances at, and
+        /// "Overrides: 1" beside "Ignored: 3" reads as one instrument
+        /// panel where "1 override" beside "3 items" reads as prose that
+        /// forgot to be a sentence. Both are hidden entirely at zero, so
+        /// neither ever renders the count these two format worst.
+        /// </summary>
+        public static string ForOverridesChip(int overrideCount)
+        {
+            return "Overrides: " + overrideCount;
+        }
+
+        public static string ForIgnoredChip(int ignoredCount)
+        {
+            return "Ignored: " + ignoredCount;
+        }
+
+        // The three lines a click that would change nothing writes instead
+        // of silently doing nothing. A dialog that protects nothing trains
+        // people to click through dialogs, and a dead click with no
+        // feedback trains them to click again harder; the click is skipped
+        // AND the re-solve is skipped, and the strip says why.
+        public const string NoOverridesToClear = "No decision overrides to clear";
+        public const string AlreadyCraftingEverything = "Already crafting everything craftable";
+        public const string AlreadyBuyingEverything = "Already buying everything buyable";
+
+        /// <summary>
+        /// The two failure verbs, deliberately different. A failed
+        /// GENERATION leaves the tab with the plan it had (or none); a
+        /// failed local re-solve leaves the plan on screen intact and only
+        /// the change unapplied. "Error:" said neither.
+        /// </summary>
+        public static string ForGenerationFailure(string message)
+        {
+            return "Generation failed: " + (message ?? "");
+        }
+
+        public static string ForUpdateFailure(string message)
+        {
+            return "Update failed: " + (message ?? "");
         }
 
         /// <summary>

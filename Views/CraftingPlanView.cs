@@ -192,7 +192,10 @@ namespace GW2CraftingHelper.Views
         // instant-apply controls that look just like them on other tabs.
         // Every one of them says so through the status label at the moment
         // it changes.
-        private const string SettingsChangedStatus = "Settings changed - press Generate Plan to update";
+        // "press" is filler and "update" said nothing about WHAT updates;
+        // "apply" says what happens to the settings, and the button is
+        // named exactly.
+        private const string SettingsChangedStatus = "Settings changed - Generate Plan to apply";
 
         // Shown while Generate resolves typed-but-unpicked row names against
         // the search provider, before any plan work starts.
@@ -797,11 +800,14 @@ namespace GW2CraftingHelper.Views
             // The stamped half goes through StatusText.Stamp, which owns
             // the module's one timestamp format and its InvariantCulture
             // policy (English-only strings; several locales' short time
-            // pattern has no AM/PM designator at all). The trailing clause
-            // keeps the hyphen: the dash separates verb from timestamp, a
-            // hyphen separates clauses.
+            // pattern has no AM/PM designator at all). ONE trailing hyphen
+            // clause: the dash separates verb from timestamp, a hyphen
+            // separates clauses, and two hyphen clauses at one level put
+            // two unrelated facts on the same footing. It also names a
+            // button that exists, and states the payoff (fresh prices)
+            // rather than the fear ("prices may have changed").
             _statusBoard.SeedRestored(
-                StatusText.Stamp("Generated", generatedAt) + " - prices may have changed - Regenerate");
+                StatusText.Stamp("Generated", generatedAt) + " - Generate Plan to refresh prices");
             RenderFromBoard(_statusBoard.Snapshot());
 
             // Started BEFORE the render below and regardless of whether
@@ -1920,6 +1926,16 @@ namespace GW2CraftingHelper.Views
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
+            // This tooltip is Generate Plan's ENTIRE safety mechanism: it
+            // is the one action in the tree's vocabulary that destroys
+            // manual decisions without a confirm dialog (see the tree
+            // confirm matrix for why it is exempt), so the second sentence
+            // is load-bearing and ships with the first.
+            TooltipFacility.ApplyPlain(
+                _generateButton,
+                "Fetches current prices and rebuilds the plan from scratch. " +
+                "Clears all manual craft/buy decisions and ignore marks.");
+
             CreateTreeToolbarRow(buildPanel, w, layout.TreeToolbarRowY);
 
             // Status label. Its own tier: the strip reports what the module
@@ -2073,25 +2089,12 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // Names what the buttons act on. The section title itself stays
-            // in the scroll flow with the tree, so without this the row
-            // would be five verbs attached to nothing.
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Recipe Tree:",
-                TextColor = new Color(170, 170, 170),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(0, TreeToolbarButtonY + 3),
-                Parent = _treeToolbarPanel
-            };
+            CreateTreeStateChips();
 
             // Right to left, so the row stays anchored to the right edge at
             // every window width. gapToLeft is the space left BEFORE the
             // next button placed (which lands to this one's left).
-            void PlaceRight(string text, int width, int gapToLeft, string tooltipText,
-                Func<TreeToolbarCommands, Action> pick)
+            void PlaceRight(string text, int width, int gapToLeft, string tooltipText, Action onClick)
             {
                 var button = new FeedbackButton()
                 {
@@ -2100,37 +2103,282 @@ namespace GW2CraftingHelper.Views
                     Parent = _treeToolbarPanel
                 };
                 TooltipFacility.ApplyPlain(button, tooltipText);
-                button.Click += (_, __) =>
-                {
-                    var commands = _treeToolbarCommands;
-                    if (commands == null) return;
-                    pick(commands)?.Invoke();
-                };
+                button.Click += (_, __) => onClick();
                 _treeToolbarButtons.Add((button, width, gapToLeft));
             }
 
+            // The two view-only actions go straight through; the three that
+            // destroy manual decisions go through the confirm matrix.
             PlaceRight("Collapse All", 96, TreeToolbarButtonGap,
                 "Collapses every branch of the Recipe Tree back down to the top level.",
-                c => c.CollapseAll);
+                () => InvokeTreeCommand(c => c.CollapseAll));
             PlaceRight("Expand All", 92, TreeToolbarGroupGap,
                 "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.",
-                c => c.ExpandAll);
+                () => InvokeTreeCommand(c => c.ExpandAll));
             PlaceRight("Buy All", 70, TreeToolbarButtonGap,
                 "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
                 "including nodes hidden under bought items - replacing any manual choices already made. " +
                 "Ingredients with no Trading Post price fall back to the solver's normal choice.",
-                c => c.BuyAll);
+                ConfirmBuyAll);
             PlaceRight("Craft All", 76, TreeToolbarButtonGap,
                 "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
                 "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
                 "with no recipe fall back to the solver's normal choice.",
-                c => c.CraftAll);
+                ConfirmCraftAll);
             PlaceRight("Best Path", 80, 0,
                 "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
                 "cheapest plan. Ignore selections are left unchanged.",
-                c => c.BestPath);
+                ConfirmBestPath);
 
             PlaceTreeToolbarRow(w, rowY);
+        }
+
+        #region 4b. Tree action confirms - a dialog only when the click would change something
+
+        // The matrix, in one sentence: a dialog appears ONLY when the
+        // click would actually change the plan; otherwise the click skips
+        // the dialog AND the re-solve, and the status line says why.
+        // A dialog that protects nothing teaches people to click through
+        // dialogs; a dead click with no feedback teaches them to click
+        // again harder.
+        //
+        // Generate Plan is deliberately absent. It clears both overrides
+        // and ignore marks, but it is the tab's primary action and gating
+        // it would punish the ordinary case - its tooltip carries the
+        // warning instead, which is why that tooltip is not optional.
+        //
+        // Every predicate is read at CLICK time from the live tree state
+        // (TreeToolbarCommands), never cached per render: two of them
+        // build a preset to compare against.
+
+        private void InvokeTreeCommand(Func<TreeToolbarCommands, Action> pick)
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            pick(commands)?.Invoke();
+        }
+
+        /// <summary>
+        /// Asks one question, with the clicked button's own verb as the
+        /// confirm label, so the dialog reads as "you clicked X - really
+        /// X?". A refused Show (another dialog already up) simply loses
+        /// the click, which is correct under a modal: nothing was armed
+        /// before asking.
+        /// </summary>
+        private void ShowTreeConfirm(string message, string confirmText, Action onConfirm)
+        {
+            if (onConfirm == null) return;
+            _modalDialog?.Show(message, onConfirm, null, confirmText);
+        }
+
+        private void ConfirmBestPath()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            if (overrides == 0)
+            {
+                SetStatus(WithStandingNotices(StatusText.NoOverridesToClear));
+                return;
+            }
+
+            ShowTreeConfirm(
+                "Clear " + StatusText.Count(overrides, "manual decision") +
+                " and re-solve for the cheapest plan? Ignore marks are kept.",
+                "Best Path", commands.BestPath);
+        }
+
+        private void ConfirmClearOverrides()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            if (overrides == 0)
+            {
+                SetStatus(WithStandingNotices(StatusText.NoOverridesToClear));
+                return;
+            }
+
+            ShowTreeConfirm(
+                "Clear " + StatusText.Count(overrides, "manual decision") +
+                " and re-solve with the solver's own choices? Ignore marks are kept.",
+                "Clear Overrides", commands.ClearOverrides);
+        }
+
+        private void ConfirmCraftAll()
+        {
+            ConfirmPreset(
+                c => c.CraftAllWouldChange, c => c.CraftAll,
+                StatusText.AlreadyCraftingEverything,
+                "Craft everything with a known recipe?", "Craft All");
+        }
+
+        private void ConfirmBuyAll()
+        {
+            ConfirmPreset(
+                c => c.BuyAllWouldChange, c => c.BuyAll,
+                StatusText.AlreadyBuyingEverything,
+                "Buy everything with a Trading Post price?", "Buy All");
+        }
+
+        /// <summary>
+        /// Craft All and Buy All are the same shape: skip when the preset
+        /// already IS the current override map, otherwise ask, naming what
+        /// the click replaces. The "this replaces N" sentence is dropped
+        /// when N is zero - there is nothing to replace, and a dialog that
+        /// says "replaces 0 manual decisions" is asking about nothing.
+        /// </summary>
+        private void ConfirmPreset(
+            Func<TreeToolbarCommands, Func<bool>> pickPredicate,
+            Func<TreeToolbarCommands, Action> pickAction,
+            string noOpStatus, string question, string confirmText)
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+
+            if (pickPredicate(commands)?.Invoke() != true)
+            {
+                SetStatus(WithStandingNotices(noOpStatus));
+                return;
+            }
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            string message = overrides > 0
+                ? question + " This replaces " + StatusText.Count(overrides, "manual decision") + "."
+                : question;
+
+            ShowTreeConfirm(message, confirmText, pickAction(commands));
+        }
+
+        private void ConfirmClearIgnored()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+
+            // The control is hidden at zero, so the predicate is always
+            // true when it is clickable - the guard is what makes that a
+            // fact rather than an assumption.
+            int ignored = commands.GetIgnoredCount?.Invoke() ?? 0;
+            if (ignored == 0) return;
+
+            ShowTreeConfirm(
+                "Stop ignoring " + StatusText.Count(ignored, "item") +
+                "? Their material costs count toward the plan again.",
+                "Clear Ignored", commands.ClearIgnored);
+        }
+
+        #endregion // 4b. Tree action confirms - a dialog only when the click would change something
+
+        // The two per-plan STATE chips, in the slot the grey "Recipe Tree:"
+        // caption used to hold. Built once per Build() and shown/hidden by
+        // RefreshTreeStateChips, which every render calls.
+        private Label _overridesChipLabel;
+        private StandardButton _clearOverridesButton;
+        private Label _ignoredChipLabel;
+        private StandardButton _clearIgnoredButton;
+
+        private const int ClearOverridesButtonWidth = 124;
+        private const int ClearIgnoredButtonWidth = 110;
+
+        /// <summary>
+        /// Builds the Overrides/Ignored chips. Their TEXT and visibility
+        /// come from RefreshTreeStateChips - these are per-plan state, and
+        /// a Build() may happen with a plan already on screen.
+        /// </summary>
+        private void CreateTreeStateChips()
+        {
+            _overridesChipLabel = ChipLabel();
+            _clearOverridesButton = ChipButton(
+                "Clear Overrides", ClearOverridesButtonWidth,
+                "Drops every manual craft/buy decision and re-solves with the solver's own choices. " +
+                "Ignore marks are kept.",
+                ConfirmClearOverrides);
+
+            _ignoredChipLabel = ChipLabel();
+            TooltipFacility.ApplyPlain(
+                _ignoredChipLabel, IgnoredChipTooltip);
+            _clearIgnoredButton = ChipButton(
+                "Clear Ignored", ClearIgnoredButtonWidth,
+                IgnoredChipTooltip + "\nClears every ignore mark and re-solves.",
+                ConfirmClearIgnored);
+
+            TooltipFacility.ApplyPlain(
+                _overridesChipLabel,
+                "Craft/buy decisions you have set by hand. They survive a re-solve and are cleared by " +
+                "Generate Plan.");
+        }
+
+        private const string IgnoredChipTooltip =
+            "Ignored items are treated as fully in-hand and cost nothing in this plan.";
+
+        private Label ChipLabel()
+        {
+            return new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "",
+                TextColor = Color.White,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Visible = false,
+                Location = new Point(0, TreeToolbarButtonY + 3),
+                Parent = _treeToolbarPanel
+            };
+        }
+
+        private StandardButton ChipButton(string text, int width, string tooltipText, Action onClick)
+        {
+            var button = new FeedbackButton()
+            {
+                Text = text,
+                Size = new Point(width, TreeToolbarButtonHeight),
+                Visible = false,
+                Parent = _treeToolbarPanel
+            };
+            TooltipFacility.ApplyPlain(button, tooltipText);
+            button.Click += (_, __) => onClick();
+            return button;
+        }
+
+        /// <summary>
+        /// Re-reads both counts from the live tree state and shows, hides
+        /// and lays out the chips accordingly. Called after every render
+        /// that can have changed them, which is every render: a pill click,
+        /// a preset, a chip's own clear, and a fresh Generate (which clears
+        /// both).
+        /// </summary>
+        private void RefreshTreeStateChips()
+        {
+            if (_overridesChipLabel == null) return;
+
+            var commands = _treeToolbarCommands;
+            int overrides = commands?.GetOverrideCount?.Invoke() ?? 0;
+            int ignored = commands?.GetIgnoredCount?.Invoke() ?? 0;
+
+            bool showOverrides = _treeToolbarVisible && overrides > 0;
+            bool showIgnored = _treeToolbarVisible && ignored > 0;
+
+            if (showOverrides) _overridesChipLabel.Text = StatusText.ForOverridesChip(overrides);
+            if (showIgnored) _ignoredChipLabel.Text = StatusText.ForIgnoredChip(ignored);
+
+            _overridesChipLabel.Visible = showOverrides;
+            _clearOverridesButton.Visible = showOverrides;
+            _ignoredChipLabel.Visible = showIgnored;
+            _clearIgnoredButton.Visible = showIgnored;
+
+            // Placed AFTER the texts are written: a label autosizes to its
+            // own text, and the slot arithmetic is measured off that width.
+            var slots = TreeChipStripLayout.Compute(
+                0,
+                showOverrides, _overridesChipLabel.Width, ClearOverridesButtonWidth,
+                showIgnored, _ignoredChipLabel.Width, ClearIgnoredButtonWidth);
+
+            _overridesChipLabel.Location = new Point(slots.OverridesLabelX, TreeToolbarButtonY + 3);
+            _clearOverridesButton.Location = new Point(slots.OverridesButtonX, TreeToolbarButtonY);
+            _ignoredChipLabel.Location = new Point(slots.IgnoredLabelX, TreeToolbarButtonY + 3);
+            _clearIgnoredButton.Location = new Point(slots.IgnoredButtonX, TreeToolbarButtonY);
         }
 
         /// <summary>
@@ -2663,8 +2911,13 @@ namespace GW2CraftingHelper.Views
                     _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                 };
 
+                // Aligned to the tree's confirm matrix: state the outcome
+                // in the user's terms AND what it costs them. It was the
+                // one dialog in the tab that did not say what is lost.
                 bool shown = _modalDialog.Show(
-                    "This will regenerate the plan. Continue?",
+                    newValue
+                        ? "Regenerate the plan with own materials counted? Manual decisions and ignore marks are cleared."
+                        : "Regenerate the plan with own materials excluded? Manual decisions and ignore marks are cleared.",
                     () =>
                     {
                         _ownMaterialsCheckbox.Enabled = true;
@@ -3047,7 +3300,7 @@ namespace GW2CraftingHelper.Views
                 // replaces it like any other status text. Unlike the
                 // standing notices above, the thing it reports is already
                 // fixed on screen - the corrected quantity is in the box.
-                SetStatus(WithStandingNotices("Quantity was invalid - reset to 1. Generating..."));
+                SetStatus(WithStandingNotices("Quantity reset to 1 - generating..."));
             }
 
             // Live coarse-phase events drive the status strip's phase
@@ -3144,7 +3397,7 @@ namespace GW2CraftingHelper.Views
 
                     // Unconditional board write - see the matching comment
                     // on the success path.
-                    _statusBoard.Finish(myGen, $"Error: {ex.Message}");
+                    _statusBoard.Finish(myGen, StatusText.ForGenerationFailure(ex.Message));
                 });
             }
             finally
@@ -3227,6 +3480,13 @@ namespace GW2CraftingHelper.Views
             {
                 entry.Button.Enabled = !dimmed;
             }
+
+            // The chips' clear buttons act on the plan being superseded,
+            // so they go dead with the five beside them. The count labels
+            // dim with the panel and keep reading, which is right: the
+            // counts are still true of what is still on screen.
+            if (_clearOverridesButton != null) _clearOverridesButton.Enabled = !dimmed;
+            if (_clearIgnoredButton != null) _clearIgnoredButton.Enabled = !dimmed;
         }
 
         /// <summary>
@@ -3647,6 +3907,11 @@ namespace GW2CraftingHelper.Views
             // A re-render that keeps its tree finds the visibility
             // unchanged and reflows nothing.
             ApplyTreeToolbarVisibility(treeRoots != null);
+
+            // Last, and unconditional: both counts are per-plan state that
+            // any render can have changed - a pill click, a preset, a
+            // chip's own clear, or a fresh Generate, which clears both.
+            RefreshTreeStateChips();
         }
 
         /// <summary>

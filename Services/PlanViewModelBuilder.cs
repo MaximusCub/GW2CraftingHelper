@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// gw2e's document-title convention for a multi-item batch: the
-        /// first requested item's name plus " and N other(s)". items is
+        /// first requested item's name plus " and N others". items is
         /// guaranteed non-empty by the isMultiItem gate.
         /// </summary>
         private static string BuildMultiItemTitle(
@@ -139,7 +139,7 @@ namespace GW2CraftingHelper.Services
             {
                 return firstName;
             }
-            return $"{firstName} and {rest} other" + (rest > 1 ? "s" : "");
+            return firstName + " and " + StatusText.Count(rest, "other");
         }
 
         // Tooltip bodies shared between the collapsed and uncollapsed

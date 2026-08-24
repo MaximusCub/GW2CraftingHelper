@@ -58,24 +58,86 @@ namespace GW2CraftingHelper.Tests.Services
 
         // The ignore toggle (and every other
         // non-Best-Path re-solve trigger) must never produce the Best
-        // Path preset's own label, regardless of the current override
-        // count - this is exactly the "Best path restored" mislabel bug.
+        // Path preset's own label - this is exactly the "Best path
+        // restored" mislabel bug.
         [Fact]
-        public void ForOverrideResolve_NotBestPathPreset_ZeroOverrides_ReturnsDecisionsUpdated()
+        public void ForOverrideResolve_NotBestPathPreset_ReportsTheEventOnly()
         {
-            Assert.Equal("Decisions updated (0 override(s))", StatusText.ForOverrideResolve(isBestPathPreset: false, overrideCount: 0));
-        }
-
-        [Fact]
-        public void ForOverrideResolve_NotBestPathPreset_WithOverrides_ReturnsDecisionsUpdatedWithCount()
-        {
-            Assert.Equal("Decisions updated (3 override(s))", StatusText.ForOverrideResolve(isBestPathPreset: false, overrideCount: 3));
+            Assert.Equal("Plan updated", StatusText.ForOverrideResolve(isBestPathPreset: false));
         }
 
         [Fact]
         public void ForOverrideResolve_BestPathPreset_ReturnsBestPathRestored()
         {
-            Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
+            Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true));
+        }
+
+        /// <summary>
+        /// The events/state split: the status line reports what HAPPENED
+        /// and carries no standing count. How many decisions are overridden
+        /// is state, and lives in its own chip.
+        /// </summary>
+        [Fact]
+        public void ForOverrideResolve_CarriesNoCount()
+        {
+            string line = StatusText.ForOverrideResolve(isBestPathPreset: false);
+
+            Assert.DoesNotContain("override", line, StringComparison.OrdinalIgnoreCase);
+            foreach (char c in line)
+            {
+                Assert.False(char.IsDigit(c), "the status line must carry no count: " + line);
+            }
+        }
+
+        [Theory]
+        [InlineData(0, "Overrides: 0")]
+        [InlineData(1, "Overrides: 1")]
+        [InlineData(12, "Overrides: 12")]
+        public void ForOverridesChip_IsALabelledCount(int n, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForOverridesChip(n));
+        }
+
+        [Theory]
+        [InlineData(1, "Ignored: 1")]
+        [InlineData(7, "Ignored: 7")]
+        public void ForIgnoredChip_IsALabelledCount(int n, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForIgnoredChip(n));
+        }
+
+        /// <summary>
+        /// The two failure verbs must stay distinct: a failed GENERATION
+        /// leaves the tab with the plan it had, a failed local re-solve
+        /// leaves the plan on screen intact with only the change
+        /// unapplied. "Error:" said neither.
+        /// </summary>
+        [Fact]
+        public void FailureVerbs_NameWhatFailed_AndDiffer()
+        {
+            Assert.Equal("Generation failed: no route to host", StatusText.ForGenerationFailure("no route to host"));
+            Assert.Equal("Update failed: no route to host", StatusText.ForUpdateFailure("no route to host"));
+            Assert.NotEqual(
+                StatusText.ForGenerationFailure("x"), StatusText.ForUpdateFailure("x"));
+        }
+
+        [Fact]
+        public void NoOpLines_SayWhyTheClickDidNothing()
+        {
+            // Each pairs with one guard in the confirm matrix. They are
+            // sentence-case event lines like every other status write, and
+            // none of them reaches for "(s)".
+            foreach (string line in new[]
+            {
+                StatusText.NoOverridesToClear,
+                StatusText.AlreadyCraftingEverything,
+                StatusText.AlreadyBuyingEverything
+            })
+            {
+                Assert.False(string.IsNullOrWhiteSpace(line));
+                Assert.DoesNotContain("(s)", line);
+                Assert.Equal(char.ToUpperInvariant(line[0]), line[0]);
+            }
         }
 
         // ---- IsStale (the staleness label and Module.Update()'s

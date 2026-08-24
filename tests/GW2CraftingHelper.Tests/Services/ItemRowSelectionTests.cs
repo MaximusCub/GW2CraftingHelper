@@ -212,10 +212,10 @@ namespace GW2CraftingHelper.Tests.Services
             // A plan built from only some of the rows must admit to the rest
             // rather than letting a requested item vanish silently.
             Assert.Equal(
-                "1 row has no item selected and is not in this plan.",
+                "1 row has no item selected - left out of this plan.",
                 ItemRowSelection.UnresolvedRowsNotice(1));
             Assert.Equal(
-                "3 rows have no item selected and are not in this plan.",
+                "3 rows have no item selected - left out of this plan.",
                 ItemRowSelection.UnresolvedRowsNotice(3));
         }
     }

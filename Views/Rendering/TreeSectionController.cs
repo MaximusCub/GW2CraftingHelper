@@ -493,17 +493,81 @@ namespace GW2CraftingHelper.Views.Rendering
                 CraftAll = () => ApplyPreset(AcquisitionSource.Craft),
                 BuyAll = () => ApplyPreset(AcquisitionSource.BuyFromTp),
                 ExpandAll = ExpandAll,
-                CollapseAll = CollapseAll
+                CollapseAll = CollapseAll,
+                ClearOverrides = ClearOverrides,
+                ClearIgnored = ClearIgnored,
+                GetOverrideCount = () => _nodeOverrides.Count,
+                GetIgnoredCount = () => _ignoredItemIds.Count,
+                CraftAllWouldChange = () => PresetWouldChange(AcquisitionSource.Craft),
+                BuyAllWouldChange = () => PresetWouldChange(AcquisitionSource.BuyFromTp)
             });
         }
 
         // Decision preset: clear every manual override and re-solve for the
-        // solver's own cheapest plan.
+        // solver's own cheapest plan. The Count == 0 early return is the
+        // belt to the view's braces - the view gates this behind its own
+        // would-change predicate now, but the command is still directly
+        // invokable with no dialog wiring at all.
         private void ApplyBestPathPreset()
         {
             if (_nodeOverrides.Count == 0) return;
             _nodeOverrides.Clear();
             ApplyOverridesAndResolve(isBestPathPreset: true);
+        }
+
+        /// <summary>
+        /// The Overrides chip's clear action: back to the solver's own
+        /// choices. MEASURED: identical work to
+        /// <see cref="ApplyBestPathPreset"/> - clear the same dictionary,
+        /// re-solve - and it differs only in writing the ordinary
+        /// "Plan updated" event rather than claiming "Best path restored",
+        /// which is a preset's label and not a description of clearing.
+        /// See docs/KNOWN-ISSUES.md: the two buttons being one action is a
+        /// finding for the maintainer, not something this seam invents a
+        /// difference to hide.
+        /// </summary>
+        private void ClearOverrides()
+        {
+            if (_nodeOverrides.Count == 0) return;
+            _nodeOverrides.Clear();
+            ApplyOverridesAndResolve();
+        }
+
+        /// <summary>
+        /// The Ignored chip's clear action. Runs the SAME re-solve path any
+        /// ignore-pill click runs - no bespoke status string, because
+        /// nothing bespoke happened.
+        /// </summary>
+        private void ClearIgnored()
+        {
+            if (_ignoredItemIds.Count == 0) return;
+            _ignoredItemIds.Clear();
+            ApplyOverridesAndResolve();
+        }
+
+        /// <summary>
+        /// Whether applying a preset would actually change the override
+        /// map - the same key set with the same values re-solves to the
+        /// identical plan (ignore marks are untouched by a preset), so the
+        /// click is a no-op the view reports instead of performing.
+        /// Answered at click time: it walks the solver tree to build the
+        /// preset, which is bounded but not free.
+        /// </summary>
+        private bool PresetWouldChange(AcquisitionSource source)
+        {
+            if (_lastResult?.SolveContext == null) return false;
+
+            var preset = CraftingPlanPipeline.BuildPresetOverrides(_lastResult.SolveContext, source);
+            if (preset.Count != _nodeOverrides.Count) return true;
+
+            foreach (var kvp in preset)
+            {
+                if (!_nodeOverrides.TryGetValue(kvp.Key, out var current) || current != kvp.Value)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void ExpandAll()
@@ -598,12 +662,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // not moved, and the render just replaced controls under
                 // it - see HoverChainResync.
                 HoverChainResync.AfterRebuild();
-                _setStatus(StatusText.ForOverrideResolve(isBestPathPreset, _nodeOverrides.Count));
+                _setStatus(StatusText.ForOverrideResolve(isBestPathPreset));
             }
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Override re-solve failed");
-                _setStatus($"Error: {ex.Message}");
+                _setStatus(StatusText.ForUpdateFailure(ex.Message));
             }
         }
 
