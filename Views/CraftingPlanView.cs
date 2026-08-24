@@ -1581,6 +1581,23 @@ namespace GW2CraftingHelper.Views
             ReflowTopRegion(rebuildItemRows: true);
         }
 
+        /// <summary>
+        /// The per-row suggestion popups are SpriteScreen-parented, like the
+        /// tickers, so disposing the host window does not reach them and
+        /// nothing else tears them down on unload - and each one holds a
+        /// global mouse subscription for its whole life. Called by
+        /// Module.Unload; every in-session teardown routes through
+        /// RebuildItemRowControls instead.
+        /// </summary>
+        public void DisposeSuggestionPanels()
+        {
+            foreach (var row in _itemRows)
+            {
+                row.SuggestionPanel?.Dispose();
+                row.SuggestionPanel = null;
+            }
+        }
+
         private void RemoveItemRow(ItemRowState row)
         {
             if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count)) return;

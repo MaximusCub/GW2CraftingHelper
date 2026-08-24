@@ -36,6 +36,7 @@ namespace GW2CraftingHelper.Views
         private bool _disposed;
         private bool _suppressTextChanged;
         private bool _globalMouseHooked;
+        private bool _pressOverPanel;
         private CancellationTokenSource _searchCts;
 
         public event EventHandler<ItemSelectedEventArgs> ItemSelected;
@@ -52,6 +53,25 @@ namespace GW2CraftingHelper.Views
             _textBox.EnterKeyPressed += OnEnterPressed;
             _textBox.InputFocusChanged += OnFocusChanged;
             _textBox.Moved += OnTextBoxMoved;
+
+            // Hooked for this panel's whole life, not just while it is
+            // shown, and specifically here in the constructor: Blish raises
+            // this event in subscription order, TextInputBase subscribes its
+            // own unfocus-on-click handler when the box first gains focus,
+            // and OnFocusChanged can only tell a click from an Escape if
+            // this handler is already ahead of it on the list.
+            GameService.Input.Mouse.LeftMouseButtonPressed += OnGlobalMousePressed;
+            GameService.Input.Mouse.LeftMouseButtonReleased += OnGlobalMouseReleased;
+        }
+
+        private void OnGlobalMousePressed(object sender, MouseEventArgs e)
+        {
+            _pressOverPanel = !_disposed && _panel != null && _panel.Visible && _panel.MouseOver;
+        }
+
+        private void OnGlobalMouseReleased(object sender, MouseEventArgs e)
+        {
+            _pressOverPanel = false;
         }
 
         private async void OnTextChanged(object sender, EventArgs e)
@@ -150,10 +170,17 @@ namespace GW2CraftingHelper.Views
             bool hasFocus = _textBox.Focused;
             if (!hasFocus)
             {
-                // If mouse is over the panel, re-focus the textbox
-                // so the click on the row can fire before we dismiss
-                if (_panel != null && _panel.MouseOver)
+                // Re-focus ONLY when this focus loss is the click that is
+                // landing on a suggestion row, so the row's own click can
+                // fire before the panel is dismissed. Every other release -
+                // Escape above all - has to pass through untouched: those
+                // arrive as UnsetFocus(), which raises this notification and
+                // only THEN nulls Blish's global focus slot, so re-focusing
+                // from in here leaves a focused box no slot names. See
+                // FocusRelease for what that state costs.
+                if (_pressOverPanel)
                 {
+                    _pressOverPanel = false;
                     _textBox.Focused = true;
                     return;
                 }
@@ -383,6 +410,9 @@ namespace GW2CraftingHelper.Views
                 GameService.Input.Mouse.LeftMouseButtonPressed -= OnGlobalMouseClick;
                 _globalMouseHooked = false;
             }
+
+            GameService.Input.Mouse.LeftMouseButtonPressed -= OnGlobalMousePressed;
+            GameService.Input.Mouse.LeftMouseButtonReleased -= OnGlobalMouseReleased;
 
             _searchCts?.Cancel();
             _searchCts?.Dispose();

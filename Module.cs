@@ -991,6 +991,10 @@ namespace GW2CraftingHelper
             // be called explicitly before disposing the host window.
             _craftingContent?.StopLiveTickers();
 
+            // Same reasoning, same ownership: one screen-parented popup per
+            // item row, each holding a global mouse subscription.
+            _craftingContent?.DisposeSuggestionPanels();
+
             _httpClient?.Dispose();
             _modalDialog?.Dispose();
             _apiAccessDialog?.Dispose();
