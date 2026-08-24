@@ -505,7 +505,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(CraftingDecision.BuyFromTp, node.Decision);
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
-            Assert.Equal(3, specs.Count); // TP, VENDOR (no recipe -> no CRAFT), IGNORE
+            // TP + VENDOR (no recipe -> no CRAFT). No IGNORE: BuildTree
+            // marked this node a plan root - see PlanRootIgnoreTests.
+            Assert.Equal(2, specs.Count);
             var selected = specs.Single(s => s.Kind == PillKind.Selected);
             Assert.Equal("TP", selected.Text);
         }
@@ -609,8 +611,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(node.CanCraft);
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
-            Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
-            Assert.Equal("UNKNOWN", specs[0].Text);
+            // UNKNOWN alone: this node is the plan root BuildTree
+            // returned, so no IGNORE toggle - see PlanRootIgnoreTests.
+            Assert.Equal("UNKNOWN", Assert.Single(specs).Text);
         }
 
         // ---- Cost-component leaves - informational-only pill

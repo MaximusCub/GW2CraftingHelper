@@ -70,12 +70,15 @@ namespace GW2CraftingHelper.Models
 
         // One tile of the Total Cost section's first formula band -
         // "Total Materials Value - Your
-        // Materials Used = Actual Cost to Craft" - collapsing to a single
-        // "Actual Cost to Craft" tile (one row of this type) when there is
-        // no materials-used middle term to subtract (PlanViewModelBuilder.
-        // BuildSummarySection's collapse rule). Rendered as an equal-width
-        // stat tile, same shape the old CoinTotal band used - see
-        // SummarySectionRenderer.
+        // Materials Used = Actual Cost to Craft". Collapses to a single
+        // "Actual Cost to Craft" tile (one row of this type) only when
+        // there is no materials-used middle term AND the plan has a real
+        // cost to show; a plan whose coin cost and materials-used term
+        // are both KNOWN zeros renders all three tiles at 0
+        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule -
+        // an unpriced-node zero is NOT a known zero and stays collapsed).
+        // Rendered as an equal-width stat tile, same shape the old
+        // CoinTotal band used - see SummarySectionRenderer.
         CostFormulaTile,
 
         // One tile of the Total Cost section's second formula band -
