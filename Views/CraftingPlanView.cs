@@ -3642,7 +3642,15 @@ namespace GW2CraftingHelper.Views
                 () => TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock);
             TooltipFacility.ApplyRichDeferred(titlePanel, buildStatContent);
             TooltipFacility.ApplyRichDeferred(nameLabel, buildStatContent);
-            IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
+
+            // The icon only for a real item root: a multi-item batch has
+            // no single target (TreeRoot is null by design), and stamping
+            // an always-empty builder over the icon would replace its own
+            // "no icon available" note with silence.
+            if (TreeRowTooltipComposer.RowIdIsAnItemId(treeRoot))
+            {
+                IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
+            }
 
             if (qtyText.Length > 0)
             {

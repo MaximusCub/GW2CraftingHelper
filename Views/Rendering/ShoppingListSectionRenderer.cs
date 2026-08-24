@@ -383,8 +383,15 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
             TooltipFacility.ApplyRichDeferred(nameLabel, buildTooltip);
             TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
-            IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
             IconControls.ApplyRichDeferredToIconTree(tagPanel, buildTooltip);
+
+            // The icon only when the row has a real item id: a currency
+            // row's icon may carry its own note, and a deferred builder
+            // with nothing to say would replace it with silence.
+            if (row.ItemId > 0)
+            {
+                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
+            }
             SetValueCellTooltip(eachCell, buildTooltip);
             SetValueCellTooltip(totalCell, buildTooltip);
 

@@ -1,3 +1,4 @@
+using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
 using System;
@@ -22,10 +23,16 @@ namespace GW2CraftingHelper.Views.Rendering
     /// assignment.</description></item>
     /// <item><description><see cref="ApplyRich"/> - anything containing a
     /// coin amount, which a string tooltip can only spell out as
-    /// "1g 23s 45c". Rendered by <see cref="RichTooltipSurface"/> with real
-    /// coin icons (RIGHT of their numbers), an opaque background, and a
-    /// four-edge screen clamp Blish's own tooltip positioning does not
+    /// "1g 23s 45c", and every item hover. Rendered by
+    /// <see cref="RichTooltipSurface"/> with real coin icons (RIGHT of
+    /// their numbers), on the game's own tooltip canvas, with a four-edge
+    /// screen clamp Blish's own tooltip positioning does not
     /// have.</description></item>
+    /// <item><description><see cref="ApplyRichDeferred"/> - the same
+    /// surface, for content whose INPUTS can change after the control was
+    /// built (an item's stat block arriving from a background fetch) or
+    /// that is not worth composing until someone points at the
+    /// row.</description></item>
     /// </list>
     ///
     /// LIFECYCLE (measured, see docs/KNOWN-ISSUES.md "Tooltip facility"):
@@ -41,6 +48,8 @@ namespace GW2CraftingHelper.Views.Rendering
     /// </summary>
     internal static class TooltipFacility
     {
+        private static readonly Logger Logger = Logger.GetLogger(typeof(TooltipFacility));
+
         private static readonly ConditionalWeakTable<Control, TooltipContentSource> Contents =
             new ConditionalWeakTable<Control, TooltipContentSource>();
 
@@ -201,7 +210,25 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return null;
             }
-            return Contents.TryGetValue(control, out var source) ? source.Resolve() : null;
+            if (!Contents.TryGetValue(control, out var source))
+            {
+                return null;
+            }
+
+            try
+            {
+                return source.Resolve();
+            }
+            catch (Exception ex)
+            {
+                // A deferred builder runs inside Blish's mouse-moved
+                // handler, so an exception here would surface as a crash on
+                // hover rather than as a missing tooltip. Showing nothing
+                // is the correct degradation, and the log line names the
+                // builder that failed.
+                Logger.Warn(ex, "Rich tooltip content builder threw; showing no tooltip");
+                return null;
+            }
         }
     }
 }

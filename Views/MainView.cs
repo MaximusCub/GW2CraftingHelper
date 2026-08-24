@@ -1987,32 +1987,6 @@ namespace GW2CraftingHelper.Views
             return shortened;
         }
 
-        /// <summary>
-        /// The row strip's own tooltip, carrying whichever of the row's
-        /// lines were shortened - one assignment, since a per-line one here
-        /// would leave the later assignment silently winning. Cleared when
-        /// neither line is shortened.
-        /// </summary>
-        private static void ApplyRowStripTooltip(
-            Panel rowPanel, string first, bool firstShortened, string second, bool secondShortened)
-        {
-            string text = null;
-            if (firstShortened && secondShortened)
-            {
-                text = first + "\n" + second;
-            }
-            else if (firstShortened)
-            {
-                text = first;
-            }
-            else if (secondShortened)
-            {
-                text = second;
-            }
-
-            TooltipFacility.ApplyPlain(rowPanel, text);
-        }
-
         private void CreateItemRow(SnapshotSearchRow row, int columnWidth)
         {
             var rowPanel = new Panel()
@@ -2026,7 +2000,7 @@ namespace GW2CraftingHelper.Views
             // degrades it to a neutral empty-slot square instead of
             // Blish's alarming magenta missing-texture placeholder (audit
             // row 56 PART B #1).
-            IconControls.CreateItemIcon(rowPanel, row.IconUrl, 2, 2);
+            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, 2, 2);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2063,7 +2037,7 @@ namespace GW2CraftingHelper.Views
             // tooltips are cleared: the stat block already opens with the
             // item's full name, and a per-line plain tooltip on top of it
             // would win the hover and show strictly less.
-            ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, row, nameText, breakdown);
+            ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, icon, row, nameText, breakdown);
 
             // The cell's own Size is the grid's to write (LayoutGridSection),
             // so this closure only re-fits what the new column width changed.
@@ -2071,7 +2045,7 @@ namespace GW2CraftingHelper.Views
             {
                 FitRowTextLabel(nameLabel, nameText, w);
                 FitRowTextLabel(breakdownLabel, breakdown, w);
-                ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, row, nameText, breakdown);
+                ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, icon, row, nameText, breakdown);
             }));
         }
 
@@ -2084,7 +2058,7 @@ namespace GW2CraftingHelper.Views
         /// always had.
         /// </summary>
         private void ApplyItemRowTooltip(
-            Panel rowPanel, Label nameLabel, Label breakdownLabel,
+            Panel rowPanel, Label nameLabel, Label breakdownLabel, Panel icon,
             SnapshotSearchRow row, string nameText, string breakdown)
         {
             Func<TooltipContent> build = () =>
@@ -2104,6 +2078,14 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyRichDeferred(rowPanel, build);
             TooltipFacility.ApplyRichDeferred(nameLabel, build);
             TooltipFacility.ApplyRichDeferred(breakdownLabel, build);
+
+            // Only when the row has a real item id: the icon may already
+            // carry its own "no icon available" note, and a deferred
+            // builder with nothing to say would replace that with silence.
+            if (row.ItemId > 0)
+            {
+                IconControls.ApplyRichDeferredToIconTree(icon, build);
+            }
         }
 
         private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth)

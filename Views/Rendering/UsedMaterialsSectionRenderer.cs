@@ -175,7 +175,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 null);
             TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
             TooltipFacility.ApplyRichDeferred(nameHandle.NameLabel, buildTooltip);
-            IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
+            if (row.ItemId > 0)
+            {
+                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
+            }
 
             var qtyLabel = LabelHelpers.WithDescenderClearance(
                 new Label()
