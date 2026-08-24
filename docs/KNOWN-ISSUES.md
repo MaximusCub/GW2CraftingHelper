@@ -13091,4 +13091,22 @@ observe.
    matches), where Enter falls through AutocompleteTextBox to the same
    base path.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 night desktop session, branch build, captures
+preflight/gKB1-gKB8). (1)+(2) The exact user repro with the mouse over
+the suggestion list: first Escape released the box (dropdown gone,
+caret gone, window OPEN - eaten by design, not by a stale slot),
+second Escape closed the window. (3) Tab-switch with a focused,
+typed-in search box: a single Escape afterwards closed the window
+immediately - the disposed box left no slot behind. (7) Qty box +
+Enter, then a single Escape: window closed immediately - the
+ReleaseOnEnter chain healed Blish's Enter soft-unfocus. (4) Suggestion
+picking still works (name lands, list dismisses; one eaten
+first-click-after-activation, a known sandbox artifact, resolved on
+the repeat). (5) Corner-icon toggle with prior box focus produced no
+stranding across subsequent interactions. (6) The interrupted-press
+Alt-Tab case is not safely synthesizable in the sandbox; it remains
+the regression-check the section describes, pinned by the
+discriminator's press-consumed design. Keyboard reach was verified
+through Escape semantics rather than typed-into-Paint checks: every
+single-Escape-closes result above requires the slot and listener to be
+clean, which is precisely the reported failure's negation.
