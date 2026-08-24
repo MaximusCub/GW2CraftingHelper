@@ -13910,7 +13910,7 @@ move.
 
 ### Post-review corrections
 
-Five findings from the adversarial review of this milestone, all
+Nine findings from the adversarial review of this milestone, all
 verified against the code before being fixed. Every one reproduced.
 
 **1 (critical). The in-place tree refresh trusted `NodeId` as item
@@ -14085,6 +14085,38 @@ moved production and left the suite green. `WindowSizing.RightEdgePadding`
 is named for the same reason - the cluster stands off the row's right
 edge by the same 20px `WindowToTabPanelChrome` already accounts for.
 
+**9 (must fix). Finding 8's fix traded a self-correcting derivation for
+a static one, and only prose bound them.** `PlaceTreeToolbarRow` still
+PLACED the buttons by walking `_treeToolbarButtons` - whatever
+`CreateTreeToolbarRow` put there - but DERIVED the chip limit from
+`TreeToolbarRowLayout.ChipLimitX(w)`, a static sum over `RightButtons`.
+Measured, the two agreed exactly: the walk consumes 414px of widths and
+32px of gaps from `w - RightEdgePadding`, ending at `w - 466`, and
+`ChipLimitX` returns `w - (20 + 446) - 20 = w - 486`, the walk's end
+less `GroupGap`. So the round was behaviour-neutral - but `ButtonSlot`'s
+constructor is public, so a sixth `PlaceRight("Export", new
+TreeToolbarRowLayout.ButtonSlot(90, 4), ...)` compiles and ships without
+touching `RightButtons`. The strip would then believe it had 94px more
+room than the row has: invisible at 1378, where 348px of slack absorbs
+it, and on a narrow client the chips paint over the leftmost button -
+two live controls on the same pixels, the click landing on whichever
+Blish hit-tests last. That is the defect `TreeChipStripLayout` exists to
+prevent, and the walk-derived limit finding 8 replaced could not produce
+it, because it measured the buttons actually placed.
+
+The limit is now `Math.Min(x - GroupGap, ChipLimitX(w))`: the walk's own
+end x is the self-correcting term, the modelled limit the tests assert
+is the cap, and production is never looser than the model. A divergence
+between them can now only cost the chips room. The alternative - driving
+the placement loop from `RightButtons` zipped against a same-length spec
+array - was rejected on failure modes, not cost: a spec entry with no
+slot would then silently not be placed, trading an invisible overlap for
+an invisible missing button, while the clamp cannot produce either. The
+residual is a documentation defect only: a slot missing from
+`RightButtons` leaves the suite's boundary cases describing a row 94px
+narrower than the one that ships. A stale test over-claiming a tier is
+worth strictly less than two controls sharing a click target.
+
 ### Desktop gate checklist (live Blish, real plan)
 
 1. Every section at the 1378px minimum width: the ramp is legible -
@@ -14150,7 +14182,7 @@ edge by the same 20px `WindowToTabPanelChrome` already accounts for.
     of the boundary, so RECORD which way it falls rather than expecting
     an answer - that measurement is the only thing that can settle the
     count labels' real widths. Drag back out to 1378+ and both clear
-    buttons must be present. Post-review findings 4, 7.
+    buttons must be present. Post-review findings 4, 7, 9.
 15. **A vendor node whose offer carries an item cost AND a currency
     cost** (two synthesised cost-component leaves - expand one). Ignore
     a sibling material so the re-solve can change which bulk offer the
