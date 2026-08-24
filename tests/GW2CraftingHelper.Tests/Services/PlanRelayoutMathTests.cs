@@ -224,21 +224,30 @@ namespace GW2CraftingHelper.Tests.Services
                 wide.CostRightEdge - wide.PillColX);
         }
 
-        // The measurement the 1478px window minimum and the 256px pill
-        // column were derived from - docs/research/minimum-window-width.md.
-        // "+24 Agony Infusion" is the deepest chain in the game (23 forced
-        // levels, one recipe each); its deepest row renders "4194304x
-        // Thermocatalytic Reagent".
+        // The measurements the window minimum and the 256px pill column
+        // are derived from - plan-redesign/minwidth.md, which reproduces
+        // the method of docs/research/minimum-window-width.md (XNB glyph
+        // parse, MonoGame.Extended's own advance / XOffset+Width rule,
+        // which is what TreeSectionController's nameFont.MeasureString
+        // computes) and every anchor figure it published.
         //
-        // Re-measured at Menomonia 16 for the +2pt body bump, against the
-        // same installed XNBs and in the same convention the Font14 figures
-        // (65 / 174) were taken in - MonoGame.Extended's own
-        // advance / XOffset+Width rule, which is what
-        // TreeSectionController's nameFont.MeasureString computes. Both
-        // figures are direct measurements: "4194304x " is 73 and
-        // "Thermocatalytic Reagent" is 192.
-        private const int DeepestRowQtyPrefixWidth = 73;
-        private const int DeepestRowNameWidth = 192;
+        // Two chains matter, and they are not the same chain:
+        //
+        //   The DEEPEST REALISTIC chain is the legendary trinket pair
+        //   Transcendence / Conflux, both exactly depth 14. Their widest
+        //   row at every font size is the dust-promotion blow-up
+        //   "429750x Pile of Glittering Dust". The window minimum fits it.
+        //
+        //   The DEEPEST chain that exists is "+24 Agony Infusion" at depth
+        //   23 ("4194304x Thermocatalytic Reagent"), which the 1478px
+        //   minimum used to fit outright. It now ellipsizes at its
+        //   deep end, which is the whole point of the change.
+        private const int RealisticDeepestDepth = 14;
+        private const int RealisticRowQtyPrefixWidth = 69;   // "429750x "
+        private const int RealisticRowNameWidth = 166;       // "Pile of Glittering Dust"
+
+        private const int AgonyRowQtyPrefixWidth = 73;       // "4194304x "
+        private const int AgonyRowNameWidth = 192;           // "Thermocatalytic Reagent"
 
         // Tree row geometry: nameX = depth * TreeIndentPer + (caret column
         // + icon frame + name gap) = depth * 24 + 58.
@@ -255,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
         private const int OldWindowMinimumWidth = 930;
 
         // Live-priced cost column behind a six-digit gold total, which is
-        // what the deepest chain costs; 150 is only the floor.
+        // what the deepest chains cost; 150 is only the floor.
         //
         // Measured at Font16, and taken at the WIDEST digits rather than at
         // one example total: Menomonia's digits are not one width, so the
@@ -274,50 +283,112 @@ namespace GW2CraftingHelper.Tests.Services
         // holds for every total; a figure taken at one example would not.
         private const int DeepestPlanCostColumnWidth = 181;
 
-        // The gutter the window minimum was DESIGNED around
-        // (docs/research/minimum-window-width.md): the slack the deepest
-        // row keeps between its name and the pill column at the minimum
-        // width. A research figure, not a production constant - the
-        // pull-in machinery that once held it as TableGutterBreathingRoom
-        // is gone.
+        // The term the shipped coin-only method never had to model. A
+        // BuyFromVendor node whose winning offer costs only currencies gets
+        // no component leaves (BuildVendorCostComponentLeaves needs 2+ cost
+        // kinds) and draws its whole currency run inline in the cost
+        // column. Measured against ref/vendor_offers.json at this tree's
+        // quantities: the widest is a two-currency bulk offer, +154px.
+        // The maintainer's minimum buys room for it rather than letting
+        // such rows ellipsize.
+        private const int WidestVendorCurrencyRunWidth = 154;
+
+        // The gutter the window minimum is DESIGNED around: the slack the
+        // deepest realistic row keeps between its name and the pill
+        // column at the minimum width. A research figure, not a production
+        // constant - the pull-in machinery that once held it as
+        // TableGutterBreathingRoom is gone.
         private const int DesignedNameGutter = 24;
 
-        private static PlanRelayoutMath.TreeColumnEdges DeepestRowEdges(int panelWidth, int depth)
+        private static PlanRelayoutMath.TreeColumnEdges TreeRowEdges(
+            int panelWidth, int depth, int qtyPrefixWidth, int costColumnWidth)
         {
             return PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, TreeNameX(depth), DeepestRowQtyPrefixWidth,
-                PlanRelayoutMath.TreePillColumnWidth, DeepestPlanCostColumnWidth,
+                panelWidth, TreeNameX(depth), qtyPrefixWidth,
+                PlanRelayoutMath.TreePillColumnWidth, costColumnWidth,
                 rightMargin: 8);
         }
 
-        [Fact]
-        public void ComputeTreeColumnEdges_DeepestRowInTheGame_KeepsTheDesignedGutterAtTheWindowMinimum()
+        /// <summary>
+        /// Gap left between where a row's untruncated name ENDS and where
+        /// the pill column starts - the quantity the window minimum is
+        /// derived from. (ComputeTreeColumnEdges' name budget is this less
+        /// the tree's own 8px name gap, which is why the two figures differ
+        /// by 8.)
+        /// </summary>
+        private static int NameToPillGutter(
+            PlanRelayoutMath.TreeColumnEdges edges, int depth, int qtyPrefixWidth, int nameWidth)
         {
-            var edges = DeepestRowEdges(PlanPanelWidthAtWindowMinimum, depth: 23);
-
-            Assert.Equal(DeepestRowNameWidth + DesignedNameGutter, edges.NameMaxWidth);
+            return edges.PillColX - (TreeNameX(depth) + qtyPrefixWidth + nameWidth);
         }
 
         [Fact]
-        public void ComputeTreeColumnEdges_OneVendorLeafBelowTheDeepestRow_StillFitsAtTheWindowMinimum()
+        public void DeepestRealisticRowAtTheWindowMinimum_KeepsTheDesignedGutterEvenBesideAVendorCurrencyRun()
+        {
+            // What the 1378px minimum buys, stated as the arithmetic it was
+            // derived from: the widest row of the deepest realistic plan,
+            // in the same tree as the widest cost column that plan can
+            // draw (six-digit gold AND a two-currency vendor run), renders
+            // whole with the designed 24px gutter and not one pixel more.
+            // Drop the currency rider and this is the figure that falls to
+            // 1232.
+            var edges = TreeRowEdges(
+                PlanPanelWidthAtWindowMinimum, RealisticDeepestDepth,
+                RealisticRowQtyPrefixWidth,
+                DeepestPlanCostColumnWidth + WidestVendorCurrencyRunWidth);
+
+            Assert.Equal(
+                DesignedNameGutter,
+                NameToPillGutter(
+                    edges, RealisticDeepestDepth, RealisticRowQtyPrefixWidth, RealisticRowNameWidth));
+            Assert.True(edges.NameMaxWidth >= RealisticRowNameWidth);
+        }
+
+        [Fact]
+        public void OneVendorLeafBelowTheDeepestRealisticRow_StillFitsAtTheWindowMinimum()
         {
             // CraftingTreeBuilder.BuildVendorCostComponentLeaves can
             // synthesise a leaf one indent level below the recipe graph.
-            // That level is the headroom the minimum was rounded up for: it
-            // spends the gutter exactly, and nothing is ellipsized.
-            var edges = DeepestRowEdges(PlanPanelWidthAtWindowMinimum, depth: 24);
+            // It is the level that has to fit for the minimum to be honest
+            // rather than exact - and at a coin-only cost column, which is
+            // what a tree carrying such leaves draws (component leaves
+            // exist precisely when the run is NOT currency-only).
+            var edges = TreeRowEdges(
+                PlanPanelWidthAtWindowMinimum, RealisticDeepestDepth + 1,
+                RealisticRowQtyPrefixWidth, DeepestPlanCostColumnWidth);
 
-            Assert.Equal(DeepestRowNameWidth, edges.NameMaxWidth);
+            int gutter = NameToPillGutter(
+                edges, RealisticDeepestDepth + 1, RealisticRowQtyPrefixWidth, RealisticRowNameWidth);
+
+            Assert.True(gutter >= DesignedNameGutter, $"vendor-leaf gutter {gutter} < {DesignedNameGutter}");
         }
 
         [Fact]
-        public void ComputeTreeColumnEdges_DeepestRowAtTheOldMinimum_WasSeverelyTruncated()
+        public void AgonyChainAtTheWindowMinimum_RendersWholeSixLevelsPastTheRealisticDeepest()
         {
-            // Why the minimum moved: at the old 930px window (804px panel)
-            // the same row had no name column left at all and clamped to
-            // the 10px floor - a bare ellipsis.
-            var edges = DeepestRowEdges(
-                WindowSizing.TabPanelWidthFor(OldWindowMinimumWidth), depth: 23);
+            // The accepted degradation, pinned so it cannot quietly get
+            // worse: the depth-23 agony chain reads whole down to depth 19
+            // and ellipsizes from depth 20 - the same idiom every other
+            // over-long name in the view gets, with the full name on the
+            // tooltip.
+            var lastWhole = TreeRowEdges(
+                PlanPanelWidthAtWindowMinimum, 19, AgonyRowQtyPrefixWidth, DeepestPlanCostColumnWidth);
+            var firstTruncated = TreeRowEdges(
+                PlanPanelWidthAtWindowMinimum, 20, AgonyRowQtyPrefixWidth, DeepestPlanCostColumnWidth);
+
+            Assert.True(lastWhole.NameMaxWidth >= AgonyRowNameWidth);
+            Assert.True(firstTruncated.NameMaxWidth < AgonyRowNameWidth);
+        }
+
+        [Fact]
+        public void DeepestRowAtTheNarrowScreenFloor_IsABareEllipsis()
+        {
+            // The floor a game client narrower than the minimum falls back
+            // to (WindowSizing.NarrowScreenFloorWidth): the depth-23 row
+            // has no name column left at all and clamps to the 10px floor.
+            var edges = TreeRowEdges(
+                WindowSizing.TabPanelWidthFor(OldWindowMinimumWidth), 23,
+                AgonyRowQtyPrefixWidth, DeepestPlanCostColumnWidth);
 
             Assert.Equal(10, edges.NameMaxWidth);
         }
