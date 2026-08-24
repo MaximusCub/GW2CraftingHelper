@@ -125,5 +125,83 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Null(ShoppingSourceBadge.ForRow(null));
         }
+
+        // --- Badge hover prose (the badge column's own tooltip: the
+        // capitals say WHICH source, this says what to do about it) ---
+
+        [Fact]
+        public void EveryBadgedRow_AlsoCarriesProse()
+        {
+            var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
+                new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 },
+                new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.Currency },
+                new PlanStep { ItemId = 4, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+            }));
+
+            Assert.All(
+                ShoppingRows(vm),
+                row => Assert.False(string.IsNullOrEmpty(ShoppingSourceBadge.TooltipForRow(row))));
+        }
+
+        [Fact]
+        public void TpProse_NamesTheTradingPost()
+        {
+            var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+            }));
+
+            Assert.Equal("Buy on the Trading Post", ShoppingSourceBadge.TooltipForRow(ShoppingRows(vm)[0]));
+        }
+
+        [Fact]
+        public void UnknownProse_PrefersTheSeededHintOverTheGenericLine()
+        {
+            // The seeded hint is specific to this item; the generic "check
+            // the wiki" line is strictly less useful on top of it.
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" }
+            };
+            var vm = _builder.Build(MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                },
+                acquisitionHints: hints));
+
+            Assert.Equal(
+                "Salvaged from ascended gear.", ShoppingSourceBadge.TooltipForRow(ShoppingRows(vm)[0]));
+        }
+
+        [Fact]
+        public void UnknownProse_NoHint_SaysThereIsNoKnownSource()
+        {
+            var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+            }));
+
+            Assert.Equal(
+                "No known acquisition source - check the item's wiki page",
+                ShoppingSourceBadge.TooltipForRow(ShoppingRows(vm)[0]));
+        }
+
+        [Fact]
+        public void NonShoppingRow_AndNull_CarryNoProse()
+        {
+            var vm = _builder.Build(MakeResult(
+                metadata: MetaFor((10, "Ori Ingot", "ori.png")),
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 }
+                }));
+
+            var used = vm.Sections.First(s => s.SectionType == PlanSectionType.UsedMaterials).Rows[0];
+            Assert.Null(ShoppingSourceBadge.TooltipForRow(used));
+            Assert.Null(ShoppingSourceBadge.TooltipForRow(null));
+        }
     }
 }

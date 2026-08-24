@@ -200,6 +200,29 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
+        /// One tag's hover, stamped on the outer panel, its inset fill
+        /// panel and the label inside that. Blish resolves a tooltip on the
+        /// deepest capturing control under the cursor and never bubbles,
+        /// and <see cref="CreateSmallTag"/>'s two inner controls cover
+        /// almost the whole tag - a stamp on the returned outer panel alone
+        /// would fire on a 1px border and nowhere else. Null clears all
+        /// three (see TooltipFacility.ApplyPlain).
+        /// </summary>
+        internal static void ApplyTagTooltip(Control control, string text)
+        {
+            if (control == null) return;
+
+            TooltipFacility.ApplyPlain(control, text);
+            if (control is Container container)
+            {
+                foreach (var child in container.Children)
+                {
+                    ApplyTagTooltip(child, text);
+                }
+            }
+        }
+
+        /// <summary>
         /// Outer height of a small tag. 22, not the 18 it was at Font12: the
         /// label inside sits at y=1 in an inset panel of SmallTagHeight - 2
         /// and its lowest Font14 ink is y=20. Callers that centre a tag in a

@@ -356,6 +356,81 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, byTotal.Count);
         }
 
+        // --- Source column (the fifth Shopping List column) ---
+
+        private static PlanRowViewModel SourceRow(string label, PlanRowType rowType, string badgeText = null)
+        {
+            return new PlanRowViewModel { Label = label, RowType = rowType, BadgeText = badgeText };
+        }
+
+        [Fact]
+        public void SourceColumn_GroupsRowsByTheBadgeTextTheyActuallyShow()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                SourceRow("v", PlanRowType.ShoppingVendor),
+                SourceRow("t1", PlanRowType.ShoppingBuy),
+                SourceRow("c", PlanRowType.ShoppingCurrency),
+                SourceRow("t2", PlanRowType.ShoppingBuy)
+            };
+
+            var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
+
+            // CURRENCY, TP, TP, VENDOR - and the two TP rows keep their
+            // original relative order (the stable tie-break).
+            Assert.Equal(new List<string> { "c", "t1", "t2", "v" }, Labels(sorted));
+        }
+
+        [Fact]
+        public void SourceColumn_SortsBySeededBadge_NotByRowType()
+        {
+            // A seeded hint replaces "UNKNOWN" with its own badge on the
+            // row, so a SALVAGE row must sort with the S's, not with the
+            // other ShoppingUnknown rows. Sorting by PlanRowType would put
+            // these two adjacent and call it a group.
+            var rows = new List<PlanRowViewModel>
+            {
+                SourceRow("unknown", PlanRowType.ShoppingUnknown),
+                SourceRow("tp", PlanRowType.ShoppingBuy),
+                SourceRow("salvage", PlanRowType.ShoppingUnknown, badgeText: "SALVAGE")
+            };
+
+            var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
+
+            Assert.Equal(new List<string> { "salvage", "tp", "unknown" }, Labels(sorted));
+        }
+
+        [Fact]
+        public void SourceColumn_DescendingReversesTheGroups()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                SourceRow("tp", PlanRowType.ShoppingBuy),
+                SourceRow("vendor", PlanRowType.ShoppingVendor),
+                SourceRow("currency", PlanRowType.ShoppingCurrency)
+            };
+
+            var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Descending));
+
+            Assert.Equal(new List<string> { "vendor", "tp", "currency" }, Labels(sorted));
+        }
+
+        [Fact]
+        public void SourceColumn_UnbadgedRowsDoNotThrowAndSortFirst()
+        {
+            // A row type the Shopping List does not emit has no badge at
+            // all. It must not blow up the comparator.
+            var rows = new List<PlanRowViewModel>
+            {
+                SourceRow("tp", PlanRowType.ShoppingBuy),
+                SourceRow("nothing", PlanRowType.UsedMaterial)
+            };
+
+            var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
+
+            Assert.Equal(new List<string> { "nothing", "tp" }, Labels(sorted));
+        }
+
         private static List<int> Quantities(IReadOnlyList<PlanRowViewModel> rows)
         {
             var quantities = new List<int>();

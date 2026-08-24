@@ -72,6 +72,60 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(edges.EachRightEdge < edges.TotalRightEdge);
         }
 
+        // --- Source column (the badge stopped trailing the name and
+        // became an aligned column inside the pinned right-hand block) ---
+
+        [Fact]
+        public void SourceColumn_SitsOneGapAndOneAmountBandLeftOfTheAmountEdge()
+        {
+            var edges = ShoppingColumnMath.ComputeEdges(
+                totalRightEdge: 792, maxEachWidth: 40, maxTotalWidth: 60,
+                maxQtyWidth: 79, sourceColumnWidth: 96);
+
+            Assert.Equal(
+                edges.QtyRightEdge - 79 - ShoppingColumnMath.ColumnGap - 96,
+                edges.SourceX);
+        }
+
+        [Fact]
+        public void SourceColumn_LeftEdgeIsTheNameBudgetsStop_NotTheAmountEdge()
+        {
+            // The name used to budget against QtyRightEdge with its OWN
+            // badge width subtracted, so no two rows' badges lined up. The
+            // budget stops at one fixed x for the whole table now, and that
+            // x is strictly left of the Amount column.
+            var edges = ShoppingColumnMath.ComputeEdges(792, 40, 60, 79, 96);
+
+            Assert.True(edges.SourceX < edges.QtyRightEdge);
+        }
+
+        [Fact]
+        public void WiderBadge_MovesTheSourceColumnLeft_AndNothingElse()
+        {
+            // The badge column widens into the NAME's space, never into
+            // Amount/Each/Total - every one of those hangs off the pinned
+            // right edge and is unaffected.
+            var narrow = ShoppingColumnMath.ComputeEdges(792, 40, 60, 79, 60);
+            var wide = ShoppingColumnMath.ComputeEdges(792, 40, 60, 79, 100);
+
+            Assert.Equal(narrow.SourceX - 40, wide.SourceX);
+            Assert.Equal(narrow.QtyRightEdge, wide.QtyRightEdge);
+            Assert.Equal(narrow.EachRightEdge, wide.EachRightEdge);
+            Assert.Equal(narrow.TotalRightEdge, wide.TotalRightEdge);
+        }
+
+        [Fact]
+        public void SourceColumn_TracksThePanelEdgeLikeEveryOtherColumn()
+        {
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1252, maxEachWidth: 40, maxTotalWidth: 60,
+                maxQtyWidth: 79, sourceColumnWidth: 96);
+            var wider = ShoppingColumnMath.ComputeEdgesForPanel(1452, 40, 60, 79, 96);
+
+            Assert.Equal(edges.SourceX + 200, wider.SourceX);
+            Assert.Equal(PlanRelayoutMath.PinnedRightEdge(1252), edges.TotalRightEdge);
+        }
+
         // --- SegmentRunWidth (currency-segment width computation, KNOWN-ISSUES #16) ---
 
         [Fact]

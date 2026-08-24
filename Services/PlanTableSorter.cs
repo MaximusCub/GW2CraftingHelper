@@ -6,14 +6,15 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Columns the Crafting Plan's two sortable tables expose. Used
-    /// Materials has Item/Amount only; the Shopping List has all four.
+    /// Materials has Item/Amount only; the Shopping List has all five.
     /// </summary>
     public enum PlanTableColumn
     {
         Item,
         Amount,
         Each,
-        Total
+        Total,
+        Source
     }
 
     /// <summary>
@@ -82,6 +83,22 @@ namespace GW2CraftingHelper.Services
                     return CompareValue(
                         a?.CoinValue ?? 0, a?.CurrencyCosts,
                         b?.CoinValue ?? 0, b?.CurrencyCosts, direction);
+                case PlanTableColumn.Source:
+                    // The BADGE TEXT, which is what the column actually
+                    // shows - not PlanRowType, whose declaration order is
+                    // an implementation detail, and not a hand-written
+                    // source ranking, which would need a reason the reader
+                    // could see. Sorting by the visible text groups every
+                    // TP row together, every VENDOR row together, and every
+                    // seeded hint badge (SALVAGE, EXPLORE) with its own
+                    // kind. Ties fall through to the caller's stable
+                    // original-order tie-break.
+                    return Flip(
+                        string.Compare(
+                            ShoppingSourceBadge.ForRow(a) ?? string.Empty,
+                            ShoppingSourceBadge.ForRow(b) ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase),
+                        direction);
                 default:
                     return 0;
             }

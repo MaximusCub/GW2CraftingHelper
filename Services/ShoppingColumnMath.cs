@@ -25,29 +25,51 @@ namespace GW2CraftingHelper.Services
             public readonly int EachRightEdge;
             public readonly int QtyRightEdge;
 
-            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge)
+            /// <summary>
+            /// LEFT edge of the source-badge column, and where its header
+            /// label sits. Left, not right: badges are words of different
+            /// lengths, and a column of them reads as a column because
+            /// their left edges rule - the same choice Required Recipes'
+            /// Discipline column makes.
+            /// </summary>
+            public readonly int SourceX;
+
+            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge, int sourceX)
             {
                 TotalRightEdge = totalRightEdge;
                 EachRightEdge = eachRightEdge;
                 QtyRightEdge = qtyRightEdge;
+                SourceX = sourceX;
             }
         }
 
         /// <summary>
-        /// Right edges for the Amount/Each/Total columns, derived
+        /// Right edges for the Source/Amount/Each/Total columns, derived
         /// right-to-left off totalRightEdge so header and data rows stay in
         /// lockstep by construction (both are handed the same ColumnEdges
         /// instance for a given render). Total's band width is
         /// max(TotalMinWidth, maxTotalWidth); Each's band width is
         /// max(EachMinWidth, maxEachWidth) - each band plus a ColumnGap is
         /// reserved to its right neighbor's left.
+        /// <para>
+        /// The source badge used to be glued to the name's right edge, so
+        /// its x moved with every row's own name length and no two rows'
+        /// badges lined up. It is a column in the right-hand block now:
+        /// maxQtyWidth and sourceColumnWidth are BAND widths (the widest
+        /// value each column draws this render), never one row's own, so a
+        /// short "1x" row cannot let its name run under the widest "429750x"
+        /// beside it.
+        /// </para>
         /// </summary>
-        public static ColumnEdges ComputeEdges(int totalRightEdge, int maxEachWidth, int maxTotalWidth)
+        public static ColumnEdges ComputeEdges(
+            int totalRightEdge, int maxEachWidth, int maxTotalWidth,
+            int maxQtyWidth = 0, int sourceColumnWidth = 0)
         {
             int eachRightEdge = totalRightEdge - EffectiveTotalWidth(maxTotalWidth) - ColumnGap;
             int qtyRightEdge = eachRightEdge - EffectiveEachWidth(maxEachWidth) - ColumnGap;
+            int sourceX = qtyRightEdge - maxQtyWidth - ColumnGap - sourceColumnWidth;
 
-            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge);
+            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge, sourceX);
         }
 
         private static int EffectiveTotalWidth(int maxTotalWidth)
@@ -70,10 +92,12 @@ namespace GW2CraftingHelper.Services
         /// table differently.
         /// </summary>
         public static ColumnEdges ComputeEdgesForPanel(
-            int panelWidth, int maxEachWidth, int maxTotalWidth)
+            int panelWidth, int maxEachWidth, int maxTotalWidth,
+            int maxQtyWidth = 0, int sourceColumnWidth = 0)
         {
             return ComputeEdges(
-                PlanRelayoutMath.PinnedRightEdge(panelWidth), maxEachWidth, maxTotalWidth);
+                PlanRelayoutMath.PinnedRightEdge(panelWidth),
+                maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth);
         }
 
         /// <summary>

@@ -34,5 +34,39 @@ namespace GW2CraftingHelper.Services
                 default: return null;
             }
         }
+
+        /// <summary>
+        /// What the badge means, in prose - the hover on the pill itself.
+        /// The badge is four to seven capital letters, which says WHICH
+        /// source only to a reader who already knows the vocabulary; this
+        /// says what to actually do about it.
+        /// <para>
+        /// A seeded acquisition hint always wins for the sources that can
+        /// carry one: the hint is specific to this item ("Salvage from
+        /// level 80 rares"), and generic prose would be strictly less
+        /// useful sitting on top of it. Null for a row type the Shopping
+        /// List does not emit, matching <see cref="ForRow"/>.
+        /// </para>
+        /// </summary>
+        public static string TooltipForRow(PlanRowViewModel row)
+        {
+            if (row == null) return null;
+            switch (row.RowType)
+            {
+                case PlanRowType.ShoppingBuy:
+                    return "Buy on the Trading Post";
+                case PlanRowType.ShoppingVendor:
+                    return string.IsNullOrEmpty(row.HintText)
+                        ? "Buy from a vendor"
+                        : "Buy from a vendor - " + row.HintText;
+                case PlanRowType.ShoppingCurrency:
+                    return "Paid from your wallet";
+                case PlanRowType.ShoppingUnknown:
+                    return !string.IsNullOrEmpty(row.HintText)
+                        ? row.HintText
+                        : "No known acquisition source - check the item's wiki page";
+                default: return null;
+            }
+        }
     }
 }

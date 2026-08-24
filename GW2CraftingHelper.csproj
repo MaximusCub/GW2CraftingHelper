@@ -185,6 +185,7 @@
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
+    <Compile Include="Views\Rendering\ShoppingBadgeColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
