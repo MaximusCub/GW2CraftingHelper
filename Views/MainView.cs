@@ -2079,9 +2079,11 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyRichDeferred(nameLabel, build);
             TooltipFacility.ApplyRichDeferred(breakdownLabel, build);
 
-            // Only when the row has a real item id: the icon may already
-            // carry its own "no icon available" note, and a deferred
-            // builder with nothing to say would replace that with silence.
+            // Only when the row has a real item id: a non-item row's icon
+            // names what it actually is, and an item builder has nothing
+            // better to say about it. (An EMPTY payload is no longer the
+            // hazard here - ApplyRichDeferredToIconTree keeps the control's
+            // own note as the builder's fallback.)
             if (row.ItemId > 0)
             {
                 IconControls.ApplyRichDeferredToIconTree(icon, build);

@@ -176,11 +176,18 @@ namespace GW2CraftingHelper.Views.Rendering
         /// row whose content is composed at hover time (see
         /// <c>TooltipFacility.ApplyRichDeferred</c>). Unlike the eager
         /// version this cannot skip an empty payload, because nothing is
-        /// composed yet - a builder that has nothing to say returns empty
-        /// content and the surface stays hidden, which leaves the icon's
-        /// own plain tooltip (the missing-icon note, a currency name)
-        /// overwritten rather than intact. Only ever called for item rows,
-        /// which always have at least a name to show.
+        /// composed yet - so each control's own plain tooltip (the
+        /// missing-icon note, a currency name) is captured here and becomes
+        /// the builder's fallback instead of being overwritten with
+        /// silence. A row having a real item id does NOT make its builder
+        /// non-empty: a plan restored from disk has no stat blocks until
+        /// the background top-up lands, and a row whose name is short
+        /// enough not to ellipsize composes nothing at all until then.
+        /// <para>
+        /// Captured before the call, not after: registering rich content
+        /// nulls <c>BasicTooltipText</c> so that an assigned surface cannot
+        /// be dropped by a later text change.
+        /// </para>
         /// </summary>
         internal static void ApplyRichDeferredToIconTree(Control control, System.Func<TooltipContent> build)
         {
@@ -189,7 +196,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 return;
             }
 
-            TooltipFacility.ApplyRichDeferred(control, build);
+            string note = control.BasicTooltipText;
+            TooltipFacility.ApplyRichDeferred(
+                control,
+                string.IsNullOrEmpty(note) ? build : () => TooltipContent.OrText(build(), note));
 
             if (control is Container container)
             {

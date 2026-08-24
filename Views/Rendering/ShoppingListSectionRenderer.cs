@@ -386,8 +386,10 @@ namespace GW2CraftingHelper.Views.Rendering
             IconControls.ApplyRichDeferredToIconTree(tagPanel, buildTooltip);
 
             // The icon only when the row has a real item id: a currency
-            // row's icon may carry its own note, and a deferred builder
-            // with nothing to say would replace it with silence.
+            // row's icon names its own currency, and an item builder has
+            // nothing better to say about it. (An EMPTY payload is no
+            // longer the hazard here - ApplyRichDeferredToIconTree keeps
+            // the control's own note as the builder's fallback.)
             if (row.ItemId > 0)
             {
                 IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);

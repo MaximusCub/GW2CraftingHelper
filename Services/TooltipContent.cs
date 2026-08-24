@@ -45,6 +45,27 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// <paramref name="content"/>, or the plain
+        /// <paramref name="fallbackText"/> when it has nothing to say.
+        /// <para>
+        /// The deferred rich path needs this because it cannot look before
+        /// it leaps: registering a builder clears whatever plain tooltip
+        /// the control already carried, and only when the builder finally
+        /// runs is it known to produce nothing - by which time the note it
+        /// replaced is gone. A control whose note is worth more than
+        /// silence hands it in here.
+        /// </para>
+        /// </summary>
+        public static TooltipContent OrText(TooltipContent content, string fallbackText)
+        {
+            if (content != null && !content.IsEmpty)
+            {
+                return content;
+            }
+            return string.IsNullOrEmpty(fallbackText) ? Empty : FromText(fallbackText);
+        }
+
+        /// <summary>
         /// For a composer that assembles its lines as a list it still needs
         /// to reorder (<c>TreeRowTooltipComposer</c> inserts the caption at
         /// the front after the fact) rather than streaming them into a
