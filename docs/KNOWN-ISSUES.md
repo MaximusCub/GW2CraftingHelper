@@ -13074,10 +13074,71 @@ setting with that shape was already silently ignoring it.
   re-reads it from the setting on every `Update`.
 - `ScrollDiagnosticsEnabled` - not affected. `CraftingPlanView` reads it
   from the setting at each use.
-- `LogMaxSizeBytes`, `LogRetentionDays` - excluded, not missed. Both are
-  once-per-session by design (`ModuleLog.Configure` and the retention
-  prune both run at startup), so they apply next session regardless of
-  which UI changed them.
+- `LogMaxSizeBytes` - **same defect, and the first sweep got this one
+  wrong.** It is not once-per-session: `ModuleLog.Configure` only seeds
+  it, `ModuleLog.MaxFileSizeBytes` is a live-settable property that every
+  file write re-reads for its self-trim check, and the Settings tab was
+  already pushing it there on Save with a comment saying exactly why. So
+  the tab's own Save applied immediately while a drag of the TrackBar
+  Blish renders for the same entry persisted a value the running file
+  sink ignored for the rest of the session. Now
+  `Module.OnLogMaxSizeBytesChanged` carries it and the tab's Save writes
+  the setting only, same shape as the two above. The handler reads
+  `GetClampedLogMaxSizeBytes()` rather than the raw new value, which is
+  load-bearing here and not just symmetry: `IntSettingView.RefreshValue`
+  widens the bar to `Math.Max(MaxValue, value)` and leaves `MinValue` at
+  0, so Blish's bar for this entry spans 0 to the persisted byte count
+  and can hand over a few hundred bytes - far under the 1 MB floor the
+  tab's own parser enforces.
+  Residual, deliberately not fixed: the tab's size TextBox does not
+  follow a Blish-side drag, so a Save there afterwards writes back what
+  the box still shows. Live-refreshing it would clobber a half-typed
+  entry, and the Save is an explicit user action; last writer wins, as
+  it did before.
+- `LogRetentionDays` - excluded, and this one holds. Age-based pruning
+  runs exactly once, in `Module.Initialize`, so a change applies next
+  session regardless of which UI made it. Nothing holds a live copy to
+  keep current.
+
+### The setting does not reach checkboxes, and cannot cheaply
+
+Swept every Blish control the module instantiates for one that plays a
+sound of its own. Measured from the 1.3.0 decompile - the controls that
+call `PlaySoundEffectByName` are `Checkbox`, `ColorBox`, `CornerIcon`,
+`GlowButton`, `MenuItem`, `StandardButton`, `TabbedWindow` and
+`WindowBase`; of those the module uses `Checkbox` (7 sites:
+`SettingsTabContent` x2, `CraftingPlanView` x3, `MainView`,
+`LogTabContent`), `CornerIcon` (1), `StandardButton` (every
+`FeedbackButton`) and `TabbedWindow2`/`WindowBase` as its window chrome.
+
+- `StandardButton` is already mute - it passes `"audio\\button-click"`
+  to a reader already rooted at `audio`, so the `FileExists` check fails
+  and it returns silently. That bug is why `FeedbackButton` exists, and
+  it is what makes the module's buttons fully controlled by the slider.
+- `Checkbox` (`OnLeftMouseButtonReleased`) and `CornerIcon` (`OnClick`)
+  are **not** covered. They play `"button-click"` at
+  `GameIntegration.Audio.Volume` - the same quiet, game-derived path
+  this branch replaced everywhere else.
+- Window/tab chrome (`window-close`, `tab-swap-N`) is Blish's own and
+  out of scope for a module setting.
+
+So at 0 the module is silent except for a checkbox tick and the corner
+icon, and at 100 a checkbox is audibly quieter than a button in the same
+window. That is a real seam and the field test will meet it.
+
+Why it is not fixed here: the sound sits **inside** those overrides,
+ahead of the base call. `Checkbox.OnLeftMouseButtonReleased` is
+`if (Enabled) { Content.PlaySoundEffectByName("button-click"); }
+base.OnLeftMouseButtonReleased(e);`, and `Control`'s base method is what
+raises `Click` (via `_clickPrimed`/`_lastClickTime`, both private). A
+subclass that skipped the base to skip the sound would break clicking;
+there is no hook, no volume argument and no static to swap. The only
+full fix is a module-owned checkbox: `LabelBase` is public, `DrawText`
+and `LabelRegion` are protected, and `Checkable.TextureRegionsCheckbox`
+is public, so Blish's own 25-line `Checkbox` can be reimplemented
+verbatim minus the sound - but that is a new control plus 7 call-site
+changes across 4 view files, which does not belong in a branch whose
+subject is a volume slider. Deferred, with the recipe recorded here.
 
 ### Incidental: this is now cheaper per click, not dearer
 
@@ -13094,8 +13155,11 @@ session, same as `TooltipFacility`).
    drags with the readout tracking it live.
 2. The **Test** button audibly plays the click, and its loudness follows
    the slider - clearly louder at 100 than at 25.
-3. **0 is silent**: drag to 0 and neither the Test button nor any other
-   button, row or pill in the module makes a sound.
+3. **0 is silent for the clicks this module plays**: drag to 0 and
+   neither the Test button nor any other button, row or pill in the
+   module makes a sound. Checkboxes and the corner icon are knowingly
+   NOT covered - they still tick at Blish's own volume (see the section
+   above); hearing those at 0 is expected, not a gate failure.
 4. The value **survives a relaunch**: set something distinctive (say 40),
    close Blish, reopen, and the slider, the readout and the actual
    loudness all come back at 40.
@@ -13103,6 +13167,10 @@ session, same as `TooltipFacility`).
    volume slider Blish renders under Manage Modules and confirm the next
    click is immediately at the new loudness (no relaunch) and that this
    tab's slider and readout follow it.
-6. Report the number that feels right - it replaces `DefaultPercent`.
+6. **Log size cap, same wiring, no regression**: with the Settings tab's
+   Logging section on 1 MB, Save, and confirm `data/module_log.jsonl`
+   still trims at the saved cap this session (the tab no longer pushes
+   it directly - `Module` does).
+7. Report the number that feels right - it replaces `DefaultPercent`.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

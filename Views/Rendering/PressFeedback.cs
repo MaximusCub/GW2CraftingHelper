@@ -53,6 +53,16 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <see cref="ClickSound"/> for the measured path and for what
         /// playing it ourselves gives up.
         /// </para>
+        /// <para>
+        /// Reaches only the controls this module wires. Blish's Checkbox
+        /// and CornerIcon play "button-click" themselves, from inside
+        /// OnLeftMouseButtonReleased / OnClick, guarded by nothing but
+        /// Enabled - so those clicks stay at Blish's volume and the setting
+        /// does not silence them. A subclass cannot intercept it: the sound
+        /// sits ahead of the base call that raises Click, so skipping the
+        /// base to skip the sound would break the control. KNOWN-ISSUES
+        /// carries the full sweep and the deferred fix.
+        /// </para>
         /// </summary>
         internal static void PlayClick()
         {

@@ -107,7 +107,13 @@ namespace GW2CraftingHelper.Services
         public SettingEntry<int> SnapshotRefreshIntervalMinutes { get; private set; }
 
         // How loud this module's own UI click plays, 0-100, where 0 is no
-        // sound at all and 100 is the click asset at full scale. Read live
+        // sound at all and 100 is the click asset at full scale. Covers
+        // every click this module plays itself (PressFeedback.Wire) and
+        // nothing else: Blish's Checkbox and CornerIcon play their own
+        // sound from inside their own event overrides, at Blish's
+        // game-derived volume, and no setting here reaches them - see
+        // KNOWN-ISSUES for the measured reason and the deferred fix. Read
+        // live
         // by Views/Rendering/ClickSound (pushed there by Module at load and
         // by the Settings tab's slider on every drag - idiom (a),
         // immediate-apply, like LogDiagnosticsEnabled above), never by the
@@ -183,7 +189,7 @@ namespace GW2CraftingHelper.Services
             ClickSoundVolumePercent = settings.DefineSetting(
                 "ClickSoundVolumePercent", ClickSoundVolume.DefaultPercent,
                 () => "Click volume",
-                () => "How loud this module's own UI click plays (0 = off, 100 = loudest)");
+                () => "How loud this module's own click plays when you press its buttons, rows and pills (0 = off, 100 = loudest). Checkboxes keep Blish HUD's own click sound.");
         }
 
         /// <summary>
