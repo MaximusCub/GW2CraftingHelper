@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Xunit;
@@ -148,5 +149,44 @@ namespace GW2CraftingHelper.Tests.Services
                 "Spirit Shards: HAVE 100/100 THIS ROW (wallet 250)"
             }, lines);
         }
-    }
+    
+        [Fact]
+        public void BuildRowContent_PutsTheStatBlockAheadOfTheHaveNeedLines()
+        {
+            var costs = new List<CurrencyAmountViewModel>
+            {
+                new CurrencyAmountViewModel
+                {
+                    Amount = 100, Name = "Karma", OwnedQuantity = 40, RawOwnedQuantity = 40
+                }
+            };
+
+            var lines = ShoppingRowTooltipFormatter.BuildRowContent(
+                new ItemStatBlock { ItemId = 1, Name = "Bag of Stuff", Rarity = "Fine", VendorValue = 7 },
+                "Bag of Stuff",
+                nameTruncated: true,
+                hintText: "Salvage from level 80 gear.",
+                currencyCosts: costs).ToPlainLines();
+
+            // The stat block opens the tooltip, so the full-name line it
+            // would otherwise duplicate is gone.
+            Assert.Equal("Bag of Stuff", lines[0]);
+            Assert.Equal(1, lines.Count(l => l == "Bag of Stuff"));
+
+            int hint = lines.IndexOf("Salvage from level 80 gear.");
+            int have = lines.IndexOf("Karma: HAVE 40/100 THIS ROW, NEED 60");
+            Assert.True(hint > 0);
+            Assert.Equal(hint + 1, have);
+            Assert.Equal("", lines[hint - 1]);
+        }
+
+        [Fact]
+        public void BuildRowContent_WithoutStats_IsExactlyTheTooltipTheRowAlwaysHad()
+        {
+            var lines = ShoppingRowTooltipFormatter.BuildRowContent(
+                null, "A Very Long Item Name", true, "A hint.", null).ToPlainLines();
+
+            Assert.Equal(new[] { "A Very Long Item Name", "", "A hint." }, lines);
+        }
+}
 }

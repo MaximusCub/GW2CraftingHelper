@@ -37,7 +37,9 @@ namespace GW2CraftingHelper.Tests.Services
             // shows the more specific one.
             Assert.Equal("Account Bound on Use", block.Binding);
             Assert.Equal(240L, block.VendorValue);
-            Assert.Equal("Crafted in the style of the renowned asuran genius, Zojja.", block.FlavorText);
+            Assert.Equal(
+                "Crafted in the style of the renowned asuran genius, Zojja.",
+                ItemDescriptionSanitizer.Sanitize(block.Description));
         }
 
         [Fact]
@@ -50,7 +52,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Basic", block.Rarity);
             Assert.Equal("CraftingMaterial", block.ItemType);
             Assert.Equal(7L, block.VendorValue);
-            Assert.Equal("Refine into Ingots.", block.FlavorText);
+            Assert.Equal("Refine into Ingots.", ItemDescriptionSanitizer.Sanitize(block.Description));
 
             Assert.Null(block.SubType);
             Assert.Null(block.Defense);
@@ -104,7 +106,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(block.Attributes);
             Assert.Null(block.Binding);
             Assert.Equal(65L, block.VendorValue);
-            Assert.Equal("Element: Brilliance\nDouble-click to apply to a piece of armor.", block.FlavorText);
+            Assert.Equal(
+                "Element: Brilliance\nDouble-click to apply to a piece of armor.",
+                ItemDescriptionSanitizer.Sanitize(block.Description));
         }
 
         [Fact]
@@ -159,7 +163,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(block.Restrictions);
             Assert.Null(block.Binding);
             Assert.Null(block.VendorValue);
-            Assert.Equal("", block.FlavorText);
+            Assert.Equal("", ItemDescriptionSanitizer.Sanitize(block.Description));
         }
     }
 }

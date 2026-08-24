@@ -184,6 +184,79 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// Fills the SESSION STAT CACHE for ids that have none, and does
+        /// nothing else - the background top-up a plan restored from disk
+        /// runs so its rows can show item tooltips at all (Q13). Returns
+        /// how many blocks it added.
+        /// <para>
+        /// Deliberately NOT <see cref="GetMetadataAsync"/>: that method
+        /// writes the unlocked <c>_cache</c> and <c>_knownMissing</c>,
+        /// which only the plan-generation path touches, and a restore-time
+        /// top-up racing a Generate would then be two threads writing one
+        /// Dictionary. This path writes only the locked stat table, which
+        /// is already designed for a background writer and a UI-thread
+        /// reader.
+        /// </para>
+        /// <para>
+        /// Best effort by design: a failing batch is skipped, not thrown -
+        /// the outcome of failing is exactly the pre-existing behaviour (a
+        /// restored row with no stat block falls back to its plain
+        /// tooltip), so an outage must not surface as an error here.
+        /// </para>
+        /// </summary>
+        public async Task<int> WarmStatBlocksAsync(IEnumerable<int> itemIds, CancellationToken ct)
+        {
+            if (itemIds == null)
+            {
+                return 0;
+            }
+
+            var toFetch = new List<int>();
+            lock (_statBlocksLock)
+            {
+                foreach (var id in new HashSet<int>(itemIds))
+                {
+                    if (id > 0 && !_statBlocks.ContainsKey(id))
+                    {
+                        toFetch.Add(id);
+                    }
+                }
+            }
+
+            int filled = 0;
+            for (int i = 0; i < toFetch.Count; i += BatchSize)
+            {
+                ct.ThrowIfCancellationRequested();
+                int count = Math.Min(BatchSize, toFetch.Count - i);
+                IReadOnlyList<RawItem> entries;
+                try
+                {
+                    entries = await _api.GetItemsAsync(toFetch.GetRange(i, count), ct);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    continue;
+                }
+
+                foreach (var entry in entries)
+                {
+                    var statBlock = ItemStatBlockFactory.Build(entry);
+                    if (statBlock == null)
+                    {
+                        continue;
+                    }
+                    lock (_statBlocksLock)
+                    {
+                        _statBlocks[entry.Id] = statBlock;
+                    }
+                    filled++;
+                }
+            }
+
+            return filled;
+        }
+
         private async Task FetchBatchIntoCacheAsync(List<int> batch, CancellationToken ct)
         {
             var entries = await _api.GetItemsAsync(batch, ct);

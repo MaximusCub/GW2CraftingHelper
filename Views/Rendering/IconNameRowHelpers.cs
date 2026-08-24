@@ -55,6 +55,15 @@ namespace GW2CraftingHelper.Views.Rendering
             internal Label NameLabel;
             internal string FullName;
             internal int NameX;
+
+            /// <summary>
+            /// The framed icon Panel. Returned so a caller can stamp the
+            /// row's tooltip onto it and its children: Blish resolves a
+            /// tooltip on the deepest control under the cursor and never
+            /// bubbles, so an unstamped icon is a hole in the row's own
+            /// hover - and the icon is the biggest target on the row.
+            /// </summary>
+            internal Panel IconFrame;
         }
 
         /// <summary>
@@ -71,7 +80,8 @@ namespace GW2CraftingHelper.Views.Rendering
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
             int iconSize = 32, int borderThickness = 1)
         {
-            IconControls.CreateRarityFramedIcon(rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);
+            var iconFrame = IconControls.CreateRarityFramedIcon(
+                rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);
 
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(rightEdge, qtyWidth, nameGap, nameX);
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);
@@ -89,7 +99,13 @@ namespace GW2CraftingHelper.Views.Rendering
                     Parent = rowPanel
                 });
 
-            return new IconNameHandle { NameLabel = nameLabel, FullName = fullName, NameX = nameX };
+            return new IconNameHandle
+            {
+                NameLabel = nameLabel,
+                FullName = fullName,
+                NameX = nameX,
+                IconFrame = iconFrame
+            };
         }
 
         /// <summary>

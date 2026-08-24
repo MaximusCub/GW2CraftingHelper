@@ -438,7 +438,8 @@ namespace GW2CraftingHelper
                 _settings,
                 ClearCache,
                 SaveStatus,
-                SaveStatusThreadSafe
+                SaveStatusThreadSafe,
+                itemMetadataService.GetCachedStatBlock
             );
 
             _craftingContent = new CraftingPlanView(
@@ -530,7 +531,13 @@ namespace GW2CraftingHelper
                     PersistResolvedPlanInBackground(result, overrides, ignoredItemIds);
                     return result;
                 },
-                itemMetadataService.GetCachedStatBlock
+                itemMetadataService.GetCachedStatBlock,
+                // Q13: a restored plan fetches its items' stat blocks in
+                // the background so its rows can show item tooltips at
+                // all. Fills only the session stat side table - see
+                // ItemMetadataService.WarmStatBlocksAsync for why it is
+                // not GetMetadataAsync.
+                ids => itemMetadataService.WarmStatBlocksAsync(ids, CancellationToken.None)
             );
 
             _settingsContent = new SettingsTabContent(_settings);
