@@ -13400,3 +13400,258 @@ handed to desktop gate step 6. The counts are corrected here, in
     lands the same hover shows the full stat block.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+
+## Plan-view redesign (plan-view-redesign)
+
+Branched from the unmerged `tooltip-authenticity` head, so its deferred
+rich-tooltip facility is part of this work's baseline - the ellipsis
+plus full-name idiom below is stamped through `TooltipFacility`.
+
+Built from `/mnt/c/Dev/Blish/plan-redesign/`: `spec.md` (build order,
+phases 0-4), `decisions.md` (the maintainer's rulings, which override
+the spec where they touch), and the four dossiers `typography.md`,
+`layout.md`, `minwidth.md`, `status-ux.md`. Where a dossier and the spec
+disagree the spec's cross-check wins; where anything and `decisions.md`
+disagree, `decisions.md` wins.
+
+### Phase 0 - foundations
+
+**Tables justify, they do not pull in.** Audit batch H pulled every
+table's right-hand block LEFT to sit one 24px breathing room past the
+widest name it rendered. The recovered space landed to the RIGHT of the
+block, which is what the maintainer's field test rejected: *"columns
+start off being smushed over to the left rather than justifying out to
+take up the available space dynamically... it leaves stranded dead
+space."* Every block is now pinned at
+`PlanRelayoutMath.PinnedRightEdge(P) = P - 8`, the name column is the
+only one that flexes, and ellipsis plus a full-text tooltip is the sole
+overflow idiom.
+
+Deleted rather than left unused, so no caller can reintroduce the
+pull-in: `RightBlockX`, `RightBlockRightEdge`, `TableGutterBreathingRoom`,
+`TableRightBlockMinX`; `ComputeTreeColumnEdges`' `widestNameEnd`
+PARAMETER; `TreeCostColumnMath`'s `measureNameEnd` callback,
+`TreeColumnScan.WidestNameEnd` and the depth-carrying walk that existed
+only for them; `ShoppingColumnMath.BlockWidth`;
+`SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel` /
+`CurrencyHeaderBandWidth` / `CurrencyTableOffsetX` (the currency table's
+CENTRING dies with the pull-in that motivated it);
+`RowRelayoutHelpers`' `dividerWidthForWidth` and
+`ShoppingListSectionRenderer.HeaderBandWidth`, both of which now compute
+exactly `P`. Header bands and row dividers are full-width again for
+free. Six per-render name pre-scans lose their name half; two lose the
+whole loop, so net `MeasureString` work per render goes DOWN.
+
+Two consequences the pinned model REQUIRES, since names can now actually
+be clipped where the pull-in guaranteed they could not:
+
+- a name's ellipsis budget stops at its neighbouring column's BAND (the
+  max across the table), not at that one row's own value width -
+  otherwise a row reading "1x" lets its name run under the column's
+  widest "429750x";
+- every band is `max(widest data, its own header label)`, because a
+  header at the ColumnHeader tier routinely out-measures the data under
+  it (measured: "Amount" 79px at 20-bold against a 32px "12x";
+  "Required" 89px against the currency number column's 60px floor).
+
+**The type ramp is named once.** `Services/TypeRampMetrics` holds the
+measured Menomonia ink for every size the module draws in and names the
+two promoted tiers: ColumnHeader 20 bold, SectionTitle 24 bold - JC-1
+resolved to Alternative B, maintainer: *"lets try 20/24 for now and if
+its too big we can go 18/22"*. The retreat is a two-line swap there,
+with the height constants and their tests following from it.
+`Views/Rendering/UiFonts` turns that into a `BitmapFont` and nothing
+else; an unmapped point size throws at the seam rather than rendering at
+a size no constant was derived for.
+
+Both measured font-inventory defects are recorded in code, not only in
+the dossier. **Menomonia 18-REGULAR's space glyph advances 4px** (against
+7 at 16-regular and 9 at 18-bold), so multi-word text at that size
+renders with collapsed word gaps - measured, `" x 42 needed"` is 104px at
+both 16-regular and 18-regular. That is why status is 18 BOLD, and why
+18-regular is now retired from the plan view entirely (it survives only
+in the Settings and About tabs, which this milestone does not restyle).
+**Menomonia 22-REGULAR is metrically identical to 24-regular** - same
+line height, cap and advances, different file bytes - so there is no
+regular-weight step between 20 and 24 and it must never be loaded.
+22-bold is a genuine intermediate.
+
+**Minimum window width 1478 -> 1378.** 1478 fitted the deepest chain
+that EXISTS ("+24 Agony Infusion", depth 23) untruncated. 1378 is
+derived for the deepest REALISTIC chain instead - the legendary trinkets
+Transcendence and Conflux, both exactly depth 14, whose widest row at
+every font size is `429750x Pile of Glittering Dust`. Every term
+measured at Menomonia 16 against the installed XNBs
+(`plan-redesign/minwidth.md`, which reproduces every anchor figure of
+`docs/research/minimum-window-width.md` byte for byte):
+
+```
+ 629  widestNameEnd = nameX(14) 394 + "429750x " 69 + name 166
+ +24  the designed name-to-pill gutter at the deepest row
++256  TreePillColumnWidth
++335  cost column: 181 worst-digit six-digit-gold coin run
+                 + 154 widest two-currency vendor run
+  +8  TableRightMargin
+---- 1252 tab panel  +126 chrome  ==== 1378
+```
+
+The +154 rider is JC-5, and it is the maintainer's call: the
+like-for-like depth-14 figure is **1232**, which accepts that a row
+combining a forced-craft dust chain with a vendor currency run
+ellipsizes. Declined - *"We are designing for a minimum resolution of
+1920x1080, so cramming down to a smaller min-size that will result in
+cramped renders seems bad... Full HD is on everything people game on."*
+A two-currency vendor run now always fits at the floor. The agony chain
+reads whole to depth 19 and ellipsizes from depth 20, six levels past
+the deepest realistic plan; that boundary is pinned by a test so the
+accepted degradation cannot quietly get worse. The controls row's own
+floor is subsumed and now measured rather than estimated: "Value Own
+Materials" is 145px at Blish's Font14, putting that row under 700px.
+
+**`StatusText.Count`** is the module's one spelling of a counted noun,
+so `"(s)"` never reaches the interface. `LogTabContent` routes through
+it. `ForOverrideResolve` still writes `"(N override(s))"` - the one
+remaining offender, and the string the events/state split rewrites
+outright rather than repairs, so it moves with that work in phase 3.
+
+### Phase 1 - typography rollout
+
+Column headers (all six tables, through `TableHeaderStyle.Font`'s single
+seam) and the Total Cost tile captions to ColumnHeader; the eight
+section titles to SectionTitle; the status line to Status (18 bold,
+JC-2); the plan header's `" x N needed"` suffix to SmallHeading (20
+regular) and the craft-step badge to SmallHeadingBold (20 bold), which
+between them retire 18-regular. Body rows are untouched - that is what
+keeps the depth-14 minimum valid.
+
+The Disciplines character-availability line goes Caption -> Body and
+keeps its grey: it was the one text in the view both smaller AND greyer
+than its neighbours, and it carries character names, which a user reads
+letter by letter. One channel of de-emphasis, not two. The craft-step
+sublabel stays Caption grey (JC-7) - it annotates a quantity, not a
+name.
+
+Heights, each derived from measured ink rather than chosen, and each
+moved in the same commit as its renderer because they are load-bearing
+for scroll math:
+
+| Constant | Was | Now | Derivation |
+|---|---|---|---|
+| `CTableHeaderRowHeight` / `CTableHeaderLabelY` | 28 / 5 | **32 / 4** | 20-bold lowest ink 26; y=4 reproduces the Body header's exact optics (cap top 8px down, ink bottom 2px clear) |
+| `SectionHeaderRowHeight` | 32 | **38** | 24-bold lowest ink 30; title y=3, ink bottom 33, divider top 35 |
+| `SectionHeaderCaretY` | 6 | **10** | the caret is Body against a SectionTitle title - baseline-aligned, with the same 1px optical lift the pair had |
+| `CostTileRowHeight` | 56 | **58** | caption block bottom 31 against an amount run bottom-anchored at 30 - a 1px overprint |
+| `CostBandCaptionLineHeight` | 25 | **32** | same 7px of slack over the real line height (18 -> 25) as before |
+| `StatusToSeparatorGap` | 23 | **25** | status lowest ink 23 plus the 2px it has always kept off the rule |
+| `InlineSpinnerLayout.PlanStripSize` | 18 | **20** | centred on a 23px line box rather than a 20px one |
+
+The Total Cost disclosure line stays Caption and gains its own measured
+height; it had been sharing the caption's, which would have grown it by
+7px for nothing.
+
+Three constants move from Views into `PlanContentHeightMath` and are
+aliased back (`TableHeaderStyle.LabelY`, the section-header band's three
+y's, the cost tile's caption y and amount pad). A label y and the band
+height it sits in are one piece of arithmetic, and only one of the two
+was testable where they lived.
+
+### Phases 2-4 - not yet landed
+
+Layout per section, the events/state split with its chips and confirm
+matrix, and the pill update-in-place fix are still to come on this
+branch. Extend the sections above rather than opening a second
+milestone heading.
+
+### Accepted divergences
+
+1. **`RecipeRowHeightWithSublabel` (48) survives phase 1.** The spec's
+   height table lists it as deleted, but nothing about a font retires
+   it - the 48px row dies when the discipline sublabel becomes a COLUMN,
+   which is phase 2. Deleting the height while the sublabel still
+   renders would clip it.
+2. **`StatusToSeparatorGap` is 25, not the spec's "+3px".** The spec
+   derived the move from the LINE HEIGHT (20 -> 23); the constant's own
+   doc comment derives it from the LOWEST INK plus 2px of clearance,
+   which is 23 -> 25. The measured-clearance rule is the one that ships
+   and the one the test asserts.
+3. **The Required Recipes status pre-scan is gone entirely**, rather
+   than kept as a header-aware band. Nothing consumes a band width there
+   yet: the recipe name is uncapped today and gains its ellipsis budget
+   with the Discipline column in phase 2, which is when the scan comes
+   back. No regression either way - a long recipe name could already run
+   under the status tag.
+4. **The currency table keeps its nested full-width content panel.** It
+   existed to be the centred slice; with the table pinned it is the same
+   size as the row panel around it. Left in place because the row's
+   truncation tooltip is stamped on it, and because unpicking the
+   parenting is churn phase 2 would only have to read past.
+5. **`UiFonts.Title` (18 regular) still exists** for the Settings and
+   About tabs' own section headers. They have the same collapsed-space
+   defect, but restyling two tabs this milestone does not otherwise
+   touch is not a font rollout, it is a second redesign.
+
+### For reviewer scrutiny
+
+1. The band-vs-row-width change in the name budgets (Used Materials,
+   Shopping List, Disciplines characters). Every one of those three now
+   budgets against the column's widest value rather than the row's own,
+   which is correct for a pinned band and is a REAL behaviour change:
+   short-value rows lose a few pixels of name they used to keep.
+2. `PlanContentHeightMath.SectionHeaderCaretY = 10` is baseline
+   alignment, not centring - `layout.md` suggested centring the caret in
+   the band (y=9 at 38px). Baseline was chosen because the pair reads as
+   one line and the old 18pt pairing was already baseline-aligned to
+   within a pixel. Cheap to swap.
+3. Whether 20/24 is in fact too big. Every height above is derived from
+   `TypeRampMetrics`' tier seats, and the tests assert derivations
+   rather than literals, so the 18/22 retreat is a two-line change plus
+   whatever the test failures then name.
+4. `UiFonts` resolves `GetFont` per property access rather than
+   memoizing. Blish caches internally (`_loadedBitmapFonts`), and the
+   call sites are per-section, never per-row; a static cache here would
+   outlive a module reload and hold a disposed font.
+5. The 1378 figure spends 146px on a rider that only the widest
+   two-currency vendor offer needs. 1232 is one constant away.
+
+### Desktop gate checklist (live Blish, real plan)
+
+1. Every section at the 1378px minimum width: the ramp is legible -
+   section title, then column header, then row, each visibly a step
+   above the next, in the Total Cost band, Recipe Tree, Used Materials,
+   Shopping List, Required Disciplines, Required Recipes, Crafting
+   Steps and Notes.
+2. Full-width justification at 1378 AND at a wide client (1920+ and
+   wider): every table's rightmost column ends one margin in from the
+   panel edge, header bands and row dividers run the full width, and no
+   table leaves a stranded band of dead space beside it at any width.
+   Drag the window across the whole range and watch for a column that
+   stops tracking.
+3. Ellipsis plus full-name tooltip on a DEEP tree (a legendary, expand
+   to depth 14+): truncated names end in an ellipsis and hovering shows
+   the whole name. Confirm the same on a truncated Used Materials,
+   Shopping List and Disciplines-characters row - hovering the LABEL,
+   not only the strip beside it.
+4. The Overrides and Ignored chips appear with a non-zero count,
+   disappear at zero, and show the right numbers after each of: a pill
+   click, Craft All, Buy All, Best Path, Clear Overrides, Clear Ignored,
+   Generate Plan.
+5. Both chip clear actions go through the confirm matrix's
+   would-change-anything guard, and each is distinct from Best Path
+   (clear = back to solver defaults; Best Path = apply the cheapest
+   preset).
+6. Confirm matrix including the no-op cases: Best Path with no
+   overrides, Craft All when everything craftable is already crafted,
+   Buy All when everything buyable is already bought. Each must SKIP the
+   dialog, skip the re-solve, and say why on the status line.
+7. Rapid stationary IGNORE toggling: click one pill repeatedly WITHOUT
+   moving the mouse. Every click lands, the pill's own highlight tracks
+   its state, and no click is swallowed by a rebuild frame.
+8. The Generate Plan tooltip is present and states both facts (fetches
+   prices and rebuilds; clears manual decisions and ignore marks) - it
+   is that button's entire safety mechanism.
+9. Status strip at 18 bold with the 20px spinner: no descender touches
+   the separator rule, the spinner sits inside the band, and the longest
+   real status line still fits at 1378.
+10. Confirm no ID of any kind became visible anywhere in the redesign.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
