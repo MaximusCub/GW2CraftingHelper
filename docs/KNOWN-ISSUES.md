@@ -12883,3 +12883,87 @@ user's live checks. Bonus: the Clear Cache ModalDialog message wraps
 un-clipped with Caption-measured button padding, the ApiAccessDialog
 stacking case renders as recorded, and both plan generations logged
 single [plan] tags.
+
+## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
+
+Two maintainer findings from the same field-test round, both about what
+the plan shows once nothing is left to buy.
+
+### 1. The root row must not offer IGNORE
+
+"You should probably not be able to IGNORE the top level item in the
+recipe tree." The Ignore pill means "treat this item as already in hand
+tree-wide"; on the plan's own target that is a request to plan nothing,
+and gw2e offers it only because gw2e's tree has no separate target row.
+
+`CraftingTreeNode.IsPlanRoot` is set in `CraftingTreeBuilder.BuildTree` -
+the one method that knows which node the caller asked for a tree OF, and
+the method a multi-item batch calls once per requested root, so all N
+roots carry it. `DecisionPillPlanner.AppendOwnershipPills` then skips the
+"IGNORE" spec for a root, which removes the affordance everywhere at
+once: `TreeSectionController` wires the click handler FROM the spec list,
+so a suppressed spec is a suppressed handler. Nothing under `Views/` was
+edited.
+
+The un-ignore half of the toggle is deliberately NOT suppressed. Ignores
+are keyed by item id and are restored across sessions
+(`PersistedPlan.IgnoredItemIds`), so an item ignored as an ingredient can
+later be planned as the target and arrive at the root already ignored -
+the "IGNORED" pill in the `Decision == Have` branch is the only way back
+out of that state.
+
+`PersistedPlan.CurrentSchemaVersion` goes **3 -> 4**. `IsPlanRoot` is
+part of the persisted graph, so a file written before it existed would
+restore every root with the flag false and put the pill straight back;
+the bump makes such a file degrade to the ordinary "no restored plan"
+fresh start (`PlanStoreTests.LoadLatest_RootIgnoreSchemaVersion3File_*`).
+
+### 2. A zero-cost plan must still render the whole band
+
+"If you do ignore it the display layout in Total Cost section gets all
+messed up and reverts to just showing the Actual Cost to Craft section
+with 0c while the rest of the layout disappears when it should revert to
+0s."
+
+The cause is `PlanViewModelBuilder.BuildCostFormulaBand`'s collapse rule,
+not the renderer: with no owned-materials term the band emits ONE tile,
+and `SummarySectionRenderer` left-aligns a lone tile in a full-width
+band. That reads fine next to a real number and reads as a broken
+section next to `0c`. The rule now collapses only when there is a cost to
+show - a plan whose coin cost AND owned-materials term are both zero
+renders the full "Total Materials Value - Your Materials Used = Actual
+Cost to Craft" formula at zero, tooltips and footnote included.
+
+This is fixed as a class, not for root-ignore alone: item 1 removes root
+ignore as a UI path, but ignoring every child, owning everything, or a
+currency-only plan all still reach a zero coin cost, and every one of
+them now gets the same band. Band height is unaffected either way -
+`SummarySectionLayoutMath.BodyHeight` counts one cost band whether it
+holds 1 or 3 tiles.
+
+Coverage: `PlanRootIgnoreTests` (pill suppression across every
+`BuildPillSpecs` return path, the flag's single write site, a real
+multi-item batch, and the end-to-end "ignore every ingredient" plan
+through `CraftingPlanPipeline.ResolveWithOverrides` into
+`PlanViewModelBuilder`), plus three zero-band cases in
+`PlanViewModelBuilderSummaryTests`. Two pre-existing
+`DecisionPillPlannerTests` end-to-end cases asserted an IGNORE pill on a
+`BuildTree` root and were updated to the new expectation.
+
+### Desktop gate
+
+1. Generate any plan. The **root row shows no IGNORE pill** - source
+   pills and any HAVE annotation are unchanged, and every child row still
+   offers IGNORE. Check a multi-item batch too: all N top-level rows.
+2. Ignore **every child** of the root until the plan costs nothing. The
+   Total Cost section still shows the **full band** - "Total Materials
+   Value - Your Materials Used = Actual Cost to Craft" - with 0 amounts,
+   the "-"/"=" operators between the tiles, the result tile's highlight
+   box, and the footnote line. It does not collapse to a lone 0c tile.
+3. Un-ignore one of those children: the band returns to its ordinary
+   shape and the numbers come back.
+4. Ignore an ingredient in one plan, then Generate a plan for THAT item.
+   Its root row shows HAVE + IGNORED (not IGNORE), and clicking IGNORED
+   restores the real plan.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
