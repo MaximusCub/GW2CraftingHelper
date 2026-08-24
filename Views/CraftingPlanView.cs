@@ -93,6 +93,11 @@ namespace GW2CraftingHelper.Views
         // a null RESULT both mean the same thing here: fall back to the
         // tooltip this surface had before stat tooltips existed.
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
+        // Q13: fills the session stat cache for a restored plan's items in
+        // the background. Never on the hover path - see
+        // ItemMetadataService.GetCachedStatBlock.
+        private readonly Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -591,7 +596,12 @@ namespace GW2CraftingHelper.Views
             ModuleSettings settings,
             PlanStripStatusBoard statusBoard,
             Func<PlanSolveContext, IReadOnlyDictionary<int, AcquisitionSource>, ISet<int>, CraftingPlanResult> resolveOverridesSync = null,
-            Func<int, ItemStatBlock> getItemStatBlock = null)
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            // Background stat top-up for a plan restored from disk (Q13) -
+            // see StartRestoredStatWarmup. Optional; without it a restored
+            // plan simply has no stat blocks until the user regenerates,
+            // which is the pre-existing behaviour.
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -600,6 +610,7 @@ namespace GW2CraftingHelper.Views
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
             _getItemStatBlock = getItemStatBlock;
+            _warmItemStatsAsync = warmItemStatsAsync;
 
             // Seed the per-plan default from the persisted setting so a
             // user who turned "Value own materials" off is not silently
@@ -735,6 +746,11 @@ namespace GW2CraftingHelper.Views
                 StatusText.Stamp("Generated", generatedAt) + " - prices may have changed - Regenerate");
             RenderFromBoard(_statusBoard.Snapshot());
 
+            // Started BEFORE the render below and regardless of whether
+            // the tab is live: the rows read the stat cache at hover time,
+            // not at render time, so there is nothing to wait for.
+            StartRestoredStatWarmup(result);
+
             if (_contentPanel == null || _contentPanel.Parent == null) return;
 
             _lastRenderedWidth = _contentPanel.Width;
@@ -745,6 +761,54 @@ namespace GW2CraftingHelper.Views
             catch (Exception ex)
             {
                 RollBackFailedPlanRender(ex, "into the live tab");
+            }
+        }
+
+        /// <summary>
+        /// Q13: a restored plan makes no network call by design, so its
+        /// session stat cache is empty and every row's item tooltip
+        /// degrades to the plain one. This fills that cache in the
+        /// background for the restored plan's own items.
+        /// <para>
+        /// The rows do not have to be re-rendered for the result to show:
+        /// their tooltips are composed when the box is about to be drawn
+        /// (TooltipFacility.ApplyRichDeferred), so the next hover picks the
+        /// blocks up on its own. The one case that needs a nudge is a
+        /// cursor already resting on a row when the fetch lands, which
+        /// RefreshCurrent redraws - on the main thread, like every other
+        /// control mutation.
+        /// </para>
+        /// <para>
+        /// Fire-and-forget and fully swallowed: failing means the tooltips
+        /// stay exactly as they were before this ran, which is not an error
+        /// worth a banner.
+        /// </para>
+        /// </summary>
+        private void StartRestoredStatWarmup(CraftingPlanResult result)
+        {
+            if (_warmItemStatsAsync == null || result?.ItemMetadata == null || result.ItemMetadata.Count == 0)
+            {
+                return;
+            }
+
+            var ids = new List<int>(result.ItemMetadata.Keys);
+            _ = WarmRestoredStatsAsync(ids);
+        }
+
+        private async Task WarmRestoredStatsAsync(IReadOnlyList<int> ids)
+        {
+            try
+            {
+                int filled = await _warmItemStatsAsync(ids).ConfigureAwait(false);
+                if (filled > 0)
+                {
+                    MainThreadMarshal.Run(TooltipFacility.RefreshCurrent);
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan",
+                    $"Restored-plan stat top-up did not complete: {ex.GetType().Name} - {ex.Message}");
             }
         }
 
