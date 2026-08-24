@@ -1,0 +1,148 @@
+namespace GW2CraftingHelper.Services
+{
+    /// <summary>
+    /// The measured Menomonia glyph metrics behind every vertical constant
+    /// in the plan view, and the ramp tier each chrome role sits in
+    /// (Blish-free, unit-testable). Views resolve the actual BitmapFont
+    /// objects through Views/Rendering/UiFonts; the arithmetic that decides
+    /// how tall a band has to be to hold one lives here, with the numbers
+    /// it is decided from.
+    ///
+    /// <para>
+    /// Method: the installed
+    /// <c>C:\Blish.HUD\Content\fonts\menomonia\menomonia-{size}-{style}.xnb</c>
+    /// files are uncompressed MonoGame XNB containers holding one
+    /// BitmapFontReader asset (lineHeight, then 9 int32 per glyph region).
+    /// Widths follow MG.Extended's own MeasureString rule, which is what a
+    /// Blish Label's autosize calls. The parse reproduces the figures
+    /// docs/research/minimum-window-width.md published, glyph for glyph.
+    /// </para>
+    ///
+    /// <para>
+    /// Two defects in the shipped font inventory constrain every choice
+    /// below and must not be re-litigated by measurement-free reasoning:
+    /// 18-REGULAR's space glyph advances 4px (against 7 at 16-regular and 9
+    /// at 18-bold), so any multi-word string at 18-regular renders with
+    /// collapsed word gaps - 18-regular is unusable for prose; and
+    /// 22-REGULAR is metrically identical to 24-regular (same lineHeight,
+    /// cap and advances, different file bytes), so there is no
+    /// regular-weight step between 20 and 24 and 22-regular must never be
+    /// loaded. 22-BOLD is a genuine intermediate.
+    /// </para>
+    /// </summary>
+    public static class TypeRampMetrics
+    {
+        /// <summary>
+        /// One font's measured vertical metrics, in the units every layout
+        /// constant in this module is written in: pixels from the top of
+        /// the line box a Label draws its text in.
+        /// </summary>
+        public readonly struct FontInk
+        {
+            /// <summary>Line box height - what an autosized Label reports.</summary>
+            public readonly int LineHeight;
+
+            /// <summary>Ink height of a capital (H/M).</summary>
+            public readonly int CapHeight;
+
+            /// <summary>Top of capital ink inside the line box.</summary>
+            public readonly int CapTopY;
+
+            /// <summary>Baseline inside the line box.</summary>
+            public readonly int BaselineY;
+
+            /// <summary>
+            /// Lowest ink of any printable ASCII glyph (the descenders -
+            /// j p q y, and Q/g where the font has them). The number every
+            /// divider-clearance and band-height constant is derived from.
+            /// </summary>
+            public readonly int LowestInk;
+
+            public FontInk(int lineHeight, int capHeight, int capTopY, int baselineY, int lowestInk)
+            {
+                LineHeight = lineHeight;
+                CapHeight = capHeight;
+                CapTopY = capTopY;
+                BaselineY = baselineY;
+                LowestInk = lowestInk;
+            }
+        }
+
+        // Measured, in the order the ramp uses them. Sizes the module does
+        // not load are deliberately absent rather than listed "for
+        // completeness" - a metric with no caller is a metric nothing
+        // re-measures when it drifts.
+        public static readonly FontInk Regular14 = new FontInk(18, 13, 2, 15, 19);
+        public static readonly FontInk Regular16 = new FontInk(20, 14, 3, 17, 21);
+        public static readonly FontInk Bold18 = new FontInk(23, 16, 3, 19, 23);
+        public static readonly FontInk Regular20 = new FontInk(25, 17, 4, 21, 26);
+        public static readonly FontInk Bold20 = new FontInk(25, 17, 4, 21, 26);
+        public static readonly FontInk Bold22 = new FontInk(27, 18, 4, 23, 27);
+        public static readonly FontInk Bold24 = new FontInk(29, 20, 4, 25, 30);
+        public static readonly FontInk Regular32 = new FontInk(36, 24, 6, 31, 37);
+
+        // --- Tier seats ---
+        //
+        // The two promoted tiers are named ONCE, here, so the maintainer's
+        // "let's try 20/24 and if it's too big we can go 18/22" is a
+        // two-line swap (point size + FontInk) with the height constants
+        // and their tests following from it, rather than a hunt through
+        // renderers. The 18/22 retreat is:
+        //     ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk  Bold20 -> Bold18
+        //     SectionTitlePointSize 24 -> 22, SectionTitleInk  Bold24 -> Bold22
+        // and the constants in PlanContentHeightMath / SummarySectionLayoutMath
+        // that are asserted against these in the tests.
+
+        /// <summary>Every column header, and the Total Cost tile captions.</summary>
+        public const int ColumnHeaderPointSize = 20;
+
+        /// <summary>The eight section titles.</summary>
+        public const int SectionTitlePointSize = 24;
+
+        /// <summary>
+        /// The status line. Bold, not regular: at this size regular is the
+        /// collapsed-space defect, and status text is always multi-word.
+        /// </summary>
+        public const int StatusPointSize = 18;
+
+        /// <summary>
+        /// The plan header's " x N needed" suffix (regular - a subordinate
+        /// annotation beside a 32pt title) and the craft-step number badge
+        /// (bold, digits only). Both exist to retire 18-regular entirely.
+        /// </summary>
+        public const int SmallHeadingPointSize = 20;
+
+        public static FontInk ColumnHeaderInk => Bold20;
+
+        public static FontInk SectionTitleInk => Bold24;
+
+        public static FontInk StatusInk => Bold18;
+
+        /// <summary>Body rows, everywhere. Not part of the ramp change.</summary>
+        public static FontInk BodyInk => Regular16;
+
+        /// <summary>Pills, tags, footnotes. The floor - nothing goes below it.</summary>
+        public static FontInk CaptionInk => Regular14;
+
+        /// <summary>
+        /// Where the lowest ink of a line drawn at <paramref name="labelY"/>
+        /// lands. Every band height and divider clearance in the plan view
+        /// is a statement about this number.
+        /// </summary>
+        public static int InkBottom(FontInk font, int labelY)
+        {
+            return labelY + font.LowestInk;
+        }
+
+        /// <summary>
+        /// The y a line has to be drawn at for its baseline to land on
+        /// <paramref name="baseline"/> - how two different fonts on one
+        /// reading line are aligned (the section header's caret against its
+        /// title, the plan header's qty suffix against its name).
+        /// </summary>
+        public static int BaselineAlignedY(FontInk font, int baseline)
+        {
+            return baseline - font.BaselineY;
+        }
+    }
+}

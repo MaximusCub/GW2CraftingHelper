@@ -1,22 +1,32 @@
 using Blish_HUD;
+using GW2CraftingHelper.Services;
 using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
     /// <summary>
-    /// The four type sizes the module draws in, named by ROLE rather than
-    /// by point size. Every view and renderer resolves its font through
-    /// here, so <c>GameService.Content.DefaultFontNN</c> appears nowhere
-    /// under Views/ and a size decision is one edit rather than sixty.
+    /// The type sizes the module draws in, named by ROLE rather than by
+    /// point size. Every view and renderer resolves its font through here,
+    /// so <c>GameService.Content.DefaultFontNN</c> appears nowhere under
+    /// Views/ and a size decision is one edit rather than sixty.
     ///
     /// <para>
-    /// The maintainer's field-test bump raised <see cref="Body"/> from
-    /// DefaultFont14 to DefaultFont16 and <see cref="Caption"/> from
-    /// DefaultFont12 to DefaultFont14. The measured Menomonia metrics
-    /// behind every constant that had to move with it - line heights
-    /// 13/18/20 at 12/14/16, and the ~1.11x width factor between 14 and
-    /// 16 on real strings - are in
-    /// docs/research/minimum-window-width.md.
+    /// The ramp is two reading sizes (<see cref="Caption"/> 14,
+    /// <see cref="Body"/> 16) and three emphatic tiers above them
+    /// (<see cref="ColumnHeader"/>, <see cref="SectionTitle"/>,
+    /// <see cref="Display"/>), with weight doing as much of the work as
+    /// size. Which point size each promoted tier sits at is decided in
+    /// Services/TypeRampMetrics, beside the measured glyph metrics the
+    /// height constants are derived from; this file only turns that
+    /// decision into a BitmapFont.
+    /// </para>
+    ///
+    /// <para>
+    /// Blish surfaces five sizes as DefaultFontNN properties; every other
+    /// size in the installed Menomonia inventory (8-36, bold at 8-24 and
+    /// 36) loads through <c>ContentService.GetFont</c>. Two entries of that
+    /// inventory are unusable and are documented in TypeRampMetrics:
+    /// 18-regular collapses word gaps, and 22-regular is really a 24.
     /// </para>
     ///
     /// <para>
@@ -41,10 +51,83 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>Sublabels, pills, tags, footnotes - one step under Body.</summary>
         internal static BitmapFont Caption => GameService.Content.DefaultFont14;
 
-        /// <summary>Section headers. Not part of the body bump.</summary>
+        /// <summary>
+        /// Every column header in the plan view, and the Total Cost band's
+        /// tile captions. Bold: headers used to be the same size and weight
+        /// as the rows under them, with only the dark band separating them.
+        /// </summary>
+        internal static BitmapFont ColumnHeader =>
+            Bold(TypeRampMetrics.ColumnHeaderPointSize);
+
+        /// <summary>The eight collapsible section titles.</summary>
+        internal static BitmapFont SectionTitle =>
+            Bold(TypeRampMetrics.SectionTitlePointSize);
+
+        /// <summary>
+        /// The plan tab's status line. Bold rather than regular at this
+        /// size for a measured reason, not a stylistic one - see
+        /// TypeRampMetrics' note on 18-regular's space glyph.
+        /// </summary>
+        internal static BitmapFont Status =>
+            Bold(TypeRampMetrics.StatusPointSize);
+
+        /// <summary>
+        /// The plan header's " x N needed" suffix: regular weight so it
+        /// stays subordinate to the Display title beside it.
+        /// </summary>
+        internal static BitmapFont SmallHeading =>
+            Regular(TypeRampMetrics.SmallHeadingPointSize);
+
+        /// <summary>
+        /// The craft-step number badge: the bold twin of
+        /// <see cref="SmallHeading"/>, digits only.
+        /// </summary>
+        internal static BitmapFont SmallHeadingBold =>
+            Bold(TypeRampMetrics.SmallHeadingPointSize);
+
+        /// <summary>
+        /// Section headers OUTSIDE the plan view (the Settings and About
+        /// tabs). 18-regular, which the plan view no longer uses at all -
+        /// see TypeRampMetrics for the space-glyph defect that retired it
+        /// there. Retiring it here too would restyle two tabs this
+        /// milestone does not otherwise touch.
+        /// </summary>
         internal static BitmapFont Title => GameService.Content.DefaultFont18;
 
-        /// <summary>The plan title. Not part of the body bump.</summary>
+        /// <summary>The plan title. No bold exists at this size.</summary>
         internal static BitmapFont Display => GameService.Content.DefaultFont32;
+
+        private static BitmapFont Bold(int pointSize)
+        {
+            return GameService.Content.GetFont(
+                ContentService.FontFace.Menomonia, SizeOf(pointSize), ContentService.FontStyle.Bold);
+        }
+
+        private static BitmapFont Regular(int pointSize)
+        {
+            return GameService.Content.GetFont(
+                ContentService.FontFace.Menomonia, SizeOf(pointSize), ContentService.FontStyle.Regular);
+        }
+
+        /// <summary>
+        /// The four point sizes the ramp is allowed to name, and nothing
+        /// else: an unmapped size is a size TypeRampMetrics has no measured
+        /// ink for, so the height constants derived from it would be
+        /// guesses. Fail loudly at the seam rather than silently render at
+        /// a size no constant was sized for.
+        /// </summary>
+        private static ContentService.FontSize SizeOf(int pointSize)
+        {
+            switch (pointSize)
+            {
+                case 18: return ContentService.FontSize.Size18;
+                case 20: return ContentService.FontSize.Size20;
+                case 22: return ContentService.FontSize.Size22;
+                case 24: return ContentService.FontSize.Size24;
+                default:
+                    throw new System.ArgumentOutOfRangeException(
+                        nameof(pointSize), pointSize, "No measured TypeRampMetrics ink for this size.");
+            }
+        }
     }
 }
