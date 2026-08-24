@@ -82,9 +82,19 @@ namespace GW2CraftingHelper.Views.Rendering
                 _build = build;
             }
 
+            /// <summary>
+            /// What the control said before this facility took its tooltip
+            /// over - the missing-icon note, a currency name. Deferred
+            /// content cannot be inspected before the control is stamped,
+            /// and a builder that turns out to have nothing to say would
+            /// otherwise leave the control silent where it used to be
+            /// informative.
+            /// </summary>
+            internal string FallbackText { get; set; }
+
             internal TooltipContent Resolve()
             {
-                return _content ?? _build();
+                return TooltipContent.OrText(_content ?? _build(), FallbackText);
             }
         }
 
@@ -166,6 +176,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 return;
             }
 
+            Contents.TryGetValue(control, out var previous);
+
+            // Carried forward on a re-stamp rather than re-read: the
+            // control's own text was nulled below on the FIRST stamp, so
+            // reading it again would find nothing and lose the note. A
+            // caller that has since assigned real plain text wins, because
+            // that text is what the control says now.
+            source.FallbackText = string.IsNullOrEmpty(control.BasicTooltipText)
+                ? previous?.FallbackText
+                : control.BasicTooltipText;
+
             // Remove-then-Add, because net472's ConditionalWeakTable has no
             // AddOrUpdate and Add throws on a duplicate key. A control is
             // usually brand new here (rows and pills are rebuilt per
@@ -223,11 +244,12 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 // A deferred builder runs inside Blish's mouse-moved
                 // handler, so an exception here would surface as a crash on
-                // hover rather than as a missing tooltip. Showing nothing
-                // is the correct degradation, and the log line names the
-                // builder that failed.
-                Logger.Warn(ex, "Rich tooltip content builder threw; showing no tooltip");
-                return null;
+                // hover rather than as a missing tooltip. Degrading to
+                // whatever the control said before - usually nothing - is
+                // the correct answer, and the log line names the builder
+                // that failed.
+                Logger.Warn(ex, "Rich tooltip content builder threw; falling back to the control's own text");
+                return TooltipContent.OrText(null, source.FallbackText);
             }
         }
     }

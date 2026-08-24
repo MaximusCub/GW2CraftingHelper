@@ -13125,12 +13125,18 @@ re-ellipsis closures stop re-stamping tooltips entirely.
 - **Icon-note clobbering.** `ApplyRichDeferredToIconTree` cannot skip an
   empty payload the way the eager version does (nothing is composed yet),
   so it would overwrite an icon's own "no icon available for this entry"
-  note with silence. It now captures each control's plain tooltip before
-  stamping and returns it as the builder's fallback
+  note with silence. `TooltipFacility.Register` now captures each
+  control's plain text as the source's fallback
   (`TooltipContent.OrText`), which covers every call site including the
-  recipe tree. The `row.ItemId > 0` gates that remain are about a
-  currency icon naming its own currency, NOT about emptiness - they never
-  prevented it (see "Post-review corrections").
+  recipe tree, and a builder that throws degrades to it too. The capture
+  lives in the facility rather than at the icon-tree call site precisely
+  because a re-stamp - `MainView.ApplyItemRowTooltip` runs again on every
+  column resize - reads a `BasicTooltipText` the FIRST stamp already
+  nulled; the fallback is carried forward from the previous source unless
+  the control has since been given real plain text. The `row.ItemId > 0`
+  gates that remain are about a currency icon naming its own currency,
+  NOT about emptiness - they never prevented it (see "Post-review
+  corrections").
 - **The header row's wrap budget** is `maxWidth - indent` for continuation
   rows. A very long item name in a narrow box is the case to look at.
 - **`RefreshCurrent` is main-thread only.** It is reached from a
