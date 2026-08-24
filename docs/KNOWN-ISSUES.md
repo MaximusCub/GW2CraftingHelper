@@ -12966,11 +12966,54 @@ parented, so disposing the window never reached them - which
 `Module.Unload`, alongside the tickers it already had to clean up for the
 same reason.
 
+### Fix, second pass (adversarial review)
+
+Review found the first pass had left the same dead-keyboard state
+reachable through the new code, by two paths that meet:
+
+- `FocusRelease.Release()` called `UnsetFocus()` and returned without
+  checking its own post-condition. `UnsetFocus()` is not atomic: it is
+  `Focused = false;` - which raises `InputFocusChanged` synchronously,
+  through `OnInputFocusChanged`, before the slot is touched - and only
+  then `FocusedControl = null;`. The module ships exactly one handler on
+  that event, `SuggestionPanel.OnFocusChanged`, and it re-focuses. So a
+  re-focus landing inside a `FocusRelease` call ended it with
+  `Focused == true`, `FocusedControl == null` and
+  `UpdateFocusState(true)` having re-armed `SetTextInputListner` - the
+  exact swallowed-keyboard state, now with no slot for
+  `KeyboardHandler`'s heal sweep to name. Through `ReleaseOnDispose()`
+  the same re-focus re-subscribed a control mid-teardown into Blish's
+  static input handler, leaving `_textInputDelegate` pointing at a
+  disposed box for the rest of the session. `Release()` now verifies:
+  after `UnsetFocus()`, while the box still reports focus, it forces
+  `Focused = false` (bounded to 3 attempts - a handler that re-focuses on
+  every notification cannot be out-waited and a spin is worse than a
+  stale slot), then nulls the slot only if the box is genuinely
+  unfocused and the slot still names it. The invariant it holds: the slot
+  names the box that holds focus, or nothing.
+- `SuggestionPanel._pressOverPanel`, the press-landed-on-the-panel
+  discriminator, had nothing bounding its lifetime. It was set on the
+  global `LeftMouseButtonPressed` and cleared only on the global
+  `LeftMouseButtonReleased` or when consumed - and Blish is free to drop
+  the release: `MouseHandler.HandleInput` returns without stashing the
+  event when a foreground `Form`'s client rectangle contains the point,
+  while `CameraDragging`, and while the cursor is hidden, and
+  `MouseHandler.Update` skips dispatch entirely when GW2 does not have
+  focus. Press and hold over a suggestion row, Alt-Tab out, release
+  outside the client, and the flag latched true for the session; the next
+  Escape on that box re-focused it out of the hard release and
+  reproduced the original field bug. It is now cleared in `ShowPanel()`,
+  `HidePanel()` and `Dispose()`. `HidePanel()` runs on every unfocus, so
+  the flag cannot outlive one focus cycle, and correctness no longer
+  depends on an event Blish may drop.
+
 No test was added. Every step of this is Blish-bound: which release API
 is called, the order Blish raises two of its own events in, and a walk
 over `Container.Children`. The testable-looking residue is a three-bool
 predicate that would only mirror the implementation, which this repo does
-not accept. It stands on the desktop gate.
+not accept. It stands on the desktop gate. The two review findings are
+latched-state paths rather than scripted ones, so gate step 6 below has
+to latch the state deliberately.
 
 `Views/Rendering/TreeSectionController.cs`, the tooltip composers and
 `RichTooltipSurface` were not touched.
@@ -13001,5 +13044,16 @@ not accept. It stands on the desktop gate.
 5. **Window close by other means.** With a text box focused, close the
    window with its X and with the corner icon toggle. Keyboard reaches
    the game in both cases.
+6. **The latched press flag.** Type into the Crafting Plan search box
+   until the suggestion list drops. Press and HOLD the left mouse button
+   over a suggestion row, and while still holding it Alt-Tab out of GW2
+   and release the button outside the game client. Return to GW2, click
+   back into that search box, type, and press Escape once. The caret must
+   leave the box and typing must reach the game with no click first.
+   Before this pass the stale flag re-focused the box here and the
+   keyboard stayed dead. Then repeat the same latch and, instead of
+   Escape, click straight onto another tab: the outgoing box is disposed
+   mid-re-focus on that path, so confirm keyboard again reaches the game
+   immediately.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
