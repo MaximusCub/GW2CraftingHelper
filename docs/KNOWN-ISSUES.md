@@ -13043,4 +13043,19 @@ expectation.
    ignores, so ignoring an ingredient and then planning that item alone
    yields an ordinary un-ignored root.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS with recorded partials (2026-08-23 night desktop session,
+branch build, captures preflight/gRZ1-gRZ6). LIVE-VERIFIED: the plan
+root offers no IGNORE pill - and on the strongest possible variant:
+a schema-3 plan RESTORED from disk into this build (PlanStoreHelpers
+re-derives IsPlanRoot on restore, so suppression holds on restored
+plans; children keep their IGNORE pills). The regenerate-confirm
+backdrop also demonstrably ate mispositioned clicks (batch-J modality
+working). PARTIALS: the all-ignored zero band, un-ignore restoration,
+the pre-ignored root's IGNORED escape hatch, and the unpriced-zero
+profit-band suppression were not reachable live this session - the
+sandbox's known synthetic-input decay (M33/M38 class) killed keyboard
+then clicks before the multi-step flows completed. All four stand on
+real-production-path tests (PlanRootIgnoreTests end-to-end through
+CraftingPlanPipeline + the three zero-band viewmodel cases + the
+profit-band assertion) and are one-hover checks on the maintainer's
+live install.
