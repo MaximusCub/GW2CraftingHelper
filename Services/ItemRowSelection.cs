@@ -15,22 +15,29 @@ namespace GW2CraftingHelper.Services
     public static class ItemRowSelection
     {
         /// <summary>Shown when every row is genuinely empty.</summary>
-        public const string NoItemsStatus = "Select at least one item before generating.";
+        // Two actions in the order they happen, and the button named
+        // exactly. "Select at least one item before generating" scolded
+        // for a state the reader is already in, and named no button.
+        public const string NoItemsStatus = "Add at least one item, then Generate Plan.";
 
         /// <summary>
         /// Shown when a row has text that resolved to nothing - the typed
         /// name is not a plan target, or was only partly typed.
         /// </summary>
         public const string UnmatchedTextStatus =
-            "No item matched what you typed - pick an item from the suggestion list.";
+            "No item matches that name - pick one from the suggestion list.";
 
         /// <summary>
         /// Shown when the typed name belongs to more than one item. Item
         /// ids are internal-only, so a plan for the wrong same-named item
         /// would be undetectable on screen - the user has to say which one.
         /// </summary>
+        // "the one you meant" IS the problem: GW2 reuses item names, so
+        // the reader has a specific one in mind and the module cannot
+        // tell which. "Suggestion list" is already established by
+        // UnmatchedTextStatus, so this one can say "the list".
         public const string AmbiguousTextStatus =
-            "More than one item has that name - pick the one you want from the suggestion list.";
+            "Several items share that name - pick the one you meant from the list.";
 
         /// <summary>
         /// True when <paramref name="resolvedItemId"/> no longer describes
@@ -141,9 +148,12 @@ namespace GW2CraftingHelper.Services
                 return null;
             }
 
+            // One hyphen clause, per the module's own status grammar -
+            // the consequence stated actively rather than as a second
+            // "and is not" limb of the same sentence.
             return unresolvedRowCount == 1
-                ? "1 row has no item selected and is not in this plan."
-                : unresolvedRowCount + " rows have no item selected and are not in this plan.";
+                ? "1 row has no item selected - left out of this plan."
+                : unresolvedRowCount + " rows have no item selected - left out of this plan.";
         }
     }
 

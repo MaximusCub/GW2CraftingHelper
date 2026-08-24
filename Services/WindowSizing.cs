@@ -12,24 +12,55 @@ namespace GW2CraftingHelper.Services
     public static class WindowSizing
     {
         /// <summary>
-        /// Narrowest window the recipe tree stays readable in, measured in
-        /// docs/research/minimum-window-width.md: the deepest chain in the
-        /// game is "+24 Agony Infusion" at depth 23, whose deepest row is
-        /// "4194304x Thermocatalytic Reagent". At this width that row keeps
-        /// the tree's designed 24px name-to-column gutter and one further
-        /// indent level still renders untruncated.
+        /// Narrowest window the recipe tree stays readable in. Measured for
+        /// the deepest REALISTIC chain rather than the deepest chain that
+        /// exists: the legendary trinkets Transcendence and Conflux, both
+        /// exactly depth 14, whose widest row at every font size is the
+        /// dust-promotion blow-up "429750x Pile of Glittering Dust".
         /// <para>
-        /// 1478, not the 1436 the module shipped with: the research's +2pt
-        /// row-text variant landed (row text Font14 -> Font16, see
-        /// Views/Rendering/UiFonts), and the deepest row's name run grows
-        /// with it. Measured directly at Menomonia 16 rather than scaled
-        /// from the 14 figures, and with the live-priced cost column taken
-        /// at its widest digits rather than at one example total - see
-        /// DeepestPlanCostColumnWidth in PlanRelayoutMathTests, which is
-        /// what pins this number.
+        /// Chain, all terms measured at Menomonia 16 against the installed
+        /// XNBs (plan-redesign/minwidth.md, which reproduces the method and
+        /// every anchor figure of docs/research/minimum-window-width.md):
+        /// <code>
+        ///  629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
+        ///  +24  the designed name-to-pill gutter at the deepest row
+        /// +256  TreePillColumnWidth
+        /// +335  cost column: 181 worst-digit six-digit-gold coin run
+        ///                    + 154 widest two-currency vendor run
+        ///   +8  TableRightMargin
+        /// ---- 1252  tab panel
+        /// +126  WindowToTabPanelChrome
+        /// ==== 1378
+        /// </code>
+        /// </para>
+        /// <para>
+        /// 1378, not the 1232 the like-for-like depth-14 arithmetic gives
+        /// on its own: 1232 accepts that a row combining a forced-craft
+        /// dust chain with a vendor currency run ellipsizes, and the
+        /// maintainer declined that trade - "we are designing for a minimum
+        /// resolution of 1920x1080, so cramming down to a smaller min-size
+        /// that will result in cramped renders seems bad". The +154 rider
+        /// is what buys "a two-currency vendor run always fits at the
+        /// floor". Pinned by DeepestRealisticRowAtTheWindowMinimum in
+        /// PlanRelayoutMathTests.
+        /// </para>
+        /// <para>
+        /// Down from 1478, which fitted the depth-23 "+24 Agony Infusion"
+        /// chain untruncated. That chain now ellipsizes from depth 20 -
+        /// six levels past the deepest realistic plan, and exactly the
+        /// idiom of record everywhere else in the view (ellipsis, full name
+        /// on the tooltip).
+        /// </para>
+        /// <para>
+        /// The other contributor to this floor is the controls row, which
+        /// is subsumed: its widest arrangement is the "Value Own Materials"
+        /// checkbox at x=350 (its label measures 145px at Blish's own
+        /// Font14, plus the box) clearing the right-anchored 120px Generate
+        /// Plan button and <see cref="WindowToTabPanelChrome"/>'s trailing
+        /// padding - under 700px all told, half of what the tree needs.
         /// </para>
         /// </summary>
-        public const int MinWindowWidth = 1478;
+        public const int MinWindowWidth = 1378;
 
         /// <summary>
         /// Unchanged by the width raise: no layout math in the module
@@ -61,7 +92,15 @@ namespace GW2CraftingHelper.Services
         /// The 8px border term is worth +/-2px; nothing derived from it is
         /// within 400px of a layout boundary.
         /// </summary>
-        public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + 20;
+        public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + RightEdgePadding;
+
+        /// <summary>
+        /// Trailing padding a tab's content keeps clear of the scrollbar -
+        /// the last term of <see cref="WindowToTabPanelChrome"/>, named here
+        /// because the toolbar row's right-anchored cluster stands off the
+        /// row's right edge by the same amount and the two must not drift.
+        /// </summary>
+        public const int RightEdgePadding = 20;
 
         /// <summary>Panel width a tab's content gets inside a window of this width.</summary>
         public static int TabPanelWidthFor(int windowWidth)

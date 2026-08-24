@@ -26,26 +26,135 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", StatusText.Normalize(""));
         }
 
-        // The ignore toggle (and every other
-        // non-Best-Path re-solve trigger) must never produce the Best
-        // Path preset's own label, regardless of the current override
-        // count - this is exactly the "Best path restored" mislabel bug.
-        [Fact]
-        public void ForOverrideResolve_NotBestPathPreset_ZeroOverrides_ReturnsDecisionsUpdated()
+        // Count: the module's one spelling of a counted noun. "(s)" is
+        // banned from user-facing text, and every count the plan view is
+        // about to show (overrides, ignored items, copied lines) goes
+        // through here.
+
+        [Theory]
+        [InlineData(0, "0 overrides")]
+        [InlineData(1, "1 override")]
+        [InlineData(2, "2 overrides")]
+        [InlineData(147, "147 overrides")]
+        public void Count_PluralizesOnOneAndNothingElse(int n, string expected)
         {
-            Assert.Equal("Decisions updated (0 override(s))", StatusText.ForOverrideResolve(isBestPathPreset: false, overrideCount: 0));
+            Assert.Equal(expected, StatusText.Count(n, "override"));
         }
 
         [Fact]
-        public void ForOverrideResolve_NotBestPathPreset_WithOverrides_ReturnsDecisionsUpdatedWithCount()
+        public void Count_IrregularPlural_IsPassedExplicitly()
         {
-            Assert.Equal("Decisions updated (3 override(s))", StatusText.ForOverrideResolve(isBestPathPreset: false, overrideCount: 3));
+            Assert.Equal("1 entry", StatusText.Count(1, "entry", "entries"));
+            Assert.Equal("2 entries", StatusText.Count(2, "entry", "entries"));
+        }
+
+        [Fact]
+        public void Count_NegativeCount_StillReadsAsAPlural()
+        {
+            // Not reachable from any current caller, but a count that went
+            // negative must not read "-1 override" as though it were one.
+            Assert.Equal("-1 overrides", StatusText.Count(-1, "override"));
+        }
+
+        // The ignore toggle (and every other
+        // non-Best-Path re-solve trigger) must never produce the Best
+        // Path preset's own label - this is exactly the "Best path
+        // restored" mislabel bug.
+        [Fact]
+        public void ForOverrideResolve_NotBestPathPreset_ReportsTheEventOnly()
+        {
+            Assert.Equal("Plan updated", StatusText.ForOverrideResolve(isBestPathPreset: false));
         }
 
         [Fact]
         public void ForOverrideResolve_BestPathPreset_ReturnsBestPathRestored()
         {
-            Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true, overrideCount: 0));
+            Assert.Equal("Best path restored", StatusText.ForOverrideResolve(isBestPathPreset: true));
+        }
+
+        /// <summary>
+        /// The events/state split: the status line reports what HAPPENED
+        /// and carries no standing count. How many decisions are overridden
+        /// is state, and lives in its own chip.
+        /// </summary>
+        [Fact]
+        public void ForOverrideResolve_CarriesNoCount()
+        {
+            string line = StatusText.ForOverrideResolve(isBestPathPreset: false);
+
+            Assert.DoesNotContain("override", line, StringComparison.OrdinalIgnoreCase);
+            foreach (char c in line)
+            {
+                Assert.False(char.IsDigit(c), "the status line must carry no count: " + line);
+            }
+        }
+
+        [Theory]
+        [InlineData(0, "Overrides: 0")]
+        [InlineData(1, "Overrides: 1")]
+        [InlineData(12, "Overrides: 12")]
+        public void ForOverridesChip_IsALabelledCount(int n, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForOverridesChip(n));
+        }
+
+        [Theory]
+        [InlineData(1, "Ignored: 1")]
+        [InlineData(7, "Ignored: 7")]
+        public void ForIgnoredChip_IsALabelledCount(int n, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForIgnoredChip(n));
+        }
+
+        /// <summary>
+        /// The two failure verbs must stay distinct: a failed GENERATION
+        /// leaves the tab with the plan it had, a failed local re-solve
+        /// leaves the plan on screen intact with only the change
+        /// unapplied. "Error:" said neither.
+        /// </summary>
+        [Fact]
+        public void FailureVerbs_NameWhatFailed_AndDiffer()
+        {
+            Assert.Equal("Generation failed: no route to host", StatusText.ForGenerationFailure("no route to host"));
+            Assert.Equal("Update failed: no route to host", StatusText.ForUpdateFailure("no route to host"));
+            Assert.NotEqual(
+                StatusText.ForGenerationFailure("x"), StatusText.ForUpdateFailure("x"));
+        }
+
+        [Fact]
+        public void NoOpLines_SayWhyTheClickDidNothing()
+        {
+            // Each pairs with one guard in the confirm matrix. They are
+            // sentence-case event lines like every other status write, and
+            // none of them reaches for "(s)".
+            foreach (string line in new[]
+            {
+                StatusText.NoOverridesToClear,
+                StatusText.AlreadyCraftingEverything,
+                StatusText.AlreadyBuyingEverything,
+                StatusText.ReSolveUnavailable
+            })
+            {
+                Assert.False(string.IsNullOrWhiteSpace(line));
+                Assert.DoesNotContain("(s)", line);
+                Assert.Equal(char.ToUpperInvariant(line[0]), line[0]);
+            }
+        }
+
+        [Fact]
+        public void UnavailableIsNotUnnecessary_SoItsLineClaimsNothingAboutThePlan()
+        {
+            // A plan restored without its solve context can be rendered and
+            // not re-solved. The three lines above assert what the plan
+            // ALREADY contains, which is exactly what nothing has read in
+            // that state - so this one must not be any of them, and must
+            // name the action that gets out of it.
+            Assert.NotEqual(StatusText.AlreadyCraftingEverything, StatusText.ReSolveUnavailable);
+            Assert.NotEqual(StatusText.AlreadyBuyingEverything, StatusText.ReSolveUnavailable);
+            Assert.NotEqual(StatusText.NoOverridesToClear, StatusText.ReSolveUnavailable);
+
+            Assert.DoesNotContain("Already", StatusText.ReSolveUnavailable);
+            Assert.Contains("Generate Plan", StatusText.ReSolveUnavailable);
         }
 
         // ---- IsStale (the staleness label and Module.Update()'s

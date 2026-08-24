@@ -8,35 +8,30 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // The Required Recipes row list, with both row heights
-    // (RecipeRowHeightWithSublabel 44px, RecipeRowHeightNoSublabel 36px)
-    // and the Auto-learned/Learned/Missing! status tags - same row
-    // geometry, PlanContentHeightMath/PlanRelayoutMath calls, and
-    // LabelHelpers.CreateRowDivider usage (divider
-    // math, its per-branch bottomClearance selection, and the 1px
-    // scissor clearance untouched). The only edit inside the moved row body
-    // is _relayoutActions.Add -> the injected ISectionRelayoutSink.AddRelayout
-    // (a semantics-preserving pass-through - see ISectionRelayoutSink's doc
-    // comment).
+    // The Required Recipes table: Recipe (flex) | Discipline | Status,
+    // every row one line at RecipeRowHeight.
     //
-    // Render() calls CTableHeaderRenderer (the shared "Recipe"/"Status"
-    // column header, also used by Required Disciplines) directly, exactly
-    // as DisciplinesSectionRenderer does - see that class's doc comment.
+    // The discipline used to be row.Sublabel, a second Caption line under
+    // the name, which is why this section carried a second (48px) row
+    // height. It is a real column now - Body, never smaller than the name
+    // beside it - so the tall row variant and its height constant are
+    // both gone, and the section is shorter despite the taller chrome
+    // above it. RecipesColumnMath owns the edge arithmetic (Blish-free,
+    // tested); this file only measures the bands it is handed.
+    //
+    // Render() calls CTableHeaderRenderer (the shared header, also used by
+    // Required Disciplines) directly, exactly as DisciplinesSectionRenderer
+    // does - see that class's doc comment.
     //
     // CreateRecipeRow's
     // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
     // the shared "row panel resize + extra reposition + divider resize"
     // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row's name label is
-    // NOT run through IconNameRowHelpers: it has
-    // no width cap or ellipsis at all (row.Label renders in full,
-    // regardless of length), an optional sublabel line BELOW the name
-    // rather than a same-line secondary label, and an icon y that varies
-    // with hasSublabel - a genuinely different shape from the two
-    // ellipsized-name rows IconNameRowHelpers actually covers; forcing it
-    // through that helper would mean either inventing ellipsis this row
-    // never had or dropping its sublabel line, both real behavior changes,
-    // so it stays hand-rolled - see IconNameRowHelpers' own doc comment.
+    // NOT run through IconNameRowHelpers: this row's name budget stops at
+    // the Discipline column rather than at a right-aligned value band, and
+    // its truncation tooltip composes with a wiki hint the shared helper
+    // knows nothing about - see IconNameRowHelpers' own doc comment.
     internal sealed class RecipesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -57,71 +52,95 @@ namespace GW2CraftingHelper.Views.Rendering
         // Left x of the name column (past the row's 34px framed icon at
         // x=8), shared by the header and every row.
         private const int NameX = 50;
+        private const string RecipeHeaderText = "Recipe";
         private const string StatusHeaderText = "Status";
+        private const string DisciplineHeaderText = "Discipline";
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateRecipesBody, plus the
-        /// CreateCTableHeaderRow call this renderer now owns directly (see
-        /// the class doc comment above), then given the same one-pass
-        /// pre-scan the other plan tables carry (audit batch H): the widest
-        /// status tag - which is this table's whole right-hand block - and
-        /// the widest UNTRUNCATED name extent, so the Status column can be
-        /// pulled in beside the names rather than pinned to the panel edge
-        /// with a growing empty band between them. This row's name has no
-        /// ellipsis at all (see the class doc comment), so the scan measures
-        /// both the name line and the optional sublabel line beneath it;
-        /// pulling the block in past the widest of them is what keeps a long
-        /// name from running under the status tag.
+        /// One pass over the rows for the two right-hand BAND widths, then
+        /// the header and the rows, all anchored through the same
+        /// RecipesColumnMath call.
         /// <para>
-        /// A section where no row carries a status tag has no right-hand
-        /// block to pull in, and stays pinned exactly as before.
+        /// Each band is max(widest data, its own header label): the Status
+        /// header right-aligns onto the same pinned edge as the tags, and
+        /// at the ColumnHeader tier "Discipline" out-measures a short
+        /// "Chef 400" - a band narrower than its own header would let the
+        /// column beside it run underneath that header. The Discipline
+        /// column is reserved only when some row actually has one (a
+        /// mystic-forge-only recipe list has no disciplines at all), the
+        /// same gate Required Disciplines puts on its Characters column.
         /// </para>
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = UiFonts.Body;
-            var sublabelFont = UiFonts.Caption;
-            int maxStatusWidth = 0;
-            int widestNameEnd = 0;
-            foreach (var row in section.Rows)
+            var headerFont = TableHeaderStyle.Font;
+
+            int statusColumnWidth = MeasureWidth(headerFont, StatusHeaderText);
+            int disciplineColumnWidth = 0;
+            bool anyDiscipline = false;
+            for (int i = 0; i < section.Rows.Count; i++)
             {
-                if (!string.IsNullOrEmpty(row.StatusTag))
+                var row = section.Rows[i];
+
+                int statusWidth = MeasureWidth(font, row.StatusTag);
+                if (statusWidth > statusColumnWidth) statusColumnWidth = statusWidth;
+
+                if (string.IsNullOrEmpty(row.Sublabel)) continue;
+
+                if (!anyDiscipline)
                 {
-                    int statusWidth = MeasureWidth(font, row.StatusTag);
-                    if (statusWidth > maxStatusWidth) maxStatusWidth = statusWidth;
+                    anyDiscipline = true;
+                    disciplineColumnWidth = MeasureWidth(headerFont, DisciplineHeaderText);
                 }
 
-                int nameEnd = NameX + MeasureWidth(font, row.Label ?? "");
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
-
-                if (!string.IsNullOrEmpty(row.Sublabel))
-                {
-                    int sublabelEnd = NameX + MeasureWidth(sublabelFont, row.Sublabel);
-                    if (sublabelEnd > widestNameEnd) widestNameEnd = sublabelEnd;
-                }
+                int disciplineWidth = MeasureWidth(font, row.Sublabel);
+                if (disciplineWidth > disciplineColumnWidth) disciplineColumnWidth = disciplineWidth;
             }
 
-            int statusColumnWidth = 0;
-            if (maxStatusWidth > 0)
+            var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
+
+            if (anyDiscipline)
             {
-                // The header label right-aligns onto the same edge as the
-                // rows, so the block has to be at least as wide as it.
-                int headerWidth = MeasureWidth(font, StatusHeaderText);
-                statusColumnWidth = maxStatusWidth > headerWidth ? maxStatusWidth : headerWidth;
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
+                    middleLabel: DisciplineHeaderText,
+                    middleXForWidth: w => scan.EdgesFor(w).DisciplineX);
             }
             else
             {
-                widestNameEnd = 0;
+                CTableHeaderRenderer.CreateCTableHeaderRow(
+                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink);
             }
 
-            CTableHeaderRenderer.CreateCTableHeaderRow(
-                contentFlow, panelWidth, "Recipe", NameX, StatusHeaderText, _sink,
-                rightXForWidth: w => StatusRightEdge(w, statusColumnWidth, widestNameEnd));
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateRecipeRow(
-                    section.Rows[i], contentFlow, panelWidth, statusColumnWidth, widestNameEnd,
-                    i == section.Rows.Count - 1);
+                    section.Rows[i], contentFlow, panelWidth, scan, i == section.Rows.Count - 1);
+            }
+        }
+
+        /// <summary>
+        /// The two data-derived (panelWidth-invariant) band widths every
+        /// row and header closure needs to recompute its column edges -
+        /// grouped so a third cannot be added to one call site and
+        /// forgotten at another. Mirrors the Shopping List's own ColumnScan.
+        /// </summary>
+        private readonly struct ColumnScan
+        {
+            private readonly int _statusColumnWidth;
+            private readonly int _disciplineColumnWidth;
+
+            internal ColumnScan(int statusColumnWidth, int disciplineColumnWidth)
+            {
+                _statusColumnWidth = statusColumnWidth;
+                _disciplineColumnWidth = disciplineColumnWidth;
+            }
+
+            internal RecipesColumnMath.ColumnEdges EdgesFor(int panelWidth)
+            {
+                return RecipesColumnMath.ComputeEdges(
+                    panelWidth, _statusColumnWidth, _disciplineColumnWidth, NameX);
             }
         }
 
@@ -130,40 +149,17 @@ namespace GW2CraftingHelper.Views.Rendering
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
-        /// <summary>
-        /// Right edge of the Status column at a given panel width - the one
-        /// formula the header, the build pass and every resize closure share.
-        /// </summary>
-        private static int StatusRightEdge(int panelWidth, int statusColumnWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, statusColumnWidth, widestNameEnd);
-        }
-
-        // The no-sublabel branch's rowHeight (32)
-        // left the 34px CreateRarityFramedIcon default frame at y=1
-        // overflowing rowHeight by 3px even BEFORE the divider-width
-        // change (icon bottom = 1 + 34 = 35, rowHeight = 32) - pre-existing
-        // negative headroom, not "several pixels of headroom" as
-        // KNOWN-ISSUES #23 previously (incorrectly) claimed for this row,
-        // and made 1px worse once that row's divider grew from 1px to 2px
-        // (needed 34 + 2 = 36 to sit flush, still only had 32). Fixed
-        // coherently, mirroring the Used Materials/Shopping List pattern
-        // already on this branch: RecipeRowHeightNoSublabel raised to 36
-        // (icon at y=0, 34 tall, + the 2px divider = exact fit, zero
-        // overlap) and this branch's icon y nudged from 1 to 0 to match.
-        // The WithSublabel branch (44) already had ample headroom and is
-        // unchanged.
-        //
-        // Moved verbatim from CraftingPlanView.CreateRecipeRow. Only
-        // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
+        // rowHeight 36 = a 34px rarity-framed icon at y=0 plus the 2px
+        // divider: an exact, non-overlapping fit, the same one Used
+        // Materials and the Shopping List already had. There is no second
+        // row height any more - the discipline is a column, so no row is
+        // two lines tall.
         private void CreateRecipeRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth,
-            int statusColumnWidth, int widestNameEnd, bool isLast)
+            ColumnScan scan, bool isLast)
         {
-            bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
-            int rowHeight = hasSublabel
-                ? PlanContentHeightMath.RecipeRowHeightWithSublabel
-                : PlanContentHeightMath.RecipeRowHeightNoSublabel;
+            const int rowHeight = PlanContentHeightMath.RecipeRowHeight;
+            var edges = scan.EdgesFor(panelWidth);
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
@@ -193,6 +189,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // as the cursor leaves this row after a press, so a stale arm
             // from an earlier aborted drag can't be replayed by an
             // unrelated release later landing back on this row.
+            string wikiHint = null;
             if (!string.IsNullOrEmpty(row.WikiUrl))
             {
                 string wikiUrl = row.WikiUrl;
@@ -207,38 +204,45 @@ namespace GW2CraftingHelper.Views.Rendering
                         WikiLinkLauncher.Open(wikiUrl);
                     }
                 };
-                rowPanel.BasicTooltipText = "Right-click: Open wiki page";
+                wikiHint = WikiHintText;
             }
 
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, hasSublabel ? 1 : 0);
+            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             var font = UiFonts.Body;
-            int nameY = hasSublabel ? 4 : 8;
-            LabelHelpers.WithDescenderClearance(
+            string fullName = row.Label ?? "";
+            var nameLabel = LabelHelpers.WithDescenderClearance(
                 new Label()
                 {
-                    Text = row.Label ?? "",
+                    Text = LabelHelpers.EllipsizeToWidth(font, fullName, edges.NameMaxWidth),
                     Font = font,
                     TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                     ShowShadow = true,
                     ShadowColor = Color.Black * 0.8f,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(NameX, nameY),
+                    Location = new Point(NameX, NameY),
                     Parent = rowPanel
                 });
+            StampRowTooltip(rowPanel, nameLabel, fullName, wikiHint);
 
-            if (hasSublabel)
+            Label disciplineLabel = null;
+            if (!string.IsNullOrEmpty(row.Sublabel))
             {
-                LabelHelpers.WithDescenderClearance(
+                // Body and left-ruled at the column's x, not a Caption
+                // line under the name: a discipline is a name the reader
+                // picks the letters of, and the locked rule is that such
+                // text is never smaller than the text beside it. It keeps
+                // its muted colour - one channel of de-emphasis, not two.
+                disciplineLabel = LabelHelpers.WithDescenderClearance(
                     new Label()
                     {
                         Text = row.Sublabel,
-                        Font = UiFonts.Caption,
+                        Font = font,
                         TextColor = new Color(170, 170, 170),
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
-                        Location = new Point(NameX, 24),
+                        Location = new Point(edges.DisciplineX, NameY),
                         Parent = rowPanel
                     });
             }
@@ -256,36 +260,66 @@ namespace GW2CraftingHelper.Views.Rendering
                     statusColor = new Color(150, 200, 150);
                 }
                 statusLabel = LabelHelpers.CreateRightAlignedLabel(
-                    rowPanel, row.StatusTag, font, statusColor,
-                    StatusRightEdge(panelWidth, statusColumnWidth, widestNameEnd), hasSublabel ? 10 : 8);
+                    rowPanel, row.StatusTag, font, statusColor, edges.StatusRightEdge, NameY);
             }
 
-            // M36b: bottomClearance depends on which rowHeight this branch
-            // used. hasSublabel is now 48px
-            // (RecipeRowHeightWithSublabel, raised from the 44px M36b
-            // simulated as VULNERABLE to the Container.Paint round-trip
-            // defect - see LabelHelpers.CreateRowDivider's doc comment).
-            // 48 is a height that simulation never covered, so the 1px is
-            // carried forward from 44 rather than proven for 48; it stays
-            // because it costs nothing here - the divider top (rowHeight -
-            // 3 = 45) clears both the icon frame bottom (1 + 34 = 35) and
-            // the sublabel's lowest ink (y=43). The no-sublabel branch
-            // (36px, RecipeRowHeightNoSublabel) is on the proven-immune
-            // list and flush-fit with zero slack; giving it clearance it
-            // doesn't need would reintroduce that overlap.
+            // bottomClearance 0: at 36px this row is on
+            // LabelHelpers.CreateRowDivider's proven-immune list, and its
+            // icon frame is flush-fit with zero slack (0..34, divider
+            // 34..36) - clearance it does not need would put the divider
+            // back under the icon. The 48px variant that took 1px went with
+            // the sublabel line.
             RowRelayoutHelpers.FinishRow(
-                rowPanel, panelWidth, rowHeight, isLast, hasSublabel ? 1 : 0, _sink,
+                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
                 w =>
                 {
+                    var e = scan.EdgesFor(w);
+                    if (disciplineLabel != null)
+                    {
+                        disciplineLabel.Location = new Point(e.DisciplineX, NameY);
+                    }
                     if (statusLabel != null)
                     {
                         statusLabel.Location = new Point(
-                            PlanRelayoutMath.RightAlignedX(
-                                StatusRightEdge(w, statusColumnWidth, widestNameEnd), statusLabel.Width),
-                            hasSublabel ? 10 : 8);
+                            PlanRelayoutMath.RightAlignedX(e.StatusRightEdge, statusLabel.Width), NameY);
                     }
-                },
-                w => StatusRightEdge(w, statusColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                });
+            _sink.AddReellipsis(w =>
+            {
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(
+                    font, fullName, scan.EdgesFor(w).NameMaxWidth);
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    StampRowTooltip(rowPanel, nameLabel, fullName, wikiHint);
+                }
+            });
+        }
+
+        private const int NameY = 8;
+
+        private const string WikiHintText = "Right-click: Open wiki page";
+
+        /// <summary>
+        /// The row's tooltip, on the name label AND the row panel: the full
+        /// recipe name when it is truncated, then the wiki hint when the
+        /// row has one. Composed rather than assigned over each other -
+        /// truncation used to clobber the hint, and the hint used to be
+        /// stamped on the panel alone, where the name label swallowed it.
+        /// Null for a row with neither is a deliberate clear (see
+        /// TooltipFacility.ApplyPlain), which is what a widening drag
+        /// leaves behind.
+        /// </summary>
+        private static void StampRowTooltip(
+            Panel rowPanel, Label nameLabel, string fullName, string wikiHint)
+        {
+            string truncationLine = nameLabel.Text != fullName ? fullName : null;
+            string tooltip = truncationLine == null
+                ? wikiHint
+                : (wikiHint == null ? truncationLine : truncationLine + "\n" + wikiHint);
+
+            TooltipFacility.ApplyPlain(rowPanel, tooltip);
+            TooltipFacility.ApplyPlain(nameLabel, tooltip);
         }
     }
 }

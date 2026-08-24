@@ -83,10 +83,15 @@
     <Compile Include="Models\OwnMaterialsMode.cs" />
     <Compile Include="Services\InlineSpinnerLayout.cs" />
     <Compile Include="Services\TopRegionLayoutMath.cs" />
+    <Compile Include="Services\TreeChipStripLayout.cs" />
+    <Compile Include="Services\TreeToolbarRowLayout.cs" />
+    <Compile Include="Services\TreeRowIdentity.cs" />
+    <Compile Include="Services\TypeRampMetrics.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
+    <Compile Include="Services\RecipesColumnMath.cs" />
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\PlanTableSorter.cs" />
     <Compile Include="Services\CoinSegmentMath.cs" />
@@ -185,6 +190,8 @@
     <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
+    <Compile Include="Views\Rendering\HoverChainResync.cs" />
+    <Compile Include="Views\Rendering\ShoppingBadgeColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\TableHeaderStyle.cs" />

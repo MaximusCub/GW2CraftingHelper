@@ -28,8 +28,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // the shared "row panel resize + extra reposition + divider resize"
     // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row has no icon and no
-    // name column at all (just plain labels - Body name and level, Caption
-    // character line), so it does
+    // name column at all (just plain Body labels - name, level and the
+    // character run), so it does
     // not match IconNameRowHelpers and stays
     // hand-rolled - see IconNameRowHelpers' own doc comment.
     internal sealed class DisciplinesSectionRenderer
@@ -71,19 +71,25 @@ namespace GW2CraftingHelper.Views.Rendering
         /// floor still clamps the ellipsis width on narrow panels exactly
         /// as it did before.
         ///
-        /// The same pass measures what the Level column may be pulled in to
-        /// (audit batch H): the widest UNTRUNCATED extent of everything left
-        /// of it, which is the character-availability text where a section
-        /// has any and the discipline names where it does not. A long
-        /// availability string simply leaves the column pinned where it
-        /// already was - RightBlockX never moves a block right - so this can
-        /// only ever shorten the gutter, never the ellipsis budget.
+        /// The Level column is pinned to the panel edge
+        /// (PlanRelayoutMath.PinnedRightEdge) and the Characters column is
+        /// the one that flexes into whatever the Discipline column and the
+        /// Level band leave it.
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = UiFonts.Body;
-            var charFont = UiFonts.Caption;
-            int maxNameWidth = 0;
+
+            // Body, not Caption: character names were the one text in this
+            // row that was both smaller AND greyer than its neighbours, and
+            // a name a user reads letter by letter is the worst thing to
+            // shrink. The grey stays - one channel of de-emphasis, not two.
+            var charFont = UiFonts.Body;
+            // Header labels are part of their own columns' widths: at the
+            // ColumnHeader tier a header is routinely wider than the data
+            // under it, and a column narrower than its own header lets the
+            // neighbouring column run under that header.
+            int maxNameWidth = MeasureWidth(TableHeaderStyle.Font, DisciplineHeaderText);
             int maxCharWidth = 0;
             int maxLevelWidth = 0;
             bool anyCharacterText = false;
@@ -105,12 +111,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     if (!anyCharacterText)
                     {
-                        // The column's own header is part of its extent: it
-                        // starts at the same charX and can be wider than a
-                        // short availability string, and the Level column
-                        // must not be pulled in over it.
+                        // The column's own header is part of its extent:
+                        // it starts at the same charX and can be wider than
+                        // a short availability string.
                         anyCharacterText = true;
-                        maxCharWidth = MeasureWidth(font, CharactersHeaderText);
+                        maxCharWidth = MeasureWidth(TableHeaderStyle.Font, CharactersHeaderText);
                     }
 
                     int charWidth = MeasureWidth(charFont, section.Rows[i].CharacterAvailabilityText);
@@ -123,36 +128,29 @@ namespace GW2CraftingHelper.Views.Rendering
 
             int charX = 8 + maxNameWidth + CharGap;
 
-            int levelColumnWidth = 0;
-            int widestNameEnd = 0;
-            if (maxLevelWidth > 0)
-            {
-                // The header label right-aligns onto the same edge as the
-                // rows, so the block has to be at least as wide as it.
-                int headerWidth = MeasureWidth(font, LevelHeaderText);
-                levelColumnWidth = maxLevelWidth > headerWidth ? maxLevelWidth : headerWidth;
-                widestNameEnd = anyCharacterText ? charX + maxCharWidth : 8 + maxNameWidth;
-            }
+            // The Level band is reserved even when no row carries a level:
+            // its header still right-aligns onto the pinned edge, and the
+            // Characters column's ellipsis budget has to stop short of it.
+            int levelHeaderWidth = MeasureWidth(TableHeaderStyle.Font, LevelHeaderText);
+            int levelColumnWidth = maxLevelWidth > levelHeaderWidth ? maxLevelWidth : levelHeaderWidth;
 
-            Func<int, int> levelRightEdge = w => LevelRightEdge(w, levelColumnWidth, widestNameEnd);
             if (anyCharacterText)
             {
                 CTableHeaderRenderer.CreateCTableHeaderRow(
-                    contentFlow, panelWidth, "Discipline", 8, LevelHeaderText, _sink, CharactersHeaderText, charX,
-                    rightXForWidth: levelRightEdge);
+                    contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
+                    CharactersHeaderText, charX);
             }
             else
             {
                 CTableHeaderRenderer.CreateCTableHeaderRow(
-                    contentFlow, panelWidth, "Discipline", 8, LevelHeaderText, _sink,
-                    rightXForWidth: levelRightEdge);
+                    contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateDisciplineRow(
                     section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1,
-                    charX, levelColumnWidth, widestNameEnd);
+                    charX, levelColumnWidth);
             }
         }
 
@@ -161,19 +159,11 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int CharGap = 12;
         private const string LevelHeaderText = "Level";
         private const string CharactersHeaderText = "Characters";
+        private const string DisciplineHeaderText = "Discipline";
 
         private static int MeasureWidth(BitmapFont font, string text)
         {
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
-        }
-
-        /// <summary>
-        /// Right edge of the Level column at a given panel width - the one
-        /// formula the header, the build pass and every resize closure share.
-        /// </summary>
-        private static int LevelRightEdge(int panelWidth, int levelColumnWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, levelColumnWidth, widestNameEnd);
         }
 
         // Moved verbatim from CraftingPlanView.CreateDisciplineRow. Only
@@ -190,7 +180,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // can never overlap nameLabel here.
         private void CreateDisciplineRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast,
-            int charX, int levelColumnWidth, int widestNameEnd)
+            int charX, int levelColumnWidth)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
@@ -203,7 +193,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true, AutoSizeHeight = true,
                     Location = new Point(8, 7), Parent = rowPanel
                 });
-            int levelRightEdge = LevelRightEdge(panelWidth, levelColumnWidth, widestNameEnd);
+            int levelRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
             var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, levelRightEdge, 7);
 
             // "Anna (500), Bob (400/450)" - secondary text sitting
@@ -220,13 +210,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // row.CharacterAvailabilityText is null (the snapshot never
             // captured this data - see that field's own doc comment): no
             // label, no tooltip, no claim either way.
-            var charFont = UiFonts.Caption;
+            var charFont = UiFonts.Body;
             var charColor = new Color(170, 170, 170);
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;
             if (!string.IsNullOrEmpty(fullCharText))
             {
-                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(levelRightEdge, levelLabel.Width, CharGap, charX);
+                // levelColumnWidth, not this row's own level text: Level
+                // is a reserved band right-aligned on the pinned edge, so
+                // the character run's budget stops at the band's left edge.
+                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                    levelRightEdge, levelColumnWidth, CharGap, charX);
                 string charDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, charMaxWidth);
                 // The reported site: "Anna (500), Bobby (400/450)" - the one
                 // label in this row carrying character names, which are the
@@ -240,7 +234,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     });
                 if (charLabel.Text != fullCharText)
                 {
-                    TooltipFacility.ApplyPlain(rowPanel, fullCharText);
+                    // Both controls: the label captures the hover before
+                    // the row panel under it is ever reached, so a tooltip
+                    // on the panel alone only fires on the blank strip
+                    // beside the very text it exists to expand.
+                    StampCharacterTooltip(rowPanel, charLabel, fullCharText);
                 }
             }
 
@@ -253,7 +251,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // 36, which the same simulation proves immune, so the clearance
             // is now belt-and-braces rather than the fix. It stays because
             // it costs nothing: no icon in this row (a Body name and level
-            // at y=7, a Caption character line at y=9, lowest ink y=28), so
+            // at y=7, a Body character line at y=9, lowest ink y=30), so
             // the divider top (rowHeight - 3 = 33) sits well clear either
             // way.
             RowRelayoutHelpers.FinishRow(
@@ -262,25 +260,37 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     levelLabel.Location = new Point(
                         PlanRelayoutMath.RightAlignedX(
-                            LevelRightEdge(w, levelColumnWidth, widestNameEnd), levelLabel.Width),
+                            PlanRelayoutMath.PinnedRightEdge(w), levelLabel.Width),
                         7);
-                },
-                w => LevelRightEdge(w, levelColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                });
 
             if (charLabel != null)
             {
                 _sink.AddReellipsis(w =>
                 {
                     int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                        LevelRightEdge(w, levelColumnWidth, widestNameEnd), levelLabel.Width, CharGap, charX);
+                        PlanRelayoutMath.PinnedRightEdge(w), levelColumnWidth, CharGap, charX);
                     string newDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, newMaxWidth);
                     if (charLabel.Text != newDisplayText)
                     {
                         charLabel.Text = newDisplayText;
-                        TooltipFacility.ApplyPlain(rowPanel, newDisplayText != fullCharText ? fullCharText : null);
+                        StampCharacterTooltip(
+                            rowPanel, charLabel, newDisplayText != fullCharText ? fullCharText : null);
                     }
                 });
             }
+        }
+
+        /// <summary>
+        /// The truncated character run's full text, on the label AND the
+        /// row panel under it. Null is a deliberate clear (see
+        /// TooltipFacility.ApplyPlain), which is what an untruncated run
+        /// after a widening drag needs.
+        /// </summary>
+        private static void StampCharacterTooltip(Panel rowPanel, Label charLabel, string fullCharText)
+        {
+            TooltipFacility.ApplyPlain(rowPanel, fullCharText);
+            TooltipFacility.ApplyPlain(charLabel, fullCharText);
         }
     }
 }

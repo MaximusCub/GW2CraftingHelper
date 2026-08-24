@@ -54,9 +54,41 @@ namespace GW2CraftingHelper.Services
         public const int ShoppingRowHeight = 36;
         public const int CraftStepRowHeight = 44;
 
-        // 28, not 26: the header label sits at TableHeaderStyle.LabelY (5)
-        // and its lowest Font16 ink is y=26, exactly the old band height.
-        public const int CTableHeaderRowHeight = 28;
+        // 32, not the 28 a Body-16 header band needed: column headers moved
+        // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
+        // lowest ink is 26 rather than 21. CTableHeaderLabelY 4 reproduces
+        // the band the 16pt header drew - cap top 8px down, ink bottom 2px
+        // clear of the band's own bottom edge - at the taller font.
+        public const int CTableHeaderRowHeight = 32;
+
+        // Baseline y of every column-header label inside that band. Lives
+        // here rather than with the chrome that draws it
+        // (Views/Rendering/TableHeaderStyle, which aliases this) because it
+        // is half of the arithmetic above: a label y and a band height that
+        // move independently are how a header's descenders end up on the
+        // row under them.
+        public const int CTableHeaderLabelY = 4;
+
+        // --- Section header band (drawn by CraftingPlanView.
+        // CreateSectionHeader, which aliases all three). ---
+
+        // 38, not the 32 an 18pt title needed: section titles moved to the
+        // SectionTitle tier (TypeRampMetrics.SectionTitleInk), lowest ink
+        // 30 rather than 23. The divider is bottom-anchored at
+        // height - 3, so its top is y=35 and the title's ink bottom
+        // (SectionHeaderTitleY 3 + 30 = 33) clears it by 2px - the
+        // clearance LabelHelpers.CreateRowDivider's scissor-defect note
+        // requires, never 1px.
+        public const int SectionHeaderRowHeight = 38;
+
+        public const int SectionHeaderTitleY = 3;
+
+        // The caret is Body, not SectionTitle - two fonts on one reading
+        // line, so it is BASELINE-aligned to the title rather than
+        // top-aligned or centred in the band, with the same 1px optical
+        // lift the 18pt header gave it. Ink bottom 10 + 21 = 31, also clear
+        // of the divider top at 35.
+        public const int SectionHeaderCaretY = 10;
 
         // 36, not 32: this row's two labels sit at y=7 and y=9, whose
         // Font16/Font14 ink (28) landed on the 32px row's divider top (29).
@@ -65,20 +97,31 @@ namespace GW2CraftingHelper.Services
         // simulation lists it as immune rather than merely clear.
         public const int DisciplineRowHeight = 36;
 
-        // 36, not 32: a 32px row left the 34px rarity-framed icon
-        // overflowing the row height once dividers widened to 2px.
         // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
-        // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
-        // correct 36.
-        public const int RecipeRowHeightNoSublabel = 36;
+        // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight.
+        //
+        // EVERY recipe row, since the discipline became a column
+        // (Services/RecipesColumnMath) rather than a second line under the
+        // name. The 48px twin this section used to need for a sublabel row
+        // is gone with the sublabel, so the section is shorter than it was
+        // despite the taller chrome above it.
+        public const int RecipeRowHeight = 36;
 
-        // 48, not 44. The name line grew from an 18px to a 20px line box,
-        // which pushed the sublabel below it from y=22 to y=24, and the
-        // sublabel's own font grew with it: its lowest ink is now y=43
-        // against a 44px row whose divider starts at 41. 48 restores the
-        // 2px of clearance the 44px row had.
-        public const int RecipeRowHeightWithSublabel = 48;
-        public const int CostTileRowHeight = 56;
+        // 58, not 56: the cost tiles' captions moved to the ColumnHeader
+        // tier, whose 25px line box puts the caption block's bottom at
+        // CostTileCaptionY 4 + 25 + 2 = 31, one past the y=30 a 56px band
+        // bottom-anchored its 20px coin run at. 58 restores the clearance
+        // (amount y = 58 - 6 - 20 = 32).
+        public const int CostTileRowHeight = 58;
+
+        // Caption y and amount bottom pad of an UNHIGHLIGHTED formula band
+        // (the profit band; a highlighted one uses
+        // SummarySectionLayoutMath's box-derived pair instead). Here rather
+        // than with the renderer that draws them because they are the other
+        // two thirds of CostTileRowHeight's arithmetic - the caption's line
+        // box has to end above the amount run the band bottom-anchors.
+        public const int CostTileCaptionY = 4;
+        public const int CostTileAmountBottomPad = 6;
 
         // The Summary section's COST formula band is no longer a taller
         // twin of this row: its result tile shares the band's one amount
@@ -118,7 +161,7 @@ namespace GW2CraftingHelper.Services
                 case PlanSectionType.RequiredDisciplines:
                     return CTableHeaderRowHeight + rows.Count * DisciplineRowHeight;
                 case PlanSectionType.RequiredRecipes:
-                    return CTableHeaderRowHeight + RecipeRowsHeight(rows);
+                    return CTableHeaderRowHeight + rows.Count * RecipeRowHeight;
                 default:
                     // Defensive fallback mirrors CreateCollapsibleSection's own
                     // default branch (CreateTextRow, one fixed-height row per
@@ -144,16 +187,6 @@ namespace GW2CraftingHelper.Services
                 height += row.RowType == PlanRowType.TimegatedNotice
                     ? FallbackTextRowHeight
                     : CraftStepRowHeight;
-            }
-            return height;
-        }
-
-        private static int RecipeRowsHeight(IReadOnlyList<PlanRowViewModel> rows)
-        {
-            int height = 0;
-            foreach (var row in rows)
-            {
-                height += string.IsNullOrEmpty(row.Sublabel) ? RecipeRowHeightNoSublabel : RecipeRowHeightWithSublabel;
             }
             return height;
         }

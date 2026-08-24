@@ -3,7 +3,6 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
-using MonoGame.Extended.BitmapFonts;
 using System;
 
 namespace GW2CraftingHelper.Views.Rendering
@@ -27,11 +26,11 @@ namespace GW2CraftingHelper.Views.Rendering
     // the shared "row panel resize + extra reposition + divider resize"
     // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row's name/qty labels
-    // are NOT run through IconNameRowHelpers: they
-    // are built via cumulative cursor-x concatenation ("Craft " + "{n}x " +
-    // name) with no width cap or ellipsis at all, a genuinely different
-    // shape from the ellipsized-name-at-a-fixed-column rows - see
-    // IconNameRowHelpers' own doc comment.
+    // are NOT run through IconNameRowHelpers: this row has no icon column
+    // of the shape that helper builds, and its name sits at a cursor x
+    // accumulated from the two fixed words before it ("Craft " + "{n}x ")
+    // rather than at a fixed column - see IconNameRowHelpers' own doc
+    // comment. Only the ellipsis idiom itself is shared.
     internal sealed class CraftStepsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -50,46 +49,34 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody,
-        /// then given the one-pass pre-scan the other plan tables carry
-        /// (audit batch H): the widest sublabel - this table's whole
-        /// right-hand block - and the widest UNTRUNCATED extent of the
-        /// "Craft Nx Name" run, so the sublabel column can be pulled in
-        /// beside that run rather than pinned to the panel edge. The run is
-        /// built by cumulative cursor-x concatenation and never ellipsized
-        /// (see the class doc comment), so the scan reproduces exactly that
-        /// concatenation; pulling the column in past it is what stops a long
-        /// name running under the sublabel.
+        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody.
+        /// The sublabel column is pinned to the panel edge and the
+        /// "Craft Nx Name" run flexes into whatever is left of the row,
+        /// ellipsizing with its full name on a tooltip.
         /// <para>
+        /// The one pre-scan is the sublabel BAND - the widest sublabel this
+        /// render draws, which is where the step name's budget has to stop.
+        /// Budgeting against a row's own (possibly absent) sublabel instead
+        /// would let a short-sublabel row's name run under the widest one.
         /// TimegatedNotice rows are plain full-width text rows with no
-        /// columns of their own, so they take no part in the scan. A section
-        /// where no row carries a sublabel has no right-hand block to pull
-        /// in and stays pinned exactly as before.
+        /// columns of their own, so they take no part in the scan; a
+        /// section where no row carries a sublabel gives its names the
+        /// whole row. The column has no header, so unlike every other table
+        /// here the band has no header label to floor it.
         /// </para>
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var textFont = UiFonts.Body;
             var sublabelFont = UiFonts.Caption;
             int maxSublabelWidth = 0;
-            int widestNameEnd = 0;
-            foreach (var row in section.Rows)
+            for (int i = 0; i < section.Rows.Count; i++)
             {
+                var row = section.Rows[i];
                 if (row.RowType == PlanRowType.TimegatedNotice) continue;
+                if (string.IsNullOrEmpty(row.Sublabel)) continue;
 
-                int sublabelWidth = MeasureWidth(sublabelFont, row.Sublabel);
-                if (sublabelWidth > maxSublabelWidth) maxSublabelWidth = sublabelWidth;
-
-                int nameEnd = TextX
-                    + MeasureWidth(textFont, CraftPrefix)
-                    + MeasureWidth(textFont, QtyPrefix(row.Quantity))
-                    + MeasureWidth(textFont, row.Label);
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
-            }
-
-            if (maxSublabelWidth == 0)
-            {
-                widestNameEnd = 0;
+                int width = (int)System.Math.Ceiling(sublabelFont.MeasureString(row.Sublabel).Width);
+                if (width > maxSublabelWidth) maxSublabelWidth = width;
             }
 
             // A TimegatedNotice row (vendor-cap informational
@@ -108,29 +95,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else
                 {
-                    CreateCraftStepRow(
-                        row, stepNumber++, contentFlow, panelWidth, maxSublabelWidth, widestNameEnd, isLast);
+                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, maxSublabelWidth, isLast);
                 }
             }
-        }
-
-        private static int MeasureWidth(BitmapFont font, string text)
-        {
-            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
         private static string QtyPrefix(int quantity)
         {
             return $"{quantity}x ";
-        }
-
-        /// <summary>
-        /// Right edge of the sublabel column at a given panel width - the one
-        /// formula the build pass and every resize closure share.
-        /// </summary>
-        private static int SublabelRightEdge(int panelWidth, int sublabelColumnWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd);
         }
 
         // Moved verbatim from CraftingPlanView.CreateCraftStepRow. Only
@@ -141,9 +113,14 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TextX = 94; // iconX(52) + frame(34) + gap(8)
         private const string CraftPrefix = "Craft ";
 
+        // Gap the step name's ellipsis budget keeps between itself and the
+        // sublabel band, matching the name-to-column gap every other table
+        // in the plan reserves.
+        private const int NameToSublabelGap = 12;
+
         private void CreateCraftStepRow(
             PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth,
-            int sublabelColumnWidth, int widestNameEnd, bool isLast)
+            int maxSublabelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
             const int badgeSize = 36;
@@ -160,8 +137,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 BackgroundColor = Color.White * 0.08f,
                 Parent = rowPanel
             };
+            // Digits only, so the space-glyph defect that retired
+            // 18-regular elsewhere is not the reason this moved - the badge
+            // is chrome, and chrome above body is bold. 20-bold's cap fills
+            // the badge square better than 18-regular's did.
             string numberText = stepNumber.ToString();
-            var numberFont = UiFonts.Title;
+            var numberFont = UiFonts.SmallHeadingBold;
             var numberMeasure = numberFont.MeasureString(numberText);
             int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
             int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);
@@ -203,14 +184,25 @@ namespace GW2CraftingHelper.Views.Rendering
                 });
             x += qtyLabel.Width;
 
-            LabelHelpers.WithDescenderClearance(
+            // The name is the row's flexing run: "Craft " and "Nx " are
+            // fixed words at a font-only cursor x, so the whole of the
+            // row's slack lands here. nameX is that cursor - invariant to
+            // panelWidth, which is why the settle closure recaptures it
+            // rather than re-measuring the two labels before it.
+            int nameX = x;
+            string fullName = row.Label ?? "";
+            int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                PlanRelayoutMath.PinnedRightEdge(panelWidth), maxSublabelWidth, NameToSublabelGap, nameX);
+            var nameLabel = LabelHelpers.WithDescenderClearance(
                 new Label()
                 {
-                    Text = row.Label ?? "", Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
+                    Text = LabelHelpers.EllipsizeToWidth(textFont, fullName, nameMaxWidth),
+                    Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                     ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel
+                    Location = new Point(nameX, 13), Parent = rowPanel
                 });
+            StampNameTooltip(rowPanel, nameLabel, fullName);
 
             Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
@@ -218,7 +210,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, UiFonts.Caption,
                     new Color(153, 153, 153),
-                    SublabelRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd), 16);
+                    PlanRelayoutMath.PinnedRightEdge(panelWidth), 16);
             }
 
             // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
@@ -240,11 +232,36 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         sublabelLabel.Location = new Point(
                             PlanRelayoutMath.RightAlignedX(
-                                SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd), sublabelLabel.Width),
+                                PlanRelayoutMath.PinnedRightEdge(w), sublabelLabel.Width),
                             16);
                     }
-                },
-                w => SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                });
+            _sink.AddReellipsis(w =>
+            {
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(
+                    textFont, fullName,
+                    PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                        PlanRelayoutMath.PinnedRightEdge(w), maxSublabelWidth, NameToSublabelGap, nameX));
+                if (nameLabel.Text != newDisplayName)
+                {
+                    nameLabel.Text = newDisplayName;
+                    StampNameTooltip(rowPanel, nameLabel, fullName);
+                }
+            });
+        }
+
+        /// <summary>
+        /// The step's full item name on the label AND the row panel when
+        /// the name is truncated, and a deliberate clear of both when a
+        /// widening drag untruncates it (see TooltipFacility.ApplyPlain).
+        /// The label is stamped because it captures the hover before the
+        /// row panel beneath it.
+        /// </summary>
+        private static void StampNameTooltip(Panel rowPanel, Label nameLabel, string fullName)
+        {
+            string tooltip = nameLabel.Text != fullName ? fullName : null;
+            TooltipFacility.ApplyPlain(rowPanel, tooltip);
+            TooltipFacility.ApplyPlain(nameLabel, tooltip);
         }
     }
 }

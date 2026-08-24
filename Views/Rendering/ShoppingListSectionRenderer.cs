@@ -9,8 +9,8 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Views.Rendering
 {
     // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Shopping List row list, its header row, and
-    // its ShoppingSourceTag helper. Behavior is unchanged: same row
+    // (continued)" region - the Shopping List row list and its header
+    // row. Behavior is unchanged: same row
     // geometry, same PlanContentHeightMath/PlanRelayoutMath/
     // ShoppingColumnMath calls, same LabelHelpers.CreateRowDivider usage
     // (divider math and its 1px scissor clearance
@@ -31,16 +31,11 @@ namespace GW2CraftingHelper.Views.Rendering
     // the only two rows across the extracted renderers that actually share
     // the ellipsis shape (see IconNameRowHelpers' own doc comment for why).
     // Everything this row does AFTER the name label - the tooltip-parts
-    // build, the source-tag Panel, the qty label, the Each/Total coin cells -
-    // is unchanged, still hand-rolled here (it does not match either shared
-    // shape).
+    // build, the source badge, the qty label, the Each/Total coin cells -
+    // is hand-rolled here (it does not match either shared shape).
     internal sealed class ShoppingListSectionRenderer
     {
-        // Gap between the name label and its source tag, and between the
-        // name column and the Amount column - both were bare literals at
-        // three call sites each before the tag started eating into the
-        // name's ellipsis budget.
-        private const int TagGap = 8;
+        // Gap the name's ellipsis budget keeps before the Source column.
         private const int NameToQtyGap = 12;
 
         // Left x of the name column (past the row's 32px icon at x=8).
@@ -49,9 +44,10 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly ISectionRelayoutSink _sink;
 
         // Clickable column headers - see the identical fields on
-        // UsedMaterialsSectionRenderer. This table sorts on all four of
+        // UsedMaterialsSectionRenderer. This table sorts on all five of
         // its columns; Each/Total are coin+currency mixes, whose ordering
-        // rule lives in PlanTableSorter.CompareValue.
+        // rule lives in PlanTableSorter.CompareValue, and Source orders by
+        // the badge TEXT the column actually shows.
         private readonly TableSortState<PlanTableColumn> _sortState;
         private readonly Action _onSortChanged;
 
@@ -107,22 +103,31 @@ namespace GW2CraftingHelper.Views.Rendering
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
-            // The same pass also measures the widest "Nx" amount string and
-            // the widest UNTRUNCATED name+tag extent, which is what lets the
-            // Amount/Each/Total block be pulled in beside the names instead
-            // of pinned to the panel edge (audit batch H) - see
-            // ShoppingColumnMath.ComputeEdgesForPanel. The tag rides in the
-            // name extent because it sits between the name and the Amount
-            // column, exactly as the ellipsis budget already treats it.
+            // The same pass measures the widest "Nx" amount string and the
+            // widest source badge - both BAND widths, so the Source
+            // column's own left edge (where the Item column's ellipsis
+            // budget now stops) is one x for the whole table. Every band's
+            // floor is its own header label: at the ColumnHeader tier a
+            // header routinely out-measures the data under it.
             // Row ORDER only - the pre-scan sees the same rows either way,
             // so every column edge (and the row count PlanContentHeightMath
             // measures this section by) is identical sorted or not.
             var rows = PlanTableSorter.Sort(section.Rows, _sortState);
 
+            string amountHeaderText =
+                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
+            string sourceHeaderText =
+                SortableHeaderLabel.Decorate("Source", _sortState.IndicatorFor(PlanTableColumn.Source));
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
-            int maxQtyWidth = 0;
-            int widestNameEnd = 0;
+            int maxQtyWidth =
+                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(amountHeaderText).Width);
+            // The Source band is floored at its own header too, but for the
+            // mirror-image reason the right-aligned bands are: this column
+            // is LEFT-ruled, so a header wider than the widest badge would
+            // overhang to the RIGHT, into the Amount column beside it.
+            int sourceColumnWidth =
+                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(sourceHeaderText).Width);
             foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
@@ -134,10 +139,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
                 if (qtyW > maxQtyWidth) maxQtyWidth = qtyW;
 
-                int nameEnd = NameX
-                    + (int)System.Math.Ceiling(coinFont.MeasureString(row.Label ?? "").Width)
-                    + TagReserve(row);
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
+                string badge = ShoppingSourceBadge.ForRow(row);
+                if (string.IsNullOrEmpty(badge)) continue;
+                int badgeW = LabelHelpers.MeasureSmallTagWidth(badge);
+                if (badgeW > sourceColumnWidth) sourceColumnWidth = badgeW;
             }
 
             // The header and every data row derive their build-time edges
@@ -145,8 +150,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // them from it too - the pre-scan depends only on row data,
             // never on panelWidth, so it does not need to re-run on resize
             // at all and no two rows can anchor the table differently.
-            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
+            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, amountHeaderText, sourceHeaderText);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
@@ -155,53 +160,42 @@ namespace GW2CraftingHelper.Views.Rendering
 
         // The four data-derived (panelWidth-invariant) measurements every
         // row and header closure needs to recompute its column edges -
-        // grouped so a fifth cannot be added to one call site and forgotten
-        // at another.
+        // grouped so a fifth cannot be added to one call site and
+        // forgotten at another.
         private readonly struct ColumnScan
         {
             internal readonly int MaxEachWidth;
             internal readonly int MaxTotalWidth;
             internal readonly int MaxQtyWidth;
-            internal readonly int WidestNameEnd;
+            internal readonly int SourceColumnWidth;
 
-            internal ColumnScan(int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int widestNameEnd)
+            internal ColumnScan(
+                int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int sourceColumnWidth)
             {
                 MaxEachWidth = maxEachWidth;
                 MaxTotalWidth = maxTotalWidth;
                 MaxQtyWidth = maxQtyWidth;
-                WidestNameEnd = widestNameEnd;
+                SourceColumnWidth = sourceColumnWidth;
             }
 
             internal ShoppingColumnMath.ColumnEdges EdgesFor(int panelWidth)
             {
                 return ShoppingColumnMath.ComputeEdgesForPanel(
-                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, WidestNameEnd);
+                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, SourceColumnWidth);
             }
-        }
-
-        /// <summary>
-        /// Width the row's source tag takes out of the name column, or 0
-        /// when it carries none - resolved identically by the pre-scan and
-        /// by the row builder itself.
-        /// </summary>
-        private static int TagReserve(PlanRowViewModel row)
-        {
-            string sourceTag = ShoppingSourceBadge.ForRow(row);
-            return string.IsNullOrEmpty(sourceTag)
-                ? 0
-                : LabelHelpers.MeasureSmallTagWidth(sourceTag) + TagGap;
         }
 
         // Moved verbatim from CraftingPlanView.CreateShoppingListHeaderRow.
         // Changes since: _relayoutActions.Add(...) -> _sink.AddRelayout(...),
         // and the column edges come from the shared pre-scan.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ColumnScan scan)
+            FlowPanel parent, int panelWidth, ColumnScan scan,
+            string amountHeaderText, string sourceHeaderText)
         {
             var edges = scan.EdgesFor(panelWidth);
             var rowPanel = new Panel()
             {
-                Size = new Point(HeaderBandWidth(panelWidth, edges), TableHeaderStyle.RowHeight),
+                Size = new Point(panelWidth, TableHeaderStyle.RowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = parent
             };
@@ -222,8 +216,16 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
+            // Left-aligned at the column's x, like the badges under it -
+            // the other three right-align off their own bands.
+            var sourceLabel = LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Text = sourceHeaderText, Font = font, TextColor = color,
+                AutoSizeWidth = true, AutoSizeHeight = true,
+                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel
+            });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount)),
+                rowPanel, amountHeaderText,
                 font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each)),
@@ -233,6 +235,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
 
             SortableHeaderLabel.MakeClickable(itemLabel, () => SortBy(PlanTableColumn.Item));
+            SortableHeaderLabel.MakeClickable(sourceLabel, () => SortBy(PlanTableColumn.Source));
             SortableHeaderLabel.MakeClickable(amountLabel, () => SortBy(PlanTableColumn.Amount));
             SortableHeaderLabel.MakeClickable(eachLabel, () => SortBy(PlanTableColumn.Each));
             SortableHeaderLabel.MakeClickable(totalLabel, () => SortBy(PlanTableColumn.Total));
@@ -245,7 +248,8 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 var e = scan.EdgesFor(w);
-                rowPanel.Size = new Point(HeaderBandWidth(w, e), TableHeaderStyle.RowHeight);
+                rowPanel.Size = new Point(w, TableHeaderStyle.RowHeight);
+                sourceLabel.Location = new Point(e.SourceX, TableHeaderStyle.LabelY);
                 amountLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), TableHeaderStyle.LabelY);
                 eachLabel.Location = new Point(
@@ -253,20 +257,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 totalLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
             });
-        }
-
-        /// <summary>
-        /// Width of the header's band: up to the Total column plus the
-        /// margin every plan table keeps past its block, never wider than
-        /// the panel. Same rule CTableHeaderRenderer.BandWidth applies -
-        /// a band that runs past its own last column stopped bounding the
-        /// table it belongs to once batch H pulled the columns in.
-        /// </summary>
-        private static int HeaderBandWidth(int panelWidth, ShoppingColumnMath.ColumnEdges edges)
-        {
-            int width = edges.TotalRightEdge + PlanRelayoutMath.TableRightMargin;
-            if (width > panelWidth) width = panelWidth;
-            return width > 0 ? width : 0;
         }
 
         // A ValueCellHandle's own
@@ -312,32 +302,28 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
-            // The source tag sits immediately right of the name, so its
-            // width has to come out of the name's ellipsis budget - it is
-            // resolved before the name is built, not after. Previously only
-            // the minority VENDOR/CURRENCY/UNKNOWN rows carried a tag and
-            // the budget ignored it, so a long name pushed its own tag into
-            // the Amount column; now that every row is badged that would be
-            // the common case, not the rare one.
-            string sourceTag = ShoppingSourceBadge.ForRow(row);
-            int tagReserve = TagReserve(row);
-
             // Icon y=0 (was 1) - see the identical note in
             // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
             // shape, same 1px shortfall against the new 2px divider.
+            //
+            // The name's budget stops at the SOURCE column's left edge now,
+            // not at the Amount band with this row's own badge width
+            // subtracted: the badge is a column, so it no longer moves with
+            // the name and no longer has to be reserved out of it.
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
-                edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, NameX, 9);
+                edges.SourceX, 0, NameToQtyGap, NameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
+            string sourceTag = ShoppingSourceBadge.ForRow(row);
             Panel tagPanel = null;
             if (!string.IsNullOrEmpty(sourceTag))
             {
-                PillColors.GetPillColors(PillKind.Locked, false, out Color tagBorder, out Color tagFill);
+                ShoppingBadgeColors.For(row.RowType, out Color tagBorder, out Color tagFill);
                 tagPanel = LabelHelpers.CreateSmallTag(
-                    rowPanel, sourceTag, NameX + nameLabel.Width + TagGap, 9, tagBorder, tagFill);
+                    rowPanel, sourceTag, edges.SourceX, 9, tagBorder, tagFill);
             }
 
             var qtyLabel = LabelHelpers.WithDescenderClearance(
@@ -361,13 +347,26 @@ namespace GW2CraftingHelper.Views.Rendering
             var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
             var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
 
+            // An UNKNOWN row's dash takes the badge's own red, so "no
+            // source" and "no price" read as one statement about the row
+            // rather than two unrelated marks. Only the dash: the item name
+            // keeps its rarity colour at full strength, because an unknown
+            // source is a fact about acquisition, not a defect of the item.
+            if (row.RowType == PlanRowType.ShoppingUnknown)
+            {
+                TintUnpricedDash(eachCell);
+                TintUnpricedDash(totalCell);
+            }
+
             // TOOLTIP SWALLOWED BY CHILD CONTROLS: a container's tooltip
             // never fires when a child control with no tooltip of its own
             // covers the hover point - the row's children (the icon,
-            // nameLabel, tagPanel, qtyLabel, the Each/Total cells) all
-            // capture the mouse before rowPanel's own tooltip is reached,
-            // so every one of them carries the row's tooltip. Stamped
-            // AFTER those controls exist, which is why this sits here.
+            // nameLabel, qtyLabel, the Each/Total cells) all capture the
+            // mouse before rowPanel's own tooltip is reached, so every one
+            // of them carries the row's tooltip. Stamped AFTER those
+            // controls exist, which is why this sits here. The source
+            // badge is the one child that carries something else - its
+            // own prose, below.
             //
             // Composed at HOVER time (see UsedMaterialsSectionRenderer's
             // matching note): the row's ellipsis state is read when the
@@ -383,7 +382,12 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
             TooltipFacility.ApplyRichDeferred(nameLabel, buildTooltip);
             TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
-            IconControls.ApplyRichDeferredToIconTree(tagPanel, buildTooltip);
+
+            // The badge gets its OWN hover, not the row's: four capital
+            // letters name the source only to a reader who already knows
+            // the vocabulary, and the badge is the one control on the row
+            // whose whole job is to answer "where do I get this?".
+            LabelHelpers.ApplyTagTooltip(tagPanel, ShoppingSourceBadge.TooltipForRow(row));
 
             // The icon only when the row has a real item id: a currency
             // row's icon names its own currency, and an item builder has
@@ -397,11 +401,12 @@ namespace GW2CraftingHelper.Views.Rendering
             SetValueCellTooltip(eachCell, buildTooltip);
             SetValueCellTooltip(totalCell, buildTooltip);
 
-            // Qty + Each/Total cells reposition every drag tick
-            // (no MeasureString - CoinCurrencyRenderer.RepositionValueCellRightAligned uses only
-            // cached segment text widths). The name label and its source
-            // tag are untouched here; both depend on ellipsis truncation
-            // and only update at settle (RunReellipsis) below.
+            // Source badge + qty + Each/Total cells reposition every drag
+            // tick (no MeasureString - the badge's width is data-fixed, and
+            // CoinCurrencyRenderer.RepositionValueCellRightAligned uses
+            // only cached segment text widths). The badge moved from the
+            // settle pass to here when it became a column: its x is
+            // width-derived now rather than trailing the name's ellipsis.
             //
             // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
             // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
@@ -412,23 +417,29 @@ namespace GW2CraftingHelper.Views.Rendering
                 w =>
                 {
                     var e = scan.EdgesFor(w);
+                    if (tagPanel != null)
+                    {
+                        tagPanel.Location = new Point(e.SourceX, 9);
+                    }
                     qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                },
-                w => scan.EdgesFor(w).TotalRightEdge + PlanRelayoutMath.TableRightMargin);
+                });
             // No tooltip re-stamp on settle: the deferred builder reads
             // the label's current text when the box is drawn.
-            _sink.AddReellipsis(w =>
-            {
-                var e = scan.EdgesFor(w);
-                IconNameRowHelpers.ReellipsizeName(
-                    nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve);
-                if (tagPanel != null)
-                {
-                    tagPanel.Location = new Point(NameX + nameLabel.Width + TagGap, 9);
-                }
-            });
+            _sink.AddReellipsis(w => IconNameRowHelpers.ReellipsizeName(
+                nameHandle, font, scan.EdgesFor(w).SourceX, 0, NameToQtyGap));
+        }
+
+        /// <summary>
+        /// Recolors an unpriceable cell's dash to the UNKNOWN badge's hue.
+        /// A no-op for a cell that renders real segments - only a cell with
+        /// nothing to price has a dash at all.
+        /// </summary>
+        private static void TintUnpricedDash(CoinCurrencyRenderer.ValueCellHandle cell)
+        {
+            if (cell?.DashLabel == null) return;
+            cell.DashLabel.TextColor = ShoppingBadgeColors.UnknownBorder;
         }
     }
 }

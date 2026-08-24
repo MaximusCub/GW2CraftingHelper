@@ -72,12 +72,17 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Moved verbatim from CraftingPlanView.CreateUsedMaterialsBody,
         /// then given the one-pass pre-scan every other plan table already
-        /// had (audit batch H): the widest rendered "Nx" string and the
-        /// widest UNTRUNCATED name extent, which together let the Amount
-        /// column be pulled in beside the names rather than pinned to the
-        /// panel edge with a growing empty band between them. Both are
-        /// data-derived, so they are measured once here and reused by every
-        /// row's relayout closure rather than re-measured per resize tick.
+        /// had: the widest rendered "Nx" string, which is the Amount
+        /// column's reserved band and therefore the Item column's ellipsis
+        /// budget. Data-derived, so it is measured once here and reused by
+        /// every row's relayout closure rather than re-measured per resize
+        /// tick.
+        /// <para>
+        /// The band is max(widest data, header label): the "Amount" header
+        /// right-aligns onto the same edge as the rows, and at the
+        /// ColumnHeader tier it is routinely wider than a short "12x", so
+        /// scanning data alone would let a name run under its own header.
+        /// </para>
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
@@ -88,15 +93,14 @@ namespace GW2CraftingHelper.Views.Rendering
             // count) is identical sorted or not.
             var rows = PlanTableSorter.Sort(section.Rows, _sortState);
 
-            int maxQtyWidth = 0;
-            int widestNameEnd = 0;
+            string amountHeaderText =
+                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
+            int maxQtyWidth =
+                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(amountHeaderText).Width);
             foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
                 if (qtyWidth > maxQtyWidth) maxQtyWidth = qtyWidth;
-
-                int nameEnd = NameX + (int)System.Math.Ceiling(font.MeasureString(row.Label ?? "").Width);
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
             }
 
             // Item/Amount column header. This was the one plan table with
@@ -105,21 +109,19 @@ namespace GW2CraftingHelper.Views.Rendering
             // quantity. Unconditional, like the Shopping List's and the two
             // c-tables', so it can never disagree with
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
-            // same way. rightXForWidth because the Amount column is no
-            // longer pinned to the panel edge (batch H) - it has to track
-            // the same QtyRightEdge its rows do.
+            // same way. No rightXForWidth: the Amount column is pinned to
+            // the panel edge, which is CTableHeaderRenderer's own default.
             CTableHeaderRenderer.CreateCTableHeaderRow(
                 contentFlow, panelWidth,
                 SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
-                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount)), _sink,
-                rightXForWidth: w => QtyRightEdge(w, maxQtyWidth, widestNameEnd),
+                amountHeaderText, _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount));
 
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateUsedMaterialRow(
-                    rows[i], contentFlow, panelWidth, maxQtyWidth, widestNameEnd,
+                    rows[i], contentFlow, panelWidth, maxQtyWidth,
                     i == rows.Count - 1);
             }
         }
@@ -130,26 +132,17 @@ namespace GW2CraftingHelper.Views.Rendering
             _onSortChanged();
         }
 
-        /// <summary>
-        /// Right edge of the Amount column at a given panel width - the one
-        /// formula the build pass and both resize closures share.
-        /// </summary>
-        private static int QtyRightEdge(int panelWidth, int maxQtyWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
-        }
-
         // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
         // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
         // the class doc comment above) - same geometry, same constants.
         private void CreateUsedMaterialRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth,
-            int maxQtyWidth, int widestNameEnd, bool isLast)
+            int maxQtyWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            int qtyRightEdge = QtyRightEdge(panelWidth, maxQtyWidth, widestNameEnd);
+            int qtyRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
             var font = UiFonts.Body;
 
             string qtyText = $"{row.Quantity}x";
@@ -161,9 +154,15 @@ namespace GW2CraftingHelper.Views.Rendering
             // divider's top pixel by 1 row. Moving the icon up by 1 makes
             // frame height (34) + divider height (2) exactly fill rowHeight
             // with no overlap.
+            // maxQtyWidth, not this row's own qtyWidth: the Amount column
+            // is a reserved band right-aligned on the pinned edge, so the
+            // name's budget stops at the band's LEFT edge. Budgeting
+            // against one row's short "1x" would let its name run under the
+            // column's widest value.
             string fullName = row.Label ?? "";
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, NameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
+                qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, 9);
             // Composed at HOVER time, not here: a plan restored from disk
             // fills its stat cache in the background (Q13), and a snapshot
             // taken now could never show what lands after it. It also
@@ -207,15 +206,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
                 w =>
                 {
-                    qtyLabel.Location = new Point(QtyRightEdge(w, maxQtyWidth, widestNameEnd) - qtyWidth, 9);
-                },
-                w => QtyRightEdge(w, maxQtyWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                    qtyLabel.Location = new Point(
+                        PlanRelayoutMath.PinnedRightEdge(w) - qtyWidth, 9);
+                });
             // The re-ellipsis no longer re-stamps anything: the tooltip
             // builder above reads the label's CURRENT text when the box is
             // drawn, so a resize that truncates or untruncates the name is
             // already reflected.
             _sink.AddReellipsis(w => IconNameRowHelpers.ReellipsizeName(
-                nameHandle, font, QtyRightEdge(w, maxQtyWidth, widestNameEnd), qtyWidth, NameToQtyGap));
+                nameHandle, font, PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap));
         }
     }
 }

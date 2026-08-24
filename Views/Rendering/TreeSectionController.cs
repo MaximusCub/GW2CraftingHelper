@@ -186,6 +186,75 @@ namespace GW2CraftingHelper.Views.Rendering
         // States for the current render pass; rebuilt with the tree itself.
         private readonly List<TreeNodeState> _treeNodeStates = new List<TreeNodeState>();
 
+        /// <summary>
+        /// Everything an in-place refresh of one already-built tree row
+        /// needs to reach - see <see cref="TryRefreshInPlace"/>. Held per
+        /// BUILT row, in build order, which is exactly the pre-order the
+        /// refresh walk re-derives.
+        /// <para>
+        /// The row's own relayout and re-ellipsis closures read their
+        /// mutable state (the pill list, the cost cell, the qty width)
+        /// through this handle rather than capturing it, so a refresh that
+        /// replaces a row's pills does not leave a closure repositioning
+        /// controls that no longer exist.
+        /// </para>
+        /// </summary>
+        private sealed class TreeRowHandle
+        {
+            internal CraftingTreeNode Node;
+            internal int Depth;
+            internal bool Dimmed;
+            internal string CaptionText;
+            internal string FullName;
+
+            internal Panel RowPanel;
+            internal Label QtyLabel;
+            internal Label NameLabel;
+            internal Panel IconFrame;
+            internal Panel IconScrim;
+
+            /// <summary>
+            /// The SAME instance for the row's whole life. The row's click
+            /// guard closes over it to ask whether a pill is under the
+            /// cursor, so a refresh must refill it, never replace it.
+            /// </summary>
+            internal readonly List<Panel> Pills = new List<Panel>();
+
+            internal CoinCurrencyRenderer.ValueCellHandle CostCell;
+            internal bool RowDrawsCurrency;
+
+            internal int NameX;
+            internal int QtyWidth;
+            internal int CostColumnWidth;
+            internal TreeCostColumnMath.CostColumnWidths ColumnWidths;
+
+            /// <summary>Null for a row with no children.</summary>
+            internal TreeNodeState State;
+        }
+
+        // Every built row of the current render pass, keyed by the solver
+        // NodeId its row draws. A MAP rather than the build-order list it
+        // started as: rows are appended in pre-order by the initial build,
+        // but a later expand APPENDS its children at the end, so build
+        // order stops being tree order the first time anyone expands
+        // anything - and a refresh that walked the list positionally would
+        // have quietly stopped matching from then on.
+        private readonly Dictionary<int, TreeRowHandle> _treeRowsByNodeId =
+            new Dictionary<int, TreeRowHandle>();
+
+        // Set when two rows of one render claim the same NodeId, which
+        // would make the map above ambiguous. Never observed - the solver
+        // numbers its nodes uniquely - so this is a guard that declines to
+        // refresh rather than a case with a handling strategy.
+        private bool _treeRowIdsAmbiguous;
+
+        // Node count of the pre-scan that titled this render's section
+        // header ("Recipe Tree (N)"). A refresh that would change it has to
+        // decline: the header is preserved across an in-place refresh, and
+        // a title that no longer counts the tree under it is worse than a
+        // rebuild.
+        private int _scannedNodeCount;
+
         // Root nodes + top-level content FlowPanel for the current render's
         // Recipe Tree section (null when the plan has no tree). Held so
         // RefreshTreeContainerHeights - called from the tree row toggle
@@ -210,14 +279,6 @@ namespace GW2CraftingHelper.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
-        // Rightmost x any row's name column reaches, from the same
-        // pre-scan. The pill+cost block is pulled in to just past this
-        // instead of sitting against the panel edge, which is what closes
-        // the tree's dead gutter - see PlanRelayoutMath.RightBlockX. 0
-        // (a tree-less render pass) leaves the block pinned exactly where
-        // it used to sit.
-        private int _widestNameEnd;
-
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -233,10 +294,12 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void ResetTreeRenderState()
         {
             _treeNodeStates.Clear();
+            _treeRowsByNodeId.Clear();
+            _treeRowIdsAmbiguous = false;
+            _scannedNodeCount = 0;
             _treeRoots = null;
             _treeFlow = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
-            _widestNameEnd = 0;
 
             // Withdrawn with the render pass that published them: the tree
             // actions operate on the controls this reset is about to
@@ -330,6 +393,8 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void CreateTreeSection(IReadOnlyList<CraftingTreeNode> treeRoots, int panelWidth)
         {
             _treeNodeStates.Clear();
+            _treeRowsByNodeId.Clear();
+            _treeRowIdsAmbiguous = false;
 
             // The five action buttons this header used to carry now live in
             // CraftingPlanView's non-scrolling top strip - see
@@ -341,9 +406,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // Column pre-scan: ONE walk of the whole tree per render
             // pass, before any row is built, so every row (including the
             // ones an expand click builds later) anchors to the same
-            // sub-columns and the same gutter-closing block x. Never re-run
-            // per row draw or per resize tick - both results are
-            // data-derived, not panelWidth-derived.
+            // sub-columns. Never re-run per row draw or per resize tick -
+            // the result is data-derived, not panelWidth-derived.
             //
             // Hoisted above the header because the header's title now
             // carries the tree's node count, which comes out of this same
@@ -351,7 +415,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
             _costColumnWidths = scan.CostWidths;
-            _widestNameEnd = scan.WidestNameEnd;
+            _scannedNodeCount = scan.NodeCount;
 
             // Parenthesised count, like every other countable section
             // ("Used Materials (12)", "Shopping List (7)"). The number is
@@ -382,14 +446,13 @@ namespace GW2CraftingHelper.Views.Rendering
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
-                int headerNameEnd = _widestNameEnd;
                 CTableHeaderRenderer.CreateCTableHeaderRow(
                     treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
                     middleLabel: "Source",
                     middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).PillColX,
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
                     rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).CostRightEdge);
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge);
             }
 
 #if DEBUG
@@ -443,17 +506,89 @@ namespace GW2CraftingHelper.Views.Rendering
                 CraftAll = () => ApplyPreset(AcquisitionSource.Craft),
                 BuyAll = () => ApplyPreset(AcquisitionSource.BuyFromTp),
                 ExpandAll = ExpandAll,
-                CollapseAll = CollapseAll
+                CollapseAll = CollapseAll,
+                ClearOverrides = ClearOverrides,
+                ClearIgnored = ClearIgnored,
+                GetOverrideCount = () => _nodeOverrides.Count,
+                GetIgnoredCount = () => _ignoredItemIds.Count,
+                CanReSolve = () => _lastResult?.SolveContext != null,
+                CraftAllWouldChange = () => PresetWouldChange(AcquisitionSource.Craft),
+                BuyAllWouldChange = () => PresetWouldChange(AcquisitionSource.BuyFromTp)
             });
         }
 
         // Decision preset: clear every manual override and re-solve for the
-        // solver's own cheapest plan.
+        // solver's own cheapest plan. The Count == 0 early return is the
+        // belt to the view's braces - the view gates this behind its own
+        // would-change predicate now, but the command is still directly
+        // invokable with no dialog wiring at all.
         private void ApplyBestPathPreset()
         {
             if (_nodeOverrides.Count == 0) return;
             _nodeOverrides.Clear();
             ApplyOverridesAndResolve(isBestPathPreset: true);
+        }
+
+        /// <summary>
+        /// The Overrides chip's clear action: back to the solver's own
+        /// choices. MEASURED: identical work to
+        /// <see cref="ApplyBestPathPreset"/> - clear the same dictionary,
+        /// re-solve - and it differs only in writing the ordinary
+        /// "Plan updated" event rather than claiming "Best path restored",
+        /// which is a preset's label and not a description of clearing.
+        /// See docs/KNOWN-ISSUES.md: the two buttons being one action is a
+        /// finding for the maintainer, not something this seam invents a
+        /// difference to hide.
+        /// </summary>
+        private void ClearOverrides()
+        {
+            if (_nodeOverrides.Count == 0) return;
+            _nodeOverrides.Clear();
+            ApplyOverridesAndResolve();
+        }
+
+        /// <summary>
+        /// The Ignored chip's clear action. Runs the SAME re-solve path any
+        /// ignore-pill click runs - no bespoke status string, because
+        /// nothing bespoke happened.
+        /// </summary>
+        private void ClearIgnored()
+        {
+            if (_ignoredItemIds.Count == 0) return;
+            _ignoredItemIds.Clear();
+            ApplyOverridesAndResolve();
+        }
+
+        /// <summary>
+        /// Whether applying a preset would actually change the override
+        /// map - the same key set with the same values re-solves to the
+        /// identical plan (ignore marks are untouched by a preset), so the
+        /// click is a no-op the view reports instead of performing.
+        /// Answered at click time: it walks the solver tree to build the
+        /// preset, which is bounded but not free.
+        /// <para>
+        /// NULL, not false, with no solve context. A persisted plan whose
+        /// Result deserialises without one restores a renderable tree
+        /// (PlanStructuralValidator accepts a null SolveContext) and a
+        /// visible toolbar, and every re-solve on it is unavailable rather
+        /// than unnecessary. See <see cref="TreeToolbarCommands"/>.
+        /// </para>
+        /// </summary>
+        private bool? PresetWouldChange(AcquisitionSource source)
+        {
+            if (_lastResult?.SolveContext == null) return null;
+
+            var preset = CraftingPlanPipeline.BuildPresetOverrides(_lastResult.SolveContext, source);
+            if (preset.Count != _nodeOverrides.Count) return true;
+
+            foreach (var kvp in preset)
+            {
+                if (!_nodeOverrides.TryGetValue(kvp.Key, out var current) || current != kvp.Value)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void ExpandAll()
@@ -484,6 +619,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
+            HoverChainResync.AfterRebuild();
         }
 
         private void CollapseAll()
@@ -499,6 +635,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 RefreshTreeContainerHeights();
             });
+            HoverChainResync.AfterRebuild();
         }
 
         // Moved verbatim from CraftingPlanView.ApplyPreset. No edits - both
@@ -529,7 +666,19 @@ namespace GW2CraftingHelper.Views.Rendering
         // SetStatus(...) -> _setStatus(...).
         private void ApplyOverridesAndResolve(bool isBestPathPreset = false)
         {
-            if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
+            // Edit since the move: this used to return silently on a
+            // missing solve context, which made EVERY local change - a pill
+            // click, a preset, either chip's clear - a dead click on a plan
+            // restored without one. The click is still refused; it now says
+            // so. Unwired _resolveOverridesSync stays silent: that is a
+            // build-time wiring fault, not a state the user is in.
+            if (_lastResult?.SolveContext == null)
+            {
+                _setStatus(StatusText.ReSolveUnavailable);
+                return;
+            }
+
+            if (_resolveOverridesSync == null)
             {
                 return;
             }
@@ -542,12 +691,16 @@ namespace GW2CraftingHelper.Views.Rendering
                 var vm = _vmBuilder.Build(result);
                 _setCurrentPlan(vm);
                 _preserveScrollAcross(() => _renderPlan(vm));
-                _setStatus(StatusText.ForOverrideResolve(isBestPathPreset, _nodeOverrides.Count));
+                // The click that got us here came from a cursor that has
+                // not moved, and the render just replaced controls under
+                // it - see HoverChainResync.
+                HoverChainResync.AfterRebuild();
+                _setStatus(StatusText.ForOverrideResolve(isBestPathPreset));
             }
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Override re-solve failed");
-                _setStatus($"Error: {ex.Message}");
+                _setStatus(StatusText.ForUpdateFailure(ex.Message));
             }
         }
 
@@ -624,13 +777,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// per DISTINCT string rather than once per node; the currency
         /// callback only fires for the handful of vendor nodes that draw a
         /// currency run at all.
-        /// <para>
-        /// The name callback reconstructs RenderTreeNode's own nameX and
-        /// quantity prefix from the same constants that row builder uses,
-        /// against the UNTRUNCATED name - see
-        /// PlanRelayoutMath.RightBlockX for why a truncated width would be
-        /// circular.
-        /// </para>
         /// </summary>
         private TreeCostColumnMath.TreeColumnScan ScanTreeColumns(IReadOnlyList<CraftingTreeNode> roots)
         {
@@ -653,13 +799,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 measure,
                 node => CoinCurrencyRenderer.TotalCurrencySegmentsWidth(
                     CoinCurrencyRenderer.BuildCurrencySegments(
-                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)),
-                (node, depth) =>
-                {
-                    int nameX = depth * TreeIndentPer + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
-                    int qtyWidth = node.Quantity > 0 ? measure($"{node.Quantity}x ") : 0;
-                    return nameX + qtyWidth + measure(node.Name ?? "");
-                });
+                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)));
         }
 
         /// <summary>
@@ -836,18 +976,39 @@ namespace GW2CraftingHelper.Views.Rendering
             // columns and its own relayout arithmetic identical by
             // construction.
             var columnWidths = _costColumnWidths;
-            int widestNameEnd = _widestNameEnd;
             int costColumnWidth = EffectiveCostColumnWidth();
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
             int pillColX = edges.PillColX;
-            // Whether this row fills the shared currency band, which is what
-            // decides where its coin run ends - see
-            // TreeCostColumnMath.ComputeRowEdges. Assigned with the cost
-            // cell below and read again by the relayout closure.
-            bool rowDrawsCurrency = false;
 
             string fullName = node.Name ?? "";
+
+            // Registered before the row's controls exist so every closure
+            // below reads its mutable state (pills, cost cell, qty width)
+            // from ONE place an in-place refresh can rewrite.
+            var handle = new TreeRowHandle
+            {
+                Node = node,
+                Depth = depth,
+                Dimmed = dimmed,
+                CaptionText = captionText,
+                FullName = fullName,
+                RowPanel = rowPanel,
+                IconFrame = iconFrame,
+                IconScrim = iconScrim,
+                NameX = nameX,
+                QtyWidth = qtyWidth,
+                CostColumnWidth = costColumnWidth,
+                ColumnWidths = columnWidths
+            };
+            if (_treeRowsByNodeId.ContainsKey(node.NodeId))
+            {
+                _treeRowIdsAmbiguous = true;
+            }
+            else
+            {
+                _treeRowsByNodeId[node.NodeId] = handle;
+            }
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
@@ -891,6 +1052,8 @@ namespace GW2CraftingHelper.Views.Rendering
                     Location = new Point(nameX + qtyWidth, 12),
                     Parent = rowPanel
                 });
+            handle.QtyLabel = qtyLabel;
+            handle.NameLabel = nameLabel;
 
             // ExtraTooltipLines never depends on panelWidth (unit
             // price / acquisition hint text is fixed), so it is computed
@@ -983,7 +1146,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
             // single locked/HAVE/CURRENCY pill when there is no choice.
-            var pillPanels = RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed);
+            var pillPanels = handle.Pills;
+            RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed, pillPanels);
 
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
@@ -1012,25 +1176,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // the breakdown lives one expand-click away as real child
             // rows, instead of one very long segmented row colliding with
             // the layout.
-            CoinCurrencyRenderer.ValueCellHandle costCell = null;
-            if (node.SubtreeCost.HasValue)
-            {
-                var costFont = UiFonts.Body;
-                // TreeCostColumnMath.ShowsCurrencySegments, not a
-                // hand-repeated cost-component check: the pre-scan reserves
-                // the currency sub-column from that same predicate, so a
-                // second copy here could reserve for rows that never draw
-                // and vice versa.
-                var currencyAmounts = TreeCostColumnMath.ShowsCurrencySegments(node)
-                    ? CurrencyDisplayResolver.ResolveAmounts(
-                        node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata)
-                    : null;
-                rowDrawsCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
-                costCell = CoinCurrencyRenderer.RenderValueCellInSubColumns(
-                    rowPanel, node.SubtreeCost.Value, currencyAmounts,
-                    TreeCostColumnMath.ComputeRowEdges(edges.CostRightEdge, columnWidths, rowDrawsCurrency),
-                    12, costFont, dimmed ? 0.35f : 1f);
-            }
+            RenderCostCell(handle, node, edges.CostRightEdge, dimmed);
 
             // Child container. Children of a non-Craft decision are this
             // module's own informational reference branch (audit row 56
@@ -1066,6 +1212,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     ChildDimmed = childDimmed
                 };
                 _treeNodeStates.Add(state);
+                handle.State = state;
                 if (isExpanded)
                 {
                     // UI-bundle milestone, Feature C: caption split computed
@@ -1118,6 +1265,9 @@ namespace GW2CraftingHelper.Views.Rendering
                         state.ArrowLabel.Text = state.IsExpanded ? "v" : ">";
                         RefreshTreeContainerHeights();
                     });
+                    // A caret click builds or hides the rows directly
+                    // under the cursor - see HoverChainResync.
+                    HoverChainResync.AfterRebuild();
                 };
                 // Same pill guard as toggleHandler, for the same reason: a
                 // press on a pill reaches this row panel too, and the row
@@ -1136,23 +1286,23 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
-                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
+                var e = RowEdges(handle, w);
 
-                if (pillPanels.Count > 0)
+                if (handle.Pills.Count > 0)
                 {
                     int x = e.PillColX;
-                    foreach (var pill in pillPanels)
+                    foreach (var pill in handle.Pills)
                     {
                         pill.Location = new Point(x, 10);
                         x += pill.Width + PillGap;
                     }
                 }
-                if (costCell != null)
+                if (handle.CostCell != null)
                 {
                     CoinCurrencyRenderer.RepositionValueCellInSubColumns(
-                        costCell,
-                        TreeCostColumnMath.ComputeRowEdges(e.CostRightEdge, columnWidths, rowDrawsCurrency),
+                        handle.CostCell,
+                        TreeCostColumnMath.ComputeRowEdges(
+                            e.CostRightEdge, handle.ColumnWidths, handle.RowDrawsCurrency),
                         12);
                 }
                 if (childFlow != null)
@@ -1162,16 +1312,267 @@ namespace GW2CraftingHelper.Views.Rendering
             });
             _sink.AddReellipsis(w =>
             {
-                var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
-                string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
+                string newDisplayName = LabelHelpers.EllipsizeToWidth(
+                    nameFont, handle.FullName, RowEdges(handle, w).NameMaxWidth);
                 // No tooltip re-stamp: the deferred builder reads the
                 // label's CURRENT text when the box is drawn.
-                if (nameLabel.Text != newDisplayName)
+                if (handle.NameLabel.Text != newDisplayName)
                 {
-                    nameLabel.Text = newDisplayName;
+                    handle.NameLabel.Text = newDisplayName;
                 }
             });
+        }
+
+        /// <summary>
+        /// One row's column grid at a given panel width, read entirely off
+        /// its handle - the single place build, relayout, re-ellipsis and
+        /// refresh all derive it, so a refresh that changes a row's qty
+        /// prefix moves every one of them together.
+        /// </summary>
+        private static PlanRelayoutMath.TreeColumnEdges RowEdges(TreeRowHandle handle, int panelWidth)
+        {
+            return PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, handle.NameX, handle.QtyWidth,
+                TreePillColumnWidth, handle.CostColumnWidth, TreeRightMargin);
+        }
+
+        /// <summary>
+        /// Builds (or rebuilds) the row's cost cell into its handle. Only
+        /// a node with a real committed decision AND a cost figure gets one
+        /// - HAVE/CURRENCY/UNKNOWN nodes carry no SubtreeCost and keep the
+        /// column blank, their own pill already saying "no price".
+        /// </summary>
+        private void RenderCostCell(
+            TreeRowHandle handle, CraftingTreeNode node, int costRightEdge, bool dimmed)
+        {
+            handle.CostCell = null;
+            handle.RowDrawsCurrency = false;
+            if (!node.SubtreeCost.HasValue) return;
+
+            // TreeCostColumnMath.ShowsCurrencySegments, not a
+            // hand-repeated cost-component check: the pre-scan reserves
+            // the currency sub-column from that same predicate, so a
+            // second copy here could reserve for rows that never draw
+            // and vice versa.
+            var currencyAmounts = TreeCostColumnMath.ShowsCurrencySegments(node)
+                ? CurrencyDisplayResolver.ResolveAmounts(
+                    node.VendorCurrencyCosts, _getCurrentPlan()?.CurrencyMetadata)
+                : null;
+            handle.RowDrawsCurrency = currencyAmounts != null && currencyAmounts.Count > 0;
+            handle.CostCell = CoinCurrencyRenderer.RenderValueCellInSubColumns(
+                handle.RowPanel, node.SubtreeCost.Value, currencyAmounts,
+                TreeCostColumnMath.ComputeRowEdges(
+                    costRightEdge, handle.ColumnWidths, handle.RowDrawsCurrency),
+                12, UiFonts.Body, dimmed ? 0.35f : 1f);
+        }
+
+        /// <summary>
+        /// Updates the already-built tree to a fresh solve WITHOUT
+        /// disposing a single row, returning false when it cannot - in
+        /// which case the caller renders the plan from scratch as before.
+        ///
+        /// <para>
+        /// WHY (measured, decompiled Blish HUD 1.3.0). A decision pill's
+        /// click re-solves and, until now, rebuilt every control in the
+        /// plan. Two facts turn that into the reported "rapid IGNORE
+        /// toggling drops clicks":
+        /// <c>MouseHandler</c> holds exactly ONE pending mouse event
+        /// (<c>_mouseEvent</c>, written by the hook thread, consumed once
+        /// per <c>Update</c>), and <c>Control.OnLeftMouseButtonReleased</c>
+        /// raises Click only when that same control INSTANCE was primed by
+        /// its own press. A frame long enough to contain both halves of the
+        /// next click therefore loses the press, and the release lands on a
+        /// control that was never primed. Shortening the frame is the fix -
+        /// and the whole of it: <see cref="RepaintRow"/> still rebuilds a
+        /// matched row's pills, so no pill INSTANCE survives a re-solve and
+        /// nothing here removes the priming hazard outright. See
+        /// <see cref="HoverChainResync"/>, which states the same mechanism.
+        /// </para>
+        ///
+        /// <para>
+        /// The gate is deliberately strict, and every rejection is a
+        /// correct full rebuild rather than a wrong cheap one: the new
+        /// tree must present the SAME built rows, in the same order, at the
+        /// same depth and dim state, each still passing
+        /// <see cref="TreeRowIdentity"/> against the node its row was built
+        /// from; the cost sub-column widths and the header's node count
+        /// must be unchanged (both are chrome this refresh preserves rather
+        /// than redraws). Ignoring a LEAF material - the common case, and the
+        /// one the field report is about - satisfies all of that. Ignoring
+        /// a node with children does not, because an ignored node is built
+        /// as a leaf, and that click still pays for a full rebuild.
+        /// </para>
+        /// </summary>
+        internal bool TryRefreshInPlace(IReadOnlyList<CraftingTreeNode> newRoots)
+        {
+            if (_treeRoots == null || _treeFlow == null || newRoots == null) return false;
+            if (_treeRowIdsAmbiguous || _treeRowsByNodeId.Count == 0) return false;
+            if (newRoots.Count != _treeRoots.Count) return false;
+
+            var scan = ScanTreeColumns(newRoots);
+            if (scan.NodeCount != _scannedNodeCount) return false;
+            if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths)) return false;
+
+            var plan = new List<KeyValuePair<TreeRowHandle, CraftingTreeNode>>(_treeRowsByNodeId.Count);
+            if (!MatchRows(newRoots, 0, false, plan)) return false;
+
+            // Every built row has to be accounted for. A shorter plan means
+            // the new tree reaches fewer rows than are on screen, which is
+            // a structural change the walk cannot see from the top.
+            if (plan.Count != _treeRowsByNodeId.Count) return false;
+
+            int panelWidth = _getCurrentPanelWidth();
+            foreach (var pair in plan)
+            {
+                RepaintRow(pair.Key, pair.Value, panelWidth);
+            }
+
+            _treeRoots = newRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(newRoots);
+            RefreshTreeContainerHeights();
+            return true;
+        }
+
+        /// <summary>
+        /// Walks the new tree, pairing each node that HAS a row with that
+        /// row and refusing the moment the two disagree about identity or
+        /// structure. Only a node whose children were actually built
+        /// descends - a collapsed subtree has no rows, so its shape is free
+        /// to differ and is simply adopted along with the node.
+        /// <para>
+        /// A matching NodeId is where the pairing STARTS, not where it is
+        /// settled: a synthetic cost-component id names a position in a
+        /// vendor offer rather than an item, so identity is asked of
+        /// TreeRowIdentity, which owns the argument.
+        /// </para>
+        /// </summary>
+        private bool MatchRows(
+            IReadOnlyList<CraftingTreeNode> newSiblings, int depth, bool dimmed,
+            List<KeyValuePair<TreeRowHandle, CraftingTreeNode>> plan)
+        {
+            for (int i = 0; i < newSiblings.Count; i++)
+            {
+                var newNode = newSiblings[i];
+                if (!_treeRowsByNodeId.TryGetValue(newNode.NodeId, out var handle)) return false;
+                if (handle.Depth != depth || handle.Dimmed != dimmed) return false;
+                if (!TreeRowIdentity.SameRow(handle.Node, newNode)) return false;
+
+                plan.Add(new KeyValuePair<TreeRowHandle, CraftingTreeNode>(handle, newNode));
+
+                if (handle.State == null || !handle.State.ChildrenBuilt) continue;
+
+                bool childDimmed = dimmed || newNode.Decision != CraftingDecision.Craft;
+                if (!MatchRows(newNode.Children, depth + 1, childDimmed, plan)) return false;
+            }
+            return true;
+        }
+
+        private static bool CostWidthsEqual(
+            TreeCostColumnMath.CostColumnWidths a, TreeCostColumnMath.CostColumnWidths b)
+        {
+            return a.GoldTextWidth == b.GoldTextWidth
+                && a.SilverTextWidth == b.SilverTextWidth
+                && a.CopperTextWidth == b.CopperTextWidth
+                && a.CurrencyRunWidth == b.CurrencyRunWidth;
+        }
+
+        /// <summary>
+        /// Re-renders the parts of one row a re-solve can change - the qty
+        /// prefix, the pill column, the cost cell and the tooltip - into
+        /// the controls the row already has. Everything
+        /// <see cref="TreeRowIdentity"/> has just proved unchanged (icon,
+        /// name text, rarity colour, caret, dim chrome) is left alone,
+        /// which is most of the row and all of its texture work.
+        /// <para>
+        /// Unconditional rather than gated on a per-row "did anything
+        /// change" test: a pill's own text, colour, tooltip and click
+        /// wiring all derive from the node AND from plan-scope facts
+        /// (currency totals, owned amounts, subduing results), so a
+        /// cheaper test would have to re-derive nearly all of it to be
+        /// correct - and a wrong skip leaves a stale, still-clickable pill.
+        /// </para>
+        /// </summary>
+        private void RepaintRow(TreeRowHandle handle, CraftingTreeNode newNode, int panelWidth)
+        {
+            var nameFont = UiFonts.Body;
+
+            if (handle.QtyLabel != null)
+            {
+                string newQtyPrefix = $"{newNode.Quantity}x ";
+                if (handle.QtyLabel.Text != newQtyPrefix)
+                {
+                    handle.QtyLabel.Text = newQtyPrefix;
+                    handle.QtyWidth = (int)Math.Ceiling(nameFont.MeasureString(newQtyPrefix).Width);
+                    handle.NameLabel.Location = new Point(handle.NameX + handle.QtyWidth, 12);
+                }
+            }
+
+            var edges = RowEdges(handle, panelWidth);
+
+            // Only when the budget actually moved: the name TEXT is one of
+            // the facts TreeRowIdentity proved unchanged, so an unchanged
+            // qty prefix leaves an unchanged ellipsis, and this is the
+            // row's only MeasureString loop.
+            string displayName = LabelHelpers.EllipsizeToWidth(nameFont, handle.FullName, edges.NameMaxWidth);
+            if (handle.NameLabel.Text != displayName)
+            {
+                handle.NameLabel.Text = displayName;
+            }
+
+            DisposePills(handle.Pills);
+            RenderDecisionPills(handle.RowPanel, newNode, edges.PillColX, 10, handle.Dimmed, handle.Pills);
+
+            DisposeValueCell(handle.CostCell);
+            RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);
+
+            var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(
+                newNode, handle.CaptionText, _getCurrentPlan());
+            UpdateTreeRowTooltip(
+                handle.RowPanel, handle.NameLabel, handle.QtyLabel, handle.IconFrame, handle.IconScrim,
+                handle.FullName,
+                () => TreeRowTooltipComposer.BuildStatTooltipContent(newNode, _getItemStatBlock),
+                extraTooltipContent);
+
+            handle.Node = newNode;
+            if (handle.State != null)
+            {
+                handle.State.Node = newNode;
+                handle.State.ChildDimmed = handle.Dimmed || newNode.Decision != CraftingDecision.Craft;
+            }
+        }
+
+        private static void DisposePills(List<Panel> pills)
+        {
+            foreach (var pill in pills)
+            {
+                pill.Dispose();
+            }
+            pills.Clear();
+        }
+
+        /// <summary>
+        /// Disposes every control a value cell put on its row - the dash,
+        /// or both halves of the coin/currency segment run. A cell is
+        /// parented straight to the row panel rather than to a wrapper of
+        /// its own, so there is no single control to drop.
+        /// </summary>
+        private static void DisposeValueCell(CoinCurrencyRenderer.ValueCellHandle cell)
+        {
+            if (cell == null) return;
+
+            cell.DashLabel?.Dispose();
+            DisposeSegments(cell.CoinSegments);
+            DisposeSegments(cell.CurrencySegments);
+        }
+
+        private static void DisposeSegments(CoinCurrencyRenderer.SegmentLayoutHandle segments)
+        {
+            if (segments.Controls == null) return;
+
+            for (int i = 0; i < segments.Controls.Length; i++)
+            {
+                segments.Controls[i].Item1?.Dispose();
+                segments.Controls[i].Item2?.Dispose();
+            }
         }
 
         /// <summary>
@@ -1272,9 +1673,11 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Renders the pill column and returns the created pill panels so
-        /// the row's expand/collapse click handler can exclude them from
-        /// its own hit-test (a pill click is a decision, not a toggle).
+        /// Renders the pill column into the caller's own list, which the
+        /// row's expand/collapse click handler closes over to exclude pills
+        /// from its hit-test (a pill click is a decision, not a toggle).
+        /// The list is REFILLED rather than replaced so an in-place refresh
+        /// can rebuild a row's pills without invalidating that closure.
         ///
         /// TreePillColumnWidth (256px) is
         /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
@@ -1296,10 +1699,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// TreePillColumnWidth - 4, whatever the panel width, because both
         /// endpoints move together. That is why the fit is resolved once at
         /// build time and the resize closure only repositions - there is no
-        /// window width at which a hidden pill would have fit. Closing the
-        /// tree's dead gutter does not change that: the pill and cost
-        /// columns are pulled in as one block, so pillColX moves and the
-        /// budget does not.
+        /// window width at which a hidden pill would have fit.
         /// </para>
         /// </summary>
         // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only
@@ -1307,8 +1707,9 @@ namespace GW2CraftingHelper.Views.Rendering
         // _nodeOverrides/_ignoredItemIds and call ApplyOverridesAndResolve
         // - both now this class's own field/method, so the bodies are
         // unchanged text.
-        private List<Panel> RenderDecisionPills(
-            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
+        private void RenderDecisionPills(
+            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed,
+            List<Panel> pillPanels)
         {
             // Plan-scope currency facts
             // for the new HAVE/TOTAL pill - see PlanViewModel.
@@ -1316,7 +1717,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var plan = _getCurrentPlan();
             var specs = DecisionPillPlanner.BuildPillSpecs(node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
             var font = UiFonts.Caption;
-            var pillPanels = new List<Panel>(specs.Count);
+            pillPanels.Clear();
             int x = pillColX;
 
             var pillWidths = new List<int>(specs.Count);
@@ -1649,8 +2050,6 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed, pillPanels);
             }
-
-            return pillPanels;
         }
 
         /// <summary>

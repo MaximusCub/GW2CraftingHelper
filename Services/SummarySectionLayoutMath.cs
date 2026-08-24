@@ -151,11 +151,12 @@ namespace GW2CraftingHelper.Services
         /// real font metrics and clamps the amount below it, so this
         /// reserve has to cover the tallest plausible metric or the band
         /// clips its own amount (the renderer's DEBUG assert is what
-        /// catches that). 25, not 20: the caption font moved from Font12 to
-        /// Font14 and its measured line height with it, 13 -> 18, so the
-        /// reserve carries the same slack over the real metric as before.
+        /// catches that). 32, not 25: the tile captions moved to
+        /// TypeRampMetrics.ColumnHeaderInk and its measured line height
+        /// with them, 18 -> 25, so the reserve carries the same 7px of
+        /// slack over the real metric as before.
         /// </summary>
-        public const int CostBandCaptionLineHeight = 25;
+        public const int CostBandCaptionLineHeight = 32;
 
         /// <summary>Gap between the caption block and the amount run.</summary>
         public const int CostBandCaptionToAmountGap = 4;
@@ -358,7 +359,9 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static CurrencyColumnEdges ComputeCurrencyColumnEdges(int panelWidth, int widestNumberWidth = 0)
         {
-            return EdgesFromRightEdge(panelWidth - 8, EffectiveCurrencyNumberColumnWidth(widestNumberWidth));
+            return EdgesFromRightEdge(
+                PlanRelayoutMath.PinnedRightEdge(panelWidth),
+                EffectiveCurrencyNumberColumnWidth(widestNumberWidth));
         }
 
         private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
@@ -370,78 +373,5 @@ namespace GW2CraftingHelper.Services
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
         }
 
-        /// <summary>
-        /// Width the Required/Have/Needed/marker block occupies: the three
-        /// number bands, the marker band, and the three gaps between them -
-        /// i.e. from the Required column's left edge to the marker's right
-        /// edge.
-        /// </summary>
-        public static int CurrencyBlockWidth(int widestNumberWidth)
-        {
-            return (3 * EffectiveCurrencyNumberColumnWidth(widestNumberWidth))
-                + (3 * CurrencyColumnGap)
-                + CurrencyMarkerWidth;
-        }
-
-        /// <summary>
-        /// <see cref="ComputeCurrencyColumnEdges"/> with the dead gutter
-        /// between the currency NAME column and the numbers closed: the
-        /// Required column starts relative to the widest name the table
-        /// renders instead of wherever the panel edge leaves it (audit
-        /// batch H). The whole block moves together, so the numbers keep
-        /// their existing relative geometry and the full-coverage marker
-        /// stays at the block's right end rather than at the panel's.
-        /// widestNameEnd must come from untruncated names - see
-        /// PlanRelayoutMath.RightBlockX.
-        /// </summary>
-        public static CurrencyColumnEdges ComputeCurrencyColumnEdgesForPanel(
-            int panelWidth, int widestNumberWidth, int widestNameEnd)
-        {
-            int numberColumnWidth = EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
-            int blockWidth = CurrencyBlockWidth(widestNumberWidth);
-            int blockRightEdge = PlanRelayoutMath.RightBlockRightEdge(panelWidth, blockWidth, widestNameEnd);
-            return EdgesFromRightEdge(blockRightEdge, numberColumnWidth);
-        }
-
-        /// <summary>
-        /// Width of the currency table: its dark header band, and the span
-        /// each data row's content occupies. It ends one
-        /// PlanRelayoutMath.TableRightMargin past the marker column rather
-        /// than at the panel's edge: once the block is pulled in beside the
-        /// names (see <see cref="ComputeCurrencyColumnEdgesForPanel"/>), a
-        /// full-width band stops bounding the columns it belongs to and
-        /// simply advertises the space to their right. Equals panelWidth
-        /// exactly whenever the block is still pinned.
-        /// </summary>
-        public static int CurrencyHeaderBandWidth(int panelWidth, int widestNumberWidth, int widestNameEnd)
-        {
-            var edges = ComputeCurrencyColumnEdgesForPanel(panelWidth, widestNumberWidth, widestNameEnd);
-            int width = edges.MarkerX + CurrencyMarkerWidth + PlanRelayoutMath.TableRightMargin;
-            if (width > panelWidth) width = panelWidth;
-            return width > 0 ? width : 0;
-        }
-
-        /// <summary>
-        /// Left x the whole currency table sits at so it is CENTRED in the
-        /// section rather than left-pinned. Batch H pulled the numeric
-        /// block in beside the names, which left the finished table sitting
-        /// against the section's left edge with all the recovered space
-        /// dead to its right; the maintainer's field test asked for that
-        /// space split evenly instead.
-        /// <para>
-        /// Every coordinate the table lays out - icon, name,
-        /// <see cref="ComputeCurrencyColumnEdgesForPanel"/>'s four edges -
-        /// stays relative to this one offset, so the columns' internal
-        /// alignment and the header's tracking of them are untouched by
-        /// centring, and a table already spanning the panel
-        /// (<see cref="CurrencyHeaderBandWidth"/> == panelWidth) gets 0,
-        /// i.e. exactly the pre-centring layout.
-        /// </para>
-        /// </summary>
-        public static int CurrencyTableOffsetX(int panelWidth, int widestNumberWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.CenterX(
-                panelWidth, CurrencyHeaderBandWidth(panelWidth, widestNumberWidth, widestNameEnd));
-        }
     }
 }

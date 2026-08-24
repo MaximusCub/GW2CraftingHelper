@@ -25,29 +25,51 @@ namespace GW2CraftingHelper.Services
             public readonly int EachRightEdge;
             public readonly int QtyRightEdge;
 
-            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge)
+            /// <summary>
+            /// LEFT edge of the source-badge column, and where its header
+            /// label sits. Left, not right: badges are words of different
+            /// lengths, and a column of them reads as a column because
+            /// their left edges rule - the same choice Required Recipes'
+            /// Discipline column makes.
+            /// </summary>
+            public readonly int SourceX;
+
+            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge, int sourceX)
             {
                 TotalRightEdge = totalRightEdge;
                 EachRightEdge = eachRightEdge;
                 QtyRightEdge = qtyRightEdge;
+                SourceX = sourceX;
             }
         }
 
         /// <summary>
-        /// Right edges for the Amount/Each/Total columns, derived
+        /// Right edges for the Source/Amount/Each/Total columns, derived
         /// right-to-left off totalRightEdge so header and data rows stay in
         /// lockstep by construction (both are handed the same ColumnEdges
         /// instance for a given render). Total's band width is
         /// max(TotalMinWidth, maxTotalWidth); Each's band width is
         /// max(EachMinWidth, maxEachWidth) - each band plus a ColumnGap is
         /// reserved to its right neighbor's left.
+        /// <para>
+        /// The source badge used to be glued to the name's right edge, so
+        /// its x moved with every row's own name length and no two rows'
+        /// badges lined up. It is a column in the right-hand block now:
+        /// maxQtyWidth and sourceColumnWidth are BAND widths (the widest
+        /// value each column draws this render), never one row's own, so a
+        /// short "1x" row cannot let its name run under the widest "429750x"
+        /// beside it.
+        /// </para>
         /// </summary>
-        public static ColumnEdges ComputeEdges(int totalRightEdge, int maxEachWidth, int maxTotalWidth)
+        public static ColumnEdges ComputeEdges(
+            int totalRightEdge, int maxEachWidth, int maxTotalWidth,
+            int maxQtyWidth = 0, int sourceColumnWidth = 0)
         {
             int eachRightEdge = totalRightEdge - EffectiveTotalWidth(maxTotalWidth) - ColumnGap;
             int qtyRightEdge = eachRightEdge - EffectiveEachWidth(maxEachWidth) - ColumnGap;
+            int sourceX = qtyRightEdge - maxQtyWidth - ColumnGap - sourceColumnWidth;
 
-            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge);
+            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge, sourceX);
         }
 
         private static int EffectiveTotalWidth(int maxTotalWidth)
@@ -61,36 +83,21 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Width the Amount/Each/Total block actually occupies: the three
-        /// reserved bands plus the two gaps between them. maxQtyWidth is
-        /// the widest rendered "Nx" string, since the Amount column has no
-        /// reserved band of its own - it right-aligns straight onto
-        /// QtyRightEdge.
-        /// </summary>
-        public static int BlockWidth(int maxEachWidth, int maxTotalWidth, int maxQtyWidth)
-        {
-            return (maxQtyWidth > 0 ? maxQtyWidth : 0)
-                + ColumnGap + EffectiveEachWidth(maxEachWidth)
-                + ColumnGap + EffectiveTotalWidth(maxTotalWidth);
-        }
-
-        /// <summary>
         /// <see cref="ComputeEdges"/> from the panel width instead of a
-        /// right edge, with the dead gutter between the name column and
-        /// this block closed: the whole block is pulled in to just past the
-        /// widest name the list renders rather than left pinned to the
-        /// panel edge (see PlanRelayoutMath.RightBlockX, including why
-        /// widestNameEnd must come from untruncated names). The single
-        /// entry point the header row, every data row, and both of their
-        /// relayout closures call, so no two of them can anchor the table
-        /// differently.
+        /// right edge: the Total column's right edge is
+        /// PlanRelayoutMath.PinnedRightEdge, so the whole block justifies
+        /// to the panel and the Item column absorbs whatever is left. The
+        /// single entry point the header row, every data row, and both of
+        /// their relayout closures call, so no two of them can anchor the
+        /// table differently.
         /// </summary>
         public static ColumnEdges ComputeEdgesForPanel(
-            int panelWidth, int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int widestNameEnd)
+            int panelWidth, int maxEachWidth, int maxTotalWidth,
+            int maxQtyWidth = 0, int sourceColumnWidth = 0)
         {
-            int blockWidth = BlockWidth(maxEachWidth, maxTotalWidth, maxQtyWidth);
-            int blockX = PlanRelayoutMath.RightBlockX(panelWidth - 8 - blockWidth, widestNameEnd);
-            return ComputeEdges(blockX + blockWidth, maxEachWidth, maxTotalWidth);
+            return ComputeEdges(
+                PlanRelayoutMath.PinnedRightEdge(panelWidth),
+                maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth);
         }
 
         /// <summary>

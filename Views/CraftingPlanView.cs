@@ -54,14 +54,13 @@ namespace GW2CraftingHelper.Views
         private const int RowButtonGap = 8;
         private const int RowButtonY = 3;
 
-        private const int RightEdgePadding = 20;
+        private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
 
-        // Was 30, against a Font16 title. The +2pt bump promoted that title
-        // to Font18, whose lowest measured ink at y=5 is y=28 - one pixel
-        // into the 30px panel's divider. Two more pixels restore the
-        // clearance the 30px panel had.
-        private const int SectionHeaderRowHeight = 32;
+        // Aliased, not duplicated: the band height, its title y and its
+        // caret y are one piece of arithmetic against the section-title
+        // font's measured ink - see PlanContentHeightMath.
+        private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
 
         // Section divider grey, readable against the parchment texture, one
         // tier below the 180-grey structural separators (window chrome,
@@ -193,7 +192,10 @@ namespace GW2CraftingHelper.Views
         // instant-apply controls that look just like them on other tabs.
         // Every one of them says so through the status label at the moment
         // it changes.
-        private const string SettingsChangedStatus = "Settings changed - press Generate Plan to update";
+        // "press" is filler and "update" said nothing about WHAT updates;
+        // "apply" says what happens to the settings, and the button is
+        // named exactly.
+        private const string SettingsChangedStatus = "Settings changed - Generate Plan to apply";
 
         // Shown while Generate resolves typed-but-unpicked row names against
         // the search provider, before any plan work starts.
@@ -368,6 +370,25 @@ namespace GW2CraftingHelper.Views
         private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
         private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
 
+        // The Recipe Tree's own half of those two registries, kept apart
+        // for one reason: the tree section SURVIVES a re-render that a
+        // decision pill triggers (see RenderPlan's preserveTree path), and
+        // a closure whose controls survive must survive with them.
+        // Everything else about them is identical - ReplayRelayout and
+        // RunReellipsis replay both, and the closures are position-only
+        // either way, so the order between the two lists cannot matter
+        // (they touch disjoint controls).
+        private readonly List<Action<int>> _treeRelayoutActions = new List<Action<int>>();
+        private readonly List<Action<int>> _treeReellipsisActions = new List<Action<int>>();
+
+        // The tree section's own children of _contentPanel (its top gap,
+        // header band and content flow), captured when it is built. Held so
+        // a preserving re-render can detach them before the dispose sweep
+        // and re-attach them at the same point in the flow afterwards -
+        // _contentPanel lays its children out in child order, so
+        // re-parenting at the right moment IS the ordering.
+        private List<Control> _treeSectionControls;
+
         // ISectionRelayoutSink implementation - explicit-interface so
         // extracted renderers register through the seam without widening
         // the public surface. Both members pass straight through to the
@@ -389,6 +410,38 @@ namespace GW2CraftingHelper.Views
         }
 
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
+
+        /// <summary>
+        /// The sink TreeSectionController registers through - the same
+        /// contract as the view's own, routed to the tree-scoped registries
+        /// above. A separate OBJECT rather than a flag on the view because
+        /// the tree registers closures outside its own build pass too
+        /// (every lazy expand adds rows), and those closures must land in
+        /// the surviving registry just as the build pass's do.
+        /// </summary>
+        private sealed class TreeRelayoutSink : ISectionRelayoutSink
+        {
+            private readonly CraftingPlanView _view;
+
+            internal TreeRelayoutSink(CraftingPlanView view)
+            {
+                _view = view;
+            }
+
+            public void AddRelayout(Action<int> closure) => _view._treeRelayoutActions.Add(closure);
+
+            public void AddReellipsis(Action<int> closure) => _view._treeReellipsisActions.Add(closure);
+
+            public void RequestRerenderAfterSettle() => _view._rerenderAfterSettlePending = true;
+
+            public int RelayoutCount => _view._treeRelayoutActions.Count;
+        }
+
+        // Set only for the duration of the tree's own CreateSectionHeader
+        // call, so the shared section chrome that call registers joins the
+        // tree's registry rather than the one a preserving re-render
+        // clears. Every other section's header is unaffected.
+        private bool _routeSectionChromeToTree;
 
         // Set by a re-ellipsis closure that cannot honour the registry's
         // no-height-change contract at the settled width (today only the
@@ -627,20 +680,28 @@ namespace GW2CraftingHelper.Views
             // SectionHeaderHandle into a ValueTuple so the nested type
             // never becomes visible outside this class).
             _treeController = new TreeSectionController(
-                this,
+                new TreeRelayoutSink(this),
                 _resolveOverridesSync,
                 _vmBuilder,
                 PreserveScrollAcross,
                 SetStatus,
-                RenderPlan,
+                RenderPlanAfterResolve,
                 GetCurrentPanelWidth,
                 () => _currentPlan,
                 vm => _currentPlan = vm,
                 log => _lastDebugLog = log,
                 (title, sectionKey, panelWidth, defaultExpanded, suppressToggle) =>
                 {
-                    var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
-                    return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+                    _routeSectionChromeToTree = true;
+                    try
+                    {
+                        var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
+                        return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+                    }
+                    finally
+                    {
+                        _routeSectionChromeToTree = false;
+                    }
                 },
                 commands => _treeToolbarCommands = commands,
                 getItemStatBlock);
@@ -739,11 +800,14 @@ namespace GW2CraftingHelper.Views
             // The stamped half goes through StatusText.Stamp, which owns
             // the module's one timestamp format and its InvariantCulture
             // policy (English-only strings; several locales' short time
-            // pattern has no AM/PM designator at all). The trailing clause
-            // keeps the hyphen: the dash separates verb from timestamp, a
-            // hyphen separates clauses.
+            // pattern has no AM/PM designator at all). ONE trailing hyphen
+            // clause: the dash separates verb from timestamp, a hyphen
+            // separates clauses, and two hyphen clauses at one level put
+            // two unrelated facts on the same footing. It also names a
+            // button that exists, and states the payoff (fresh prices)
+            // rather than the fear ("prices may have changed").
             _statusBoard.SeedRestored(
-                StatusText.Stamp("Generated", generatedAt) + " - prices may have changed - Regenerate");
+                StatusText.Stamp("Generated", generatedAt) + " - Generate Plan to refresh prices");
             RenderFromBoard(_statusBoard.Snapshot());
 
             // Started BEFORE the render below and regardless of whether
@@ -853,6 +917,7 @@ namespace GW2CraftingHelper.Views
             // row itself would otherwise stay reserved over a plan that no
             // longer exists.
             ApplyTreeToolbarVisibility(false);
+            RefreshTreeStateChips();
 
             // Leaves the tab in the SAME no-plan state a first visit shows,
             // rather than the blank panel a rolled-back render used to
@@ -1777,6 +1842,17 @@ namespace GW2CraftingHelper.Views
             _treeToolbarVisible = ResolveTreeRoots(_currentPlan) != null;
             _treeToolbarCommands = null;
 
+            // A Build gives the tab a brand new content panel; everything
+            // the previous one held - including the tree section this view
+            // otherwise preserves across a re-render - dies with it. Held
+            // controls and the closures that reposition them have to go
+            // with it, or the first preserving render after a tab rebuild
+            // re-parents disposed controls.
+            _treeController.ResetTreeRenderState();
+            _treeSectionControls = null;
+            _treeRelayoutActions.Clear();
+            _treeReellipsisActions.Clear();
+
             var layout = ComputeTopRegionLayout();
 
             // Input rows: search box + quantity per requested item.
@@ -1879,12 +1955,24 @@ namespace GW2CraftingHelper.Views
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
+            // This tooltip is Generate Plan's ENTIRE safety mechanism: it
+            // is the one action in the tree's vocabulary that destroys
+            // manual decisions without a confirm dialog (see the tree
+            // confirm matrix for why it is exempt), so the second sentence
+            // is load-bearing and ships with the first.
+            TooltipFacility.ApplyPlain(
+                _generateButton,
+                "Fetches current prices and rebuilds the plan from scratch. " +
+                "Clears all manual craft/buy decisions and ignore marks.");
+
             CreateTreeToolbarRow(buildPanel, w, layout.TreeToolbarRowY);
 
-            // Status label
+            // Status label. Its own tier: the strip reports what the module
+            // is doing, and had been reporting it at the same size as
+            // every row in the plan below.
             _statusLabel = new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1990,19 +2078,12 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        // Toolbar row geometry. The five widths are the ones the buttons
-        // carried in the section header; only their home changed.
+        // Toolbar row geometry. The widths and gaps are TreeToolbarRowLayout's
+        // (the chip strip negotiates against their total, so they cannot be
+        // literals here); the height is the module's button height.
         private const int TreeToolbarButtonHeight = UiMetrics.ButtonHeight;
         private const int TreeToolbarButtonY =
             (TopRegionLayoutMath.TreeToolbarRowHeight - TreeToolbarButtonHeight) / 2;
-        private const int TreeToolbarButtonGap = 4;
-
-        // Separates the three plan-mutating presets from the two view-only
-        // actions. Wider than TreeToolbarButtonGap on purpose: "Buy All"
-        // re-solves the whole plan and "Expand All" only opens branches,
-        // and sitting them 4px apart in one undifferentiated run invited
-        // exactly the misclick that costs a set of manual overrides.
-        private const int TreeToolbarGroupGap = 20;
 
         /// <summary>
         /// The Recipe Tree's action row, in the non-scrolling strip. It is
@@ -2030,64 +2111,386 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // Names what the buttons act on. The section title itself stays
-            // in the scroll flow with the tree, so without this the row
-            // would be five verbs attached to nothing.
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Recipe Tree:",
-                TextColor = new Color(170, 170, 170),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(0, TreeToolbarButtonY + 3),
-                Parent = _treeToolbarPanel
-            };
+            CreateTreeStateChips();
 
             // Right to left, so the row stays anchored to the right edge at
             // every window width. gapToLeft is the space left BEFORE the
             // next button placed (which lands to this one's left).
-            void PlaceRight(string text, int width, int gapToLeft, string tooltipText,
-                Func<TreeToolbarCommands, Action> pick)
+            void PlaceRight(
+                string text, TreeToolbarRowLayout.ButtonSlot slot, string tooltipText, Action onClick)
             {
                 var button = new FeedbackButton()
                 {
                     Text = text,
-                    Size = new Point(width, TreeToolbarButtonHeight),
+                    Size = new Point(slot.Width, TreeToolbarButtonHeight),
                     Parent = _treeToolbarPanel
                 };
                 TooltipFacility.ApplyPlain(button, tooltipText);
-                button.Click += (_, __) =>
-                {
-                    var commands = _treeToolbarCommands;
-                    if (commands == null) return;
-                    pick(commands)?.Invoke();
-                };
-                _treeToolbarButtons.Add((button, width, gapToLeft));
+                button.Click += (_, __) => onClick();
+                _treeToolbarButtons.Add((button, slot.Width, slot.GapToLeft));
             }
 
-            PlaceRight("Collapse All", 96, TreeToolbarButtonGap,
+            // The two view-only actions go straight through; the three that
+            // destroy manual decisions go through the confirm matrix.
+            PlaceRight("Collapse All", TreeToolbarRowLayout.CollapseAll,
                 "Collapses every branch of the Recipe Tree back down to the top level.",
-                c => c.CollapseAll);
-            PlaceRight("Expand All", 92, TreeToolbarGroupGap,
+                () => InvokeTreeCommand(c => c.CollapseAll));
+            PlaceRight("Expand All", TreeToolbarRowLayout.ExpandAll,
                 "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.",
-                c => c.ExpandAll);
-            PlaceRight("Buy All", 70, TreeToolbarButtonGap,
+                () => InvokeTreeCommand(c => c.ExpandAll));
+            PlaceRight("Buy All", TreeToolbarRowLayout.BuyAll,
                 "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
                 "including nodes hidden under bought items - replacing any manual choices already made. " +
                 "Ingredients with no Trading Post price fall back to the solver's normal choice.",
-                c => c.BuyAll);
-            PlaceRight("Craft All", 76, TreeToolbarButtonGap,
+                ConfirmBuyAll);
+            PlaceRight("Craft All", TreeToolbarRowLayout.CraftAll,
                 "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
                 "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
                 "with no recipe fall back to the solver's normal choice.",
-                c => c.CraftAll);
-            PlaceRight("Best Path", 80, 0,
+                ConfirmCraftAll);
+            PlaceRight("Best Path", TreeToolbarRowLayout.BestPath,
                 "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
                 "cheapest plan. Ignore selections are left unchanged.",
-                c => c.BestPath);
+                ConfirmBestPath);
 
             PlaceTreeToolbarRow(w, rowY);
+        }
+
+        #region 4b. Tree action confirms - a dialog only when the click would change something
+
+        // The matrix, in one sentence: a dialog appears ONLY when the
+        // click would actually change the plan; otherwise the click skips
+        // the dialog AND the re-solve, and the status line says why.
+        // A dialog that protects nothing teaches people to click through
+        // dialogs; a dead click with no feedback teaches them to click
+        // again harder.
+        //
+        // Generate Plan is deliberately absent. It clears both overrides
+        // and ignore marks, but it is the tab's primary action and gating
+        // it would punish the ordinary case - its tooltip carries the
+        // warning instead, which is why that tooltip is not optional.
+        //
+        // Every predicate is read at CLICK time from the live tree state
+        // (TreeToolbarCommands), never cached per render: two of them
+        // build a preset to compare against.
+
+        private void InvokeTreeCommand(Func<TreeToolbarCommands, Action> pick)
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            pick(commands)?.Invoke();
+        }
+
+        /// <summary>
+        /// Asks one question, with the clicked button's own verb as the
+        /// confirm label, so the dialog reads as "you clicked X - really
+        /// X?". A refused Show (another dialog already up) simply loses
+        /// the click, which is correct under a modal: nothing was armed
+        /// before asking.
+        /// </summary>
+        private void ShowTreeConfirm(string message, string confirmText, Action onConfirm)
+        {
+            if (onConfirm == null) return;
+            _modalDialog?.Show(message, onConfirm, null, confirmText);
+        }
+
+        /// <summary>
+        /// The matrix's zeroth question, asked by every entry before its
+        /// own: can this plan be re-solved at all? A plan restored without
+        /// its solve context renders and shows this toolbar, and nothing
+        /// on it can run - so the answer is a line saying so, never a
+        /// dialog for an action that will do nothing.
+        /// </summary>
+        private bool TreeCommandUnavailable(TreeToolbarCommands commands)
+        {
+            if (commands.CanReSolve?.Invoke() != false) return false;
+
+            SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
+            return true;
+        }
+
+        private void ConfirmBestPath()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            if (overrides == 0)
+            {
+                SetStatus(WithStandingNotices(StatusText.NoOverridesToClear));
+                return;
+            }
+
+            ShowTreeConfirm(
+                "Clear " + StatusText.Count(overrides, "manual decision") +
+                " and re-solve for the cheapest plan? Ignore marks are kept.",
+                "Best Path", commands.BestPath);
+        }
+
+        private void ConfirmClearOverrides()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            if (overrides == 0)
+            {
+                SetStatus(WithStandingNotices(StatusText.NoOverridesToClear));
+                return;
+            }
+
+            ShowTreeConfirm(
+                "Clear " + StatusText.Count(overrides, "manual decision") +
+                " and re-solve with the solver's own choices? Ignore marks are kept.",
+                "Clear Overrides", commands.ClearOverrides);
+        }
+
+        private void ConfirmCraftAll()
+        {
+            ConfirmPreset(
+                c => c.CraftAllWouldChange, c => c.CraftAll,
+                StatusText.AlreadyCraftingEverything,
+                "Craft everything with a known recipe?", "Craft All");
+        }
+
+        private void ConfirmBuyAll()
+        {
+            ConfirmPreset(
+                c => c.BuyAllWouldChange, c => c.BuyAll,
+                StatusText.AlreadyBuyingEverything,
+                "Buy everything with a Trading Post price?", "Buy All");
+        }
+
+        /// <summary>
+        /// Craft All and Buy All are the same shape: skip when the preset
+        /// already IS the current override map, otherwise ask, naming what
+        /// the click replaces. The "this replaces N" sentence is dropped
+        /// when N is zero - there is nothing to replace, and a dialog that
+        /// says "replaces 0 manual decisions" is asking about nothing.
+        /// <para>
+        /// Three answers, not two. UNAVAILABLE (no solve context to build a
+        /// preset from) is not the same as UNNECESSARY, and reporting it as
+        /// the no-op line would state something about the plan's contents
+        /// that nothing has read - see TreeToolbarCommands. The null branch
+        /// is the predicate's own contract rather than a second copy of
+        /// TreeCommandUnavailable's answer: the two read the same field,
+        /// and a predicate that can return null must have a caller that
+        /// handles null.
+        /// </para>
+        /// </summary>
+        private void ConfirmPreset(
+            Func<TreeToolbarCommands, Func<bool?>> pickPredicate,
+            Func<TreeToolbarCommands, Action> pickAction,
+            string noOpStatus, string question, string confirmText)
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
+
+            bool? wouldChange = pickPredicate(commands)?.Invoke();
+            if (wouldChange == null)
+            {
+                SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
+                return;
+            }
+
+            if (wouldChange == false)
+            {
+                SetStatus(WithStandingNotices(noOpStatus));
+                return;
+            }
+
+            int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
+            string message = overrides > 0
+                ? question + " This replaces " + StatusText.Count(overrides, "manual decision") + "."
+                : question;
+
+            ShowTreeConfirm(message, confirmText, pickAction(commands));
+        }
+
+        private void ConfirmClearIgnored()
+        {
+            var commands = _treeToolbarCommands;
+            if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
+
+            // The control is hidden at zero, so the predicate is always
+            // true when it is clickable - the guard is what makes that a
+            // fact rather than an assumption.
+            int ignored = commands.GetIgnoredCount?.Invoke() ?? 0;
+            if (ignored == 0) return;
+
+            ShowTreeConfirm(
+                "Stop ignoring " + StatusText.Count(ignored, "item") +
+                "? Their material costs count toward the plan again.",
+                "Clear Ignored", commands.ClearIgnored);
+        }
+
+        #endregion // 4b. Tree action confirms - a dialog only when the click would change something
+
+        // The two per-plan STATE chips, in the slot the grey "Recipe Tree:"
+        // caption used to hold. Built once per Build() and shown/hidden by
+        // RefreshTreeStateChips, which every render calls.
+        private Label _overridesChipLabel;
+        private StandardButton _clearOverridesButton;
+        private Label _ignoredChipLabel;
+        private StandardButton _clearIgnoredButton;
+
+        private const int ClearOverridesButtonWidth = TreeToolbarRowLayout.ClearOverridesButtonWidth;
+        private const int ClearIgnoredButtonWidth = TreeToolbarRowLayout.ClearIgnoredButtonWidth;
+
+        /// <summary>
+        /// Rightmost x the chip strip may reach, written by
+        /// PlaceTreeToolbarRow from the live row width and read by
+        /// RefreshTreeStateChips. Zero until the first placement, which
+        /// hides the chips rather than guessing - Build() places the row
+        /// before anything can ask for a count.
+        /// </summary>
+        private int _treeChipLimitX;
+
+        /// <summary>
+        /// Builds the Overrides/Ignored chips. Their TEXT and visibility
+        /// come from RefreshTreeStateChips - these are per-plan state, and
+        /// a Build() may happen with a plan already on screen.
+        /// </summary>
+        private void CreateTreeStateChips()
+        {
+            _overridesChipLabel = ChipLabel();
+            _clearOverridesButton = ChipButton(
+                "Clear Overrides", ClearOverridesButtonWidth,
+                "Drops every manual craft/buy decision and re-solves with the solver's own choices. " +
+                "Ignore marks are kept.",
+                ConfirmClearOverrides);
+
+            _ignoredChipLabel = ChipLabel();
+            TooltipFacility.ApplyPlain(
+                _ignoredChipLabel, IgnoredChipTooltip);
+            _clearIgnoredButton = ChipButton(
+                "Clear Ignored", ClearIgnoredButtonWidth,
+                IgnoredChipTooltip + "\nClears every ignore mark and re-solves.",
+                ConfirmClearIgnored);
+
+            TooltipFacility.ApplyPlain(
+                _overridesChipLabel,
+                "Craft/buy decisions you have set by hand. They survive a re-solve and are cleared by " +
+                "Generate Plan.");
+        }
+
+        private const string IgnoredChipTooltip =
+            "Ignored items are treated as fully in-hand and cost nothing in this plan.";
+
+        private Label ChipLabel()
+        {
+            return new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "",
+                TextColor = Color.White,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Visible = false,
+                Location = new Point(0, TreeToolbarButtonY + 3),
+                Parent = _treeToolbarPanel
+            };
+        }
+
+        private StandardButton ChipButton(string text, int width, string tooltipText, Action onClick)
+        {
+            var button = new FeedbackButton()
+            {
+                Text = text,
+                Size = new Point(width, TreeToolbarButtonHeight),
+                Visible = false,
+                Parent = _treeToolbarPanel
+            };
+            TooltipFacility.ApplyPlain(button, tooltipText);
+            button.Click += (_, __) => onClick();
+            return button;
+        }
+
+        /// <summary>
+        /// Re-reads both counts from the live tree state and shows, hides
+        /// and lays out the chips accordingly. Called after every render
+        /// that can have changed them, which is every render: a pill click,
+        /// a preset, a chip's own clear, and a fresh Generate (which clears
+        /// both) - and by PlaceTreeToolbarRow, because the room the strip
+        /// has changes with the row's width and not only with the counts.
+        /// <para>
+        /// Two independent reasons a control here is hidden, deliberately
+        /// combined rather than merged: the chip's own count is zero, or
+        /// the strip does not fit beside the right-hand buttons. They
+        /// answer different questions and neither implies the other.
+        /// </para>
+        /// </summary>
+        private void RefreshTreeStateChips()
+        {
+            if (_overridesChipLabel == null) return;
+
+            var commands = _treeToolbarCommands;
+            int overrides = commands?.GetOverrideCount?.Invoke() ?? 0;
+            int ignored = commands?.GetIgnoredCount?.Invoke() ?? 0;
+
+            bool showOverrides = _treeToolbarVisible && overrides > 0;
+            bool showIgnored = _treeToolbarVisible && ignored > 0;
+
+            // Measured from the font, not read back off the Label: an
+            // AutoSizeWidth Label recomputes its Width during Blish's next
+            // layout pass, so reading .Width in the same call that wrote
+            // .Text yields the PREVIOUS text's width - and these two are
+            // the only labels in the strip whose text changes at runtime.
+            int overridesWidth = 0;
+            int ignoredWidth = 0;
+            if (showOverrides)
+            {
+                overridesWidth = SetChipText(_overridesChipLabel, StatusText.ForOverridesChip(overrides));
+            }
+            if (showIgnored)
+            {
+                ignoredWidth = SetChipText(_ignoredChipLabel, StatusText.ForIgnoredChip(ignored));
+            }
+
+            var placement = TreeChipStripLayout.Fit(
+                0, _treeChipLimitX,
+                showOverrides, overridesWidth, ClearOverridesButtonWidth,
+                showIgnored, ignoredWidth, ClearIgnoredButtonWidth);
+
+            _overridesChipLabel.Visible = showOverrides && placement.ShowCounts;
+            _clearOverridesButton.Visible = showOverrides && placement.ShowButtons;
+            _ignoredChipLabel.Visible = showIgnored && placement.ShowCounts;
+            _clearIgnoredButton.Visible = showIgnored && placement.ShowButtons;
+
+            var slots = placement.Slots;
+            _overridesChipLabel.Location = new Point(slots.OverridesLabelX, TreeToolbarButtonY + 3);
+            _clearOverridesButton.Location = new Point(slots.OverridesButtonX, TreeToolbarButtonY);
+            _ignoredChipLabel.Location = new Point(slots.IgnoredLabelX, TreeToolbarButtonY + 3);
+            _clearIgnoredButton.Location = new Point(slots.IgnoredButtonX, TreeToolbarButtonY);
+        }
+
+        /// <summary>
+        /// Writes a chip's text and returns the width it will render at,
+        /// measured in its own font. Also re-pins the label's height: both
+        /// chips carry a descender ("Ignored:" has its g) and a label
+        /// autosized to its exact text height loses it to Blish's scissor
+        /// round trip - see LabelHelpers.WithDescenderClearance.
+        /// <para>
+        /// The WIDTH is measured either way, because the caller needs it
+        /// on every call; the write is skipped when the text is unchanged.
+        /// This runs on every resize tick now that the strip re-fits with
+        /// the row, and a resize does not change a count.
+        /// </para>
+        /// </summary>
+        private static int SetChipText(Label label, string text)
+        {
+            if (label.Text == text)
+            {
+                return (int)Math.Ceiling(label.Font.MeasureString(text).Width);
+            }
+
+            label.Text = text;
+            LabelHelpers.WithDescenderClearance(label);
+            return (int)Math.Ceiling(label.Font.MeasureString(text).Width);
         }
 
         /// <summary>
@@ -2104,6 +2507,14 @@ namespace GW2CraftingHelper.Views
         /// the scrollable content area, and this way it cannot intercept
         /// anything even if Blish's hit-testing ever stopped honouring
         /// Visible.
+        /// </para>
+        /// <para>
+        /// Placing the buttons also PUBLISHES where their cluster starts,
+        /// and the chips are re-fitted against it. The two clusters share
+        /// one row and only this method knows its width, so a left cluster
+        /// laid out without that number is a left cluster laid out over the
+        /// buttons - which is what the chips did before
+        /// TreeChipStripLayout.Fit existed.
         /// </para>
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
@@ -2122,6 +2533,18 @@ namespace GW2CraftingHelper.Views
                 button.Location = new Point(x, TreeToolbarButtonY);
                 x -= gapToLeft;
             }
+
+            // Invariant: the strip never reaches past the buttons ACTUALLY
+            // placed. The walk's own end x is the self-correcting term - a
+            // button placed with a slot missing from
+            // TreeToolbarRowLayout.RightButtons moves it and not
+            // ChipLimitX - and the modelled limit the tests assert is the
+            // cap. Taking the lower of the two means a divergence between
+            // them can only cost the chips room, never overlap a button
+            // with a live click target.
+            _treeChipLimitX = Math.Min(
+                x - TreeToolbarRowLayout.GroupGap, TreeToolbarRowLayout.ChipLimitX(w));
+            RefreshTreeStateChips();
         }
 
         /// <summary>
@@ -2415,7 +2838,8 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
-            if (_contentPanel == null || _relayoutActions.Count == 0) return;
+            if (_contentPanel == null) return;
+            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0) return;
 
 #if DEBUG
             // Invariant (KNOWN-ISSUES #13): a pure width/text
@@ -2433,6 +2857,10 @@ namespace GW2CraftingHelper.Views
             try
             {
                 foreach (var relayout in _relayoutActions)
+                {
+                    relayout(panelWidth);
+                }
+                foreach (var relayout in _treeRelayoutActions)
                 {
                     relayout(panelWidth);
                 }
@@ -2573,6 +3001,10 @@ namespace GW2CraftingHelper.Views
             {
                 reellipsis(panelWidth);
             }
+            foreach (var reellipsis in _treeReellipsisActions)
+            {
+                reellipsis(panelWidth);
+            }
         }
 
         #endregion // 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
@@ -2611,8 +3043,13 @@ namespace GW2CraftingHelper.Views
                     _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
                 };
 
+                // Aligned to the tree's confirm matrix: state the outcome
+                // in the user's terms AND what it costs them. It was the
+                // one dialog in the tab that did not say what is lost.
                 bool shown = _modalDialog.Show(
-                    "This will regenerate the plan. Continue?",
+                    newValue
+                        ? "Regenerate the plan with own materials counted? Manual decisions and ignore marks are cleared."
+                        : "Regenerate the plan with own materials excluded? Manual decisions and ignore marks are cleared.",
                     () =>
                     {
                         _ownMaterialsCheckbox.Enabled = true;
@@ -2995,7 +3432,7 @@ namespace GW2CraftingHelper.Views
                 // replaces it like any other status text. Unlike the
                 // standing notices above, the thing it reports is already
                 // fixed on screen - the corrected quantity is in the box.
-                SetStatus(WithStandingNotices("Quantity was invalid - reset to 1. Generating..."));
+                SetStatus(WithStandingNotices("Quantity reset to 1 - generating..."));
             }
 
             // Live coarse-phase events drive the status strip's phase
@@ -3092,7 +3529,7 @@ namespace GW2CraftingHelper.Views
 
                     // Unconditional board write - see the matching comment
                     // on the success path.
-                    _statusBoard.Finish(myGen, $"Error: {ex.Message}");
+                    _statusBoard.Finish(myGen, StatusText.ForGenerationFailure(ex.Message));
                 });
             }
             finally
@@ -3175,6 +3612,13 @@ namespace GW2CraftingHelper.Views
             {
                 entry.Button.Enabled = !dimmed;
             }
+
+            // The chips' clear buttons act on the plan being superseded,
+            // so they go dead with the five beside them. The count labels
+            // dim with the panel and keep reading, which is right: the
+            // counts are still true of what is still on screen.
+            if (_clearOverridesButton != null) _clearOverridesButton.Enabled = !dimmed;
+            if (_clearIgnoredButton != null) _clearIgnoredButton.Enabled = !dimmed;
         }
 
         /// <summary>
@@ -3383,13 +3827,32 @@ namespace GW2CraftingHelper.Views
         /// downstream can observe stale tree/relayout state pointing at
         /// controls that are about to be gone.
         /// </summary>
-        private void ResetContentPanelToEmpty()
+        private void ResetContentPanelToEmpty(bool preserveTree = false)
         {
-            _treeController.ResetTreeRenderState();
+            if (!preserveTree)
+            {
+                _treeController.ResetTreeRenderState();
+                _treeRelayoutActions.Clear();
+                _treeReellipsisActions.Clear();
+                _treeSectionControls = null;
+            }
+
             _relayoutActions.Clear();
             _reellipsisActions.Clear();
 
             if (_contentPanel == null) return;
+
+            // Detached, not disposed, and BEFORE the sweep: a preserved
+            // tree's controls are children of the very panel being emptied.
+            // They re-enter at the point the tree belongs in the flow -
+            // see RenderPlan.
+            if (preserveTree && _treeSectionControls != null)
+            {
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Parent = null;
+                }
+            }
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -3465,11 +3928,35 @@ namespace GW2CraftingHelper.Views
             });
         }
 
-        private void RenderPlan(PlanViewModel vm)
+        /// <summary>
+        /// The render a local re-solve (a decision pill, an ignore toggle,
+        /// a tree preset) runs. It asks the tree to update itself in place
+        /// first, and rebuilds the plan AROUND the tree when it can - see
+        /// TreeSectionController.TryRefreshInPlace for the measured reason
+        /// a shorter rebuild frame is what stops rapid clicking from
+        /// dropping clicks. Any doubt inside that method is a full rebuild,
+        /// which is exactly what this path did before it existed.
+        /// </summary>
+        private void RenderPlanAfterResolve(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
 
-            ResetContentPanelToEmpty();
+            var treeRoots = ResolveTreeRoots(vm);
+            if (treeRoots != null && _treeSectionControls != null &&
+                _treeController.TryRefreshInPlace(treeRoots))
+            {
+                RenderPlan(vm, preserveTree: true);
+                return;
+            }
+
+            RenderPlan(vm);
+        }
+
+        private void RenderPlan(PlanViewModel vm, bool preserveTree = false)
+        {
+            if (_contentPanel == null) return;
+
+            ResetContentPanelToEmpty(preserveTree);
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
@@ -3506,9 +3993,38 @@ namespace GW2CraftingHelper.Views
             }
 
             var treeRoots = ResolveTreeRoots(vm);
-            if (treeRoots != null)
+            if (treeRoots != null && preserveTree)
             {
+                // Re-attached at the point the tree occupies in the flow.
+                // _contentPanel positions its children in child order, so
+                // re-parenting here IS the ordering, and the refresh has
+                // already brought their contents up to this solve.
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Parent = _contentPanel;
+                }
+            }
+            else if (treeRoots != null)
+            {
+                int childrenBeforeTree = _contentPanel.Children.Count;
                 _treeController.CreateTreeSection(treeRoots, panelWidth);
+                _treeSectionControls = CapturedChildrenFrom(childrenBeforeTree);
+            }
+            else if (preserveTree && _treeSectionControls != null)
+            {
+                // Unreachable while the only caller decides preserveTree
+                // from this same ResolveTreeRoots answer - but a detached
+                // control with nowhere to go is a leak, not a no-op, so
+                // this branch is the one that pays for it rather than a
+                // future caller discovering it.
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Dispose();
+                }
+                _treeSectionControls = null;
+                _treeController.ResetTreeRenderState();
+                _treeRelayoutActions.Clear();
+                _treeReellipsisActions.Clear();
             }
 
             foreach (var section in vm.Sections)
@@ -3523,6 +4039,28 @@ namespace GW2CraftingHelper.Views
             // A re-render that keeps its tree finds the visibility
             // unchanged and reflows nothing.
             ApplyTreeToolbarVisibility(treeRoots != null);
+
+            // Last, and unconditional: both counts are per-plan state that
+            // any render can have changed - a pill click, a preset, a
+            // chip's own clear, or a fresh Generate, which clears both.
+            RefreshTreeStateChips();
+        }
+
+        /// <summary>
+        /// The content-panel children added since a recorded child count -
+        /// how the tree section's own controls are identified without
+        /// threading a handle for each one out through the section-header
+        /// seam. A section's controls are contiguous by construction: they
+        /// are appended, in order, by one builder call.
+        /// </summary>
+        private List<Control> CapturedChildrenFrom(int firstIndex)
+        {
+            var captured = new List<Control>();
+            for (int i = firstIndex; i < _contentPanel.Children.Count; i++)
+            {
+                captured.Add(_contentPanel.Children[i]);
+            }
+            return captured;
         }
 
         /// <summary>
@@ -3587,7 +4125,11 @@ namespace GW2CraftingHelper.Views
             int frameSize = iconSize + iconBorder * 2;
 
             var titleFont = UiFonts.Display;
-            var qtyFont = UiFonts.Title;
+
+            // Regular weight, one tier down from the title it annotates -
+            // and not the 18-regular it used to be, whose 4px space glyph
+            // rendered " x 42 needed" no wider than Body did.
+            var qtyFont = UiFonts.SmallHeading;
 
             string nameText = vm.TargetItemName ?? "Unknown Item";
 
@@ -3756,23 +4298,22 @@ namespace GW2CraftingHelper.Views
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(4, 6),
+                Location = new Point(4, PlanContentHeightMath.SectionHeaderCaretY),
                 Parent = headerPanel
             };
 
-            // Title, not Body: a section header has to read one step above
-            // the rows under it, and the +2pt bump moved Body onto the 16
-            // this header used to sit at. Font18 no longer collides with
-            // the plan title (it renders at Font32 - see CreatePlanHeader),
-            // and it is what the Settings and About tabs already use for
-            // their own section headers.
+            // The top of the ramp below the plan title: a section header
+            // outranks the column headers inside it, which in turn outrank
+            // the rows. It used to be 18-regular - one nominal step over
+            // Body, and the size whose space glyph collapses word gaps in
+            // exactly these multi-word titles.
             new Label()
             {
                 Text = title,
-                Font = UiFonts.Title,
+                Font = UiFonts.SectionTitle,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(22, 5),
+                Location = new Point(22, PlanContentHeightMath.SectionHeaderTitleY),
                 Parent = headerPanel
             };
 
@@ -3788,12 +4329,12 @@ namespace GW2CraftingHelper.Views
             // scissor round-trip defect. Simulation (M36b investigation)
             // showed a bottom-flush 2px line under the header's then-30px
             // height immune at the default 0.897 scale but vulnerable
-            // (~16-17%) at the "Small" 0.81 scale; the Font18 promotion
-            // raised it to 32, which that investigation lists as vulnerable
-            // outright. Either way it gets the same 1px bottom clearance as
-            // the vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
-            // at y=5 and its lowest measured ink at Font18 is y=28, which
-            // is what SectionHeaderRowHeight's own two extra pixels buy.
+            // (~16-17%) at the "Small" 0.81 scale. It gets the same 1px
+            // bottom clearance as the vulnerable row types
+            // (y = SectionHeaderRowHeight - 2 - 1). What the band's height
+            // buys is the 2px between the title's lowest ink and this
+            // rule's top - the arithmetic is in PlanContentHeightMath,
+            // beside the constants.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
@@ -3840,7 +4381,7 @@ namespace GW2CraftingHelper.Views
             // exactly (whatever it was most recently finalized to by
             // PlanContentHeightMath) so this can never disturb scroll
             // state.
-            _relayoutActions.Add(w =>
+            (_routeSectionChromeToTree ? _treeRelayoutActions : _relayoutActions).Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, SectionHeaderRowHeight);
@@ -3877,7 +4418,27 @@ namespace GW2CraftingHelper.Views
         {
             if (_currentPlan == null) return;
 
-            PreserveScrollAcross(() => RenderPlan(_currentPlan));
+            // The tree is a pure function of the plan, and a sort click
+            // does not change the plan - only the row ORDER of one flat
+            // table. So the tree section is not rebuilt, and not even
+            // refreshed: its contents are already this plan's.
+            PreserveScrollAcross(() => RenderPlan(_currentPlan, CanPreserveTree(_currentPlan)));
+            // A sort header rebuilds the table it sits in - including
+            // itself, under a cursor that has not moved. See
+            // HoverChainResync.
+            HoverChainResync.AfterRebuild();
+        }
+
+        /// <summary>
+        /// Whether a re-render may keep the Recipe Tree section it already
+        /// built: there has to BE one, and the plan it was built from has
+        /// to be the plan being rendered. Callers that changed the plan
+        /// itself go through TreeSectionController.TryRefreshInPlace
+        /// instead, which brings the tree up to the new solve first.
+        /// </summary>
+        private bool CanPreserveTree(PlanViewModel vm)
+        {
+            return _treeSectionControls != null && ResolveTreeRoots(vm) != null;
         }
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
@@ -4073,8 +4634,11 @@ namespace GW2CraftingHelper.Views
 
             hideUnlockedCheckbox.CheckedChanged += (_, e) =>
             {
+                // Same reasoning as RerenderForSortChange: this filters
+                // one section's rows, it does not re-solve the plan.
                 _hideUnlockedRecipes = e.Checked;
-                PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                PreserveScrollAcross(() => RenderPlan(_currentPlan, CanPreserveTree(_currentPlan)));
+                HoverChainResync.AfterRebuild();
             };
 
 #if DEBUG

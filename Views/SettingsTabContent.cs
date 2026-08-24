@@ -1403,8 +1403,8 @@ namespace GW2CraftingHelper.Views
                 // SettingsCurrencyGridLayout.CellClearWidth (74px) for this
                 // control, and widening that widens MinColumnWidth with it.
                 // That was load-bearing at the old 930px window minimum,
-                // whose panel could not hold two columns at all; the 1478px
-                // minimum clears the two-column threshold by ~444px, so the
+                // whose panel could not hold two columns at all; the 1378px
+                // minimum clears the two-column threshold by ~344px, so the
                 // budget now has slack (see CellInputToClearGap). The name
                 // stays short anyway - the tag slot immediately right of it
                 // ("default 3600" / "ignored") and the tooltip carry the

@@ -17,11 +17,13 @@ namespace GW2CraftingHelper.Services
         public const int RowGap = 3;
         /// <summary>
         /// Band the plan tab's status label occupies between the row above
-        /// it and the separator rule. 23, not the 21 it was at Font14: the
-        /// label's lowest Font16 ink is y+21 measured from the band's own
-        /// top, which landed exactly on the separator.
+        /// it and the separator rule. 25, not the 23 it was at Body: the
+        /// status line moved to TypeRampMetrics.StatusInk, whose lowest ink
+        /// is y+23 rather than y+21 measured from the band's own top. The
+        /// constant is that ink plus the same 2px it has always kept off
+        /// the separator - at 23 the descenders would sit on the rule.
         /// </summary>
-        public const int StatusToSeparatorGap = 23;
+        public const int StatusToSeparatorGap = 25;
         public const int SeparatorToContentGap = 5;
         public const int ContentToBottomPad = 5;
 
