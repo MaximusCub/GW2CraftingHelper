@@ -232,10 +232,21 @@ namespace GW2CraftingHelper.Views.Rendering
             internal TreeNodeState State;
         }
 
-        // Built rows of the current render pass, in build order (including
-        // the ones a later expand click adds). The list a refresh matches
-        // the new solve's tree against.
-        private readonly List<TreeRowHandle> _treeRowHandles = new List<TreeRowHandle>();
+        // Every built row of the current render pass, keyed by the solver
+        // NodeId its row draws. A MAP rather than the build-order list it
+        // started as: rows are appended in pre-order by the initial build,
+        // but a later expand APPENDS its children at the end, so build
+        // order stops being tree order the first time anyone expands
+        // anything - and a refresh that walked the list positionally would
+        // have quietly stopped matching from then on.
+        private readonly Dictionary<int, TreeRowHandle> _treeRowsByNodeId =
+            new Dictionary<int, TreeRowHandle>();
+
+        // Set when two rows of one render claim the same NodeId, which
+        // would make the map above ambiguous. Never observed - the solver
+        // numbers its nodes uniquely - so this is a guard that declines to
+        // refresh rather than a case with a handling strategy.
+        private bool _treeRowIdsAmbiguous;
 
         // Node count of the pre-scan that titled this render's section
         // header ("Recipe Tree (N)"). A refresh that would change it has to
@@ -283,7 +294,8 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void ResetTreeRenderState()
         {
             _treeNodeStates.Clear();
-            _treeRowHandles.Clear();
+            _treeRowsByNodeId.Clear();
+            _treeRowIdsAmbiguous = false;
             _scannedNodeCount = 0;
             _treeRoots = null;
             _treeFlow = null;
@@ -381,7 +393,8 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void CreateTreeSection(IReadOnlyList<CraftingTreeNode> treeRoots, int panelWidth)
         {
             _treeNodeStates.Clear();
-            _treeRowHandles.Clear();
+            _treeRowsByNodeId.Clear();
+            _treeRowIdsAmbiguous = false;
 
             // The five action buttons this header used to carry now live in
             // CraftingPlanView's non-scrolling top strip - see
@@ -968,7 +981,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 CostColumnWidth = costColumnWidth,
                 ColumnWidths = columnWidths
             };
-            _treeRowHandles.Add(handle);
+            if (_treeRowsByNodeId.ContainsKey(node.NodeId))
+            {
+                _treeRowIdsAmbiguous = true;
+            }
+            else
+            {
+                _treeRowsByNodeId[node.NodeId] = handle;
+            }
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
@@ -1363,22 +1383,25 @@ namespace GW2CraftingHelper.Views.Rendering
         internal bool TryRefreshInPlace(IReadOnlyList<CraftingTreeNode> newRoots)
         {
             if (_treeRoots == null || _treeFlow == null || newRoots == null) return false;
+            if (_treeRowIdsAmbiguous || _treeRowsByNodeId.Count == 0) return false;
             if (newRoots.Count != _treeRoots.Count) return false;
-            if (_treeRowHandles.Count == 0) return false;
 
             var scan = ScanTreeColumns(newRoots);
             if (scan.NodeCount != _scannedNodeCount) return false;
             if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths)) return false;
 
-            var matched = new List<CraftingTreeNode>(_treeRowHandles.Count);
-            int index = 0;
-            if (!MatchRows(newRoots, 0, false, ref index, matched)) return false;
-            if (index != _treeRowHandles.Count) return false;
+            var plan = new List<KeyValuePair<TreeRowHandle, CraftingTreeNode>>(_treeRowsByNodeId.Count);
+            if (!MatchRows(newRoots, 0, false, plan)) return false;
+
+            // Every built row has to be accounted for. A shorter plan means
+            // the new tree reaches fewer rows than are on screen, which is
+            // a structural change the walk cannot see from the top.
+            if (plan.Count != _treeRowsByNodeId.Count) return false;
 
             int panelWidth = _getCurrentPanelWidth();
-            for (int i = 0; i < _treeRowHandles.Count; i++)
+            foreach (var pair in plan)
             {
-                RepaintRow(_treeRowHandles[i], matched[i], panelWidth);
+                RepaintRow(pair.Key, pair.Value, panelWidth);
             }
 
             _treeRoots = newRoots as List<CraftingTreeNode> ?? new List<CraftingTreeNode>(newRoots);
@@ -1387,24 +1410,20 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Walks the new tree in the pre-order the rows were built in,
-        /// pairing each BUILT row with its counterpart and refusing the
-        /// moment the two disagree about structure. Only a node whose
-        /// children were actually built descends - a collapsed subtree has
-        /// no rows, so its shape is free to differ and is simply adopted
-        /// with the node.
+        /// Walks the new tree, pairing each node that HAS a row with that
+        /// row and refusing the moment the two disagree about structure.
+        /// Only a node whose children were actually built descends - a
+        /// collapsed subtree has no rows, so its shape is free to differ
+        /// and is simply adopted along with the node.
         /// </summary>
         private bool MatchRows(
             IReadOnlyList<CraftingTreeNode> newSiblings, int depth, bool dimmed,
-            ref int index, List<CraftingTreeNode> matched)
+            List<KeyValuePair<TreeRowHandle, CraftingTreeNode>> plan)
         {
             for (int i = 0; i < newSiblings.Count; i++)
             {
                 var newNode = newSiblings[i];
-                if (index >= _treeRowHandles.Count) return false;
-
-                var handle = _treeRowHandles[index++];
-                if (handle.Node.NodeId != newNode.NodeId) return false;
+                if (!_treeRowsByNodeId.TryGetValue(newNode.NodeId, out var handle)) return false;
                 if (handle.Depth != depth || handle.Dimmed != dimmed) return false;
                 if (handle.Node.Children.Count != newNode.Children.Count) return false;
 
@@ -1412,12 +1431,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // controls the row HAS, not just what they say.
                 if ((handle.Node.Quantity > 0) != (newNode.Quantity > 0)) return false;
 
-                matched.Add(newNode);
+                plan.Add(new KeyValuePair<TreeRowHandle, CraftingTreeNode>(handle, newNode));
 
                 if (handle.State == null || !handle.State.ChildrenBuilt) continue;
 
                 bool childDimmed = dimmed || newNode.Decision != CraftingDecision.Craft;
-                if (!MatchRows(newNode.Children, depth + 1, childDimmed, ref index, matched)) return false;
+                if (!MatchRows(newNode.Children, depth + 1, childDimmed, plan)) return false;
             }
             return true;
         }

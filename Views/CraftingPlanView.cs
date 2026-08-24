@@ -917,6 +917,7 @@ namespace GW2CraftingHelper.Views
             // row itself would otherwise stay reserved over a plan that no
             // longer exists.
             ApplyTreeToolbarVisibility(false);
+            RefreshTreeStateChips();
 
             // Leaves the tab in the SAME no-plan state a first visit shows,
             // rather than the blank panel a rolled-back render used to
@@ -1824,6 +1825,17 @@ namespace GW2CraftingHelper.Views
             _treeToolbarVisible = ResolveTreeRoots(_currentPlan) != null;
             _treeToolbarCommands = null;
 
+            // A Build gives the tab a brand new content panel; everything
+            // the previous one held - including the tree section this view
+            // otherwise preserves across a re-render - dies with it. Held
+            // controls and the closures that reposition them have to go
+            // with it, or the first preserving render after a tab rebuild
+            // re-parents disposed controls.
+            _treeController.ResetTreeRenderState();
+            _treeSectionControls = null;
+            _treeRelayoutActions.Clear();
+            _treeReellipsisActions.Clear();
+
             var layout = ComputeTopRegionLayout();
 
             // Input rows: search box + quantity per requested item.
@@ -2360,25 +2372,50 @@ namespace GW2CraftingHelper.Views
             bool showOverrides = _treeToolbarVisible && overrides > 0;
             bool showIgnored = _treeToolbarVisible && ignored > 0;
 
-            if (showOverrides) _overridesChipLabel.Text = StatusText.ForOverridesChip(overrides);
-            if (showIgnored) _ignoredChipLabel.Text = StatusText.ForIgnoredChip(ignored);
+            // Measured from the font, not read back off the Label: an
+            // AutoSizeWidth Label recomputes its Width during Blish's next
+            // layout pass, so reading .Width in the same call that wrote
+            // .Text yields the PREVIOUS text's width - and these two are
+            // the only labels in the strip whose text changes at runtime.
+            int overridesWidth = 0;
+            int ignoredWidth = 0;
+            if (showOverrides)
+            {
+                overridesWidth = SetChipText(_overridesChipLabel, StatusText.ForOverridesChip(overrides));
+            }
+            if (showIgnored)
+            {
+                ignoredWidth = SetChipText(_ignoredChipLabel, StatusText.ForIgnoredChip(ignored));
+            }
 
             _overridesChipLabel.Visible = showOverrides;
             _clearOverridesButton.Visible = showOverrides;
             _ignoredChipLabel.Visible = showIgnored;
             _clearIgnoredButton.Visible = showIgnored;
 
-            // Placed AFTER the texts are written: a label autosizes to its
-            // own text, and the slot arithmetic is measured off that width.
             var slots = TreeChipStripLayout.Compute(
                 0,
-                showOverrides, _overridesChipLabel.Width, ClearOverridesButtonWidth,
-                showIgnored, _ignoredChipLabel.Width, ClearIgnoredButtonWidth);
+                showOverrides, overridesWidth, ClearOverridesButtonWidth,
+                showIgnored, ignoredWidth, ClearIgnoredButtonWidth);
 
             _overridesChipLabel.Location = new Point(slots.OverridesLabelX, TreeToolbarButtonY + 3);
             _clearOverridesButton.Location = new Point(slots.OverridesButtonX, TreeToolbarButtonY);
             _ignoredChipLabel.Location = new Point(slots.IgnoredLabelX, TreeToolbarButtonY + 3);
             _clearIgnoredButton.Location = new Point(slots.IgnoredButtonX, TreeToolbarButtonY);
+        }
+
+        /// <summary>
+        /// Writes a chip's text and returns the width it will render at,
+        /// measured in its own font. Also re-pins the label's height: both
+        /// chips carry a descender ("Ignored:" has its g) and a label
+        /// autosized to its exact text height loses it to Blish's scissor
+        /// round trip - see LabelHelpers.WithDescenderClearance.
+        /// </summary>
+        private static int SetChipText(Label label, string text)
+        {
+            label.Text = text;
+            LabelHelpers.WithDescenderClearance(label);
+            return (int)Math.Ceiling(label.Font.MeasureString(text).Width);
         }
 
         /// <summary>
