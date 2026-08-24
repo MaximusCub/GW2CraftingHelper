@@ -367,6 +367,7 @@ namespace GW2CraftingHelper.Services
                     null,
                     PillKind.OwnedInfo));
             }
+
             if (!node.IsPlanRoot)
             {
                 specs.Add(new PillSpec("IGNORE", null, PillKind.Ignore));

@@ -64,6 +64,7 @@ namespace GW2CraftingHelper.Services
                 decisions, metadata, hints, ownedQuantityUsedByNodeId,
                 ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
             var rootNode = BuildNode(root, ctx, insideReferenceBranch: false);
+
             // Marked here rather than inside BuildNode: this method is the
             // only place that knows which node the caller asked for a tree
             // OF - a multi-item batch calls it once per requested root, so
