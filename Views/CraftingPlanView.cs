@@ -2331,6 +2331,15 @@ namespace GW2CraftingHelper.Views
         private const int ClearIgnoredButtonWidth = 110;
 
         /// <summary>
+        /// Rightmost x the chip strip may reach, written by
+        /// PlaceTreeToolbarRow from the live row width and read by
+        /// RefreshTreeStateChips. Zero until the first placement, which
+        /// hides the chips rather than guessing - Build() places the row
+        /// before anything can ask for a count.
+        /// </summary>
+        private int _treeChipLimitX;
+
+        /// <summary>
         /// Builds the Overrides/Ignored chips. Their TEXT and visibility
         /// come from RefreshTreeStateChips - these are per-plan state, and
         /// a Build() may happen with a plan already on screen.
@@ -2395,7 +2404,14 @@ namespace GW2CraftingHelper.Views
         /// and lays out the chips accordingly. Called after every render
         /// that can have changed them, which is every render: a pill click,
         /// a preset, a chip's own clear, and a fresh Generate (which clears
-        /// both).
+        /// both) - and by PlaceTreeToolbarRow, because the room the strip
+        /// has changes with the row's width and not only with the counts.
+        /// <para>
+        /// Two independent reasons a control here is hidden, deliberately
+        /// combined rather than merged: the chip's own count is zero, or
+        /// the strip does not fit beside the right-hand buttons. They
+        /// answer different questions and neither implies the other.
+        /// </para>
         /// </summary>
         private void RefreshTreeStateChips()
         {
@@ -2424,16 +2440,17 @@ namespace GW2CraftingHelper.Views
                 ignoredWidth = SetChipText(_ignoredChipLabel, StatusText.ForIgnoredChip(ignored));
             }
 
-            _overridesChipLabel.Visible = showOverrides;
-            _clearOverridesButton.Visible = showOverrides;
-            _ignoredChipLabel.Visible = showIgnored;
-            _clearIgnoredButton.Visible = showIgnored;
-
-            var slots = TreeChipStripLayout.Compute(
-                0,
+            var placement = TreeChipStripLayout.Fit(
+                0, _treeChipLimitX,
                 showOverrides, overridesWidth, ClearOverridesButtonWidth,
                 showIgnored, ignoredWidth, ClearIgnoredButtonWidth);
 
+            _overridesChipLabel.Visible = showOverrides && placement.ShowCounts;
+            _clearOverridesButton.Visible = showOverrides && placement.ShowButtons;
+            _ignoredChipLabel.Visible = showIgnored && placement.ShowCounts;
+            _clearIgnoredButton.Visible = showIgnored && placement.ShowButtons;
+
+            var slots = placement.Slots;
             _overridesChipLabel.Location = new Point(slots.OverridesLabelX, TreeToolbarButtonY + 3);
             _clearOverridesButton.Location = new Point(slots.OverridesButtonX, TreeToolbarButtonY);
             _ignoredChipLabel.Location = new Point(slots.IgnoredLabelX, TreeToolbarButtonY + 3);
@@ -2469,6 +2486,14 @@ namespace GW2CraftingHelper.Views
         /// anything even if Blish's hit-testing ever stopped honouring
         /// Visible.
         /// </para>
+        /// <para>
+        /// The walk that anchors the buttons also PUBLISHES where their
+        /// cluster starts, and the chips are re-fitted against it. The two
+        /// clusters share one row and only this method knows its width, so
+        /// a left cluster laid out without that number is a left cluster
+        /// laid out over the buttons - which is what the chips did before
+        /// TreeChipStripLayout.Fit existed.
+        /// </para>
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
         {
@@ -2486,6 +2511,12 @@ namespace GW2CraftingHelper.Views
                 button.Location = new Point(x, TreeToolbarButtonY);
                 x -= gapToLeft;
             }
+
+            // The same group gap that separates the presets from the
+            // view-only actions: the two clusters have to read apart, not
+            // merely not overlap.
+            _treeChipLimitX = x - TreeToolbarGroupGap;
+            RefreshTreeStateChips();
         }
 
         /// <summary>
