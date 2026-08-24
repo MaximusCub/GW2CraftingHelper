@@ -13555,40 +13555,308 @@ y's, the cost tile's caption y and amount pad). A label y and the band
 height it sits in are one piece of arithmetic, and only one of the two
 was testable where they lived.
 
-### Phases 2-4 - not yet landed
+### Phase 2 - layout per section
 
-Layout per section, the events/state split with its chips and confirm
-matrix, and the pill update-in-place fix are still to come on this
-branch. Extend the sections above rather than opening a second
-milestone heading.
+Built in the spec's dependency order. Every section's rightmost column
+was already pinned by phase 0; this phase gave each one the columns and
+the overflow idiom the pinned model requires.
+
+**Total Cost.** Only cleanup was left: each currency row was two nested
+panels, because the inner one was the table's centred slice. The table
+justifies now, so the slice was exactly the size of the row around it -
+a control per row, and a second `Size` write per resize tick, for
+geometry that had become the identity. Collapsed to one panel carrying
+its own background; the row's truncation tooltip moved with it.
+
+**Used Materials.** Nothing left - phase 1 already gave it the
+header-aware Amount band and both halves of the tooltip stamp.
+
+**Required Disciplines.** The character run's full text was stamped on
+the row panel alone. Blish resolves a tooltip on the deepest capturing
+control under the cursor and never bubbles, so it fired on the blank
+strip BESIDE the truncated names and not on the names themselves - the
+one place a reader points to find out what was cut off. Both stamps go
+through one helper now, so the build pass and the settle re-ellipsis
+cannot stamp different control sets.
+
+**Crafting Steps.** `Craft Nx <name>` had no width cap at all: a long
+name ran under the right-aligned sublabel and off the panel. It takes
+the standard idiom now - ellipsis, full name on the label AND the row
+panel, re-derived at settle - budgeted against the widest SUBLABEL this
+render draws rather than the row's own (a row with a short sublabel, or
+none, must not let its name run under the widest one in the column).
+That band is the section's only pre-scan, and unlike every other
+table's it has no header label to floor it: the column is unlabelled.
+
+**Required Recipes - the Discipline column.** The discipline was
+`row.Sublabel`, a Caption line UNDER the recipe name. That cost the
+section a second row height (48 against 36), put a name and its
+discipline on different reading lines, and made the discipline both
+smaller AND greyer than the text beside it - the double punishment the
+type rules ban for a name a reader picks the letters of.
+
+Recipe (flex) | Discipline | Status, one line at 36px:
+
+- `Services/RecipesColumnMath` owns the edges (Blish-free, tested).
+  Status pins to `PinnedRightEdge`; Discipline is LEFT-ruled at its own
+  x - discipline names are words, not numerics, and a ragged right edge
+  under a left rule still reads as one column; the name absorbs the
+  rest.
+- Both bands are `max(widest data, own header label)`. Measured at the
+  ColumnHeader tier, "Discipline" out-measures a short "Chef 400". The
+  Status pre-scan comes BACK here - phase 0 deleted it because nothing
+  consumed a band width yet, and the accepted divergence that recorded
+  that is now discharged.
+- The recipe name gains the standard ellipsis, with the full name
+  COMPOSED with the row's existing wiki hint rather than assigned over
+  it, and both stamped on the name label as well as the row panel (the
+  hint was on the panel alone, where the name label swallowed it).
+- `RecipeRowHeightWithSublabel` and the per-row height branch are
+  deleted; `RecipeRowHeightNoSublabel` is renamed `RecipeRowHeight`,
+  there being nothing left to distinguish it from.
+- The column and its header are reserved only when some row carries a
+  discipline - the same gate Required Disciplines puts on its Characters
+  column, so a mystic-forge-only list gives that width to the name.
+
+**Shopping List - the Source column.** The badge was glued to the
+name's right edge, so its x moved with every row's own name length and
+no two badges lined up; its width had to come out of that row's own
+ellipsis budget; and every badge rendered in the same recessed grey, so
+the column said WHICH source only to a reader who stopped and read four
+capitals on every row.
+
+Item (flex) | Source | Amount | Each | Total:
+
+- `ShoppingColumnMath` grows `SourceX`, derived right-to-left off the
+  same pinned edge as the rest of the block. Badges LEFT-rule at that
+  x and the name's budget stops there - one fixed x for the whole
+  table. The band is `max(widest badge, own header label)`, floored at
+  the header for the mirror image of the right-aligned columns' reason:
+  a left-ruled header wider than its data overhangs RIGHT, into Amount.
+- Fifth sortable column, ordered by the badge TEXT the column shows
+  rather than by `PlanRowType`, so a seeded SALVAGE badge groups with
+  the S's instead of with the other unknown-source rows.
+- Two colours, and only two (`Views/Rendering/ShoppingBadgeColors`):
+  VENDOR teal `#2E8B84`, the one hue with no existing meaning in the
+  module, for the "go somewhere and buy it" class; UNKNOWN `#B24A4A`,
+  darkened out of the Missing!-red family Required Recipes already
+  uses, for "the plan cannot price or source this". TP and CURRENCY
+  keep Locked's chrome - TP because it is the majority row, CURRENCY
+  because the tree's own CURRENCY pill is Locked chrome and one meaning
+  must not have two looks. `PillColors` is untouched: its vocabulary is
+  the tree's DECISIONS, and none of them means "vendor".
+- An UNKNOWN row's unpriceable dash takes the same red, so "no source"
+  and "no price" read as one statement. The name keeps its rarity
+  colour at full strength - an unknown source is a fact about
+  acquisition, not a defect of the item.
+- The badge carries its own prose hover (Blish-free, beside the text
+  mapping in `ShoppingSourceBadge`), stamped on all three of the tag's
+  nested controls because the outer panel is a 1px border.
+- The badge's reposition moves from the settle pass to the per-tick
+  relayout: its x is width-derived now rather than trailing an
+  ellipsis.
+
+**Recipe Tree.** Columns were done in phase 0; what this phase owed it
+is the click fix below. **Notes** needed nothing - it was already the
+model section for the width principle.
+
+Settle-pipeline inventory after this phase: tree names, Used Materials,
+Shopping List, Disciplines characters, Summary currency names, Notes
+re-wrap, plus the two new closures - Required Recipes names and
+Crafting Steps names. Net `MeasureString` work per render is still down
+on the pre-redesign figure.
+
+### Phase 2 - the pill update-in-place fix
+
+Field report: rapid IGNORE toggling with a stationary mouse drops
+clicks, and the pill stops highlighting. Two distinct mechanisms, both
+measured against decompiled Blish HUD 1.3.0.
+
+**Dropped clicks.** `MouseHandler` buffers exactly ONE pending mouse
+event - `_mouseEvent`, written by the hook thread on every event and
+consumed once per `Update` - and `Control.OnLeftMouseButtonReleased`
+raises `Click` only when that same control INSTANCE was primed by its
+own `OnLeftMouseButtonPressed` (`_clickPrimed`). A frame long enough to
+contain both halves of the next click therefore loses the press, and
+the release finds nothing primed. Every pill click was rebuilding every
+control in the plan inside that frame.
+
+Note what this is NOT: click dispatch does not go through
+`ActiveControl`. `MouseHandler.HandleMouseEvent` routes button events
+through `SpriteScreen.TriggerMouseInput`, and `Container.TriggerMouseInput`
+hit-tests `AbsoluteBounds.Contains(position)` against the LIVE tree, so
+a freshly built pill under a stationary cursor does receive the click.
+Only the priming is lost.
+
+So a local re-solve now asks the tree to update ITSELF, and rebuilds
+the plan around it. `TreeSectionController.TryRefreshInPlace` matches
+the new solve's tree against the rows already on screen and, when they
+present the same rows at the same depth and dim state with the same
+children counts, the same cost sub-column widths and the same node
+count, repaints each row's pill column, cost cell, qty prefix and
+tooltip into the controls it already has. Icons, names, carets and the
+row panels themselves - most of the row, and all of its texture work -
+are never touched. Ignoring a LEAF material, the case the report is
+about, satisfies the gate; ignoring a node with children does not (an
+ignored node is built as a leaf - `CraftingTreeBuilder` returns before
+its children), and that click still pays for a full rebuild. Every
+rejection is a correct full rebuild rather than a wrong cheap one.
+
+Rows are keyed by solver NodeId, not by build order: a lazy expand
+appends its children at the END of the build list, so build order stops
+being tree order the first time anyone expands anything.
+
+The view keeps the tree section's controls across such a render by
+detaching them before the dispose sweep and re-attaching them at the
+point the tree occupies in the flow - `_contentPanel` lays children out
+in child order, so re-parenting at the right moment IS the ordering.
+The tree's relayout/re-ellipsis closures move to their own registry for
+the same reason: a closure whose controls survive has to survive with
+them. Both registries are replayed together and touch disjoint
+controls, so their relative order cannot matter.
+
+**Stale hover.** `MouseHandler.Update` recomputes the hover chain ONLY
+when the mouse position changed between frames
+(`if (previous.Position != State.Position) ActiveControl =
+SpriteScreen.TriggerMouseInput(MouseMoved, State)`). A replacement
+control landing under a stationary cursor therefore has `MouseOver`
+false and never fires `MouseEntered` - the pill reads as un-hovered,
+and this module's own `AnyPillHovered` guard answers wrongly, until the
+user jiggles the mouse. `Views/Rendering/HoverChainResync` calls the
+same entry point Blish's own motion branch calls, with the live mouse
+state. It does NOT restore `MouseHandler.ActiveControl` (private
+setter), so tooltip resolution and input blocking still wait for a real
+move; the visible hover state, which is what a stationary user sees, is
+what this fixes.
+
+Sweep of the other rebuild-on-click surfaces, per the fix-the-class
+rule:
+
+- **Sort headers** (Used Materials, Shopping List) and the **Hide
+  Unlocked** filter rebuilt the whole plan including the tree, although
+  neither re-solves anything: the tree is a pure function of the plan,
+  and the plan is unchanged. Both preserve the tree outright now - not
+  even refreshed, because its contents are already this plan's - and
+  resync the hover chain.
+- **Expand/collapse carets** and Expand All / Collapse All build or
+  hide rows directly under the cursor, so they resync the hover chain.
+  They do not need the in-place path: they never re-solve, and already
+  touch only the subtree they own.
+- **Section header collapse toggles** flip `Visible` without rebuilding
+  anything, and are left alone.
+
+### Phase 3 - status, chips, confirms
+
+Maintainer correction, verbatim: *"1 is about the status of actions and
+the other is about the state of your own edits... they are not
+connected."*
+
+The status line carried both. `Decisions updated (3 override(s))` mixed
+an EVENT - a re-solve just finished - with STATE, how many decisions
+you have overridden, which stays true until you change it. The state
+half then vanished the moment anything else wrote to the strip, so the
+one fact worth keeping was the one that did not last.
+
+- `StatusText.ForOverrideResolve` reports the event alone: `Plan
+  updated`, or `Best path restored` when that preset is what fired it,
+  never inferred from a zero count. Its `overrideCount` parameter is
+  gone, not ignored.
+- `Overrides: N` and `Ignored: N` are persistent chips in the top
+  strip's LEFT slot, each hidden entirely at zero - a standing
+  `Overrides: 0` spends attention on the absence of a thing, and a
+  permanently disabled clear button beside it invites "why is this
+  disabled?". `Services/TreeChipStripLayout` owns their x's, Blish-free
+  and tested. They sit where the grey `Recipe Tree:` caption was: small
+  AND grey, labelling five buttons whose own verbs and tooltips already
+  said what they act on.
+- Each chip has a clear action, and both go through the confirm matrix.
+
+**The confirm matrix.** A dialog appears ONLY when the click would
+change something; otherwise the click skips the dialog AND the
+re-solve, and the strip says why (three new no-op lines). Predicates
+are read at CLICK time from live tree state through `TreeToolbarCommands`
+- Craft All and Buy All each build their preset and compare it against
+the current override map, a bounded walk that is cheap for a click and
+wasteful per render. Generate Plan is deliberately exempt: it clears
+both overrides and ignore marks, but it is the tab's primary action and
+gating it would punish the ordinary case. Its tooltip is its entire
+safety mechanism, so it ships in the same change - what it does, and
+what it costs you.
+
+**Measured finding: Clear Overrides and Best Path are the same
+action.** `decisions.md` distinguishes them ("clear = back to solver
+defaults, Best Path = apply cheapest preset"), but
+`TreeSectionController.ApplyBestPathPreset` clears `_nodeOverrides` and
+re-solves, and that is exactly what clearing does - the solver's own
+choices ARE the cheapest plan it can find. The two differ only in the
+status line they write and the dialog they ask. Both shipped as
+specified rather than one being silently dropped, and the finding is
+recorded here for the maintainer: either Best Path is renamed, or one
+of the two goes.
+
+**Wording**, per the status dossier's table: the failure verb splits
+(`Generation failed:` leaves the tab without a plan, `Update failed:`
+leaves the plan on screen intact with only the change unapplied); the
+restored-plan seed drops its second hyphen clause and names a button
+that exists; the quantity-reset, settings-changed, no-items, unmatched,
+ambiguous and unresolved-rows lines all trim. `"(s)"` is now absent
+from the module entirely, including the two remaining non-user-facing
+offenders. The `Use Own Materials` dialog is aligned to the matrix
+(JC-11) - it was the one dialog left that did not say what is lost.
+
+**Width floor.** The chip cluster is bounded by its widest realistic
+form: `Overrides: 12` + 8 + a 124px button + 20 + `Ignored: 12` + 8 +
+a 110px button, roughly 455px at Body 16, against the right cluster's
+414px of buttons + 32px of gaps + the 20px right padding. Under 950px
+together, comfortably inside the 1378 floor, so the floor does not
+move.
 
 ### Accepted divergences
 
-1. **`RecipeRowHeightWithSublabel` (48) survives phase 1.** The spec's
-   height table lists it as deleted, but nothing about a font retires
-   it - the 48px row dies when the discipline sublabel becomes a COLUMN,
-   which is phase 2. Deleting the height while the sublabel still
-   renders would clip it.
+1. ~~**`RecipeRowHeightWithSublabel` (48) survives phase 1.**~~
+   DISCHARGED in phase 2: the sublabel became a column and the constant
+   went with it. `RecipeRowHeightNoSublabel` is now `RecipeRowHeight`.
 2. **`StatusToSeparatorGap` is 25, not the spec's "+3px".** The spec
    derived the move from the LINE HEIGHT (20 -> 23); the constant's own
    doc comment derives it from the LOWEST INK plus 2px of clearance,
    which is 23 -> 25. The measured-clearance rule is the one that ships
    and the one the test asserts.
-3. **The Required Recipes status pre-scan is gone entirely**, rather
-   than kept as a header-aware band. Nothing consumes a band width there
-   yet: the recipe name is uncapped today and gains its ellipsis budget
-   with the Discipline column in phase 2, which is when the scan comes
-   back. No regression either way - a long recipe name could already run
-   under the status tag.
-4. **The currency table keeps its nested full-width content panel.** It
-   existed to be the centred slice; with the table pinned it is the same
-   size as the row panel around it. Left in place because the row's
-   truncation tooltip is stamped on it, and because unpicking the
-   parenting is churn phase 2 would only have to read past.
+3. ~~**The Required Recipes status pre-scan is gone entirely.**~~
+   DISCHARGED in phase 2: the scan is back, header-floored, feeding the
+   Discipline column's edges.
+4. ~~**The currency table keeps its nested full-width content panel.**~~
+   DISCHARGED in phase 2: collapsed to one panel, with the row's
+   truncation tooltip moved onto it.
 5. **`UiFonts.Title` (18 regular) still exists** for the Settings and
    About tabs' own section headers. They have the same collapsed-space
    defect, but restyling two tabs this milestone does not otherwise
    touch is not a font rollout, it is a second redesign.
+6. **The chips read `Overrides: N` / `Ignored: N`, not
+   `StatusText.Count`'s `N overrides`.** `decisions.md` gives the
+   literal wording, and a labelled count is what a gauge should be: two
+   chips side by side read as one instrument panel, where "1 override"
+   beside "3 items" reads as prose that forgot to be a sentence. The
+   dialog copy does use `StatusText.Count`, where the counts sit inside
+   real sentences.
+7. **A row's in-place repaint is unconditional, not gated on a per-row
+   "did anything change" test.** A pill's text, colour, tooltip and
+   click wiring derive from the node AND from plan-scope facts
+   (currency totals, owned amounts, subduing results), so a cheaper
+   test would have to re-derive nearly all of it to be correct - and a
+   wrong skip leaves a stale, still-clickable pill. The saving that
+   matters is structural (no dispose/rebuild of icons, names, carets,
+   row panels or child containers), and it is taken either way.
+8. **Clear Overrides ships despite being the same action as Best
+   Path.** See the phase 3 finding above: implementing the maintainer's
+   stated design, and recording that the code says the two are one, is
+   more useful than inventing a difference to justify the second
+   button.
+9. **`Views/Rendering/HoverChainResync` does not restore
+   `MouseHandler.ActiveControl`.** That setter is private in Blish
+   1.3.0. Tooltip resolution and input blocking therefore still wait
+   for a real mouse move; the visible hover state does not. Splitting
+   the two is a divergence from "the hover chain is fully resynced",
+   and it is the half a stationary user can see.
 
 ### For reviewer scrutiny
 
@@ -13606,6 +13874,27 @@ milestone heading.
    `TypeRampMetrics`' tier seats, and the tests assert derivations
    rather than literals, so the 18/22 retreat is a two-line change plus
    whatever the test failures then name.
+3a. **The tree-preserving render path is the highest-risk change in
+   this milestone and has had no live run.** It detaches three
+   `_contentPanel` children, disposes the rest, and re-parents them
+   mid-rebuild; it keeps a second relayout registry alive across a
+   render that clears the first; and it is entered from three places
+   (a local re-solve, a sort click, the Hide Unlocked filter). Read
+   `ResetContentPanelToEmpty`, `RenderPlan`'s preserve branch and
+   `RenderPlanAfterResolve` together. Desktop gate steps 2, 4 and 7
+   are what actually exercise it.
+3b. **`TryRefreshInPlace`'s gate is deliberately conservative and its
+   rejections are invisible.** A rejected refresh is a correct full
+   rebuild, so a gate that is too tight looks like nothing at all -
+   the click simply stays slow. If the field test says clicks are
+   still dropped, instrument the gate before changing anything else:
+   the node-count and cost-width checks are the two most likely to
+   reject a case that would have been fine.
+3c. **The Shopping List's Source band is floored at its own header for
+   the OPPOSITE reason to every other column.** It is left-ruled, so a
+   header wider than its widest badge overhangs RIGHT into Amount, not
+   left into the name. Worth one look at a list whose only badge is
+   `TP` (39px against a ~96px header).
 4. `UiFonts` resolves `GetFont` per property access rather than
    memoizing. Blish caches internally (`_loadedBitmapFonts`), and the
    call sites are per-section, never per-row; a static cache here would
@@ -13653,5 +13942,20 @@ milestone heading.
    the separator rule, the spinner sits inside the band, and the longest
    real status line still fits at 1378.
 10. Confirm no ID of any kind became visible anywhere in the redesign.
+11. The Shopping List's Source column: badges LEFT-rule on one x for
+    the whole table (not trailing each name), the fifth header sorts
+    and groups them, VENDOR reads teal and UNKNOWN red, an UNKNOWN
+    row's dash carries the same red, and each badge's own hover names
+    the source in prose. Check a list whose only badge is TP - the
+    header is wider than the badge there and must not overhang into
+    Amount.
+12. Required Recipes is one line per row with a real Discipline column
+    that lines up under its header, and a truncated recipe name's
+    tooltip shows the full name AND still offers the wiki hint.
+13. The tree survives a click that does not re-solve it: sort the Used
+    Materials and Shopping List headers, and toggle Hide Unlocked, with
+    the tree scrolled and partly expanded. Expansion state, scroll
+    position and column tracking must all be exactly as they were, and
+    a window drag afterwards must still move every tree column.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
