@@ -13079,4 +13079,16 @@ observe.
    the flag and ends the interrupted-press state, which is why the steps
    above go straight from the Alt-Tab to the check.
 
+7. **Enter does not strand the slot.** Click the Qty box, type a
+   number, press Enter (caret gone), then press Escape ONCE: the window
+   closes immediately - no swallowed first Escape. Measured basis:
+   Blish's TextBox.OnEnterPressed is a soft unfocus (Focused = false
+   before EnterPressed is raised), leaving the shared FocusedControl
+   slot naming the box; every module text box now chains
+   ReleaseOnEnter(), whose handler runs ahead of any site handler on
+   the same event and clears the stale slot. Repeat on the Crafting
+   Plan search box with NO suggestions showing (a query with no
+   matches), where Enter falls through AutocompleteTextBox to the same
+   base path.
+
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

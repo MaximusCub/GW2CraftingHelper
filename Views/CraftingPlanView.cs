@@ -1492,7 +1492,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
                 Parent = rowPanel
-            }.ReleaseOnDispose();
+            }.ReleaseOnDispose().ReleaseOnEnter();
             row.SearchBox = searchBox;
 
             // The list drops straight under this box (see
@@ -1540,7 +1540,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(QtyInputWidth, 28),
                 Location = new Point(QtyInputX, 3),
                 Parent = rowPanel
-            }.ReleaseOnDispose();
+            }.ReleaseOnDispose().ReleaseOnEnter();
             qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
             row.QtyInput = qtyInput;
 

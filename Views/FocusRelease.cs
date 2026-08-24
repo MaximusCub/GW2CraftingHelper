@@ -55,6 +55,31 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
+        /// Releases the stale global slot Blish's Enter handling leaves
+        /// behind. Measured against Blish HUD 1.3.0:
+        /// <c>TextBox.OnEnterPressed</c> soft-unfocuses
+        /// (<c>base.Focused = false</c>) BEFORE raising
+        /// <c>EnterPressed</c>, so the shared slot still names the box and
+        /// the next Escape is consumed clearing it instead of closing the
+        /// window. Chained at construction, so this handler runs ahead of
+        /// any site handler on the same event - a site that re-focuses in
+        /// response to Enter ends with a coherent focused state, not a
+        /// half-cleared one. Returns the box so construction sites can
+        /// chain.
+        /// </summary>
+        public static T ReleaseOnEnter<T>(this T input)
+            where T : TextBox
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            input.EnterPressed += (sender, e) => Release(sender as TextInputBase);
+            return input;
+        }
+
+        /// <summary>
         /// Releases any focused text box in <paramref name="root"/>'s
         /// subtree. Called where the module takes focus away from the user
         /// without a click: hiding the window, and swapping a tab's view.
