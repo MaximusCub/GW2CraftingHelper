@@ -283,6 +283,139 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1080 - TooltipLayoutMath.ScreenEdgeMargin - 1000, y);
         }
 
+        // --- Header rows and per-row heights (G11, G21) ---
+
+        [Fact]
+        public void HeaderRow_IsIconTall_IndentedPastTheIcon_AndCarriesItsIcon()
+        {
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
+                TooltipContent.TextLine("Weapon Strength: 950 - 1,050")
+            });
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth,
+                coinRowHeight: 20, headerRowHeight: 34, headerIndent: 39);
+
+            var header = layout.Rows[0];
+            Assert.Equal(34, header.Height);
+            Assert.Equal(0, header.Y);
+            Assert.Equal("icon.png", header.IconUrl);
+            Assert.Equal(39, header.Spans[0].X);
+
+            // The prose row under it is one line pitch, not icon-tall, and
+            // starts where the header ends.
+            Assert.Equal(20, layout.Rows[1].Height);
+            Assert.Equal(34, layout.Rows[1].Y);
+            Assert.Null(layout.Rows[1].IconUrl);
+            Assert.Equal(0, layout.Rows[1].Spans[0].X);
+            Assert.Equal(54, layout.Height);
+        }
+
+        [Fact]
+        public void AWrappedHeaderNameStaysInTheNameColumnAndDrawsOneIcon()
+        {
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic")
+            });
+
+            // 39px indent + a 70px budget for the name itself.
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 109, 20, TenPxPerChar, FixedCoinWidth,
+                headerRowHeight: 34, headerIndent: 39);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.All(layout.Rows, r => Assert.Equal(39, r.Spans[0].X));
+            Assert.All(layout.Rows, r => Assert.True(r.Width <= 109));
+            Assert.Equal("icon.png", layout.Rows[0].IconUrl);
+            Assert.Null(layout.Rows[1].IconUrl);
+
+            // Only the icon-bearing first row is icon-tall; a wrapped
+            // continuation is an ordinary text row at the line pitch, so
+            // the box does not grow icon-height per wrapped name row.
+            Assert.Equal(34, layout.Rows[0].Height);
+            Assert.Equal(20, layout.Rows[1].Height);
+            Assert.Equal(54, layout.Height);
+        }
+
+        [Fact]
+        public void AHeaderWithNoIconUrlStillHasAnIconToDrawInTheColumnItReserves()
+        {
+            // An item whose /v2/items response carries no "icon" reaches
+            // here with null. The row reserves the name indent either way,
+            // so the url has to survive as EMPTY - which the surface draws
+            // as the module's neutral empty-slot square - rather than as
+            // null, which draws nothing and leaves the name floating over
+            // the reserved column.
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.HeaderLine(null, "Iconless Thing", "Basic"),
+                TooltipContent.TextLine("Basic")
+            });
+
+            Assert.Equal("", content.Lines[0].IconUrl);
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth,
+                headerRowHeight: 34, headerIndent: 39);
+
+            Assert.Equal("", layout.Rows[0].IconUrl);
+            Assert.Equal(39, layout.Rows[0].Spans[0].X);
+            Assert.Null(layout.Rows[1].IconUrl);
+        }
+
+        [Fact]
+        public void OnlyTheCoinRowTakesTheCoinHeight()
+        {
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.TextLine("prose"),
+                TooltipContent.Line(TooltipSpan.FromCoin(240, "2s 40c"))
+            });
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth, coinRowHeight: 26);
+
+            Assert.Equal(20, layout.Rows[0].Height);
+            Assert.Equal(26, layout.Rows[1].Height);
+            Assert.Equal(46, layout.Height);
+        }
+
+        [Fact]
+        public void ACoinRunPushedOntoTheNextRow_TakesTheHeightWithIt()
+        {
+            // "aaaaa" is 50px and the coin run 100px, so the run cannot
+            // share the 120px row and moves down whole.
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.Line(
+                    TooltipSpan.FromText("aaaaa"),
+                    TooltipSpan.FromCoin(240, "2s 40c"))
+            });
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 120, 20, TenPxPerChar, FixedCoinWidth, coinRowHeight: 26);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.Equal(20, layout.Rows[0].Height);
+            Assert.Equal(26, layout.Rows[1].Height);
+        }
+
+        [Fact]
+        public void HeaderPlainTextIsStillJustTheName()
+        {
+            var content = TooltipContent.FromLines(new[]
+            {
+                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary")
+            });
+
+            Assert.Equal("Bolt", content.ToPlainText());
+            Assert.Equal(TooltipSpanRole.Rarity, content.Lines[0].Spans[0].Role);
+            Assert.Equal(TooltipLineKind.Header, content.Lines[0].Kind);
+        }
+
         [Fact]
         public void ClampAxis_KeepsBothEdgesInsideTheMargin()
         {

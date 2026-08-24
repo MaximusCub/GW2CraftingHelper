@@ -1,3 +1,4 @@
+using System.Linq;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -76,6 +77,79 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal("<b>bold</b>", ItemDescriptionSanitizer.Sanitize("<b>bold</b>"));
             Assert.Equal("5 < 6 and 7 > 6", ItemDescriptionSanitizer.Sanitize("5 < 6 and 7 > 6"));
+        }
+
+        // --- Role-carrying spans (gap G7) ---
+
+        [Fact]
+        public void PlainAndFlavorRunsInOneDescriptionKeepSeparateRoles()
+        {
+            // The xyaren capture's shape: an unmarked sentence the game
+            // renders WHITE, then a quoted flavour run it renders teal.
+            var spans = ItemDescriptionSanitizer.SanitizeToSpans(
+                "A gift bag!<c=@flavor>\"Care is taken with every toy.\"</c>");
+
+            Assert.Equal(2, spans.Count);
+            Assert.Equal("A gift bag!", spans[0].Text);
+            Assert.Equal(TooltipSpanRole.Default, spans[0].Role);
+            Assert.Equal("\"Care is taken with every toy.\"", spans[1].Text);
+            Assert.Equal(TooltipSpanRole.Flavor, spans[1].Role);
+        }
+
+        [Fact]
+        public void AbilityTypeLeadInKeepsItsOwnRoleAndTheRestStaysDefault()
+        {
+            var spans = ItemDescriptionSanitizer.SanitizeToSpans(
+                "<c=@abilitytype>Element: </c>Brilliance<br>Double-click to apply to a piece of armor.");
+
+            Assert.Equal(TooltipSpanRole.AbilityType, spans[0].Role);
+            Assert.Equal("Element: ", spans[0].Text);
+            Assert.All(spans.Skip(1), s => Assert.Equal(TooltipSpanRole.Default, s.Role));
+        }
+
+        [Fact]
+        public void WarningAndReminderMapToTheirOwnRoles()
+        {
+            Assert.Equal(
+                TooltipSpanRole.Warning,
+                ItemDescriptionSanitizer.SanitizeToSpans("<c=@warning>Do not eat.</c>").Single().Role);
+
+            // Its own role, not Muted: reminder is gw2efficiency's #afafaf
+            // (175) and the annotation grey is the measured #939496 (150).
+            Assert.Equal(
+                TooltipSpanRole.Reminder,
+                ItemDescriptionSanitizer.SanitizeToSpans("<c=@reminder>(Rounded down.)</c>").Single().Role);
+        }
+
+        [Fact]
+        public void AnUnknownColourNameKeepsItsTextAtTheDefaultRole()
+        {
+            var span = ItemDescriptionSanitizer.SanitizeToSpans("<c=@nosuchcolour>text</c>").Single();
+
+            Assert.Equal("text", span.Text);
+            Assert.Equal(TooltipSpanRole.Default, span.Role);
+        }
+
+        [Fact]
+        public void ANestedRunRestoresTheOuterRoleWhenItCloses()
+        {
+            var spans = ItemDescriptionSanitizer.SanitizeToSpans(
+                "<c=@flavor>outer <c=@warning>inner</c> outer again</c>");
+
+            Assert.Equal(
+                new[] { TooltipSpanRole.Flavor, TooltipSpanRole.Warning, TooltipSpanRole.Flavor },
+                spans.Select(s => s.Role).ToArray());
+        }
+
+        [Fact]
+        public void SanitizeStaysExactlyTheConcatenationOfTheSpans()
+        {
+            const string description =
+                "<c=@abilitytype>Element: </c>Brilliance<br><c=@flavor>  Quoted.  </c>";
+
+            Assert.Equal(
+                ItemDescriptionSanitizer.Sanitize(description),
+                string.Concat(ItemDescriptionSanitizer.SanitizeToSpans(description).Select(s => s.Text)));
         }
     }
 }

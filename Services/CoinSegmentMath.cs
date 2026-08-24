@@ -94,13 +94,20 @@ namespace GW2CraftingHelper.Services
             public string Name;
         }
 
-        public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments)
+        /// <summary>
+        /// Width of a whole coin run. iconSize defaults to the shared
+        /// CoinIconSize every plan table draws at; the rich tooltip passes
+        /// its own smaller, line-height-derived size (gap G22) and must
+        /// measure with the same number it draws with.
+        /// </summary>
+        public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments, int iconSize = 0)
         {
             if (segments.Count == 0) return 0;
+            int effectiveIcon = iconSize > 0 ? iconSize : CoinIconSize;
             int width = 0;
             foreach (var seg in segments)
             {
-                width += seg.TextWidth + CoinLabelIconGap + CoinIconSize + CoinSegmentGap;
+                width += seg.TextWidth + CoinLabelIconGap + effectiveIcon + CoinSegmentGap;
             }
             return width - CoinSegmentGap;
         }
