@@ -367,6 +367,25 @@ namespace GW2CraftingHelper.Views
         private readonly List<Action<int>> _relayoutActions = new List<Action<int>>();
         private readonly List<Action<int>> _reellipsisActions = new List<Action<int>>();
 
+        // The Recipe Tree's own half of those two registries, kept apart
+        // for one reason: the tree section SURVIVES a re-render that a
+        // decision pill triggers (see RenderPlan's preserveTree path), and
+        // a closure whose controls survive must survive with them.
+        // Everything else about them is identical - ReplayRelayout and
+        // RunReellipsis replay both, and the closures are position-only
+        // either way, so the order between the two lists cannot matter
+        // (they touch disjoint controls).
+        private readonly List<Action<int>> _treeRelayoutActions = new List<Action<int>>();
+        private readonly List<Action<int>> _treeReellipsisActions = new List<Action<int>>();
+
+        // The tree section's own children of _contentPanel (its top gap,
+        // header band and content flow), captured when it is built. Held so
+        // a preserving re-render can detach them before the dispose sweep
+        // and re-attach them at the same point in the flow afterwards -
+        // _contentPanel lays its children out in child order, so
+        // re-parenting at the right moment IS the ordering.
+        private List<Control> _treeSectionControls;
+
         // ISectionRelayoutSink implementation - explicit-interface so
         // extracted renderers register through the seam without widening
         // the public surface. Both members pass straight through to the
@@ -388,6 +407,38 @@ namespace GW2CraftingHelper.Views
         }
 
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
+
+        /// <summary>
+        /// The sink TreeSectionController registers through - the same
+        /// contract as the view's own, routed to the tree-scoped registries
+        /// above. A separate OBJECT rather than a flag on the view because
+        /// the tree registers closures outside its own build pass too
+        /// (every lazy expand adds rows), and those closures must land in
+        /// the surviving registry just as the build pass's do.
+        /// </summary>
+        private sealed class TreeRelayoutSink : ISectionRelayoutSink
+        {
+            private readonly CraftingPlanView _view;
+
+            internal TreeRelayoutSink(CraftingPlanView view)
+            {
+                _view = view;
+            }
+
+            public void AddRelayout(Action<int> closure) => _view._treeRelayoutActions.Add(closure);
+
+            public void AddReellipsis(Action<int> closure) => _view._treeReellipsisActions.Add(closure);
+
+            public void RequestRerenderAfterSettle() => _view._rerenderAfterSettlePending = true;
+
+            public int RelayoutCount => _view._treeRelayoutActions.Count;
+        }
+
+        // Set only for the duration of the tree's own CreateSectionHeader
+        // call, so the shared section chrome that call registers joins the
+        // tree's registry rather than the one a preserving re-render
+        // clears. Every other section's header is unaffected.
+        private bool _routeSectionChromeToTree;
 
         // Set by a re-ellipsis closure that cannot honour the registry's
         // no-height-change contract at the settled width (today only the
@@ -626,20 +677,28 @@ namespace GW2CraftingHelper.Views
             // SectionHeaderHandle into a ValueTuple so the nested type
             // never becomes visible outside this class).
             _treeController = new TreeSectionController(
-                this,
+                new TreeRelayoutSink(this),
                 _resolveOverridesSync,
                 _vmBuilder,
                 PreserveScrollAcross,
                 SetStatus,
-                RenderPlan,
+                RenderPlanAfterResolve,
                 GetCurrentPanelWidth,
                 () => _currentPlan,
                 vm => _currentPlan = vm,
                 log => _lastDebugLog = log,
                 (title, sectionKey, panelWidth, defaultExpanded, suppressToggle) =>
                 {
-                    var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
-                    return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+                    _routeSectionChromeToTree = true;
+                    try
+                    {
+                        var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
+                        return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+                    }
+                    finally
+                    {
+                        _routeSectionChromeToTree = false;
+                    }
                 },
                 commands => _treeToolbarCommands = commands,
                 getItemStatBlock);
@@ -2399,7 +2458,8 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
-            if (_contentPanel == null || _relayoutActions.Count == 0) return;
+            if (_contentPanel == null) return;
+            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0) return;
 
 #if DEBUG
             // Invariant (KNOWN-ISSUES #13): a pure width/text
@@ -2417,6 +2477,10 @@ namespace GW2CraftingHelper.Views
             try
             {
                 foreach (var relayout in _relayoutActions)
+                {
+                    relayout(panelWidth);
+                }
+                foreach (var relayout in _treeRelayoutActions)
                 {
                     relayout(panelWidth);
                 }
@@ -2554,6 +2618,10 @@ namespace GW2CraftingHelper.Views
         private void RunReellipsis(int panelWidth)
         {
             foreach (var reellipsis in _reellipsisActions)
+            {
+                reellipsis(panelWidth);
+            }
+            foreach (var reellipsis in _treeReellipsisActions)
             {
                 reellipsis(panelWidth);
             }
@@ -3367,13 +3435,32 @@ namespace GW2CraftingHelper.Views
         /// downstream can observe stale tree/relayout state pointing at
         /// controls that are about to be gone.
         /// </summary>
-        private void ResetContentPanelToEmpty()
+        private void ResetContentPanelToEmpty(bool preserveTree = false)
         {
-            _treeController.ResetTreeRenderState();
+            if (!preserveTree)
+            {
+                _treeController.ResetTreeRenderState();
+                _treeRelayoutActions.Clear();
+                _treeReellipsisActions.Clear();
+                _treeSectionControls = null;
+            }
+
             _relayoutActions.Clear();
             _reellipsisActions.Clear();
 
             if (_contentPanel == null) return;
+
+            // Detached, not disposed, and BEFORE the sweep: a preserved
+            // tree's controls are children of the very panel being emptied.
+            // They re-enter at the point the tree belongs in the flow -
+            // see RenderPlan.
+            if (preserveTree && _treeSectionControls != null)
+            {
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Parent = null;
+                }
+            }
 
             foreach (var child in _contentPanel.Children.ToArray())
             {
@@ -3449,11 +3536,35 @@ namespace GW2CraftingHelper.Views
             });
         }
 
-        private void RenderPlan(PlanViewModel vm)
+        /// <summary>
+        /// The render a local re-solve (a decision pill, an ignore toggle,
+        /// a tree preset) runs. It asks the tree to update itself in place
+        /// first, and rebuilds the plan AROUND the tree when it can - see
+        /// TreeSectionController.TryRefreshInPlace for the measured reason
+        /// a shorter rebuild frame is what stops rapid clicking from
+        /// dropping clicks. Any doubt inside that method is a full rebuild,
+        /// which is exactly what this path did before it existed.
+        /// </summary>
+        private void RenderPlanAfterResolve(PlanViewModel vm)
         {
             if (_contentPanel == null) return;
 
-            ResetContentPanelToEmpty();
+            var treeRoots = ResolveTreeRoots(vm);
+            if (treeRoots != null && _treeSectionControls != null &&
+                _treeController.TryRefreshInPlace(treeRoots))
+            {
+                RenderPlan(vm, preserveTree: true);
+                return;
+            }
+
+            RenderPlan(vm);
+        }
+
+        private void RenderPlan(PlanViewModel vm, bool preserveTree = false)
+        {
+            if (_contentPanel == null) return;
+
+            ResetContentPanelToEmpty(preserveTree);
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
@@ -3490,9 +3601,38 @@ namespace GW2CraftingHelper.Views
             }
 
             var treeRoots = ResolveTreeRoots(vm);
-            if (treeRoots != null)
+            if (treeRoots != null && preserveTree)
             {
+                // Re-attached at the point the tree occupies in the flow.
+                // _contentPanel positions its children in child order, so
+                // re-parenting here IS the ordering, and the refresh has
+                // already brought their contents up to this solve.
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Parent = _contentPanel;
+                }
+            }
+            else if (treeRoots != null)
+            {
+                int childrenBeforeTree = _contentPanel.Children.Count;
                 _treeController.CreateTreeSection(treeRoots, panelWidth);
+                _treeSectionControls = CapturedChildrenFrom(childrenBeforeTree);
+            }
+            else if (preserveTree && _treeSectionControls != null)
+            {
+                // Unreachable while the only caller decides preserveTree
+                // from this same ResolveTreeRoots answer - but a detached
+                // control with nowhere to go is a leak, not a no-op, so
+                // this branch is the one that pays for it rather than a
+                // future caller discovering it.
+                foreach (var control in _treeSectionControls)
+                {
+                    control.Dispose();
+                }
+                _treeSectionControls = null;
+                _treeController.ResetTreeRenderState();
+                _treeRelayoutActions.Clear();
+                _treeReellipsisActions.Clear();
             }
 
             foreach (var section in vm.Sections)
@@ -3507,6 +3647,23 @@ namespace GW2CraftingHelper.Views
             // A re-render that keeps its tree finds the visibility
             // unchanged and reflows nothing.
             ApplyTreeToolbarVisibility(treeRoots != null);
+        }
+
+        /// <summary>
+        /// The content-panel children added since a recorded child count -
+        /// how the tree section's own controls are identified without
+        /// threading a handle for each one out through the section-header
+        /// seam. A section's controls are contiguous by construction: they
+        /// are appended, in order, by one builder call.
+        /// </summary>
+        private List<Control> CapturedChildrenFrom(int firstIndex)
+        {
+            var captured = new List<Control>();
+            for (int i = firstIndex; i < _contentPanel.Children.Count; i++)
+            {
+                captured.Add(_contentPanel.Children[i]);
+            }
+            return captured;
         }
 
         /// <summary>
@@ -3827,7 +3984,7 @@ namespace GW2CraftingHelper.Views
             // exactly (whatever it was most recently finalized to by
             // PlanContentHeightMath) so this can never disturb scroll
             // state.
-            _relayoutActions.Add(w =>
+            (_routeSectionChromeToTree ? _treeRelayoutActions : _relayoutActions).Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, SectionHeaderRowHeight);
@@ -3864,7 +4021,27 @@ namespace GW2CraftingHelper.Views
         {
             if (_currentPlan == null) return;
 
-            PreserveScrollAcross(() => RenderPlan(_currentPlan));
+            // The tree is a pure function of the plan, and a sort click
+            // does not change the plan - only the row ORDER of one flat
+            // table. So the tree section is not rebuilt, and not even
+            // refreshed: its contents are already this plan's.
+            PreserveScrollAcross(() => RenderPlan(_currentPlan, CanPreserveTree(_currentPlan)));
+            // A sort header rebuilds the table it sits in - including
+            // itself, under a cursor that has not moved. See
+            // HoverChainResync.
+            HoverChainResync.AfterRebuild();
+        }
+
+        /// <summary>
+        /// Whether a re-render may keep the Recipe Tree section it already
+        /// built: there has to BE one, and the plan it was built from has
+        /// to be the plan being rendered. Callers that changed the plan
+        /// itself go through TreeSectionController.TryRefreshInPlace
+        /// instead, which brings the tree up to the new solve first.
+        /// </summary>
+        private bool CanPreserveTree(PlanViewModel vm)
+        {
+            return _treeSectionControls != null && ResolveTreeRoots(vm) != null;
         }
 
         private void CreateCollapsibleSection(PlanSectionViewModel section, int panelWidth)
@@ -4060,8 +4237,11 @@ namespace GW2CraftingHelper.Views
 
             hideUnlockedCheckbox.CheckedChanged += (_, e) =>
             {
+                // Same reasoning as RerenderForSortChange: this filters
+                // one section's rows, it does not re-solve the plan.
                 _hideUnlockedRecipes = e.Checked;
-                PreserveScrollAcross(() => RenderPlan(_currentPlan));
+                PreserveScrollAcross(() => RenderPlan(_currentPlan, CanPreserveTree(_currentPlan)));
+                HoverChainResync.AfterRebuild();
             };
 
 #if DEBUG
