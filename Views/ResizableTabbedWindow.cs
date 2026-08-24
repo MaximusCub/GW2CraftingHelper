@@ -1,4 +1,5 @@
 using System;
+using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
@@ -59,6 +60,11 @@ namespace GW2CraftingHelper.Views
             // unhooked in DisposeControl.
             Blish_HUD.GameService.Graphics.SpriteScreen.Resized += OnScreenResized;
 
+            // Belt to Hide()'s braces: Hide() is the intent, Hidden is the
+            // fact, and a direct Visible = false only raises the latter.
+            // Both unhooked in DisposeControl.
+            this.Hidden += OnWindowHidden;
+
             // The base constructor sizes the window from windowRegion, a
             // region of the background texture, which is narrower than the
             // minimum. Clamping here means the window is never below the
@@ -94,9 +100,40 @@ namespace GW2CraftingHelper.Views
             ClampToMinimum();
         }
 
+        /// <summary>
+        /// A focused text box whose window goes away without a click keeps
+        /// Blish's keyboard focus, and with it the text-input listener that
+        /// swallows every keystroke bound for the game - see
+        /// <see cref="FocusRelease"/>. Released on the intent (here), not on
+        /// the fade that follows it, because the box eats keys for the whole
+        /// of that fade.
+        /// </summary>
+        public override void Hide()
+        {
+            FocusRelease.ReleaseWithin(this);
+            base.Hide();
+        }
+
+        private void OnWindowHidden(object sender, EventArgs e)
+        {
+            FocusRelease.ReleaseWithin(this);
+        }
+
+        /// <summary>
+        /// Runs BEFORE the base implementation, which swaps the hosted view
+        /// and disposes the outgoing tab's controls with it.
+        /// </summary>
+        protected override void OnTabChanged(ValueChangedEventArgs<Tab> e)
+        {
+            FocusRelease.ReleaseWithin(this);
+            base.OnTabChanged(e);
+        }
+
         protected override void DisposeControl()
         {
             Blish_HUD.GameService.Graphics.SpriteScreen.Resized -= OnScreenResized;
+            this.Hidden -= OnWindowHidden;
+            FocusRelease.ReleaseWithin(this);
             base.DisposeControl();
         }
 
