@@ -19,10 +19,10 @@ namespace GW2CraftingHelper.Services
     /// persisted). The view holds one instance per sortable table for its
     /// own lifetime and re-reads it on every render, so every re-render of
     /// the same plan - a re-sort, a tree pill override, a re-solve - keeps
-    /// whatever sort the user last clicked. A NEW plan generation calls
-    /// <see cref="Reset"/> instead: the sort described a table that no
-    /// longer exists (maintainer decision, field-test round; see
-    /// CraftingPlanView.ResetPerPlanSortState).
+    /// whatever sort the user last clicked. Arriving at a DIFFERENT plan
+    /// calls <see cref="Reset"/> instead: the sort described a table that
+    /// no longer exists (maintainer decision, field-test round; see
+    /// CraftingPlanView.ResetPerPlanSortState, which lists the sites).
     /// <para>
     /// One click cycle per column: None -> Ascending -> Descending -> None.
     /// The third click restores the plan's own emission order rather than

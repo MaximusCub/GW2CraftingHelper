@@ -271,6 +271,16 @@ namespace GW2CraftingHelper.Views
         /// <see cref="TableSortDirection.None"/>. One method so a future
         /// third sortable table cannot be added to one reset site and
         /// forgotten at another.
+        /// <para>
+        /// Called from every site that clears <c>_sectionExpansion</c> -
+        /// TriggerGenerate's commit point, ApplyRestoredPlan and
+        /// RollBackFailedPlanRender - so "new plan state" is one pairing
+        /// rather than three independent ones. Only the first can actually
+        /// carry a stale sort today (a restore cannot follow a Generate in
+        /// the same session, and a rolled-back render leaves no table), but
+        /// pinning that to a guard in another file is what invites the
+        /// forgotten site this method exists to prevent.
+        /// </para>
         /// </summary>
         private void ResetPerPlanSortState()
         {
@@ -692,6 +702,7 @@ namespace GW2CraftingHelper.Views
             _treeController.ResetForNewPlan(result);
             _treeController.RestoreOverrides(nodeOverrides, ignoredItemIds);
             _sectionExpansion.Clear();
+            ResetPerPlanSortState();
             _lastDebugLog = result.DebugLog;
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
@@ -759,6 +770,7 @@ namespace GW2CraftingHelper.Views
 
             _treeController.ResetForNewPlan(null);
             _sectionExpansion.Clear();
+            ResetPerPlanSortState();
             _lastDebugLog = null;
             _currentPlan = null;
             _planGeneratedAt = default(DateTime);
