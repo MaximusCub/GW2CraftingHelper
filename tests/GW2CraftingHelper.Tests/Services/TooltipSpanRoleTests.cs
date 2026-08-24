@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void HardBreaksInsideStyledTextKeepTheRoleOnEveryResultingLine()
         {
             var content = new TooltipContentBuilder()
-                .Styled("30% Magic Find\n+70 Condition Damage", TooltipSpanRole.Bonus)
+                .Styled("(1): +25 Power\n(2): +35 Ferocity", TooltipSpanRole.Bonus)
                 .Build();
 
             Assert.Equal(2, content.Lines.Count);

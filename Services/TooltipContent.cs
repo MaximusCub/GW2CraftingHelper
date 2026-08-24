@@ -45,6 +45,27 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// <paramref name="content"/>, or the plain
+        /// <paramref name="fallbackText"/> when it has nothing to say.
+        /// <para>
+        /// The deferred rich path needs this because it cannot look before
+        /// it leaps: registering a builder clears whatever plain tooltip
+        /// the control already carried, and only when the builder finally
+        /// runs is it known to produce nothing - by which time the note it
+        /// replaced is gone. A control whose note is worth more than
+        /// silence hands it in here.
+        /// </para>
+        /// </summary>
+        public static TooltipContent OrText(TooltipContent content, string fallbackText)
+        {
+            if (content != null && !content.IsEmpty)
+            {
+                return content;
+            }
+            return string.IsNullOrEmpty(fallbackText) ? Empty : FromText(fallbackText);
+        }
+
+        /// <summary>
         /// For a composer that assembles its lines as a list it still needs
         /// to reorder (<c>TreeRowTooltipComposer</c> inserts the caption at
         /// the front after the fact) rather than streaming them into a
@@ -58,6 +79,28 @@ namespace GW2CraftingHelper.Services
         public static TooltipLine TextLine(string text)
         {
             return new TooltipLine(new List<TooltipSpan> { TooltipSpan.FromText(text ?? "") });
+        }
+
+        /// <summary>
+        /// The icon+name row every in-game item tooltip opens with: a
+        /// ~34x34 framed item icon with the name set to its right and
+        /// vertically centred on it (spec section 1.5, gap G11). A taller
+        /// row than a prose one, and the only line kind that carries an
+        /// icon - which is why it is a KIND rather than another span role.
+        /// <para>
+        /// A null url is normalised to empty here, so a header row ALWAYS
+        /// has an icon to draw. The row reserves the name's indent whether
+        /// or not one arrives; leaving the url null drew nothing into that
+        /// reserved column and left the name floating over empty black
+        /// while the body below it started at x=0.
+        /// </para>
+        /// </summary>
+        public static TooltipLine HeaderLine(string iconUrl, string name, string rarity)
+        {
+            return new TooltipLine(
+                new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", rarity) },
+                TooltipLineKind.Header,
+                iconUrl ?? "");
         }
 
         public static TooltipLine Line(params TooltipSpan[] spans)
@@ -103,16 +146,46 @@ namespace GW2CraftingHelper.Services
         }
     }
 
+    /// <summary>What a line IS, structurally. Prose unless stated.</summary>
+    public enum TooltipLineKind
+    {
+        /// <summary>An ordinary prose row, one line height tall.</summary>
+        Text,
+
+        /// <summary>The icon+name header row - see
+        /// <see cref="TooltipContent.HeaderLine"/>.</summary>
+        Header
+    }
+
     public sealed class TooltipLine
     {
         private readonly IReadOnlyList<TooltipSpan> _spans;
 
-        internal TooltipLine(IReadOnlyList<TooltipSpan> spans)
+        internal TooltipLine(
+            IReadOnlyList<TooltipSpan> spans,
+            TooltipLineKind kind = TooltipLineKind.Text,
+            string iconUrl = null)
         {
             _spans = spans ?? new List<TooltipSpan>();
+            Kind = kind;
+            IconUrl = iconUrl;
         }
 
         public IReadOnlyList<TooltipSpan> Spans => _spans;
+
+        public TooltipLineKind Kind { get; }
+
+        /// <summary>
+        /// The item icon drawn at the head of a
+        /// <see cref="TooltipLineKind.Header"/> row. Empty renders the
+        /// module's neutral empty-slot square, never an error texture - a
+        /// missing icon is a data gap, not a failure - and
+        /// <see cref="TooltipContent.HeaderLine"/> normalises null to empty
+        /// so the two can never diverge. Null means "this row draws no
+        /// icon": the continuation rows of a wrapped header name, and every
+        /// prose row.
+        /// </summary>
+        public string IconUrl { get; }
 
         internal void AppendPlainText(StringBuilder sb)
         {
@@ -140,12 +213,45 @@ namespace GW2CraftingHelper.Services
         /// span itself (<see cref="TooltipSpan.RarityKey"/>).</summary>
         Rarity,
 
-        /// <summary>An upgrade's granted bonus - a rune bonus line, a sigil
-        /// or infusion buff, a food nourishment line.</summary>
+        /// <summary>An upgrade's granted bonus - a rune bonus line, a
+        /// sigil or infusion buff. NOT a food's nourishment line, which
+        /// the one capture of one measures white (spec section 1.4,
+        /// steak.png).</summary>
         Bonus,
 
-        /// <summary>Subdued secondary text: flavour prose, and the
-        /// rarity/type/level/binding block under the stats.</summary>
+        /// <summary>
+        /// A bonus tier the wearer has not reached. Reserved and unused:
+        /// greying a tier needs the character's equipped count, which is
+        /// instance state /v2/items cannot carry (spec section 3.2). It
+        /// exists so an equipped-aware surface does not have to re-plumb
+        /// the role through every composer to get it.
+        /// </summary>
+        BonusInactive,
+
+        /// <summary>The item's <c>&lt;c=@flavor&gt;</c> prose.</summary>
+        Flavor,
+
+        /// <summary>The item's <c>&lt;c=@abilitytype&gt;</c> lead-in
+        /// ("Element: ").</summary>
+        AbilityType,
+
+        /// <summary>The item's <c>&lt;c=@warning&gt;</c> run.</summary>
+        Warning,
+
+        /// <summary>
+        /// The item's <c>&lt;c=@reminder&gt;</c> run. Its own role rather
+        /// than a second user of <see cref="Muted"/>: the two greys have
+        /// different sources and differ by 25 levels per channel (spec
+        /// section 1.4 - reminder `#afafaf`, inferred from gw2efficiency;
+        /// the annotation grey `#939496`, measured on xyaren.png).
+        /// </summary>
+        Reminder,
+
+        /// <summary>
+        /// A genuine secondary annotation - the game's own grey, e.g.
+        /// "0/500 in Material Storage". NOT the identity block, which the
+        /// game renders white (spec section 1.4, gap G4).
+        /// </summary>
         Muted
     }
 
@@ -250,6 +356,21 @@ namespace GW2CraftingHelper.Services
         public TooltipContentBuilder RarityText(string text, string rarity)
         {
             return AppendText(text, TooltipSpan.RarityText("", rarity));
+        }
+
+        /// <summary>
+        /// The icon+name header row - see
+        /// <see cref="TooltipContent.HeaderLine"/>. Commits whatever line
+        /// was open first: a header is a whole row, never a run inside one.
+        /// </summary>
+        public TooltipContentBuilder Header(string iconUrl, string name, string rarity)
+        {
+            if (_current != null)
+            {
+                EndLine();
+            }
+            _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
+            return this;
         }
 
         // template carries the role/rarity every piece of this text

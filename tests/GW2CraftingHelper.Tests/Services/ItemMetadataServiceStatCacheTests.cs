@@ -97,6 +97,71 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(service.GetCachedStatBlock(12345));
         }
 
+        // --- Q13: the restored-plan background top-up ---
+
+        [Fact]
+        public async Task WarmStatBlocks_FillsTheCacheForAPlanThatWasRestoredRatherThanGenerated()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(Armor(48074));
+            var service = new ItemMetadataService(api);
+
+            // A restore makes no network call at all, so the hover path
+            // finds nothing.
+            Assert.Null(service.GetCachedStatBlock(48074));
+
+            int filled = await service.WarmStatBlocksAsync(new[] { 48074 }, CancellationToken.None);
+
+            Assert.Equal(1, filled);
+            Assert.Equal("Zojja's Warfists", service.GetCachedStatBlock(48074).Name);
+        }
+
+        [Fact]
+        public async Task WarmStatBlocks_SkipsIdsThatAlreadyHaveABlock()
+        {
+            var api = new InMemoryItemApiClient();
+            api.AddItem(Armor(48074));
+            var service = new ItemMetadataService(api);
+
+            await service.GetMetadataAsync(new[] { 48074 }, CancellationToken.None);
+            int callsAfterFetch = api.Calls.Count;
+
+            Assert.Equal(0, await service.WarmStatBlocksAsync(new[] { 48074 }, CancellationToken.None));
+            Assert.Equal(callsAfterFetch, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task WarmStatBlocks_IsBestEffort_AFailingBatchDoesNotThrow()
+        {
+            // Failing means the rows keep the plain tooltip they already
+            // had, which is not an error worth surfacing.
+            var api = new InMemoryItemApiClient { ThrowOnCallNumber = 1 };
+            api.AddItem(Armor(48074));
+            var service = new ItemMetadataService(api);
+
+            Assert.Equal(0, await service.WarmStatBlocksAsync(new[] { 48074 }, CancellationToken.None));
+            Assert.Null(service.GetCachedStatBlock(48074));
+        }
+
+        [Fact]
+        public async Task WarmStatBlocks_DoesNotDisturbTheMetadataCacheItDoesNotOwn()
+        {
+            // Deliberately not GetMetadataAsync: that path writes the
+            // unlocked metadata dictionary from the plan thread, and a
+            // restore-time top-up racing a Generate would be two writers.
+            var api = new InMemoryItemApiClient();
+            api.AddItem(Armor(48074));
+            var service = new ItemMetadataService(api);
+
+            await service.WarmStatBlocksAsync(new[] { 48074 }, CancellationToken.None);
+            int callsAfterWarm = api.Calls.Count;
+
+            var metadata = await service.GetMetadataAsync(new[] { 48074 }, CancellationToken.None);
+
+            Assert.Equal("Zojja's Warfists", metadata[48074].Name);
+            Assert.True(api.Calls.Count > callsAfterWarm);
+        }
+
         [Fact]
         public async Task SeedFallbackEntriesGetNoStatBlock()
         {
