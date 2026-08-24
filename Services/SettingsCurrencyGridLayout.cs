@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
         // numbers the controls are placed with and cannot drift from them,
         // and so the arithmetic is covered by Blish-free tests.
         public const int CellNameX = 8;
-        public const int CellNameWidth = 170;
+        public const int CellNameWidth = 190;
         public const int CellInputX = CellNameX + CellNameWidth;
         public const int CellInputWidth = 70;
         public const int CellClearX = CellInputX + CellInputWidth + CellInputToClearGap;
@@ -28,22 +28,30 @@ namespace GW2CraftingHelper.Services
         /// the checkbox on 70; the label rename needed four more pixels and
         /// they came from here rather than from the cell's total extent.
         /// <para>
-        /// Two columns need a 848px panel (2 * MinColumnWidth), i.e. a 974px
-        /// window once the 126px of window-to-panel chrome is counted. At
-        /// the old 930px minimum that made the cell extent load-bearing -
-        /// and in fact the grid was already falling back to one column
-        /// there, the "864px settings panel" this comment used to cite
-        /// having been derived without the ViewAdapter's own padding. The
-        /// 1436px minimum clears the two-column threshold by ~460px, so
-        /// the cell has room to grow now; it is still derived rather than
-        /// estimated (see MinColumnWidth).
+        /// Two columns need a 908px panel (2 * MinColumnWidth), i.e. a
+        /// 1034px window once the 126px of window-to-panel chrome is
+        /// counted. At the old 930px minimum that made the cell extent
+        /// load-bearing - and in fact the grid was already falling back to
+        /// one column there, the "864px settings panel" this comment used
+        /// to cite having been derived without the ViewAdapter's own
+        /// padding. The 1478px minimum clears the two-column threshold by
+        /// ~444px even after the font bump widened all three text-derived
+        /// terms, so the cell has room to grow now; it is still derived
+        /// rather than estimated (see MinColumnWidth).
         /// </para>
         /// </summary>
         public const int CellInputToClearGap = 2;
 
         /// <summary>
-        /// Room for the per-currency "Ignore" checkbox (box plus its label
-        /// at DefaultFont14, ~7.7px per character).
+        /// Room for the per-currency "Ignore" checkbox: its 32px of box and
+        /// gap chrome plus the measured 42px of the word "Ignore".
+        /// <para>
+        /// Unchanged by the +2pt bump, and that is deliberate rather than an
+        /// oversight: Blish_HUD.Controls.Checkbox has no Font property, so
+        /// its label stays at DefaultFont14 whatever the module's body font
+        /// is. Widening this slot for a Font16 "Ignore" would reserve 6px
+        /// the control never paints.
+        /// </para>
         /// </summary>
         public const int CellClearWidth = 74;
 
@@ -53,9 +61,11 @@ namespace GW2CraftingHelper.Services
         /// Room for the widest string the cell's one tag slot shows:
         /// "default 3600" (12 characters; 3600 is the largest value in
         /// CurrencyDecisionDefaults), which the red "Invalid" tag and
-        /// "ignored" both fit inside.
+        /// "ignored" both fit inside. 110, holding that string's measured
+        /// 98px at Font16 with the same ~11% of slack the 100px slot gave
+        /// its 89px at Font14.
         /// </summary>
-        public const int CellTagWidth = 100;
+        public const int CellTagWidth = 110;
 
         /// <summary>
         /// Narrowest column a two-up cell fits in - the full extent of the

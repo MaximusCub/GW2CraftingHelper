@@ -25,6 +25,7 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             LabelHelpers.WithDescenderClearance(new Label()
             {
+                Font = UiFonts.Body,
                 Text = "  " + text,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,

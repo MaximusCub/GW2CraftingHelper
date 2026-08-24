@@ -18,8 +18,8 @@ namespace GW2CraftingHelper.Tests.Services
         };
 
         [Theory]
-        [InlineData(847, 1)]
-        [InlineData(848, 2)]
+        [InlineData(907, 1)]
+        [InlineData(908, 2)]
         [InlineData(1000, 2)]
         [InlineData(0, 1)]
         [InlineData(-40, 1)]
@@ -54,21 +54,21 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_NoFilter_PacksTwoUpInInputOrder()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 900, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 960, 30);
 
             Assert.Equal(2, grid.ColumnCount);
-            Assert.Equal(450, grid.ColumnWidth);
+            Assert.Equal(480, grid.ColumnWidth);
             Assert.Equal(5, grid.VisibleCount);
             Assert.Equal(3, grid.RowCount);
             Assert.Equal(90, grid.Height);
 
             Assert.Equal(0, grid.Cells[0].X);
             Assert.Equal(0, grid.Cells[0].Y);
-            Assert.Equal(450, grid.Cells[1].X);
+            Assert.Equal(480, grid.Cells[1].X);
             Assert.Equal(0, grid.Cells[1].Y);
             Assert.Equal(0, grid.Cells[2].X);
             Assert.Equal(30, grid.Cells[2].Y);
-            Assert.Equal(450, grid.Cells[3].X);
+            Assert.Equal(480, grid.Cells[3].X);
             Assert.Equal(30, grid.Cells[3].Y);
             Assert.Equal(0, grid.Cells[4].X);
             Assert.Equal(60, grid.Cells[4].Y);
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // "Fractal Relics" and "Pristine Fractal Relics" only - they sit
             // at input indexes 3 and 4 but must land in the first grid row.
-            var grid = SettingsCurrencyGridLayout.Compute(Names, "fractal", 900, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, "fractal", 960, 30);
 
             Assert.Equal(2, grid.VisibleCount);
             Assert.Equal(1, grid.RowCount);
@@ -112,14 +112,14 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, grid.Cells[3].Row);
 
             Assert.True(grid.Cells[4].Visible);
-            Assert.Equal(450, grid.Cells[4].X);
+            Assert.Equal(480, grid.Cells[4].X);
             Assert.Equal(0, grid.Cells[4].Y);
         }
 
         [Fact]
         public void Compute_HiddenCells_ReportRowMinusOneSoNoDividerClaimsALastRow()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, "karma", 900, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, "karma", 960, 30);
 
             Assert.Equal(1, grid.VisibleCount);
             Assert.Equal(0, grid.Cells[0].Row);
@@ -130,7 +130,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_FilterMatchingNothing_CollapsesToZeroHeight()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, "no such currency", 900, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, "no such currency", 960, 30);
 
             Assert.Equal(0, grid.VisibleCount);
             Assert.Equal(0, grid.RowCount);
@@ -144,7 +144,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_NullNames_ReturnsEmptyGrid()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(null, "karma", 900, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(null, "karma", 960, 30);
 
             Assert.Empty(grid.Cells);
             Assert.Equal(0, grid.RowCount);
@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(-30)]
         public void Compute_NonPositiveRowHeight_ProducesZeroHeightGrid(int rowHeight)
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 900, rowHeight);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 960, rowHeight);
 
             Assert.Equal(3, grid.RowCount);
             Assert.Equal(0, grid.Height);
@@ -179,16 +179,16 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_OddColumnWidth_KeepsColumnsInsideThePanel()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 901, 30);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, null, 961, 30);
 
-            Assert.Equal(450, grid.ColumnWidth);
-            Assert.Equal(450, grid.Cells[1].X);
-            Assert.True(grid.Cells[1].X + grid.ColumnWidth <= 901);
+            Assert.Equal(480, grid.ColumnWidth);
+            Assert.Equal(480, grid.Cells[1].X);
+            Assert.True(grid.Cells[1].X + grid.ColumnWidth <= 961);
         }
 
         [Theory]
-        [InlineData(900, 450)]
-        [InlineData(901, 450)]
+        [InlineData(960, 480)]
+        [InlineData(961, 480)]
         [InlineData(800, 800)]
         [InlineData(0, 0)]
         [InlineData(-40, 0)]
@@ -201,10 +201,10 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(47, 900, 720)]
+        [InlineData(47, 960, 720)]
         [InlineData(47, 800, 1410)]
-        [InlineData(0, 900, 0)]
-        [InlineData(-3, 900, 0)]
+        [InlineData(0, 960, 0)]
+        [InlineData(-3, 960, 0)]
         public void ComputeHeight_IsTheUnfilteredGridHeight(int count, int panelWidth, int expected)
         {
             Assert.Equal(expected, SettingsCurrencyGridLayout.ComputeHeight(count, panelWidth, 30));
@@ -216,13 +216,13 @@ namespace GW2CraftingHelper.Tests.Services
             // The whole point of the fixed height: Blish's Scrollbar snaps to
             // the top on any content-height change, so the grid panel must
             // measure the same whatever the filter leaves showing.
-            int unfiltered = SettingsCurrencyGridLayout.ComputeHeight(Names.Count, 900, 30);
+            int unfiltered = SettingsCurrencyGridLayout.ComputeHeight(Names.Count, 960, 30);
 
             Assert.Equal(90, unfiltered);
-            Assert.Equal(unfiltered, SettingsCurrencyGridLayout.ComputeHeight(Names.Count, 900, 30));
+            Assert.Equal(unfiltered, SettingsCurrencyGridLayout.ComputeHeight(Names.Count, 960, 30));
             Assert.NotEqual(
                 unfiltered,
-                SettingsCurrencyGridLayout.Compute(Names, "karma", 900, 30).Height);
+                SettingsCurrencyGridLayout.Compute(Names, "karma", 960, 30).Height);
         }
 
         [Fact]
@@ -234,13 +234,13 @@ namespace GW2CraftingHelper.Tests.Services
             // appended after them.
             var alwaysShow = new[] { false, true, false, false, false };
 
-            var grid = SettingsCurrencyGridLayout.Compute(Names, "fractal", 900, 30, alwaysShow);
+            var grid = SettingsCurrencyGridLayout.Compute(Names, "fractal", 960, 30, alwaysShow);
 
             Assert.Equal(3, grid.VisibleCount);
             Assert.True(grid.Cells[1].Visible);
             Assert.Equal(0, grid.Cells[1].Row);
             Assert.Equal(0, grid.Cells[1].X);
-            Assert.Equal(450, grid.Cells[3].X);
+            Assert.Equal(480, grid.Cells[3].X);
             Assert.Equal(0, grid.Cells[4].X);
             Assert.Equal(30, grid.Cells[4].Y);
             Assert.False(grid.Cells[0].Visible);
@@ -249,15 +249,22 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_AlwaysShow_ShorterThanNames_DoesNotThrow()
         {
-            var grid = SettingsCurrencyGridLayout.Compute(Names, "karma", 900, 30, new[] { false });
+            var grid = SettingsCurrencyGridLayout.Compute(Names, "karma", 960, 30, new[] { false });
 
             Assert.Equal(1, grid.VisibleCount);
         }
 
-        // Upper bound on one character of DefaultFont14, calibrated from the
-        // 170px name column the view sizes to hold "Pristine Fractal Relic"
-        // (22 characters, ~7.7px each).
-        private const int MaxCharWidthPx = 8;
+        // Upper bound on one character of the BODY font, calibrated from the
+        // 190px name column the view sizes to hold "Pristine Fractal Relic"
+        // (22 characters, ~8.5px each at Font16).
+        private const int MaxCharWidthPx = 9;
+
+        // The same bound for the two controls in this cell that Blish draws
+        // in its OWN DefaultFont14 whatever the module's body font is: the
+        // Ignore Checkbox (no Font property at all) and the amount TextBox.
+        // See Views/Rendering/UiFonts on the exclusions - measuring those
+        // two at the body width would reserve pixels they never paint.
+        private const int BlishDefaultMaxCharWidthPx = 8;
 
         [Fact]
         public void MinColumnWidth_CoversTheWholeCellItSizes()
@@ -315,7 +322,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void TwoColumnGrid_NeedsAWindowFarNarrowerThanTheMinimum()
         {
             // How much of the raise the grid actually needed: two columns
-            // want a 848px panel, i.e. a 974px window. The old 930px
+            // want a 908px panel, i.e. a 1034px window. The old 930px
             // minimum was short of that, which is why the grid really did
             // fall back to one column there.
             int windowWidthForTwoColumns =
@@ -344,7 +351,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int CheckboxGlyphAndGapPx = 24;
 
             Assert.True(
-                CheckboxGlyphAndGapPx + "Ignore".Length * MaxCharWidthPx
+                CheckboxGlyphAndGapPx + "Ignore".Length * BlishDefaultMaxCharWidthPx
                     <= SettingsCurrencyGridLayout.CellClearWidth);
         }
 
@@ -381,7 +388,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 string placeholder = kvp.Value.ToString(CultureInfo.InvariantCulture);
                 Assert.True(
-                    placeholder.Length * MaxCharWidthPx <= textRegion,
+                    placeholder.Length * BlishDefaultMaxCharWidthPx <= textRegion,
                     $"Placeholder \"{placeholder}\" does not fit the {textRegion}px text region");
             }
         }

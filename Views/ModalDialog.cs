@@ -28,7 +28,12 @@ namespace GW2CraftingHelper.Views
         // control (see ApiAccessDialog's own measurement note), so window
         // width is the only lever either dialog has over the title bar.
         private const int WindowWidth = 560;
-        private const int WindowHeight = 170;
+        // 190, not 170. The message area is capped to whole lines of the
+        // body font (see MessageAreaHeight), and the +2pt bump made that
+        // text ~11% wider while growing its line box 18 -> 20 - the same
+        // sentence needs a line it did not need before. 20px is exactly one
+        // Font16 line, which takes the cap from three lines back to four.
+        private const int WindowHeight = 190;
         private const int ContentX = 10;
         private const int ContentY = 35;
         private const int ContentWidth = WindowWidth - (2 * ContentX);
@@ -150,7 +155,7 @@ namespace GW2CraftingHelper.Views
             // count, which is what keeps the buttons in the content region
             // (see ButtonY) - the same greedy wrap plus ellipsized tail the
             // notes section already renders with.
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             var measure = LabelHelpers.MeasureWith(font);
             int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
             var wrapped = TextWrapMath.Wrap(
@@ -189,9 +194,15 @@ namespace GW2CraftingHelper.Views
             // grows the button instead of being clipped by StandardButton's
             // own scissor (it centres text with zero side padding, so the
             // breathing room has to be added here).
+            // Measured in Caption, not in the message's Body: StandardButton
+            // (FeedbackButton's base) draws its own label in DefaultFont14
+            // and exposes no Font seam, exactly like Checkbox - see UiFonts'
+            // note on the exclusions. Measuring in Body would pad every
+            // over-floor button by ~11% of a width it never paints.
+            var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
             string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
-            int btnW = System.Math.Max(100, measure(confirmText ?? "") + ButtonSidePadding);
-            int cancelW = System.Math.Max(70, measure(cancelLabel) + ButtonSidePadding);
+            int btnW = System.Math.Max(100, buttonMeasure(confirmText ?? "") + ButtonSidePadding);
+            int cancelW = System.Math.Max(70, buttonMeasure(cancelLabel) + ButtonSidePadding);
             int btnGap = 16;
             int totalBtnW = btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;

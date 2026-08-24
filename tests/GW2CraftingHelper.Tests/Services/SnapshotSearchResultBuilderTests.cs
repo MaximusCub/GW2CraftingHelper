@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
@@ -933,6 +934,107 @@ namespace GW2CraftingHelper.Tests.Services
         public void FormatSourceLabel_UnknownSource_ReturnedAsIs()
         {
             Assert.Equal("SomeFutureSource", SnapshotSearchResultBuilder.FormatSourceLabel("SomeFutureSource"));
+        }
+
+        // --- The one-letter empty-state hint ---
+        //
+        // The hint exists because BuildItemRows' own character-name matching
+        // is held back below two characters (MinCharacterSearchLength), and
+        // that hold-back is invisible: the list simply comes back empty.
+        // These cases pin the pairing - the hint appears exactly where a
+        // second keystroke really would change the result, and nowhere else.
+
+        private static readonly List<string> Roster =
+            new List<string> { "Zaeed Massani", "Ylva", "Bob" };
+
+        [Fact]
+        public void ShortQueryCharacterHint_OneLetterThatARosterNameCarries_IsHinted()
+        {
+            Assert.Equal(
+                SnapshotSearchResultBuilder.ShortQueryCharacterHintText,
+                SnapshotSearchResultBuilder.ShortQueryCharacterHint("y", Roster));
+
+            // The very case the hint is for: the same one-letter query is
+            // ignored by the character half of the real search path, so
+            // without the hint an empty list is all the user sees.
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+            });
+            var rows = SnapshotSearchResultBuilder.BuildItemRows(
+                SnapshotSearchResultBuilder.BuildRepresentativeIndex(new List<SnapshotItemEntry>
+                {
+                    Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+                }),
+                index, "y", null, null);
+            Assert.Empty(rows);
+
+            // ...and two letters do surface it, which is what the hint
+            // promises.
+            var twoLetters = SnapshotSearchResultBuilder.BuildItemRows(
+                SnapshotSearchResultBuilder.BuildRepresentativeIndex(new List<SnapshotItemEntry>
+                {
+                    Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+                }),
+                index, "yl", null, null);
+            Assert.Single(twoLetters);
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_MatchIsCaseInsensitiveAndMidName()
+        {
+            Assert.NotNull(SnapshotSearchResultBuilder.ShortQueryCharacterHint("Z", Roster));
+            Assert.NotNull(SnapshotSearchResultBuilder.ShortQueryCharacterHint("s", Roster));
+            Assert.NotNull(SnapshotSearchResultBuilder.ShortQueryCharacterHint(" b ", Roster));
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_OneLetterNoRosterNameCarriesIt_IsSilent()
+        {
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("q", Roster));
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_QueryAtOrPastTheMinimum_IsSilent()
+        {
+            // Two letters already search character names, so an empty list
+            // there is a genuine no-results and the hint would be a lie.
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("yl", Roster));
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("ylva", Roster));
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_BlankOrNullQuery_IsSilent()
+        {
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint(null, Roster));
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("", Roster));
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("   ", Roster));
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_NoRosterAtAll_IsSilent()
+        {
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("y", null));
+            Assert.Null(SnapshotSearchResultBuilder.ShortQueryCharacterHint("y", new List<string>()));
+            Assert.Null(
+                SnapshotSearchResultBuilder.ShortQueryCharacterHint("y", new List<string> { null, "" }));
+        }
+
+        [Fact]
+        public void ShortQueryCharacterHint_OnlyMatchingCharacterIsUnchecked_IsSilent()
+        {
+            // Another letter would still not surface that character, so the
+            // hint must not offer it. The other roster names do not carry
+            // the letter, which is what isolates the exclusion.
+            var unchecked_ = new HashSet<string>(StringComparer.Ordinal) { "Ylva" };
+
+            Assert.Null(
+                SnapshotSearchResultBuilder.ShortQueryCharacterHint("y", Roster, unchecked_));
+
+            // A different unchecked character leaves the match standing.
+            Assert.NotNull(
+                SnapshotSearchResultBuilder.ShortQueryCharacterHint(
+                    "y", Roster, new HashSet<string>(StringComparer.Ordinal) { "Bob" }));
         }
     }
 

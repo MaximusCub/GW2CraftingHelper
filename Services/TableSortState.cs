@@ -16,10 +16,13 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Click-to-sort state for one table: which column is active, and in
     /// which direction. Blish-free and per-session (nothing here is
-    /// persisted), so a plan regenerate that rebuilds every control keeps
-    /// whatever sort the user last clicked - the view holds one instance
-    /// per sortable table for its own lifetime and re-reads it on every
-    /// render.
+    /// persisted). The view holds one instance per sortable table for its
+    /// own lifetime and re-reads it on every render, so every re-render of
+    /// the same plan - a re-sort, a tree pill override, a re-solve - keeps
+    /// whatever sort the user last clicked. Arriving at a DIFFERENT plan
+    /// calls <see cref="Reset"/> instead: the sort described a table that
+    /// no longer exists (maintainer decision, field-test round; see
+    /// CraftingPlanView.ResetPerPlanSortState, which lists the sites).
     /// <para>
     /// One click cycle per column: None -> Ascending -> Descending -> None.
     /// The third click restores the plan's own emission order rather than
@@ -73,6 +76,11 @@ namespace GW2CraftingHelper.Services
             Reset();
         }
 
+        /// <summary>
+        /// Back to the data source's own order and no indicator anywhere -
+        /// the state a fresh instance starts in, so a table reset this way
+        /// is indistinguishable from one never clicked. Idempotent.
+        /// </summary>
         public void Reset()
         {
             Column = null;

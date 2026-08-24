@@ -43,10 +43,12 @@ namespace GW2CraftingHelper.Services
         public const int ScrollbarAllowance = 20;
 
         /// <summary>
-        /// Upper bound on one character of DefaultFont14, which averages
-        /// ~7.7px. Rounding up is what pays for the cell's breathing room.
+        /// Upper bound on one character of the body font, which averages
+        /// ~8.4px on item names at Font16 (measured: "Thermocatalytic
+        /// Reagent" is 192px over 23 characters). Rounding up is what pays
+        /// for the cell's breathing room. Was 8 against Font14's ~7.6px.
         /// </summary>
-        public const int MaxCharWidthPx = 8;
+        public const int MaxCharWidthPx = 9;
 
         /// <summary>
         /// The run the narrowest column is sized to hold without
@@ -68,9 +70,9 @@ namespace GW2CraftingHelper.Services
         /// Narrowest column a cell fits in. Below twice this the grid falls
         /// back to a single column rather than clipping the name line.
         /// <para>
-        /// 464px, which puts two columns inside the 1310px grid the 1436px
-        /// window minimum leaves (655px each) and a third only once the
-        /// window reaches ~1518px.
+        /// 516px, which puts two columns inside the 1352px grid the 1478px
+        /// window minimum leaves (676px each) and a third only once the
+        /// window reaches 1674px.
         /// </para>
         /// </summary>
         public const int MinColumnWidth = CellTextX + (NameRunChars * MaxCharWidthPx) + CellTextRightPad;

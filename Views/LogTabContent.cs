@@ -338,12 +338,14 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label
             {
+                Font = UiFonts.Body,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
                 // Y=2 inside this 24px row, matching MainView's own status
-                // label for the same DefaultFont14 clearance.
+                // label for the same body-font clearance (the label's lowest
+                // Font16 ink is y=23).
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
@@ -708,6 +710,7 @@ namespace GW2CraftingHelper.Views
                 // BEFORE the clearedBeforeVersion/level/search filters ran.
                 new Label
                 {
+                    Font = UiFonts.Body,
                     Text = result.RawCount == 0 ? "No log entries yet." : "No entries match the current filter.",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -855,7 +858,7 @@ namespace GW2CraftingHelper.Views
 
         private RowMetrics MeasureRowMetrics()
         {
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             int contentWidth = _contentPanel?.Width ?? 0;
             _lastLayoutWidth = contentWidth;
 
@@ -958,6 +961,7 @@ namespace GW2CraftingHelper.Views
 
             row.PrefixLabel = new Label
             {
+                Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
@@ -967,6 +971,7 @@ namespace GW2CraftingHelper.Views
 
             row.MessageLabel = new Label
             {
+                Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor,

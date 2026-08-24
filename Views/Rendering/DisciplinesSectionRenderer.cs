@@ -28,7 +28,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // the shared "row panel resize + extra reposition + divider resize"
     // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row has no icon and no
-    // name column at all (just two plain DefaultFont14 labels), so it does
+    // name column at all (just plain labels - Body name and level, Caption
+    // character line), so it does
     // not match IconNameRowHelpers and stays
     // hand-rolled - see IconNameRowHelpers' own doc comment.
     internal sealed class DisciplinesSectionRenderer
@@ -80,8 +81,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var font = GameService.Content.DefaultFont14;
-            var charFont = GameService.Content.DefaultFont12;
+            var font = UiFonts.Body;
+            var charFont = UiFonts.Caption;
             int maxNameWidth = 0;
             int maxCharWidth = 0;
             int maxLevelWidth = 0;
@@ -193,7 +194,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             LabelHelpers.WithDescenderClearance(
                 new Label()
@@ -219,7 +220,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // row.CharacterAvailabilityText is null (the snapshot never
             // captured this data - see that field's own doc comment): no
             // label, no tooltip, no claim either way.
-            var charFont = GameService.Content.DefaultFont12;
+            var charFont = UiFonts.Caption;
             var charColor = new Color(170, 170, 170);
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;
@@ -243,15 +244,18 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
 
-            // M36b: bottomClearance 1 - DisciplineRowHeight (32) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment), same ~10.2% vanish rate as
-            // the 44px rows; the M36b investigation confirmed this via
-            // simulation but omitted it from its fix list by oversight.
-            // No icon in this row (two DefaultFont14 labels at y=7 only),
-            // so there is no icon-clearance side effect to worry about -
-            // the new divider top (rowHeight - 3 = 29) sits well clear of
-            // the text baseline.
+            // M36b: bottomClearance 1 - DisciplineRowHeight was 32, which
+            // that investigation's simulation found VULNERABLE to the
+            // Container.Paint round-trip defect (see
+            // LabelHelpers.CreateRowDivider's doc comment) at the same
+            // ~10.2% vanish rate as the 44px rows, then omitted from its
+            // fix list by oversight. The +2pt body bump raised the row to
+            // 36, which the same simulation proves immune, so the clearance
+            // is now belt-and-braces rather than the fix. It stays because
+            // it costs nothing: no icon in this row (a Body name and level
+            // at y=7, a Caption character line at y=9, lowest ink y=28), so
+            // the divider top (rowHeight - 3 = 33) sits well clear either
+            // way.
             RowRelayoutHelpers.FinishRow(
                 rowPanel, panelWidth, rowHeight, isLast, 1, _sink,
                 w =>

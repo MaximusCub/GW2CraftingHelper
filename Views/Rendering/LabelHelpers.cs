@@ -163,20 +163,20 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static Panel CreateSmallTag(Panel parent, string text, int x, int y, Color border, Color fill)
         {
-            var font = GameService.Content.DefaultFont12;
+            var font = UiFonts.Caption;
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             int width = MeasureSmallTagWidth(text);
 
             var outer = new Panel()
             {
-                Size = new Point(width, 18),
+                Size = new Point(width, SmallTagHeight),
                 Location = new Point(x, y),
                 BackgroundColor = border,
                 Parent = parent
             };
             var inner = new Panel()
             {
-                Size = new Point(width - 2, 16),
+                Size = new Point(width - 2, SmallTagHeight - 2),
                 Location = new Point(1, 1),
                 BackgroundColor = fill,
                 Parent = outer
@@ -200,6 +200,14 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
+        /// Outer height of a small tag. 22, not the 18 it was at Font12: the
+        /// label inside sits at y=1 in an inset panel of SmallTagHeight - 2
+        /// and its lowest Font14 ink is y=20. Callers that centre a tag in a
+        /// row read this rather than repeating the literal.
+        /// </summary>
+        internal const int SmallTagHeight = 22;
+
+        /// <summary>
         /// Width CreateSmallTag will give a tag of this text, without
         /// building it - a caller that has to reserve room for the tag
         /// before laying out what sits left of it (the shopping list's name
@@ -207,7 +215,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static int MeasureSmallTagWidth(string text)
         {
-            var font = GameService.Content.DefaultFont12;
+            var font = UiFonts.Caption;
             return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width) + 12;
         }
 

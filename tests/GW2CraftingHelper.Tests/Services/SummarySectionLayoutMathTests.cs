@@ -155,7 +155,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- CostBandHeight + the currency disclosure line ---
         //
         // Re-baselined for the cost-band restyle: the result tile no
-        // longer carries a promoted DefaultFont32 amount (which is what
+        // longer carries a promoted display-font amount (which is what
         // made the band 76 tall), it carries a highlight box at the band's
         // one shared amount font, so the band's height is now the box's
         // margin+padding around a caption line, an optional disclosure
@@ -168,15 +168,17 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            // 6 margin + 6 pad + 20 caption line + 4 gap + 20 coin run
-            // + 6 pad + 6 margin.
-            Assert.Equal(68, SummarySectionLayoutMath.CostBandHeight(false));
+            // 6 margin + 6 pad + 25 caption line + 4 gap + 20 coin run
+            // + 6 pad + 6 margin. The caption line is 25, not the 20 it was
+            // before the +2pt bump: its font moved Font12 -> Font14, whose
+            // measured line height is 18 rather than 13.
+            Assert.Equal(73, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
         [Fact]
         public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
         {
-            Assert.Equal(68 + 18, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(73 + 23, SummarySectionLayoutMath.CostBandHeight(true));
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
                 SummarySectionLayoutMath.CostBandHeight(true));
@@ -264,7 +266,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SummarySectionLayoutMath.CostBandBoxWidth(0));
 
             // The widest run a real result tile carries is the disclosure
-            // line ("+ N currencies required") at DefaultFont12, which
+            // line ("+ N currencies required") at the caption font, which
             // measures well under 160px; the box must clear that with both
             // pads even in the narrowest tile slice.
             Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(160) <= geometry.TileWidth);
@@ -608,7 +610,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void EffectiveCurrencyNumberColumnWidth_AboveFloor_ReturnsMeasuredWidth()
         {
             // A plausible width for a 7-digit Karma balance rendered at
-            // DefaultFont14 - comfortably past the 60px fixed floor.
+            // the body font - comfortably past the 60px fixed floor.
             Assert.Equal(90, SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(90));
         }
 

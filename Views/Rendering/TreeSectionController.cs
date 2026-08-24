@@ -581,7 +581,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // when a row's pills do not fit: 3px of side padding instead of 6
         // still reads as a pill, and squeezing beats hiding a real option
         // (PlanRelayoutMath.ComputePillFit).
-        private const int PillHeight = 20;
+        // 24, not 20. A pill's label sits at y=2 inside an inset fill panel
+        // of PillHeight - 2, and the Font14 label's lowest ink is y=21; the
+        // old 18px interior clipped it. 24 gives the same 1px of interior
+        // slack the Font12 label had.
+        private const int PillHeight = 24;
         private const int PillGap = 6;
         private const int PillPadding = 12;
         private const int TightPillPadding = 6;
@@ -630,7 +634,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private TreeCostColumnMath.TreeColumnScan ScanTreeColumns(IReadOnlyList<CraftingTreeNode> roots)
         {
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             var measured = new Dictionary<string, int>();
             var metadata = _getCurrentPlan()?.CurrencyMetadata;
 
@@ -778,6 +782,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Color arrowColor = dimmed ? Color.White * 0.35f : Color.White;
                 arrowLabel = new Label()
                 {
+                    Font = UiFonts.Body,
                     // ASCII, matching the section headers - the U+25BC/U+25B6
                     // triangles do not render in Blish's font.
                     Text = isExpanded ? "v" : ">",
@@ -819,7 +824,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // these columns.
             int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
 
-            var nameFont = GameService.Content.DefaultFont14;
+            var nameFont = UiFonts.Body;
             string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
             int qtyWidth = qtyPrefix.Length > 0
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
@@ -1007,7 +1012,7 @@ namespace GW2CraftingHelper.Views.Rendering
             CoinCurrencyRenderer.ValueCellHandle costCell = null;
             if (node.SubtreeCost.HasValue)
             {
-                var costFont = GameService.Content.DefaultFont14;
+                var costFont = UiFonts.Body;
                 // TreeCostColumnMath.ShowsCurrencySegments, not a
                 // hand-repeated cost-component check: the pre-scan reserves
                 // the currency sub-column from that same predicate, so a
@@ -1315,7 +1320,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // CurrencyPlanTotals/OwnedCurrencyAmounts' own doc comments.
             var plan = _getCurrentPlan();
             var specs = DecisionPillPlanner.BuildPillSpecs(node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
-            var font = GameService.Content.DefaultFont12;
+            var font = UiFonts.Caption;
             var pillPanels = new List<Panel>(specs.Count);
             int x = pillColX;
 
@@ -1721,7 +1726,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static int MeasureOverflowPillWidth(int hiddenCount)
         {
-            var font = GameService.Content.DefaultFont12;
+            var font = UiFonts.Caption;
             return (int)System.Math.Ceiling(
                 font.MeasureString(OverflowPillText(hiddenCount)).Width) + TightPillPadding;
         }

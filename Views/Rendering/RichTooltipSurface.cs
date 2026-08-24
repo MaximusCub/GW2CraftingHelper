@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             DisposeContent();
 
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             // Never shorter than a coin icon: the content panel clips its
             // children, and a row that cannot hold a 20px icon would clip
             // the bottom off every coin run on the last line.

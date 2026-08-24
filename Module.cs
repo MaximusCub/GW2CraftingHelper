@@ -16,6 +16,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Recipes;
 using GW2CraftingHelper.Views;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -190,6 +191,28 @@ namespace GW2CraftingHelper
         // (the explicit "Refresh Now" button) - a user-initiated retry
         // should never be throttled by an earlier automatic failure.
         private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
+
+        // Whether the timer-driven auto-refresh is running right now.
+        // Written from RefreshSnapshotInBackgroundAsync, which starts on the
+        // main thread but whose finally may resume on a ThreadPool
+        // continuation (Blish's XNA host installs no SynchronizationContext)
+        // - hence volatile, and hence applied to the view from Update()
+        // rather than written to a control here, the same shape
+        // SaveStatusThreadSafe already uses for status text.
+        //
+        // NOT the same flag as _refreshInProgress: that one gates whether a
+        // refresh may START (and covers the clicked path too), while this
+        // one is only ever about the SPINNER for the automatic path. Keeping
+        // them apart is what lets the clicked path own its own spinner
+        // without either path switching the other's off.
+        private volatile bool _backgroundRefreshInFlight;
+
+        // Last value actually pushed to the view, so the drain below pushes
+        // on CHANGE rather than every frame. Only advanced when a view
+        // existed to receive the push: the very first refresh runs at module
+        // load, and marking it applied against a null view would lose the
+        // state instead of retrying on the next tick.
+        private bool _backgroundRefreshSpinnerApplied;
 
         [ImportingConstructor]
         public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
@@ -928,6 +951,18 @@ namespace GW2CraftingHelper
                 }
             }
 
+            // The auto-refresh spinner, drained on change. Above the
+            // early return below on purpose: _refreshInProgress is true for
+            // the whole of the refresh whose spinner this is, so a drain
+            // underneath it would only ever get to switch the spinner ON
+            // once the refresh had already finished.
+            bool backgroundRefreshing = _backgroundRefreshInFlight;
+            if (backgroundRefreshing != _backgroundRefreshSpinnerApplied && _snapshotContent != null)
+            {
+                _backgroundRefreshSpinnerApplied = backgroundRefreshing;
+                _snapshotContent.SetBackgroundRefreshInFlight(backgroundRefreshing);
+            }
+
             if (_refreshInProgress) return;
             if (_currentSnapshot == null) return;
 
@@ -1087,6 +1122,11 @@ namespace GW2CraftingHelper
 
             _refreshInProgress = true;
 
+            // Set only past both early returns above, so a tick that
+            // declines to refresh (already running, or inside the failure
+            // backoff) never spins a spinner over nothing.
+            _backgroundRefreshInFlight = true;
+
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = new CancellationTokenSource();
@@ -1132,6 +1172,7 @@ namespace GW2CraftingHelper
             }
             finally
             {
+                _backgroundRefreshInFlight = false;
                 _refreshInProgress = false;
             }
         }
@@ -1421,6 +1462,7 @@ namespace GW2CraftingHelper
             new Label()
             {
                 Text = "Coming Soon",
+                Font = UiFonts.Body,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(20, 20),

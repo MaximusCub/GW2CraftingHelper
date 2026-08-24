@@ -308,14 +308,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(edges.NameMaxWidth >= nameWidth);
         }
 
-        // The measurement the 1436px window minimum and the 256px pill
+        // The measurement the 1478px window minimum and the 256px pill
         // column were derived from - docs/research/minimum-window-width.md.
         // "+24 Agony Infusion" is the deepest chain in the game (23 forced
         // levels, one recipe each); its deepest row renders "4194304x
-        // Thermocatalytic Reagent", measured at Menomonia 14 against the
-        // installed font: 65px of quantity prefix, 174px of name.
-        private const int DeepestRowQtyPrefixWidth = 65;
-        private const int DeepestRowNameWidth = 174;
+        // Thermocatalytic Reagent".
+        //
+        // Re-measured at Menomonia 16 for the +2pt body bump, against the
+        // same installed XNBs and in the same convention the Font14 figures
+        // (65 / 174) were taken in - MonoGame.Extended's own
+        // advance / XOffset+Width rule, which is what
+        // TreeSectionController's nameFont.MeasureString computes. Both
+        // figures are direct measurements: "4194304x " is 73 and
+        // "Thermocatalytic Reagent" is 192.
+        private const int DeepestRowQtyPrefixWidth = 73;
+        private const int DeepestRowNameWidth = 192;
 
         // Tree row geometry: nameX = depth * TreeIndentPer + (caret column
         // + icon frame + name gap) = depth * 24 + 58.
@@ -333,7 +340,23 @@ namespace GW2CraftingHelper.Tests.Services
 
         // Live-priced cost column behind a six-digit gold total, which is
         // what the deepest chain costs; 150 is only the floor.
-        private const int DeepestPlanCostColumnWidth = 165;
+        //
+        // Measured at Font16, and taken at the WIDEST digits rather than at
+        // one example total: Menomonia's digits are not one width, so the
+        // column a plan reserves depends on which digits its total happens
+        // to contain. TreeCostColumnMath.SegmentWidth adds
+        // CoinLabelIconGap(2) + CoinIconSize(20) to each of three segments
+        // and CoinSegmentGap(6) sits twice between them, so the column is
+        // the three digit runs' MeasureString widths + 78 of fixed chrome.
+        // At Font16 '0' advances 10px and inks 12, '2' and '7' advance 10
+        // and ink 11, '1' advances 6, and every other digit advances 9 and
+        // inks 11. A run's rect is the leading digits' advances plus the
+        // last digit's ink, so the widest six-digit gold plus two two-digit
+        // units is drawn from 0/2/7 and ends in '0': 171 (Font14) / 181
+        // (Font16), against 161 / 171 for all-nines and 168 / 178 for
+        // all-twos. 181 is the worst case, so a minimum derived from it
+        // holds for every total; a figure taken at one example would not.
+        private const int DeepestPlanCostColumnWidth = 181;
 
         // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
         // scanned rows gets. Pass the scanned end to exercise what

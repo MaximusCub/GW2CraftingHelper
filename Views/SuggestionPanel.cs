@@ -225,13 +225,18 @@ namespace GW2CraftingHelper.Views
                 // MainView.cs's snapshot/wallet rows).
                 IconControls.CreateItemIcon(row, item.IconUrl, 2, (RowHeight - IconSize) / 2, IconSize);
 
-                // Item name
+                // Item name. Centred against the FONT's own line box rather
+                // than a hand-tuned stand-in for it: these rows stack flush
+                // with opaque backgrounds, so a stale offset puts a
+                // descender on the next row's top edge.
+                var nameFont = UiFonts.Body;
                 new Label()
                 {
+                    Font = nameFont,
                     Text = item.Name,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(2 + IconSize + IconPad, (RowHeight - 16) / 2),
+                    Location = new Point(2 + IconSize + IconPad, (RowHeight - nameFont.LineHeight) / 2),
                     Parent = row
                 };
 

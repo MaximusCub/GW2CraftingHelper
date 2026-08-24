@@ -296,8 +296,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
 
-            var captionFont = GameService.Content.DefaultFont12;
-            var amountFont = GameService.Content.DefaultFont16;
+            var captionFont = UiFonts.Caption;
+            var amountFont = UiFonts.Body;
 
             // A highlighted band carries its result tile's box, so its
             // caption starts one box margin+padding down and its amount
@@ -623,7 +623,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // H: the numbers used to sit against the panel edge however
             // short "Karma"/"Spirit Shard" are) - see
             // SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel.
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             int widestNumberWidth = 0;
             int widestNameEnd = 0;
             foreach (var row in rows)
@@ -778,7 +778,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = CreateCurrencyTableRowContent(
                 parent, panelWidth, rowHeight, widestNumberWidth, widestNameEnd,
                 Color.Transparent, out var outerRowPanel);
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
 
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
@@ -824,7 +824,7 @@ namespace GW2CraftingHelper.Views.Rendering
             Panel marker = null;
             if (row.CurrencyFullyCovered)
             {
-                int markerY = (rowHeight - 18) / 2;
+                int markerY = (rowHeight - LabelHelpers.SmallTagHeight) / 2;
                 marker = LabelHelpers.CreateSmallTag(rowPanel, FullCoverageMarkerText, edges.MarkerX, markerY, FullCoverageBorder, FullCoverageFill);
                 // No BasicTooltipText here: CreateSmallTag's inner fill
                 // panel + label cover almost the entire pill, so a
@@ -851,7 +851,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 4);
                 if (marker != null)
                 {
-                    marker.Location = new Point(e.MarkerX, (rowHeight - 18) / 2);
+                    marker.Location = new Point(
+                        e.MarkerX, (rowHeight - LabelHelpers.SmallTagHeight) / 2);
                 }
             });
             _sink.AddReellipsis(w =>
@@ -890,7 +891,7 @@ namespace GW2CraftingHelper.Views.Rendering
             LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = "  " + text,
-                Font = GameService.Content.DefaultFont12,
+                Font = UiFonts.Caption,
                 TextColor = FootnoteColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,

@@ -44,8 +44,8 @@ namespace GW2CraftingHelper.Tests.Services
             int windowForThreeColumns = 3 * SnapshotItemGridLayout.MinColumnWidth
                 + WindowSizing.WindowToTabPanelChrome;
 
-            Assert.Equal(1054, windowForTwoColumns);
-            Assert.Equal(1518, windowForThreeColumns);
+            Assert.Equal(1158, windowForTwoColumns);
+            Assert.Equal(1674, windowForThreeColumns);
 
             // The enforced minimum sits between them, which is the whole
             // claim: every client that can hold the minimum is at least
@@ -84,12 +84,12 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(0, 1)]
         [InlineData(-100, 1)]
         [InlineData(1, 1)]
-        [InlineData(463, 1)]
-        [InlineData(927, 1)]
-        [InlineData(928, 2)]
-        [InlineData(1391, 2)]
-        [InlineData(1392, 3)]
-        [InlineData(2320, 5)]
+        [InlineData(515, 1)]
+        [InlineData(1031, 1)]
+        [InlineData(1032, 2)]
+        [InlineData(1547, 2)]
+        [InlineData(1548, 3)]
+        [InlineData(2580, 5)]
         public void ComputeColumnCount_AddsAColumnPerWholeMinColumnWidth(int gridWidth, int expected)
         {
             Assert.Equal(expected, SnapshotItemGridLayout.ComputeColumnCount(gridWidth));
@@ -126,19 +126,19 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_PacksInReadingOrder()
         {
-            var grid = SnapshotItemGridLayout.Compute(5, 1000, 52);
+            var grid = SnapshotItemGridLayout.Compute(5, 1100, 52);
 
             Assert.Equal(2, grid.ColumnCount);
-            Assert.Equal(500, grid.ColumnWidth);
+            Assert.Equal(550, grid.ColumnWidth);
             Assert.Equal(3, grid.RowCount);
             Assert.Equal(156, grid.Height);
 
             // Left-to-right first, then down - NOT column-major, so the
             // wallet run still reads after the item run above it.
             Assert.Equal((0, 0, 0, 0), Cell(grid, 0));
-            Assert.Equal((500, 0, 1, 0), Cell(grid, 1));
+            Assert.Equal((550, 0, 1, 0), Cell(grid, 1));
             Assert.Equal((0, 52, 0, 1), Cell(grid, 2));
-            Assert.Equal((500, 52, 1, 1), Cell(grid, 3));
+            Assert.Equal((550, 52, 1, 1), Cell(grid, 3));
             Assert.Equal((0, 104, 0, 2), Cell(grid, 4));
         }
 
@@ -160,10 +160,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_ThreeColumns_FillsTheLastRowPartially()
         {
-            var grid = SnapshotItemGridLayout.Compute(4, 1500, 52);
+            var grid = SnapshotItemGridLayout.Compute(4, 1560, 52);
 
             Assert.Equal(3, grid.ColumnCount);
-            Assert.Equal(500, grid.ColumnWidth);
+            Assert.Equal(520, grid.ColumnWidth);
             Assert.Equal(2, grid.RowCount);
             Assert.Equal(104, grid.Height);
             Assert.Equal((0, 52, 0, 1), Cell(grid, 3));
@@ -225,7 +225,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_ZeroRowHeight_PlacesEveryRowAtZero()
         {
-            var grid = SnapshotItemGridLayout.Compute(4, 1000, 0);
+            var grid = SnapshotItemGridLayout.Compute(4, 1100, 0);
 
             Assert.Equal(0, grid.Height);
             Assert.Equal(0, grid.Cells[3].Y);
@@ -254,8 +254,8 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(5, 156)]
         public void ComputeHeight_MatchesTheGridItPlaces(int count, int expected)
         {
-            Assert.Equal(expected, SnapshotItemGridLayout.ComputeHeight(count, 1000, 52));
-            Assert.Equal(expected, SnapshotItemGridLayout.Compute(count, 1000, 52).Height);
+            Assert.Equal(expected, SnapshotItemGridLayout.ComputeHeight(count, 1100, 52));
+            Assert.Equal(expected, SnapshotItemGridLayout.Compute(count, 1100, 52).Height);
         }
 
         private static (int, int, int, int) Cell(SnapshotItemGridLayout.Grid grid, int index)

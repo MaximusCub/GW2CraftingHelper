@@ -57,6 +57,12 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
+        // Was 30, against a Font16 title. The +2pt bump promoted that title
+        // to Font18, whose lowest measured ink at y=5 is y=28 - one pixel
+        // into the 30px panel's divider. Two more pixels restore the
+        // clearance the 30px panel had.
+        private const int SectionHeaderRowHeight = 32;
+
         // Section divider grey, readable against the parchment texture, one
         // tier below the 180-grey structural separators (window chrome,
         // unrelated to this). The row-divider twin (RowDividerColor) moved
@@ -242,15 +248,50 @@ namespace GW2CraftingHelper.Views
         private bool _hideUnlockedRecipes = true;
 
         // Click-to-sort state for the two sortable plan tables. Session
-        // state like _sectionExpansion, and for the same reason: it must
-        // survive every RenderPlan rebuild, including the one a regenerate
-        // triggers, so a user who sorted by Amount stays sorted by Amount.
+        // state with exactly the lifetime _sectionExpansion has, and it is
+        // reset in the same place for the same reason: it survives every
+        // RenderPlan rebuild a re-sort, a pill override or a re-solve
+        // triggers - those all re-render the SAME plan, and a user who
+        // sorted by Amount must stay sorted by Amount through them - but a
+        // NEW plan generation clears it back to None.
+        //
+        // Why a new plan is different: the sort described a table that no
+        // longer exists. A fresh Generate can carry an entirely different
+        // row set, so an inherited sort silently re-orders rows the user
+        // never sorted, and the header indicator on a table they did not
+        // touch this plan reads as the module's own doing rather than
+        // theirs (maintainer decision, field-test round). The reset sits at
+        // TriggerGenerate's commit point, which the override/re-solve paths
+        // do not run through at all - see ResetPerPlanSortState.
+        //
         // TableSortState/PlanTableSorter (Blish-free) own the click cycle
         // and the comparators; these fields are only the live state.
         private readonly TableSortState<PlanTableColumn> _usedMaterialsSort =
             new TableSortState<PlanTableColumn>();
         private readonly TableSortState<PlanTableColumn> _shoppingListSort =
             new TableSortState<PlanTableColumn>();
+
+        /// <summary>
+        /// Clears BOTH tables' sort back to
+        /// <see cref="TableSortDirection.None"/>. One method so a future
+        /// third sortable table cannot be added to one reset site and
+        /// forgotten at another.
+        /// <para>
+        /// Called from every site that clears <c>_sectionExpansion</c> -
+        /// TriggerGenerate's commit point, ApplyRestoredPlan and
+        /// RollBackFailedPlanRender - so "new plan state" is one pairing
+        /// rather than three independent ones. Only the first can actually
+        /// carry a stale sort today (a restore cannot follow a Generate in
+        /// the same session, and a rolled-back render leaves no table), but
+        /// pinning that to a guard in another file is what invites the
+        /// forgotten site this method exists to prevent.
+        /// </para>
+        /// </summary>
+        private void ResetPerPlanSortState()
+        {
+            _usedMaterialsSort.Reset();
+            _shoppingListSort.Reset();
+        }
 
         #endregion // 7. Section builders (state: section expand/collapse)
 
@@ -670,6 +711,7 @@ namespace GW2CraftingHelper.Views
             _treeController.ResetForNewPlan(result);
             _treeController.RestoreOverrides(nodeOverrides, ignoredItemIds);
             _sectionExpansion.Clear();
+            ResetPerPlanSortState();
             _lastDebugLog = result.DebugLog;
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
@@ -737,6 +779,7 @@ namespace GW2CraftingHelper.Views
 
             _treeController.ResetForNewPlan(null);
             _sectionExpansion.Clear();
+            ResetPerPlanSortState();
             _lastDebugLog = null;
             _currentPlan = null;
             _planGeneratedAt = default(DateTime);
@@ -1483,6 +1526,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Qty:",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1687,6 +1731,7 @@ namespace GW2CraftingHelper.Views
             // Price basis selector; applies on the next Generate.
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Prices:",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1758,6 +1803,7 @@ namespace GW2CraftingHelper.Views
             // Status label
             _statusLabel = new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1908,6 +1954,7 @@ namespace GW2CraftingHelper.Views
             // would be five verbs attached to nothing.
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = "Recipe Tree:",
                 TextColor = new Color(170, 170, 170),
                 AutoSizeWidth = true,
@@ -2924,6 +2971,7 @@ namespace GW2CraftingHelper.Views
                     // ResetForNewPlan's own doc comment.
                     _treeController.ResetForNewPlan(result);
                     _sectionExpansion.Clear();
+                    ResetPerPlanSortState();
                     _lastDebugLog = result.DebugLog;
                     _currentPlan = vm;
                     _planGeneratedAt = DateTime.Now;
@@ -3318,6 +3366,7 @@ namespace GW2CraftingHelper.Views
 
             var label = new Label()
             {
+                Font = UiFonts.Body,
                 Text = EmptyPlanText,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
@@ -3456,8 +3505,8 @@ namespace GW2CraftingHelper.Views
 
             int frameSize = iconSize + iconBorder * 2;
 
-            var titleFont = GameService.Content.DefaultFont32;
-            var qtyFont = GameService.Content.DefaultFont18;
+            var titleFont = UiFonts.Display;
+            var qtyFont = UiFonts.Title;
 
             string nameText = vm.TargetItemName ?? "Unknown Item";
 
@@ -3599,7 +3648,7 @@ namespace GW2CraftingHelper.Views
 
             var headerPanel = new Panel()
             {
-                Size = new Point(panelWidth, 30),
+                Size = new Point(panelWidth, SectionHeaderRowHeight),
                 BackgroundColor = Color.Transparent,
                 Parent = _contentPanel
             };
@@ -3614,6 +3663,7 @@ namespace GW2CraftingHelper.Views
             // Unicode without a fresh render check.
             var headerArrow = new Label()
             {
+                Font = UiFonts.Body,
                 Text = expanded ? "v" : ">",
                 TextColor = Color.White,
                 AutoSizeWidth = true,
@@ -3622,14 +3672,16 @@ namespace GW2CraftingHelper.Views
                 Parent = headerPanel
             };
 
-            // DefaultFont16, not 18: the plan title above now owns
-            // Font18-and-up (it renders at Font32), so a section header
-            // sharing Font18 with it would flatten the page back into one
-            // typographic level - see CreatePlanHeader.
+            // Title, not Body: a section header has to read one step above
+            // the rows under it, and the +2pt bump moved Body onto the 16
+            // this header used to sit at. Font18 no longer collides with
+            // the plan title (it renders at Font32 - see CreatePlanHeader),
+            // and it is what the Settings and About tabs already use for
+            // their own section headers.
             new Label()
             {
                 Text = title,
-                Font = GameService.Content.DefaultFont16,
+                Font = UiFonts.Title,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(22, 5),
@@ -3637,24 +3689,27 @@ namespace GW2CraftingHelper.Views
             };
 
             // Divider under the header - identical chrome for every section.
-            // 2px, bottom-anchored inside the 30px headerPanel
-            // (Location.Y = 28, i.e. headerPanel.Height - 2) - see
+            // 2px, bottom-anchored inside the SectionHeaderRowHeight
+            // headerPanel - see
             // LabelHelpers.CreateRowDivider's doc comment for why 1px is unsafe under
             // Blish's non-integer UI-scale GPU transform.
             // NOT built via LabelHelpers.CreateRowDivider (headerPanel is not a row of a
-            // list, it has its own fixed 30px height) but it is built the
+            // list, it has its own fixed SectionHeaderRowHeight) but it is built the
             // SAME way (a Panel child bottom-anchored near its parent's
             // bottom edge) and is subject to the identical Container.Paint
             // scissor round-trip defect. Simulation (M36b investigation)
-            // shows a bottom-flush 2px line under H=30 is immune at the
-            // default 0.897 scale but vulnerable (~16-17%) at the "Small"
-            // 0.81 scale, so it gets the same 1px bottom clearance as the
-            // vulnerable row types (y = 30 - 2 - 1 = 27). Title text sits
-            // at y=5 with DefaultFont16 and remains clear of y=27.
+            // showed a bottom-flush 2px line under the header's then-30px
+            // height immune at the default 0.897 scale but vulnerable
+            // (~16-17%) at the "Small" 0.81 scale; the Font18 promotion
+            // raised it to 32, which that investigation lists as vulnerable
+            // outright. Either way it gets the same 1px bottom clearance as
+            // the vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
+            // at y=5 and its lowest measured ink at Font18 is y=28, which
+            // is what SectionHeaderRowHeight's own two extra pixels buy.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),
-                Location = new Point(0, 27),
+                Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             };
@@ -3700,7 +3755,7 @@ namespace GW2CraftingHelper.Views
             _relayoutActions.Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
-                headerPanel.Size = new Point(w, 30);
+                headerPanel.Size = new Point(w, SectionHeaderRowHeight);
                 headerDivider.Size = new Point(w, 2);
                 contentFlow.Size = new Point(w, contentFlow.Height);
             });

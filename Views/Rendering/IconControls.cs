@@ -102,7 +102,7 @@ namespace GW2CraftingHelper.Views.Rendering
             Label placeholderMark = null;
             if (missing && size > 0)
             {
-                var font = GameService.Content.DefaultFont14;
+                var font = UiFonts.Body;
                 var glyphSize = font.MeasureString(NoIconGlyph);
                 placeholderMark = new Label()
                 {

@@ -8,6 +8,7 @@ using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Modules;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
@@ -97,7 +98,11 @@ namespace GW2CraftingHelper.Views
 
         private const int RightEdgePadding = 20;
         private const int RowHeight = 30;
-        private const int InfoRowHeight = 20;
+        // 22, not 20: AddLabeledInfoSection puts a heading at y=2 in a panel
+        // of exactly this height, and that heading's lowest Font16 ink is
+        // y=23. AddInfoLine's own rows already size themselves to their
+        // wrapped label and only use this as a floor.
+        private const int InfoRowHeight = 22;
         private const int InfoLineBottomPadding = 4;
         private const int SpacerHeight = 10;
         private const int HeaderRowHeight = 44;
@@ -199,7 +204,7 @@ namespace GW2CraftingHelper.Views
             new Label()
             {
                 Text = $"{info.Name} v{info.Version}",
-                Font = GameService.Content.DefaultFont18,
+                Font = UiFonts.Title,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(nameX, 10),
@@ -224,7 +229,7 @@ namespace GW2CraftingHelper.Views
         // rows are pushed down instead of overlapping it.
         private void AddInfoLine(string text, int panelWidth)
         {
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             int maxTextWidth = Math.Max(1, panelWidth - NameColumnX - RightEdgePadding);
             string wrappedText = DrawUtil.WrapText(font, text, maxTextWidth);
 
@@ -266,6 +271,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = label,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -295,6 +301,7 @@ namespace GW2CraftingHelper.Views
 
             new Label()
             {
+                Font = UiFonts.Body,
                 Text = label,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -326,6 +333,7 @@ namespace GW2CraftingHelper.Views
             {
                 new Label()
                 {
+                    Font = UiFonts.Body,
                     Text = value,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,

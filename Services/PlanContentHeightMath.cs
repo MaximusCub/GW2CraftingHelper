@@ -34,11 +34,36 @@ namespace GW2CraftingHelper.Services
         // --- Section row-height constants (mirrored 1:1 by CraftingPlanView's
         // row builders - CreateUsedMaterialRow, CreateShoppingRow, etc. use
         // these same constants rather than their own local copies). ---
+        //
+        // Every height below was re-derived against the +2pt body font
+        // (Views/Rendering/UiFonts): measured Menomonia line heights are 13
+        // at 12pt, 18 at 14pt and 20 at 16pt, and the lowest ASCII ink sits
+        // 1px past the line box at 14pt and 16pt, 3px past it at 12pt. A
+        // row keeps its height only where that ink still clears whatever
+        // sits under it (the 2px divider, or the row's own bottom edge).
+        //
+        // Unchanged and why: the three 36px rows and TreeRowHeight are
+        // ICON-driven, not text-driven - a 34px rarity frame at y=0 plus a
+        // 2px divider already exceeds the tallest text run in them.
+        // CraftStepRowHeight's body text was already Font16 before the
+        // bump, so only its Font12 -> Font14 sublabel moved, and that
+        // sublabel's new ink (y=16 + 19 = 35) still clears its divider at
+        // 41. The two 28px rows put a single line at y=4 (ink 25) and y=7
+        // (ink 26) with no divider beneath either.
         public const int UsedMaterialRowHeight = 36;
         public const int ShoppingRowHeight = 36;
         public const int CraftStepRowHeight = 44;
-        public const int CTableHeaderRowHeight = 26;
-        public const int DisciplineRowHeight = 32;
+
+        // 28, not 26: the header label sits at TableHeaderStyle.LabelY (5)
+        // and its lowest Font16 ink is y=26, exactly the old band height.
+        public const int CTableHeaderRowHeight = 28;
+
+        // 36, not 32: this row's two labels sit at y=7 and y=9, whose
+        // Font16/Font14 ink (28) landed on the 32px row's divider top (29).
+        // 36 is the height every other single-line table row in this file
+        // already uses, and LabelHelpers.CreateRowDivider's scale
+        // simulation lists it as immune rather than merely clear.
+        public const int DisciplineRowHeight = 36;
 
         // 36, not 32: a 32px row left the 34px rarity-framed icon
         // overflowing the row height once dividers widened to 2px.
@@ -46,7 +71,13 @@ namespace GW2CraftingHelper.Services
         // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
         // correct 36.
         public const int RecipeRowHeightNoSublabel = 36;
-        public const int RecipeRowHeightWithSublabel = 44;
+
+        // 48, not 44. The name line grew from an 18px to a 20px line box,
+        // which pushed the sublabel below it from y=22 to y=24, and the
+        // sublabel's own font grew with it: its lowest ink is now y=43
+        // against a 44px row whose divider starts at 41. 48 restores the
+        // 2px of clearance the 44px row had.
+        public const int RecipeRowHeightWithSublabel = 48;
         public const int CostTileRowHeight = 56;
 
         // The Summary section's COST formula band is no longer a taller

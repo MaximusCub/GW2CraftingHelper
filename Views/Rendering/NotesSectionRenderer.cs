@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             const int rowHeight = PlanContentHeightMath.FallbackTextRowHeight;
             const int labelX = NotesSectionLayoutMath.LabelX;
-            var font = GameService.Content.DefaultFont14;
+            var font = UiFonts.Body;
             var measure = LabelHelpers.MeasureWith(font);
 
             string fullText = row.Label ?? "";

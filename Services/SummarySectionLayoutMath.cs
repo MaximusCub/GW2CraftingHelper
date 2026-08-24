@@ -146,20 +146,26 @@ namespace GW2CraftingHelper.Services
         public const int CostBandAmountBottomPad = CostBandBoxPadY + CostBandBoxMarginY;
 
         /// <summary>
-        /// Height reserved for one DefaultFont12 caption line. 20, not the
-        /// ~17 the font actually measures: the renderer places the caption
-        /// from real font metrics and clamps the amount below it, so this
+        /// Height reserved for one caption line, deliberately above what
+        /// the font actually measures: the renderer places the caption from
+        /// real font metrics and clamps the amount below it, so this
         /// reserve has to cover the tallest plausible metric or the band
         /// clips its own amount (the renderer's DEBUG assert is what
-        /// catches that).
+        /// catches that). 25, not 20: the caption font moved from Font12 to
+        /// Font14 and its measured line height with it, 13 -> 18, so the
+        /// reserve carries the same slack over the real metric as before.
         /// </summary>
-        public const int CostBandCaptionLineHeight = 20;
+        public const int CostBandCaptionLineHeight = 25;
 
         /// <summary>Gap between the caption block and the amount run.</summary>
         public const int CostBandCaptionToAmountGap = 4;
 
-        /// <summary>Extra band height reserved for the disclosure line.</summary>
-        public const int CostBandCurrencyNoteHeight = 18;
+        /// <summary>
+        /// Extra band height reserved for the disclosure line. 23, not 18,
+        /// for the same measured 13 -> 18 caption line-height move as
+        /// <see cref="CostBandCaptionLineHeight"/>.
+        /// </summary>
+        public const int CostBandCurrencyNoteHeight = 23;
 
         /// <summary>
         /// Height of the cost formula band's single tile row: the highlight

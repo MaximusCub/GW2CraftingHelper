@@ -15,7 +15,13 @@ namespace GW2CraftingHelper.Services
         public const int RowHeight = 35;
         public const int InputRowY = 5;
         public const int RowGap = 3;
-        public const int StatusToSeparatorGap = 21;
+        /// <summary>
+        /// Band the plan tab's status label occupies between the row above
+        /// it and the separator rule. 23, not the 21 it was at Font14: the
+        /// label's lowest Font16 ink is y+21 measured from the band's own
+        /// top, which landed exactly on the separator.
+        /// </summary>
+        public const int StatusToSeparatorGap = 23;
         public const int SeparatorToContentGap = 5;
         public const int ContentToBottomPad = 5;
 
