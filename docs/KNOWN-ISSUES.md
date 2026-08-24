@@ -12883,3 +12883,123 @@ user's live checks. Bonus: the Clear Cache ModalDialog message wraps
 un-clipped with Caption-measured button padding, the ApiAccessDialog
 stacking case renders as recorded, and both plan generations logged
 single [plan] tags.
+
+## Keyboard focus release (kb-focus-release)
+
+Field repro: type into the Crafting Plan search box, do not press Enter,
+press Escape. The window closes with the caret still visibly in the box,
+and from then on GW2 receives no keyboard input at all until the user
+clicks somewhere.
+
+### Diagnosis
+
+Measured by decompiling the vendored `packages/BlishHUD.1.3.0/lib/net472/
+Blish HUD.exe` (ilspycmd 10.1.1). Everything below is read off that
+source, not inferred:
+
+- `TextInputBase.Focused`'s setter assigns
+  `GameService.Input.Keyboard.FocusedControl = this` on EVERY change,
+  including a change to **false**. `UnsetFocus()` is the only method that
+  nulls the slot (`Focused = false;` then `FocusedControl = null;`), and
+  so the only full release.
+- Blish soft-unfocuses in two places, both of which therefore leave the
+  slot naming a box that is no longer focused: the click-away handler
+  (`Focused = _mouseOver && _enabled`) and `DisposeControl`
+  (`Focused = false`).
+- `Control.Dispose` clears `Parent` BEFORE calling `DisposeControl`, so a
+  box disposed while focused leaves the slot holding an orphan whose
+  `GetAncestors()` is empty. `KeyboardHandler.Update`'s self-heal only
+  walks the named control's ancestors looking for an invisible one, so it
+  can never reach that orphan.
+- A slot naming one control while another box actually holds focus is
+  what the user feels. `KeyboardHandler.ProcessInput`'s Escape branch
+  consumes the key clearing the slot and returns, so the first Escape
+  does nothing visible; the second finds the slot null and closes the
+  window instead. The still-focused box keeps
+  `KeyboardHandler._textInputDelegate` (set in `UpdateFocusState(true)`),
+  and every keystroke then goes to `_textInputDelegate?.Invoke` and is
+  blocked from the game. Clicking anywhere ends it, because the
+  click-away handler finally sets `Focused = false`.
+- Re-clicking the box does NOT repair it: the setter is guarded by
+  `SetProperty`, so with `_focused` already true the assignment to the
+  slot is skipped.
+
+The module's own contribution to that desynced state is
+`SuggestionPanel.OnFocusChanged`, which re-focused its text box from
+inside the `InputFocusChanged` notification whenever the mouse was over
+the suggestion list. `UnsetFocus()` raises that notification as its first
+step and nulls the slot as its second, so an Escape pressed while
+hovering the suggestion list produced exactly the reported state: box
+focused, slot empty, listener live. Mouse events are raised from
+`MouseHandler.Update` on the main thread (`HandleInput` only stashes the
+event), so this is ordinary single-threaded reentrancy, not a race.
+
+### Fix
+
+`Views/FocusRelease.cs` (new) is the module's only full release. It
+guards every call - a box may only null the shared slot if it holds
+focus or is the control the slot already names - and offers two entry
+points:
+
+- `ReleaseOnDispose()`, chained onto a construction site, releases on the
+  `Disposed` event, which fires at the top of `Control.Dispose` while the
+  control is still whole and ahead of Blish's own soft unfocus. Applied
+  at all **11** module text box sites (Snapshot search, Crafting Plan
+  search + quantity, Log search, six in Settings, the copyable About
+  field).
+- `ReleaseWithin(root)` walks a subtree. `ResizableTabbedWindow` calls it
+  where the module takes focus away without a click: `Hide()` (the intent,
+  ahead of the fade the box would otherwise eat keys through), the
+  `Hidden` event (a direct `Visible = false`), `OnTabChanged` BEFORE the
+  base implementation swaps and disposes the outgoing view, and
+  `DisposeControl`.
+
+`SuggestionPanel` now re-focuses only for the press that is landing on
+the panel, observed from the same `LeftMouseButtonPressed` event that
+drives the unfocus. The hook is taken in the constructor on purpose:
+Blish raises the event in subscription order, and `TextInputBase`
+subscribes its own handler when the box first gains focus, so the panel
+has to already be ahead of it to classify the release. Keeping that hook
+honest needed the panels torn down on unload - they are SpriteScreen
+parented, so disposing the window never reached them - which
+`CraftingPlanView.DisposeSuggestionPanels()` now does from
+`Module.Unload`, alongside the tickers it already had to clean up for the
+same reason.
+
+No test was added. Every step of this is Blish-bound: which release API
+is called, the order Blish raises two of its own events in, and a walk
+over `Container.Children`. The testable-looking residue is a three-bool
+predicate that would only mirror the implementation, which this repo does
+not accept. It stands on the desktop gate.
+
+`Views/Rendering/TreeSectionController.cs`, the tooltip composers and
+`RichTooltipSurface` were not touched.
+
+### Desktop gate
+
+1. **The repro.** Crafting Plan tab, click the item search box, type a
+   few letters, do NOT press Enter. Press Escape. Whatever the design
+   does - the box unfocuses, or the window closes - the caret must be
+   GONE from the box, and typing must reach the game immediately, with
+   no click needed first. Run it twice: once with the mouse resting over
+   the suggestion list that dropped under the box, once with the mouse
+   over the box itself. The hover-the-list run is the one that used to
+   fail.
+2. **Escape is not eaten.** From that same state, count the Escapes. The
+   first releases the box, the next closes the window. Neither one
+   should be silently swallowed with nothing happening.
+3. **Tab switch while focused.** Type into the Crafting Plan search box
+   and, without pressing Enter or Escape, click straight onto another
+   tab. Keyboard reaches the game right away. Then press Escape once and
+   confirm it closes the window rather than being consumed by a slot the
+   old, disposed box left behind. Repeat with the Snapshot search box and
+   with a Settings number field.
+4. **Suggestion picking still works.** Type enough to raise the
+   suggestion list and pick a row with the mouse. The row is selected,
+   the name lands in the box, the list dismisses. Do it slowly and with a
+   fast click.
+5. **Window close by other means.** With a text box focused, close the
+   window with its X and with the corner icon toggle. Keyboard reaches
+   the game in both cases.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
