@@ -122,6 +122,22 @@ namespace GW2CraftingHelper.Services
         public const string AlreadyBuyingEverything = "Already buying everything buyable";
 
         /// <summary>
+        /// The fourth, and a different KIND: the three above say the click
+        /// was unnecessary, this one says it was impossible. A plan
+        /// restored without its solve context renders, and its toolbar
+        /// shows, but nothing local can be re-solved on it - so every
+        /// decision pill, both presets and both chip clears land here.
+        /// <para>
+        /// Deliberately not one of the "already ..." lines. Those assert
+        /// something about the plan's contents, which is exactly what
+        /// cannot be known in this state, and asserting it anyway is the
+        /// one failure mode a status line must not have.
+        /// </para>
+        /// </summary>
+        public const string ReSolveUnavailable =
+            "This plan cannot be changed - Generate Plan to rebuild it";
+
+        /// <summary>
         /// The two failure verbs, deliberately different. A failed
         /// GENERATION leaves the tab with the plan it had (or none); a
         /// failed local re-solve leaves the plan on screen intact and only

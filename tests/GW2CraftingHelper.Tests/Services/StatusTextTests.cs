@@ -131,13 +131,30 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 StatusText.NoOverridesToClear,
                 StatusText.AlreadyCraftingEverything,
-                StatusText.AlreadyBuyingEverything
+                StatusText.AlreadyBuyingEverything,
+                StatusText.ReSolveUnavailable
             })
             {
                 Assert.False(string.IsNullOrWhiteSpace(line));
                 Assert.DoesNotContain("(s)", line);
                 Assert.Equal(char.ToUpperInvariant(line[0]), line[0]);
             }
+        }
+
+        [Fact]
+        public void UnavailableIsNotUnnecessary_SoItsLineClaimsNothingAboutThePlan()
+        {
+            // A plan restored without its solve context can be rendered and
+            // not re-solved. The three lines above assert what the plan
+            // ALREADY contains, which is exactly what nothing has read in
+            // that state - so this one must not be any of them, and must
+            // name the action that gets out of it.
+            Assert.NotEqual(StatusText.AlreadyCraftingEverything, StatusText.ReSolveUnavailable);
+            Assert.NotEqual(StatusText.AlreadyBuyingEverything, StatusText.ReSolveUnavailable);
+            Assert.NotEqual(StatusText.NoOverridesToClear, StatusText.ReSolveUnavailable);
+
+            Assert.DoesNotContain("Already", StatusText.ReSolveUnavailable);
+            Assert.Contains("Generate Plan", StatusText.ReSolveUnavailable);
         }
 
         // ---- IsStale (the staleness label and Module.Update()'s

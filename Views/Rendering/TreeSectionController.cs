@@ -511,6 +511,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 ClearIgnored = ClearIgnored,
                 GetOverrideCount = () => _nodeOverrides.Count,
                 GetIgnoredCount = () => _ignoredItemIds.Count,
+                CanReSolve = () => _lastResult?.SolveContext != null,
                 CraftAllWouldChange = () => PresetWouldChange(AcquisitionSource.Craft),
                 BuyAllWouldChange = () => PresetWouldChange(AcquisitionSource.BuyFromTp)
             });
@@ -565,10 +566,17 @@ namespace GW2CraftingHelper.Views.Rendering
         /// click is a no-op the view reports instead of performing.
         /// Answered at click time: it walks the solver tree to build the
         /// preset, which is bounded but not free.
+        /// <para>
+        /// NULL, not false, with no solve context. A persisted plan whose
+        /// Result deserialises without one restores a renderable tree
+        /// (PlanStructuralValidator accepts a null SolveContext) and a
+        /// visible toolbar, and every re-solve on it is unavailable rather
+        /// than unnecessary. See <see cref="TreeToolbarCommands"/>.
+        /// </para>
         /// </summary>
-        private bool PresetWouldChange(AcquisitionSource source)
+        private bool? PresetWouldChange(AcquisitionSource source)
         {
-            if (_lastResult?.SolveContext == null) return false;
+            if (_lastResult?.SolveContext == null) return null;
 
             var preset = CraftingPlanPipeline.BuildPresetOverrides(_lastResult.SolveContext, source);
             if (preset.Count != _nodeOverrides.Count) return true;
@@ -658,7 +666,19 @@ namespace GW2CraftingHelper.Views.Rendering
         // SetStatus(...) -> _setStatus(...).
         private void ApplyOverridesAndResolve(bool isBestPathPreset = false)
         {
-            if (_lastResult?.SolveContext == null || _resolveOverridesSync == null)
+            // Edit since the move: this used to return silently on a
+            // missing solve context, which made EVERY local change - a pill
+            // click, a preset, either chip's clear - a dead click on a plan
+            // restored without one. The click is still refused; it now says
+            // so. Unwired _resolveOverridesSync stays silent: that is a
+            // build-time wiring fault, not a state the user is in.
+            if (_lastResult?.SolveContext == null)
+            {
+                _setStatus(StatusText.ReSolveUnavailable);
+                return;
+            }
+
+            if (_resolveOverridesSync == null)
             {
                 return;
             }

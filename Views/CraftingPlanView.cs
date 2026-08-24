@@ -2183,10 +2183,26 @@ namespace GW2CraftingHelper.Views
             _modalDialog?.Show(message, onConfirm, null, confirmText);
         }
 
+        /// <summary>
+        /// The matrix's zeroth question, asked by every entry before its
+        /// own: can this plan be re-solved at all? A plan restored without
+        /// its solve context renders and shows this toolbar, and nothing
+        /// on it can run - so the answer is a line saying so, never a
+        /// dialog for an action that will do nothing.
+        /// </summary>
+        private bool TreeCommandUnavailable(TreeToolbarCommands commands)
+        {
+            if (commands.CanReSolve?.Invoke() != false) return false;
+
+            SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
+            return true;
+        }
+
         private void ConfirmBestPath()
         {
             var commands = _treeToolbarCommands;
             if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2205,6 +2221,7 @@ namespace GW2CraftingHelper.Views
         {
             var commands = _treeToolbarCommands;
             if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2241,16 +2258,34 @@ namespace GW2CraftingHelper.Views
         /// the click replaces. The "this replaces N" sentence is dropped
         /// when N is zero - there is nothing to replace, and a dialog that
         /// says "replaces 0 manual decisions" is asking about nothing.
+        /// <para>
+        /// Three answers, not two. UNAVAILABLE (no solve context to build a
+        /// preset from) is not the same as UNNECESSARY, and reporting it as
+        /// the no-op line would state something about the plan's contents
+        /// that nothing has read - see TreeToolbarCommands. The null branch
+        /// is the predicate's own contract rather than a second copy of
+        /// TreeCommandUnavailable's answer: the two read the same field,
+        /// and a predicate that can return null must have a caller that
+        /// handles null.
+        /// </para>
         /// </summary>
         private void ConfirmPreset(
-            Func<TreeToolbarCommands, Func<bool>> pickPredicate,
+            Func<TreeToolbarCommands, Func<bool?>> pickPredicate,
             Func<TreeToolbarCommands, Action> pickAction,
             string noOpStatus, string question, string confirmText)
         {
             var commands = _treeToolbarCommands;
             if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
 
-            if (pickPredicate(commands)?.Invoke() != true)
+            bool? wouldChange = pickPredicate(commands)?.Invoke();
+            if (wouldChange == null)
+            {
+                SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
+                return;
+            }
+
+            if (wouldChange == false)
             {
                 SetStatus(WithStandingNotices(noOpStatus));
                 return;
@@ -2268,6 +2303,7 @@ namespace GW2CraftingHelper.Views
         {
             var commands = _treeToolbarCommands;
             if (commands == null) return;
+            if (TreeCommandUnavailable(commands)) return;
 
             // The control is hidden at zero, so the predicate is always
             // true when it is clickable - the guard is what makes that a

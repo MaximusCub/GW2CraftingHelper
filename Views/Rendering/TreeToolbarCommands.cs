@@ -53,7 +53,29 @@ namespace GW2CraftingHelper.Views.Rendering
         internal Func<int> GetOverrideCount;
         internal Func<int> GetIgnoredCount;
 
-        internal Func<bool> CraftAllWouldChange;
-        internal Func<bool> BuyAllWouldChange;
+        /// <summary>
+        /// Whether a local re-solve is possible at all on the current
+        /// plan. False only for a plan restored without its solve context,
+        /// which renders and shows its toolbar but can apply nothing.
+        /// The confirms read it BEFORE asking: a dialog whose action
+        /// cannot run is the "dialog that protects nothing" the matrix
+        /// exists to avoid.
+        /// </summary>
+        internal Func<bool> CanReSolve;
+
+        /// <summary>
+        /// Whether the preset would change the plan: true it would, false
+        /// it is already applied, NULL it cannot be answered because this
+        /// plan has no solve context to build a preset from.
+        /// <para>
+        /// Tri-state on purpose. Collapsing null into false makes a click
+        /// on an UNAVAILABLE action report the no-op line - "Already
+        /// crafting everything craftable" is a confident statement about a
+        /// plan nothing has examined, on the one line this milestone
+        /// rebuilt around a click that does nothing having to say why.
+        /// </para>
+        /// </summary>
+        internal Func<bool?> CraftAllWouldChange;
+        internal Func<bool?> BuyAllWouldChange;
     }
 }
