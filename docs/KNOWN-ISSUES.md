@@ -14191,4 +14191,36 @@ worth strictly less than two controls sharing a click target.
     one item and prices another, the row-identity gate has a hole.
     Post-review finding 1.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-24 morning desktop session, branch build, captures
+preflight/gRD1-gRD17). Verified live: (1) the ramp reads as three
+clear tiers in every section; (2) full-width justification holds at
+the 1900 client, at 1024, and at the ~930 floor - headers, dividers
+and right-anchored columns track the panel at every width; (4) both
+chips appear with correct counts, sit side by side in the old grey
+label's slot, and disappear at zero (a fresh Generate cleared the
+restored "Overrides: 1"); (5) Clear Ignored raised its
+consequence-stating confirm ("Stop ignoring 1 item? Their material
+costs count toward the plan again.") and its button tooltip reads
+"Clears every ignore mark and re-solves"; (6) Best Path with nothing
+to change SKIPPED dialog and re-solve with a status explanation -
+wording nit recorded: it says "No decision overrides to clear", a
+Clear-Overrides phrase, where a Best-Path-specific line would read
+better; (7) FIVE rapid stationary IGNORE clicks all landed (odd
+parity held through five rebuild frames - the update-in-place fix
+proven on the exact field repro); (8) the Generate tooltip states
+both facts; (9) the 18-bold status + 20px spinner rendered through a
+live generation; (10) no ids anywhere; (11) badges left-rule on one
+x, VENDOR teal, UNKNOWN red with matching red dashes, DAILY distinct;
+(12) Required Recipes is one line per row with a real Discipline
+column and a green Auto-learned status; (13) Hide Unlocked toggled
+with the sections above pixel-identical; (14) MEASURED at 1024: both
+count labels AND both clear buttons fit with clear space before Best
+Path - and they still render at the ~930 floor, against the review's
+certain-vanish prediction (the cluster is narrower than modeled).
+Sub-minimum clients CLIP an already-wide window (pre-existing
+effective-min behavior, not a redesign regression). Recorded
+partials, all test-pinned or one-hover checks: deep-tree ellipsis
+tooltips (pinned by the depth-19/20 boundary tests + the deferred
+full-name builders), item 15's dual-cost vendor leaves (row-identity
+gate is test-pinned; one expand on a live plan settles it), badge
+hover prose, and the longest-status-at-1378 measurement.
