@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// what the item DOES (strength/defense, attributes, granted bonuses),
     /// its infusion slots, then the white identity block - rarity, type,
     /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
-    /// all, alone after a blank, the unlabelled vendor value.
+    /// all, unlabelled, the vendor value.
     ///
     /// <para>
     /// Blish-free, so the whole line-by-line contract is directly testable
@@ -52,11 +52,10 @@ namespace GW2CraftingHelper.Services
             // Blocks are collected first and joined with exactly one blank
             // line each, so an empty block never leaves a separator behind
             // and a name-only block never ends on a stray blank row.
-            var blocks = new List<TooltipContent>(4);
+            var blocks = new List<TooltipContent>(3);
             AddBlock(blocks, facts);
             AddBlock(blocks, BuildInfusionSlots(stats));
             AddBlock(blocks, BuildIdentityBlock(stats));
-            AddBlock(blocks, BuildVendorValue(stats));
 
             for (int i = 0; i < blocks.Count; i++)
             {
@@ -78,7 +77,68 @@ namespace GW2CraftingHelper.Services
                 builder.Append(blocks[i]);
             }
 
+            var value = BuildVendorValue(stats);
+            if (!value.IsEmpty)
+            {
+                // The value is NOT unconditionally preceded by a blank.
+                // The header rule still owns the case where the value is
+                // the whole body; otherwise the item's own shape decides
+                // (see ValueSitsAfterABlank).
+                if (blocks.Count == 0 ? !bodyOpensUnderHeader : ValueSitsAfterABlank(stats))
+                {
+                    builder.Separator();
+                }
+                builder.Append(value);
+            }
+
             return builder.Build();
+        }
+
+        /// <summary>
+        /// Whether a blank row sits above the vendor value.
+        /// <para>
+        /// Measured absent on steak.png, the only capture that shows a
+        /// value line at all: its body bands run at a 18px pitch - 39, 57,
+        /// 75 (blank), 93 ("Food"), 111 ("Required Level: 10"), 129 (the
+        /// coin row) - so the value follows the line above it contiguously,
+        /// with row 128 carrying no glyph at all. FWDekker agrees for
+        /// twelve of its thirteen builders; only <c>Generic</c> (its
+        /// fallback, which is what a crafting material, a trait or a key
+        /// gets) and an <c>UpgradeComponent</c> of type Gem emit a
+        /// <c>&lt;br /&gt;</c> in front of <c>getValue()</c>.
+        /// </para>
+        /// <para>
+        /// The table is inverted deliberately: a type this module has never
+        /// seen falls to the Generic shape, exactly as it does in the
+        /// replica. The Generic blank itself is INFERRED - no capture of a
+        /// crafting material's value line exists.
+        /// </para>
+        /// </summary>
+        private static bool ValueSitsAfterABlank(ItemStatBlock stats)
+        {
+            if (stats.ItemType == "UpgradeComponent")
+            {
+                return stats.SubType == "Gem";
+            }
+
+            switch (stats.ItemType)
+            {
+                case "Armor":
+                case "Back":
+                case "Bag":
+                case "Consumable":
+                case "Container":
+                case "Gathering":
+                case "Gizmo":
+                case "MiniPet":
+                case "Tool":
+                case "Trinket":
+                case "Trophy":
+                case "Weapon":
+                    return false;
+                default:
+                    return true;
+            }
         }
 
         private static void AddBlock(List<TooltipContent> blocks, TooltipContent block)
@@ -329,9 +389,10 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// The vendor value the way the game shows it: unlabelled, alone on
-        /// the last line after a blank, and absent entirely when the item
-        /// cannot be sold (<see cref="ItemStatBlock.VendorValue"/> is null
-        /// exactly then). Gap G14.
+        /// the last line, and absent entirely when the item cannot be sold
+        /// (<see cref="ItemStatBlock.VendorValue"/> is null exactly then).
+        /// Gap G14. Whether a blank precedes it is
+        /// <see cref="ValueSitsAfterABlank"/>'s to say.
         /// </summary>
         private static TooltipContent BuildVendorValue(ItemStatBlock stats)
         {

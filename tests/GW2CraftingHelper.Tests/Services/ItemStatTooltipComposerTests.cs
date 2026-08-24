@@ -40,7 +40,6 @@ namespace GW2CraftingHelper.Tests.Services
                 "Required Level: 80",
                 "Crafted in the style of the renowned asuran genius, Zojja.",
                 "Account Bound on Use",
-                "",
                 "2s 40c"
             }, await LinesFor(RealItemJson.ZojjasWarfists));
         }
@@ -85,6 +84,55 @@ namespace GW2CraftingHelper.Tests.Services
                 "",
                 "7c"
             }, await LinesFor(RealItemJson.MithrilOre));
+        }
+
+        [Fact]
+        public async Task AConsumablesValueFollowsTheLineAboveItWithNoBlank()
+        {
+            // Measured on steak.png, the one capture that shows a value
+            // line: its body bands run 39, 57, 75 (blank), 93 ("Food"),
+            // 111 ("Required Level: 10"), 129 (the coin row) - one 18px
+            // pitch from the level line to the value, row 128 empty.
+            // FWDekker's Consumable builder emits getValue() with no
+            // leading break, as eleven of its other twelve builders do.
+            var lines = await LinesFor(RealItemJson.CilantroSteak);
+
+            Assert.Equal("Account Bound on Use", lines[lines.Length - 2]);
+            Assert.Equal("1s 65c", lines[lines.Length - 1]);
+        }
+
+        [Fact]
+        public void ACraftingMaterialKeepsTheBlankAboveItsValue()
+        {
+            // The other side: FWDekker's Generic builder - its fallback,
+            // and what a crafting material, a trait or a key gets - is one
+            // of only two that put a break in front of getValue().
+            // Inferred; no capture of a crafting material's value exists.
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Mithril Ore",
+                ItemType = "CraftingMaterial",
+                VendorValue = 7
+            }).ToPlainLines();
+
+            Assert.Equal("", lines[lines.Count - 2]);
+            Assert.Equal("7c", lines[lines.Count - 1]);
+        }
+
+        [Fact]
+        public void AnItemTypeThisModuleHasNeverSeenFallsToTheGenericShape()
+        {
+            // The type table is inverted on purpose: the API's vocabulary
+            // grows, and a new type takes the replica's own fallback
+            // rather than silently losing a blank.
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Some Future Thing",
+                ItemType = "MountSkin",
+                VendorValue = 7
+            }).ToPlainLines();
+
+            Assert.Equal("", lines[lines.Count - 2]);
         }
 
         [Fact]

@@ -12968,7 +12968,7 @@ Double-click to select stats.     white   (G12)
 <description / flavour>           white / teal   (G13)
 Unique                            white   (G18)
 <binding> / <restrictions>        white
-(blank)
+(blank)                           ONLY on the Generic shape - see below
 <value>                           per-denomination coin run, unlabelled (G14)
 ```
 
@@ -12977,9 +12977,20 @@ with, not on combat facts alone. A body opening with the combat facts or
 with the nourishment block runs straight on; one opening with the
 identity block, or with an upgrade component's bonus run, takes a blank
 first. See "Post-review corrections" below for the measurements and for
-the one capture this still diverges from. The vendor value is omitted
-entirely on a `NoSell` item - there is no last line and no blank in front of one - and
-its plain rendering now drops leading zero units through
+the one capture this still diverges from.
+
+The blank ABOVE the value splits the same way, on the item's own shape:
+measured absent on `steak.png` (body bands 39, 57, 75-blank, 93, 111,
+129 - one 18px pitch from `Required Level: 10` to the coin row, row 128
+empty), and FWDekker emits a break before `getValue()` in only two of
+its thirteen builders - `Generic`, its fallback, and an
+`UpgradeComponent` of type Gem. So a weapon, armour piece, consumable,
+trinket, bag or rune runs its value straight on under the line above,
+while a crafting material, a trait, a key, a Gem or any type the API
+adds later takes a blank first. The Generic blank is INFERRED; only its
+absence is measured. The vendor value is omitted entirely on a `NoSell`
+item - there is no last line and no blank in front of one - and its
+plain rendering now drops leading zero units through
 `CoinSegmentMath.FormatSegmentTexts`, so "7c", never "0g 0s 7c".
 
 **4. Header icon** (G11). A new HEADER line KIND on `TooltipContent`
@@ -13225,10 +13236,13 @@ rationale that keeps its suffix from reading as noise. Moved back.
 5. Hover an item whose description has a flavour run (Zojja's anything):
    the flavour is pale TEAL and any unmarked description prose beside it
    stays white.
-6. The vendor value is the LAST line, alone after a blank, with no
-   "Vendor value:" label, per-denomination tints, and coin ICONS to the
-   RIGHT of their numbers. On a NoSell item (Bolt, a Rebreather) there is
-   no value line and no trailing blank at all.
+6. The vendor value is the LAST line, with no "Vendor value:" label,
+   per-denomination tints, and coin ICONS to the RIGHT of their numbers.
+   On a sellable weapon, armour piece, food or rune it sits directly
+   under the line above it with NO blank row (measured on steak.png); on
+   a crafting material there IS one blank above it (inferred, FWDekker's
+   Generic builder). On a NoSell item (Bolt, a Rebreather) there is no
+   value line and no trailing blank at all.
 7. A Basic item (Mithril Ore) shows NO "Basic" line; an Exotic one shows
    "Exotic" in white.
 8. Coin icons in the tooltip are noticeably smaller than the plan
