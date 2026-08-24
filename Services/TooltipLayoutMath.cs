@@ -49,12 +49,21 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int MinContentWidth = 120;
 
-        public static int MaxContentWidth(int screenWidth, int chromeWidth)
+        /// <summary>
+        /// The width a tooltip may wrap at on this screen.
+        /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
+        /// every existing caller reads the same as every plain tooltip; a
+        /// caller with a measured cap of its own - the item tooltip, whose
+        /// in-game boxes are 300-332px wide (gap G24) - passes it and does
+        /// not move the shared constant out from under the rest.
+        /// </summary>
+        public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {
+            int preferred = preferredWidth > 0 ? preferredWidth : PreferredMaxContentWidth;
             int usable = screenWidth - (2 * ScreenEdgeMargin) - Math.Max(0, chromeWidth);
-            if (usable >= PreferredMaxContentWidth)
+            if (usable >= preferred)
             {
-                return PreferredMaxContentWidth;
+                return preferred;
             }
             return Math.Max(MinContentWidth, usable);
         }

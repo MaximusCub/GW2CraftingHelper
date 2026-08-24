@@ -82,6 +82,28 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
 
+        /// <summary>
+        /// TOOLTIP-LOCAL, deliberately: the measured in-game boxes are
+        /// 300-332px wide and gw2efficiency caps at 350, while Blish's own
+        /// 500 stays the preferred width for every plain tooltip in the
+        /// module (gap G24). The shared
+        /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
+        /// </summary>
+        private const int MaxContentWidth = 350;
+
+        /// <summary>
+        /// The game's coin icon is ~0.8x its line height (~13px on a 16px
+        /// line, measured on the steak capture) - not the module's shared
+        /// 20px table icon, which under the +2pt font wave reads small on
+        /// a 22px line and tall on a 16px one. TOOLTIP-LOCAL for the same
+        /// reason as the width above: <c>CoinSegmentMath.CoinIconSize</c>
+        /// is the plan tables' constant and stays theirs (gap G22).
+        /// </summary>
+        private static int CoinIconSizeFor(int lineHeight)
+        {
+            return System.Math.Max(8, (lineHeight * 4) / 5);
+        }
+
         private readonly Func<Control, TooltipContent> _resolveContent;
 
         private Panel _contentPanel;
@@ -209,18 +231,18 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             var font = UiFonts.Body;
             int lineHeight = font.LineHeight;
-            int coinIconSize = CoinSegmentMath.CoinIconSize;
+            int coinIconSize = CoinIconSizeFor(lineHeight);
 
             DisposeContent();
 
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
-                GameService.Graphics.SpriteScreen.Width, ChromeWidth);
+                GameService.Graphics.SpriteScreen.Width, ChromeWidth, MaxContentWidth);
 
             var layout = TooltipLayoutMath.LayoutContent(
                 content, maxWidth, lineHeight,
                 s => (int)System.Math.Ceiling(font.MeasureString(s).Width),
                 copper => CoinSegmentMath.TotalCoinSegmentsWidth(
-                    CoinCurrencyRenderer.BuildCoinSegments(copper, font)),
+                    CoinCurrencyRenderer.BuildCoinSegments(copper, font), coinIconSize),
                 // Only a coin row needs icon clearance, and only a header
                 // row is icon-tall; a prose row is one line pitch, as the
                 // game's 16px pitch is (gap G21).
@@ -292,7 +314,8 @@ namespace GW2CraftingHelper.Views.Rendering
                         // band's tiles make - without it the icons stick
                         // to the top of their row.
                         System.Math.Max(0, (lineHeight - coinIconSize) / 2),
-                        showShadow: true);
+                        showShadow: true,
+                        iconSize: coinIconSize);
                     continue;
                 }
 
