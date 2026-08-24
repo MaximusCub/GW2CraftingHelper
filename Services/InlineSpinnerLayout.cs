@@ -13,10 +13,17 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Spinner edge for the plan tab's status row. That row is
         /// <see cref="TopRegionLayoutMath.StatusToSeparatorGap"/> logical
-        /// pixels tall, so 18 leaves clearance above and below without the
+        /// pixels tall, so 20 leaves clearance above and below without the
         /// spinner ever reaching the separator beneath it.
+        /// <para>
+        /// 20, not the 18 it sat at beside a Body status line: the spinner
+        /// is centred on the label's line box, so it scales with the label
+        /// - TypeRampMetrics.StatusInk's box is 23 tall against Body's 20.
+        /// Proportion against the spinner ART is by eye and wants a live
+        /// check; the clearance is arithmetic and is asserted.
+        /// </para>
         /// </summary>
-        public const int PlanStripSize = 18;
+        public const int PlanStripSize = 20;
 
         /// <summary>
         /// Spinner edge for the Snapshot tab's status row, which is its own

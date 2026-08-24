@@ -20,19 +20,49 @@ namespace GW2CraftingHelper.Tests.Services
             // all, so a constant changing must fail here rather than
             // silently move the strip.
             //
-            // Re-baselined once, by two pixels, for the +2pt body bump:
-            // StatusToSeparatorGap went 21 -> 23 so the status label's
-            // Font16 descenders clear the separator beneath them. Every row
-            // ABOVE the status label is unmoved, which is the point of
-            // listing them all here.
+            // Re-baselined twice, by two pixels each time, and only ever
+            // below the status label: 21 -> 23 for the +2pt body bump, then
+            // 23 -> 25 when the status line moved to its own tier
+            // (TypeRampMetrics.StatusInk, lowest ink 23 against Body's 21).
+            // Every row ABOVE the status label is unmoved both times, which
+            // is the point of listing them all here.
             var layout = TopRegionLayoutMath.Compute(rowCount: 1, treeToolbarVisible: false);
 
             Assert.Equal(35, layout.InputPanelHeight);
             Assert.Equal(43, layout.ControlsRowY);
             Assert.Equal(81, layout.StatusRowY);
-            Assert.Equal(104, layout.SeparatorY);
-            Assert.Equal(109, layout.ContentY);
-            Assert.Equal(114, layout.TopRegionHeight);
+            Assert.Equal(106, layout.SeparatorY);
+            Assert.Equal(111, layout.ContentY);
+            Assert.Equal(116, layout.TopRegionHeight);
+        }
+
+        [Fact]
+        public void StatusBand_KeepsTheStatusLinesDescendersOffTheSeparator()
+        {
+            // StatusToSeparatorGap is measured from the status label's own
+            // top, so the separator sits exactly that far under the text -
+            // and the status tier's descenders reach 23px down, not Body's
+            // 21. The 2px is the scissor-safe clearance every rule in the
+            // module keeps (LabelHelpers.CreateRowDivider's M36b note).
+            Assert.True(
+                TypeRampMetrics.StatusInk.LowestInk + 2 <= TopRegionLayoutMath.StatusToSeparatorGap,
+                $"status ink bottom {TypeRampMetrics.StatusInk.LowestInk} crowds the separator at "
+                    + $"{TopRegionLayoutMath.StatusToSeparatorGap}");
+        }
+
+        [Fact]
+        public void StatusBand_HoldsTheSpinnerToo()
+        {
+            // The spinner is centred on the label's line box, so it starts
+            // inside the band; it must also END inside it, or it overlaps
+            // the separator the label was measured to clear.
+            int spinnerTop = (TypeRampMetrics.StatusInk.LineHeight - InlineSpinnerLayout.PlanStripSize) / 2;
+            if (spinnerTop < 0) spinnerTop = 0;
+
+            Assert.True(
+                spinnerTop + InlineSpinnerLayout.PlanStripSize <= TopRegionLayoutMath.StatusToSeparatorGap,
+                $"spinner bottom {spinnerTop + InlineSpinnerLayout.PlanStripSize} overruns the "
+                    + $"{TopRegionLayoutMath.StatusToSeparatorGap}px status band");
         }
 
         [Fact]

@@ -56,10 +56,17 @@ namespace GW2CraftingHelper.Views.Rendering
         internal const int RowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
 
         /// <summary>
-        /// Baseline y of every header label inside the band.
+        /// Baseline y of every header label inside the band. Aliased to
+        /// the height-math constant for the same reason
+        /// <see cref="RowHeight"/> is: the two are one piece of arithmetic.
         /// </summary>
-        internal const int LabelY = 5;
+        internal const int LabelY = PlanContentHeightMath.CTableHeaderLabelY;
 
-        internal static BitmapFont Font => UiFonts.Body;
+        /// <summary>
+        /// Column headers used to be the same size and weight as the rows
+        /// under them, with only the dark band to separate them. This is
+        /// the single seam that promotes all six tables at once.
+        /// </summary>
+        internal static BitmapFont Font => UiFonts.ColumnHeader;
     }
 }

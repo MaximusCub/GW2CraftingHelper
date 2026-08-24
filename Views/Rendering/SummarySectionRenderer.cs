@@ -159,13 +159,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // footnote row already use, so the section reads as one left edge.
         private const int LoneTileContentX = 8;
 
-        // Caption y and amount bottom pad of an UNHIGHLIGHTED band (the
-        // profit band); 4/6 reproduce the fixed y=30 a CostTileRowHeight
-        // band has always drawn its amounts at (56 - 6 - 20 == 30). A
-        // highlighted band uses SummarySectionLayoutMath's box-derived
-        // pair instead - see CreateFormulaBand.
-        private const int BandCaptionY = 4;
-        private const int BandAmountBottomPad = 6;
+        // Aliased, not duplicated: these two and CostTileRowHeight are one
+        // piece of arithmetic - see PlanContentHeightMath. A highlighted
+        // band uses SummarySectionLayoutMath's box-derived pair instead -
+        // see CreateFormulaBand.
+        private const int BandCaptionY = PlanContentHeightMath.CostTileCaptionY;
+        private const int BandAmountBottomPad = PlanContentHeightMath.CostTileAmountBottomPad;
 
         private static readonly Color BandCaptionColor = new Color(153, 153, 153);
 
@@ -296,7 +295,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
 
-            var captionFont = UiFonts.Caption;
+            // The tile caption is this band's column header - it names the
+            // number under it exactly as a table header names its column -
+            // so it sits in the same tier. The disclosure line stays
+            // Caption: it is fine print qualifying one number, not a
+            // heading.
+            var captionFont = UiFonts.ColumnHeader;
+            var noteFont = UiFonts.Caption;
             var amountFont = UiFonts.Body;
 
             // A highlighted band carries its result tile's box, so its
@@ -309,8 +314,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 : BandAmountBottomPad;
 
             int captionHeight = (int)System.Math.Ceiling(captionFont.MeasureString("0").Height);
+            int noteHeight = (int)System.Math.Ceiling(noteFont.MeasureString("0").Height);
             int noteY = captionY + captionHeight + 2;
-            int captionBlockBottom = (currencyNoteText != null ? noteY + captionHeight : captionY + captionHeight) + 2;
+            int captionBlockBottom =
+                (currencyNoteText != null ? noteY + noteHeight : captionY + captionHeight) + 2;
 
             int amountHeight = AmountBlockHeight(amountFont);
             int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
@@ -336,7 +343,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 string caption = row.Label ?? "";
                 int captionWidth = (int)System.Math.Ceiling(captionFont.MeasureString(caption).Width);
                 int noteWidth = noteText != null
-                    ? (int)System.Math.Ceiling(captionFont.MeasureString(noteText).Width)
+                    ? (int)System.Math.Ceiling(noteFont.MeasureString(noteText).Width)
                     : 0;
                 var segments = CoinCurrencyRenderer.BuildCoinSegments(row.CoinValue, amountFont);
                 int segmentsWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
@@ -388,7 +395,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     noteLabel = LabelHelpers.WithDescenderClearance(new Label()
                     {
                         Text = noteText,
-                        Font = captionFont,
+                        Font = noteFont,
                         TextColor = CurrencyNoteColor,
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,

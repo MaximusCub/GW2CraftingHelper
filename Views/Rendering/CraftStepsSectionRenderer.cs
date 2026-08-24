@@ -126,8 +126,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 BackgroundColor = Color.White * 0.08f,
                 Parent = rowPanel
             };
+            // Digits only, so the space-glyph defect that retired
+            // 18-regular elsewhere is not the reason this moved - the badge
+            // is chrome, and chrome above body is bold. 20-bold's cap fills
+            // the badge square better than 18-regular's did.
             string numberText = stepNumber.ToString();
-            var numberFont = UiFonts.Title;
+            var numberFont = UiFonts.SmallHeadingBold;
             var numberMeasure = numberFont.MeasureString(numberText);
             int numberWidth = (int)System.Math.Ceiling(numberMeasure.Width);
             int numberHeight = (int)System.Math.Ceiling(numberMeasure.Height);

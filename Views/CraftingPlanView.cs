@@ -57,11 +57,10 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SectionSpacing = 16;
 
-        // Was 30, against a Font16 title. The +2pt bump promoted that title
-        // to Font18, whose lowest measured ink at y=5 is y=28 - one pixel
-        // into the 30px panel's divider. Two more pixels restore the
-        // clearance the 30px panel had.
-        private const int SectionHeaderRowHeight = 32;
+        // Aliased, not duplicated: the band height, its title y and its
+        // caret y are one piece of arithmetic against the section-title
+        // font's measured ink - see PlanContentHeightMath.
+        private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
 
         // Section divider grey, readable against the parchment texture, one
         // tier below the 180-grey structural separators (window chrome,
@@ -1864,10 +1863,12 @@ namespace GW2CraftingHelper.Views
 
             CreateTreeToolbarRow(buildPanel, w, layout.TreeToolbarRowY);
 
-            // Status label
+            // Status label. Its own tier: the strip reports what the module
+            // is doing, and had been reporting it at the same size as
+            // every row in the plan below.
             _statusLabel = new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "Ready",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -3570,7 +3571,11 @@ namespace GW2CraftingHelper.Views
             int frameSize = iconSize + iconBorder * 2;
 
             var titleFont = UiFonts.Display;
-            var qtyFont = UiFonts.Title;
+
+            // Regular weight, one tier down from the title it annotates -
+            // and not the 18-regular it used to be, whose 4px space glyph
+            // rendered " x 42 needed" no wider than Body did.
+            var qtyFont = UiFonts.SmallHeading;
 
             string nameText = vm.TargetItemName ?? "Unknown Item";
 
@@ -3739,23 +3744,22 @@ namespace GW2CraftingHelper.Views
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(4, 6),
+                Location = new Point(4, PlanContentHeightMath.SectionHeaderCaretY),
                 Parent = headerPanel
             };
 
-            // Title, not Body: a section header has to read one step above
-            // the rows under it, and the +2pt bump moved Body onto the 16
-            // this header used to sit at. Font18 no longer collides with
-            // the plan title (it renders at Font32 - see CreatePlanHeader),
-            // and it is what the Settings and About tabs already use for
-            // their own section headers.
+            // The top of the ramp below the plan title: a section header
+            // outranks the column headers inside it, which in turn outrank
+            // the rows. It used to be 18-regular - one nominal step over
+            // Body, and the size whose space glyph collapses word gaps in
+            // exactly these multi-word titles.
             new Label()
             {
                 Text = title,
-                Font = UiFonts.Title,
+                Font = UiFonts.SectionTitle,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(22, 5),
+                Location = new Point(22, PlanContentHeightMath.SectionHeaderTitleY),
                 Parent = headerPanel
             };
 
@@ -3771,12 +3775,12 @@ namespace GW2CraftingHelper.Views
             // scissor round-trip defect. Simulation (M36b investigation)
             // showed a bottom-flush 2px line under the header's then-30px
             // height immune at the default 0.897 scale but vulnerable
-            // (~16-17%) at the "Small" 0.81 scale; the Font18 promotion
-            // raised it to 32, which that investigation lists as vulnerable
-            // outright. Either way it gets the same 1px bottom clearance as
-            // the vulnerable row types (y = 32 - 2 - 1 = 29). Title text sits
-            // at y=5 and its lowest measured ink at Font18 is y=28, which
-            // is what SectionHeaderRowHeight's own two extra pixels buy.
+            // (~16-17%) at the "Small" 0.81 scale. It gets the same 1px
+            // bottom clearance as the vulnerable row types
+            // (y = SectionHeaderRowHeight - 2 - 1). What the band's height
+            // buys is the 2px between the title's lowest ink and this
+            // rule's top - the arithmetic is in PlanContentHeightMath,
+            // beside the constants.
             var headerDivider = new Panel()
             {
                 Size = new Point(panelWidth, 2),

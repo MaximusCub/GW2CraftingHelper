@@ -13,6 +13,95 @@ namespace GW2CraftingHelper.Tests.Services
     /// </summary>
     public class PlanContentHeightMathTests
     {
+        // --- Chrome-band clearances (the type ramp's vertical half) ---
+        //
+        // Each band below holds text in a tier named by TypeRampMetrics,
+        // and each has something directly under it that the text's
+        // DESCENDERS must not touch: the band's own bottom edge, a 2px
+        // divider, or a coin run. These are the assertions that make the
+        // 20/24 ramp a constant swap - retreat the tier seats to 18/22 and
+        // whichever height stops being derived correctly fails here.
+        //
+        // 2px, never 1: LabelHelpers.CreateRowDivider's scissor-defect note
+        // (M36b) records that a 1px gap survives the default UI scale and
+        // vanishes at "Small".
+        private const int ScissorSafeClearance = 2;
+
+        [Fact]
+        public void ColumnHeaderBand_HoldsItsLabelsDescenders()
+        {
+            int inkBottom = TypeRampMetrics.InkBottom(
+                TypeRampMetrics.ColumnHeaderInk, PlanContentHeightMath.CTableHeaderLabelY);
+
+            Assert.True(
+                inkBottom + ScissorSafeClearance <= PlanContentHeightMath.CTableHeaderRowHeight,
+                $"header ink bottom {inkBottom} crowds the "
+                    + $"{PlanContentHeightMath.CTableHeaderRowHeight}px band");
+        }
+
+        [Fact]
+        public void ColumnHeaderBand_KeepsTheOpticalPlacementTheBodyHeaderHad()
+        {
+            // Cap top 8px below the band's top edge, which is where a
+            // Body-16 header at LabelY 5 put it. The band grew by exactly
+            // what the taller font's descenders needed, not by an arbitrary
+            // amount, and the label did not drift up the band.
+            Assert.Equal(
+                8,
+                PlanContentHeightMath.CTableHeaderLabelY + TypeRampMetrics.ColumnHeaderInk.CapTopY);
+        }
+
+        [Fact]
+        public void SectionHeaderBand_TitleAndCaretBothClearTheDivider()
+        {
+            // The divider is a 2px rule bottom-anchored at height - 3.
+            int dividerTop = PlanContentHeightMath.SectionHeaderRowHeight - 3;
+
+            int titleInk = TypeRampMetrics.InkBottom(
+                TypeRampMetrics.SectionTitleInk, PlanContentHeightMath.SectionHeaderTitleY);
+            int caretInk = TypeRampMetrics.InkBottom(
+                TypeRampMetrics.BodyInk, PlanContentHeightMath.SectionHeaderCaretY);
+
+            Assert.True(
+                titleInk + ScissorSafeClearance <= dividerTop,
+                $"section title ink bottom {titleInk} crowds the divider at {dividerTop}");
+            Assert.True(
+                caretInk + ScissorSafeClearance <= dividerTop,
+                $"caret ink bottom {caretInk} crowds the divider at {dividerTop}");
+        }
+
+        [Fact]
+        public void SectionHeaderBand_CaretSitsOnTheTitlesReadingLine()
+        {
+            // Two tiers on one line are baseline-aligned, not top-aligned -
+            // with the 1px optical lift the pair carried at the old sizes.
+            int titleBaseline = PlanContentHeightMath.SectionHeaderTitleY
+                + TypeRampMetrics.SectionTitleInk.BaselineY;
+            int caretBaseline = PlanContentHeightMath.SectionHeaderCaretY
+                + TypeRampMetrics.BodyInk.BaselineY;
+
+            Assert.InRange(titleBaseline - caretBaseline, 0, 1);
+        }
+
+        [Fact]
+        public void CostTileRow_CaptionBlockEndsAboveTheAmountRun()
+        {
+            // The band bottom-anchors a coin run (never shorter than the
+            // 20px coin icon) above its own bottom pad; the caption block
+            // is the caption's line box plus the 2px the renderer adds
+            // under it.
+            int captionBlockBottom = PlanContentHeightMath.CostTileCaptionY
+                + TypeRampMetrics.ColumnHeaderInk.LineHeight
+                + 2;
+            int amountY = PlanContentHeightMath.CostTileRowHeight
+                - PlanContentHeightMath.CostTileAmountBottomPad
+                - CoinSegmentMath.CoinIconSize;
+
+            Assert.True(
+                amountY >= captionBlockBottom,
+                $"amount run at {amountY} overprints a caption block ending at {captionBlockBottom}");
+        }
+
         private static PlanRowViewModel Row(PlanRowType type, string sublabel = null)
         {
             return new PlanRowViewModel { RowType = type, Sublabel = sublabel };

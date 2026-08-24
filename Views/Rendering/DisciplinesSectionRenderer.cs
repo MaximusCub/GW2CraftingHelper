@@ -79,7 +79,12 @@ namespace GW2CraftingHelper.Views.Rendering
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = UiFonts.Body;
-            var charFont = UiFonts.Caption;
+
+            // Body, not Caption: character names were the one text in this
+            // row that was both smaller AND greyer than its neighbours, and
+            // a name a user reads letter by letter is the worst thing to
+            // shrink. The grey stays - one channel of de-emphasis, not two.
+            var charFont = UiFonts.Body;
             // Header labels are part of their own columns' widths: at the
             // ColumnHeader tier a header is routinely wider than the data
             // under it, and a column narrower than its own header lets the
@@ -206,7 +211,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // row.CharacterAvailabilityText is null (the snapshot never
             // captured this data - see that field's own doc comment): no
             // label, no tooltip, no claim either way.
-            var charFont = UiFonts.Caption;
+            var charFont = UiFonts.Body;
             var charColor = new Color(170, 170, 170);
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;

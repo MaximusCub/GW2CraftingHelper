@@ -168,20 +168,41 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            // 6 margin + 6 pad + 25 caption line + 4 gap + 20 coin run
-            // + 6 pad + 6 margin. The caption line is 25, not the 20 it was
-            // before the +2pt bump: its font moved Font12 -> Font14, whose
-            // measured line height is 18 rather than 13.
-            Assert.Equal(73, SummarySectionLayoutMath.CostBandHeight(false));
+            // 6 margin + 6 pad + 32 caption line + 4 gap + 20 coin run
+            // + 6 pad + 6 margin. The caption line is 32, not the 25 it was
+            // at Caption: the tile captions moved to the ColumnHeader tier,
+            // whose measured line height is 25 rather than 18.
+            Assert.Equal(80, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
         [Fact]
         public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
         {
-            Assert.Equal(73 + 23, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(80 + 23, SummarySectionLayoutMath.CostBandHeight(true));
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
                 SummarySectionLayoutMath.CostBandHeight(true));
+        }
+
+        [Fact]
+        public void CostBandCaptionReserve_CoversTheCaptionTierItActuallyDraws()
+        {
+            // The reserve is deliberately above the real metric: the
+            // renderer places the caption from live font metrics and clamps
+            // the amount below it, so a reserve under the real line height
+            // makes the band clip its own amount (its DEBUG assert is what
+            // catches that at runtime - this catches it at build time).
+            Assert.True(
+                TypeRampMetrics.ColumnHeaderInk.LineHeight
+                    <= SummarySectionLayoutMath.CostBandCaptionLineHeight,
+                $"caption line box {TypeRampMetrics.ColumnHeaderInk.LineHeight} exceeds the "
+                    + $"{SummarySectionLayoutMath.CostBandCaptionLineHeight}px reserve");
+
+            // The disclosure line under it stays Caption, and its own
+            // reserve has to cover that tier rather than the caption's.
+            Assert.True(
+                TypeRampMetrics.CaptionInk.LineHeight
+                    <= SummarySectionLayoutMath.CostBandCurrencyNoteHeight);
         }
 
         [Fact]

@@ -151,11 +151,12 @@ namespace GW2CraftingHelper.Services
         /// real font metrics and clamps the amount below it, so this
         /// reserve has to cover the tallest plausible metric or the band
         /// clips its own amount (the renderer's DEBUG assert is what
-        /// catches that). 25, not 20: the caption font moved from Font12 to
-        /// Font14 and its measured line height with it, 13 -> 18, so the
-        /// reserve carries the same slack over the real metric as before.
+        /// catches that). 32, not 25: the tile captions moved to
+        /// TypeRampMetrics.ColumnHeaderInk and its measured line height
+        /// with them, 18 -> 25, so the reserve carries the same 7px of
+        /// slack over the real metric as before.
         /// </summary>
-        public const int CostBandCaptionLineHeight = 25;
+        public const int CostBandCaptionLineHeight = 32;
 
         /// <summary>Gap between the caption block and the amount run.</summary>
         public const int CostBandCaptionToAmountGap = 4;
