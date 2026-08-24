@@ -1362,9 +1362,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// raises Click only when that same control INSTANCE was primed by
         /// its own press. A frame long enough to contain both halves of the
         /// next click therefore loses the press, and the release lands on a
-        /// control that was never primed. Shortening the frame is the fix;
-        /// keeping the pill's own instance alive across the re-solve
-        /// removes the priming hazard outright.
+        /// control that was never primed. Shortening the frame is the fix -
+        /// and the whole of it: <see cref="RepaintRow"/> still rebuilds a
+        /// matched row's pills, so no pill INSTANCE survives a re-solve and
+        /// nothing here removes the priming hazard outright. See
+        /// <see cref="HoverChainResync"/>, which states the same mechanism.
         /// </para>
         ///
         /// <para>
