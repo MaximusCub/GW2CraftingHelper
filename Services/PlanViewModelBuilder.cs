@@ -564,6 +564,7 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.UsedMaterial,
+                    ItemId = um.ItemId,
                     Label = name,
                     IconUrl = iconUrl,
                     Rarity = rarity,
@@ -594,6 +595,8 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = rowType,
+                    // 0 on a currency row - see PlanRowViewModel.ItemId.
+                    ItemId = rowType == PlanRowType.ShoppingCurrency ? 0 : step.ItemId,
                     Label = name,
                     IconUrl = iconUrl,
                     Rarity = rarity,

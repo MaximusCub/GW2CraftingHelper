@@ -39,8 +39,15 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly TableSortState<PlanTableColumn> _sortState;
         private readonly Action _onSortChanged;
 
+        // Session item-stat lookup (ItemMetadataService's own cache), so a
+        // Used Materials row hovers the same rich item tooltip a tree row
+        // does. Optional: a null lookup, or a null answer from it, degrades
+        // to the full-name-when-truncated tooltip this row always had.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
         internal UsedMaterialsSectionRenderer(
-            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged)
+            ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             // Mirrors the constructor-null-guard convention already used
             // for injected dependencies elsewhere in Views/ (ViewAdapter's
@@ -53,6 +60,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         // Left x of the name column (past the row's 32px icon at x=8), and
@@ -156,9 +164,20 @@ namespace GW2CraftingHelper.Views.Rendering
             string fullName = row.Label ?? "";
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font, qtyRightEdge, qtyWidth, NameToQtyGap, NameX, 9);
-            if (nameHandle.NameLabel.Text != fullName)
+            // Composed at HOVER time, not here: a plan restored from disk
+            // fills its stat cache in the background (Q13), and a snapshot
+            // taken now could never show what lands after it. It also
+            // keeps the compose work off the render path.
+            Func<TooltipContent> buildTooltip = () => ItemRowTooltipComposer.BuildRowContent(
+                _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
+                fullName,
+                nameHandle.NameLabel.Text != fullName,
+                null);
+            TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
+            TooltipFacility.ApplyRichDeferred(nameHandle.NameLabel, buildTooltip);
+            if (row.ItemId > 0)
             {
-                TooltipFacility.ApplyPlain(rowPanel, fullName);
+                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
             }
 
             var qtyLabel = LabelHelpers.WithDescenderClearance(
@@ -172,6 +191,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Location = new Point(qtyRightEdge - qtyWidth, 9),
                     Parent = rowPanel
                 });
+            TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
 
             // Qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and
@@ -190,14 +210,12 @@ namespace GW2CraftingHelper.Views.Rendering
                     qtyLabel.Location = new Point(QtyRightEdge(w, maxQtyWidth, widestNameEnd) - qtyWidth, 9);
                 },
                 w => QtyRightEdge(w, maxQtyWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
-            _sink.AddReellipsis(w =>
-            {
-                if (IconNameRowHelpers.ReellipsizeName(
-                    nameHandle, font, QtyRightEdge(w, maxQtyWidth, widestNameEnd), qtyWidth, NameToQtyGap))
-                {
-                    TooltipFacility.ApplyPlain(rowPanel, nameHandle.NameLabel.Text != fullName ? fullName : null);
-                }
-            });
+            // The re-ellipsis no longer re-stamps anything: the tooltip
+            // builder above reads the label's CURRENT text when the box is
+            // drawn, so a resize that truncates or untruncates the name is
+            // already reflected.
+            _sink.AddReellipsis(w => IconNameRowHelpers.ReellipsizeName(
+                nameHandle, font, QtyRightEdge(w, maxQtyWidth, widestNameEnd), qtyWidth, NameToQtyGap));
         }
     }
 }

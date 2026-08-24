@@ -49,12 +49,21 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int MinContentWidth = 120;
 
-        public static int MaxContentWidth(int screenWidth, int chromeWidth)
+        /// <summary>
+        /// The width a tooltip may wrap at on this screen.
+        /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
+        /// every existing caller reads the same as every plain tooltip; a
+        /// caller with a measured cap of its own - the item tooltip, whose
+        /// in-game boxes are 300-332px wide (gap G24) - passes it and does
+        /// not move the shared constant out from under the rest.
+        /// </summary>
+        public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {
+            int preferred = preferredWidth > 0 ? preferredWidth : PreferredMaxContentWidth;
             int usable = screenWidth - (2 * ScreenEdgeMargin) - Math.Max(0, chromeWidth);
-            if (usable >= PreferredMaxContentWidth)
+            if (usable >= preferred)
             {
-                return PreferredMaxContentWidth;
+                return preferred;
             }
             return Math.Max(MinContentWidth, usable);
         }
@@ -76,14 +85,35 @@ namespace GW2CraftingHelper.Services
 
         public sealed class LaidOutRow
         {
-            internal LaidOutRow(IReadOnlyList<PlacedSpan> spans, int width)
+            internal LaidOutRow(
+                IReadOnlyList<PlacedSpan> spans, int width, int y, int height, string iconUrl)
             {
                 Spans = spans;
                 Width = width;
+                Y = y;
+                Height = height;
+                IconUrl = iconUrl;
             }
 
             public IReadOnlyList<PlacedSpan> Spans { get; }
             public int Width { get; }
+
+            /// <summary>Top of this row inside the content, in pixels.</summary>
+            public int Y { get; }
+
+            /// <summary>
+            /// This row's own height. Prose rows are one line pitch; only
+            /// a coin row needs icon clearance and only a header row is
+            /// icon-tall (gap G21) - a uniform height taken from the
+            /// tallest kind pads every prose row in the box.
+            /// </summary>
+            public int Height { get; }
+
+            /// <summary>
+            /// The header icon, on the FIRST row of a header line only - a
+            /// name that wraps must not draw its icon again.
+            /// </summary>
+            public string IconUrl { get; }
         }
 
         public sealed class Layout
@@ -121,7 +151,10 @@ namespace GW2CraftingHelper.Services
             int maxWidth,
             int rowHeight,
             Func<string, int> measureText,
-            Func<long, int> measureCoin)
+            Func<long, int> measureCoin,
+            int coinRowHeight = 0,
+            int headerRowHeight = 0,
+            int headerIndent = 0)
         {
             if (measureText == null) throw new ArgumentNullException(nameof(measureText));
             if (measureCoin == null) throw new ArgumentNullException(nameof(measureCoin));
@@ -132,23 +165,53 @@ namespace GW2CraftingHelper.Services
                 return new Layout(rows, 0, 0);
             }
 
+            // Both default to the prose pitch, so a caller that has only
+            // one row kind - every test, and every non-item tooltip -
+            // still gets the uniform box it always got.
+            int coinHeight = coinRowHeight > 0 ? coinRowHeight : rowHeight;
+            int headerHeight = headerRowHeight > 0 ? headerRowHeight : rowHeight;
+
             int effectiveMax = Math.Max(1, maxWidth);
+            int y = 0;
             foreach (var line in content.Lines)
             {
+                bool isHeader = line.Kind == TooltipLineKind.Header;
+                // The name column of a header row starts past the icon,
+                // and a wrapped continuation of it stays in that column.
+                int indent = isHeader ? Math.Max(0, headerIndent) : 0;
+                int lineHeight = isHeader ? headerHeight : rowHeight;
+                string iconUrl = isHeader ? line.IconUrl : null;
+
                 var current = new List<PlacedSpan>();
-                int x = 0;
+                int x = indent;
+
+                // Commits the row being built and starts the next one -
+                // the icon rides the first row of its line only.
+                void BreakRow()
+                {
+                    rows.Add(new LaidOutRow(current, x, y, lineHeight, iconUrl));
+                    y += lineHeight;
+                    // Continuations are ordinary text rows: only the FIRST
+                    // row of a header line carries the icon and its height.
+                    lineHeight = rowHeight;
+                    iconUrl = null;
+                    current = new List<PlacedSpan>();
+                    x = indent;
+                }
 
                 foreach (var span in line.Spans)
                 {
                     if (span.IsCoin)
                     {
                         int coinWidth = Math.Max(0, measureCoin(span.CoinCopper));
-                        if (x > 0 && x + coinWidth > effectiveMax)
+                        if (x > indent && x + coinWidth > effectiveMax)
                         {
-                            rows.Add(new LaidOutRow(current, x));
-                            current = new List<PlacedSpan>();
-                            x = 0;
+                            BreakRow();
                         }
+                        // A coin run makes the row it actually lands on -
+                        // never the one it was pushed off - the taller
+                        // coin kind.
+                        lineHeight = Math.Max(lineHeight, coinHeight);
                         current.Add(new PlacedSpan(span, x, coinWidth));
                         x += coinWidth;
                         continue;
@@ -168,15 +231,17 @@ namespace GW2CraftingHelper.Services
                     string core = span.Text.TrimEnd(' ');
                     string trailingSpaces = core.Length == span.Text.Length ? null : span.Text.Substring(core.Length);
 
+                    // Continuation rows start at the indent too, so their
+                    // budget is the box minus it - otherwise a wrapped
+                    // header name runs past the right edge by one icon.
                     var wrapped = TextWrapMath.Wrap(
-                        core, Math.Max(1, effectiveMax - x), effectiveMax, measureText).Lines;
+                        core, Math.Max(1, effectiveMax - x), Math.Max(1, effectiveMax - indent),
+                        measureText).Lines;
                     for (int i = 0; i < wrapped.Count; i++)
                     {
                         if (i > 0)
                         {
-                            rows.Add(new LaidOutRow(current, x));
-                            current = new List<PlacedSpan>();
-                            x = 0;
+                            BreakRow();
                         }
                         string piece = wrapped[i];
                         if (piece.Length == 0)
@@ -202,7 +267,7 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                rows.Add(new LaidOutRow(current, x));
+                BreakRow();
             }
 
             int width = 0;
@@ -213,7 +278,7 @@ namespace GW2CraftingHelper.Services
                     width = row.Width;
                 }
             }
-            return new Layout(rows, width, rows.Count * Math.Max(0, rowHeight));
+            return new Layout(rows, width, Math.Max(0, y));
         }
 
         /// <summary>

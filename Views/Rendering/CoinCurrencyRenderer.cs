@@ -124,6 +124,16 @@ namespace GW2CraftingHelper.Views.Rendering
             /// </summary>
             public int[] AssetIds;
 
+            /// <summary>
+            /// This run's own icon size, 0 meaning the shared
+            /// CoinSegmentMath.CoinIconSize. Only the rich tooltip sets it
+            /// (gap G22); it is cached here so RepositionSegments advances
+            /// by the size the run was actually drawn at.
+            /// </summary>
+            public int IconSize;
+
+            public int EffectiveIconSize => IconSize > 0 ? IconSize : CoinSegmentMath.CoinIconSize;
+
             public static readonly SegmentLayoutHandle Empty =
                 new SegmentLayoutHandle { Controls = System.Array.Empty<(Label, Panel)>(), TextWidths = System.Array.Empty<int>() };
         }
@@ -137,20 +147,28 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font,
-            float alphaScale = 1f, int iconYOffset = 0)
+            float alphaScale = 1f, int iconYOffset = 0, bool showShadow = false, int iconSize = 0)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
+            int effectiveIcon = iconSize > 0 ? iconSize : CoinSegmentMath.CoinIconSize;
             int x = startX;
             for (int i = 0; i < segments.Count; i++)
             {
                 var seg = segments[i];
-                controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, iconYOffset);
+                controls[i] = CreateCoinSegment(
+                    parent, seg, x, y, font, alphaScale, iconYOffset, showShadow, effectiveIcon);
                 widths[i] = seg.TextWidth;
-                x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
+                x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + effectiveIcon + CoinSegmentMath.CoinSegmentGap;
             }
 
-            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths, IconYOffset = iconYOffset };
+            return new SegmentLayoutHandle
+            {
+                Controls = controls,
+                TextWidths = widths,
+                IconYOffset = iconYOffset,
+                IconSize = iconSize
+            };
         }
 
         /// <summary>
@@ -162,7 +180,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static (Label Label, Panel Icon) CreateCoinSegment(
             Panel parent, CoinSegmentMath.CoinSegmentSpec seg, int x, int y, BitmapFont font,
-            float alphaScale, int iconYOffset)
+            float alphaScale, int iconYOffset, bool showShadow, int iconSize)
         {
             Color textColor = GetCoinColor(seg.AssetId);
             if (alphaScale < 1f) textColor *= alphaScale;
@@ -172,6 +190,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 Text = seg.Text,
                 Font = font,
                 TextColor = textColor,
+                // Off everywhere but the rich tooltip, whose every glyph
+                // carries the game's dark halo (gap G8); the plan tables
+                // render coin runs on their own flat rows.
+                ShowShadow = showShadow,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(x, y),
@@ -180,7 +203,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var icon = new Panel()
             {
-                Size = new Point(CoinSegmentMath.CoinIconSize, CoinSegmentMath.CoinIconSize),
+                Size = new Point(iconSize, iconSize),
                 Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset),
                 BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
                 Parent = parent
@@ -201,13 +224,14 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static void RepositionSegments(SegmentLayoutHandle handle, int startX, int y)
         {
             int x = startX;
+            int effectiveIcon = handle.EffectiveIconSize;
             for (int i = 0; i < handle.Controls.Length; i++)
             {
                 var (label, icon) = handle.Controls[i];
                 int textWidth = handle.TextWidths[i];
                 label.Location = new Point(x, y);
                 icon.Location = new Point(x + textWidth + CoinSegmentMath.CoinLabelIconGap, y + handle.IconYOffset);
-                x += textWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
+                x += textWidth + CoinSegmentMath.CoinLabelIconGap + effectiveIcon + CoinSegmentMath.CoinSegmentGap;
             }
         }
 
@@ -499,7 +523,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     var seg = coinSegments[i];
                     int x = SubColumnRightEdge(edges, seg.AssetId) - TreeCostColumnMath.SegmentWidth(seg.TextWidth);
-                    controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, 0);
+                    controls[i] = CreateCoinSegment(
+                        parent, seg, x, y, font, alphaScale, 0, false, CoinSegmentMath.CoinIconSize);
                     widths[i] = seg.TextWidth;
                     assetIds[i] = seg.AssetId;
                 }

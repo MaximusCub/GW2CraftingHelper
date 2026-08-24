@@ -51,7 +51,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 case "Rare": return new Color(252, 208, 11);
                 case "Exotic": return new Color(255, 164, 5);
                 case "Ascended": return new Color(251, 62, 141);
-                case "Legendary": return new Color(160, 95, 240);
+                // #974EFF - the GW2 wiki dark skin's own legendary, chosen
+                // there for the same dark background this palette sits on
+                // (gap G9). Every other entry already matches it exactly.
+                case "Legendary": return new Color(151, 78, 255);
                 default: return new Color(200, 200, 200);
             }
         }

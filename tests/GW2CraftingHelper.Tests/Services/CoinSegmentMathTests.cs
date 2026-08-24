@@ -258,5 +258,25 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinSegmentMath.FormatSegmentTexts(0L),
                 CoinSegmentMath.FormatSegmentTexts(-500L));
         }
+
+        [Fact]
+        public void TotalCoinSegmentsWidth_HonoursACallersOwnIconSize()
+        {
+            // The rich tooltip draws coin icons at ~0.8x its line height
+            // rather than at the plan tables' shared 20px (gap G22), and
+            // has to MEASURE at the size it draws at or its box is too
+            // wide by one icon per denomination.
+            var segments = new List<CoinSegmentMath.CoinSegmentSpec>
+            {
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = CoinSegmentMath.GoldAssetId, Text = "1", TextWidth = 10 },
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = CoinSegmentMath.CopperAssetId, Text = "23", TextWidth = 20 }
+            };
+
+            int shared = CoinSegmentMath.TotalCoinSegmentsWidth(segments);
+            int local = CoinSegmentMath.TotalCoinSegmentsWidth(segments, 13);
+
+            Assert.Equal(shared - (2 * (CoinSegmentMath.CoinIconSize - 13)), local);
+            Assert.Equal(shared, CoinSegmentMath.TotalCoinSegmentsWidth(segments, 0));
+        }
     }
 }

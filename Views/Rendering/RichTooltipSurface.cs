@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MonoGame.Extended.BitmapFonts;
 using System;
@@ -24,8 +25,8 @@ namespace GW2CraftingHelper.Views.Rendering
     ///
     /// Everything interesting happens in <see cref="TooltipLayoutMath"/>;
     /// this class is the thin Blish-coupled shell that turns a laid-out
-    /// row into Labels and coin runs, keeps the box opaque, and keeps it
-    /// on screen.
+    /// row into Labels and coin runs, paints the game's own canvas in
+    /// place of Blish's tooltip art, and keeps the box on screen.
     /// </summary>
     internal sealed class RichTooltipSurface : Tooltip
     {
@@ -41,14 +42,67 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
-        /// Fully opaque, and drawn as the content panel's own background so
-        /// nothing behind the tooltip bleeds through its art. Blish's
-        /// tooltip texture is drawn at 0.98 alpha over whatever is behind
-        /// it, which is exactly the audit H6 complaint on the value-detail
-        /// hover; the panel sits inside the content edge buffer, so the
-        /// frame itself still reads as a Blish tooltip.
+        /// The game's own canvas: pure black, faintly translucent, over
+        /// the whole box. Measured per-row background medians run
+        /// (20,25,28)..(57,59,56) over a bright scene, i.e. ~0.88-0.92
+        /// alpha (spec section 1.1, gap G1).
+        /// <para>
+        /// This is the ONE translucent layer. Blish's own tooltip art is
+        /// drawn at 0.98 alpha and is suppressed entirely by the
+        /// <see cref="PaintBeforeChildren"/> override below - stacking a
+        /// second translucent layer on top of it would match neither the
+        /// game nor audit finding H6 (content bleeding through the box).
+        /// </para>
         /// </summary>
-        private static readonly Color BackgroundColor = new Color(14, 14, 14);
+        private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.92f;
+
+        /// <summary>1px, near-black, all four edges - measured on column
+        /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
+        private static readonly Color BorderColor = new Color(6, 10, 12);
+
+        /// <summary>
+        /// Every glyph in a game tooltip carries a dark halo (measured at
+        /// 3x, spec section 1.3, gap G8). Same pair the module's own row
+        /// labels already use.
+        /// </summary>
+        private static readonly Color ShadowColor = Color.Black * 0.8f;
+
+        /// <summary>
+        /// The header icon: ~34x34 including its 1px frame, ~32px of art,
+        /// with the name ~5px to its right - all measured off the xyaren
+        /// capture (spec section 1.2, gap G11).
+        /// </summary>
+        private const int HeaderIconSize = 32;
+
+        private const int HeaderIconBorder = 1;
+
+        private const int HeaderIconFrameSize = HeaderIconSize + (2 * HeaderIconBorder);
+
+        private const int HeaderIconGap = 5;
+
+        private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
+
+        /// <summary>
+        /// TOOLTIP-LOCAL, deliberately: the measured in-game boxes are
+        /// 300-332px wide and gw2efficiency caps at 350, while Blish's own
+        /// 500 stays the preferred width for every plain tooltip in the
+        /// module (gap G24). The shared
+        /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
+        /// </summary>
+        private const int MaxContentWidth = 350;
+
+        /// <summary>
+        /// The game's coin icon is ~0.8x its line height (~13px on a 16px
+        /// line, measured on the steak capture) - not the module's shared
+        /// 20px table icon, which under the +2pt font wave reads small on
+        /// a 22px line and tall on a 16px one. TOOLTIP-LOCAL for the same
+        /// reason as the width above: <c>CoinSegmentMath.CoinIconSize</c>
+        /// is the plan tables' constant and stays theirs (gap G22).
+        /// </summary>
+        private static int CoinIconSizeFor(int lineHeight)
+        {
+            return System.Math.Max(8, (lineHeight * 4) / 5);
+        }
 
         private readonly Func<Control, TooltipContent> _resolveContent;
 
@@ -73,6 +127,35 @@ namespace GW2CraftingHelper.Views.Rendering
         public override Control TriggerMouseInput(MouseEventType mouseEventType, MouseState ms)
         {
             return null;
+        }
+
+        /// <summary>
+        /// The game's canvas instead of Blish's. Blish's own override
+        /// (decompiled, 1.3.0) draws its "tooltip" texture at
+        /// <c>Color.White * 0.98f</c> plus four dark inner edge bands;
+        /// replacing it outright is what lets the fill be translucent
+        /// without stacking two translucent layers, and what makes the
+        /// border a single measured pixel rather than Blish's gradient.
+        /// <para>
+        /// Blish's content edge buffer - <c>Thickness(4 top, 4 right,
+        /// 3 bottom, 6 left)</c>, which <c>RecalculateLayout</c> turns into
+        /// the ContentRegion every child is positioned inside - already IS
+        /// the game's measured 6px left padding with 3-4px on the other
+        /// edges (spec section 1.2, gap G23), so the padding needs no work
+        /// of its own once the art underneath it is gone.
+        /// </para>
+        /// </summary>
+        public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
+        {
+            var pixel = ContentService.Textures.Pixel;
+            spriteBatch.DrawOnCtrl(this, pixel, bounds, BackgroundColor);
+
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), BorderColor);
+            spriteBatch.DrawOnCtrl(
+                this, pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), BorderColor);
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), BorderColor);
+            spriteBatch.DrawOnCtrl(
+                this, pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), BorderColor);
         }
 
         public override void Show()
@@ -120,6 +203,20 @@ namespace GW2CraftingHelper.Views.Rendering
             Reposition();
         }
 
+        /// <summary>
+        /// Redraws the box for the control it is currently showing. The
+        /// content itself is unchanged - what changed is an INPUT the
+        /// deferred builder reads (the session stat cache gaining the
+        /// hovered item's block, Q13).
+        /// </summary>
+        internal void RefreshCurrent()
+        {
+            if (Visible && CurrentControl != null)
+            {
+                RefreshShowing(CurrentControl);
+            }
+        }
+
         public override void UpdateContainer(GameTime gameTime)
         {
             // base re-runs Blish's own unclamped positioning on every tick
@@ -146,38 +243,43 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void BuildContent(TooltipContent content)
         {
+            var font = UiFonts.Body;
+            int lineHeight = font.LineHeight;
+            int coinIconSize = CoinIconSizeFor(lineHeight);
+
             DisposeContent();
 
-            var font = UiFonts.Body;
-            // Never shorter than a coin icon: the content panel clips its
-            // children, and a row that cannot hold a 20px icon would clip
-            // the bottom off every coin run on the last line.
-            int rowHeight = System.Math.Max(font.LineHeight, CoinSegmentMath.CoinIconSize);
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
-                GameService.Graphics.SpriteScreen.Width, ChromeWidth);
+                GameService.Graphics.SpriteScreen.Width, ChromeWidth, MaxContentWidth);
 
             var layout = TooltipLayoutMath.LayoutContent(
-                content, maxWidth, rowHeight,
+                content, maxWidth, lineHeight,
                 s => (int)System.Math.Ceiling(font.MeasureString(s).Width),
                 copper => CoinSegmentMath.TotalCoinSegmentsWidth(
-                    CoinCurrencyRenderer.BuildCoinSegments(copper, font)));
+                    CoinCurrencyRenderer.BuildCoinSegments(copper, font), coinIconSize),
+                // Only a coin row needs icon clearance, and only a header
+                // row is icon-tall; a prose row is one line pitch, as the
+                // game's 16px pitch is (gap G21).
+                coinRowHeight: System.Math.Max(lineHeight, coinIconSize),
+                headerRowHeight: System.Math.Max(lineHeight, HeaderIconFrameSize),
+                headerIndent: HeaderIconFrameSize + HeaderIconGap);
 
             _contentPanel = new Panel()
             {
                 Size = new Point(System.Math.Max(1, layout.Width), System.Math.Max(1, layout.Height)),
                 Location = Point.Zero,
-                BackgroundColor = BackgroundColor,
+                // No fill of its own: the canvas is painted across the
+                // whole box by PaintBeforeChildren, so a second fill here
+                // would be the stacked-translucency case that matches
+                // neither the game nor H6.
+                BackgroundColor = Color.Transparent,
                 ShowBorder = false,
                 Parent = this
             };
 
-            // Fixed-size coin icons centred against a taller number font,
-            // the same correction the Summary band's tiles make - without
-            // it the icons stick to the top of their row.
-            int iconYOffset = System.Math.Max(0, (rowHeight - CoinSegmentMath.CoinIconSize) / 2);
-            for (int rowIndex = 0; rowIndex < layout.Rows.Count; rowIndex++)
+            foreach (var row in layout.Rows)
             {
-                RenderRow(layout.Rows[rowIndex], rowIndex * rowHeight, font, iconYOffset);
+                RenderRow(row, font, lineHeight, coinIconSize);
             }
 
             // Sized NOW rather than on the next update tick. The content
@@ -189,8 +291,24 @@ namespace GW2CraftingHelper.Views.Rendering
             RecalculateLayout();
         }
 
-        private void RenderRow(TooltipLayoutMath.LaidOutRow row, int y, BitmapFont font, int iconYOffset)
+        private void RenderRow(
+            TooltipLayoutMath.LaidOutRow row, BitmapFont font, int lineHeight, int coinIconSize)
         {
+            if (row.IconUrl != null)
+            {
+                // The game frames the icon in a 1px light grey (measured
+                // (166,175,174) on the xyaren capture's left edge) rather
+                // than in the rarity colour the module frames its ROWS
+                // with - the name beside it already carries the rarity.
+                IconControls.CreateRarityFramedIcon(
+                    _contentPanel, row.IconUrl, HeaderIconFrameColor,
+                    0, row.Y, HeaderIconSize, HeaderIconBorder);
+            }
+
+            // The name is centred on the icon, not top-aligned (measured,
+            // spec section 1.2); every other row kind sits at its top.
+            int textY = row.Y + System.Math.Max(0, (row.Height - lineHeight) / 2);
+
             foreach (var placed in row.Spans)
             {
                 if (placed.Span.IsCoin)
@@ -202,10 +320,16 @@ namespace GW2CraftingHelper.Views.Rendering
                         _contentPanel,
                         CoinCurrencyRenderer.BuildCoinSegments(placed.Span.CoinCopper, font),
                         placed.X,
-                        y,
+                        textY,
                         font,
                         1f,
-                        iconYOffset);
+                        // Fixed-size coin icons centred against a taller
+                        // number font, the same correction the Summary
+                        // band's tiles make - without it the icons stick
+                        // to the top of their row.
+                        System.Math.Max(0, (lineHeight - coinIconSize) / 2),
+                        showShadow: true,
+                        iconSize: coinIconSize);
                     continue;
                 }
 
@@ -224,9 +348,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     Text = placed.Span.Text,
                     Font = font,
                     TextColor = ResolveColor(placed.Span),
+                    ShowShadow = true,
+                    ShadowColor = ShadowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(placed.X, y),
+                    Location = new Point(placed.X, textY),
                     Parent = _contentPanel
                 });
             }
@@ -247,16 +373,44 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
 
-                // The game's own green for granted bonuses (rune lines,
-                // sigil/infusion buffs, food nourishment).
+                // Light blue, not green: measured on the wiki's
+                // Rune_effects_*.jpg captures (per-row peaks
+                // 95-115/118-138/148-180) and corroborated by FWDekker's
+                // #5599ff replica - see docs/KNOWN-ISSUES.md,
+                // "Tooltip authenticity", gap G3. The exact triple is the
+                // spec's recommendation, not a measurement.
                 case TooltipSpanRole.Bonus:
-                    return new Color(140, 200, 140);
+                    return new Color(120, 170, 235);
 
-                // Secondary block (rarity/type/level/binding/flavour) -
-                // matches the qty and footnote grey used elsewhere in the
-                // plan rather than introducing a third neutral.
+                // A tier above the wearer's equipped count. Unreachable
+                // today - see TooltipSpanRole.BonusInactive.
+                case TooltipSpanRole.BonusInactive:
+                    return new Color(150, 150, 150);
+
+                // Pale aquamarine, measured off File:User Xyaren
+                // Tooltip.png rows 149-177 (median #B1D7D2). Upright, not
+                // italic - the game does not italicise flavour.
+                case TooltipSpanRole.Flavor:
+                    return new Color(170, 210, 205);
+
+                // gw2efficiency's .desc-abilitytype (#fea) - inferred, no
+                // in-game capture of an abilitytype run exists.
+                case TooltipSpanRole.AbilityType:
+                    return new Color(255, 238, 170);
+
+                case TooltipSpanRole.Warning:
+                    return new Color(255, 0, 0);
+
+                // gw2efficiency's .desc-reminder (#afafaf = 175) - inferred,
+                // and 25 levels per channel lighter than the annotation grey
+                // below, which is measured. Two sources, two constants.
+                case TooltipSpanRole.Reminder:
+                    return new Color(175, 175, 175);
+
+                // Genuine secondary annotations only ("0/500 in Material
+                // Storage", measured #939496). The identity block is white.
                 case TooltipSpanRole.Muted:
-                    return new Color(170, 170, 170);
+                    return new Color(150, 150, 150);
 
                 default:
                     return Color.White;
