@@ -12883,3 +12883,158 @@ user's live checks. Bonus: the Clear Cache ModalDialog message wraps
 un-clipped with Caption-measured button padding, the ApiAccessDialog
 stacking case renders as recorded, and both plan generations logged
 single [plan] tags.
+
+## Click volume slider (click-sound-gain)
+
+Field feedback, verbatim: the module's click sound is "VERY quiet. I can
+barely hear it over my own mouse physical click sound." This section
+records what the playback path actually was, the mapping that replaced
+it, and the two judgment calls taken along the way.
+
+### The measured playback path
+
+All of the following is decompiled from the vendored binaries with
+`ilspycmd` - Blish HUD 1.3.0
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`) and MonoGame
+3.8.0.1641 (`packages/MonoGame.Framework.WindowsDX.3.8.0.1641`).
+
+1. `PressFeedback.PlayClick` called
+   `ContentService.PlaySoundEffectByName("button-click")`.
+2. That method's body, in full: skip if `_playRemainingAttempts <= 0` or
+   `GameService.GameIntegration.Audio.AudioDevice == null`, then
+   `SoundEffect.FromStream(_audioDataReader.GetFileStream(name + ".wav"))
+   .Play(GameService.GameIntegration.Audio.Volume, 0f, 0f)`.
+3. `AudioIntegration.Volume` is `GetVolume()`, which is:
+   `MathHelper.Clamp(mean(last 20 samples of the GW2 audio session's
+   MasterPeakValue), 0f, 0.4f)` when "use game volume" is on (the
+   default); Blish's own `Volume` setting otherwise, which is itself
+   `SetRange(0f, 0.4f)` with a **0.2 default**; and a hard `0f` when
+   "mute if no game audio" is on (also the default) and that mean is
+   below 0.0001.
+4. `SoundEffect.Play(volume, pitch, pan)` assigns straight to
+   `SoundEffectInstance.Volume`, whose setter **throws
+   ArgumentOutOfRangeException outside [0,1]** - it does not clamp - and
+   then multiplies by the static `SoundEffect.MasterVolume`, which is
+   MonoGame's untouched `1f` default (`grep MasterVolume` over the whole
+   decompiled Blish assembly: no hits).
+
+So the one input that controls loudness is that first argument, its
+ceiling is **0.4**, and its everyday value is whatever the game happened
+to be peaking at.
+
+The asset itself explains the rest. `audio/button-click.wav` inside
+`ref.dat` is 44.1 kHz stereo, 128 ms, 22,616 bytes, and peaks at
+**0.357 of full scale** (-8.9 dBFS) with an RMS of 0.024. At Blish's
+0.2 fixed default that peak lands at 0.071 (-23 dBFS); at a realistic
+game-audio mean it is lower still. A -23 dBFS transient under a physical
+mouse click is exactly the reported symptom.
+
+### The mapping, and where the default came from
+
+The module now plays the effect itself: same asset, read once from
+`ref.dat`'s `audio` subpath - the same archive and subpath
+`ContentService.Load` reads - decoded once into a cached `SoundEffect`,
+played at a volume the user sets.
+
+`Services/ClickSoundVolume` is the whole mapping, Blish-free and
+therefore unit-tested (39 cases):
+
+- `ToVolume(percent) = Clamp(percent, 0, 100) / 100f`, linear in
+  amplitude, handed to `Play` as-is.
+- `0` is not "volume 0" - `IsSilent` short-circuits before the asset
+  load and before any pooled voice is taken.
+- `100` is exactly `1f`, the loudest the asset can be played.
+- The clamp is load-bearing, not decoration: see the throwing setter
+  above.
+
+Percent that reproduces today's loudness: **40** is the loudest today
+could ever be (the 0.4 clamp), and **20** is Blish's fixed-volume
+default. The shipped default is **`ClickSoundVolume.DefaultPercent =
+75`** - 1.875x the absolute old ceiling (+5.5 dB) and 3.75x the old
+fixed default (+11.5 dB), with headroom left above it. It sits at
+-11.4 dBFS peak. That constant is the single line to edit when the
+maintainer's field test returns a number; nothing else encodes a
+default.
+
+### Deliberate divergence 1: the slider is not save-gated
+
+The Settings tab has one Save button and an unsaved-changes prompt driven
+by `CaptureFormState`/`UnsavedChangeCount`. The click volume row is
+**deliberately outside** that model: it writes through to
+`ModuleSettings` and to the live player on every `ValueChanged`, exactly
+like the Diagnostics checkbox (idiom (a)), and it is **absent from
+`CaptureFormState`**. Auditioning a volume through a Save button - and
+through a save prompt on the next tab switch - is hostile for the one
+setting a user tunes by ear, and listing it in the form state would
+report every drag as an unsaved change to a value already on disk. This
+is the same reasoning `SettingsFormState`'s own doc comment already gives
+for the Diagnostics checkbox.
+
+Cost of writing on every change, measured: `SettingEntry.Value` ignores
+an unchanged value, the TrackBar snaps to whole numbers (`SmallStep` is
+off), and `SettingsService.Save()` only sets a dirty flag - the JSON
+write is debounced until 4 seconds past the last change.
+
+### Deliberate divergence 2: no game-volume coupling
+
+Playing the effect ourselves gives up Blish's game-derived volume,
+including its "mute if the game makes no sound" rule. Kept anyway, on
+purpose: that rule is the cause of the complaint, and its zero case is
+not only a muted game - the peak buffer also reads zero when GW2 is not
+running or simply is not making noise at that moment, which would leave
+the Settings tab's own Test button dead exactly when someone is setting
+the volume with the game quiet. The user-facing mute is the slider's own
+0.
+
+The no-audio-device guard is kept, reading a different signal.
+Blish tests `Audio.AudioDevice == null`, whose type is NAudio's
+`MMDevice`; referencing it here pulls the whole `NAudio.Wasapi` assembly
+into the module for one null check (measured: it is a `CS0012` without
+it). MonoGame answers the same question in a type the module already
+references - `SoundEffect`'s stream constructor throws
+`NoAudioHardwareException` when the sound system failed to initialize -
+and the loader turns that into a permanent, quiet give-up.
+
+### Two Blish behaviors this row had to work around
+
+- `ViewContainer.Clear` -> `Container.ClearChildren` only sets each
+  child's `Parent` to `null`; it never disposes them. `TrackBar` is the
+  one control type on this tab that subscribes to a **static** event in
+  its constructor (`Control.Input.Mouse.LeftMouseButtonReleased`,
+  released only in its `DisposeControl` override), so the previous
+  build's slider is now disposed explicitly at the top of `Build` -
+  otherwise every Settings re-open would strand another live slider on
+  Blish's mouse handler for the session. Swept the other control types
+  used here: `TextInputBase` takes its global hooks on focus and
+  releases them on unfocus; `Checkbox`, `StandardButton`, `Panel` and
+  `Label` take none.
+- `TrackBar.MinValue`/`MaxValue` are assigned even though 0 and 100 are
+  already the defaults. Their setters are the only callers of the
+  private `MinMaxChanged`, which fills the ten-increment table that
+  Ctrl+drag snaps against with `Enumerable.Aggregate`; on a TrackBar
+  that never had either assigned that table is empty and the first
+  Ctrl+drag throws.
+
+### Incidental: this is now cheaper per click, not dearer
+
+`PlaySoundEffectByName` re-read and re-decoded the 22 KB wav into a
+brand-new `SoundEffect` on **every** press and never disposed any of
+them. The module now decodes once and reuses one cached effect, disposed
+on module unload (statics outlive a module instance inside one Blish
+session, same as `TooltipFacility`).
+
+### Gate items
+
+1. The Settings tab's new **Sound** section renders at the top: label,
+   slider, "NN%" readout, Test button, none overlapping, and the slider
+   drags with the readout tracking it live.
+2. The **Test** button audibly plays the click, and its loudness follows
+   the slider - clearly louder at 100 than at 25.
+3. **0 is silent**: drag to 0 and neither the Test button nor any other
+   button, row or pill in the module makes a sound.
+4. The value **survives a relaunch**: set something distinctive (say 40),
+   close Blish, reopen, and the slider, the readout and the actual
+   loudness all come back at 40.
+5. Report the number that feels right - it replaces `DefaultPercent`.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
