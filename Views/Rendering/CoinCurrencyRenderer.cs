@@ -137,7 +137,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font,
-            float alphaScale = 1f, int iconYOffset = 0)
+            float alphaScale = 1f, int iconYOffset = 0, bool showShadow = false)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < segments.Count; i++)
             {
                 var seg = segments[i];
-                controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, iconYOffset);
+                controls[i] = CreateCoinSegment(parent, seg, x, y, font, alphaScale, iconYOffset, showShadow);
                 widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static (Label Label, Panel Icon) CreateCoinSegment(
             Panel parent, CoinSegmentMath.CoinSegmentSpec seg, int x, int y, BitmapFont font,
-            float alphaScale, int iconYOffset)
+            float alphaScale, int iconYOffset, bool showShadow = false)
         {
             Color textColor = GetCoinColor(seg.AssetId);
             if (alphaScale < 1f) textColor *= alphaScale;
@@ -172,6 +172,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 Text = seg.Text,
                 Font = font,
                 TextColor = textColor,
+                // Off everywhere but the rich tooltip, whose every glyph
+                // carries the game's dark halo (gap G8); the plan tables
+                // render coin runs on their own flat rows.
+                ShowShadow = showShadow,
+                ShadowColor = Color.Black * 0.8f,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(x, y),

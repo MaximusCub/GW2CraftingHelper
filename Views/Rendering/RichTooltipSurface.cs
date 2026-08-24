@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MonoGame.Extended.BitmapFonts;
 using System;
@@ -24,8 +25,8 @@ namespace GW2CraftingHelper.Views.Rendering
     ///
     /// Everything interesting happens in <see cref="TooltipLayoutMath"/>;
     /// this class is the thin Blish-coupled shell that turns a laid-out
-    /// row into Labels and coin runs, keeps the box opaque, and keeps it
-    /// on screen.
+    /// row into Labels and coin runs, paints the game's own canvas in
+    /// place of Blish's tooltip art, and keeps the box on screen.
     /// </summary>
     internal sealed class RichTooltipSurface : Tooltip
     {
@@ -41,14 +42,30 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
-        /// Fully opaque, and drawn as the content panel's own background so
-        /// nothing behind the tooltip bleeds through its art. Blish's
-        /// tooltip texture is drawn at 0.98 alpha over whatever is behind
-        /// it, which is exactly the audit H6 complaint on the value-detail
-        /// hover; the panel sits inside the content edge buffer, so the
-        /// frame itself still reads as a Blish tooltip.
+        /// The game's own canvas: pure black, faintly translucent, over
+        /// the whole box. Measured per-row background medians run
+        /// (20,25,28)..(57,59,56) over a bright scene, i.e. ~0.88-0.92
+        /// alpha (spec section 1.1, gap G1).
+        /// <para>
+        /// This is the ONE translucent layer. Blish's own tooltip art is
+        /// drawn at 0.98 alpha and is suppressed entirely by the
+        /// <see cref="PaintBeforeChildren"/> override below - stacking a
+        /// second translucent layer on top of it would match neither the
+        /// game nor audit finding H6 (content bleeding through the box).
+        /// </para>
         /// </summary>
-        private static readonly Color BackgroundColor = new Color(14, 14, 14);
+        private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.92f;
+
+        /// <summary>1px, near-black, all four edges - measured on column
+        /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
+        private static readonly Color BorderColor = new Color(6, 10, 12);
+
+        /// <summary>
+        /// Every glyph in a game tooltip carries a dark halo (measured at
+        /// 3x, spec section 1.3, gap G8). Same pair the module's own row
+        /// labels already use.
+        /// </summary>
+        private static readonly Color ShadowColor = Color.Black * 0.8f;
 
         private readonly Func<Control, TooltipContent> _resolveContent;
 
@@ -73,6 +90,35 @@ namespace GW2CraftingHelper.Views.Rendering
         public override Control TriggerMouseInput(MouseEventType mouseEventType, MouseState ms)
         {
             return null;
+        }
+
+        /// <summary>
+        /// The game's canvas instead of Blish's. Blish's own override
+        /// (decompiled, 1.3.0) draws its "tooltip" texture at
+        /// <c>Color.White * 0.98f</c> plus four dark inner edge bands;
+        /// replacing it outright is what lets the fill be translucent
+        /// without stacking two translucent layers, and what makes the
+        /// border a single measured pixel rather than Blish's gradient.
+        /// <para>
+        /// Blish's content edge buffer - <c>Thickness(4 top, 4 right,
+        /// 3 bottom, 6 left)</c>, which <c>RecalculateLayout</c> turns into
+        /// the ContentRegion every child is positioned inside - already IS
+        /// the game's measured 6px left padding with 3-4px on the other
+        /// edges (spec section 1.2, gap G23), so the padding needs no work
+        /// of its own once the art underneath it is gone.
+        /// </para>
+        /// </summary>
+        public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
+        {
+            var pixel = ContentService.Textures.Pixel;
+            spriteBatch.DrawOnCtrl(this, pixel, bounds, BackgroundColor);
+
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), BorderColor);
+            spriteBatch.DrawOnCtrl(
+                this, pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), BorderColor);
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), BorderColor);
+            spriteBatch.DrawOnCtrl(
+                this, pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), BorderColor);
         }
 
         public override void Show()
@@ -166,7 +212,11 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(System.Math.Max(1, layout.Width), System.Math.Max(1, layout.Height)),
                 Location = Point.Zero,
-                BackgroundColor = BackgroundColor,
+                // No fill of its own: the canvas is painted across the
+                // whole box by PaintBeforeChildren, so a second fill here
+                // would be the stacked-translucency case that matches
+                // neither the game nor H6.
+                BackgroundColor = Color.Transparent,
                 ShowBorder = false,
                 Parent = this
             };
@@ -205,7 +255,8 @@ namespace GW2CraftingHelper.Views.Rendering
                         y,
                         font,
                         1f,
-                        iconYOffset);
+                        iconYOffset,
+                        showShadow: true);
                     continue;
                 }
 
@@ -224,6 +275,8 @@ namespace GW2CraftingHelper.Views.Rendering
                     Text = placed.Span.Text,
                     Font = font,
                     TextColor = ResolveColor(placed.Span),
+                    ShowShadow = true,
+                    ShadowColor = ShadowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(placed.X, y),
