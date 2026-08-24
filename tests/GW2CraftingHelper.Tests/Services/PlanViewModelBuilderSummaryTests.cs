@@ -248,6 +248,146 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void CostBand_ZeroCostFromAnUnpricedItem_StaysCollapsed()
+        {
+            // The other half of the known-zero rule: this plan totals 0
+            // because nothing in it could be priced, not because it is
+            // free. "Total Materials Value 0c" would state the full market
+            // value of a craft the pipeline never valued, so the unpriced
+            // plan keeps the single result tile.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithUnpricedNodeOnlyInAReferenceBranch_RendersFullBand()
+        {
+            // A reference branch is the dimmed "what it would cost to
+            // craft instead" comparison, not part of the plan - an
+            // unpriced ingredient down there costs the user nothing and
+            // must not suppress the band.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Have,
+                IsReferenceBranch = true,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostFromIgnoredChildren_RendersFullBand()
+        {
+            // An ignored node collapses to Have + IsIgnored, never to
+            // Unknown (CraftingTreeBuilder.BuildNode), so the unpriced
+            // guard cannot swallow the case this rule exists for.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Have,
+                        IsIgnored = true
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithAnUnpricedMultiItemRoot_StaysCollapsed()
+        {
+            // A batch exposes its N roots through MultiItemRoots and
+            // leaves CraftingTree null, so the guard has to walk both.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                requestedItems: new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                },
+                multiItemRoots: new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 1,
+                        NodeId = 1,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Have
+                    },
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                });
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+        }
+
+        [Fact]
         public void CostBand_BuyOrderBasis_QualifierMovesToActualCostTooltip()
         {
             var result = MakeResult(totalCoinCost: 100);

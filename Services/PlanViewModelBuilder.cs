@@ -207,10 +207,10 @@ namespace GW2CraftingHelper.Services
         /// = Actual Cost to Craft"). When MaterialOpportunityCost is null
         /// or 0 the middle term does not exist, so the band collapses to a
         /// single "Actual Cost to Craft" tile - unless the plan costs
-        /// nothing either AND the zero middle term is a KNOWN zero rather
-        /// than an unmeasured one, in which case the full band renders at
-        /// zero (a lone tile reading "0c" with the formula around it gone
-        /// looks like a broken section, not a free plan). Actual Cost to
+        /// nothing either AND both zero terms are KNOWN zeros rather than
+        /// unmeasured ones, in which case the full band renders at zero (a
+        /// lone tile reading "0c" with the formula around it gone looks
+        /// like a broken section, not a free plan). Actual Cost to
         /// Craft is result.Plan.TotalCoinCost; the price-basis qualifier
         /// lives in this tile's tooltip.
         /// </summary>
@@ -253,7 +253,17 @@ namespace GW2CraftingHelper.Services
             // value (every node ignored or already in hand) renders the
             // whole formula at zero instead of a lone "0c" result tile
             // with the rest of the band missing.
-            bool zeroPlan = actualCost == 0 && materialsUsed == 0 && materialsUsedIsKnownZero;
+            //
+            // Both zero terms must be KNOWN zeros. A plan totalling 0
+            // because nothing in it could be priced is a different fact
+            // from a plan totalling 0 because it is free, and the band's
+            // captions ("Full market value of everything this craft
+            // consumes") state the second - so the unpriced plan keeps the
+            // collapsed tile.
+            bool zeroPlan = actualCost == 0 &&
+                materialsUsed == 0 &&
+                materialsUsedIsKnownZero &&
+                !HasUnpricedNode(result);
             if (materialsUsed > 0 || zeroPlan)
             {
                 section.Rows.Add(new PlanRowViewModel
@@ -276,6 +286,71 @@ namespace GW2CraftingHelper.Services
             // it is the formula's rightmost ("= Actual Cost to Craft")
             // term, added last either way.
             section.Rows.Add(actualCostTile);
+        }
+
+        /// <summary>
+        /// True when the display tree holds an item the pipeline could
+        /// neither craft nor price, so a zero total is an unmeasured zero
+        /// rather than a free plan. CraftingDecision.Unknown is exactly
+        /// that state - an ignored node collapses to Have + IsIgnored
+        /// instead (see CraftingTreeBuilder.BuildNode), so ignoring every
+        /// child still reads as a genuine zero.
+        /// <para>
+        /// Walked only from the zero-cost gate in BuildCostFormulaBand,
+        /// never on the ordinary priced path.
+        /// </para>
+        /// </summary>
+        private static bool HasUnpricedNode(CraftingPlanResult result)
+        {
+            if (HasUnpricedNode(result.CraftingTree, insideReferenceBranch: false))
+            {
+                return true;
+            }
+
+            if (result.MultiItemRoots != null)
+            {
+                foreach (var root in result.MultiItemRoots)
+                {
+                    if (HasUnpricedNode(root, insideReferenceBranch: false))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // insideReferenceBranch: a reference branch is the dimmed "what it
+        // would cost to craft instead" comparison, not part of the plan -
+        // an unpriced ingredient down there costs the user nothing.
+        private static bool HasUnpricedNode(CraftingTreeNode node, bool insideReferenceBranch)
+        {
+            if (node == null)
+            {
+                return false;
+            }
+
+            if (!insideReferenceBranch && node.Decision == CraftingDecision.Unknown)
+            {
+                return true;
+            }
+
+            if (node.Children == null)
+            {
+                return false;
+            }
+
+            bool childInsideReferenceBranch = insideReferenceBranch || node.IsReferenceBranch;
+            foreach (var child in node.Children)
+            {
+                if (HasUnpricedNode(child, childInsideReferenceBranch))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

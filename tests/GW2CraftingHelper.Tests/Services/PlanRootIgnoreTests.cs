@@ -17,7 +17,8 @@ namespace GW2CraftingHelper.Tests.Services
     /// (DecisionPillPlanner), the flag's single production write site
     /// (CraftingTreeBuilder.BuildTree) and the end-to-end pipeline path,
     /// including the all-children-ignored plan the suppression leaves
-    /// reachable.
+    /// reachable and the unpriced-plan counterexample that must not be
+    /// mistaken for it.
     /// </summary>
     public class PlanRootIgnoreTests
     {
@@ -253,6 +254,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
             Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
             Assert.Contains(summary.Rows, r => r.RowType == PlanRowType.SummaryFootnote);
+        }
+
+        [Fact]
+        public async Task UnpricedIngredient_ZeroesThePlanWithoutUnlockingTheZeroBand()
+        {
+            // The counterexample that keeps the zero-band rule honest: an
+            // ingredient with no recipe and no price also totals 0, but
+            // that 0 is unmeasured, not free. The plan still generates
+            // (nothing gates it), so the band must stay collapsed rather
+            // than state a full market value nobody computed.
+            var pipeline = BuildPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            // Item 2, the sole ingredient, is deliberately left unpriced.
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(0, result.Plan.TotalCoinCost);
+            Assert.Equal(CraftingDecision.Unknown, result.CraftingTree.Children[0].Decision);
+            Assert.False(result.CraftingTree.Children[0].IsIgnored);
+
+            var vm = new PlanViewModelBuilder().Build(result);
+            var summary = vm.Sections.Single(s => s.SectionType == PlanSectionType.Summary);
+            var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
         }
 
         /// <summary>
