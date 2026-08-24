@@ -13827,6 +13827,16 @@ real-production-path tests (PlanRootIgnoreTests end-to-end through
 CraftingPlanPipeline + the three zero-band viewmodel cases + the
 profit-band assertion) and are one-hover checks on the maintainer's
 live install.
+Morning re-run (2026-08-24, screens awake, captures preflight/gM1-gM8):
+those partials are now LIVE-VERIFIED - a fresh-generated root also
+offers no IGNORE pill; ignoring the sole child rendered the FULL
+three-tile band at 0 ("Total Materials Value 0c - Your Materials Used
+0c = Actual Cost to Craft 0c", profit band legitimately present since
+the plan is priced); un-ignoring restored every number. The pre-ignored
+root's escape hatch is live-UNREACHABLE by design (TriggerGenerate
+clears the ignore set, so a root cannot arrive ignored through the UI);
+its unit pin in PlanRootIgnoreTests is the correct and complete
+coverage. Bonus: the dimmed-pill dead-click tooltip fired correctly.
 ## Click volume slider (click-sound-gain)
 
 Field feedback, verbatim: the module's click sound is "VERY quiet. I can
@@ -14127,3 +14137,23 @@ maintainer's field check by nature (the sandbox cannot hear); the
 percent-to-volume mapping and clamps are pinned by
 ClickSoundVolumeTests. The maintainer's number becomes the new
 DefaultPercent in a one-line change.
+Morning re-run (2026-08-24, captures preflight/gM9-gM14): thumb DRAG
+moves the value with the readout live-updating (75 -> 21), the value
+SURVIVED a full Blish relaunch (restored at 21), and the slider was
+returned to ~the default afterwards. Notes: click-on-track does not
+jump and the wheel scrolls the panel, not the slider - both stock
+Blish TrackBar behavior. Only audibility remains with the maintainer.
+
+
+## Follow-up: snapshot rows without plan-cached stats have no rich tooltip
+
+Observed on the tooltip-authenticity gate (2026-08-23): hovering a
+Snapshot row whose item has never been part of a generated or restored
+plan shows NO tooltip (correct per the no-stats fallback rule, since
+the name is untruncated) - the rich stat block only exists for items
+the plan pipeline has fetched. The Q5 decision (live per-session stat
+fetch) is therefore only partially realized on the Snapshot surface:
+bank items never planned get no in-game-style hover. Candidate fix for
+the app-wide rollout wave: an on-hover metadata fetch through the
+deferred builders + ItemMetadataService's side-table warm path. Until
+then this is a recorded, deliberate gap - not a regression.
