@@ -340,6 +340,15 @@ namespace GW2CraftingHelper.Views
         {
             if (_panel == null) return;
 
+            // Invariant: _pressOverPanel never outlives one focus cycle.
+            // Its clear on LeftMouseButtonReleased is not guaranteed - Blish
+            // drops mouse events whenever a foreground Form owns the point,
+            // while the camera is dragging, while the cursor is hidden, and
+            // whenever GW2 does not have focus - and a latched flag re-focuses
+            // the box out of a hard release, which is the bug this panel's
+            // discriminator must not cause.
+            _pressOverPanel = false;
+
             _panel.Visible = true;
 
             if (!_globalMouseHooked)
@@ -351,6 +360,8 @@ namespace GW2CraftingHelper.Views
 
         public void HidePanel()
         {
+            _pressOverPanel = false;
+
             if (_panel != null)
             {
                 _panel.Visible = false;
@@ -398,6 +409,7 @@ namespace GW2CraftingHelper.Views
         {
             if (_disposed) return;
             _disposed = true;
+            _pressOverPanel = false;
 
             _textBox.TextChanged -= OnTextChanged;
             _textBox.ArrowPressed -= OnArrowPressed;
