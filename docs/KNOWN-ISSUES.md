@@ -12883,3 +12883,285 @@ user's live checks. Bonus: the Clear Cache ModalDialog message wraps
 un-clipped with Caption-measured button padding, the ApiAccessDialog
 stacking case renders as recorded, and both plan generations logged
 single [plan] tags.
+
+---
+
+## Tooltip authenticity (tooltip-authenticity)
+
+The maintainer's mandate, verbatim: *"tool tips should try as hard as
+possible to duplicate the in-game visual style pixel perfectly.
+divergences where necessary because of the item representations being
+slightly different are ok.. but lets try to make it match."*
+
+Everything below is built from `/mnt/c/Dev/Blish/tooltip-research/spec.md`,
+the read-only research artefact that measured the game's own tooltip off
+five wiki captures, two third-party replicas, and the live `/v2/items`
+responses. Its gap map numbers the deltas G1-G25; this section says what
+each one became. **Where the spec labels a claim `inferred` (chiefly
+FWDekker's per-item-type replica of the LINE ORDER - no modern in-game
+equipment tooltip capture exists on the wiki) the implementation follows
+the replica and this section says so.**
+
+### One correction to the record
+
+`ItemStatTooltipComposer` carried the standing comment *"No item icon:
+GW2's own item tooltips have none"*. That is **false** - all three wiki
+captures open with a ~34x34 framed item icon (spec section 1.5). It was
+the largest single visual divergence in the feature and is now the header
+row.
+
+### What changed, in the spec's own build order
+
+**1. Colours and roles** (G3, G4, G5, G6, G7, G9). `TooltipSpanRole`
+gained `Flavor`, `AbilityType`, `Warning` and a reserved `BonusInactive`;
+`Default` (white) took over the whole identity block, and `Muted` narrowed
+to genuine secondary annotations. `Bonus` went from green to the measured
+light blue - the old comment asserting *"the game's own green for granted
+bonuses"* was wrong; `Rune_effects_full.jpg` and
+`Rune_effects_partial.jpg` both show blue, and FWDekker uses `#5599ff`.
+Flavour went from grey to the measured pale teal `#B1D7D2`. Legendary
+moved to the wiki dark skin's `#974EFF`; the rest of `RarityColors` was
+already an exact match and is untouched.
+
+`ItemDescriptionSanitizer` stopped discarding the API's `<c=@...>` runs
+and now emits role-carrying spans, which is the only way "A gift bag!"
+(white) can be told from the quoted flavour after it (teal) inside one
+description string. `Sanitize()` is still exactly the concatenation of
+those spans, and a nested run restores its outer role on close.
+`ItemStatBlock` carries the description verbatim; the split happens at
+compose time. `Services/` stays XNA-free - only
+`RichTooltipSurface.ResolveColor` maps a role to a `Color`.
+
+**2. Canvas** (G1, G2, G8, G23). `RichTooltipSurface` overrides
+`PaintBeforeChildren`, so Blish's own tooltip texture (decompiled: drawn
+at `Color.White * 0.98f`, plus four dark inner edge bands) is never drawn
+at all. The box is ONE translucent layer - `Color(0,0,0) * 0.92f` - plus a
+1px `rgb(6,10,12)` border on all four edges. That is the G1 collision's
+recommended resolution: the content covers Blish's chrome entirely, so
+audit finding H6 (content bleeding through the box) stays fixed while the
+fill is the game's own translucency rather than an opaque `(14,14,14)`.
+**Never reduce the alpha while Blish's own art is still drawn underneath**
+- that stacks two translucent layers and matches neither.
+
+G23 needed no code: Blish's content edge buffer is `Thickness(4 top, 4
+right, 3 bottom, 6 left)` and `RecalculateLayout` turns it into the
+ContentRegion every child is positioned inside, which already IS the
+game's measured 6px left padding.
+
+**3. Line order and blanks** (G12, G13, G14, G15, G20) and **6. content
+completeness** (G16, G17, G18, G19), taken in one commit because both are
+lines in the same rewritten identity block.
+
+```
+[icon] <Name>                     rarity colour
+Weapon Strength / Defense         white   (thousands-separated, G19)
++<N> <Attribute>                  white
+<buff> / (N): <bonus> / nourishment   upgrade-bonus blue
+(blank)
+Infusion Slot                     white   (one line per slot, G16)
+(blank)
+<Rarity>                          white   (omitted when Basic, G20)
+<Weight class> / <Type> Armor     white
+(<Hand>)                          white   (G17)
+Damage Type / Required Level      white
+Double-click to select stats.     white   (G12)
+<description / flavour>           white / teal   (G13)
+Unique                            white   (G18)
+<binding> / <restrictions>        white
+(blank)
+<value>                           per-denomination coin run, unlabelled (G14)
+```
+
+An item with no combat facts opens with one blank line instead (measured
+on `xyaren.png`; FWDekker's `UpgradeComponent` builder emits the same
+break before a rune's bonuses). The vendor value is omitted entirely on a
+`NoSell` item - there is no last line and no blank in front of one - and
+its plain rendering now drops leading zero units through
+`CoinSegmentMath.FormatSegmentTexts`, so "7c", never "0g 0s 7c".
+
+**4. Header icon** (G11). A new HEADER line KIND on `TooltipContent`
+carrying an icon URL. `TooltipLayoutMath` gives every row its own `Y` and
+`Height`, indents a header line's name column past the icon (continuation
+rows included, with the wrap budget narrowed to match), and hands the icon
+to the first row of the line only. The icon rides `ItemStatBlock` out of
+the same `/v2/items` response the name does - no new request.
+
+**5. Metrics** (G21, G22, G24). Row heights are per-row: a prose row is
+one line pitch, only a coin row takes icon clearance, only a header row is
+icon-tall. Coin icons in a tooltip are drawn AND measured at ~0.8x the
+line height, and the tooltip wraps at 350px. Both of those are
+TOOLTIP-LOCAL by design - `CoinSegmentMath.CoinIconSize` and
+`TooltipLayoutMath.PreferredMaxContentWidth` keep their values for every
+plan table and every plain tooltip; the tooltip passes its own numbers in.
+
+### Beyond the gap map: the maintainer's own scope
+
+**Q1, all surfaces.** The rich item tooltip is now on Used Materials rows,
+Shopping List rows and the Snapshot result list as well as the recipe tree
+and the plan header. There is no per-surface fork: all five compose
+through `Services/ItemRowTooltipComposer`, whose one rule is that the stat
+block OPENS the box (it already carries the full name in its rarity
+colour, so the ellipsis fallback line would be a duplicate) and the
+surface's own extra lines follow after a blank.
+`ShoppingRowTooltipFormatter` grew a `BuildRowContent` returning
+`TooltipContent`; its HAVE/NEED wording and `BuildCurrencyLines` are
+untouched.
+
+`PlanRowViewModel` carries the row's ITEM id, **0 on a currency row** -
+the same cross-domain collision `TreeRowTooltipComposer.RowIdIsAnItemId`
+guards on the tree side (id 24 is both a real item and the currency
+"Pristine Fractal Relics"), gated in `PlanViewModelBuilder` where the
+row's source is known.
+
+**Q13, restored plans.** `TooltipFacility.ApplyRichDeferred` composes a
+row's content when the box is about to be drawn rather than at render
+time. `ApplyRestoredPlan` then fills the session stat cache in the
+background via `ItemMetadataService.WarmStatBlocksAsync`, and the next
+hover picks the blocks up with no re-render at all; a cursor already
+resting on a row when the fetch lands is redrawn by
+`TooltipFacility.RefreshCurrent`, marshalled to the main thread.
+
+`WarmStatBlocksAsync` deliberately is NOT `GetMetadataAsync`: that method
+writes the unlocked `_cache` and `_knownMissing`, which only the
+plan-generation thread touches, and a restore-time top-up racing a
+Generate would be two threads writing one Dictionary. The warm path
+writes only the locked stat side table, which was already designed for a
+background writer and a UI-thread reader. **The stat cache stays OFF the
+`PersistedPlan` graph** - nothing here touches the schema, and
+`PersistedPlanSchemaMemberSetTests` is unchanged.
+
+Deferring also moved the compose work off the render path, where it ran
+once per row per render for rows nobody points at, and let the settle
+re-ellipsis closures stop re-stamping tooltips entirely.
+
+### Accepted divergences (G16-style: representation differences, not bugs)
+
+- **Infusion slots say "Infusion Slot", not "Unused Infusion Slot"** (the
+  game's exact string, captured on
+  `Applying_Infusion_To_Ascended_Staff.jpg`). What is socketed in the
+  player's own copy is instance state `/v2/items` does not carry, so the
+  module will not claim the slot is empty. It is white and one line per
+  slot, so the BLOCK HEIGHT matches the game even though the wording does
+  not. Two slots therefore read "Infusion Slot / Infusion Slot".
+- **Armour's slot line is the API's own noun plus "Armor"** - "Gloves
+  Armor" where the game says "Hand Armor". The game's slot vocabulary
+  (Head/Hand/Chest/Leg/Foot/Shoulder) is a different word set from
+  `details.type` (Helm/Gloves/Coat/Leggings/Boots/Shoulders), and a
+  mapping table is exactly the kind of invented data this module refuses.
+  The ORDER is the game's (weight class first, measured on
+  `warhelm.jpg`); only the noun differs. **Judgment call - flagged for the
+  maintainer.**
+- **"Damage Type: <x>" has no counterpart in the game's weapon block.**
+  Kept because it is a real API fact the tooltip already showed, placed
+  after the hand line. **Judgment call - flagged.**
+- **A stat-selectable item shows "Double-click to select stats." AND its
+  own description, if it has one.** The game's description for exactly
+  that item state IS that string, so for the common case the two are the
+  same line; emitting both rather than choosing loses nothing. No
+  `/v2/itemstats` request is made and `StatChoiceCount` remains the seam
+  for a future numbered representation. **Judgment call - flagged.**
+- **No `(x/6)` counter and no greyed inactive rune tiers.** Both need the
+  character's equipped set - instance state the plan surfaces have no
+  business asking for. `TooltipSpanRole.BonusInactive` exists, reserved
+  and unused, so an equipped-aware surface does not have to re-plumb the
+  role through every composer (spec section 3.2).
+- **`<c=@reminder>` maps to the existing `Muted` role**, whose grey
+  (150,150,150) is within two levels of gw2efficiency's `#afafaf`. No
+  separate role earns its keep for it.
+- **The header icon is framed in the measured light grey (166,175,174)**,
+  not in the rarity colour the module frames its ROW icons with. The name
+  beside it already carries the rarity, and the grey is what the capture
+  shows. **Judgment call - flagged.**
+- **The upgrade-bonus blue `Color(120,170,235)` is a recommendation, not a
+  measurement.** The direction (blue, not green) is measured and
+  unambiguous; the exact triple comes from a heavily-compressed JPEG over
+  a dark-blue scene plus one replica.
+- **Coin number tints are unchanged** (G10). The only measurement is a
+  2012 capture; the module's constants are brighter. Not chased without a
+  modern sample.
+
+### Reviewer-scrutiny list
+
+- **`PaintBeforeChildren` replaces Blish's art outright.** If a future
+  Blish version moves the tooltip's painting, the box would lose its
+  background rather than gain a second one. Measured against 1.3.0 by
+  decompilation (`ilspycmd`, repo precedent).
+- **Deferred builders run inside Blish's mouse-moved handler.** An
+  exception in one would be a crash on hover, so resolution is wrapped -
+  the box shows nothing and the failure is logged. Every builder should
+  stay a pure read of already-built state.
+- **A deferred builder retains what it closes over** for as long as its
+  control lives: the row view model, the name Label, the renderer's stat
+  lookup. Value-references-key cycles in a `ConditionalWeakTable` are the
+  documented ephemeron case and still collect, but the retained graph per
+  row is larger than the finished `TooltipContent` it replaced.
+- **Compose-per-hover cost is unmeasured.** It is ~20 builder lines plus a
+  short `StringBuilder` walk of the description, once per hover, against
+  the per-render composition it replaced. Inferred to be a net win; nobody
+  has profiled it.
+- **Icon-note clobbering.** `ApplyRichDeferredToIconTree` cannot skip an
+  empty payload the way the eager version does (nothing is composed yet),
+  so it would overwrite an icon's own "no icon available for this entry"
+  note with silence. Call sites gate on the row having a real item id -
+  EXCEPT the recipe tree, whose builder is effectively never empty (a tree
+  row carries plan lines and the wiki affordance). If a tree row is ever
+  found with no tooltip at all AND a missing icon, that gate needs the
+  same treatment.
+- **The header row's wrap budget** is `maxWidth - indent` for continuation
+  rows. A very long item name in a narrow box is the case to look at.
+- **`RefreshCurrent` is main-thread only.** It is reached from a
+  background continuation exclusively through `MainThreadMarshal.Run`.
+- **`ItemStatTooltipComposer.SpaceCamelCase`** is unchanged and would
+  still mangle an acronym-bearing type token ("PvP" -> "Pv P"); no such
+  token exists in the type vocabulary today.
+
+### Desktop gate (live, required)
+
+1. Hover a crafting material row in the recipe tree. The box opens with a
+   ~34x34 FRAMED ICON and the item name beside it, vertically centred on
+   the icon - not a name-only first line.
+2. The box itself: square corners, a 1px near-black border on all four
+   edges, a faintly translucent black fill with the scene visible through
+   it, and NO Blish tooltip art (no rounded/lit texture, no gradient edge
+   bands). Every glyph carries a dark halo.
+3. Hover an item with attributes (any ascended armour piece): the
+   attribute lines are WHITE, and so are the rarity word, the type, the
+   weight class and the binding line. Nothing in that block is grey.
+   Only the NAME carries the rarity colour.
+4. Hover a Superior Rune: all six `(N): <bonus>` lines are LIGHT BLUE,
+   not green, none greyed, and there is no `(x/6)` counter.
+5. Hover an item whose description has a flavour run (Zojja's anything):
+   the flavour is pale TEAL and any unmarked description prose beside it
+   stays white.
+6. The vendor value is the LAST line, alone after a blank, with no
+   "Vendor value:" label, per-denomination tints, and coin ICONS to the
+   RIGHT of their numbers. On a NoSell item (Bolt, a Rebreather) there is
+   no value line and no trailing blank at all.
+7. A Basic item (Mithril Ore) shows NO "Basic" line; an Exotic one shows
+   "Exotic" in white.
+8. Coin icons in the tooltip are noticeably smaller than the plan
+   tables' - about 0.8x the line height - and the plan tables' own coin
+   icons are UNCHANGED. Prose rows are one line pitch apart with no extra
+   padding.
+9. Flavour text wraps at roughly 350px, not 500. Plain tooltips
+   elsewhere in the module are unchanged.
+10. Hover a row in Used Materials, a row in the Shopping List (name,
+    quantity, source tag, Each cell, Total cell, and the icon), and a row
+    in the Snapshot result list. All show the same rich item tooltip. A
+    Shopping List row with a currency cost still shows its HAVE/NEED
+    lines, after the stat block and one blank.
+11. Id-space gate: hover a CURRENCY shopping row and a currency
+    cost-component leaf in the tree. Neither may open with an unrelated
+    ITEM's name, rarity, type or vendor value.
+12. Resize the window across a row's truncation boundary with the cursor
+    held still on that row: the tooltip's name must appear exactly once,
+    never twice, on either side of the boundary.
+13. Q13: restart Blish so the plan restores from disk WITHOUT
+    regenerating. Within a few seconds of the tab opening, hovering a
+    tree row shows the full stat block - no Generate needed. Confirm the
+    first hover before the fetch lands is the plain fallback and never an
+    empty or flickering box.
+14. Confirm no tooltip anywhere shows a raw item id, currency id or
+    vendor id.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
