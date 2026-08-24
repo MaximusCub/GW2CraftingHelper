@@ -12972,10 +12972,13 @@ Unique                            white   (G18)
 <value>                           per-denomination coin run, unlabelled (G14)
 ```
 
-An item with no combat facts opens with one blank line instead (measured
-on `xyaren.png`; FWDekker's `UpgradeComponent` builder emits the same
-break before a rune's bonuses). The vendor value is omitted entirely on a
-`NoSell` item - there is no last line and no blank in front of one - and
+Whether a blank sits under the header depends on what the body OPENS
+with, not on combat facts alone. A body opening with the combat facts or
+with the nourishment block runs straight on; one opening with the
+identity block, or with an upgrade component's bonus run, takes a blank
+first. See "Post-review corrections" below for the measurements and for
+the one capture this still diverges from. The vendor value is omitted
+entirely on a `NoSell` item - there is no last line and no blank in front of one - and
 its plain rendering now drops leading zero units through
 `CoinSegmentMath.FormatSegmentTexts`, so "7c", never "0g 0s 7c".
 
@@ -13065,9 +13068,11 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   business asking for. `TooltipSpanRole.BonusInactive` exists, reserved
   and unused, so an equipped-aware surface does not have to re-plumb the
   role through every composer (spec section 3.2).
-- **`<c=@reminder>` maps to the existing `Muted` role**, whose grey
-  (150,150,150) is within two levels of gw2efficiency's `#afafaf`. No
-  separate role earns its keep for it.
+- **`<c=@reminder>` has its own `Reminder` role at (175,175,175)**, the
+  spec's section-1.4 constant for it (gw2efficiency `.desc-reminder`
+  `#afafaf`, inferred). It is deliberately NOT folded into `Muted`
+  (150,150,150), which is the measured `#939496` annotation grey off
+  `xyaren.png` - two sources, 25 levels per channel apart.
 - **The header icon is framed in the measured light grey (166,175,174)**,
   not in the rarity colour the module frames its ROW icons with. The name
   beside it already carries the rarity, and the grey is what the capture
@@ -13079,6 +13084,24 @@ re-ellipsis closures stop re-stamping tooltips entirely.
 - **Coin number tints are unchanged** (G10). The only measurement is a
   2012 capture; the module's constants are brighter. Not chased without a
   modern sample.
+- **A consumable's use description stays inside the identity block, so
+  `warhelm.jpg` keeps its blank under the header where the game has
+  none.** The game (and FWDekker's `Consumable` / `Container` / `Generic`
+  builders) put a consumable's description FIRST, above the identity
+  block; the module puts every description in the identity position,
+  which is what G13 measured off `xyaren.png` and what keeps one line
+  order for every item type. Given that placement the identity block is
+  what opens the body, and a blank before it is correct. Reversing it
+  means per-item-type builders. **Judgment call - flagged.**
+- **No blank before the binding-flags block**, which gap G15 lists as one
+  of four required blanks. The primary evidence does not support it:
+  `warhelm.jpg` renders `Consumable` and `Account Bound` on consecutive
+  16px pitches with no gap (measured, bands y=160-168 and y=176-184), and
+  FWDekker's `getFlags()` carries no leading break in any of its fifteen
+  builders. `xyaren.png` does show a blank above `Unique`, but the line
+  above that blank is the `0/500 in Material Storage` annotation - its
+  own block, blank-separated on both sides - which this module does not
+  have. Emitting the blank would make `warhelm` measurably worse.
 
 ### Reviewer-scrutiny list
 
@@ -13102,11 +13125,12 @@ re-ellipsis closures stop re-stamping tooltips entirely.
 - **Icon-note clobbering.** `ApplyRichDeferredToIconTree` cannot skip an
   empty payload the way the eager version does (nothing is composed yet),
   so it would overwrite an icon's own "no icon available for this entry"
-  note with silence. Call sites gate on the row having a real item id -
-  EXCEPT the recipe tree, whose builder is effectively never empty (a tree
-  row carries plan lines and the wiki affordance). If a tree row is ever
-  found with no tooltip at all AND a missing icon, that gate needs the
-  same treatment.
+  note with silence. It now captures each control's plain tooltip before
+  stamping and returns it as the builder's fallback
+  (`TooltipContent.OrText`), which covers every call site including the
+  recipe tree. The `row.ItemId > 0` gates that remain are about a
+  currency icon naming its own currency, NOT about emptiness - they never
+  prevented it (see "Post-review corrections").
 - **The header row's wrap budget** is `maxWidth - indent` for continuation
   rows. A very long item name in a narrow box is the case to look at.
 - **`RefreshCurrent` is main-thread only.** It is reached from a
@@ -13114,6 +13138,68 @@ re-ellipsis closures stop re-stamping tooltips entirely.
 - **`ItemStatTooltipComposer.SpaceCamelCase`** is unchanged and would
   still mangle an acronym-bearing type token ("PvP" -> "Pv P"); no such
   token exists in the type vocabulary today.
+
+### Post-review corrections
+
+An adversarial review of the milestone raised six Must Fix findings.
+Each was verified before being acted on; one was refuted with
+measurements and is recorded as a divergence instead of a fix.
+
+**1. The header's blank contradicted `warhelm.jpg` - FIXED, and the rule
+re-derived.** The rule was "no combat facts -> blank", and its comment
+cited `warhelm.jpg` and `steak.png` as captures of items that HAVE
+combat facts. Neither does. Re-measured (PIL, per-row glyph-band profile
+of each capture):
+
+| Capture | icon bottom | first body band | blank? |
+|---|---|---|---|
+| `xyaren.png` (Exotic back item) | y=34 | y=53 | yes |
+| `warhelm.jpg` (Fine transmutation consumable) | y=37 | y=38 | no |
+| `steak.png` (Fine food) | y=37 | y=39 | no |
+
+That also settles a contradiction inside the spec itself: section 1.2
+measures `steak.png` as `37 -> 39` while section 1.6's ASCII
+transcription of the same image draws a blank under the name. The
+measurement wins. FWDekker's per-type builders agree and explain the
+split - `Armor` / `Weapon` / `Consumable` / `Container` / `Generic` emit
+their leading block with no break, while `Back` / `Bag` /
+`UpgradeComponent` emit `getHeader() + "<br />"`. So the blank is owed
+when the body opens with the identity block or with a bonus run, not
+when combat facts are merely absent. Food now runs its nourishment block
+straight on under the header. The residual `warhelm` divergence is in
+the divergence list above.
+
+**2. The missing fourth blank of G15 (before the flags block) -
+REFUTED.** See the divergence list: `warhelm.jpg` measures the flags
+line contiguous with the line above it, and FWDekker emits no break
+before `getFlags()`. The finding cited `warhelm.jpg` as showing the
+blank; it does not. Recorded rather than implemented.
+
+**3. A header line with a null icon url - FIXED.** `LayoutContent`
+reserved the 39px name indent for every header line, while `RenderRow`
+drew only when `IconUrl != null`, so an item whose `/v2/items` response
+carries no `icon` rendered its name floating over an empty reserved
+column with the body below it at x=0. `TooltipLine.IconUrl`'s own
+contract promised the opposite. `HeaderLine` now normalises null to
+empty, so a header row always has an icon to draw and null keeps one
+meaning: this row draws no icon.
+
+**4. The `row.ItemId > 0` gate did not prevent icon-note clobbering -
+FIXED.** A real item id does not make the builder non-empty:
+`ItemRowTooltipComposer.BuildRowContent(null stats, short name, no
+extras)` returns `Empty`, which is exactly the state of a plan restored
+from disk before the Q13 top-up lands. See the reviewer-scrutiny entry
+above for the fix.
+
+**5. `ShoppingRowTooltipFormatter` doc-comment hijack - FIXED.** The
+`BuildCurrencyLines` summary had been left in place above the newly
+inserted `BuildRowContent`, leaving the new method with two `<summary>`
+elements and `BuildCurrencyLines` bare of the "THIS ROW" scope-collision
+rationale that keeps its suffix from reading as noise. Moved back.
+
+**6. The reminder-grey justification was wrong by an order of magnitude
+- FIXED.** `#afafaf` is 175, not "within two levels" of `Muted`'s 150.
+`Reminder` is now its own role at the spec's `Color(175,175,175)`.
 
 ### Desktop gate (live, required)
 
@@ -13163,5 +13249,20 @@ re-ellipsis closures stop re-stamping tooltips entirely.
     empty or flickering box.
 14. Confirm no tooltip anywhere shows a raw item id, currency id or
     vendor id.
+15. Hover a FOOD item (a Cup of Lotus Fries, any feast). Its nourishment
+    lines start on the line immediately under the header - no blank
+    between the name and the first effect. An item with no combat facts
+    and no nourishment (a back item, a crafting material) still opens
+    with one blank.
+16. Hover an item whose icon never loads or whose entry has no icon at
+    all. The header shows the neutral dark empty-slot square with its
+    "-" mark, the name sits beside it in the same column every other
+    tooltip's name sits in, and the body lines below start at the left
+    padding - the name must not float over an empty gap.
+17. Restart Blish so the plan restores from disk, and BEFORE the stat
+    top-up lands hover the ICON of a Used Materials / Shopping List /
+    Snapshot row whose icon is missing. It must still say "No icon
+    available for this entry." - never an empty box. After the top-up
+    lands the same hover shows the full stat block.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
