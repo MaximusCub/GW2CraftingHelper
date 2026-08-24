@@ -1371,10 +1371,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// The gate is deliberately strict, and every rejection is a
         /// correct full rebuild rather than a wrong cheap one: the new
         /// tree must present the SAME built rows, in the same order, at the
-        /// same depth and dim state, with the same children counts; the
-        /// cost sub-column widths and the header's node count must be
-        /// unchanged (both are chrome this refresh preserves rather than
-        /// redraws). Ignoring a LEAF material - the common case, and the
+        /// same depth and dim state, each still passing
+        /// <see cref="TreeRowIdentity"/> against the node its row was built
+        /// from; the cost sub-column widths and the header's node count
+        /// must be unchanged (both are chrome this refresh preserves rather
+        /// than redraws). Ignoring a LEAF material - the common case, and the
         /// one the field report is about - satisfies all of that. Ignoring
         /// a node with children does not, because an ignored node is built
         /// as a leaf, and that click still pays for a full rebuild.
@@ -1411,10 +1412,16 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Walks the new tree, pairing each node that HAS a row with that
-        /// row and refusing the moment the two disagree about structure.
-        /// Only a node whose children were actually built descends - a
-        /// collapsed subtree has no rows, so its shape is free to differ
-        /// and is simply adopted along with the node.
+        /// row and refusing the moment the two disagree about identity or
+        /// structure. Only a node whose children were actually built
+        /// descends - a collapsed subtree has no rows, so its shape is free
+        /// to differ and is simply adopted along with the node.
+        /// <para>
+        /// A matching NodeId is where the pairing STARTS, not where it is
+        /// settled: a synthetic cost-component id names a position in a
+        /// vendor offer rather than an item, so identity is asked of
+        /// TreeRowIdentity, which owns the argument.
+        /// </para>
         /// </summary>
         private bool MatchRows(
             IReadOnlyList<CraftingTreeNode> newSiblings, int depth, bool dimmed,
@@ -1425,11 +1432,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 var newNode = newSiblings[i];
                 if (!_treeRowsByNodeId.TryGetValue(newNode.NodeId, out var handle)) return false;
                 if (handle.Depth != depth || handle.Dimmed != dimmed) return false;
-                if (handle.Node.Children.Count != newNode.Children.Count) return false;
-
-                // A qty prefix that appears or disappears changes which
-                // controls the row HAS, not just what they say.
-                if ((handle.Node.Quantity > 0) != (newNode.Quantity > 0)) return false;
+                if (!TreeRowIdentity.SameRow(handle.Node, newNode)) return false;
 
                 plan.Add(new KeyValuePair<TreeRowHandle, CraftingTreeNode>(handle, newNode));
 
@@ -1453,10 +1456,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Re-renders the parts of one row a re-solve can change - the qty
         /// prefix, the pill column, the cost cell and the tooltip - into
-        /// the controls the row already has. Everything a NodeId fixes for
-        /// the row's whole life (icon, name text, rarity colour, caret,
-        /// dim chrome) is left alone, which is most of the row and all of
-        /// its texture work.
+        /// the controls the row already has. Everything
+        /// <see cref="TreeRowIdentity"/> has just proved unchanged (icon,
+        /// name text, rarity colour, caret, dim chrome) is left alone,
+        /// which is most of the row and all of its texture work.
         /// <para>
         /// Unconditional rather than gated on a per-row "did anything
         /// change" test: a pill's own text, colour, tooltip and click
@@ -1483,9 +1486,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
             var edges = RowEdges(handle, panelWidth);
 
-            // Only when the budget actually moved: the name TEXT is fixed
-            // by the NodeId, so an unchanged qty prefix leaves an unchanged
-            // ellipsis, and this is the row's only MeasureString loop.
+            // Only when the budget actually moved: the name TEXT is one of
+            // the facts TreeRowIdentity proved unchanged, so an unchanged
+            // qty prefix leaves an unchanged ellipsis, and this is the
+            // row's only MeasureString loop.
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, handle.FullName, edges.NameMaxWidth);
             if (handle.NameLabel.Text != displayName)
             {
