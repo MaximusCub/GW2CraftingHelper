@@ -14061,6 +14061,30 @@ only where the margin is not a glyph's width: 930, where Full misses by
 slack. The 1024 arithmetic is recorded in the file as the reason that
 width carries no tier assertion.
 
+**8 (must fix). The number the fit negotiates against lived in the view
+as five literals, and the test re-typed it.** The repo invariant puts
+column/height/ramp arithmetic in `Services/` with tests;
+`TreeChipStripLayout.Fit` honoured it but its `limitX` did not.
+`PlaceTreeToolbarRow` derived the limit from a walk over widths that
+existed only as arguments to `CreateTreeToolbarRow`'s five `PlaceRight`
+calls, so the test hard-coded `414 + 32 + 20` beside a comment admitting
+a width changed there would leave the boundary cases describing a row
+that no longer exists. Renaming "Craft All" to something 34px wider
+would have kept production correct (it measures the walk) and quietly
+turned every boundary case in the suite into a statement about a row
+nobody ships.
+
+`Services/TreeToolbarRowLayout` now owns the row's fixed geometry - each
+button's width and the gap to its left, the two chip clear buttons'
+widths, and `ChipLimitX(rowWidth)` derived from their sum.
+`PlaceTreeToolbarRow` reads `ChipLimitX`, `CreateTreeToolbarRow` places
+the same slots, and the tests fit against the same function, so a width
+change moves all three at once. Proven by mutation: widening one slot by
+400px fails five tests in this suite; before the change the same edit
+moved production and left the suite green. `WindowSizing.RightEdgePadding`
+is named for the same reason - the cluster stands off the row's right
+edge by the same 20px `WindowToTabPanelChrome` already accounts for.
+
 ### Desktop gate checklist (live Blish, real plan)
 
 1. Every section at the 1378px minimum width: the ramp is legible -

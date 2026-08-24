@@ -92,7 +92,15 @@ namespace GW2CraftingHelper.Services
         /// The 8px border term is worth +/-2px; nothing derived from it is
         /// within 400px of a layout boundary.
         /// </summary>
-        public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + 20;
+        public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + RightEdgePadding;
+
+        /// <summary>
+        /// Trailing padding a tab's content keeps clear of the scrollbar -
+        /// the last term of <see cref="WindowToTabPanelChrome"/>, named here
+        /// because the toolbar row's right-anchored cluster stands off the
+        /// row's right edge by the same amount and the two must not drift.
+        /// </summary>
+        public const int RightEdgePadding = 20;
 
         /// <summary>Panel width a tab's content gets inside a window of this width.</summary>
         public static int TabPanelWidthFor(int windowWidth)

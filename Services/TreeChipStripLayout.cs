@@ -115,9 +115,10 @@ namespace GW2CraftingHelper.Services
         /// <para>
         /// This exists because the row has two clusters and only one of
         /// them used to have arithmetic. The chips replaced a fixed ~90px
-        /// grey caption with up to ~450px of live content, against five
-        /// right-anchored buttons that start at rowWidth - 466: below
-        /// roughly a 914px row they overlap, and two live buttons on the
+        /// grey caption with up to ~450px of live content, against the
+        /// right-anchored button cluster
+        /// <see cref="TreeToolbarRowLayout.ChipLimitX"/> measures: on a
+        /// narrow enough row they overlap, and two live controls on the
         /// same pixels is a click landing on whichever Blish hit-tests
         /// last. Reachable well inside the module's own supported range -
         /// WindowSizing.EffectiveMinWindowWidth falls back to the client

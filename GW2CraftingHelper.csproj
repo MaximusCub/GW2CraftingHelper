@@ -84,6 +84,7 @@
     <Compile Include="Services\InlineSpinnerLayout.cs" />
     <Compile Include="Services\TopRegionLayoutMath.cs" />
     <Compile Include="Services\TreeChipStripLayout.cs" />
+    <Compile Include="Services\TreeToolbarRowLayout.cs" />
     <Compile Include="Services\TreeRowIdentity.cs" />
     <Compile Include="Services\TypeRampMetrics.cs" />
     <Compile Include="Services\TradingPostMath.cs" />

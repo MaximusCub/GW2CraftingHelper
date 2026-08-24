@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Views
         private const int RowButtonGap = 8;
         private const int RowButtonY = 3;
 
-        private const int RightEdgePadding = 20;
+        private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
 
         // Aliased, not duplicated: the band height, its title y and its
@@ -2061,19 +2061,12 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        // Toolbar row geometry. The five widths are the ones the buttons
-        // carried in the section header; only their home changed.
+        // Toolbar row geometry. The widths and gaps are TreeToolbarRowLayout's
+        // (the chip strip negotiates against their total, so they cannot be
+        // literals here); the height is the module's button height.
         private const int TreeToolbarButtonHeight = UiMetrics.ButtonHeight;
         private const int TreeToolbarButtonY =
             (TopRegionLayoutMath.TreeToolbarRowHeight - TreeToolbarButtonHeight) / 2;
-        private const int TreeToolbarButtonGap = 4;
-
-        // Separates the three plan-mutating presets from the two view-only
-        // actions. Wider than TreeToolbarButtonGap on purpose: "Buy All"
-        // re-solves the whole plan and "Expand All" only opens branches,
-        // and sitting them 4px apart in one undifferentiated run invited
-        // exactly the misclick that costs a set of manual overrides.
-        private const int TreeToolbarGroupGap = 20;
 
         /// <summary>
         /// The Recipe Tree's action row, in the non-scrolling strip. It is
@@ -2106,38 +2099,39 @@ namespace GW2CraftingHelper.Views
             // Right to left, so the row stays anchored to the right edge at
             // every window width. gapToLeft is the space left BEFORE the
             // next button placed (which lands to this one's left).
-            void PlaceRight(string text, int width, int gapToLeft, string tooltipText, Action onClick)
+            void PlaceRight(
+                string text, TreeToolbarRowLayout.ButtonSlot slot, string tooltipText, Action onClick)
             {
                 var button = new FeedbackButton()
                 {
                     Text = text,
-                    Size = new Point(width, TreeToolbarButtonHeight),
+                    Size = new Point(slot.Width, TreeToolbarButtonHeight),
                     Parent = _treeToolbarPanel
                 };
                 TooltipFacility.ApplyPlain(button, tooltipText);
                 button.Click += (_, __) => onClick();
-                _treeToolbarButtons.Add((button, width, gapToLeft));
+                _treeToolbarButtons.Add((button, slot.Width, slot.GapToLeft));
             }
 
             // The two view-only actions go straight through; the three that
             // destroy manual decisions go through the confirm matrix.
-            PlaceRight("Collapse All", 96, TreeToolbarButtonGap,
+            PlaceRight("Collapse All", TreeToolbarRowLayout.CollapseAll,
                 "Collapses every branch of the Recipe Tree back down to the top level.",
                 () => InvokeTreeCommand(c => c.CollapseAll));
-            PlaceRight("Expand All", 92, TreeToolbarGroupGap,
+            PlaceRight("Expand All", TreeToolbarRowLayout.ExpandAll,
                 "Expands every branch of the Recipe Tree, including nested children, so the full tree is visible.",
                 () => InvokeTreeCommand(c => c.ExpandAll));
-            PlaceRight("Buy All", 70, TreeToolbarButtonGap,
+            PlaceRight("Buy All", TreeToolbarRowLayout.BuyAll,
                 "Forces every ingredient with a Trading Post price to Buy from TP, throughout the whole tree " +
                 "including nodes hidden under bought items - replacing any manual choices already made. " +
                 "Ingredients with no Trading Post price fall back to the solver's normal choice.",
                 ConfirmBuyAll);
-            PlaceRight("Craft All", 76, TreeToolbarButtonGap,
+            PlaceRight("Craft All", TreeToolbarRowLayout.CraftAll,
                 "Forces every ingredient with a known recipe to Craft, throughout the whole tree including " +
                 "nodes hidden under bought items - replacing any manual choices already made. Ingredients " +
                 "with no recipe fall back to the solver's normal choice.",
                 ConfirmCraftAll);
-            PlaceRight("Best Path", 80, 0,
+            PlaceRight("Best Path", TreeToolbarRowLayout.BestPath,
                 "Clears every manual override, including Craft All/Buy All, and re-solves for the solver's " +
                 "cheapest plan. Ignore selections are left unchanged.",
                 ConfirmBestPath);
@@ -2327,8 +2321,8 @@ namespace GW2CraftingHelper.Views
         private Label _ignoredChipLabel;
         private StandardButton _clearIgnoredButton;
 
-        private const int ClearOverridesButtonWidth = 124;
-        private const int ClearIgnoredButtonWidth = 110;
+        private const int ClearOverridesButtonWidth = TreeToolbarRowLayout.ClearOverridesButtonWidth;
+        private const int ClearIgnoredButtonWidth = TreeToolbarRowLayout.ClearIgnoredButtonWidth;
 
         /// <summary>
         /// Rightmost x the chip strip may reach, written by
@@ -2498,11 +2492,11 @@ namespace GW2CraftingHelper.Views
         /// Visible.
         /// </para>
         /// <para>
-        /// The walk that anchors the buttons also PUBLISHES where their
-        /// cluster starts, and the chips are re-fitted against it. The two
-        /// clusters share one row and only this method knows its width, so
-        /// a left cluster laid out without that number is a left cluster
-        /// laid out over the buttons - which is what the chips did before
+        /// Placing the buttons also PUBLISHES where their cluster starts,
+        /// and the chips are re-fitted against it. The two clusters share
+        /// one row and only this method knows its width, so a left cluster
+        /// laid out without that number is a left cluster laid out over the
+        /// buttons - which is what the chips did before
         /// TreeChipStripLayout.Fit existed.
         /// </para>
         /// </summary>
@@ -2523,10 +2517,11 @@ namespace GW2CraftingHelper.Views
                 x -= gapToLeft;
             }
 
-            // The same group gap that separates the presets from the
-            // view-only actions: the two clusters have to read apart, not
-            // merely not overlap.
-            _treeChipLimitX = x - TreeToolbarGroupGap;
+            // The walk above places the same slots ChipLimitX sums, so the
+            // limit is the walk's own end x less the group gap - taken from
+            // TreeToolbarRowLayout so the tests can assert the boundary
+            // against the widths that actually ship.
+            _treeChipLimitX = TreeToolbarRowLayout.ChipLimitX(w);
             RefreshTreeStateChips();
         }
 

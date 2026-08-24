@@ -12,9 +12,9 @@ namespace GW2CraftingHelper.Tests.Services
     public class TreeChipStripLayoutTests
     {
         private const int OverridesLabel = 90;
-        private const int OverridesButton = 124;
+        private const int OverridesButton = TreeToolbarRowLayout.ClearOverridesButtonWidth;
         private const int IgnoredLabel = 70;
-        private const int IgnoredButton = 110;
+        private const int IgnoredButton = TreeToolbarRowLayout.ClearIgnoredButtonWidth;
 
         /// <summary>
         /// A limit no arrangement can reach - for the tests that are about
@@ -252,25 +252,13 @@ namespace GW2CraftingHelper.Tests.Services
         private const int ShippedOverridesLabel = 90;
         private const int ShippedIgnoredLabel = 78;
 
-        // The five right-anchored buttons: 414px of width (96 + 92 + 70 +
-        // 76 + 80) plus 32px of gaps (4 + 20 + 4 + 4), anchored
-        // RightEdgePadding clear of the row's right edge. Read from
-        // CraftingPlanView.CreateTreeToolbarRow's PlaceRight calls; a width
-        // changed there without changing this makes the boundary cases
-        // above describe a row that no longer exists.
-        private const int RightClusterWidth = 414 + 32 + 20;
-
-        /// <summary>
-        /// The two clusters have to read apart, not merely not overlap -
-        /// CraftingPlanView passes the same gap it groups the buttons by.
-        /// </summary>
-        private const int ClusterSeparation = 20;
-
         /// <summary>
         /// The strip's placement on a client of the given width, and the x
         /// the button cluster starts at, through the same chain the view
         /// uses: the window minimum actually enforced there, the tab panel
-        /// inside it, and the toolbar row inside that.
+        /// inside it, the toolbar row inside that, and
+        /// TreeToolbarRowLayout.ChipLimitX - the one owner of the cluster's
+        /// width, which CraftingPlanView.PlaceTreeToolbarRow reads too.
         /// </summary>
         private static (TreeChipStripLayout.Placement Placement, int LimitX) FitAtClientWidth(
             int clientWidth, int overridesLabelWidth, int ignoredLabelWidth)
@@ -281,8 +269,8 @@ namespace GW2CraftingHelper.Tests.Services
             // WindowToTabPanelChrome already took off: the toolbar row is
             // parented to the strip, which is the whole content region, and
             // it is the button walk that steps back in from its edge.
-            int rowWidth = WindowSizing.TabPanelWidthFor(windowWidth) + 20;
-            int limitX = rowWidth - RightClusterWidth - ClusterSeparation;
+            int rowWidth = WindowSizing.TabPanelWidthFor(windowWidth) + WindowSizing.RightEdgePadding;
+            int limitX = TreeToolbarRowLayout.ChipLimitX(rowWidth);
 
             var placement = TreeChipStripLayout.Fit(
                 0, limitX,
