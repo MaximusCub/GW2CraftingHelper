@@ -438,7 +438,8 @@ namespace GW2CraftingHelper
                 _settings,
                 ClearCache,
                 SaveStatus,
-                SaveStatusThreadSafe
+                SaveStatusThreadSafe,
+                itemMetadataService.GetCachedStatBlock
             );
 
             _craftingContent = new CraftingPlanView(

@@ -909,10 +909,13 @@ namespace GW2CraftingHelper.Views.Rendering
             var currentPlan = _getCurrentPlan();
             var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(node, captionText, currentPlan);
 
-            // Width-invariant like extraTooltipContent, so it is composed
-            // once per row per render and reused verbatim by the settle
-            // re-ellipsis closure rather than recomposed there.
-            var statTooltipContent = TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
+            // Composed at HOVER time, not here: a plan restored from disk
+            // fills its stat cache in the background (Q13), so a snapshot
+            // taken at render time could never show what lands after it.
+            // The lookup itself is a session cache read - see
+            // ItemMetadataService.GetCachedStatBlock, which never fetches.
+            Func<TooltipContent> getStatContent =
+                () => TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
 
             // This module's only external-URL launch - a context action
             // (right-click), not a visible icon. Every tree
@@ -975,7 +978,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             UpdateTreeRowTooltip(
                 rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
-                displayName, fullName, statTooltipContent, extraTooltipContent);
+                () => displayName, fullName, getStatContent, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1162,12 +1165,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
                     w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
+                // No tooltip re-stamp: the deferred builder reads the
+                // label's CURRENT text when the box is drawn.
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(
-                        rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
-                        newDisplayName, fullName, statTooltipContent, extraTooltipContent);
                 }
             });
         }
@@ -1186,34 +1188,24 @@ namespace GW2CraftingHelper.Views.Rendering
         private static void UpdateTreeRowTooltip(
             Panel rowPanel, Label nameLabel, Label qtyLabel,
             Panel iconFrame, Panel iconScrim,
-            string displayName, string fullName,
-            TooltipContent statContent, TooltipContent extraContent)
+            Func<string> getDisplayName, string fullName,
+            Func<TooltipContent> getStatContent, TooltipContent extraContent)
         {
-            var builder = new TooltipContentBuilder();
-            bool hasStats = statContent != null && !statContent.IsEmpty;
-            if (hasStats)
+            // The whole tooltip is composed when the box is about to be
+            // drawn - see TooltipFacility.ApplyRichDeferred. Which means
+            // the row's re-ellipsis no longer has to re-stamp anything,
+            // and a stat block fetched after this render still shows.
+            Func<TooltipContent> build = () =>
             {
                 // The stat block already OPENS with the full item name, in
-                // its rarity colour, so the truncation line below would be
-                // a duplicate. Its own blank-line rhythm is why the plan
-                // lines that follow get a separator they did not have when
-                // they were the whole tooltip.
-                builder.Append(statContent);
-                if (extraContent != null && !extraContent.IsEmpty)
-                {
-                    builder.Separator();
-                }
-            }
-            else if (displayName != fullName)
-            {
-                // The full item name, the one line of this tooltip that was
-                // never routed through any wrap - an item name is
-                // arbitrarily long and used to be prepended raw. It now
-                // goes through the facility with everything else.
-                builder.Text(fullName).EndLine();
-            }
-            builder.Append(extraContent);
-            var content = builder.Build();
+                // its rarity colour, so the truncation line would be a
+                // duplicate; the name line is the no-stats fallback only.
+                // The blank between it and the plan lines is its own
+                // block rhythm.
+                var statContent = getStatContent();
+                return ItemRowTooltipComposer.BuildRowContent(
+                    statContent, fullName, getDisplayName() != fullName, extraContent);
+            };
 
             // The name and quantity Labels get it too, not just the row
             // Panel. Tooltip lookup reads ONE control -
@@ -1235,17 +1227,17 @@ namespace GW2CraftingHelper.Views.Rendering
             // deepest child only wins the RETURN value (ActiveControl) and
             // suppresses its siblings. Duplicating toggleHandler onto a Label
             // would toggle the row twice per click.
-            TooltipFacility.ApplyRich(rowPanel, content);
-            TooltipFacility.ApplyRich(nameLabel, content);
-            TooltipFacility.ApplyRich(qtyLabel, content);
+            TooltipFacility.ApplyRichDeferred(rowPanel, build);
+            TooltipFacility.ApplyRichDeferred(nameLabel, build);
+            TooltipFacility.ApplyRichDeferred(qtyLabel, build);
 
             // The icon column is the same swallowed-hover case, one level
             // deeper: the framed icon is a Panel inside a Panel, and a
             // dimmed row lays a scrim Panel over the top of both. Left
             // unstamped, the largest and most obvious target on the row -
             // the item picture - was the one spot that showed nothing.
-            IconControls.ApplyRichToIconTree(iconFrame, content);
-            IconControls.ApplyRichToIconTree(iconScrim, content);
+            IconControls.ApplyRichDeferredToIconTree(iconFrame, build);
+            IconControls.ApplyRichDeferredToIconTree(iconScrim, build);
         }
 
         // --- Decision pills ---

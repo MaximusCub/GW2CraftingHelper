@@ -37,6 +37,45 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ItemRows_CarryTheirItemIdSoTheirTooltipCanFindTheStatBlock()
+        {
+            var result = MakeResult(
+                metadata: MetaFor((10, "Ori Ingot", "ori.png")),
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 }
+                },
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 10, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                });
+            var vm = _builder.Build(result);
+
+            Assert.Equal(10, vm.Sections
+                .First(s => s.SectionType == PlanSectionType.UsedMaterials).Rows[0].ItemId);
+            Assert.Equal(10, vm.Sections
+                .First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0].ItemId);
+        }
+
+        [Fact]
+        public void ACurrencyShoppingRowCarriesNoItemId()
+        {
+            // PlanStep.ItemId is a WALLET CURRENCY id on this row, and id
+            // 24 is both a real item and the currency "Pristine Fractal
+            // Relics" - looking it up in the item stat cache would open the
+            // tooltip with an unrelated item's name, rarity and value.
+            var result = MakeResult(steps: new List<PlanStep>
+            {
+                new PlanStep { ItemId = 24, Quantity = 5, Source = AcquisitionSource.Currency }
+            });
+            var vm = _builder.Build(result);
+
+            var row = vm.Sections.First(s => s.SectionType == PlanSectionType.ShoppingList).Rows[0];
+            Assert.Equal(PlanRowType.ShoppingCurrency, row.RowType);
+            Assert.Equal(0, row.ItemId);
+        }
+
+        [Fact]
         public void UsedMaterials_Empty_NoSection()
         {
             var result = MakeResult(usedMaterials: new List<UsedMaterial>());

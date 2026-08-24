@@ -203,6 +203,20 @@ namespace GW2CraftingHelper.Views.Rendering
             Reposition();
         }
 
+        /// <summary>
+        /// Redraws the box for the control it is currently showing. The
+        /// content itself is unchanged - what changed is an INPUT the
+        /// deferred builder reads (the session stat cache gaining the
+        /// hovered item's block, Q13).
+        /// </summary>
+        internal void RefreshCurrent()
+        {
+            if (Visible && CurrentControl != null)
+            {
+                RefreshShowing(CurrentControl);
+            }
+        }
+
         public override void UpdateContainer(GameTime gameTime)
         {
             // base re-runs Blish's own unclamped positioning on every tick

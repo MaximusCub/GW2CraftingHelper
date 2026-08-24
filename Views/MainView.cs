@@ -34,6 +34,8 @@ namespace GW2CraftingHelper.Views
         private static readonly Logger Logger = Logger.GetLogger<MainView>();
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
+
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
         private AccountSnapshot _snapshot;
@@ -337,7 +339,13 @@ namespace GW2CraftingHelper.Views
             ModuleSettings settings,
             Action clearCache,
             Action<string> saveStatus,
-            Action<string> saveStatusThreadSafe)
+            Action<string> saveStatusThreadSafe,
+            // Session item-stat lookup (ItemMetadataService's own cache),
+            // for the Snapshot result rows' item tooltips. Optional, and a
+            // pure cache read - a snapshot row whose item no plan has
+            // fetched this session degrades to the ellipsis tooltip it
+            // always had. See docs/KNOWN-ISSUES.md, "Tooltip authenticity".
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _snapshot = snapshot;
             // The constructor sets _snapshot directly, bypassing
@@ -356,6 +364,7 @@ namespace GW2CraftingHelper.Views
             _clearCache = clearCache;
             _saveStatus = saveStatus;
             _saveStatusThreadSafe = saveStatusThreadSafe;
+            _getItemStatBlock = getItemStatBlock;
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -2048,16 +2057,53 @@ namespace GW2CraftingHelper.Views
             var breakdownLabel =
                 CreateRowTextLabel(rowPanel, breakdown, columnWidth, 26, InfoTextColor, out bool breakdownShortened);
 
-            ApplyRowStripTooltip(rowPanel, nameText, nameShortened, breakdown, breakdownShortened);
+            // The same rich item tooltip the plan's rows show, composed at
+            // hover time so a stat block fetched later in the session shows
+            // without re-rendering the grid. Both lines' own ellipsis
+            // tooltips are cleared: the stat block already opens with the
+            // item's full name, and a per-line plain tooltip on top of it
+            // would win the hover and show strictly less.
+            ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, row, nameText, breakdown);
 
             // The cell's own Size is the grid's to write (LayoutGridSection),
             // so this closure only re-fits what the new column width changed.
             _itemCells.Add(new ResultCell(rowPanel, w =>
             {
-                bool nameNowShortened = FitRowTextLabel(nameLabel, nameText, w);
-                bool breakdownNowShortened = FitRowTextLabel(breakdownLabel, breakdown, w);
-                ApplyRowStripTooltip(rowPanel, nameText, nameNowShortened, breakdown, breakdownNowShortened);
+                FitRowTextLabel(nameLabel, nameText, w);
+                FitRowTextLabel(breakdownLabel, breakdown, w);
+                ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, row, nameText, breakdown);
             }));
+        }
+
+        /// <summary>
+        /// One item row's tooltip, on the strip AND on both of its labels -
+        /// Blish resolves a tooltip on the deepest control under the cursor
+        /// and never bubbles, so an unstamped label is a hole in the row's
+        /// hover. Falls back to the shortened-line text when the session
+        /// has no stat block for this item, which is the tooltip these rows
+        /// always had.
+        /// </summary>
+        private void ApplyItemRowTooltip(
+            Panel rowPanel, Label nameLabel, Label breakdownLabel,
+            SnapshotSearchRow row, string nameText, string breakdown)
+        {
+            Func<TooltipContent> build = () =>
+            {
+                var extras = new List<string>();
+                if (breakdownLabel.Text != breakdown)
+                {
+                    extras.Add(breakdown);
+                }
+                return ItemRowTooltipComposer.BuildRowContent(
+                    _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
+                    nameText,
+                    nameLabel.Text != nameText,
+                    extras);
+            };
+
+            TooltipFacility.ApplyRichDeferred(rowPanel, build);
+            TooltipFacility.ApplyRichDeferred(nameLabel, build);
+            TooltipFacility.ApplyRichDeferred(breakdownLabel, build);
         }
 
         private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth)

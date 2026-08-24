@@ -170,5 +170,34 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
         }
+
+        /// <summary>
+        /// The deferred twin of <see cref="ApplyRichToIconTree"/>, for a
+        /// row whose content is composed at hover time (see
+        /// <c>TooltipFacility.ApplyRichDeferred</c>). Unlike the eager
+        /// version this cannot skip an empty payload, because nothing is
+        /// composed yet - a builder that has nothing to say returns empty
+        /// content and the surface stays hidden, which leaves the icon's
+        /// own plain tooltip (the missing-icon note, a currency name)
+        /// overwritten rather than intact. Only ever called for item rows,
+        /// which always have at least a name to show.
+        /// </summary>
+        internal static void ApplyRichDeferredToIconTree(Control control, System.Func<TooltipContent> build)
+        {
+            if (control == null || build == null)
+            {
+                return;
+            }
+
+            TooltipFacility.ApplyRichDeferred(control, build);
+
+            if (control is Container container)
+            {
+                foreach (var child in container.Children)
+                {
+                    ApplyRichDeferredToIconTree(child, build);
+                }
+            }
+        }
     }
 }

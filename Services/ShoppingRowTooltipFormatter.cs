@@ -65,6 +65,38 @@ namespace GW2CraftingHelper.Services
         /// the tree's "HAVE x/y TOTAL" pill - a THIS ROW/wallet line can
         /// never be mistaken for the plan-scope facts those two show.
         /// </summary>
+        /// <summary>
+        /// The whole shopping row tooltip as CONTENT rather than as a
+        /// string: the item's stat block (which opens with its name in its
+        /// rarity colour and closes with a real coin run), then the row's
+        /// own acquisition hint and the HAVE/NEED lines below.
+        /// <para>
+        /// The plain string form this row used to build could only spell a
+        /// coin amount out as "1g 23s 45c" and could show no stats at all,
+        /// which is why every item-hover surface in the module now goes
+        /// through <see cref="ItemRowTooltipComposer"/> instead. A null
+        /// <paramref name="stats"/> - a row whose item has not been fetched
+        /// this session - degrades to exactly the tooltip this row had
+        /// before, never to an empty box.
+        /// </para>
+        /// </summary>
+        public static TooltipContent BuildRowContent(
+            ItemStatBlock stats,
+            string fullName,
+            bool nameTruncated,
+            string hintText,
+            IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
+        {
+            var extras = new List<string>();
+            if (!string.IsNullOrEmpty(hintText))
+            {
+                extras.Add(hintText);
+            }
+            extras.AddRange(BuildCurrencyLines(currencyCosts));
+
+            return ItemRowTooltipComposer.BuildRowContent(stats, fullName, nameTruncated, extras);
+        }
+
         public static IReadOnlyList<string> BuildCurrencyLines(IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
         {
             if (currencyCosts == null || currencyCosts.Count == 0)

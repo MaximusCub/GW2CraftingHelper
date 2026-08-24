@@ -3564,19 +3564,21 @@ namespace GW2CraftingHelper.Views
             // tree root - the very item this header names - is the id. A
             // multi-item batch has no single target and no single tooltip
             // either (TreeRoot is null there by design).
-            var statContent = TreeRowTooltipComposer.BuildStatTooltipContent(vm.TreeRoot, _getItemStatBlock);
-            if (!statContent.IsEmpty)
-            {
-                // Stamped on the Label and the icon as well as the panel:
-                // anything lying over the panel wins the hover outright
-                // (Control.ActiveControl is the deepest capturing control),
-                // the same swallowed-hover class already fixed on tree
-                // rows. The 44px icon is the header's largest target and
-                // the most natural one to point at.
-                TooltipFacility.ApplyRich(titlePanel, statContent);
-                TooltipFacility.ApplyRich(nameLabel, statContent);
-                IconControls.ApplyRichToIconTree(iconFrame, statContent);
-            }
+            //
+            // Composed at hover time, so a plan restored from disk shows
+            // its stats as soon as the background top-up lands (Q13).
+            // Stamped on the Label and the icon as well as the panel:
+            // anything lying over the panel wins the hover outright
+            // (Control.ActiveControl is the deepest capturing control),
+            // the same swallowed-hover class already fixed on tree rows.
+            // The 44px icon is the header's largest target and the most
+            // natural one to point at.
+            var treeRoot = vm.TreeRoot;
+            Func<TooltipContent> buildStatContent =
+                () => TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock);
+            TooltipFacility.ApplyRichDeferred(titlePanel, buildStatContent);
+            TooltipFacility.ApplyRichDeferred(nameLabel, buildStatContent);
+            IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
 
             if (qtyText.Length > 0)
             {
@@ -3590,10 +3592,7 @@ namespace GW2CraftingHelper.Views
                     Location = new Point(textX + nameWidth, qtyY),
                     Parent = titlePanel
                 };
-                if (!statContent.IsEmpty)
-                {
-                    TooltipFacility.ApplyRich(qtyLabel, statContent);
-                }
+                TooltipFacility.ApplyRichDeferred(qtyLabel, buildStatContent);
             }
 
             // Every x here is now a constant or a font-only measurement,
@@ -3835,13 +3834,15 @@ namespace GW2CraftingHelper.Views
                 case PlanSectionType.UsedMaterials:
                     // Row rendering moved to
                     // Views/Rendering/UsedMaterialsSectionRenderer.
-                    new UsedMaterialsSectionRenderer(this, _usedMaterialsSort, RerenderForSortChange)
+                    new UsedMaterialsSectionRenderer(
+                        this, _usedMaterialsSort, RerenderForSortChange, _getItemStatBlock)
                         .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.ShoppingList:
                     // Row rendering moved to
                     // Views/Rendering/ShoppingListSectionRenderer.
-                    new ShoppingListSectionRenderer(this, _shoppingListSort, RerenderForSortChange)
+                    new ShoppingListSectionRenderer(
+                        this, _shoppingListSort, RerenderForSortChange, _getItemStatBlock)
                         .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.CraftingSteps:
