@@ -63,7 +63,13 @@ namespace GW2CraftingHelper.Services
             var ctx = new BuildContext(
                 decisions, metadata, hints, ownedQuantityUsedByNodeId,
                 ignoredItemIds, currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts);
-            return BuildNode(root, ctx, insideReferenceBranch: false);
+            var rootNode = BuildNode(root, ctx, insideReferenceBranch: false);
+            // Marked here rather than inside BuildNode: this method is the
+            // only place that knows which node the caller asked for a tree
+            // OF - a multi-item batch calls it once per requested root, so
+            // each of those N nodes is a plan root too.
+            rootNode.IsPlanRoot = true;
+            return rootNode;
         }
 
         private static CraftingTreeNode BuildNode(

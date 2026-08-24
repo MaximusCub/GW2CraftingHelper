@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Models
             // Ties this snapshot to the version constant it exists to guard:
             // without this, editing the literal below to make a failing run
             // green requires no corresponding SchemaVersion bump at all.
-            Assert.Equal(3, PersistedPlan.CurrentSchemaVersion);
+            Assert.Equal(4, PersistedPlan.CurrentSchemaVersion);
         }
 
         [Fact]
@@ -107,6 +107,7 @@ namespace GW2CraftingHelper.Tests.Models
                 "CraftingTreeNode.IsAchievementBitDeduped:Boolean",
                 "CraftingTreeNode.IsCostComponent:Boolean",
                 "CraftingTreeNode.IsIgnored:Boolean",
+                "CraftingTreeNode.IsPlanRoot:Boolean",
                 "CraftingTreeNode.IsReferenceBranch:Boolean",
                 "CraftingTreeNode.ItemId:Int32",
                 "CraftingTreeNode.Name:String",

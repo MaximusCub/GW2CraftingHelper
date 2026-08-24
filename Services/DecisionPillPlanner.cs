@@ -71,8 +71,8 @@ namespace GW2CraftingHelper.Services
         /// choice, exactly 1 pill means the source is locked - the pill
         /// count itself is the affordance. HAVE/CURRENCY/GUILD UPGRADE/
         /// UNRECOGNIZED are always single, non-interactive pills; UNKNOWN
-        /// alone also gets the interactive IGNORE toggle (see
-        /// AppendOwnershipPills).
+        /// alone also gets the interactive IGNORE toggle, except on a plan
+        /// root (see AppendOwnershipPills).
         ///
         /// The selected pill always matches node.Decision - the solver's
         /// committed Source, never a guessed "cheapest looking" option.
@@ -144,6 +144,10 @@ namespace GW2CraftingHelper.Services
                 // A node collapses to Have both for genuine full ownership
                 // and for a manually "Ignore"-d item - only the latter
                 // gets the extra toggle pill, so it can be un-ignored.
+                // Offered on a plan root too, unlike the "IGNORE" half
+                // (AppendOwnershipPills): ignores are keyed by item id and
+                // outlive the plan they were set in, so a root can arrive
+                // already ignored and this pill is the only way back.
                 if (node.IsIgnored)
                 {
                     specs.Add(new PillSpec("IGNORED", null, PillKind.Ignore));
@@ -345,6 +349,13 @@ namespace GW2CraftingHelper.Services
         /// real item node, matching gw2e's always-offered Ignore pill).
         /// A node reaching this method is never already ignored, so the
         /// toggle always starts as "IGNORE".
+        /// <para>
+        /// Except on a plan root (see CraftingTreeNode.IsPlanRoot):
+        /// ignoring the item you asked to plan zeroes the whole plan, so
+        /// the toggle is not offered there. The un-ignore half of the
+        /// toggle is NOT suppressed - see the Have branch in
+        /// BuildPillSpecs.
+        /// </para>
         /// </summary>
         private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
         {
@@ -356,7 +367,10 @@ namespace GW2CraftingHelper.Services
                     null,
                     PillKind.OwnedInfo));
             }
-            specs.Add(new PillSpec("IGNORE", null, PillKind.Ignore));
+            if (!node.IsPlanRoot)
+            {
+                specs.Add(new PillSpec("IGNORE", null, PillKind.Ignore));
+            }
         }
     }
 }

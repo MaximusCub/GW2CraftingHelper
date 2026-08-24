@@ -581,6 +581,29 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void LoadLatest_RootIgnoreSchemaVersion3File_ReturnsNullAndLogsWarn()
+        {
+            // CurrentSchemaVersion bumped 3 -> 4 for
+            // CraftingTreeNode.IsPlanRoot. A SchemaVersion-3 file (the
+            // actual previous CurrentSchemaVersion) carries no such field,
+            // so restoring it would leave every root with IsPlanRoot false
+            // and put the suppressed IGNORE pill back on the plan's own
+            // target - it must be rejected the same way as the 1/2 files
+            // above, degrading to Module's "no restored plan" path.
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 3, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedMessage = null;
+            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.NotNull(capturedMessage);
+        }
+
+        [Fact]
         public void Save_Load_ExplicitCurrentSchemaVersion_RoundTrips()
         {
             // PersistedPlan.SchemaVersion has
