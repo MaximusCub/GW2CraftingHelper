@@ -214,32 +214,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RecipeRowHeightNoSublabel_ExactlyFitsIconFramePlusDivider()
+        public void RecipeRowHeight_ExactlyFitsIconFramePlusDivider()
         {
-            // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow's
-            // no-sublabel branch
+            // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow
             // places a 34px rarity-framed icon at y=0
             // and a bottom-anchored 2px row divider inside rowHeight - the
             // constant must equal exactly icon + divider (34 + 2 = 36) with
             // no overlap or slack, locking the fix that closed the
             // pre-existing overflow KNOWN-ISSUES #23 mis-described as
             // "several pixels of headroom" for this row.
-            Assert.Equal(36, PlanContentHeightMath.RecipeRowHeightNoSublabel);
+            Assert.Equal(36, PlanContentHeightMath.RecipeRowHeight);
         }
 
         [Fact]
-        public void Recipes_MixOfSublabelAndNoSublabel_UsesPerRowHeight()
+        public void Recipes_SublabelNoLongerChangesRowHeight()
         {
+            // The discipline moved from a second line under the name to a
+            // real column (Services/RecipesColumnMath), so a row carrying
+            // one is exactly as tall as a row that does not. This is the
+            // regression guard for the 48px twin that used to exist: a
+            // section counted at two heights and drawn at one desyncs its
+            // container from its rows.
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.RecipeRow, sublabel: null),
-                Row(PlanRowType.RecipeRow, sublabel: "Missing!"),
+                Row(PlanRowType.RecipeRow, sublabel: "Armorsmith 400"),
                 Row(PlanRowType.RecipeRow, sublabel: ""),
             };
             int expected = PlanContentHeightMath.CTableHeaderRowHeight
-                + PlanContentHeightMath.RecipeRowHeightNoSublabel
-                + PlanContentHeightMath.RecipeRowHeightWithSublabel
-                + PlanContentHeightMath.RecipeRowHeightNoSublabel;
+                + 3 * PlanContentHeightMath.RecipeRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.RequiredRecipes, rows));
         }
 

@@ -97,19 +97,15 @@ namespace GW2CraftingHelper.Services
         // simulation lists it as immune rather than merely clear.
         public const int DisciplineRowHeight = 36;
 
-        // 36, not 32: a 32px row left the 34px rarity-framed icon
-        // overflowing the row height once dividers widened to 2px.
         // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
-        // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight's already-
-        // correct 36.
-        public const int RecipeRowHeightNoSublabel = 36;
-
-        // 48, not 44. The name line grew from an 18px to a 20px line box,
-        // which pushed the sublabel below it from y=22 to y=24, and the
-        // sublabel's own font grew with it: its lowest ink is now y=43
-        // against a 44px row whose divider starts at 41. 48 restores the
-        // 2px of clearance the 44px row had.
-        public const int RecipeRowHeightWithSublabel = 48;
+        // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight.
+        //
+        // EVERY recipe row, since the discipline became a column
+        // (Services/RecipesColumnMath) rather than a second line under the
+        // name. The 48px twin this section used to need for a sublabel row
+        // is gone with the sublabel, so the section is shorter than it was
+        // despite the taller chrome above it.
+        public const int RecipeRowHeight = 36;
 
         // 58, not 56: the cost tiles' captions moved to the ColumnHeader
         // tier, whose 25px line box puts the caption block's bottom at
@@ -165,7 +161,7 @@ namespace GW2CraftingHelper.Services
                 case PlanSectionType.RequiredDisciplines:
                     return CTableHeaderRowHeight + rows.Count * DisciplineRowHeight;
                 case PlanSectionType.RequiredRecipes:
-                    return CTableHeaderRowHeight + RecipeRowsHeight(rows);
+                    return CTableHeaderRowHeight + rows.Count * RecipeRowHeight;
                 default:
                     // Defensive fallback mirrors CreateCollapsibleSection's own
                     // default branch (CreateTextRow, one fixed-height row per
@@ -191,16 +187,6 @@ namespace GW2CraftingHelper.Services
                 height += row.RowType == PlanRowType.TimegatedNotice
                     ? FallbackTextRowHeight
                     : CraftStepRowHeight;
-            }
-            return height;
-        }
-
-        private static int RecipeRowsHeight(IReadOnlyList<PlanRowViewModel> rows)
-        {
-            int height = 0;
-            foreach (var row in rows)
-            {
-                height += string.IsNullOrEmpty(row.Sublabel) ? RecipeRowHeightNoSublabel : RecipeRowHeightWithSublabel;
             }
             return height;
         }

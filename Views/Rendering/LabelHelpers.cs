@@ -54,11 +54,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// positive scale s). Whether that 1px shrink actually deletes the
         /// divider depends on rowHeight: simulation across every rowHeight
         /// in this file and all four GW2 UI Size scale factors (0.81 /
-        /// 0.897 / 1.0 / 1.103) shows 44px rows (CraftStepRowHeight,
-        /// RecipeRowHeightWithSublabel) and 32px rows (DisciplineRowHeight)
-        /// vanish completely (0 physical scanlines) at ~10.2% of scroll
-        /// phases at the default scale; 36px rows (UsedMaterialRowHeight,
-        /// ShoppingRowHeight, RecipeRowHeightNoSublabel) are immune at every
+        /// 0.897 / 1.0 / 1.103) shows 44px rows (CraftStepRowHeight) and
+        /// 32px rows (the DisciplineRowHeight of the day) vanish
+        /// completely (0 physical scanlines) at ~10.2% of scroll phases at
+        /// the default scale; 36px rows (UsedMaterialRowHeight,
+        /// ShoppingRowHeight, RecipeRowHeight) are immune at every
         /// tested scale.
         ///
         /// Fix: bottomClearance - an extra logical pixel of gap between the
@@ -69,7 +69,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// pair tested - proven, not just observed clean at one scale.
         /// Callers pass 1 for the vulnerable 44px/32px row types above and 0
         /// for the immune 36px row types (CreateUsedMaterialRow,
-        /// CreateShoppingRow, CreateRecipeRow's no-sublabel branch) - those
+        /// CreateShoppingRow, CreateRecipeRow) - those
         /// three were tuned to a flush icon(0..34) + divider(34..36)
         /// fit with zero slack, and giving them clearance they don't need
         /// would reintroduce the icon/divider overlap that fix removed.
