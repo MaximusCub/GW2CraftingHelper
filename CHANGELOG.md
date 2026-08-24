@@ -5,6 +5,40 @@ matching `v<version>` git tag on the release commit, so any two shipped
 builds can be compared with `git diff v0.2.0..v0.2.1`. The About tab shows
 the running version.
 
+## 0.2.3 - 2026-08-24
+
+The plan-view redesign (PR #173): the crafting planner stops wasting
+your screen.
+
+### Changed
+- Every plan section now justifies to the full window width: item names
+  flex, and pills, costs, amounts, levels and statuses anchor to the
+  right edge at every window size - no more columns crammed left with
+  stranded dead space. The minimum window width drops from 1478px to a
+  measured 1378px.
+- A real type hierarchy: section titles at 24 bold, column headers at
+  20 bold, an 18-bold status line with a larger spinner - each tier
+  visibly a step above the next. Character and discipline names render
+  at full body size everywhere.
+- The Total Cost section is a full-width formula band; the currency
+  table's numbers right-align under proper headers.
+- Required Recipes is one line per row with its own Discipline column;
+  the Shopping List gains a Source column with aligned, color-coded
+  badges (vendor teal, unknown red) and a sortable header.
+
+### Added
+- Overrides and Ignored counts as persistent chips with guarded Clear
+  buttons: clearing confirms with plain-language consequences, and
+  actions that would change nothing skip the dialog and say why.
+  The status line reports events only.
+- Generate Plan explains itself on hover (it clears manual decisions
+  and ignore marks - now it says so before you click).
+
+### Fixed
+- Rapidly toggling a pill without moving the mouse no longer drops
+  clicks (re-solves now update the existing controls in place instead
+  of rebuilding them under your cursor).
+
 ## 0.2.2 - 2026-08-24
 
 Second field-test round plus the pixel-authenticity wave (PRs #163-#170).
