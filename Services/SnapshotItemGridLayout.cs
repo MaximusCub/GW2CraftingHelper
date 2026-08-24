@@ -70,8 +70,8 @@ namespace GW2CraftingHelper.Services
         /// Narrowest column a cell fits in. Below twice this the grid falls
         /// back to a single column rather than clipping the name line.
         /// <para>
-        /// 516px, which puts two columns inside the 1346px grid the 1472px
-        /// window minimum leaves (673px each) and a third only once the
+        /// 516px, which puts two columns inside the 1352px grid the 1478px
+        /// window minimum leaves (676px each) and a third only once the
         /// window reaches 1674px.
         /// </para>
         /// </summary>

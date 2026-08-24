@@ -19,15 +19,17 @@ namespace GW2CraftingHelper.Services
         /// the tree's designed 24px name-to-column gutter and one further
         /// indent level still renders untruncated.
         /// <para>
-        /// 1472, not the 1436 the module shipped with: the research's +2pt
+        /// 1478, not the 1436 the module shipped with: the research's +2pt
         /// row-text variant landed (row text Font14 -> Font16, see
         /// Views/Rendering/UiFonts), and the deepest row's name run grows
-        /// with it. The research measured that variant directly at
-        /// Menomonia 16 rather than scaling the 14 figures, so this is a
-        /// measured number, not a 14.3% inflation of the old one.
+        /// with it. Measured directly at Menomonia 16 rather than scaled
+        /// from the 14 figures, and with the live-priced cost column taken
+        /// at its widest digits rather than at one example total - see
+        /// DeepestPlanCostColumnWidth in PlanRelayoutMathTests, which is
+        /// what pins this number.
         /// </para>
         /// </summary>
-        public const int MinWindowWidth = 1472;
+        public const int MinWindowWidth = 1478;
 
         /// <summary>
         /// Unchanged by the width raise: no layout math in the module

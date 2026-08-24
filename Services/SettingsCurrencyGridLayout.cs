@@ -34,8 +34,8 @@ namespace GW2CraftingHelper.Services
         /// load-bearing - and in fact the grid was already falling back to
         /// one column there, the "864px settings panel" this comment used
         /// to cite having been derived without the ViewAdapter's own
-        /// padding. The 1472px minimum clears the two-column threshold by
-        /// ~426px even after the font bump widened all three text-derived
+        /// padding. The 1478px minimum clears the two-column threshold by
+        /// ~432px even after the font bump widened all three text-derived
         /// terms, so the cell has room to grow now; it is still derived
         /// rather than estimated (see MinColumnWidth).
         /// </para>

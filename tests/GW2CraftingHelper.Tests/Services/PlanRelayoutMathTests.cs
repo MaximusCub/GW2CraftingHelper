@@ -308,7 +308,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(edges.NameMaxWidth >= nameWidth);
         }
 
-        // The measurement the 1472px window minimum and the 256px pill
+        // The measurement the 1478px window minimum and the 256px pill
         // column were derived from - docs/research/minimum-window-width.md.
         // "+24 Agony Infusion" is the deepest chain in the game (23 forced
         // levels, one recipe each); its deepest row renders "4194304x
@@ -341,15 +341,19 @@ namespace GW2CraftingHelper.Tests.Services
         // Live-priced cost column behind a six-digit gold total, which is
         // what the deepest chain costs; 150 is only the floor.
         //
-        // 175 at Font16, from 165 at Font14: only the three digit runs in
-        // the column scale with the font (a six-digit gold plus two
-        // two-digit units, 90px at the measured Font14 digit advance of 9,
-        // 100px at Font16's 10), while the 75px of coin-icon and gap chrome
-        // around them is fixed pixels. Digit ADVANCES, which run ~4px over
-        // what MeasureString's inked rect gives for the same run (161 at
-        // Font14, 171 at Font16) - conservative in the safe direction, as a
-        // wider cost column leaves the name column less room, not more.
-        private const int DeepestPlanCostColumnWidth = 175;
+        // Measured at Font16, and taken at the WIDEST digits rather than at
+        // one example total: Menomonia's digits are not one width, so the
+        // column a plan reserves depends on which digits its total happens
+        // to contain. TreeCostColumnMath.SegmentWidth adds
+        // CoinLabelIconGap(2) + CoinIconSize(20) to each of three segments
+        // and CoinSegmentGap(6) sits twice between them, so the column is
+        // the three digit runs' MeasureString widths + 78 of fixed chrome.
+        // For a six-digit gold plus two two-digit units that is 161
+        // (Font14) / 171 (Font16) of all-nines - '9' is the narrowest wide
+        // digit - and 171 / 181 of 0, 2 or 7, the widest. 181 is the worst
+        // case, so a minimum derived from it holds for every total; an
+        // all-nines figure would not.
+        private const int DeepestPlanCostColumnWidth = 181;
 
         // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
         // scanned rows gets. Pass the scanned end to exercise what
