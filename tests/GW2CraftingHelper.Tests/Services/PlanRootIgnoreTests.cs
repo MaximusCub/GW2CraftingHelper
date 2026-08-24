@@ -280,6 +280,14 @@ namespace GW2CraftingHelper.Tests.Services
             var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
             Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+
+            // The profit band obeys the same unpriced-zero rule: the
+            // target HAS a sell price here, so without the guard the band
+            // would print "Sell Value - Total Materials Value 0 = Profit
+            // if Sold" - a settled equation claiming the craft consumes
+            // nothing and profits its entire sale price.
+            Assert.DoesNotContain(
+                summary.Rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
         }
 
         /// <summary>

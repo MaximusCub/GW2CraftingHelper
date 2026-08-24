@@ -375,6 +375,19 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
+            // The same unpriced-zero rule the cost band enforces: a plan
+            // whose coin cost is zero only because nodes could not be
+            // priced must not print "Sell Value - Total Materials Value 0
+            // = Profit if Sold" one band lower - a settled equation
+            // claiming the craft consumes nothing and profits its entire
+            // sale price. Plans with a real nonzero cost keep the band
+            // even when some node is unpriced (the pre-existing partial
+            // pricing behavior, out of this round's scope).
+            if (result.Plan.TotalCoinCost == 0 && HasUnpricedNode(result))
+            {
+                return;
+            }
+
             long netSaleValue = result.NetSaleValue.Value;
             long profit = result.CraftingProfit ?? 0L;
             long totalMaterialsValue = netSaleValue - profit;

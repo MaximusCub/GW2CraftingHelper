@@ -13028,7 +13028,12 @@ expectation.
 5. Plan an item with **no recipe and no Trading Post price** (root row
    reads UNKNOWN). The plan totals 0c but the band stays a **lone 0c
    tile** - a zero nobody measured must not be dressed up as a priced
-   equation.
+   equation. The profit band below obeys the same rule: on such a plan
+   **no "Sell Value / Total Materials Value / Profit if Sold" tiles
+   render at all** (an unpriced-zero cost would otherwise read as
+   "profit = the entire sale price"). Also try a variant whose TARGET
+   has a sell price but whose ingredient is unpriced - same
+   expectation: lone 0c tile, no profit band.
 6. Generate a **multi-item batch** where one requested item is also an
    ingredient of another requested item (e.g. request a weapon and one of
    its components). Ignore that component where it appears as a child row
