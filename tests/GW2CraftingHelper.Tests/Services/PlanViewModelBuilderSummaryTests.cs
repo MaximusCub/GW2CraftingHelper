@@ -23,14 +23,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PlanSectionType.Summary, vm.Sections[0].SectionType);
 
             var rows = vm.Sections[0].Rows;
-            // Collapsed cost-formula tile ("Actual Cost to Craft") +
-            // the always-present footnote row - no profit band (no sell
+            // A zero-cost plan does NOT collapse: the full three-tile cost
+            // band renders at 0 (see BuildCostFormulaBand) + the
+            // always-present footnote row - no profit band (no sell
             // price), no currency rows (no currency costs).
-            Assert.Equal(2, rows.Count);
-            Assert.Equal(PlanRowType.CostFormulaTile, rows[0].RowType);
-            Assert.Equal("Actual Cost to Craft", rows[0].Label);
-            Assert.Equal(0L, rows[0].CoinValue);
-            Assert.Equal(PlanRowType.SummaryFootnote, rows[1].RowType);
+            Assert.Equal(4, rows.Count);
+            Assert.All(rows.Take(3), r => Assert.Equal(PlanRowType.CostFormulaTile, r.RowType));
+            Assert.All(rows.Take(3), r => Assert.Equal(0L, r.CoinValue));
+            Assert.Equal("Actual Cost to Craft", rows[2].Label);
+            Assert.Equal(PlanRowType.SummaryFootnote, rows[3].RowType);
         }
 
         // --- Target item resolution ---
@@ -131,6 +132,71 @@ namespace GW2CraftingHelper.Tests.Services
             // FormulaResultIsExact escape hatch exists for the profit
             // band's loss case only.
             Assert.True(costTiles[2].FormulaResultIsExact);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostAndNoMaterialsUsed_RendersFullBandAtZero()
+        {
+            // The collapse rule is about there being no MIDDLE term to
+            // show, and it only reads as a deliberate layout when the
+            // remaining tile carries a real number. A plan that costs
+            // nothing (every node ignored or already in hand) collapsed to
+            // a lone "0c" tile with the rest of the band gone, which reads
+            // as a broken section - it renders the whole formula at 0
+            // instead.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal("Total Materials Value", costTiles[0].Label);
+            Assert.Equal("Your Materials Used", costTiles[1].Label);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+            Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+            // 0 - 0 == 0 balances, so the band still ends in a true "=".
+            Assert.True(costTiles[2].FormulaResultIsExact);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithMaterialsUsed_StillRendersFullBand()
+        {
+            // Nothing to pay out of pocket because owned materials cover
+            // the whole plan: the middle term is real, so this was already
+            // the uncollapsed shape - pinned here so the zero-plan rule
+            // above cannot be "simplified" into overwriting it.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 75;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(75L, costTiles[0].CoinValue);
+            Assert.Equal(75L, costTiles[1].CoinValue);
+            Assert.Equal(0L, costTiles[2].CoinValue);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithCurrencyOnlyPlan_StillRendersFullBand()
+        {
+            // A plan paid entirely in a non-coin currency has a genuine 0
+            // coin cost. The currency table below the band carries the
+            // real numbers; the band itself must not be the odd one out.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 1, Amount = 500 }
+                });
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(3, rows.Count(r => r.RowType == PlanRowType.CostFormulaTile));
+            Assert.Single(rows.Where(r => r.RowType == PlanRowType.CurrencyCost));
         }
 
         [Fact]
