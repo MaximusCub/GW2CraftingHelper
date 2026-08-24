@@ -655,7 +655,8 @@ namespace GW2CraftingHelper.Views
         {
             AddSectionHeader("Sound", panelWidth);
             AddInfoLine("Volume of this module's own click, played whenever you press one of its buttons, rows or pills.", panelWidth);
-            AddInfoLine("Applies immediately - no Save needed. Drag to 0 to turn the click off entirely.", panelWidth);
+            AddInfoLine("Applies immediately - no Save needed. Drag to 0 to turn that click off.", panelWidth);
+            AddInfoLine("Checkboxes are the exception: they play Blish HUD's own click, which this does not change.", panelWidth);
 
             AddClickVolumeRow(panelWidth);
         }
@@ -701,7 +702,7 @@ namespace GW2CraftingHelper.Views
                 Value = percent,
                 Size = new Point(SliderWidth, SliderHeight),
                 Location = new Point(SliderX, 7),
-                BasicTooltipText = "How loud this module's click plays. 0 turns it off.",
+                BasicTooltipText = "How loud this module's click plays. 0 turns it off. Does not change the checkbox click, which is Blish HUD's own.",
                 Parent = rowPanel
             };
 
@@ -1074,20 +1075,13 @@ namespace GW2CraftingHelper.Views
             }
             if (SettingsInputParser.TryParseLogMaxSizeMb(_logMaxSizeInput?.Text, out long maxSizeBytes))
             {
+                // Writes the setting and nothing else: the running
+                // ModuleLog picks the new cap up live from
+                // Module.OnLogMaxSizeBytesChanged, so this Save and the
+                // TrackBar Blish renders in Manage Modules take the same
+                // one path. Pushing it from here as well would leave that
+                // second UI unserved (it was, before).
                 _settings.LogMaxSizeBytes.Value = (int)maxSizeBytes;
-
-                // Pushed live immediately (not just persisted) - the
-                // running ModuleLog instance otherwise would not pick up a
-                // smaller/larger cap until the next module reload. Mirrors
-                // DiagnosticsEnabled's own immediate-apply behavior above,
-                // even though this row uses the TextBox+Save idiom rather
-                // than a plain checkbox. Routed through the same clamp as
-                // Module.cs's own Configure call (redundant here in
-                // practice, since TryParseLogMaxSizeMb already rejected
-                // anything outside 1-1000 MB above, but keeps every live
-                // consumer of this setting going through one clamped
-                // accessor rather than two separately-trusted paths).
-                ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
             }
             else if (_logMaxSizeErrorLabel != null)
             {
@@ -1105,8 +1099,8 @@ namespace GW2CraftingHelper.Views
                 // Module.Initialize (age-based pruning does not need
                 // per-write cost - d2-log-system.md Section 4.2), so a
                 // saved value here intentionally takes effect next session,
-                // not immediately - no live push needed, unlike the size
-                // cap above.
+                // not immediately - nothing holds a live copy of it to keep
+                // current, unlike the size cap above.
                 _settings.LogRetentionDays.Value = retentionDays;
             }
             else if (_logRetentionDaysErrorLabel != null)

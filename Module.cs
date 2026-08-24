@@ -244,6 +244,17 @@ namespace GW2CraftingHelper
             _settings.LogDiagnosticsEnabled.SettingChanged += OnLogDiagnosticsEnabledChanged;
             ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
 
+            // Same shape again, and for the same reason: the size cap is
+            // pushed INTO the running ModuleLog (its MaxFileSizeBytes is a
+            // live-settable property that every subsequent file write
+            // re-reads), so a change made anywhere has to reach it. The
+            // Configure call above seeds it; this keeps it current. Blish's
+            // Manage Modules pane renders this entry as its own TrackBar
+            // too (IntSettingView.RefreshValue widens the bar to fit the
+            // persisted value - measured from the 1.3.0 binary), and
+            // dragging that one only writes the setting.
+            _settings.LogMaxSizeBytes.SettingChanged += OnLogMaxSizeBytesChanged;
+
             // Same immediate-apply shape as the line above: the click
             // player holds the live percent on a static, seeded here from
             // the persisted value.
@@ -1012,6 +1023,7 @@ namespace GW2CraftingHelper
             // cycle re-defines onto the same objects. An unsubscribed
             // handler would root each dead Module instance in turn.
             _settings.LogDiagnosticsEnabled.SettingChanged -= OnLogDiagnosticsEnabledChanged;
+            _settings.LogMaxSizeBytes.SettingChanged -= OnLogMaxSizeBytesChanged;
             _settings.ClickSoundVolumePercent.SettingChanged -= OnClickSoundVolumeChanged;
 
             _refreshCts?.Cancel();
@@ -1079,23 +1091,37 @@ namespace GW2CraftingHelper
         }
 
         /// <summary>
-        /// The same setting-first wiring as the click volume above, for the
-        /// one sibling setting that shared its defect: this one is pushed
-        /// into a live object (ModuleLog.Shared) rather than re-read per
-        /// use, so a toggle made anywhere had to reach it.
+        /// The same setting-first wiring as the click volume above, for a
+        /// sibling setting that shared its defect: this one is pushed into
+        /// a live object (ModuleLog.Shared) rather than re-read per use, so
+        /// a toggle made anywhere had to reach it.
         /// <para>
-        /// Swept the rest and excluded them, each for a real reason.
+        /// Swept the rest. LogMaxSizeBytes has the same shape and is
+        /// carried the same way (see OnLogMaxSizeBytesChanged).
         /// SnapshotRefreshIntervalMinutes and ScrollDiagnosticsEnabled are
         /// re-read from the setting at every use (the stale-check tick and
         /// CraftingPlanView respectively), so they were never stale.
-        /// LogMaxSizeBytes and LogRetentionDays are once-per-session by
-        /// design - Configure and the retention prune both run at startup -
-        /// so they apply next session no matter which UI changes them.
+        /// LogRetentionDays is the one genuine exclusion: age-based pruning
+        /// runs exactly once, here in Initialize, so a change applies next
+        /// session no matter which UI made it.
         /// </para>
         /// </summary>
         private void OnLogDiagnosticsEnabledChanged(object sender, ValueChangedEventArgs<bool> e)
         {
             ModuleLog.Shared.DiagnosticsEnabled = e.NewValue;
+        }
+
+        /// <summary>
+        /// Pushes a log size cap change on to the running file sink,
+        /// whichever UI made it - this module's Settings tab or the
+        /// TrackBar Blish renders in Manage Modules. Reads the clamped
+        /// accessor rather than e.NewValue: the Blish-side bar spans 0 to
+        /// the persisted value, so it can hand over a byte count far below
+        /// the 1 MB floor the tab's own parser enforces.
+        /// </summary>
+        private void OnLogMaxSizeBytesChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
