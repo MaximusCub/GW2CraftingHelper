@@ -978,7 +978,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
             UpdateTreeRowTooltip(
                 rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
-                () => displayName, fullName, getStatContent, extraTooltipContent);
+                fullName, getStatContent, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1188,7 +1188,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private static void UpdateTreeRowTooltip(
             Panel rowPanel, Label nameLabel, Label qtyLabel,
             Panel iconFrame, Panel iconScrim,
-            Func<string> getDisplayName, string fullName,
+            string fullName,
             Func<TooltipContent> getStatContent, TooltipContent extraContent)
         {
             // The whole tooltip is composed when the box is about to be
@@ -1202,9 +1202,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // duplicate; the name line is the no-stats fallback only.
                 // The blank between it and the plan lines is its own
                 // block rhythm.
-                var statContent = getStatContent();
+                // nameLabel.Text, not the display name captured at build
+                // time: the settle re-ellipsis rewrites the label in place
+                // and no longer re-stamps anything, so the truncation
+                // state has to be read live.
                 return ItemRowTooltipComposer.BuildRowContent(
-                    statContent, fullName, getDisplayName() != fullName, extraContent);
+                    getStatContent(), fullName, nameLabel.Text != fullName, extraContent);
             };
 
             // The name and quantity Labels get it too, not just the row
