@@ -14116,4 +14116,14 @@ session, same as `TooltipFacility`).
    it directly - `Module` does).
 7. Report the number that feels right - it replaces `DefaultPercent`.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS on the render half (2026-08-23 night desktop session,
+captures preflight/gSND1-gSND2): the Sound section renders first on
+the Settings tab with the Click volume label, the TrackBar at the 75
+default, the live "75%" readout, the Test button beside it, and the
+instant-apply/zero-off/checkbox-exception prose. The audible half -
+how loud 75 actually feels, the Test button's playback at the dragged
+value, silence at 0, persistence across a relaunch - is the
+maintainer's field check by nature (the sandbox cannot hear); the
+percent-to-volume mapping and clamps are pinned by
+ClickSoundVolumeTests. The maintainer's number becomes the new
+DefaultPercent in a one-line change.
