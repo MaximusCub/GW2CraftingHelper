@@ -12983,13 +12983,16 @@ the one capture this still diverges from.
 The blank ABOVE the value splits the same way, on the item's own shape:
 measured absent on `steak.png` (body bands 39, 57, 75-blank, 93, 111,
 129 - one 18px pitch from `Required Level: 10` to the coin row, row 128
-empty), and FWDekker emits a break before `getValue()` in only two of
-its thirteen builders - `Generic`, its fallback, and an
-`UpgradeComponent` of type Gem. So a weapon, armour piece, consumable,
-trinket, bag or rune runs its value straight on under the line above,
-while a crafting material, a trait, a key, a Gem or any type the API
-adds later takes a blank first. The Generic blank is INFERRED; only its
-absence is measured. The vendor value is omitted entirely on a `NoSell`
+empty). FWDekker has FOURTEEN builders, only ELEVEN of which emit a
+value at all, and it puts a break before `getValue()` in just two of
+those eleven - `Generic`, its fallback, and an `UpgradeComponent` of
+type Gem. So a weapon, armour piece, consumable, trinket, bag or rune
+runs its value straight on under the line above, while a crafting
+material, a trait, a key, a Gem or any type the API adds later takes a
+blank first. The Generic blank is INFERRED; only its absence is
+measured. The three builders that emit no value line - `Gathering`,
+`MiniPet`, `Tool` - are a GUESS and the only one in the table; see
+"Accepted divergences" below. The vendor value is omitted entirely on a `NoSell`
 item - there is no last line and no blank in front of one - and its
 plain rendering now drops leading zero units through
 `CoinSegmentMath.FormatSegmentTexts`, so "7c", never "0g 0s 7c".
@@ -13058,6 +13061,20 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   module will not claim the slot is empty. It is white and one line per
   slot, so the BLOCK HEIGHT matches the game even though the wording does
   not. Two slots therefore read "Infusion Slot / Infusion Slot".
+- **A gathering tool, a salvage kit and a miniature run their vendor
+  value straight on under the line above - GUESSED, not measured.** These
+  are the only three entries in `ValueSitsAfterABlank` with no evidence
+  behind them in either direction: FWDekker's `Gathering`, `MiniPet` and
+  `Tool` builders emit no `getValue()` at all (they end on
+  `getLevel() + getFlags()`, `"Miniature" + getFlags()` and
+  `getDescription() + getFlags()`), and no capture of one exists. This
+  module does show their value, because a mining pick and a salvage kit
+  both sell, so a shape had to be picked. Picked contiguous by nearest
+  body shape - Gathering's description/level/flags body matches Gizmo's
+  and Trophy's, Tool's matches Container's and Consumable's, MiniPet's
+  matches Trophy's, and all three of those neighbours are contiguous.
+  Desktop gate step 6 settles it in one hover.
+  **Judgment call - flagged for the maintainer.**
 - **Armour's slot line is the API's own noun plus "Armor"** - "Gloves
   Armor" where the game says "Hand Armor". The game's slot vocabulary
   (Head/Hand/Chest/Leg/Foot/Shoulder) is a different word set from
@@ -13257,10 +13274,10 @@ line. `steak.png` re-measured: body bands at 39, 57, 75 (blank), 93
 ("Food"), 111 ("Required Level: 10"), 129 (the coin row - number band
 y=130-139 at x4-23, coin icon x23-41). Row 128 carries no glyph and rows
 122-127 only the `q` descender of "Required": 111 -> 129 is ONE 18px
-pitch, contiguous. FWDekker agrees for twelve of its thirteen builders.
-The blank now splits on the item's shape - see the line-order block
-above - and desktop gate step 6 was corrected, since it had told the
-tester to confirm the divergence.
+pitch, contiguous. FWDekker agrees for nine of the eleven builders that
+emit a value. The blank now splits on the item's shape - see the
+line-order block above - and desktop gate step 6 was corrected, since it
+had told the tester to confirm the divergence.
 
 **3. A tooltip CLEAR could be undone by the next re-stamp - FIXED.**
 `TooltipFacility.Register` inferred a source's fallback text from
@@ -13279,6 +13296,29 @@ one `ConditionalWeakTable` lookup per plain tooltip assignment, on the
 render path. Not unit-testable: `TooltipFacility` takes a Blish
 `Control` and tests stay Blish-free, so desktop gate step 12 carries the
 check and now names the no-stat-block precondition it needs.
+
+### Post-review corrections, round 3
+
+**1. The round-2 blank-above-the-value table cited evidence that does
+not exist, and miscounted its source twice - FIXED.** Re-read
+`tooltip-research/fwd-ItemTooltip.js` line by line. `tooltipString` has
+FOURTEEN builders, not thirteen (Armor 433, Back 457, Bag 477,
+Consumable 494, Container 513, Gathering 531, Gizmo 548, MiniPet 563,
+Tool 580, Trinket 596, Trophy 618, UpgradeComponent 635, Weapon 653,
+Generic 680), and only ELEVEN of them call `getValue()` at all (448,
+468, 485, 504, 522, 554, 609, 626, 644, 670, 687). So "twelve of its
+thirteen builders agree" was wrong in both numbers: the true figure is
+nine of the eleven that emit a value. Worse, `Gathering`, `MiniPet` and
+`Tool` emit NO value line whatsoever, so they cannot agree with either
+shape - yet round 2 had listed all three in the no-blank arm on the
+strength of that same sentence, while the arm's own doc comment said an
+unknown shape falls to Generic. They are now their own labelled arm,
+still contiguous but on a stated nearest-body-shape inference rather
+than a borrowed measurement, recorded under "Accepted divergences" as
+the one guess in the table, pinned by a Theory test that says so, and
+handed to desktop gate step 6. The counts are corrected here, in
+`ItemStatTooltipComposer.ValueSitsAfterABlank`'s doc comment and in
+`ItemStatTooltipComposerTests`.
 
 ### Desktop gate (live, required)
 
@@ -13304,7 +13344,13 @@ check and now names the no-stat-block precondition it needs.
    under the line above it with NO blank row (measured on steak.png); on
    a crafting material there IS one blank above it (inferred, FWDekker's
    Generic builder). On a NoSell item (Bolt, a Rebreather) there is no
-   value line and no trailing blank at all.
+   value line and no trailing blank at all. THEN settle the one guess in
+   the table: hover a Copper Mining Pick (Gathering), a Master's Salvage
+   Kit (Tool) and any sellable miniature (MiniPet) and record whether a
+   blank sits above the coin row. Nothing measures these three - if the
+   game shows a blank, move them to the default arm in
+   `ValueSitsAfterABlank` and flip
+   `ATypeTheReplicaGivesNoValueLineIsGuessedContiguous`.
 7. A Basic item (Mithril Ore) shows NO "Basic" line; an Exotic one shows
    "Exotic" in white.
 8. Coin icons in the tooltip are noticeably smaller than the plan
