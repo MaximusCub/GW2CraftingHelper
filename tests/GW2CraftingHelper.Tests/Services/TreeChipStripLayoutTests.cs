@@ -163,20 +163,72 @@ namespace GW2CraftingHelper.Tests.Services
                 Both(startX: 40, limitX: endAtZero).Tier);
         }
 
-        [Theory]
-        [InlineData(1024, TreeChipStripLayout.ChipStripTier.CountsOnly)]
-        [InlineData(WindowSizing.NarrowScreenFloorWidth, TreeChipStripLayout.ChipStripTier.CountsOnly)]
-        [InlineData(WindowSizing.MinWindowWidth, TreeChipStripLayout.ChipStripTier.Full)]
-        public void TheRoomLeftByTheButtonCluster_IsWhatDecidesTheTier(
-            int clientWidth, TreeChipStripLayout.ChipStripTier expected)
+        // Every width the row is actually rendered at:
+        // EffectiveMinWindowWidth falls back to the client width below the
+        // designed minimum, so a 1024x768 windowed client really does render
+        // this row, and 930 is the floor that fallback stops at.
+        public static TheoryData<int> WidthsTheRowRendersAt => new TheoryData<int>
         {
-            // The case the desktop gate only exercised at 1378 and wider.
-            // WindowSizing.EffectiveMinWindowWidth falls back to the client
-            // width below the designed minimum, so a 1024x768 or 1280x720
-            // windowed client really does render this row at these widths.
-            Assert.Equal(
-                expected,
-                TierAtClientWidth(clientWidth, ShippedOverridesLabel, ShippedIgnoredLabel));
+            WindowSizing.NarrowScreenFloorWidth,
+            1024,
+            WindowSizing.MinWindowWidth
+        };
+
+        [Theory]
+        [MemberData(nameof(WidthsTheRowRendersAt))]
+        public void AtEveryWidth_TheCountsFitAndStopShortOfTheButtons(int clientWidth)
+        {
+            // The two claims that hold whatever the count labels actually
+            // measure, which is why they are asserted at every width and the
+            // TIER is not: the strip never reaches the buttons (two live
+            // controls on the same pixels is a click landing on whichever
+            // Blish hit-tests last), and what the plan's state IS never
+            // degrades away. The narrowest row the module renders (930 -> an
+            // 824px row) leaves 338px against 188px of counts, so the second
+            // claim clears its boundary by 150px at the worst width and the
+            // first would break only if the button cluster grew past the
+            // whole row.
+            var (placement, limitX) = FitAtClientWidth(
+                clientWidth, ShippedOverridesLabel, ShippedIgnoredLabel);
+
+            Assert.True(placement.ShowCounts);
+            Assert.True(
+                placement.Slots.EndX <= limitX,
+                "strip ends at " + placement.Slots.EndX + ", cluster starts at " + limitX);
+        }
+
+        // The TIER is asserted only where the shipped widths sit far from
+        // the boundary, because the two count labels are measured from a
+        // font no Blish-free test can resolve (see ShippedOverridesLabel).
+        // At 1024 the full strip wants 438px against a 432px limit - a 6px
+        // margin, which is a real degradation on screen and an unfalsifiable
+        // assertion in here, so that width is covered by the two properties
+        // above instead.
+
+        [Fact]
+        public void BelowTheDesignedFloor_TheClearButtonsAreDroppedFirst()
+        {
+            // The 930 narrow-screen floor: an 824px row, 338px of it left
+            // of the buttons, against 438px of full strip. 100px past the
+            // tier boundary in one direction and 150px in the other.
+            var (placement, _) = FitAtClientWidth(
+                WindowSizing.NarrowScreenFloorWidth, ShippedOverridesLabel, ShippedIgnoredLabel);
+
+            Assert.Equal(TreeChipStripLayout.ChipStripTier.CountsOnly, placement.Tier);
+            Assert.False(placement.ShowButtons);
+        }
+
+        [Fact]
+        public void AtTheDesignedFloor_BothChipsKeepTheirClearButtons()
+        {
+            // 1378 -> a 1272px row leaving 786px, against 438px of full
+            // strip: 348px of slack, so this is a statement about the
+            // designed minimum and not about a glyph.
+            var (placement, _) = FitAtClientWidth(
+                WindowSizing.MinWindowWidth, ShippedOverridesLabel, ShippedIgnoredLabel);
+
+            Assert.Equal(TreeChipStripLayout.ChipStripTier.Full, placement.Tier);
+            Assert.True(placement.ShowButtons);
         }
 
         [Fact]
@@ -184,19 +236,28 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Not a boundary the shipped widths sit on: both counts can
             // gain a digit without the tier moving.
-            Assert.Equal(
-                TreeChipStripLayout.ChipStripTier.Full,
-                TierAtClientWidth(
-                    WindowSizing.MinWindowWidth,
-                    ShippedOverridesLabel + 11, ShippedIgnoredLabel + 11));
+            var (placement, _) = FitAtClientWidth(
+                WindowSizing.MinWindowWidth,
+                ShippedOverridesLabel + 11, ShippedIgnoredLabel + 11);
+
+            Assert.Equal(TreeChipStripLayout.ChipStripTier.Full, placement.Tier);
         }
+
+        // The two count labels at their widest ordinary reading -
+        // "Overrides: 12" and "Ignored: 3" at Menomonia 16, the widths the
+        // field report this fit answers was written against. The module
+        // measures its own labels at runtime (a Label's font is Blish's),
+        // so these stand in for a size no Blish-free test can resolve;
+        // nothing asserted against them is closer than 100px to a boundary.
+        private const int ShippedOverridesLabel = 90;
+        private const int ShippedIgnoredLabel = 78;
 
         // The five right-anchored buttons: 414px of width (96 + 92 + 70 +
         // 76 + 80) plus 32px of gaps (4 + 20 + 4 + 4), anchored
         // RightEdgePadding clear of the row's right edge. Read from
         // CraftingPlanView.CreateTreeToolbarRow's PlaceRight calls; a width
         // changed there without changing this makes the boundary cases
-        // below describe a row that no longer exists.
+        // above describe a row that no longer exists.
         private const int RightClusterWidth = 414 + 32 + 20;
 
         /// <summary>
@@ -205,22 +266,13 @@ namespace GW2CraftingHelper.Tests.Services
         /// </summary>
         private const int ClusterSeparation = 20;
 
-        // The two count labels at their widest ordinary reading -
-        // "Overrides: 12" and "Ignored: 3" at Menomonia 16, the widths the
-        // field report this fit answers was written against. The module
-        // measures its own labels at runtime (a Label's font is Blish's),
-        // so these stand in for a size no Blish-free test can resolve; the
-        // arithmetic under test is the fit, not the glyphs.
-        private const int ShippedOverridesLabel = 90;
-        private const int ShippedIgnoredLabel = 78;
-
         /// <summary>
-        /// The tier the strip lands in on a client of the given width,
-        /// through the same chain the view uses: the window minimum
-        /// actually enforced there, the tab panel inside it, and the
-        /// toolbar row inside that.
+        /// The strip's placement on a client of the given width, and the x
+        /// the button cluster starts at, through the same chain the view
+        /// uses: the window minimum actually enforced there, the tab panel
+        /// inside it, and the toolbar row inside that.
         /// </summary>
-        private static TreeChipStripLayout.ChipStripTier TierAtClientWidth(
+        private static (TreeChipStripLayout.Placement Placement, int LimitX) FitAtClientWidth(
             int clientWidth, int overridesLabelWidth, int ignoredLabelWidth)
         {
             int windowWidth = WindowSizing.EffectiveMinWindowWidth(clientWidth);
@@ -230,11 +282,14 @@ namespace GW2CraftingHelper.Tests.Services
             // parented to the strip, which is the whole content region, and
             // it is the button walk that steps back in from its edge.
             int rowWidth = WindowSizing.TabPanelWidthFor(windowWidth) + 20;
+            int limitX = rowWidth - RightClusterWidth - ClusterSeparation;
 
-            return TreeChipStripLayout.Fit(
-                0, rowWidth - RightClusterWidth - ClusterSeparation,
+            var placement = TreeChipStripLayout.Fit(
+                0, limitX,
                 true, overridesLabelWidth, OverridesButton,
-                true, ignoredLabelWidth, IgnoredButton).Tier;
+                true, ignoredLabelWidth, IgnoredButton);
+
+            return (placement, limitX);
         }
     }
 }

@@ -14040,6 +14040,27 @@ would trust if the field test still reported dropped clicks.
 `HoverChainResync` states the mechanism correctly and is now the wording
 of record, pointed at from here.
 
+**7 (must fix). The narrow-client tier assertion sat 6px from asserting
+the opposite of what ships.** `TreeChipStripLayoutTests` asserted
+`CountsOnly` at a 1024px client - the one case showing the chips degrade
+on a real narrow window, and the one gate step 14 was written from.
+Recomputed from the production constants: `TabPanelWidthFor(1024)` 898,
+a 918px row, a 432px limit against a 438px full strip. A 6px margin, and
+90/78 of that 438 are the two count labels the test's own comment
+concedes it cannot resolve glyph-for-glyph, because a `Label`'s font is
+Blish's and the module measures them live. Real glyphs 12px narrower
+combined and the strip renders Full at 1024 while the test keeps passing
+on CountsOnly: a green suite certifying a degradation the module does
+not perform, at the exact width the overlap finding came from.
+
+What is asserted at every rendered width is now what holds whatever the
+labels measure - the counts survive (188px against the narrowest row's
+338px) and the strip stops short of the buttons. The TIER is asserted
+only where the margin is not a glyph's width: 930, where Full misses by
+100px and CountsOnly clears by 150, and 1378, where Full has 348px of
+slack. The 1024 arithmetic is recorded in the file as the reason that
+width carries no tier assertion.
+
 ### Desktop gate checklist (live Blish, real plan)
 
 1. Every section at the 1378px minimum width: the ramp is legible -
@@ -14098,10 +14119,14 @@ of record, pointed at from here.
 14. **Narrow client, which steps 1-13 never reach.** Run the game
     windowed at 1024x768 (and again at the 930 floor) so
     `EffectiveMinWindowWidth` falls back below 1378. With BOTH counts
-    non-zero, the two clear buttons disappear and the two counts remain,
-    and nothing in the left cluster paints on "Best Path" or any other
-    toolbar button. Drag back out to 1378+ and the buttons return in the
-    same click. Post-review finding 4.
+    non-zero: both counts stay readable at every width, and nothing in
+    the left cluster paints on "Best Path" or any other toolbar button.
+    At the 930 floor the two clear buttons are gone (100px past the
+    boundary, so this one is certain); at 1024 the strip is within 6px
+    of the boundary, so RECORD which way it falls rather than expecting
+    an answer - that measurement is the only thing that can settle the
+    count labels' real widths. Drag back out to 1378+ and both clear
+    buttons must be present. Post-review findings 4, 7.
 15. **A vendor node whose offer carries an item cost AND a currency
     cost** (two synthesised cost-component leaves - expand one). Ignore
     a sibling material so the re-solve can change which bulk offer the
