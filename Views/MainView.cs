@@ -532,7 +532,7 @@ namespace GW2CraftingHelper.Views
                 PlaceholderText = "Search items, currencies, characters...",
                 Text = _lastSearchText ?? "",
                 Parent = _filterPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
             _searchBox.TextChanged += (_, __) =>
             {
                 _lastSearchText = _searchBox.Text ?? "";

@@ -149,6 +149,7 @@ namespace GW2CraftingHelper
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
+        private Texture2D _cornerIconTexture;
         private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
@@ -237,7 +238,14 @@ namespace GW2CraftingHelper
             // failed).
             var logStore = new ModuleLogStore(dataDir, (message, ex) => Logger.Warn(ex, message));
             ModuleLog.Shared.Configure(logStore, _settings.GetClampedLogMaxSizeBytes(), (message, ex) => Logger.Warn(ex, message));
+            // Blish renders each SettingEntry a second time in Manage
+            // Modules, and those controls only write the setting - these
+            // subscriptions carry a change live no matter which UI made it.
+            _settings.LogDiagnosticsEnabled.SettingChanged += OnLogDiagnosticsEnabledChanged;
             ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
+            _settings.LogMaxSizeBytes.SettingChanged += OnLogMaxSizeBytesChanged;
+            _settings.ClickSoundVolumePercent.SettingChanged += OnClickSoundVolumeChanged;
+            Views.Rendering.ClickSound.VolumePercent = _settings.GetClampedClickSoundVolumePercent();
 
             // Once-per-session age-based retention enforcement, BEFORE the
             // ring is seeded from the file below - the ring then mirrors
@@ -411,6 +419,21 @@ namespace GW2CraftingHelper
             {
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Module icon texture load failed, using the fallback error texture: {ex.GetType().Name} - {ex.Message}");
                 _moduleIconTexture = ContentService.Textures.Error;
+            }
+
+            try
+            {
+                // The strip variant: same hammer, re-padded so the glyph
+                // fills ~72% of the canvas like the game's own top-row
+                // icons (icon.png fills 84% - correct for the module list
+                // and emblem, visibly oversized between GW2's menu icons;
+                // measured against a live top-row capture 2026-08-23).
+                _cornerIconTexture = ContentsManager.GetTexture("corner-icon.png");
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Corner icon texture load failed, using the module icon: {ex.GetType().Name} - {ex.Message}");
+                _cornerIconTexture = _moduleIconTexture;
             }
 
             try
@@ -669,7 +692,7 @@ namespace GW2CraftingHelper
             _cornerIcon = new CornerIcon()
             {
                 IconName = "GW2 Crafting Helper",
-                Icon = new AsyncTexture2D(_moduleIconTexture),
+                Icon = new AsyncTexture2D(_cornerIconTexture),
                 Priority = 1245846523,
                 Parent = GameService.Graphics.SpriteScreen
             };
@@ -989,6 +1012,13 @@ namespace GW2CraftingHelper
         {
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
 
+            // The SettingEntry objects outlive this module instance
+            // (DefineSetting returns the existing entry on re-enable), so a
+            // leftover handler would root each dead Module in turn.
+            _settings.LogDiagnosticsEnabled.SettingChanged -= OnLogDiagnosticsEnabledChanged;
+            _settings.LogMaxSizeBytes.SettingChanged -= OnLogMaxSizeBytesChanged;
+            _settings.ClickSoundVolumePercent.SettingChanged -= OnClickSoundVolumeChanged;
+
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
 
@@ -997,6 +1027,10 @@ namespace GW2CraftingHelper
             // tree, so nothing else tears them down on unload - this must
             // be called explicitly before disposing the host window.
             _craftingContent?.StopLiveTickers();
+
+            // Same reasoning, same ownership: one screen-parented popup per
+            // item row, each holding a global mouse subscription.
+            _craftingContent?.DisposeSuggestionPanels();
 
             _httpClient?.Dispose();
             _modalDialog?.Dispose();
@@ -1011,6 +1045,9 @@ namespace GW2CraftingHelper
             // TooltipFacility for why there is one instance rather than
             // one per tooltip'd control.
             Views.Rendering.TooltipFacility.Shutdown();
+
+            Views.Rendering.ClickSound.Unload();
+            _settingsContent?.Teardown();
 
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush
@@ -1027,6 +1064,24 @@ namespace GW2CraftingHelper
             // disable) - never by any in-tab user action. The on-disk file
             // is untouched (survives across sessions by design).
             ModuleLog.Shared.Clear();
+        }
+
+        private void OnClickSoundVolumeChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            Views.Rendering.ClickSound.VolumePercent = e.NewValue;
+        }
+
+        private void OnLogDiagnosticsEnabledChanged(object sender, ValueChangedEventArgs<bool> e)
+        {
+            ModuleLog.Shared.DiagnosticsEnabled = e.NewValue;
+        }
+
+        // Reads the clamped accessor, not e.NewValue: Blish's Manage Modules
+        // bar spans 0 to the persisted value, so it can deliver a byte count
+        // below the 1 MB floor the tab's own parser enforces.
+        private void OnLogMaxSizeBytesChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
         }
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)

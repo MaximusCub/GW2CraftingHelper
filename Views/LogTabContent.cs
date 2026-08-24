@@ -273,7 +273,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, 7),
                 PlaceholderText = "Search log entries...",
                 Parent = _toolbarPanel
-            };
+            }.ReleaseOnDispose().ReleaseOnEnter();
             _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
 
             _levelDropdown = new Dropdown

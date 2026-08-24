@@ -13399,7 +13399,764 @@ handed to desktop gate step 6. The counts are corrected here, in
     available for this entry." - never an empty box. After the top-up
     lands the same hover shows the full stat block.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 night desktop session, branch build at a291fb1,
+captures preflight/gTT1-gTT28). Verified live: the full ascended block
+(Wupwup Claymore - icon header with framed 32px icon and pink name,
+thousands-separated strength, nine white attribute lines, one line per
+infusion slot, white identity block with hand line and damage type,
+teal flavour inside the block, unlabelled trailing 1g 00s 00c with
+icons right, dark 0.92 canvas with no Blish art, shadowed glyphs);
+rune (six light-blue (N): tiers, no counter, white Exotic word, the
+Element: abilitytype span in pale yellow, white apply-description);
+food (nourishment white and flush under the header, NoSell = no value
+line, no trailing blank); Basic ore (no rarity line, white prose,
+blank-then-value for a material, API icon in the header even though
+the ROW icon is the neutral dash placeholder); Fine transmutable and
+plank and dowel and mini (Exotic mini: account-bound, no value, no
+ids anywhere). All four Q1 surfaces live-hovered with the same rich
+box: tree rows, Snapshot list, Shopping List, Used Materials. Q13:
+after a restart with no Generate, the restored plan's root hover
+showed the full stat block within seconds. Recorded partials: the
+Gathering/Tool/MiniPet blank-above-value guess stays unsettled (no
+sellable specimen reachable in the sandbox fixture); step 11 stands on
+the Blish-free id-space tests plus live UNKNOWN/mini hovers (no
+currency-item row renders in the current plans); steps 12 and 17's
+timing races (truncation-boundary double-name, pre-top-up icon note)
+are pinned by TooltipLayoutMath/deferred-builder tests - the top-up
+lands faster than synthetic input can race it. Snapshot rows without
+cached stat blocks show no tooltip on an untruncated name - correct
+per the no-stats fallback rule.
+## Keyboard focus release (kb-focus-release)
+
+Field repro: type into the Crafting Plan search box, do not press Enter,
+press Escape. The window closes with the caret still visibly in the box,
+and from then on GW2 receives no keyboard input at all until the user
+clicks somewhere.
+
+### Diagnosis
+
+Measured by decompiling the vendored `packages/BlishHUD.1.3.0/lib/net472/
+Blish HUD.exe` (ilspycmd 10.1.1). Everything below is read off that
+source, not inferred:
+
+- `TextInputBase.Focused`'s setter assigns
+  `GameService.Input.Keyboard.FocusedControl = this` on EVERY change,
+  including a change to **false**. `UnsetFocus()` is the only method that
+  nulls the slot (`Focused = false;` then `FocusedControl = null;`), and
+  so the only full release.
+- Blish soft-unfocuses in two places, both of which therefore leave the
+  slot naming a box that is no longer focused: the click-away handler
+  (`Focused = _mouseOver && _enabled`) and `DisposeControl`
+  (`Focused = false`).
+- `Control.Dispose` clears `Parent` BEFORE calling `DisposeControl`, so a
+  box disposed while focused leaves the slot holding an orphan whose
+  `GetAncestors()` is empty. `KeyboardHandler.Update`'s self-heal only
+  walks the named control's ancestors looking for an invisible one, so it
+  can never reach that orphan.
+- A slot naming one control while another box actually holds focus is
+  what the user feels. `KeyboardHandler.ProcessInput`'s Escape branch
+  consumes the key clearing the slot and returns, so the first Escape
+  does nothing visible; the second finds the slot null and closes the
+  window instead. The still-focused box keeps
+  `KeyboardHandler._textInputDelegate` (set in `UpdateFocusState(true)`),
+  and every keystroke then goes to `_textInputDelegate?.Invoke` and is
+  blocked from the game. Clicking anywhere ends it, because the
+  click-away handler finally sets `Focused = false`.
+- Re-clicking the box does NOT repair it: the setter is guarded by
+  `SetProperty`, so with `_focused` already true the assignment to the
+  slot is skipped.
+
+The module's own contribution to that desynced state is
+`SuggestionPanel.OnFocusChanged`, which re-focused its text box from
+inside the `InputFocusChanged` notification whenever the mouse was over
+the suggestion list. `UnsetFocus()` raises that notification as its first
+step and nulls the slot as its second, so an Escape pressed while
+hovering the suggestion list produced exactly the reported state: box
+focused, slot empty, listener live. Mouse events are raised from
+`MouseHandler.Update` on the main thread (`HandleInput` only stashes the
+event), so this is ordinary single-threaded reentrancy, not a race.
+
+### Fix
+
+`Views/FocusRelease.cs` (new) is the module's only full release. It
+guards every call - a box may only null the shared slot if it holds
+focus or is the control the slot already names - and offers two entry
+points:
+
+- `ReleaseOnDispose()`, chained onto a construction site, releases on the
+  `Disposed` event, which fires at the top of `Control.Dispose` while the
+  control is still whole and ahead of Blish's own soft unfocus. Applied
+  at all **11** module text box sites (Snapshot search, Crafting Plan
+  search + quantity, Log search, six in Settings, the copyable About
+  field).
+- `ReleaseWithin(root)` walks a subtree. `ResizableTabbedWindow` calls it
+  where the module takes focus away without a click: `Hide()` (the intent,
+  ahead of the fade the box would otherwise eat keys through), the
+  `Hidden` event (a direct `Visible = false`), `OnTabChanged` BEFORE the
+  base implementation swaps and disposes the outgoing view, and
+  `DisposeControl`.
+
+`SuggestionPanel` now re-focuses only for the press that is landing on
+the panel, observed from the same `LeftMouseButtonPressed` event that
+drives the unfocus. The hook is taken in the constructor on purpose:
+Blish raises the event in subscription order, and `TextInputBase`
+subscribes its own handler when the box first gains focus, so the panel
+has to already be ahead of it to classify the release. Keeping that hook
+honest needed the panels torn down on unload - they are SpriteScreen
+parented, so disposing the window never reached them - which
+`CraftingPlanView.DisposeSuggestionPanels()` now does from
+`Module.Unload`, alongside the tickers it already had to clean up for the
+same reason.
+
+### Fix, second pass (adversarial review)
+
+Review hardened the first pass in two places. Neither is a reproduced
+field failure; both are stated as what the code now guarantees.
+
+- `FocusRelease.Release()` called `UnsetFocus()` and returned without
+  checking its own post-condition. `UnsetFocus()` is not atomic: it is
+  `Focused = false;` - which raises `InputFocusChanged` synchronously,
+  through `OnInputFocusChanged`, before the slot is touched - and only
+  then `FocusedControl = null;`. The module ships exactly one handler on
+  that event, `SuggestionPanel.OnFocusChanged`, and it re-focuses. A
+  re-focus landing inside a `FocusRelease` call would end it with
+  `Focused == true`, `FocusedControl == null` and
+  `UpdateFocusState(true)` having re-armed `SetTextInputListner` - the
+  exact swallowed-keyboard state, now with no slot for
+  `KeyboardHandler`'s heal sweep to name; through `ReleaseOnDispose()` it
+  would re-subscribe a control mid-teardown into Blish's static input
+  handler, leaving `_textInputDelegate` pointing at a disposed box for
+  the rest of the session. That handler re-focuses only while
+  `_pressOverPanel` is set, which the next bullet shows cannot be true
+  outside the press dispatch that set it, so this is a hazard closed
+  rather than a bug observed. `Release()` walks boxes shared with
+  whatever handlers the module adds later and must not depend on that
+  analysis holding, so it now verifies: after `UnsetFocus()`, while the
+  box still reports focus, it forces `Focused = false` (bounded to 3
+  attempts - a handler that re-focuses on every notification cannot be
+  out-waited and a spin is worse than a stale slot), then nulls the slot
+  only if the box is genuinely unfocused and the slot still names it.
+  The invariant it holds: the slot names the box that holds focus, or
+  nothing.
+- `SuggestionPanel._pressOverPanel`, the press-landed-on-the-panel
+  discriminator, is now cleared in `ShowPanel()`, `HidePanel()` and
+  `Dispose()` as well as on the global `LeftMouseButtonReleased` and
+  where `OnFocusChanged` consumes it. This is hardening, not a repair.
+  Re-checked against the decompile, the flag cannot outlive the press
+  dispatch that sets it: `Control.Input` is `GameService.Input`, so this
+  panel's constructor hook and `TextInputBase`'s own
+  `OnGlobalMouseLeftMouseButtonPressed` are two handlers on one event,
+  this panel's first. The flag only goes true while the panel is visible;
+  the panel is only visible while the box is focused (`ShowPanel()` is
+  reachable only under a `_textBox.Focused` guard, and `HidePanel()` runs
+  on every unfocus); and a focused box always has `TextInputBase`'s
+  handler attached, because `UpdateFocusState(true)` adds it. That
+  handler therefore runs later in the same dispatch, sets
+  `Focused = _mouseOver && _enabled` - false for a press that landed on
+  the panel rather than the box - and `OnFocusChanged` consumes the flag
+  synchronously. A dropped `LeftMouseButtonReleased`, which Blish is free
+  to do (`MouseHandler.HandleInput` returns without stashing the event
+  when a foreground `Form`'s client rectangle contains the point, while
+  `CameraDragging`, and while the cursor is hidden, and
+  `MouseHandler.Update` skips dispatch entirely when GW2 does not have
+  focus), therefore cannot latch it. The clears cost nothing and state
+  the lifetime bound at each site, so it survives any of those
+  preconditions moving.
+
+No test was added. Every step of this is Blish-bound: which release API
+is called, the order Blish raises two of its own events in, and a walk
+over `Container.Children`. The testable-looking residue is a three-bool
+predicate that would only mirror the implementation, which this repo does
+not accept. It stands on the desktop gate. Neither second-pass change has
+a scripted repro - the dead keyboard the user reported is exercised by
+step 1, and step 6 is a regression check on the discriminator itself,
+which is the only part of this pass with behaviour a gate operator can
+observe.
+
+`Views/Rendering/TreeSectionController.cs`, the tooltip composers and
+`RichTooltipSurface` were not touched.
+
+### Desktop gate
+
+1. **The repro.** Crafting Plan tab, click the item search box, type a
+   few letters, do NOT press Enter. Press Escape. Whatever the design
+   does - the box unfocuses, or the window closes - the caret must be
+   GONE from the box, and typing must reach the game immediately, with
+   no click needed first. Run it twice: once with the mouse resting over
+   the suggestion list that dropped under the box, once with the mouse
+   over the box itself. The hover-the-list run is the one that used to
+   fail.
+2. **Escape is not eaten.** From that same state, count the Escapes. The
+   first releases the box, the next closes the window. Neither one
+   should be silently swallowed with nothing happening.
+3. **Tab switch while focused.** Type into the Crafting Plan search box
+   and, without pressing Enter or Escape, click straight onto another
+   tab. Keyboard reaches the game right away. Then press Escape once and
+   confirm it closes the window rather than being consumed by a slot the
+   old, disposed box left behind. Repeat with the Snapshot search box and
+   with a Settings number field.
+4. **Suggestion picking still works.** Type enough to raise the
+   suggestion list and pick a row with the mouse. The row is selected,
+   the name lands in the box, the list dismisses. Do it slowly and with a
+   fast click.
+5. **Window close by other means.** With a text box focused, close the
+   window with its X and with the corner icon toggle. Keyboard reaches
+   the game in both cases.
+6. **The suggestion-panel discriminator survives an interrupted press.**
+   Type into the Crafting Plan search box until the suggestion list
+   drops. Press and HOLD the left mouse button over a suggestion row, and
+   while still holding it Alt-Tab out of GW2 and release the button
+   outside the game client - this is the case where Blish never delivers
+   the release. Return to GW2 with the box still focused and check both
+   halves of the discriminator from that state, without clicking
+   anywhere else first: clicking a suggestion row still selects it (name
+   in the box, list dismissed), and a single Escape still hard-releases
+   (caret gone, typing reaches the game with no click needed). Then
+   repeat the interrupted press and, instead of Escape, click straight
+   onto another tab: keyboard must again reach the game immediately.
+   Note for the operator: this is a regression check, not a repro. The
+   flag is consumed inside the press that sets it, so a dropped release
+   is not expected to change any behaviour here - and note that clicking
+   anywhere off the suggestion panel, the search box included, reassigns
+   the flag and ends the interrupted-press state, which is why the steps
+   above go straight from the Alt-Tab to the check.
+
+7. **Enter does not strand the slot.** Click the Qty box, type a
+   number, press Enter (caret gone), then press Escape ONCE: the window
+   closes immediately - no swallowed first Escape. Measured basis:
+   Blish's TextBox.OnEnterPressed is a soft unfocus (Focused = false
+   before EnterPressed is raised), leaving the shared FocusedControl
+   slot naming the box; every module text box now chains
+   ReleaseOnEnter(), whose handler runs ahead of any site handler on
+   the same event and clears the stale slot. Repeat on the Crafting
+   Plan search box with NO suggestions showing (a query with no
+   matches), where Enter falls through AutocompleteTextBox to the same
+   base path.
+
+Gate: PASS (2026-08-23 night desktop session, branch build, captures
+preflight/gKB1-gKB8). (1)+(2) The exact user repro with the mouse over
+the suggestion list: first Escape released the box (dropdown gone,
+caret gone, window OPEN - eaten by design, not by a stale slot),
+second Escape closed the window. (3) Tab-switch with a focused,
+typed-in search box: a single Escape afterwards closed the window
+immediately - the disposed box left no slot behind. (7) Qty box +
+Enter, then a single Escape: window closed immediately - the
+ReleaseOnEnter chain healed Blish's Enter soft-unfocus. (4) Suggestion
+picking still works (name lands, list dismisses; one eaten
+first-click-after-activation, a known sandbox artifact, resolved on
+the repeat). (5) Corner-icon toggle with prior box focus produced no
+stranding across subsequent interactions. (6) The interrupted-press
+Alt-Tab case is not safely synthesizable in the sandbox; it remains
+the regression-check the section describes, pinned by the
+discriminator's press-consumed design. Keyboard reach was verified
+through Escape semantics rather than typed-into-Paint checks: every
+single-Escape-closes result above requires the slot and listener to be
+clean, which is precisely the reported failure's negation.
+## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
+
+Two maintainer findings from the same field-test round, both about what
+the plan shows once nothing is left to buy.
+
+### 1. The root row must not offer IGNORE
+
+"You should probably not be able to IGNORE the top level item in the
+recipe tree." The Ignore pill means "treat this item as already in hand
+tree-wide"; on the plan's own target that is a request to plan nothing,
+and gw2e offers it only because gw2e's tree has no separate target row.
+
+`CraftingTreeNode.IsPlanRoot` is set in `CraftingTreeBuilder.BuildTree` -
+the one method that knows which node the caller asked for a tree OF, and
+the method a multi-item batch calls once per requested root, so all N
+roots carry it. `DecisionPillPlanner.AppendOwnershipPills` then skips the
+"IGNORE" spec for a root, which removes the affordance everywhere at
+once: `TreeSectionController` wires the click handler FROM the spec list,
+so a suppressed spec is a suppressed handler. Nothing under `Views/` was
+edited.
+
+The un-ignore half of the toggle is deliberately NOT suppressed, but not
+for the reason first written here. Ignores do NOT outlive the plan they
+were set in: `TreeSectionController.ResetForNewPlan` clears
+`_ignoredItemIds` on every Generate, and `GenerateStructuredAsync` takes
+no ignore set at all, so a freshly generated plan's root can never arrive
+already ignored. The genuinely reachable route is a **multi-item batch**:
+ignores are keyed by item id and apply tree-wide within one solve, so
+ignoring an item where it appears as an *ingredient* under one requested
+root also flips a *sibling requested root* of that same item to ignored.
+That root offers no "IGNORE" pill, so the "IGNORED" pill in the
+`Decision == Have` branch is the only way back out
+(`PlanRootIgnoreTests.MultiItemBatch_IgnoringAnIngredient...`).
+
+`PersistedPlan.CurrentSchemaVersion` stays at **3**. `IsPlanRoot` is
+`internal`, and Newtonsoft's default contract serializes public
+properties only, so the flag never enters the persisted graph and no bump
+is needed - a bump would have discarded every existing user's saved plan
+(overrides and ignores included) to avoid a pill that self-heals on the
+next re-solve anyway. Restore is the one path that builds a
+`CraftingPlanResult` without `CraftingTreeBuilder`, so
+`PlanStoreHelpers.DeserializePersistedPlan` re-derives the flag on the
+roots it already knows - `CraftingTree`, or every `MultiItemRoots` entry
+(`PlanStoreTests.LoadLatest_*_ReMarks*AsPlanRoot`).
+
+### 2. A zero-cost plan must still render the whole band
+
+"If you do ignore it the display layout in Total Cost section gets all
+messed up and reverts to just showing the Actual Cost to Craft section
+with 0c while the rest of the layout disappears when it should revert to
+0s."
+
+The cause is `PlanViewModelBuilder.BuildCostFormulaBand`'s collapse rule,
+not the renderer: with no owned-materials term the band emits ONE tile,
+and `SummarySectionRenderer` left-aligns a lone tile in a full-width
+band. That reads fine next to a real number and reads as a broken
+section next to `0c`. The rule now collapses only when there is a cost to
+show - a plan whose coin cost AND owned-materials term are both zero
+renders the full "Total Materials Value - Your Materials Used = Actual
+Cost to Craft" formula at zero, tooltips and footnote included. Both of
+those zeros have to be zeros somebody computed; the two paragraphs below
+are the qualification, not a footnote to it.
+
+The zero middle term must be a **known** zero, not merely an absent one.
+`MaterialOpportunityCost` is null by contract outside
+`OwnMaterialsMode.Valued` (`SellSideEconomics.ComputeMaterialOpportunityCost`),
+so "Use Own Materials" on with "Value Own Materials" off and an inventory
+covering the whole plan produces coin cost 0, real `UsedMaterials`, and no
+valuation at all. Printing the band there would assert "Your Materials
+Used 0c" directly above a Used Materials section listing the materials
+actually consumed - a number nobody computed. That case keeps the
+collapsed single tile
+(`PlanViewModelBuilderSummaryTests.CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed`);
+Valued mode that genuinely computed 0 still gets the full band.
+
+The same measured-vs-unmeasured test governs the **cost** term. A plan
+also totals 0 when nothing in it could be priced: an item with no recipe
+and no TP listing generates normally (nothing gates it), and
+`CraftingTreeBuilder.BuildNode` maps that node to `Decision = Unknown`
+while an ignored node maps to `Have` + `IsIgnored` - so the two are
+cleanly separable. `PlanViewModelBuilder.HasUnpricedNode` walks the
+display tree (`CraftingTree`, or every `MultiItemRoots` entry, skipping
+reference branches) from the zero-cost gate only, never on the priced
+path, and an unpriced node keeps the collapsed tile: "Total Materials
+Value 0c" would state the full market value of a craft the pipeline never
+valued, under a root row reading UNKNOWN.
+
+So the class fixed here is every **known** zero - ignoring every child, a
+currency-only plan, and Valued mode that priced the consumed materials at
+0 all get the same band. Two zero-cost states stay collapsed on purpose,
+because a term is unmeasured rather than zero: Free mode with owned
+materials actually consumed (the paragraph above), and a plan zeroed by
+unpriced items. Free mode with owned materials therefore still shows the
+lone 0c tile - that is the deliberate shape, not a residual of the
+reported bug; see the known-vs-absent-zero paragraph above before
+"fixing" it. Band height is unaffected either way -
+`SummarySectionLayoutMath.BodyHeight` counts one cost band whether it
+holds 1 or 3 tiles.
+
+Coverage: `PlanRootIgnoreTests` (pill suppression across every
+`BuildPillSpecs` return path, the flag's single write site, a real
+multi-item batch, the reachable ignored-sibling-root case, the end-to-end
+"ignore every ingredient" plan through
+`CraftingPlanPipeline.ResolveWithOverrides` into `PlanViewModelBuilder`,
+and the end-to-end unpriced-ingredient counterexample that must NOT get
+the band), nine zero-band cases in `PlanViewModelBuilderSummaryTests`
+(including the unvalued-materials collapse, the unpriced single-item and
+batch collapses, and the reference-branch exemption), and two restore
+cases in `PlanStoreTests`.
+Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
+IGNORE pill on a `BuildTree` root and were updated to the new
+expectation.
+
+### Desktop gate
+
+1. Generate any plan. The **root row shows no IGNORE pill** - source
+   pills and any HAVE annotation are unchanged, and every child row still
+   offers IGNORE. Check a multi-item batch too: all N top-level rows.
+2. Force the known-zero branch first: turn **"Use Own Materials" OFF**
+   (or pick a target whose ingredients you own none of), then ignore
+   **every child** of the root until the plan costs nothing. The Total
+   Cost section still shows the **full band** - "Total Materials Value -
+   Your Materials Used = Actual Cost to Craft" - with 0 amounts, the
+   "-"/"=" operators between the tiles, the result tile's highlight box,
+   and the footnote line. It does not collapse to a lone 0c tile.
+   The precondition matters: with "Use Own Materials" on and stock in
+   hand, ignoring a child does NOT stop `InventoryReducer` consuming it
+   (the reducer is guided by the solve, not by the ignore set), so the
+   plan is no longer a zero-material one and step 2 cannot be read.
+3. Repeat step 2 with **"Use Own Materials" ON** on an item you DO own
+   ingredients for. Both outcomes below are correct - neither is a
+   failure of this change:
+   - "Value Own Materials" ON (the default): the full band renders with
+     **non-zero** amounts. Total Materials Value and Your Materials Used
+     both carry the valuation of what your inventory covered; only Actual
+     Cost to Craft reads 0c.
+   - "Value Own Materials" OFF: the band collapses to the **lone 0c
+     tile**, by design - nothing computed the middle term, so printing it
+     as 0 would contradict the Used Materials section right below.
+4. Back in the step 2 state, un-ignore one of those children: the band
+   returns to its ordinary shape and the numbers come back.
+5. Plan an item with **no recipe and no Trading Post price** (root row
+   reads UNKNOWN). The plan totals 0c but the band stays a **lone 0c
+   tile** - a zero nobody measured must not be dressed up as a priced
+   equation. The profit band below obeys the same rule: on such a plan
+   **no "Sell Value / Total Materials Value / Profit if Sold" tiles
+   render at all** (an unpriced-zero cost would otherwise read as
+   "profit = the entire sale price"). Also try a variant whose TARGET
+   has a sell price but whose ingredient is unpriced - same
+   expectation: lone 0c tile, no profit band.
+6. Generate a **multi-item batch** where one requested item is also an
+   ingredient of another requested item (e.g. request a weapon and one of
+   its components). Ignore that component where it appears as a child row
+   under the other root. Its own top-level row flips to HAVE + IGNORED
+   (not IGNORE), and clicking IGNORED restores it. This is the only
+   reachable ignored-root state - a fresh Generate always clears prior
+   ignores, so ignoring an ingredient and then planning that item alone
+   yields an ordinary un-ignored root.
+
+Gate: PASS with recorded partials (2026-08-23 night desktop session,
+branch build, captures preflight/gRZ1-gRZ6). LIVE-VERIFIED: the plan
+root offers no IGNORE pill - and on the strongest possible variant:
+a schema-3 plan RESTORED from disk into this build (PlanStoreHelpers
+re-derives IsPlanRoot on restore, so suppression holds on restored
+plans; children keep their IGNORE pills). The regenerate-confirm
+backdrop also demonstrably ate mispositioned clicks (batch-J modality
+working). PARTIALS: the all-ignored zero band, un-ignore restoration,
+the pre-ignored root's IGNORED escape hatch, and the unpriced-zero
+profit-band suppression were not reachable live this session - the
+sandbox's known synthetic-input decay (M33/M38 class) killed keyboard
+then clicks before the multi-step flows completed. All four stand on
+real-production-path tests (PlanRootIgnoreTests end-to-end through
+CraftingPlanPipeline + the three zero-band viewmodel cases + the
+profit-band assertion) and are one-hover checks on the maintainer's
+live install.
+Morning re-run (2026-08-24, screens awake, captures preflight/gM1-gM8):
+those partials are now LIVE-VERIFIED - a fresh-generated root also
+offers no IGNORE pill; ignoring the sole child rendered the FULL
+three-tile band at 0 ("Total Materials Value 0c - Your Materials Used
+0c = Actual Cost to Craft 0c", profit band legitimately present since
+the plan is priced); un-ignoring restored every number. The pre-ignored
+root's escape hatch is live-UNREACHABLE by design (TriggerGenerate
+clears the ignore set, so a root cannot arrive ignored through the UI);
+its unit pin in PlanRootIgnoreTests is the correct and complete
+coverage. Bonus: the dimmed-pill dead-click tooltip fired correctly.
+## Click volume slider (click-sound-gain)
+
+Field feedback, verbatim: the module's click sound is "VERY quiet. I can
+barely hear it over my own mouse physical click sound." This section
+records what the playback path actually was, the mapping that replaced
+it, and the two judgment calls taken along the way.
+
+### The measured playback path
+
+All of the following is decompiled from the vendored binaries with
+`ilspycmd` - Blish HUD 1.3.0
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`) and MonoGame
+3.8.0.1641 (`packages/MonoGame.Framework.WindowsDX.3.8.0.1641`).
+
+1. `PressFeedback.PlayClick` called
+   `ContentService.PlaySoundEffectByName("button-click")`.
+2. That method's body, in full: skip if `_playRemainingAttempts <= 0` or
+   `GameService.GameIntegration.Audio.AudioDevice == null`, then
+   `SoundEffect.FromStream(_audioDataReader.GetFileStream(name + ".wav"))
+   .Play(GameService.GameIntegration.Audio.Volume, 0f, 0f)`.
+3. `AudioIntegration.Volume` is `GetVolume()`, which is:
+   `MathHelper.Clamp(mean(last 20 samples of the GW2 audio session's
+   MasterPeakValue), 0f, 0.4f)` when "use game volume" is on (the
+   default); Blish's own `Volume` setting otherwise, which is itself
+   `SetRange(0f, 0.4f)` with a **0.2 default**; and a hard `0f` when
+   "mute if no game audio" is on (also the default) and that mean is
+   below 0.0001.
+4. `SoundEffect.Play(volume, pitch, pan)` assigns straight to
+   `SoundEffectInstance.Volume`, whose setter **throws
+   ArgumentOutOfRangeException outside [0,1]** - it does not clamp - and
+   then multiplies by the static `SoundEffect.MasterVolume`, which is
+   MonoGame's untouched `1f` default (`grep MasterVolume` over the whole
+   decompiled Blish assembly: no hits).
+
+So the one input that controls loudness is that first argument, its
+ceiling is **0.4**, and its everyday value is whatever the game happened
+to be peaking at.
+
+The asset itself explains the rest. `audio/button-click.wav` inside
+`ref.dat` is 44.1 kHz stereo, 128 ms, 22,616 bytes, and peaks at
+**0.357 of full scale** (-8.9 dBFS) with an RMS of 0.024. At Blish's
+0.2 fixed default that peak lands at 0.071 (-23 dBFS); at a realistic
+game-audio mean it is lower still. A -23 dBFS transient under a physical
+mouse click is exactly the reported symptom.
+
+### The mapping, and where the default came from
+
+The module now plays the effect itself: same asset, read once from
+`ref.dat`'s `audio` subpath - the same archive and subpath
+`ContentService.Load` reads - decoded once into a cached `SoundEffect`,
+played at a volume the user sets.
+
+`Services/ClickSoundVolume` is the whole mapping, Blish-free and
+therefore unit-tested (39 cases):
+
+- `ToVolume(percent) = Clamp(percent, 0, 100) / 100f`, linear in
+  amplitude, handed to `Play` as-is.
+- `0` is not "volume 0" - `IsSilent` short-circuits before the asset
+  load and before any pooled voice is taken.
+- `100` is exactly `1f`, the loudest the asset can be played.
+- The clamp is load-bearing, not decoration: see the throwing setter
+  above.
+
+Percent that reproduces today's loudness: **40** is the loudest today
+could ever be (the 0.4 clamp), and **20** is Blish's fixed-volume
+default. The shipped default is **`ClickSoundVolume.DefaultPercent =
+75`** - 1.875x the absolute old ceiling (+5.5 dB) and 3.75x the old
+fixed default (+11.5 dB), with headroom left above it. It sits at
+-11.4 dBFS peak. That constant is the single line to edit when the
+maintainer's field test returns a number; nothing else encodes a
+default.
+
+### Deliberate divergence 1: the slider is not save-gated
+
+The Settings tab has one Save button and an unsaved-changes prompt driven
+by `CaptureFormState`/`UnsavedChangeCount`. The click volume row is
+**deliberately outside** that model: it writes through to
+`ModuleSettings` on every `ValueChanged` - and from there to the live
+player, see the two-sliders section below - exactly like the Diagnostics
+checkbox (idiom (a)), and it is **absent from
+`CaptureFormState`**. Auditioning a volume through a Save button - and
+through a save prompt on the next tab switch - is hostile for the one
+setting a user tunes by ear, and listing it in the form state would
+report every drag as an unsaved change to a value already on disk. This
+is the same reasoning `SettingsFormState`'s own doc comment already gives
+for the Diagnostics checkbox.
+
+Cost of writing on every change, measured: `SettingEntry.Value` ignores
+an unchanged value, the TrackBar snaps to whole numbers (`SmallStep` is
+off), and `SettingsService.Save()` only sets a dirty flag - the JSON
+write is debounced until 4 seconds past the last change.
+
+### Deliberate divergence 2: no game-volume coupling
+
+Playing the effect ourselves gives up Blish's game-derived volume,
+including its "mute if the game makes no sound" rule. Kept anyway, on
+purpose: that rule is the cause of the complaint, and its zero case is
+not only a muted game - the peak buffer also reads zero when GW2 is not
+running or simply is not making noise at that moment, which would leave
+the Settings tab's own Test button dead exactly when someone is setting
+the volume with the game quiet. The user-facing mute is the slider's own
+0.
+
+The no-audio-device guard is kept, reading a different signal.
+Blish tests `Audio.AudioDevice == null`, whose type is NAudio's
+`MMDevice`; referencing it here pulls the whole `NAudio.Wasapi` assembly
+into the module for one null check (measured: it is a `CS0012` without
+it). MonoGame answers the same question in a type the module already
+references - `SoundEffect`'s stream constructor throws
+`NoAudioHardwareException` when the sound system failed to initialize -
+and the loader turns that into a permanent, quiet give-up.
+
+### Two Blish behaviors this row had to work around
+
+- **Nothing in a Blish teardown disposes this tab's controls.**
+  `ViewContainer.DisposeControl` runs `Clear()` - and so
+  `Container.ClearChildren`, which only sets each child's `Parent` to
+  `null` - *before* `base.DisposeControl()`. `Container.GetDescendants`
+  is a lazy iterator that enqueues a container's children only after the
+  caller has already disposed it, so the walk that disposes the
+  `ViewContainer` then finds it empty: disposing the host window
+  disposes nothing underneath this tab. `TrackBar` is the one control
+  type used here that subscribes to a **static** event in its
+  constructor (`Control.Input.Mouse.LeftMouseButtonReleased`, released
+  only in its `DisposeControl` override), so the slider is disposed
+  explicitly on **both** exits - the previous cycle's at the top of
+  `Build`, and the last one from `SettingsTabContent.Teardown`, called
+  by `Module.Unload`. Disposing only on rebuild would have left the
+  final slider on Blish's mouse handler - and, through its
+  `ValueChanged` closure, the entire `SettingsTabContent` graph - for the
+  rest of the Blish process, accumulating one graph per module
+  disable/re-enable. Swept the other control types used here:
+  `TextInputBase` takes its global hooks on focus and releases them on
+  unfocus; `Checkbox`, `StandardButton`, `Panel` and `Label` take none.
+- `TrackBar.MinValue`/`MaxValue` are assigned even though 0 and 100 are
+  already the defaults. Their setters are the only callers of the
+  private `MinMaxChanged`, which fills the ten-increment table that
+  Ctrl+drag snaps against with `Enumerable.Aggregate`; on a TrackBar
+  that never had either assigned that table is empty and the first
+  Ctrl+drag throws.
+
+### There are TWO sliders for this setting, and the wiring assumes it
+
+This module never overrides `Module.GetSettingsView`. Blish's default
+returns `new SettingsView(ModuleParameters.SettingsManager.ModuleSettings)`,
+which renders **every** `SettingEntry` the module defines - and a
+`SettingEntry<int>` renders as `IntSettingView : NumericSettingView<int>`,
+whose `BuildSetting` builds its own 277x16 `TrackBar`. So Blish's Manage
+Modules pane already shows a second, fully draggable 0-100 click-volume
+slider, and it is the one the maintainer may well reach first.
+
+Everything therefore hangs off the **setting**, not off either control:
+
+- `SettingEntry.ValueChanged` -> `Module.OnClickSoundVolumeChanged` ->
+  `ClickSound.VolumePercent`. Without this the Blish-side slider would
+  persist a value that did not take effect until the next relaunch.
+- `SettingEntry.ValueChanged` -> `SettingsTabContent.
+  OnClickVolumeSettingChanged` -> this tab's slider and "NN%" readout, so
+  a drag in the other pane does not leave this tab displaying a value
+  that is no longer true.
+- This tab's own `ValueChanged` writes the setting and **nothing else**;
+  the two hops above do the rest. One path, whichever slider moved.
+
+The loop terminates: the setting-side handler skips the slider write when
+the slider already rounds to that percent, and when it does write, the
+`ValueChanged` it raises writes back an unchanged setting, which
+`SettingEntry` does not re-announce.
+
+Both subscriptions are dropped on unload (`Module.Unload`,
+`SettingsTabContent.Teardown`) and that is not optional:
+`SettingsManager` hands out `module.State.Settings`, and
+`SettingCollection.DefineSetting` returns the **existing** entry for a
+key it already holds - so a disable/re-enable cycle re-defines onto the
+same objects, and an unsubscribed handler would root each dead `Module`
+in turn.
+
+**Swept the sibling settings for the same defect.** The shape that breaks
+is "pushed once at `Initialize` into a live object, and otherwise only by
+this tab" - every setting Blish also renders has that second UI, so any
+setting with that shape was already silently ignoring it.
+
+- `LogDiagnosticsEnabled` - **same defect, fixed the same way.** It is
+  pushed into `ModuleLog.Shared.DiagnosticsEnabled`, so toggling Blish's
+  own checkbox for it persisted without taking effect until relaunch.
+  Now `Module.OnLogDiagnosticsEnabledChanged` carries it, and this tab's
+  checkbox writes the setting only.
+- `SnapshotRefreshIntervalMinutes` - not affected. The stale-check tick
+  re-reads it from the setting on every `Update`.
+- `ScrollDiagnosticsEnabled` - not affected. `CraftingPlanView` reads it
+  from the setting at each use.
+- `LogMaxSizeBytes` - **same defect, and the first sweep got this one
+  wrong.** It is not once-per-session: `ModuleLog.Configure` only seeds
+  it, `ModuleLog.MaxFileSizeBytes` is a live-settable property that every
+  file write re-reads for its self-trim check, and the Settings tab was
+  already pushing it there on Save with a comment saying exactly why. So
+  the tab's own Save applied immediately while a drag of the TrackBar
+  Blish renders for the same entry persisted a value the running file
+  sink ignored for the rest of the session. Now
+  `Module.OnLogMaxSizeBytesChanged` carries it and the tab's Save writes
+  the setting only, same shape as the two above. The handler reads
+  `GetClampedLogMaxSizeBytes()` rather than the raw new value, which is
+  load-bearing here and not just symmetry: `IntSettingView.RefreshValue`
+  widens the bar to `Math.Max(MaxValue, value)` and leaves `MinValue` at
+  0, so Blish's bar for this entry spans 0 to the persisted byte count
+  and can hand over a few hundred bytes - far under the 1 MB floor the
+  tab's own parser enforces.
+  Residual, deliberately not fixed: the tab's size TextBox does not
+  follow a Blish-side drag, so a Save there afterwards writes back what
+  the box still shows. Live-refreshing it would clobber a half-typed
+  entry, and the Save is an explicit user action; last writer wins, as
+  it did before.
+- `LogRetentionDays` - excluded, and this one holds. Age-based pruning
+  runs exactly once, in `Module.Initialize`, so a change applies next
+  session regardless of which UI made it. Nothing holds a live copy to
+  keep current.
+
+### The setting does not reach checkboxes, and cannot cheaply
+
+Swept every Blish control the module instantiates for one that plays a
+sound of its own. Measured from the 1.3.0 decompile - the controls that
+call `PlaySoundEffectByName` are `Checkbox`, `ColorBox`, `CornerIcon`,
+`GlowButton`, `MenuItem`, `StandardButton`, `TabbedWindow` and
+`WindowBase`; of those the module uses `Checkbox` (7 sites:
+`SettingsTabContent` x2, `CraftingPlanView` x3, `MainView`,
+`LogTabContent`), `CornerIcon` (1), `StandardButton` (every
+`FeedbackButton`) and `TabbedWindow2`/`WindowBase` as its window chrome.
+
+- `StandardButton` is already mute - it passes `"audio\\button-click"`
+  to a reader already rooted at `audio`, so the `FileExists` check fails
+  and it returns silently. That bug is why `FeedbackButton` exists, and
+  it is what makes the module's buttons fully controlled by the slider.
+- `Checkbox` (`OnLeftMouseButtonReleased`) and `CornerIcon` (`OnClick`)
+  are **not** covered. They play `"button-click"` at
+  `GameIntegration.Audio.Volume` - the same quiet, game-derived path
+  this branch replaced everywhere else.
+- Window/tab chrome (`window-close`, `tab-swap-N`) is Blish's own and
+  out of scope for a module setting.
+
+So at 0 the module is silent except for a checkbox tick and the corner
+icon, and at 100 a checkbox is audibly quieter than a button in the same
+window. That is a real seam and the field test will meet it.
+
+Why it is not fixed here: the sound sits **inside** those overrides,
+ahead of the base call. `Checkbox.OnLeftMouseButtonReleased` is
+`if (Enabled) { Content.PlaySoundEffectByName("button-click"); }
+base.OnLeftMouseButtonReleased(e);`, and `Control`'s base method is what
+raises `Click` (via `_clickPrimed`/`_lastClickTime`, both private). A
+subclass that skipped the base to skip the sound would break clicking;
+there is no hook, no volume argument and no static to swap. The only
+full fix is a module-owned checkbox: `LabelBase` is public, `DrawText`
+and `LabelRegion` are protected, and `Checkable.TextureRegionsCheckbox`
+is public, so Blish's own 25-line `Checkbox` can be reimplemented
+verbatim minus the sound - but that is a new control plus 7 call-site
+changes across 4 view files, which does not belong in a branch whose
+subject is a volume slider. Deferred, with the recipe recorded here.
+
+### Incidental: this is now cheaper per click, not dearer
+
+`PlaySoundEffectByName` re-read and re-decoded the 22 KB wav into a
+brand-new `SoundEffect` on **every** press and never disposed any of
+them. The module now decodes once and reuses one cached effect, disposed
+on module unload (statics outlive a module instance inside one Blish
+session, same as `TooltipFacility`).
+
+### Gate items
+
+1. The Settings tab's new **Sound** section renders at the top: label,
+   slider, "NN%" readout, Test button, none overlapping, and the slider
+   drags with the readout tracking it live.
+2. The **Test** button audibly plays the click, and its loudness follows
+   the slider - clearly louder at 100 than at 25.
+3. **0 is silent for the clicks this module plays**: drag to 0 and
+   neither the Test button nor any other button, row or pill in the
+   module makes a sound. Checkboxes and the corner icon are knowingly
+   NOT covered - they still tick at Blish's own volume (see the section
+   above); hearing those at 0 is expected, not a gate failure.
+4. The value **survives a relaunch**: set something distinctive (say 40),
+   close Blish, reopen, and the slider, the readout and the actual
+   loudness all come back at 40.
+5. The **other** slider works too: with this tab open, drag the click
+   volume slider Blish renders under Manage Modules and confirm the next
+   click is immediately at the new loudness (no relaunch) and that this
+   tab's slider and readout follow it.
+6. **Log size cap, same wiring, no regression**: with the Settings tab's
+   Logging section on 1 MB, Save, and confirm `data/module_log.jsonl`
+   still trims at the saved cap this session (the tab no longer pushes
+   it directly - `Module` does).
+7. Report the number that feels right - it replaces `DefaultPercent`.
+
+Gate: PASS on the render half (2026-08-23 night desktop session,
+captures preflight/gSND1-gSND2): the Sound section renders first on
+the Settings tab with the Click volume label, the TrackBar at the 75
+default, the live "75%" readout, the Test button beside it, and the
+instant-apply/zero-off/checkbox-exception prose. The audible half -
+how loud 75 actually feels, the Test button's playback at the dragged
+value, silence at 0, persistence across a relaunch - is the
+maintainer's field check by nature (the sandbox cannot hear); the
+percent-to-volume mapping and clamps are pinned by
+ClickSoundVolumeTests. The maintainer's number becomes the new
+DefaultPercent in a one-line change.
+Morning re-run (2026-08-24, captures preflight/gM9-gM14): thumb DRAG
+moves the value with the readout live-updating (75 -> 21), the value
+SURVIVED a full Blish relaunch (restored at 21), and the slider was
+returned to ~the default afterwards. Notes: click-on-track does not
+jump and the wheel scrolls the panel, not the slider - both stock
+Blish TrackBar behavior. Only audibility remains with the maintainer.
+
+
+## Follow-up: snapshot rows without plan-cached stats have no rich tooltip
+
+Observed on the tooltip-authenticity gate (2026-08-23): hovering a
+Snapshot row whose item has never been part of a generated or restored
+plan shows NO tooltip (correct per the no-stats fallback rule, since
+the name is untruncated) - the rich stat block only exists for items
+the plan pipeline has fetched. The Q5 decision (live per-session stat
+fetch) is therefore only partially realized on the Snapshot surface:
+bank items never planned get no in-game-style hover. Candidate fix for
+the app-wide rollout wave: an on-hover metadata fetch through the
+deferred builders + ItemMetadataService's side-table warm path. Until
+then this is a recorded, deliberate gap - not a regression.
 
 ## Plan-view redesign (plan-view-redesign)
 

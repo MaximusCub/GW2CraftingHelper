@@ -106,6 +106,10 @@ namespace GW2CraftingHelper.Services
         // GetClampedLogMaxSizeBytes/GetClampedLogRetentionDays above).
         public SettingEntry<int> SnapshotRefreshIntervalMinutes { get; private set; }
 
+        // How loud this module's own UI click plays, 0-100. Reaches only the
+        // clicks this module plays itself - see PressFeedback.PlayClick.
+        public SettingEntry<int> ClickSoundVolumePercent { get; private set; }
+
         public ModuleSettings(SettingCollection settings)
         {
             ModalDialogX = settings.DefineSetting(
@@ -167,6 +171,11 @@ namespace GW2CraftingHelper.Services
                 "SnapshotRefreshIntervalMinutes", 10,
                 () => "Snapshot refresh interval (minutes)",
                 () => "How long a cached account snapshot may sit before an automatic background refresh is triggered");
+
+            ClickSoundVolumePercent = settings.DefineSetting(
+                "ClickSoundVolumePercent", ClickSoundVolume.DefaultPercent,
+                () => "Click volume",
+                () => "How loud this module's own click plays when you press its buttons, rows and pills (0 = off, 100 = loudest). Checkboxes keep Blish HUD's own click sound.");
         }
 
         /// <summary>
@@ -283,6 +292,15 @@ namespace GW2CraftingHelper.Services
         public int GetClampedSnapshotRefreshIntervalMinutes()
         {
             return ClampSnapshotRefreshIntervalMinutes(SnapshotRefreshIntervalMinutes.Value);
+        }
+
+        /// <summary>
+        /// Clamped ClickSoundVolumePercent for actual use - same contract
+        /// as the clamped accessors above.
+        /// </summary>
+        public int GetClampedClickSoundVolumePercent()
+        {
+            return ClickSoundVolume.Clamp(ClickSoundVolumePercent.Value);
         }
 
         /// <summary>

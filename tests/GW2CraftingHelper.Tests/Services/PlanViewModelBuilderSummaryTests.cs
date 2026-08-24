@@ -23,14 +23,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PlanSectionType.Summary, vm.Sections[0].SectionType);
 
             var rows = vm.Sections[0].Rows;
-            // Collapsed cost-formula tile ("Actual Cost to Craft") +
-            // the always-present footnote row - no profit band (no sell
+            // A zero-cost plan does NOT collapse: the full three-tile cost
+            // band renders at 0 (see BuildCostFormulaBand) + the
+            // always-present footnote row - no profit band (no sell
             // price), no currency rows (no currency costs).
-            Assert.Equal(2, rows.Count);
-            Assert.Equal(PlanRowType.CostFormulaTile, rows[0].RowType);
-            Assert.Equal("Actual Cost to Craft", rows[0].Label);
-            Assert.Equal(0L, rows[0].CoinValue);
-            Assert.Equal(PlanRowType.SummaryFootnote, rows[1].RowType);
+            Assert.Equal(4, rows.Count);
+            Assert.All(rows.Take(3), r => Assert.Equal(PlanRowType.CostFormulaTile, r.RowType));
+            Assert.All(rows.Take(3), r => Assert.Equal(0L, r.CoinValue));
+            Assert.Equal("Actual Cost to Craft", rows[2].Label);
+            Assert.Equal(PlanRowType.SummaryFootnote, rows[3].RowType);
         }
 
         // --- Target item resolution ---
@@ -131,6 +132,259 @@ namespace GW2CraftingHelper.Tests.Services
             // FormulaResultIsExact escape hatch exists for the profit
             // band's loss case only.
             Assert.True(costTiles[2].FormulaResultIsExact);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostAndNoMaterialsUsed_RendersFullBandAtZero()
+        {
+            // The collapse rule is about there being no MIDDLE term to
+            // show, and it only reads as a deliberate layout when the
+            // remaining tile carries a real number. A plan that costs
+            // nothing (every node ignored or already in hand) collapsed to
+            // a lone "0c" tile with the rest of the band gone, which reads
+            // as a broken section - it renders the whole formula at 0
+            // instead.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal("Total Materials Value", costTiles[0].Label);
+            Assert.Equal("Your Materials Used", costTiles[1].Label);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+            Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
+            // 0 - 0 == 0 balances, so the band still ends in a true "=".
+            Assert.True(costTiles[2].FormulaResultIsExact);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed()
+        {
+            // OwnMaterialsMode.Free leaves MaterialOpportunityCost null BY
+            // CONTRACT (see SellSideEconomics) even though owned materials
+            // really were consumed - "Use Own Materials" on with "Value Own
+            // Materials" off, inventory covering the whole plan. Rendering
+            // the band here would print "Your Materials Used 0c" directly
+            // above a Used Materials section listing the real materials:
+            // a valuation the pipeline deliberately declined to make. Only
+            // a KNOWN zero unlocks the band.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            Assert.Null(result.MaterialOpportunityCost);
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithMaterialsConsumedAndValuedAtZero_RendersFullBand()
+        {
+            // The Valued-mode counterpart: materials were consumed AND
+            // priced, and the priced total genuinely came out 0 (nothing
+            // consumed had a sell price). That IS a known zero, so the
+            // band renders - the distinction is measured-vs-unmeasured,
+            // not consumed-vs-not.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithMaterialsUsed_StillRendersFullBand()
+        {
+            // Nothing to pay out of pocket because owned materials cover
+            // the whole plan: the middle term is real, so this was already
+            // the uncollapsed shape - pinned here so the zero-plan rule
+            // above cannot be "simplified" into overwriting it.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 75;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(75L, costTiles[0].CoinValue);
+            Assert.Equal(75L, costTiles[1].CoinValue);
+            Assert.Equal(0L, costTiles[2].CoinValue);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithCurrencyOnlyPlan_StillRendersFullBand()
+        {
+            // A plan paid entirely in a non-coin currency has a genuine 0
+            // coin cost. The currency table below the band carries the
+            // real numbers; the band itself must not be the odd one out.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 1, Amount = 500 }
+                });
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(3, rows.Count(r => r.RowType == PlanRowType.CostFormulaTile));
+            Assert.Single(rows.Where(r => r.RowType == PlanRowType.CurrencyCost));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostFromAnUnpricedItem_StaysCollapsed()
+        {
+            // The other half of the known-zero rule: this plan totals 0
+            // because nothing in it could be priced, not because it is
+            // free. "Total Materials Value 0c" would state the full market
+            // value of a craft the pipeline never valued, so the unpriced
+            // plan keeps the single result tile.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithUnpricedNodeOnlyInAReferenceBranch_RendersFullBand()
+        {
+            // A reference branch is the dimmed "what it would cost to
+            // craft instead" comparison, not part of the plan - an
+            // unpriced ingredient down there costs the user nothing and
+            // must not suppress the band.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Have,
+                IsReferenceBranch = true,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostFromIgnoredChildren_RendersFullBand()
+        {
+            // An ignored node collapses to Have + IsIgnored, never to
+            // Unknown (CraftingTreeBuilder.BuildNode), so the unpriced
+            // guard cannot swallow the case this rule exists for.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Have,
+                        IsIgnored = true
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+        }
+
+        [Fact]
+        public void CostBand_ZeroCostWithAnUnpricedMultiItemRoot_StaysCollapsed()
+        {
+            // A batch exposes its N roots through MultiItemRoots and
+            // leaves CraftingTree null, so the guard has to walk both.
+            var result = MakeResult(
+                totalCoinCost: 0,
+                requestedItems: new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                },
+                multiItemRoots: new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 1,
+                        NodeId = 1,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Have
+                    },
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                });
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
         }
 
         [Fact]

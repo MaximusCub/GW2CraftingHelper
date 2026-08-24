@@ -5,6 +5,54 @@ matching `v<version>` git tag on the release commit, so any two shipped
 builds can be compared with `git diff v0.2.0..v0.2.1`. The About tab shows
 the running version.
 
+## 0.2.2 - 2026-08-24
+
+Second field-test round plus the pixel-authenticity wave (PRs #163-#170).
+
+### Added
+- Item tooltips now duplicate the in-game visual style, measured
+  pixel-by-pixel from real game captures: the framed item icon header,
+  white identity block with the name alone carrying rarity color, teal
+  flavour text, light-blue rune/sigil bonus lines, the game's own line
+  order, a translucent black canvas, and the vendor value as an
+  unlabelled final coin line (absent on unsellable items).
+- Those rich tooltips appear on every item surface: recipe tree rows,
+  Used Materials, the Shopping List, and Snapshot results - and restored
+  plans fetch their stat data in the background so hovers work right
+  after a restart without regenerating.
+- Item stat blocks in tooltips: attributes, defense/weapon strength,
+  upgrade bonuses, binding, level - computed from the same API data the
+  plan already fetches (zero extra requests).
+- The Snapshot tab lays items out in multiple columns when the window is
+  wide enough.
+- A Click Volume slider in Settings (with live readout and a Test
+  button): the module's click sound was nearly inaudible at Blish's
+  volume ceiling; it now plays at your chosen level, default well above
+  the old cap, and 0 turns it off.
+- Searching the Snapshot with a single letter that only matches a
+  character name now explains why nothing shows yet.
+
+### Fixed
+- Dismissing the module window no longer strands your keyboard: closing
+  with Escape, switching tabs, or pressing Enter in a box previously
+  could leave GW2 ignoring all keys until you clicked. Root-caused to a
+  Blish focus-slot quirk (plus one bug of ours) and fixed at every text
+  box.
+- The plan's own root item no longer offers an IGNORE pill, and a plan
+  whose cost is genuinely zero renders the full cost formula at 0
+  instead of collapsing the Total Cost section; zeros caused by
+  unpriceable items stay honestly unexplained instead of being dressed
+  up as profit.
+- Rapid pill toggling and table re-sorts no longer lose your sort state
+  on re-solve; sorting resets only when a new plan arrives.
+
+### Changed
+- All row and body text moved up a size (Menomonia 16) with every layout
+  constant re-derived from measured font metrics; the minimum window
+  width follows the same measurements.
+- The corner icon is re-padded to match the size of GW2's own top-row
+  icons (it rendered noticeably larger than its neighbors).
+
 ## 0.2.1 - 2026-08-24
 
 First round of live field-test feedback, fixed and shipped (PRs #156-#161).

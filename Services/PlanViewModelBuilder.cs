@@ -206,9 +206,13 @@ namespace GW2CraftingHelper.Services
         /// Formula band 1 ("Total Materials Value - Your Materials Used
         /// = Actual Cost to Craft"). When MaterialOpportunityCost is null
         /// or 0 the middle term does not exist, so the band collapses to a
-        /// single "Actual Cost to Craft" tile. Actual Cost to Craft is
-        /// result.Plan.TotalCoinCost; the price-basis qualifier lives in
-        /// this tile's tooltip.
+        /// single "Actual Cost to Craft" tile - unless the plan costs
+        /// nothing either AND both zero terms are KNOWN zeros rather than
+        /// unmeasured ones, in which case the full band renders at zero (a
+        /// lone tile reading "0c" with the formula around it gone looks
+        /// like a broken section, not a free plan). Actual Cost to
+        /// Craft is result.Plan.TotalCoinCost; the price-basis qualifier
+        /// lives in this tile's tooltip.
         /// </summary>
         private static void BuildCostFormulaBand(PlanSectionViewModel section, CraftingPlanResult result)
         {
@@ -228,10 +232,40 @@ namespace GW2CraftingHelper.Services
                 TooltipText = actualCostTooltip
             };
 
-            bool hasMaterialsUsed = result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0;
-            if (hasMaterialsUsed)
+            long materialsUsed = result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0
+                ? result.MaterialOpportunityCost.Value
+                : 0L;
+
+            // MaterialOpportunityCost is null by contract outside
+            // OwnMaterialsMode.Valued (see SellSideEconomics), so a
+            // Free-mode plan that consumed owned materials has a middle
+            // term nobody computed - printing it as 0 would assert a
+            // valuation the pipeline deliberately declined to make. Only a
+            // KNOWN zero (Valued mode computed 0, or nothing was consumed
+            // at all) qualifies.
+            bool materialsUsedIsKnownZero =
+                result.MaterialOpportunityCost.HasValue ||
+                result.UsedMaterials == null ||
+                result.UsedMaterials.Count == 0;
+
+            // The band collapses only when there is a real cost to show.
+            // A plan that costs nothing AND provably consumed no owned
+            // value (every node ignored or already in hand) renders the
+            // whole formula at zero instead of a lone "0c" result tile
+            // with the rest of the band missing.
+            //
+            // Both zero terms must be KNOWN zeros. A plan totalling 0
+            // because nothing in it could be priced is a different fact
+            // from a plan totalling 0 because it is free, and the band's
+            // captions ("Full market value of everything this craft
+            // consumes") state the second - so the unpriced plan keeps the
+            // collapsed tile.
+            bool zeroPlan = actualCost == 0 &&
+                materialsUsed == 0 &&
+                materialsUsedIsKnownZero &&
+                !HasUnpricedNode(result);
+            if (materialsUsed > 0 || zeroPlan)
             {
-                long materialsUsed = result.MaterialOpportunityCost.Value;
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CostFormulaTile,
@@ -255,6 +289,71 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// True when the display tree holds an item the pipeline could
+        /// neither craft nor price, so a zero total is an unmeasured zero
+        /// rather than a free plan. CraftingDecision.Unknown is exactly
+        /// that state - an ignored node collapses to Have + IsIgnored
+        /// instead (see CraftingTreeBuilder.BuildNode), so ignoring every
+        /// child still reads as a genuine zero.
+        /// <para>
+        /// Walked only from the zero-cost gate in BuildCostFormulaBand,
+        /// never on the ordinary priced path.
+        /// </para>
+        /// </summary>
+        private static bool HasUnpricedNode(CraftingPlanResult result)
+        {
+            if (HasUnpricedNode(result.CraftingTree, insideReferenceBranch: false))
+            {
+                return true;
+            }
+
+            if (result.MultiItemRoots != null)
+            {
+                foreach (var root in result.MultiItemRoots)
+                {
+                    if (HasUnpricedNode(root, insideReferenceBranch: false))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // insideReferenceBranch: a reference branch is the dimmed "what it
+        // would cost to craft instead" comparison, not part of the plan -
+        // an unpriced ingredient down there costs the user nothing.
+        private static bool HasUnpricedNode(CraftingTreeNode node, bool insideReferenceBranch)
+        {
+            if (node == null)
+            {
+                return false;
+            }
+
+            if (!insideReferenceBranch && node.Decision == CraftingDecision.Unknown)
+            {
+                return true;
+            }
+
+            if (node.Children == null)
+            {
+                return false;
+            }
+
+            bool childInsideReferenceBranch = insideReferenceBranch || node.IsReferenceBranch;
+            foreach (var child in node.Children)
+            {
+                if (HasUnpricedNode(child, childInsideReferenceBranch))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Formula band 2 ("Sell Value (after fees) - Total Materials
         /// Value = Profit if Sold"), only when NetSaleValue.HasValue - the
         /// profit formula is meaningless with no sell price.
@@ -272,6 +371,19 @@ namespace GW2CraftingHelper.Services
         private static void BuildProfitFormulaBand(PlanSectionViewModel section, CraftingPlanResult result, bool isMultiItem)
         {
             if (!result.NetSaleValue.HasValue)
+            {
+                return;
+            }
+
+            // The same unpriced-zero rule the cost band enforces: a plan
+            // whose coin cost is zero only because nodes could not be
+            // priced must not print "Sell Value - Total Materials Value 0
+            // = Profit if Sold" one band lower - a settled equation
+            // claiming the craft consumes nothing and profits its entire
+            // sale price. Plans with a real nonzero cost keep the band
+            // even when some node is unpriced (the pre-existing partial
+            // pricing behavior, out of this round's scope).
+            if (result.Plan.TotalCoinCost == 0 && HasUnpricedNode(result))
             {
                 return;
             }
