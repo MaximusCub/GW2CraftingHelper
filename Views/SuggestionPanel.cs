@@ -340,13 +340,13 @@ namespace GW2CraftingHelper.Views
         {
             if (_panel == null) return;
 
-            // Invariant: _pressOverPanel never outlives one focus cycle.
-            // Its clear on LeftMouseButtonReleased is not guaranteed - Blish
-            // drops mouse events whenever a foreground Form owns the point,
-            // while the camera is dragging, while the cursor is hidden, and
-            // whenever GW2 does not have focus - and a latched flag re-focuses
-            // the box out of a hard release, which is the bug this panel's
-            // discriminator must not cause.
+            // Invariant: _pressOverPanel never outlives the press that sets
+            // it. TextInputBase hooks the same global press event when the
+            // box gains focus, so its unfocus handler runs after this
+            // panel's and OnFocusChanged consumes the flag in that same
+            // dispatch. The clears here, in HidePanel and in Dispose hold
+            // the bound without relying on that ordering, or on a
+            // LeftMouseButtonReleased that Blish may never deliver.
             _pressOverPanel = false;
 
             _panel.Visible = true;
