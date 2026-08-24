@@ -40,7 +40,8 @@ namespace GW2CraftingHelper.Views
         /// <c>Control.Dispose</c>, while the control is still parented.
         /// Returns the box so construction sites can chain.
         /// </summary>
-        public static T ReleaseOnDispose<T>(this T input) where T : TextInputBase
+        public static T ReleaseOnDispose<T>(this T input)
+            where T : TextInputBase
         {
             if (input == null)
             {
