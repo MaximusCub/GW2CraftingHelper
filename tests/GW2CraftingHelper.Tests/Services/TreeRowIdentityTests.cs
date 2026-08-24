@@ -61,6 +61,46 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void IgnoringALeafMaterial_LeavesEveryRowRepaintable()
+        {
+            // The case the in-place refresh was built for, and the one a
+            // stricter gate could quietly have taken back: if identity
+            // rejected here, every IGNORE click would pay a full rebuild
+            // again and the dropped-click fix would be gone with no test
+            // saying so.
+            var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2), Leaf(3, 4)));
+            var prices = new Dictionary<int, ItemPrice>
+            {
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } }
+            };
+            var metadata = new Dictionary<int, ItemMetadata>
+            {
+                { 1, new ItemMetadata { ItemId = 1, Name = "Finished Thing", IconUrl = "a.png" } },
+                { 2, new ItemMetadata { ItemId = 2, Name = "Material Two", IconUrl = "b.png" } },
+                { 3, new ItemMetadata { ItemId = 3, Name = "Material Three", IconUrl = "c.png" } }
+            };
+
+            var before = BuildDisplayTree(tree, prices, metadata, ignored: null);
+            var after = BuildDisplayTree(tree, prices, metadata, ignored: new HashSet<int> { 2 });
+
+            var byNodeId = new Dictionary<int, CraftingTreeNode>();
+            Flatten(before, byNodeId);
+
+            var afterNodes = new Dictionary<int, CraftingTreeNode>();
+            Flatten(after, afterNodes);
+
+            Assert.Equal(byNodeId.Count, afterNodes.Count);
+            foreach (var pair in afterNodes)
+            {
+                Assert.True(
+                    TreeRowIdentity.SameRow(byNodeId[pair.Key], pair.Value),
+                    $"node {pair.Key} stopped being repaintable across an ignore");
+            }
+        }
+
+        [Fact]
         public void QuantityMoving_IsWhatTheRefreshExistsToRepaint()
         {
             var built = Node(itemId: 42, quantity: 4);
@@ -115,6 +155,26 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(TreeRowIdentity.SameRow(null, Node()));
             Assert.False(TreeRowIdentity.SameRow(Node(), null));
             Assert.False(TreeRowIdentity.SameRow(null, null));
+        }
+
+        private static CraftingTreeNode BuildDisplayTree(
+            RecipeNode tree,
+            Dictionary<int, ItemPrice> prices,
+            Dictionary<int, ItemMetadata> metadata,
+            ISet<int> ignored)
+        {
+            var solveResult = new PlanSolver().Solve(
+                tree, prices, null, PriceBasis.InstantBuy, null, null, ignoredItemIds: ignored);
+            return new CraftingTreeBuilder().BuildTree(tree, solveResult.Decisions, metadata);
+        }
+
+        private static void Flatten(CraftingTreeNode node, Dictionary<int, CraftingTreeNode> into)
+        {
+            into[node.NodeId] = node;
+            foreach (var child in node.Children)
+            {
+                Flatten(child, into);
+            }
         }
 
         private static CraftingTreeNode Node(

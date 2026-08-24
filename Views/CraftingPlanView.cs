@@ -2463,9 +2463,20 @@ namespace GW2CraftingHelper.Views
         /// chips carry a descender ("Ignored:" has its g) and a label
         /// autosized to its exact text height loses it to Blish's scissor
         /// round trip - see LabelHelpers.WithDescenderClearance.
+        /// <para>
+        /// The WIDTH is measured either way, because the caller needs it
+        /// on every call; the write is skipped when the text is unchanged.
+        /// This runs on every resize tick now that the strip re-fits with
+        /// the row, and a resize does not change a count.
+        /// </para>
         /// </summary>
         private static int SetChipText(Label label, string text)
         {
+            if (label.Text == text)
+            {
+                return (int)Math.Ceiling(label.Font.MeasureString(text).Width);
+            }
+
             label.Text = text;
             LabelHelpers.WithDescenderClearance(label);
             return (int)Math.Ceiling(label.Font.MeasureString(text).Width);
