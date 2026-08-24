@@ -90,6 +90,7 @@
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\PlanTableSorter.cs" />
     <Compile Include="Services\CoinSegmentMath.cs" />
+    <Compile Include="Services\ClickSoundVolume.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
