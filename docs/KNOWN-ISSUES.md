@@ -12943,7 +12943,9 @@ band. That reads fine next to a real number and reads as a broken
 section next to `0c`. The rule now collapses only when there is a cost to
 show - a plan whose coin cost AND owned-materials term are both zero
 renders the full "Total Materials Value - Your Materials Used = Actual
-Cost to Craft" formula at zero, tooltips and footnote included.
+Cost to Craft" formula at zero, tooltips and footnote included. Both of
+those zeros have to be zeros somebody computed; the two paragraphs below
+are the qualification, not a footnote to it.
 
 The zero middle term must be a **known** zero, not merely an absent one.
 `MaterialOpportunityCost` is null by contract outside
@@ -12957,20 +12959,40 @@ collapsed single tile
 (`PlanViewModelBuilderSummaryTests.CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed`);
 Valued mode that genuinely computed 0 still gets the full band.
 
-This is fixed as a class, not for root-ignore alone: item 1 removes root
-ignore as a UI path, but ignoring every child, owning everything, or a
-currency-only plan all still reach a zero coin cost, and every one of
-them now gets the same band. Band height is unaffected either way -
+The same measured-vs-unmeasured test governs the **cost** term. A plan
+also totals 0 when nothing in it could be priced: an item with no recipe
+and no TP listing generates normally (nothing gates it), and
+`CraftingTreeBuilder.BuildNode` maps that node to `Decision = Unknown`
+while an ignored node maps to `Have` + `IsIgnored` - so the two are
+cleanly separable. `PlanViewModelBuilder.HasUnpricedNode` walks the
+display tree (`CraftingTree`, or every `MultiItemRoots` entry, skipping
+reference branches) from the zero-cost gate only, never on the priced
+path, and an unpriced node keeps the collapsed tile: "Total Materials
+Value 0c" would state the full market value of a craft the pipeline never
+valued, under a root row reading UNKNOWN.
+
+So the class fixed here is every **known** zero - ignoring every child, a
+currency-only plan, and Valued mode that priced the consumed materials at
+0 all get the same band. Two zero-cost states stay collapsed on purpose,
+because a term is unmeasured rather than zero: Free mode with owned
+materials actually consumed (the paragraph above), and a plan zeroed by
+unpriced items. Free mode with owned materials therefore still shows the
+lone 0c tile - that is the deliberate shape, not a residual of the
+reported bug; see the known-vs-absent-zero paragraph above before
+"fixing" it. Band height is unaffected either way -
 `SummarySectionLayoutMath.BodyHeight` counts one cost band whether it
 holds 1 or 3 tiles.
 
 Coverage: `PlanRootIgnoreTests` (pill suppression across every
 `BuildPillSpecs` return path, the flag's single write site, a real
-multi-item batch, the reachable ignored-sibling-root case, and the
-end-to-end "ignore every ingredient" plan through
-`CraftingPlanPipeline.ResolveWithOverrides` into `PlanViewModelBuilder`),
-five zero-band cases in `PlanViewModelBuilderSummaryTests` (including the
-unvalued-materials collapse), and two restore cases in `PlanStoreTests`.
+multi-item batch, the reachable ignored-sibling-root case, the end-to-end
+"ignore every ingredient" plan through
+`CraftingPlanPipeline.ResolveWithOverrides` into `PlanViewModelBuilder`,
+and the end-to-end unpriced-ingredient counterexample that must NOT get
+the band), nine zero-band cases in `PlanViewModelBuilderSummaryTests`
+(including the unvalued-materials collapse, the unpriced single-item and
+batch collapses, and the reference-branch exemption), and two restore
+cases in `PlanStoreTests`.
 Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
 IGNORE pill on a `BuildTree` root and were updated to the new
 expectation.
@@ -12980,14 +13002,34 @@ expectation.
 1. Generate any plan. The **root row shows no IGNORE pill** - source
    pills and any HAVE annotation are unchanged, and every child row still
    offers IGNORE. Check a multi-item batch too: all N top-level rows.
-2. Ignore **every child** of the root until the plan costs nothing. The
-   Total Cost section still shows the **full band** - "Total Materials
-   Value - Your Materials Used = Actual Cost to Craft" - with 0 amounts,
-   the "-"/"=" operators between the tiles, the result tile's highlight
-   box, and the footnote line. It does not collapse to a lone 0c tile.
-3. Un-ignore one of those children: the band returns to its ordinary
-   shape and the numbers come back.
-4. Generate a **multi-item batch** where one requested item is also an
+2. Force the known-zero branch first: turn **"Use Own Materials" OFF**
+   (or pick a target whose ingredients you own none of), then ignore
+   **every child** of the root until the plan costs nothing. The Total
+   Cost section still shows the **full band** - "Total Materials Value -
+   Your Materials Used = Actual Cost to Craft" - with 0 amounts, the
+   "-"/"=" operators between the tiles, the result tile's highlight box,
+   and the footnote line. It does not collapse to a lone 0c tile.
+   The precondition matters: with "Use Own Materials" on and stock in
+   hand, ignoring a child does NOT stop `InventoryReducer` consuming it
+   (the reducer is guided by the solve, not by the ignore set), so the
+   plan is no longer a zero-material one and step 2 cannot be read.
+3. Repeat step 2 with **"Use Own Materials" ON** on an item you DO own
+   ingredients for. Both outcomes below are correct - neither is a
+   failure of this change:
+   - "Value Own Materials" ON (the default): the full band renders with
+     **non-zero** amounts. Total Materials Value and Your Materials Used
+     both carry the valuation of what your inventory covered; only Actual
+     Cost to Craft reads 0c.
+   - "Value Own Materials" OFF: the band collapses to the **lone 0c
+     tile**, by design - nothing computed the middle term, so printing it
+     as 0 would contradict the Used Materials section right below.
+4. Back in the step 2 state, un-ignore one of those children: the band
+   returns to its ordinary shape and the numbers come back.
+5. Plan an item with **no recipe and no Trading Post price** (root row
+   reads UNKNOWN). The plan totals 0c but the band stays a **lone 0c
+   tile** - a zero nobody measured must not be dressed up as a priced
+   equation.
+6. Generate a **multi-item batch** where one requested item is also an
    ingredient of another requested item (e.g. request a weapon and one of
    its components). Ignore that component where it appears as a child row
    under the other root. Its own top-level row flips to HAVE + IGNORED
