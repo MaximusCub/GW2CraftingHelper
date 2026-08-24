@@ -28,8 +28,8 @@ namespace GW2CraftingHelper.Views.Rendering
     // the shared "row panel resize + extra reposition + divider resize"
     // shape identical across all five extracted renderers' row
     // builders (see that class's doc comment). This row has no icon and no
-    // name column at all (just plain labels - Body name and level, Caption
-    // character line), so it does
+    // name column at all (just plain Body labels - name, level and the
+    // character run), so it does
     // not match IconNameRowHelpers and stays
     // hand-rolled - see IconNameRowHelpers' own doc comment.
     internal sealed class DisciplinesSectionRenderer
@@ -234,7 +234,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     });
                 if (charLabel.Text != fullCharText)
                 {
-                    TooltipFacility.ApplyPlain(rowPanel, fullCharText);
+                    // Both controls: the label captures the hover before
+                    // the row panel under it is ever reached, so a tooltip
+                    // on the panel alone only fires on the blank strip
+                    // beside the very text it exists to expand.
+                    StampCharacterTooltip(rowPanel, charLabel, fullCharText);
                 }
             }
 
@@ -247,7 +251,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // 36, which the same simulation proves immune, so the clearance
             // is now belt-and-braces rather than the fix. It stays because
             // it costs nothing: no icon in this row (a Body name and level
-            // at y=7, a Caption character line at y=9, lowest ink y=28), so
+            // at y=7, a Body character line at y=9, lowest ink y=30), so
             // the divider top (rowHeight - 3 = 33) sits well clear either
             // way.
             RowRelayoutHelpers.FinishRow(
@@ -270,10 +274,23 @@ namespace GW2CraftingHelper.Views.Rendering
                     if (charLabel.Text != newDisplayText)
                     {
                         charLabel.Text = newDisplayText;
-                        TooltipFacility.ApplyPlain(rowPanel, newDisplayText != fullCharText ? fullCharText : null);
+                        StampCharacterTooltip(
+                            rowPanel, charLabel, newDisplayText != fullCharText ? fullCharText : null);
                     }
                 });
             }
+        }
+
+        /// <summary>
+        /// The truncated character run's full text, on the label AND the
+        /// row panel under it. Null is a deliberate clear (see
+        /// TooltipFacility.ApplyPlain), which is what an untruncated run
+        /// after a widening drag needs.
+        /// </summary>
+        private static void StampCharacterTooltip(Panel rowPanel, Label charLabel, string fullCharText)
+        {
+            TooltipFacility.ApplyPlain(rowPanel, fullCharText);
+            TooltipFacility.ApplyPlain(charLabel, fullCharText);
         }
     }
 }
