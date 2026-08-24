@@ -581,26 +581,98 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_RootIgnoreSchemaVersion3File_ReturnsNullAndLogsWarn()
+        public void LoadLatest_SingleItemPlan_ReMarksTheRestoredRootAsPlanRoot()
         {
-            // CurrentSchemaVersion bumped 3 -> 4 for
-            // CraftingTreeNode.IsPlanRoot. A SchemaVersion-3 file (the
-            // actual previous CurrentSchemaVersion) carries no such field,
-            // so restoring it would leave every root with IsPlanRoot false
-            // and put the suppressed IGNORE pill back on the plan's own
-            // target - it must be rejected the same way as the 1/2 files
-            // above, degrading to Module's "no restored plan" path.
-            string filePath = Path.Combine(_tempDir, "plan.json");
-            File.WriteAllText(filePath,
-                "{ \"SchemaVersion\": 3, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+            // CraftingTreeNode.IsPlanRoot is internal and so never
+            // serialized (deliberately - a schema bump would discard every
+            // existing user's saved plan). Restore is the one path that
+            // produces a CraftingPlanResult without CraftingTreeBuilder,
+            // so PlanStoreHelpers re-derives the flag; without that, a
+            // restored root row offers the IGNORE pill again.
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
+                Result = new CraftingPlanResult
+                {
+                    Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 },
+                    CraftingTree = new CraftingTreeNode
+                    {
+                        ItemId = 5,
+                        NodeId = 1,
+                        Name = "Target",
+                        Quantity = 1,
+                        Decision = CraftingDecision.BuyFromTp,
+                        CanBuyTp = true,
+                        CanBuyVendor = true,
+                        Children = new List<CraftingTreeNode>
+                        {
+                            new CraftingTreeNode
+                            {
+                                ItemId = 6,
+                                NodeId = 2,
+                                Name = "Child",
+                                Quantity = 1,
+                                Decision = CraftingDecision.BuyFromTp,
+                                CanBuyTp = true,
+                                CanBuyVendor = true
+                            }
+                        }
+                    }
+                }
+            };
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            _store.Save(plan);
+            var loaded = _store.LoadLatest();
 
-            var loaded = store.LoadLatest();
+            Assert.True(loaded.Result.CraftingTree.IsPlanRoot);
+            Assert.False(loaded.Result.CraftingTree.Children[0].IsPlanRoot);
+            Assert.DoesNotContain(
+                DecisionPillPlanner.BuildPillSpecs(loaded.Result.CraftingTree),
+                s => s.Kind == PillKind.Ignore);
+            Assert.Contains(
+                DecisionPillPlanner.BuildPillSpecs(loaded.Result.CraftingTree.Children[0]),
+                s => s.Kind == PillKind.Ignore);
+        }
 
-            Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+        [Fact]
+        public void LoadLatest_MultiItemPlan_ReMarksEveryRestoredRootAsPlanRoot()
+        {
+            // A batch has N roots, not one - MultiItemRoots must be walked
+            // too, or only the first requested item keeps the suppression.
+            var plan = new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 5, Quantity = 1 },
+                    new PlanRequestItem { ItemId = 6, Quantity = 1 }
+                },
+                Result = new CraftingPlanResult
+                {
+                    Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 },
+                    MultiItemRoots = new List<CraftingTreeNode>
+                    {
+                        new CraftingTreeNode
+                        {
+                            ItemId = 5, NodeId = 1, Name = "A", Quantity = 1,
+                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true
+                        },
+                        new CraftingTreeNode
+                        {
+                            ItemId = 6, NodeId = 2, Name = "B", Quantity = 1,
+                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true
+                        }
+                    }
+                }
+            };
+
+            _store.Save(plan);
+            var loaded = _store.LoadLatest();
+
+            Assert.All(loaded.Result.MultiItemRoots, r => Assert.True(r.IsPlanRoot));
         }
 
         [Fact]

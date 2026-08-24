@@ -111,7 +111,12 @@ namespace GW2CraftingHelper.Models
         // CraftingTreeNode). The plan's own target is the thing being
         // planned, not an acquisition decision to opt out of, so
         // DecisionPillPlanner offers no IGNORE toggle here.
-        public bool IsPlanRoot { get; set; }
+        // Internal, not public: Newtonsoft's default contract serializes
+        // public properties only, so this stays out of the persisted graph
+        // and needs no PersistedPlan schema bump (a bump discards every
+        // existing user's saved plan). PlanStoreHelpers re-derives it on
+        // restore - see DeserializePersistedPlan.
+        internal bool IsPlanRoot { get; set; }
 
         // True when this node was bought but also has a known recipe, so
         // Children holds the "what it would cost to craft instead"

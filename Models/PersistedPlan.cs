@@ -26,14 +26,8 @@ namespace GW2CraftingHelper.Models
         /// field entirely deserialize as current and sail through the
         /// mismatch check. Construction sites set it explicitly instead.
         /// </para>
-        /// <para>
-        /// 3 -> 4: CraftingTreeNode.IsPlanRoot. A file written before that
-        /// member existed deserializes every root with the flag false,
-        /// putting the suppressed IGNORE pill back on the plan's own
-        /// target - exactly the state the flag exists to prevent.
-        /// </para>
         /// </summary>
-        public const int CurrentSchemaVersion = 4;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
