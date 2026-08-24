@@ -61,36 +61,19 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Width the Amount/Each/Total block actually occupies: the three
-        /// reserved bands plus the two gaps between them. maxQtyWidth is
-        /// the widest rendered "Nx" string, since the Amount column has no
-        /// reserved band of its own - it right-aligns straight onto
-        /// QtyRightEdge.
-        /// </summary>
-        public static int BlockWidth(int maxEachWidth, int maxTotalWidth, int maxQtyWidth)
-        {
-            return (maxQtyWidth > 0 ? maxQtyWidth : 0)
-                + ColumnGap + EffectiveEachWidth(maxEachWidth)
-                + ColumnGap + EffectiveTotalWidth(maxTotalWidth);
-        }
-
-        /// <summary>
         /// <see cref="ComputeEdges"/> from the panel width instead of a
-        /// right edge, with the dead gutter between the name column and
-        /// this block closed: the whole block is pulled in to just past the
-        /// widest name the list renders rather than left pinned to the
-        /// panel edge (see PlanRelayoutMath.RightBlockX, including why
-        /// widestNameEnd must come from untruncated names). The single
-        /// entry point the header row, every data row, and both of their
-        /// relayout closures call, so no two of them can anchor the table
-        /// differently.
+        /// right edge: the Total column's right edge is
+        /// PlanRelayoutMath.PinnedRightEdge, so the whole block justifies
+        /// to the panel and the Item column absorbs whatever is left. The
+        /// single entry point the header row, every data row, and both of
+        /// their relayout closures call, so no two of them can anchor the
+        /// table differently.
         /// </summary>
         public static ColumnEdges ComputeEdgesForPanel(
-            int panelWidth, int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int widestNameEnd)
+            int panelWidth, int maxEachWidth, int maxTotalWidth)
         {
-            int blockWidth = BlockWidth(maxEachWidth, maxTotalWidth, maxQtyWidth);
-            int blockX = PlanRelayoutMath.RightBlockX(panelWidth - 8 - blockWidth, widestNameEnd);
-            return ComputeEdges(blockX + blockWidth, maxEachWidth, maxTotalWidth);
+            return ComputeEdges(
+                PlanRelayoutMath.PinnedRightEdge(panelWidth), maxEachWidth, maxTotalWidth);
         }
 
         /// <summary>

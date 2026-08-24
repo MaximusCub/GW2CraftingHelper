@@ -210,14 +210,6 @@ namespace GW2CraftingHelper.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
-        // Rightmost x any row's name column reaches, from the same
-        // pre-scan. The pill+cost block is pulled in to just past this
-        // instead of sitting against the panel edge, which is what closes
-        // the tree's dead gutter - see PlanRelayoutMath.RightBlockX. 0
-        // (a tree-less render pass) leaves the block pinned exactly where
-        // it used to sit.
-        private int _widestNameEnd;
-
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -236,7 +228,6 @@ namespace GW2CraftingHelper.Views.Rendering
             _treeRoots = null;
             _treeFlow = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
-            _widestNameEnd = 0;
 
             // Withdrawn with the render pass that published them: the tree
             // actions operate on the controls this reset is about to
@@ -351,7 +342,6 @@ namespace GW2CraftingHelper.Views.Rendering
             // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
             _costColumnWidths = scan.CostWidths;
-            _widestNameEnd = scan.WidestNameEnd;
 
             // Parenthesised count, like every other countable section
             // ("Used Materials (12)", "Shopping List (7)"). The number is
@@ -382,14 +372,13 @@ namespace GW2CraftingHelper.Views.Rendering
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
-                int headerNameEnd = _widestNameEnd;
                 CTableHeaderRenderer.CreateCTableHeaderRow(
                     treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
                     middleLabel: "Source",
                     middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).PillColX,
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
                     rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin, headerNameEnd).CostRightEdge);
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge);
             }
 
 #if DEBUG
@@ -624,13 +613,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// per DISTINCT string rather than once per node; the currency
         /// callback only fires for the handful of vendor nodes that draw a
         /// currency run at all.
-        /// <para>
-        /// The name callback reconstructs RenderTreeNode's own nameX and
-        /// quantity prefix from the same constants that row builder uses,
-        /// against the UNTRUNCATED name - see
-        /// PlanRelayoutMath.RightBlockX for why a truncated width would be
-        /// circular.
-        /// </para>
         /// </summary>
         private TreeCostColumnMath.TreeColumnScan ScanTreeColumns(IReadOnlyList<CraftingTreeNode> roots)
         {
@@ -653,13 +635,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 measure,
                 node => CoinCurrencyRenderer.TotalCurrencySegmentsWidth(
                     CoinCurrencyRenderer.BuildCurrencySegments(
-                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)),
-                (node, depth) =>
-                {
-                    int nameX = depth * TreeIndentPer + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
-                    int qtyWidth = node.Quantity > 0 ? measure($"{node.Quantity}x ") : 0;
-                    return nameX + qtyWidth + measure(node.Name ?? "");
-                });
+                        CurrencyDisplayResolver.ResolveAmounts(node.VendorCurrencyCosts, metadata), font)));
         }
 
         /// <summary>
@@ -836,10 +812,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // columns and its own relayout arithmetic identical by
             // construction.
             var columnWidths = _costColumnWidths;
-            int widestNameEnd = _widestNameEnd;
             int costColumnWidth = EffectiveCostColumnWidth();
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
+                panelWidth, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
             int pillColX = edges.PillColX;
             // Whether this row fills the shared currency band, which is what
             // decides where its coin run ends - see
@@ -1137,7 +1112,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
 
                 if (pillPanels.Count > 0)
                 {
@@ -1163,7 +1138,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddReellipsis(w =>
             {
                 var e = PlanRelayoutMath.ComputeTreeColumnEdges(
-                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin, widestNameEnd);
+                    w, nameX, qtyWidth, TreePillColumnWidth, costColumnWidth, TreeRightMargin);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, e.NameMaxWidth);
                 // No tooltip re-stamp: the deferred builder reads the
                 // label's CURRENT text when the box is drawn.

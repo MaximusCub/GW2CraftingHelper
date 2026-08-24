@@ -79,64 +79,22 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var font = UiFonts.Body;
-            var sublabelFont = UiFonts.Caption;
-            int maxStatusWidth = 0;
-            int widestNameEnd = 0;
-            foreach (var row in section.Rows)
-            {
-                if (!string.IsNullOrEmpty(row.StatusTag))
-                {
-                    int statusWidth = MeasureWidth(font, row.StatusTag);
-                    if (statusWidth > maxStatusWidth) maxStatusWidth = statusWidth;
-                }
-
-                int nameEnd = NameX + MeasureWidth(font, row.Label ?? "");
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
-
-                if (!string.IsNullOrEmpty(row.Sublabel))
-                {
-                    int sublabelEnd = NameX + MeasureWidth(sublabelFont, row.Sublabel);
-                    if (sublabelEnd > widestNameEnd) widestNameEnd = sublabelEnd;
-                }
-            }
-
-            int statusColumnWidth = 0;
-            if (maxStatusWidth > 0)
-            {
-                // The header label right-aligns onto the same edge as the
-                // rows, so the block has to be at least as wide as it.
-                int headerWidth = MeasureWidth(font, StatusHeaderText);
-                statusColumnWidth = maxStatusWidth > headerWidth ? maxStatusWidth : headerWidth;
-            }
-            else
-            {
-                widestNameEnd = 0;
-            }
-
+            // No pre-scan: the Status column right-aligns onto the pinned
+            // panel edge and the recipe name is uncapped (its ellipsis
+            // budget arrives with the Discipline column), so nothing in
+            // this section is derived from a measured column width.
             CTableHeaderRenderer.CreateCTableHeaderRow(
-                contentFlow, panelWidth, "Recipe", NameX, StatusHeaderText, _sink,
-                rightXForWidth: w => StatusRightEdge(w, statusColumnWidth, widestNameEnd));
+                contentFlow, panelWidth, "Recipe", NameX, StatusHeaderText, _sink);
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateRecipeRow(
-                    section.Rows[i], contentFlow, panelWidth, statusColumnWidth, widestNameEnd,
-                    i == section.Rows.Count - 1);
+                    section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1);
             }
         }
 
         private static int MeasureWidth(BitmapFont font, string text)
         {
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
-        }
-
-        /// <summary>
-        /// Right edge of the Status column at a given panel width - the one
-        /// formula the header, the build pass and every resize closure share.
-        /// </summary>
-        private static int StatusRightEdge(int panelWidth, int statusColumnWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, statusColumnWidth, widestNameEnd);
         }
 
         // The no-sublabel branch's rowHeight (32)
@@ -158,7 +116,7 @@ namespace GW2CraftingHelper.Views.Rendering
         // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
         private void CreateRecipeRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth,
-            int statusColumnWidth, int widestNameEnd, bool isLast)
+            bool isLast)
         {
             bool hasSublabel = !string.IsNullOrEmpty(row.Sublabel);
             int rowHeight = hasSublabel
@@ -257,7 +215,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 statusLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.StatusTag, font, statusColor,
-                    StatusRightEdge(panelWidth, statusColumnWidth, widestNameEnd), hasSublabel ? 10 : 8);
+                    PlanRelayoutMath.PinnedRightEdge(panelWidth), hasSublabel ? 10 : 8);
             }
 
             // M36b: bottomClearance depends on which rowHeight this branch
@@ -281,11 +239,10 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         statusLabel.Location = new Point(
                             PlanRelayoutMath.RightAlignedX(
-                                StatusRightEdge(w, statusColumnWidth, widestNameEnd), statusLabel.Width),
+                                PlanRelayoutMath.PinnedRightEdge(w), statusLabel.Width),
                             hasSublabel ? 10 : 8);
                     }
-                },
-                w => StatusRightEdge(w, statusColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                });
         }
     }
 }

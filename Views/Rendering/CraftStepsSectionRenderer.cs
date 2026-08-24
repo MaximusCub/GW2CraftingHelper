@@ -69,29 +69,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
-            var textFont = UiFonts.Body;
-            var sublabelFont = UiFonts.Caption;
-            int maxSublabelWidth = 0;
-            int widestNameEnd = 0;
-            foreach (var row in section.Rows)
-            {
-                if (row.RowType == PlanRowType.TimegatedNotice) continue;
-
-                int sublabelWidth = MeasureWidth(sublabelFont, row.Sublabel);
-                if (sublabelWidth > maxSublabelWidth) maxSublabelWidth = sublabelWidth;
-
-                int nameEnd = TextX
-                    + MeasureWidth(textFont, CraftPrefix)
-                    + MeasureWidth(textFont, QtyPrefix(row.Quantity))
-                    + MeasureWidth(textFont, row.Label);
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
-            }
-
-            if (maxSublabelWidth == 0)
-            {
-                widestNameEnd = 0;
-            }
-
+            // No pre-scan: the sublabel right-aligns onto the pinned panel
+            // edge and the step's own "Craft Nx Name" run is uncapped, so
+            // nothing here is derived from a measured column width.
+            //
             // A TimegatedNotice row (vendor-cap informational
             // line) is a plain text row, not a numbered craft step - render
             // it via the same generic TextRowRenderer pattern every other
@@ -108,29 +89,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
                 else
                 {
-                    CreateCraftStepRow(
-                        row, stepNumber++, contentFlow, panelWidth, maxSublabelWidth, widestNameEnd, isLast);
+                    CreateCraftStepRow(row, stepNumber++, contentFlow, panelWidth, isLast);
                 }
             }
-        }
-
-        private static int MeasureWidth(BitmapFont font, string text)
-        {
-            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
         private static string QtyPrefix(int quantity)
         {
             return $"{quantity}x ";
-        }
-
-        /// <summary>
-        /// Right edge of the sublabel column at a given panel width - the one
-        /// formula the build pass and every resize closure share.
-        /// </summary>
-        private static int SublabelRightEdge(int panelWidth, int sublabelColumnWidth, int widestNameEnd)
-        {
-            return PlanRelayoutMath.RightBlockRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd);
         }
 
         // Moved verbatim from CraftingPlanView.CreateCraftStepRow. Only
@@ -143,7 +109,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void CreateCraftStepRow(
             PlanRowViewModel row, int stepNumber, FlowPanel parent, int panelWidth,
-            int sublabelColumnWidth, int widestNameEnd, bool isLast)
+            bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
             const int badgeSize = 36;
@@ -218,7 +184,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, UiFonts.Caption,
                     new Color(153, 153, 153),
-                    SublabelRightEdge(panelWidth, sublabelColumnWidth, widestNameEnd), 16);
+                    PlanRelayoutMath.PinnedRightEdge(panelWidth), 16);
             }
 
             // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
@@ -240,11 +206,10 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         sublabelLabel.Location = new Point(
                             PlanRelayoutMath.RightAlignedX(
-                                SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd), sublabelLabel.Width),
+                                PlanRelayoutMath.PinnedRightEdge(w), sublabelLabel.Width),
                             16);
                     }
-                },
-                w => SublabelRightEdge(w, sublabelColumnWidth, widestNameEnd) + PlanRelayoutMath.TableRightMargin);
+                });
         }
     }
 }

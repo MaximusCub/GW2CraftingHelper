@@ -377,85 +377,9 @@ namespace GW2CraftingHelper.Tests.Services
 
         // The view's own nameX arithmetic (indent 24 per depth, caret 18,
         // icon frame 34, gap 6) against the one-pixel-per-character font.
-        private static int NameEnd(CraftingTreeNode node, int depth)
+        private static TreeCostColumnMath.TreeColumnScan ScanTree(IReadOnlyList<CraftingTreeNode> roots)
         {
-            int nameX = (depth * 24) + 18 + 34 + 6;
-            int qtyWidth = node.Quantity > 0 ? MeasureByLength($"{node.Quantity}x ") : 0;
-            return nameX + qtyWidth + MeasureByLength(node.Name ?? "");
-        }
-
-        private static TreeCostColumnMath.TreeColumnScan ScanNames(IReadOnlyList<CraftingTreeNode> roots)
-        {
-            return TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0, NameEnd);
-        }
-
-        [Fact]
-        public void ScanColumns_NoNameCallback_ReportsZeroExtent()
-        {
-            var scan = TreeCostColumnMath.ScanColumns(
-                new[] { NamedNode(1, "Mithril Ingot") }, MeasureByLength, _ => 0, null);
-
-            Assert.Equal(0, scan.WidestNameEnd);
-        }
-
-        [Fact]
-        public void ScanColumns_WidestNameWins_NotTheFirstOrLast()
-        {
-            var roots = new[]
-            {
-                NamedNode(1, "Bolt", children: new[]
-                {
-                    NamedNode(2, "Elonian Leather Square"),
-                    NamedNode(3, "Ore")
-                })
-            };
-
-            var scan = ScanNames(roots);
-
-            Assert.Equal(58 + 24 + "Elonian Leather Square".Length, scan.WidestNameEnd);
-        }
-
-        [Fact]
-        public void ScanColumns_DeepShortNameCanOutreachAShallowLongOne()
-        {
-            // Indent is part of the extent: the whole point is where the
-            // name column ENDS on screen, not how long the string is.
-            var roots = new[]
-            {
-                NamedNode(1, "Mithril Plated Dowel", children: new[]
-                {
-                    NamedNode(2, "x", children: new[]
-                    {
-                        NamedNode(3, "y", children: new[] { NamedNode(4, "Ore") })
-                    })
-                })
-            };
-
-            var scan = ScanNames(roots);
-
-            Assert.Equal(58 + (3 * 24) + "Ore".Length, scan.WidestNameEnd);
-        }
-
-        [Fact]
-        public void ScanColumns_QuantityPrefixCountsTowardTheExtent()
-        {
-            var withPrefix = ScanNames(new[] { NamedNode(1, "Ore", quantity: 250) });
-            var withoutPrefix = ScanNames(new[] { NamedNode(1, "Ore") });
-
-            Assert.Equal("250x ".Length, withPrefix.WidestNameEnd - withoutPrefix.WidestNameEnd);
-        }
-
-        [Fact]
-        public void ScanColumns_CollapsedSubtreeStillCounts()
-        {
-            // Rows are built lazily; a scan that skipped unbuilt children
-            // would move every column the first time one was expanded.
-            var roots = new[]
-            {
-                NamedNode(1, "Ore", children: new[] { NamedNode(2, "A Very Long Ingredient Name") })
-            };
-
-            Assert.Equal(58 + 24 + "A Very Long Ingredient Name".Length, ScanNames(roots).WidestNameEnd);
+            return TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0);
         }
 
         // --- ScanColumns node count (audit batch J, L2: the Recipe Tree
@@ -473,7 +397,7 @@ namespace GW2CraftingHelper.Tests.Services
                 })
             };
 
-            Assert.Equal(4, ScanNames(roots).NodeCount);
+            Assert.Equal(4, ScanTree(roots).NodeCount);
         }
 
         // Rows are built lazily, so a count taken from what is on screen
@@ -491,8 +415,8 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var flat = new[] { NamedNode(1, "A"), NamedNode(2, "B"), NamedNode(3, "C") };
 
-            Assert.Equal(3, ScanNames(deep).NodeCount);
-            Assert.Equal(3, ScanNames(flat).NodeCount);
+            Assert.Equal(3, ScanTree(deep).NodeCount);
+            Assert.Equal(3, ScanTree(flat).NodeCount);
         }
 
         [Fact]
@@ -500,13 +424,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var roots = new[] { NamedNode(1, "First"), NamedNode(2, "Second") };
 
-            Assert.Equal(2, ScanNames(roots).NodeCount);
+            Assert.Equal(2, ScanTree(roots).NodeCount);
         }
 
         [Fact]
         public void ScanColumns_NoRoots_ReportsZeroNodes()
         {
-            Assert.Equal(0, ScanNames(new CraftingTreeNode[0]).NodeCount);
+            Assert.Equal(0, ScanTree(new CraftingTreeNode[0]).NodeCount);
             Assert.Equal(0, TreeCostColumnMath.TreeColumnScan.Empty.NodeCount);
         }
 
@@ -517,7 +441,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var roots = new[] { NamedNode(1, "Root", children: new CraftingTreeNode[] { null }) };
 
-            Assert.Equal(1, ScanNames(roots).NodeCount);
+            Assert.Equal(1, ScanTree(roots).NodeCount);
         }
 
         [Fact]
@@ -526,12 +450,11 @@ namespace GW2CraftingHelper.Tests.Services
             var roots = new[] { Node(1, subtreeCost: 123456), Node(2, subtreeCost: 42) };
 
             var costOnly = Scan(roots);
-            var both = TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0, (_, __) => 999);
+            var both = TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0);
 
             Assert.Equal(costOnly.GoldTextWidth, both.CostWidths.GoldTextWidth);
             Assert.Equal(costOnly.SilverTextWidth, both.CostWidths.SilverTextWidth);
             Assert.Equal(costOnly.CopperTextWidth, both.CostWidths.CopperTextWidth);
-            Assert.Equal(999, both.WidestNameEnd);
         }
 
         [Fact]

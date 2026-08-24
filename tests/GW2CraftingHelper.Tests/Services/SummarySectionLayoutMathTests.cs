@@ -400,188 +400,49 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(wide.RequiredRightEdge > narrow.RequiredRightEdge);
         }
 
-        // --- CurrencyBlockWidth / ComputeCurrencyColumnEdgesForPanel
-        // (audit batch H: the numbers sat against the panel edge however
-        // short the currency names were) ---
+        // --- The justified-width invariant (replaces the pull-in and
+        // centring pair CurrencyHeaderBandWidth/CurrencyTableOffsetX built
+        // on, both deleted with the machinery) ---
 
         [Fact]
-        public void CurrencyBlockWidth_IsTheSpanTheEdgesActuallyLayOut()
+        public void ComputeCurrencyColumnEdges_MarkerEndsAtThePinnedPanelEdge()
         {
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            int numberColumnWidth = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
 
             Assert.Equal(
-                (800 - 8) - (edges.RequiredRightEdge - numberColumnWidth),
-                SummarySectionLayoutMath.CurrencyBlockWidth(0));
+                PlanRelayoutMath.PinnedRightEdge(800),
+                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth);
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdgesForPanel_LongNames_MatchesThePinnedEdges()
+        public void ComputeCurrencyColumnEdges_WiderPanel_MovesTheWholeBlockByTheFullIncrease()
         {
-            var pinned = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            var pulled = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780);
+            var narrow = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
+            var wide = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1600, 90);
 
-            Assert.Equal(pinned.RequiredRightEdge, pulled.RequiredRightEdge);
-            Assert.Equal(pinned.MarkerX, pulled.MarkerX);
+            Assert.Equal(400, wide.MarkerX - narrow.MarkerX);
+            Assert.Equal(400, wide.NeededRightEdge - narrow.NeededRightEdge);
+            Assert.Equal(400, wide.HaveRightEdge - narrow.HaveRightEdge);
+            Assert.Equal(400, wide.RequiredRightEdge - narrow.RequiredRightEdge);
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdgesForPanel_ShortNames_CapsRequiredRelativeToTheNameColumn()
-        {
-            // "Spirit Shard" in a wide window: the Required column now
-            // starts one breathing room past the name column instead of
-            // 300+px away against the panel edge.
-            const int widestNameEnd = 34 + 120;
-            var pulled = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth: 1200, widestNumberWidth: 0, widestNameEnd: widestNameEnd);
-
-            int requiredLeft = pulled.RequiredRightEdge
-                - SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
-
-            Assert.Equal(
-                System.Math.Max(
-                    widestNameEnd + PlanRelayoutMath.TableGutterBreathingRoom,
-                    PlanRelayoutMath.TableRightBlockMinX),
-                requiredLeft);
-            Assert.True(pulled.MarkerX < 1200 - 8);
-        }
-
-        [Fact]
-        public void ComputeCurrencyColumnEdgesForPanel_PulledIn_KeepsTheColumnsRelativeGeometry()
-        {
-            var pinned = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
-            var pulled = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth: 1200, widestNumberWidth: 90, widestNameEnd: 200);
-
-            int shift = pinned.MarkerX - pulled.MarkerX;
-            Assert.True(shift > 0);
-            Assert.Equal(shift, pinned.NeededRightEdge - pulled.NeededRightEdge);
-            Assert.Equal(shift, pinned.HaveRightEdge - pulled.HaveRightEdge);
-            Assert.Equal(shift, pinned.RequiredRightEdge - pulled.RequiredRightEdge);
-        }
-
-        [Fact]
-        public void ComputeCurrencyColumnEdgesForPanel_PulledIn_LeavesTheWidestNameItsFullWidth()
+        public void ComputeCurrencyColumnEdges_NameBudgetAbsorbsTheWidthIncrease()
         {
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
-            const int nameWidth = 160;
 
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth: 1200, widestNumberWidth: 0, widestNameEnd: nameX + nameWidth);
-
-            int budget = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                edges.RequiredRightEdge,
+            int narrow = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200).RequiredRightEdge,
+                SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0),
+                SummarySectionLayoutMath.CurrencyColumnGap,
+                nameX);
+            int wide = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1600).RequiredRightEdge,
                 SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0),
                 SummarySectionLayoutMath.CurrencyColumnGap,
                 nameX);
 
-            Assert.True(budget >= nameWidth);
-        }
-
-        [Fact]
-        public void CurrencyHeaderBandWidth_PinnedTable_IsStillTheWholePanel()
-        {
-            // The header's dark band only narrows where the block actually
-            // moved; a table whose names already reach the numbers keeps the
-            // full-width band it drew before.
-            Assert.Equal(
-                800,
-                SummarySectionLayoutMath.CurrencyHeaderBandWidth(
-                    panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780));
-        }
-
-        [Fact]
-        public void CurrencyHeaderBandWidth_PulledInTable_EndsJustPastTheMarkerColumn()
-        {
-            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 120;
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth: 1600, widestNumberWidth: 0, widestNameEnd: widestNameEnd);
-
-            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(1600, 0, widestNameEnd);
-
-            Assert.Equal(
-                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth
-                    + PlanRelayoutMath.TableRightMargin,
-                band);
-
-            // The point of the fix: at 1600px the band no longer runs ~1000px
-            // past the last column it is supposed to bound.
-            Assert.True(band < 1600 / 2);
-        }
-
-        // --- CurrencyTableOffsetX (the field test's "the currency table
-        // under total cost needs to be centered") ---
-
-        [Fact]
-        public void CurrencyTableOffsetX_PinnedTable_IsZero()
-        {
-            // A table already spanning the panel has nothing to centre, and
-            // must lay out byte-identically to the pre-centring version.
-            Assert.Equal(
-                0,
-                SummarySectionLayoutMath.CurrencyTableOffsetX(
-                    panelWidth: 800, widestNumberWidth: 0, widestNameEnd: 780));
-        }
-
-        [Fact]
-        public void CurrencyTableOffsetX_PulledInTable_SplitsTheLeftoverSpaceEvenly()
-        {
-            const int panelWidth = 1600;
-            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 120;
-
-            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(panelWidth, 0, widestNameEnd);
-            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(panelWidth, 0, widestNameEnd);
-
-            Assert.True(offset > 0);
-            // Same margin either side, to the odd pixel integer division
-            // leaves on the right.
-            Assert.Equal(panelWidth - band - offset, offset + (panelWidth - band) % 2);
-            // And the table still ends inside the panel.
-            Assert.True(offset + band <= panelWidth);
-        }
-
-        [Fact]
-        public void CurrencyTableOffsetX_NarrowPanel_NeverGoesNegative()
-        {
-            // A panel narrower than the block itself: the table stays at
-            // the left edge rather than being pushed off it.
-            Assert.Equal(
-                0,
-                SummarySectionLayoutMath.CurrencyTableOffsetX(
-                    panelWidth: 120, widestNumberWidth: 0, widestNameEnd: 0));
-        }
-
-        [Fact]
-        public void CurrencyTableOffsetX_LeavesEveryColumnInsideTheCentredTable()
-        {
-            // Centring must move the table, not reshape it: the columns
-            // are still laid out against the same width the offset is
-            // derived from, so the name column starts inside the table's
-            // left edge and the marker still ends one shared table margin
-            // inside its right edge. This is what lets the renderer centre
-            // header and rows by moving one panel each.
-            const int panelWidth = 1400;
-            const int widestNumberWidth = 90;
-            const int widestNameEnd = SummarySectionLayoutMath.CurrencyNameX + 200;
-
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdgesForPanel(
-                panelWidth, widestNumberWidth, widestNameEnd);
-            int band = SummarySectionLayoutMath.CurrencyHeaderBandWidth(
-                panelWidth, widestNumberWidth, widestNameEnd);
-            int offset = SummarySectionLayoutMath.CurrencyTableOffsetX(
-                panelWidth, widestNumberWidth, widestNameEnd);
-
-            Assert.True(offset > 0);
-            Assert.Equal(
-                band,
-                edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth
-                    + PlanRelayoutMath.TableRightMargin);
-            Assert.True(SummarySectionLayoutMath.CurrencyIconX >= 0);
-            Assert.True(
-                edges.RequiredRightEdge
-                    - SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth)
-                    > SummarySectionLayoutMath.CurrencyNameX);
+            Assert.Equal(400, wide - narrow);
         }
 
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened

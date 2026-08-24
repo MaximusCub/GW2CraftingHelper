@@ -107,22 +107,23 @@ namespace GW2CraftingHelper.Views.Rendering
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
-            // The same pass also measures the widest "Nx" amount string and
-            // the widest UNTRUNCATED name+tag extent, which is what lets the
-            // Amount/Each/Total block be pulled in beside the names instead
-            // of pinned to the panel edge (audit batch H) - see
-            // ShoppingColumnMath.ComputeEdgesForPanel. The tag rides in the
-            // name extent because it sits between the name and the Amount
-            // column, exactly as the ellipsis budget already treats it.
+            // The same pass measures the widest "Nx" amount string, which
+            // is the Amount column's reserved band and therefore where the
+            // Item column's ellipsis budget stops. Its floor is the
+            // "Amount" header label: the header right-aligns onto the same
+            // edge as the rows and at the ColumnHeader tier is routinely
+            // wider than a short "12x".
             // Row ORDER only - the pre-scan sees the same rows either way,
             // so every column edge (and the row count PlanContentHeightMath
             // measures this section by) is identical sorted or not.
             var rows = PlanTableSorter.Sort(section.Rows, _sortState);
 
+            string amountHeaderText =
+                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
-            int maxQtyWidth = 0;
-            int widestNameEnd = 0;
+            int maxQtyWidth =
+                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(amountHeaderText).Width);
             foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
@@ -133,11 +134,6 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
                 if (qtyW > maxQtyWidth) maxQtyWidth = qtyW;
-
-                int nameEnd = NameX
-                    + (int)System.Math.Ceiling(coinFont.MeasureString(row.Label ?? "").Width)
-                    + TagReserve(row);
-                if (nameEnd > widestNameEnd) widestNameEnd = nameEnd;
             }
 
             // The header and every data row derive their build-time edges
@@ -145,37 +141,35 @@ namespace GW2CraftingHelper.Views.Rendering
             // them from it too - the pre-scan depends only on row data,
             // never on panelWidth, so it does not need to re-run on resize
             // at all and no two rows can anchor the table differently.
-            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, widestNameEnd);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
+            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, amountHeaderText);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
             }
         }
 
-        // The four data-derived (panelWidth-invariant) measurements every
+        // The three data-derived (panelWidth-invariant) measurements every
         // row and header closure needs to recompute its column edges -
-        // grouped so a fifth cannot be added to one call site and forgotten
-        // at another.
+        // grouped so a fourth cannot be added to one call site and
+        // forgotten at another.
         private readonly struct ColumnScan
         {
             internal readonly int MaxEachWidth;
             internal readonly int MaxTotalWidth;
             internal readonly int MaxQtyWidth;
-            internal readonly int WidestNameEnd;
 
-            internal ColumnScan(int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int widestNameEnd)
+            internal ColumnScan(int maxEachWidth, int maxTotalWidth, int maxQtyWidth)
             {
                 MaxEachWidth = maxEachWidth;
                 MaxTotalWidth = maxTotalWidth;
                 MaxQtyWidth = maxQtyWidth;
-                WidestNameEnd = widestNameEnd;
             }
 
             internal ShoppingColumnMath.ColumnEdges EdgesFor(int panelWidth)
             {
                 return ShoppingColumnMath.ComputeEdgesForPanel(
-                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, WidestNameEnd);
+                    panelWidth, MaxEachWidth, MaxTotalWidth);
             }
         }
 
@@ -196,12 +190,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // Changes since: _relayoutActions.Add(...) -> _sink.AddRelayout(...),
         // and the column edges come from the shared pre-scan.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ColumnScan scan)
+            FlowPanel parent, int panelWidth, ColumnScan scan, string amountHeaderText)
         {
             var edges = scan.EdgesFor(panelWidth);
             var rowPanel = new Panel()
             {
-                Size = new Point(HeaderBandWidth(panelWidth, edges), TableHeaderStyle.RowHeight),
+                Size = new Point(panelWidth, TableHeaderStyle.RowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = parent
             };
@@ -223,7 +217,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount)),
+                rowPanel, amountHeaderText,
                 font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each)),
@@ -245,7 +239,7 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 var e = scan.EdgesFor(w);
-                rowPanel.Size = new Point(HeaderBandWidth(w, e), TableHeaderStyle.RowHeight);
+                rowPanel.Size = new Point(w, TableHeaderStyle.RowHeight);
                 amountLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), TableHeaderStyle.LabelY);
                 eachLabel.Location = new Point(
@@ -253,20 +247,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 totalLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
             });
-        }
-
-        /// <summary>
-        /// Width of the header's band: up to the Total column plus the
-        /// margin every plan table keeps past its block, never wider than
-        /// the panel. Same rule CTableHeaderRenderer.BandWidth applies -
-        /// a band that runs past its own last column stopped bounding the
-        /// table it belongs to once batch H pulled the columns in.
-        /// </summary>
-        private static int HeaderBandWidth(int panelWidth, ShoppingColumnMath.ColumnEdges edges)
-        {
-            int width = edges.TotalRightEdge + PlanRelayoutMath.TableRightMargin;
-            if (width > panelWidth) width = panelWidth;
-            return width > 0 ? width : 0;
         }
 
         // A ValueCellHandle's own
@@ -329,7 +309,7 @@ namespace GW2CraftingHelper.Views.Rendering
             string hintText = row.HintText;
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
-                edges.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve, NameX, 9);
+                edges.QtyRightEdge, scan.MaxQtyWidth, NameToQtyGap + tagReserve, NameX, 9);
             var nameLabel = nameHandle.NameLabel;
 
             Panel tagPanel = null;
@@ -415,15 +395,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
-                },
-                w => scan.EdgesFor(w).TotalRightEdge + PlanRelayoutMath.TableRightMargin);
+                });
             // No tooltip re-stamp on settle: the deferred builder reads
             // the label's current text when the box is drawn.
             _sink.AddReellipsis(w =>
             {
                 var e = scan.EdgesFor(w);
                 IconNameRowHelpers.ReellipsizeName(
-                    nameHandle, font, e.QtyRightEdge, qtyWidth, NameToQtyGap + tagReserve);
+                    nameHandle, font, e.QtyRightEdge, scan.MaxQtyWidth, NameToQtyGap + tagReserve);
                 if (tagPanel != null)
                 {
                     tagPanel.Location = new Point(NameX + nameLabel.Width + TagGap, 9);
