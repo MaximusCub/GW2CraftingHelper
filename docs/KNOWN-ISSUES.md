@@ -12576,4 +12576,37 @@ Things a reviewer should look at hardest, stated rather than buried:
    then click a tree decision pill (re-solve) and confirm the sort and
    its indicator SURVIVE that.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 desktop session, branch build at the fix HEAD,
+captures preflight/gFP5-gFP36), with two sub-cases left to the live
+install. (1) READING PASS at the effective minimum: every tab read end
+to end - snapshot rows and source tags, tree pills including the "+2"
+overflow run, the Required Disciplines character line, Required Recipes
+rows WITH sublabel (zoomed: name descenders and sublabel both clear of
+the 48px row's divider), the cost band caption, Shopping List tags,
+Settings currency grid two-up, About prose, Log rows - nothing clipped
+or overlapping. (3) HINT: fixture gained "Quiet Quinn" (only q-carrying
+name); "q" produced the empty state WITH "Type another letter to match
+character names.", "j" produced it WITHOUT the hint, "qu" listed Green
+Wood Log via the character match with no hint. (5) SORT RESET: Shopping
+List sorted by Amount showed the indicator; a fresh Generate (Mystic
+Tribute, live prices) cleared it and returned plan order; Used
+Materials re-sorted ascending (Coin 25x before Clover 35x), and a
+VENDOR pill re-solve ("Decisions updated (1 override(s))", list 36->33)
+kept the sort, its indicator, and the scroll position. (4) SPINNER:
+partially machine-verified - Refresh Now showed "Refreshing..." with
+the inline spinner turning and both buttons disabled 300ms in, and the
+failure landed with a fresh status timestamp, spinner stopped, buttons
+re-enabled. The AUTOMATIC path never starts a refresh in the keyless
+sandbox (the API-ready guard skips the timer attempt), so
+spinner-during-auto and the overlap click stand on the shared two-flag
+wiring plus the manual-path evidence; confirm on a live install. (2)
+RESIZE: the client-growth path re-clamped live (window grew from the
+1064-client floor to the full minimum when the client widened; the
+sandbox renders at Blish UI scale 0.81, so 1478 logical = ~1197
+physical, measured against the search-row constants); grip drag-resize
+remains synthetically uncatchable (longstanding), so
+outward-and-back dragging and the 3-column snapshot threshold are the
+user's live checks. Bonus: the Clear Cache ModalDialog message wraps
+un-clipped with Caption-measured button padding, the ApiAccessDialog
+stacking case renders as recorded, and both plan generations logged
+single [plan] tags.
