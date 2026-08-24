@@ -12961,8 +12961,9 @@ default.
 The Settings tab has one Save button and an unsaved-changes prompt driven
 by `CaptureFormState`/`UnsavedChangeCount`. The click volume row is
 **deliberately outside** that model: it writes through to
-`ModuleSettings` and to the live player on every `ValueChanged`, exactly
-like the Diagnostics checkbox (idiom (a)), and it is **absent from
+`ModuleSettings` on every `ValueChanged` - and from there to the live
+player, see the two-sliders section below - exactly like the Diagnostics
+checkbox (idiom (a)), and it is **absent from
 `CaptureFormState`**. Auditioning a volume through a Save button - and
 through a save prompt on the next tab switch - is hostile for the one
 setting a user tunes by ear, and listing it in the form state would
@@ -12997,23 +12998,86 @@ and the loader turns that into a permanent, quiet give-up.
 
 ### Two Blish behaviors this row had to work around
 
-- `ViewContainer.Clear` -> `Container.ClearChildren` only sets each
-  child's `Parent` to `null`; it never disposes them. `TrackBar` is the
-  one control type on this tab that subscribes to a **static** event in
-  its constructor (`Control.Input.Mouse.LeftMouseButtonReleased`,
-  released only in its `DisposeControl` override), so the previous
-  build's slider is now disposed explicitly at the top of `Build` -
-  otherwise every Settings re-open would strand another live slider on
-  Blish's mouse handler for the session. Swept the other control types
-  used here: `TextInputBase` takes its global hooks on focus and
-  releases them on unfocus; `Checkbox`, `StandardButton`, `Panel` and
-  `Label` take none.
+- **Nothing in a Blish teardown disposes this tab's controls.**
+  `ViewContainer.DisposeControl` runs `Clear()` - and so
+  `Container.ClearChildren`, which only sets each child's `Parent` to
+  `null` - *before* `base.DisposeControl()`. `Container.GetDescendants`
+  is a lazy iterator that enqueues a container's children only after the
+  caller has already disposed it, so the walk that disposes the
+  `ViewContainer` then finds it empty: disposing the host window
+  disposes nothing underneath this tab. `TrackBar` is the one control
+  type used here that subscribes to a **static** event in its
+  constructor (`Control.Input.Mouse.LeftMouseButtonReleased`, released
+  only in its `DisposeControl` override), so the slider is disposed
+  explicitly on **both** exits - the previous cycle's at the top of
+  `Build`, and the last one from `SettingsTabContent.Teardown`, called
+  by `Module.Unload`. Disposing only on rebuild would have left the
+  final slider on Blish's mouse handler - and, through its
+  `ValueChanged` closure, the entire `SettingsTabContent` graph - for the
+  rest of the Blish process, accumulating one graph per module
+  disable/re-enable. Swept the other control types used here:
+  `TextInputBase` takes its global hooks on focus and releases them on
+  unfocus; `Checkbox`, `StandardButton`, `Panel` and `Label` take none.
 - `TrackBar.MinValue`/`MaxValue` are assigned even though 0 and 100 are
   already the defaults. Their setters are the only callers of the
   private `MinMaxChanged`, which fills the ten-increment table that
   Ctrl+drag snaps against with `Enumerable.Aggregate`; on a TrackBar
   that never had either assigned that table is empty and the first
   Ctrl+drag throws.
+
+### There are TWO sliders for this setting, and the wiring assumes it
+
+This module never overrides `Module.GetSettingsView`. Blish's default
+returns `new SettingsView(ModuleParameters.SettingsManager.ModuleSettings)`,
+which renders **every** `SettingEntry` the module defines - and a
+`SettingEntry<int>` renders as `IntSettingView : NumericSettingView<int>`,
+whose `BuildSetting` builds its own 277x16 `TrackBar`. So Blish's Manage
+Modules pane already shows a second, fully draggable 0-100 click-volume
+slider, and it is the one the maintainer may well reach first.
+
+Everything therefore hangs off the **setting**, not off either control:
+
+- `SettingEntry.ValueChanged` -> `Module.OnClickSoundVolumeChanged` ->
+  `ClickSound.VolumePercent`. Without this the Blish-side slider would
+  persist a value that did not take effect until the next relaunch.
+- `SettingEntry.ValueChanged` -> `SettingsTabContent.
+  OnClickVolumeSettingChanged` -> this tab's slider and "NN%" readout, so
+  a drag in the other pane does not leave this tab displaying a value
+  that is no longer true.
+- This tab's own `ValueChanged` writes the setting and **nothing else**;
+  the two hops above do the rest. One path, whichever slider moved.
+
+The loop terminates: the setting-side handler skips the slider write when
+the slider already rounds to that percent, and when it does write, the
+`ValueChanged` it raises writes back an unchanged setting, which
+`SettingEntry` does not re-announce.
+
+Both subscriptions are dropped on unload (`Module.Unload`,
+`SettingsTabContent.Teardown`) and that is not optional:
+`SettingsManager` hands out `module.State.Settings`, and
+`SettingCollection.DefineSetting` returns the **existing** entry for a
+key it already holds - so a disable/re-enable cycle re-defines onto the
+same objects, and an unsubscribed handler would root each dead `Module`
+in turn.
+
+**Swept the sibling settings for the same defect.** The shape that breaks
+is "pushed once at `Initialize` into a live object, and otherwise only by
+this tab" - every setting Blish also renders has that second UI, so any
+setting with that shape was already silently ignoring it.
+
+- `LogDiagnosticsEnabled` - **same defect, fixed the same way.** It is
+  pushed into `ModuleLog.Shared.DiagnosticsEnabled`, so toggling Blish's
+  own checkbox for it persisted without taking effect until relaunch.
+  Now `Module.OnLogDiagnosticsEnabledChanged` carries it, and this tab's
+  checkbox writes the setting only.
+- `SnapshotRefreshIntervalMinutes` - not affected. The stale-check tick
+  re-reads it from the setting on every `Update`.
+- `ScrollDiagnosticsEnabled` - not affected. `CraftingPlanView` reads it
+  from the setting at each use.
+- `LogMaxSizeBytes`, `LogRetentionDays` - excluded, not missed. Both are
+  once-per-session by design (`ModuleLog.Configure` and the retention
+  prune both run at startup), so they apply next session regardless of
+  which UI changed them.
 
 ### Incidental: this is now cheaper per click, not dearer
 
@@ -13035,6 +13099,10 @@ session, same as `TooltipFacility`).
 4. The value **survives a relaunch**: set something distinctive (say 40),
    close Blish, reopen, and the slider, the readout and the actual
    loudness all come back at 40.
-5. Report the number that feels right - it replaces `DefaultPercent`.
+5. The **other** slider works too: with this tab open, drag the click
+   volume slider Blish renders under Manage Modules and confirm the next
+   click is immediately at the new loudness (no relaunch) and that this
+   tab's slider and readout follow it.
+6. Report the number that feels right - it replaces `DefaultPercent`.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
