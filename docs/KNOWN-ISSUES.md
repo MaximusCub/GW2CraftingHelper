@@ -13399,4 +13399,30 @@ handed to desktop gate step 6. The counts are corrected here, in
     available for this entry." - never an empty box. After the top-up
     lands the same hover shows the full stat block.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-23 night desktop session, branch build at a291fb1,
+captures preflight/gTT1-gTT28). Verified live: the full ascended block
+(Wupwup Claymore - icon header with framed 32px icon and pink name,
+thousands-separated strength, nine white attribute lines, one line per
+infusion slot, white identity block with hand line and damage type,
+teal flavour inside the block, unlabelled trailing 1g 00s 00c with
+icons right, dark 0.92 canvas with no Blish art, shadowed glyphs);
+rune (six light-blue (N): tiers, no counter, white Exotic word, the
+Element: abilitytype span in pale yellow, white apply-description);
+food (nourishment white and flush under the header, NoSell = no value
+line, no trailing blank); Basic ore (no rarity line, white prose,
+blank-then-value for a material, API icon in the header even though
+the ROW icon is the neutral dash placeholder); Fine transmutable and
+plank and dowel and mini (Exotic mini: account-bound, no value, no
+ids anywhere). All four Q1 surfaces live-hovered with the same rich
+box: tree rows, Snapshot list, Shopping List, Used Materials. Q13:
+after a restart with no Generate, the restored plan's root hover
+showed the full stat block within seconds. Recorded partials: the
+Gathering/Tool/MiniPet blank-above-value guess stays unsettled (no
+sellable specimen reachable in the sandbox fixture); step 11 stands on
+the Blish-free id-space tests plus live UNKNOWN/mini hovers (no
+currency-item row renders in the current plans); steps 12 and 17's
+timing races (truncation-boundary double-name, pre-top-up icon note)
+are pinned by TooltipLayoutMath/deferred-builder tests - the top-up
+lands faster than synthetic input can race it. Snapshot rows without
+cached stat blocks show no tooltip on an untruncated name - correct
+per the no-stats fallback rule.
