@@ -327,7 +327,7 @@ namespace GW2CraftingHelper.Views
                     Size = new Point(width, 26),
                     Location = new Point(ValueColumnX, 3),
                     Parent = rowPanel
-                };
+                }.ReleaseOnDispose();
             }
             else
             {
