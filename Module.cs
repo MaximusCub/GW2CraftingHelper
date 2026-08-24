@@ -149,6 +149,7 @@ namespace GW2CraftingHelper
         private VendorOfferStore _vendorOfferStore;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
+        private Texture2D _cornerIconTexture;
         private Texture2D _emblemTexture;
 
         private CancellationTokenSource _refreshCts;
@@ -415,6 +416,21 @@ namespace GW2CraftingHelper
 
             try
             {
+                // The strip variant: same hammer, re-padded so the glyph
+                // fills ~72% of the canvas like the game's own top-row
+                // icons (icon.png fills 84% - correct for the module list
+                // and emblem, visibly oversized between GW2's menu icons;
+                // measured against a live top-row capture 2026-08-23).
+                _cornerIconTexture = ContentsManager.GetTexture("corner-icon.png");
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Corner icon texture load failed, using the module icon: {ex.GetType().Name} - {ex.Message}");
+                _cornerIconTexture = _moduleIconTexture;
+            }
+
+            try
+            {
                 _emblemTexture = ContentsManager.GetTexture("emblem.png");
             }
             catch (Exception ex)
@@ -669,7 +685,7 @@ namespace GW2CraftingHelper
             _cornerIcon = new CornerIcon()
             {
                 IconName = "GW2 Crafting Helper",
-                Icon = new AsyncTexture2D(_moduleIconTexture),
+                Icon = new AsyncTexture2D(_cornerIconTexture),
                 Priority = 1245846523,
                 Parent = GameService.Graphics.SpriteScreen
             };
