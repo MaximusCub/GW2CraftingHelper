@@ -239,6 +239,12 @@ namespace GW2CraftingHelper
             ModuleLog.Shared.Configure(logStore, _settings.GetClampedLogMaxSizeBytes(), (message, ex) => Logger.Warn(ex, message));
             ModuleLog.Shared.DiagnosticsEnabled = _settings.LogDiagnosticsEnabled.Value;
 
+            // Same immediate-apply shape as the line above: the click
+            // player holds the live percent on a static, and the Settings
+            // tab's slider re-pushes it on every change, so this is the
+            // only place the persisted value is read at startup.
+            Views.Rendering.ClickSound.VolumePercent = _settings.GetClampedClickSoundVolumePercent();
+
             // Once-per-session age-based retention enforcement, BEFORE the
             // ring is seeded from the file below - the ring then mirrors
             // exactly what survived retention, rather than briefly showing
@@ -1004,6 +1010,11 @@ namespace GW2CraftingHelper
             // TooltipFacility for why there is one instance rather than
             // one per tooltip'd control.
             Views.Rendering.TooltipFacility.Shutdown();
+
+            // Same reason as the facility above: the decoded click sound is
+            // held on a static, which outlives this module instance inside
+            // one Blish session.
+            Views.Rendering.ClickSound.Unload();
 
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush

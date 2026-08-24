@@ -1,4 +1,3 @@
-using Blish_HUD;
 using Blish_HUD.Controls;
 using System;
 
@@ -42,28 +41,22 @@ namespace GW2CraftingHelper.Views.Rendering
         internal const float PressedOpacityFactor = 0.8f;
 
         /// <summary>
-        /// Blish's own UI click sound, the one its Checkbox, GlowButton and
-        /// CornerIcon play. Measured: <c>ContentService.Load</c> builds its
-        /// audio reader as <c>zipArchiveReader.GetSubPath("audio")</c> and
-        /// <c>PlaySoundEffectByName</c> looks up
-        /// <c>Path.Combine(subPath, name + ".wav")</c>, so the name carries
-        /// no "audio/" prefix of its own. (StandardButton passes
-        /// "audio\\button-click", which resolves to a nonexistent
-        /// audio/audio/button-click.wav and is swallowed by the
-        /// FileExists check - which is why a Blish StandardButton is silent
-        /// on click in 1.3.0. See Views/Rendering/FeedbackButton.)
-        /// </summary>
-        private const string ClickSoundName = "button-click";
-
-        /// <summary>
-        /// Plays the click sound at Blish's own audio volume
-        /// (<c>GameService.GameIntegration.Audio.Volume</c>, applied inside
-        /// PlaySoundEffectByName), and does nothing at all when the game has
-        /// no audio device.
+        /// Plays Blish's own UI click sound - the one its Checkbox,
+        /// GlowButton and CornerIcon play - at the user's configured
+        /// volume, and nothing at all at 0 or with no audio device.
+        /// <para>
+        /// This no longer goes through
+        /// <c>GameService.Content.PlaySoundEffectByName("button-click")</c>:
+        /// that overload plays at Blish's game-derived audio volume, capped
+        /// at 0.4 and usually far below it, which the field test reported as
+        /// inaudible over a physical mouse click. See
+        /// <see cref="ClickSound"/> for the measured path and for what
+        /// playing it ourselves gives up.
+        /// </para>
         /// </summary>
         internal static void PlayClick()
         {
-            GameService.Content.PlaySoundEffectByName(ClickSoundName);
+            ClickSound.Play();
         }
 
         /// <summary>

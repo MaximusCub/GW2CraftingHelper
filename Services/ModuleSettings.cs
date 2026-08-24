@@ -106,6 +106,18 @@ namespace GW2CraftingHelper.Services
         // GetClampedLogMaxSizeBytes/GetClampedLogRetentionDays above).
         public SettingEntry<int> SnapshotRefreshIntervalMinutes { get; private set; }
 
+        // How loud this module's own UI click plays, 0-100, where 0 is no
+        // sound at all and 100 is the click asset at full scale. Read live
+        // by Views/Rendering/ClickSound (pushed there by Module at load and
+        // by the Settings tab's slider on every drag - idiom (a),
+        // immediate-apply, like LogDiagnosticsEnabled above), never by the
+        // plan pipeline. The percent-to-volume mapping and its clamp live
+        // on the Blish-free Services/ClickSoundVolume so they are testable;
+        // that type also owns the default, so retuning it after the field
+        // test is a one-line change there rather than a second number to
+        // keep in sync here.
+        public SettingEntry<int> ClickSoundVolumePercent { get; private set; }
+
         public ModuleSettings(SettingCollection settings)
         {
             ModalDialogX = settings.DefineSetting(
@@ -167,6 +179,11 @@ namespace GW2CraftingHelper.Services
                 "SnapshotRefreshIntervalMinutes", 10,
                 () => "Snapshot refresh interval (minutes)",
                 () => "How long a cached account snapshot may sit before an automatic background refresh is triggered");
+
+            ClickSoundVolumePercent = settings.DefineSetting(
+                "ClickSoundVolumePercent", ClickSoundVolume.DefaultPercent,
+                () => "Click volume",
+                () => "How loud this module's own UI click plays (0 = off, 100 = loudest)");
         }
 
         /// <summary>
@@ -283,6 +300,18 @@ namespace GW2CraftingHelper.Services
         public int GetClampedSnapshotRefreshIntervalMinutes()
         {
             return ClampSnapshotRefreshIntervalMinutes(SnapshotRefreshIntervalMinutes.Value);
+        }
+
+        /// <summary>
+        /// Clamped ClickSoundVolumePercent for actual use. Same contract as
+        /// the clamped accessors above: a hand-edited settings file must
+        /// never hand an out-of-range percent to the player, whose
+        /// SoundEffect.Play argument THROWS rather than clamps outside
+        /// [0,1] - see ClickSoundVolume's own comment.
+        /// </summary>
+        public int GetClampedClickSoundVolumePercent()
+        {
+            return ClickSoundVolume.Clamp(ClickSoundVolumePercent.Value);
         }
 
         /// <summary>
