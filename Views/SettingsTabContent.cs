@@ -192,6 +192,13 @@ namespace GW2CraftingHelper.Views
         private TextBox _logRetentionDaysInput;
         private Label _logRetentionDaysErrorLabel;
 
+        // The click-volume slider, held for ONE reason: to dispose the
+        // previous build's instance - see Build. Its value is never read
+        // back from here (the row is immediate-apply, so the setting is
+        // always already current), and it is deliberately absent from
+        // CaptureFormState - see BuildSoundSection.
+        private TrackBar _clickVolumeSlider;
+
         // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
         // Defaults", which is about per-plan choices - a different
@@ -258,6 +265,21 @@ namespace GW2CraftingHelper.Views
             _currencyHeaderPanel = null;
             _statusLabel = null;
 
+            // Disposed, not just dropped, and it is the only control on
+            // this tab that needs to be. Measured: Blish tears a view down
+            // with ViewContainer.Clear -> Container.ClearChildren, which
+            // only sets each child's Parent to null - it never disposes
+            // them - and TrackBar is the one control type used here that
+            // subscribes to a STATIC event in its constructor
+            // (Control.Input.Mouse.LeftMouseButtonReleased, dropped only in
+            // its DisposeControl override; TextInputBase's global hooks are
+            // taken on focus and released on unfocus, and Checkbox/
+            // StandardButton/Panel/Label take none). Left alone, every
+            // Settings tab re-open would strand another live slider on
+            // Blish's mouse handler for the rest of the session.
+            _clickVolumeSlider?.Dispose();
+            _clickVolumeSlider = null;
+
             // Dropped before the controls it describes are replaced: a
             // baseline left over from the previous Build cycle would be
             // compared against a freshly loaded form and report the
@@ -296,6 +318,12 @@ namespace GW2CraftingHelper.Views
                 _rootPanel.Size = ContentSizeBelowSaveBar(container);
                 ApplyPanelWidth(container.ContentRegion.Width - RightEdgePadding);
             };
+
+            // First on the tab, and the only section here that needs no
+            // Save: it is the one setting a user tunes by ear, so it has to
+            // be reachable and auditionable without scrolling past four
+            // save-gated sections to find it.
+            BuildSoundSection(panelWidth);
 
             BuildHomesteadRefinementSection(panelWidth);
             BuildLoggingSection(panelWidth);
@@ -516,6 +544,143 @@ namespace GW2CraftingHelper.Views
             _currencyForceVisible = new bool[_rows.Count];
             SetCurrencyGridHeight();
             ApplyCurrencyFilter();
+        }
+
+        // Horizontal layout for the click-volume row only. The shared
+        // HintX/ErrorX constants above are derived from the 80px TextBox
+        // every other row uses, and a slider that narrow is unusable, so
+        // this row lays its own three controls out from the same
+        // NameColumn origin instead of inheriting those two.
+        private const int SliderX = NameColumnX + NameColumnWidth;
+        private const int SliderWidth = 200;
+        // Blish's TrackBar is 16px tall (its own default Size, and the
+        // height of the nub region it paints), so 7 centers it in a 30px
+        // row the same way the 26px TextBoxes sit at y=3.
+        private const int SliderHeight = 16;
+        private const int ReadoutX = SliderX + SliderWidth + 12;
+        // Fixed, not auto-sized: the readout runs 0% to 100%, and an
+        // auto-sized label would shove the Test button sideways by a
+        // character's width as the number crosses 10 and 100 mid-drag.
+        private const int ReadoutWidth = 44;
+        private const int TestButtonX = ReadoutX + ReadoutWidth + 8;
+        private const int TestButtonWidth = 72;
+
+        /// <summary>
+        /// The click-volume row: label, slider, live percent readout, and a
+        /// button that plays the click at the slider's current value.
+        /// <para>
+        /// DELIBERATE DIVERGENCE from this tab's save-gated model, recorded
+        /// in KNOWN-ISSUES: the slider writes through to ModuleSettings and
+        /// to the live player on every change, exactly like the Diagnostics
+        /// checkbox (idiom (a)) and unlike the four TextBox+Save sections
+        /// below. Auditioning a volume through a Save button - and through
+        /// the unsaved-changes prompt a tab switch would then raise - is
+        /// hostile for a setting whose whole point is drag, listen, adjust.
+        /// It follows that this row must NOT appear in CaptureFormState:
+        /// listing it there would make every drag an "unsaved change" for a
+        /// value already on disk. That is the same reasoning
+        /// SettingsFormState's own doc comment gives for the Diagnostics
+        /// checkbox.
+        /// </para>
+        /// </summary>
+        private void BuildSoundSection(int panelWidth)
+        {
+            AddSectionHeader("Sound", panelWidth);
+            AddInfoLine("Volume of this module's own click, played whenever you press one of its buttons, rows or pills.", panelWidth);
+            AddInfoLine("Applies immediately - no Save needed. Drag to 0 to turn the click off entirely.", panelWidth);
+
+            AddClickVolumeRow(panelWidth);
+        }
+
+        private void AddClickVolumeRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+            _fullWidthPanels.Add(rowPanel);
+
+            new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "Click volume",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            int percent = _settings.GetClampedClickSoundVolumePercent();
+
+            // Read straight from the setting rather than from LoadAll: this
+            // row is never save-gated, so the persisted value and the live
+            // value can never disagree, and a DiscardChanges that reset the
+            // slider would be reverting an edit that was already committed.
+            //
+            // MinValue/MaxValue are assigned even though 0 and 100 are
+            // already TrackBar's own defaults, and that is load-bearing:
+            // its setters are the only callers of the private
+            // MinMaxChanged, which fills the ten-increment table that
+            // Ctrl+drag snaps against with Enumerable.Aggregate. On a
+            // TrackBar that never had either assigned, that table is empty
+            // and a Ctrl+drag throws (measured from the 1.3.0 binary).
+            _clickVolumeSlider = new TrackBar()
+            {
+                MinValue = ClickSoundVolume.MinPercent,
+                MaxValue = ClickSoundVolume.MaxPercent,
+                Value = percent,
+                Size = new Point(SliderWidth, SliderHeight),
+                Location = new Point(SliderX, 7),
+                BasicTooltipText = "How loud this module's click plays. 0 turns it off.",
+                Parent = rowPanel
+            };
+
+            var readout = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = ClickSoundVolume.FormatPercent(percent),
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = ReadoutWidth,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Location = new Point(ReadoutX, 7),
+                Parent = rowPanel
+            };
+
+            // Subscribed AFTER the initial Value assignment above, which
+            // would otherwise fire this handler during Build - on Blish's
+            // build thread, before _settings has anything new to hear.
+            _clickVolumeSlider.ValueChanged += (_, e) =>
+            {
+                if (!ClickSoundVolume.TryPercentFromSliderValue(e.Value, out int newPercent)) return;
+
+                readout.Text = ClickSoundVolume.FormatPercent(newPercent);
+
+                // Persisted AND pushed live. The write is cheap even during
+                // a drag: SettingEntry.Value ignores an unchanged value, the
+                // TrackBar snaps to whole numbers (SmallStep is off), and
+                // Blish's SettingsService.Save only flags the collection
+                // dirty - the actual JSON write is debounced 4 seconds past
+                // the last change (all measured from the 1.3.0 binary).
+                _settings.ClickSoundVolumePercent.Value = newPercent;
+                ClickSound.VolumePercent = newPercent;
+            };
+
+            // The audition IS this button's own press feedback: every
+            // FeedbackButton plays the click through PressFeedback.Wire on
+            // mouse-down, at whatever the slider has just set. A Click
+            // handler that played a second time would simply double it, so
+            // there deliberately is not one.
+            new FeedbackButton()
+            {
+                Text = "Test",
+                Size = new Point(TestButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(TestButtonX, 1),
+                BasicTooltipText = "Play the click at the volume set here.",
+                Parent = rowPanel
+            };
         }
 
         /// <summary>
