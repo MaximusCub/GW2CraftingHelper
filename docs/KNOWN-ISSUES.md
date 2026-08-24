@@ -12259,21 +12259,30 @@ Body text moves **Menomonia 14 -> 16** and small/caption/pill text
 That is the point: the previous size decision was spread over ~60 call
 sites plus every Label that silently took Blish's own default, so
 "is the module consistent?" was not a question anyone could answer by
-looking. It is now `grep -rn DefaultFont Views/` returning comments only.
+looking. It is now `grep -rn DefaultFont Views/` returning comments only,
+and `grep -rn "new Label" --include=*.cs .` outside `Views/` returning a
+single site (`Module.BuildPlaceholder`) that names a font too.
 
-- **49 Labels were taking Blish's DefaultFont14 default** rather than
+- **50 Labels were taking Blish's DefaultFont14 default** rather than
   setting a font. Under the old scheme that was invisibly correct; under
   the bump it would have left a third of the module one size behind.
-  Every one of them now names a font.
-- **Three control types are deliberately excluded and stay at Blish's
-  own DefaultFont14**: `Checkbox` exposes no `Font` property at all, and
+  Every one of them now names a font. The 50th is
+  `Module.BuildPlaceholder`'s "Coming Soon", the body of the Plan History
+  and Crafting Ranker tabs - live UI that a `Views/`-scoped grep does not
+  reach.
+- **Four control types are deliberately excluded and stay at Blish's
+  own DefaultFont14**: `Checkbox` and `StandardButton` (which
+  `FeedbackButton` derives from) expose no `Font` property at all, and
   `TextBox`/`Dropdown` have internal padding Blish authors against its
   default while holding typed values rather than module prose. Anything
-  MEASURING one of those three measures in `Caption`, which is the size
-  they actually paint - `MainView.MeasureCheckboxWidth` and
-  `SettingsCurrencyGridLayout.CellClearWidth` both say so at the point of
-  use, and `SettingsCurrencyGridLayoutTests` carries a second char-width
-  bound for exactly those two controls.
+  MEASURING one of those four measures in `Caption`, which is the size
+  they actually paint - `MainView.MeasureCheckboxWidth`,
+  `SettingsCurrencyGridLayout.CellClearWidth` and `ModalDialog`'s button
+  sizing all say so at the point of use, and
+  `SettingsCurrencyGridLayoutTests` carries a second char-width bound for
+  exactly those controls. The same reasoning covers text the module never
+  builds a control for at all: `TooltipTextFormat`'s line budget sizes
+  Blish's own `BasicTooltipView`, so it is measured at Font14 too.
 
 #### Measured font metrics behind every re-derived constant
 
@@ -12301,7 +12310,7 @@ Real strings measure **1.10-1.11x** wider at 16 than at 14 (730 -> 810,
 | constant | old | new | basis |
 |---|---|---|---|
 | `WindowSizing.MinWindowWidth` | 1436 | **1472** | the research's +2pt variant (1448, measured at Menomonia 16, not scaled) plus one `TreeIndentPer` of vendor-leaf headroom |
-| `TooltipTextFormat.LineBudgetChars` | 75 | **67** | 75 / 1.11, the measured Font16/Font14 prose ratio - scaling the shipped budget keeps whatever calibration prose the original 6.5px/char figure came from |
+| `TooltipTextFormat.LineBudgetChars` | 75 | **71** | NOT a body-bump consequence: this budget sizes text Blish renders itself, in its own `BasicTooltipView` at DefaultFont14, which the module has no seam to re-font. Re-measured at **Font14** over every >=55-character prose string the module builds (73 of them): 7.03px/char average, so Blish's 500px cap is 71 characters, not the 76 the shipped 6.5px/char estimate assumed |
 | `SnapshotItemGridLayout.MaxCharWidthPx` | 8 | **9** | item names measure ~8.4px/char at Font16 (192px over 23 characters), rounded up |
 | `SnapshotItemGridLayout.MinColumnWidth` | 464 | **516** | derived: `40 + 52*9 + 8`. Two columns at 1158px, three at 1674px |
 | `SettingsCurrencyGridLayout.CellNameWidth` | 170 | **190** | 170 x 1.11, so the same currency names still fit before ellipsis |
@@ -12354,6 +12363,10 @@ constant, not just here):
   (24): status labels sit at y=2, Font16 ink y=23.
 - `MainView.WalletRowHeight` (36): icon-driven (32px icon at y=2, plus
   2), and its single Font16 line's ink (y=27) sits well inside.
+- `SuggestionPanel.RowHeight` (28): its one line is now centred on the
+  font's OWN `LineHeight` rather than on a hand-tuned 16, so the offset
+  moves with any future size change instead of stranding a descender on
+  the next row's top edge (these rows stack flush and opaque).
 - `LogTabContent`'s row metrics are **measured from the font at runtime**
   (`Measure(font, "Ag").Height + 2`), so they moved on their own.
   `NotesSectionLayoutMath` likewise takes a measure function.
@@ -12367,19 +12380,33 @@ constant, not just here):
 The window minimum is **measured for the fonts and inferred for the
 chrome**, exactly as it was at 1436: the 126px window-to-panel chain has
 one ~8px term (Blish's `Panel` border) taken from this repo's own comment
-rather than a decompile, so the whole figure carries +/-2px there. Two
-further pixels of slop come from the cost column: this round's
-re-measurement of a six-digit gold run gives 178px where the research's
-table says 175, a 3px difference in how the two rounded the trailing
-glyph. `PlanRelayoutMathTests`' deepest-row constants are taken in the
-research's convention (`DeepestRowQtyPrefixWidth` 65 -> **73** by that
-string's own measured 77/68 ratio, `DeepestRowNameWidth` 174 -> **192**
-measured directly, `DeepestPlanCostColumnWidth` 165 -> **175** by scaling
-only the three digit runs), which is what keeps the depth-23 row's
-designed 24px gutter and the depth-24 vendor leaf's exact zero-gutter fit
-assertable rather than approximate. Under this round's own convention the
-depth-23 gutter would read 21px instead of 24 - inside the chrome term's
-own uncertainty, and not worth moving the minimum for.
+rather than a decompile, so the whole figure carries +/-2px there. That
+is the **only** uncertainty in the figure.
+
+Both deepest-row constants in `PlanRelayoutMathTests` are direct
+measurements in the one convention the production code uses -
+MonoGame.Extended's advance / `XOffset+Width` rule, which is what
+`TreeSectionController`'s `nameFont.MeasureString` and
+`TreeCostColumnMath`'s pre-scan compute, and the rule that reproduces the
+research's `65` for `4194304x ` and `174` for `Thermocatalytic Reagent`:
+`DeepestRowQtyPrefixWidth` 65 -> **73** and `DeepestRowNameWidth`
+174 -> **192**. So the depth-23 row's designed **24px gutter** and the
+depth-24 vendor leaf's exact zero-gutter fit are measured facts, not
+approximations.
+
+`DeepestPlanCostColumnWidth` 165 -> **175** is the one scaled figure, and
+it scales the research's own digit-ADVANCE derivation (three digit runs,
+90px at the Font14 digit advance of 9, 100px at Font16's 10, plus 75px of
+fixed coin-icon and gap chrome). Advances run ~4px over the inked rect
+for the same run (161 at Font14, 171 at Font16), which errs in the safe
+direction: a wider cost column leaves the name column less room, not
+more.
+
+An earlier draft of this section recorded two extra caveats - a Font16
+quantity prefix of 76-77 and a "3px cost-column convention gap". Both
+were artifacts of summing `xAdvance` instead of measuring the inked rect,
+which is not what either call site does. They are withdrawn rather than
+left to send a future maintainer chasing a gap that is not there.
 
 ### 2. The one-letter empty-state hint ("add a hint")
 
@@ -12444,13 +12471,22 @@ reaching it, so they keep the sort exactly as before - which is the
 behaviour the sortable-tables round deliberately built and which stays.
 
 One method rather than two calls at the site, so a future third sortable
-table cannot be reset in one place and forgotten in another.
+table cannot be reset in one place and forgotten in another - and it is
+called from **all three** sites that clear `_sectionExpansion`
+(`TriggerGenerate`'s commit point, `ApplyRestoredPlan`,
+`RollBackFailedPlanRender`), so "arriving at a different plan" is one
+pairing rather than three independent ones.
 
-Not reset elsewhere, on purpose: `ApplyRestoredPlan` cannot run after a
-Generate in the same session (`_generateCompletedThisSession` guards it),
-so a reset there would be a no-op; `RollBackFailedPlanRender` leaves no
-plan and therefore no sortable table rendered at all, and the next
-Generate resets it anyway.
+Only the first of those three can carry a stale sort today:
+`ApplyRestoredPlan` cannot run after a Generate in the same session
+(`Module`'s `_generateCompletedThisSession` guards it) and
+`RollBackFailedPlanRender` leaves no plan and therefore no sortable table
+rendered at all. Both calls are no-ops as the code stands. They are there
+because the alternative is a local invariant resting on a guard in
+another file: relax or reorder that guard, or add a second restore path
+(plan history is on the roadmap), and a restored plan would inherit the
+previous plan's sort column and header indicator - precisely the
+behaviour this commit removes.
 
 `TableSortState`'s class doc claimed the superseded lifetime and is
 corrected. The struck-through claim in the sortable-tables section above
@@ -12470,8 +12506,9 @@ Things a reviewer should look at hardest, stated rather than buried:
 3. **`ModalDialog.WindowHeight` 170 -> 190 is the one growth not forced
    by a clipping calculation** - three lines still fit at 170. It buys
    back the line ~11% wider text can now need.
-4. **The 1472 minimum's +/-2px chrome term and the 3px cost-column
-   convention gap** are described above rather than papered over.
+4. **The 1472 minimum's +/-2px chrome term** is the figure's one soft
+   spot, described above rather than papered over. Everything else in the
+   chain is measured in the convention the renderer itself measures in.
 5. **The spinner wiring has no automated coverage.** `Module` and
    `MainView` are Blish-bound; the two-flag OR and the `Update()` drain
    are argued from source and pinned only by desktop gate item 4.

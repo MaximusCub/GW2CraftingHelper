@@ -316,9 +316,11 @@ namespace GW2CraftingHelper.Tests.Services
         //
         // Re-measured at Menomonia 16 for the +2pt body bump, against the
         // same installed XNBs and in the same convention the Font14 figures
-        // (65 / 174) were taken in: the name run measures 192 directly, and
-        // the quantity prefix scales by that string's own measured Font16 /
-        // Font14 ratio (77 / 68 = 1.132), 65 * 1.132 = 73.6 -> 73.
+        // (65 / 174) were taken in - MonoGame.Extended's own
+        // advance / XOffset+Width rule, which is what
+        // TreeSectionController's nameFont.MeasureString computes. Both
+        // figures are direct measurements: "4194304x " is 73 and
+        // "Thermocatalytic Reagent" is 192.
         private const int DeepestRowQtyPrefixWidth = 73;
         private const int DeepestRowNameWidth = 192;
 
@@ -343,7 +345,10 @@ namespace GW2CraftingHelper.Tests.Services
         // the column scale with the font (a six-digit gold plus two
         // two-digit units, 90px at the measured Font14 digit advance of 9,
         // 100px at Font16's 10), while the 75px of coin-icon and gap chrome
-        // around them is fixed pixels.
+        // around them is fixed pixels. Digit ADVANCES, which run ~4px over
+        // what MeasureString's inked rect gives for the same run (161 at
+        // Font14, 171 at Font16) - conservative in the safe direction, as a
+        // wider cost column leaves the name column less room, not more.
         private const int DeepestPlanCostColumnWidth = 175;
 
         // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
