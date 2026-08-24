@@ -12968,52 +12968,68 @@ same reason.
 
 ### Fix, second pass (adversarial review)
 
-Review found the first pass had left the same dead-keyboard state
-reachable through the new code, by two paths that meet:
+Review hardened the first pass in two places. Neither is a reproduced
+field failure; both are stated as what the code now guarantees.
 
 - `FocusRelease.Release()` called `UnsetFocus()` and returned without
   checking its own post-condition. `UnsetFocus()` is not atomic: it is
   `Focused = false;` - which raises `InputFocusChanged` synchronously,
   through `OnInputFocusChanged`, before the slot is touched - and only
   then `FocusedControl = null;`. The module ships exactly one handler on
-  that event, `SuggestionPanel.OnFocusChanged`, and it re-focuses. So a
-  re-focus landing inside a `FocusRelease` call ended it with
+  that event, `SuggestionPanel.OnFocusChanged`, and it re-focuses. A
+  re-focus landing inside a `FocusRelease` call would end it with
   `Focused == true`, `FocusedControl == null` and
   `UpdateFocusState(true)` having re-armed `SetTextInputListner` - the
   exact swallowed-keyboard state, now with no slot for
-  `KeyboardHandler`'s heal sweep to name. Through `ReleaseOnDispose()`
-  the same re-focus re-subscribed a control mid-teardown into Blish's
-  static input handler, leaving `_textInputDelegate` pointing at a
-  disposed box for the rest of the session. `Release()` now verifies:
-  after `UnsetFocus()`, while the box still reports focus, it forces
-  `Focused = false` (bounded to 3 attempts - a handler that re-focuses on
-  every notification cannot be out-waited and a spin is worse than a
-  stale slot), then nulls the slot only if the box is genuinely
-  unfocused and the slot still names it. The invariant it holds: the slot
-  names the box that holds focus, or nothing.
+  `KeyboardHandler`'s heal sweep to name; through `ReleaseOnDispose()` it
+  would re-subscribe a control mid-teardown into Blish's static input
+  handler, leaving `_textInputDelegate` pointing at a disposed box for
+  the rest of the session. That handler re-focuses only while
+  `_pressOverPanel` is set, which the next bullet shows cannot be true
+  outside the press dispatch that set it, so this is a hazard closed
+  rather than a bug observed. `Release()` walks boxes shared with
+  whatever handlers the module adds later and must not depend on that
+  analysis holding, so it now verifies: after `UnsetFocus()`, while the
+  box still reports focus, it forces `Focused = false` (bounded to 3
+  attempts - a handler that re-focuses on every notification cannot be
+  out-waited and a spin is worse than a stale slot), then nulls the slot
+  only if the box is genuinely unfocused and the slot still names it.
+  The invariant it holds: the slot names the box that holds focus, or
+  nothing.
 - `SuggestionPanel._pressOverPanel`, the press-landed-on-the-panel
-  discriminator, had nothing bounding its lifetime. It was set on the
-  global `LeftMouseButtonPressed` and cleared only on the global
-  `LeftMouseButtonReleased` or when consumed - and Blish is free to drop
-  the release: `MouseHandler.HandleInput` returns without stashing the
-  event when a foreground `Form`'s client rectangle contains the point,
-  while `CameraDragging`, and while the cursor is hidden, and
+  discriminator, is now cleared in `ShowPanel()`, `HidePanel()` and
+  `Dispose()` as well as on the global `LeftMouseButtonReleased` and
+  where `OnFocusChanged` consumes it. This is hardening, not a repair.
+  Re-checked against the decompile, the flag cannot outlive the press
+  dispatch that sets it: `Control.Input` is `GameService.Input`, so this
+  panel's constructor hook and `TextInputBase`'s own
+  `OnGlobalMouseLeftMouseButtonPressed` are two handlers on one event,
+  this panel's first. The flag only goes true while the panel is visible;
+  the panel is only visible while the box is focused (`ShowPanel()` is
+  reachable only under a `_textBox.Focused` guard, and `HidePanel()` runs
+  on every unfocus); and a focused box always has `TextInputBase`'s
+  handler attached, because `UpdateFocusState(true)` adds it. That
+  handler therefore runs later in the same dispatch, sets
+  `Focused = _mouseOver && _enabled` - false for a press that landed on
+  the panel rather than the box - and `OnFocusChanged` consumes the flag
+  synchronously. A dropped `LeftMouseButtonReleased`, which Blish is free
+  to do (`MouseHandler.HandleInput` returns without stashing the event
+  when a foreground `Form`'s client rectangle contains the point, while
+  `CameraDragging`, and while the cursor is hidden, and
   `MouseHandler.Update` skips dispatch entirely when GW2 does not have
-  focus. Press and hold over a suggestion row, Alt-Tab out, release
-  outside the client, and the flag latched true for the session; the next
-  Escape on that box re-focused it out of the hard release and
-  reproduced the original field bug. It is now cleared in `ShowPanel()`,
-  `HidePanel()` and `Dispose()`. `HidePanel()` runs on every unfocus, so
-  the flag cannot outlive one focus cycle, and correctness no longer
-  depends on an event Blish may drop.
+  focus), therefore cannot latch it. The clears cost nothing and state
+  the lifetime bound at each site, so it survives any of those
+  preconditions moving.
 
 No test was added. Every step of this is Blish-bound: which release API
 is called, the order Blish raises two of its own events in, and a walk
 over `Container.Children`. The testable-looking residue is a three-bool
 predicate that would only mirror the implementation, which this repo does
-not accept. It stands on the desktop gate. The two review findings are
-latched-state paths rather than scripted ones, so gate step 6 below has
-to latch the state deliberately.
+not accept. It stands on the desktop gate. Neither second-pass change has
+a scripted repro - the dead keyboard the user reported is exercised by
+step 1, and step 6 is a regression check on the discriminator itself,
+which is the only part of this pass with behaviour a gate operator can
+observe.
 
 `Views/Rendering/TreeSectionController.cs`, the tooltip composers and
 `RichTooltipSurface` were not touched.
@@ -13044,16 +13060,23 @@ to latch the state deliberately.
 5. **Window close by other means.** With a text box focused, close the
    window with its X and with the corner icon toggle. Keyboard reaches
    the game in both cases.
-6. **The latched press flag.** Type into the Crafting Plan search box
-   until the suggestion list drops. Press and HOLD the left mouse button
-   over a suggestion row, and while still holding it Alt-Tab out of GW2
-   and release the button outside the game client. Return to GW2, click
-   back into that search box, type, and press Escape once. The caret must
-   leave the box and typing must reach the game with no click first.
-   Before this pass the stale flag re-focused the box here and the
-   keyboard stayed dead. Then repeat the same latch and, instead of
-   Escape, click straight onto another tab: the outgoing box is disposed
-   mid-re-focus on that path, so confirm keyboard again reaches the game
-   immediately.
+6. **The suggestion-panel discriminator survives an interrupted press.**
+   Type into the Crafting Plan search box until the suggestion list
+   drops. Press and HOLD the left mouse button over a suggestion row, and
+   while still holding it Alt-Tab out of GW2 and release the button
+   outside the game client - this is the case where Blish never delivers
+   the release. Return to GW2 with the box still focused and check both
+   halves of the discriminator from that state, without clicking
+   anywhere else first: clicking a suggestion row still selects it (name
+   in the box, list dismissed), and a single Escape still hard-releases
+   (caret gone, typing reaches the game with no click needed). Then
+   repeat the interrupted press and, instead of Escape, click straight
+   onto another tab: keyboard must again reach the game immediately.
+   Note for the operator: this is a regression check, not a repro. The
+   flag is consumed inside the press that sets it, so a dropped release
+   is not expected to change any behaviour here - and note that clicking
+   anywhere off the suggestion panel, the search box included, reassigns
+   the flag and ends the interrupted-press state, which is why the steps
+   above go straight from the Alt-Tab to the check.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
