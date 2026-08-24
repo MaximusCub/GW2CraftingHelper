@@ -101,17 +101,19 @@ namespace GW2CraftingHelper.Services
         /// value line at all: its body bands run at a 18px pitch - 39, 57,
         /// 75 (blank), 93 ("Food"), 111 ("Required Level: 10"), 129 (the
         /// coin row) - so the value follows the line above it contiguously,
-        /// with row 128 carrying no glyph at all. FWDekker agrees for
-        /// twelve of its thirteen builders; only <c>Generic</c> (its
-        /// fallback, which is what a crafting material, a trait or a key
-        /// gets) and an <c>UpgradeComponent</c> of type Gem emit a
-        /// <c>&lt;br /&gt;</c> in front of <c>getValue()</c>.
+        /// with row 128 carrying no glyph at all. Of FWDekker's fourteen
+        /// builders only ELEVEN emit a value at all, and nine of those
+        /// eleven emit it with no leading <c>&lt;br /&gt;</c>. The two that
+        /// do not are <c>Generic</c> (its fallback, which is what a
+        /// crafting material, a trait or a key gets) and an
+        /// <c>UpgradeComponent</c> of type Gem.
         /// </para>
         /// <para>
         /// The table is inverted deliberately: a type this module has never
         /// seen falls to the Generic shape, exactly as it does in the
-        /// replica. The Generic blank itself is INFERRED - no capture of a
-        /// crafting material's value line exists.
+        /// replica's own <c>hasOwnProperty</c> fallback. The Generic blank
+        /// itself is INFERRED - no capture of a crafting material's value
+        /// line exists.
         /// </para>
         /// </summary>
         private static bool ValueSitsAfterABlank(ItemStatBlock stats)
@@ -123,19 +125,36 @@ namespace GW2CraftingHelper.Services
 
             switch (stats.ItemType)
             {
+                // The nine builders that emit getValue() contiguously.
                 case "Armor":
                 case "Back":
                 case "Bag":
                 case "Consumable":
                 case "Container":
-                case "Gathering":
                 case "Gizmo":
-                case "MiniPet":
-                case "Tool":
                 case "Trinket":
                 case "Trophy":
                 case "Weapon":
                     return false;
+
+                // GUESS, and the only one in this table. The replica emits
+                // NO value line for these three - Gathering ends on
+                // getLevel() + getFlags(), MiniPet on "Miniature" +
+                // getFlags(), Tool on getDescription() + getFlags() - so it
+                // cannot agree either way, and no capture of one exists.
+                // This module does show their value (a mining pick and a
+                // salvage kit both sell), so a shape has to be picked.
+                // Picked contiguous by nearest body shape: Gathering's
+                // description/level/flags body matches Gizmo's and
+                // Trophy's, Tool's rarity/type/description/flags body
+                // matches Container's and Consumable's, and MiniPet's
+                // description/type/flags body matches Trophy's - all
+                // contiguous. Desktop gate step 6 settles it.
+                case "Gathering":
+                case "MiniPet":
+                case "Tool":
+                    return false;
+
                 default:
                     return true;
             }

@@ -94,7 +94,9 @@ namespace GW2CraftingHelper.Tests.Services
             // 111 ("Required Level: 10"), 129 (the coin row) - one 18px
             // pitch from the level line to the value, row 128 empty.
             // FWDekker's Consumable builder emits getValue() with no
-            // leading break, as eleven of its other twelve builders do.
+            // leading break, as eight of the ten other builders that emit
+            // a value at all do (fourteen builders, eleven getValue()
+            // call sites, two of them behind a break).
             var lines = await LinesFor(RealItemJson.CilantroSteak);
 
             Assert.Equal("Account Bound on Use", lines[lines.Length - 2]);
@@ -116,6 +118,30 @@ namespace GW2CraftingHelper.Tests.Services
             }).ToPlainLines();
 
             Assert.Equal("", lines[lines.Count - 2]);
+            Assert.Equal("7c", lines[lines.Count - 1]);
+        }
+
+        [Theory]
+        [InlineData("Gathering")]
+        [InlineData("MiniPet")]
+        [InlineData("Tool")]
+        public void ATypeTheReplicaGivesNoValueLineIsGuessedContiguous(string itemType)
+        {
+            // Pins a GUESS, not a measurement. FWDekker's Gathering,
+            // MiniPet and Tool builders emit no getValue() at all, so
+            // neither shape can claim its agreement and no capture of one
+            // exists. Contiguous is chosen by nearest body shape; see
+            // ValueSitsAfterABlank. Flip this test, not just the table, if
+            // the desktop gate measures a blank.
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Copper Mining Pick",
+                ItemType = itemType,
+                Description = "Used to gather from copper ore.",
+                VendorValue = 7
+            }).ToPlainLines();
+
+            Assert.NotEqual("", lines[lines.Count - 2]);
             Assert.Equal("7c", lines[lines.Count - 1]);
         }
 
