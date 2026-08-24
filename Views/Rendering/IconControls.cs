@@ -1,5 +1,6 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
+using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
@@ -131,6 +132,43 @@ namespace GW2CraftingHelper.Views.Rendering
                 TooltipFacility.ApplyPlain(placeholderMark, resolvedTooltip);
             }
             return icon;
+        }
+
+        /// <summary>
+        /// Stamps rich content on a framed icon AND everything nested
+        /// inside it. Blish resolves a tooltip on the deepest control under
+        /// the cursor and never bubbles to the parent, so stamping the
+        /// frame alone leaves the hover swallowed by the icon square that
+        /// covers all but its border - and the square swallowed in turn by
+        /// its missing-icon placeholder mark. Same swallowed-hover class
+        /// <see cref="CreateItemIcon"/> already handles for its own plain
+        /// tooltip and TreeSectionController.UpdateTreeRowTooltip for a
+        /// row's Labels.
+        /// <para>
+        /// Empty content is a no-op rather than a clear. The icon may
+        /// already carry a plain tooltip this method did not set - the
+        /// missing-icon note, or a currency name - and clearing would
+        /// destroy information instead of replacing it. Real content still
+        /// overwrites: an item's own stat block says strictly more than
+        /// either.
+        /// </para>
+        /// </summary>
+        internal static void ApplyRichToIconTree(Control control, TooltipContent content)
+        {
+            if (control == null || content == null || content.IsEmpty)
+            {
+                return;
+            }
+
+            TooltipFacility.ApplyRich(control, content);
+
+            if (control is Container container)
+            {
+                foreach (var child in container.Children)
+                {
+                    ApplyRichToIconTree(child, content);
+                }
+            }
         }
     }
 }

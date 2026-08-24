@@ -223,12 +223,43 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = placed.Span.Text,
                     Font = font,
-                    TextColor = Color.White,
+                    TextColor = ResolveColor(placed.Span),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(placed.X, y),
                     Parent = _contentPanel
                 });
+            }
+        }
+
+        /// <summary>
+        /// The one place a tooltip span's semantic role becomes a colour.
+        /// The roles live in Blish-free <c>Services/TooltipContent.cs</c>
+        /// precisely so no composer has to reference XNA to say "this line
+        /// is an item name".
+        /// </summary>
+        private static Color ResolveColor(TooltipSpan span)
+        {
+            switch (span.Role)
+            {
+                // Same palette the plan's own item-name labels use, so a
+                // name reads identically on the row and in its tooltip.
+                case TooltipSpanRole.Rarity:
+                    return RarityColors.GetRarityNameColor(span.RarityKey);
+
+                // The game's own green for granted bonuses (rune lines,
+                // sigil/infusion buffs, food nourishment).
+                case TooltipSpanRole.Bonus:
+                    return new Color(140, 200, 140);
+
+                // Secondary block (rarity/type/level/binding/flavour) -
+                // matches the qty and footnote grey used elsewhere in the
+                // plan rather than introducing a third neutral.
+                case TooltipSpanRole.Muted:
+                    return new Color(170, 170, 170);
+
+                default:
+                    return Color.White;
             }
         }
 

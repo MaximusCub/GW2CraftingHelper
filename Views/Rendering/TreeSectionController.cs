@@ -88,6 +88,14 @@ namespace GW2CraftingHelper.Views.Rendering
         // whatever surface hosts their buttons - see TreeToolbarCommands.
         private readonly Action<TreeToolbarCommands> _setTreeToolbar;
 
+        // This session's item stat block for an item id, or null. Null is
+        // routine, not exceptional: a synthesized cost-component leaf is
+        // not a real item at all, and a plan restored from disk has no
+        // stats until something re-fetches (docs/KNOWN-ISSUES.md, "Item
+        // stat tooltips"). Either way the row falls back to the tooltip it
+        // had before this feature existed.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
         private static readonly Logger Logger = Logger.GetLogger<TreeSectionController>();
 
         internal TreeSectionController(
@@ -102,7 +110,8 @@ namespace GW2CraftingHelper.Views.Rendering
             Action<PlanViewModel> setCurrentPlan,
             Action<IReadOnlyList<string>> setLastDebugLog,
             Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader,
-            Action<TreeToolbarCommands> setTreeToolbar)
+            Action<TreeToolbarCommands> setTreeToolbar,
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             // resolveOverridesSync is deliberately NOT null-guarded - the
             // sole production call site (CraftingPlanView's own
@@ -123,6 +132,11 @@ namespace GW2CraftingHelper.Views.Rendering
             _setLastDebugLog = setLastDebugLog ?? throw new ArgumentNullException(nameof(setLastDebugLog));
             _createSectionHeader = createSectionHeader ?? throw new ArgumentNullException(nameof(createSectionHeader));
             _setTreeToolbar = setTreeToolbar ?? throw new ArgumentNullException(nameof(setTreeToolbar));
+
+            // Optional and NOT null-guarded, matching resolveOverridesSync
+            // above: null simply means "no stat tooltips this session",
+            // which every reader below already treats as the fallback.
+            _getItemStatBlock = getItemStatBlock;
         }
 
         // Per-node user decision overrides (keyed by solver NodeId) and
@@ -786,10 +800,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = indent + TreeCaretColWidth;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
-            IconControls.CreateRarityFramedIcon(rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            var iconFrame = IconControls.CreateRarityFramedIcon(
+                rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+            Panel iconScrim = null;
             if (dimmed)
             {
-                new Panel()
+                iconScrim = new Panel()
                 {
                     Size = new Point(TreeIconSize, TreeIconSize),
                     Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
@@ -893,6 +909,11 @@ namespace GW2CraftingHelper.Views.Rendering
             var currentPlan = _getCurrentPlan();
             var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(node, captionText, currentPlan);
 
+            // Width-invariant like extraTooltipContent, so it is composed
+            // once per row per render and reused verbatim by the settle
+            // re-ellipsis closure rather than recomposed there.
+            var statTooltipContent = TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
+
             // This module's only external-URL launch - a context action
             // (right-click), not a visible icon. Every tree
             // row gets this, item leaf or internal node alike - a wiki page
@@ -952,7 +973,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 };
             }
 
-            UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, displayName, fullName, extraTooltipContent);
+            UpdateTreeRowTooltip(
+                rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
+                displayName, fullName, statTooltipContent, extraTooltipContent);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1142,7 +1165,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    UpdateTreeRowTooltip(rowPanel, nameLabel, qtyLabel, newDisplayName, fullName, extraTooltipContent);
+                    UpdateTreeRowTooltip(
+                        rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
+                        newDisplayName, fullName, statTooltipContent, extraTooltipContent);
                 }
             });
         }
@@ -1160,10 +1185,26 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static void UpdateTreeRowTooltip(
             Panel rowPanel, Label nameLabel, Label qtyLabel,
-            string displayName, string fullName, TooltipContent extraContent)
+            Panel iconFrame, Panel iconScrim,
+            string displayName, string fullName,
+            TooltipContent statContent, TooltipContent extraContent)
         {
             var builder = new TooltipContentBuilder();
-            if (displayName != fullName)
+            bool hasStats = statContent != null && !statContent.IsEmpty;
+            if (hasStats)
+            {
+                // The stat block already OPENS with the full item name, in
+                // its rarity colour, so the truncation line below would be
+                // a duplicate. Its own blank-line rhythm is why the plan
+                // lines that follow get a separator they did not have when
+                // they were the whole tooltip.
+                builder.Append(statContent);
+                if (extraContent != null && !extraContent.IsEmpty)
+                {
+                    builder.Separator();
+                }
+            }
+            else if (displayName != fullName)
             {
                 // The full item name, the one line of this tooltip that was
                 // never routed through any wrap - an item name is
@@ -1197,6 +1238,14 @@ namespace GW2CraftingHelper.Views.Rendering
             TooltipFacility.ApplyRich(rowPanel, content);
             TooltipFacility.ApplyRich(nameLabel, content);
             TooltipFacility.ApplyRich(qtyLabel, content);
+
+            // The icon column is the same swallowed-hover case, one level
+            // deeper: the framed icon is a Panel inside a Panel, and a
+            // dimmed row lays a scrim Panel over the top of both. Left
+            // unstamped, the largest and most obvious target on the row -
+            // the item picture - was the one spot that showed nothing.
+            IconControls.ApplyRichToIconTree(iconFrame, content);
+            IconControls.ApplyRichToIconTree(iconScrim, content);
         }
 
         // --- Decision pills ---
