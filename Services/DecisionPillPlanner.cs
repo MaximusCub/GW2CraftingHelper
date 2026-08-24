@@ -146,8 +146,9 @@ namespace GW2CraftingHelper.Services
                 // gets the extra toggle pill, so it can be un-ignored.
                 // Offered on a plan root too, unlike the "IGNORE" half
                 // (AppendOwnershipPills): ignores are keyed by item id and
-                // outlive the plan they were set in, so a root can arrive
-                // already ignored and this pill is the only way back.
+                // apply tree-wide, so in a multi-item batch ignoring an
+                // ingredient occurrence also flips a sibling root of that
+                // same item to ignored - this pill is the only way back.
                 if (node.IsIgnored)
                 {
                     specs.Add(new PillSpec("IGNORED", null, PillKind.Ignore));

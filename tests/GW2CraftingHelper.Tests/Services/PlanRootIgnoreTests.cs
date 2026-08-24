@@ -100,11 +100,11 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Root_AlreadyIgnored_KeepsIgnoredToggleSoTheStateIsRecoverable()
         {
-            // Ignores are keyed by item id and outlive the plan they were
-            // set in (they are restored from PersistedPlan.IgnoredItemIds),
-            // so an item ignored as an ingredient can later be planned as
-            // the target. Suppressing the un-ignore half here would leave
-            // that plan permanently zeroed with no way back.
+            // Ignores are keyed by item id and apply tree-wide within one
+            // solve, so a multi-item batch can reach a root that is itself
+            // ignored (see MultiItemBatch_IgnoringAnIngredient_...).
+            // Suppressing the un-ignore half here would leave that root
+            // permanently zeroed with no way back.
             var root = Node(CraftingDecision.Have, isPlanRoot: true, isIgnored: true);
 
             var specs = DecisionPillPlanner.BuildPillSpecs(root);
@@ -175,6 +175,44 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        [Fact]
+        public async Task MultiItemBatch_IgnoringAnIngredientAlsoIgnoresTheSiblingRootOfThatItem()
+        {
+            // The reachable route to an ignored ROOT, and the whole reason
+            // the "IGNORED" un-ignore pill is exempt from the suppression:
+            // ignores are keyed by item id and apply tree-wide, so ignoring
+            // item 3 where it appears as an ingredient of root 1 also
+            // flips requested root 3. Root 3 offers no "IGNORE" pill, so
+            // the un-ignore toggle is the ONLY way back.
+            var pipeline = BuildNestedBatchPipeline(out var priceApi);
+            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            priceApi.AddPrice(3, buyUnitPrice: 100, sellUnitPrice: 200);
+
+            var items = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 3, Quantity = 1 }
+            };
+
+            var initial = await pipeline.GenerateStructuredAsync(
+                items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+            var siblingRootBefore = initial.MultiItemRoots.Single(r => r.ItemId == 3);
+            Assert.False(siblingRootBefore.IsIgnored);
+
+            var resolved = pipeline.ResolveWithOverrides(
+                initial.SolveContext, null, new HashSet<int> { 3 });
+
+            var siblingRoot = resolved.MultiItemRoots.Single(r => r.ItemId == 3);
+            Assert.True(siblingRoot.IsPlanRoot);
+            Assert.True(siblingRoot.IsIgnored);
+
+            var specs = DecisionPillPlanner.BuildPillSpecs(siblingRoot);
+            var toggle = specs.Single(s => s.Kind == PillKind.Ignore);
+            Assert.Equal("IGNORED", toggle.Text);
+            Assert.True(DecisionPillPlanner.IsInteractive(toggle));
+        }
+
         // --- The state root suppression leaves reachable ---
 
         [Fact]
@@ -215,6 +253,59 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
             Assert.All(costTiles, t => Assert.False(string.IsNullOrEmpty(t.TooltipText)));
             Assert.Contains(summary.Rows, r => r.RowType == PlanRowType.SummaryFootnote);
+        }
+
+        /// <summary>
+        /// Batch shape where one requested root (item 3) is also an
+        /// ingredient of the other requested root (item 1): 1 &lt;- 2x 3,
+        /// 3 &lt;- 2x 2.
+        /// </summary>
+        private static CraftingPlanPipeline BuildNestedBatchPipeline(
+            out InMemoryPriceApiClient priceApi)
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+            recipeApi.AddSearchResult(3, 20);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 20,
+                OutputItemId = 3,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 2 }
+                },
+                Disciplines = new List<string> { "Weaponsmith" },
+                MinRating = 400,
+                Flags = new List<string> { "AutoLearned" }
+            });
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target", "t.png");
+            itemApi.AddItem(2, "Base", "b.png");
+            itemApi.AddItem(3, "Shared Intermediate", "s.png");
+
+            priceApi = new InMemoryPriceApiClient();
+
+            return new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                reducer: new InventoryReducer());
         }
 
         private static CraftingPlanPipeline BuildPipeline(
