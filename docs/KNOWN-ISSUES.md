@@ -12316,7 +12316,7 @@ Real strings measure **1.10-1.11x** wider at 16 than at 14 (730 -> 810,
 | `SettingsCurrencyGridLayout.CellNameWidth` | 170 | **190** | 170 x 1.11, so the same currency names still fit before ellipsis |
 | `SettingsCurrencyGridLayout.CellTagWidth` | 100 | **110** | "default 3600" measures 98px at Font16; keeps the ~11% slack the 100px slot gave its 89px at Font14 |
 | `SettingsCurrencyGridLayout.CellClearWidth` | 74 | **74** | unchanged - it sizes a `Checkbox` label Blish keeps at Font14 |
-| `SettingsCurrencyGridLayout.MinColumnWidth` | 424 | **454** | derived from the three above. Two columns need a 908px panel (a 1034px window), clearing the 1478 minimum by ~432px |
+| `SettingsCurrencyGridLayout.MinColumnWidth` | 424 | **454** | derived from the three above. Two columns need a 908px panel (a 1034px window), clearing the 1478 minimum by ~444px |
 | `PlanContentHeightMath.CTableHeaderRowHeight` | 26 | **28** | header label at `LabelY` 5, lowest Font16 ink y=26 - exactly the old band |
 | `PlanContentHeightMath.DisciplineRowHeight` | 32 | **36** | two labels at y=7/y=9, ink y=28, divider top was y=29. 36 is what every other single-line table row uses and is on `CreateRowDivider`'s proven-immune list |
 | `PlanContentHeightMath.RecipeRowHeightWithSublabel` | 44 | **48** | name line box 18 -> 20 pushed the sublabel y=22 -> 24, and the sublabel's own font grew: ink y=43 against a divider at y=41 |
@@ -12397,8 +12397,12 @@ approximations.
 `DeepestPlanCostColumnWidth` 165 -> **181** is the constant that moved
 the window minimum past the research's own +2pt prediction, and it is
 worth stating why. Menomonia's digits are **not one width**: at Font16
-`9` advances 9px and inks 11, while `0`, `2` and `7` advance 10 and ink
-12. The cost column is the three digit runs' measured widths plus 78px of
+`0` advances 10px and inks 12, `2` and `7` advance 10 and ink 11, `1`
+advances 6, and every other digit advances 9 and inks 11. A run's
+measured rect is the leading digits' advances plus the last digit's ink,
+so the widest run is drawn from `0`/`2`/`7` and ends in `0` - all-twos
+is 3px short of it, all-nines 10px short.
+The cost column is the three digit runs' measured widths plus 78px of
 fixed chrome (`TreeCostColumnMath.SegmentWidth` = text +
 `CoinLabelIconGap` 2 + `CoinIconSize` 20, three segments, two
 `CoinSegmentGap` 6 between them), so a six-digit gold total plus two
@@ -12406,15 +12410,17 @@ two-digit units measures:
 
 | gold digits | Font14 | Font16 |
 |---|---|---|
-| all nines (narrowest wide digit) | 161 | 171 |
-| all 0 / 2 / 7 (widest) | 171 | **181** |
+| all nines (or 3/4/5/6/8 - one advance class) | 161 | 171 |
+| all twos (or sevens) | 168 | 178 |
+| widest run: `0`/`2`/`7` ending in `0` | 171 | **181** |
 | the research's live example, ~174,000 gold | 166 | 176 |
 
 The constant is now the **worst case**, 181, and the minimum is derived
-from it - 1472 -> **1478**. A figure taken at any one example total
-would be light by up to 6px for a plan whose gold happens to be
-`0`/`2`/`7`-heavy, which is exactly the kind of digit-choice artifact
-this section already withdrew once; at 1472 such a plan would have spent
+from it - 1472 -> **1478**. A figure taken at any one example total is
+light for a plan whose gold happens to run wider: the withdrawn 175 (an
+all-nines figure) by 6px, the live example's 176 by 5px. That is exactly
+the kind of digit-choice artifact this section already withdrew once; at
+1472 such a plan would have spent
 the depth-24 vendor leaf's headroom and cut the depth-23 gutter to 18px.
 There is no residual term here to trade against the +/-2px chrome
 uncertainty: the constant covers every total the module can price.

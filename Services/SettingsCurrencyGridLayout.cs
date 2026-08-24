@@ -28,14 +28,14 @@ namespace GW2CraftingHelper.Services
         /// the checkbox on 70; the label rename needed four more pixels and
         /// they came from here rather than from the cell's total extent.
         /// <para>
-        /// Two columns need a 920px panel (2 * MinColumnWidth), i.e. a
-        /// 1046px window once the 126px of window-to-panel chrome is
+        /// Two columns need a 908px panel (2 * MinColumnWidth), i.e. a
+        /// 1034px window once the 126px of window-to-panel chrome is
         /// counted. At the old 930px minimum that made the cell extent
         /// load-bearing - and in fact the grid was already falling back to
         /// one column there, the "864px settings panel" this comment used
         /// to cite having been derived without the ViewAdapter's own
         /// padding. The 1478px minimum clears the two-column threshold by
-        /// ~432px even after the font bump widened all three text-derived
+        /// ~444px even after the font bump widened all three text-derived
         /// terms, so the cell has room to grow now; it is still derived
         /// rather than estimated (see MinColumnWidth).
         /// </para>

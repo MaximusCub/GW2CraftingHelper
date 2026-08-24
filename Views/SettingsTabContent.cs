@@ -1246,13 +1246,15 @@ namespace GW2CraftingHelper.Views
                 // it (audit batch J, M12). "Ignore" names the state.
                 //
                 // Not the longer "Ignore default": the cell reserves
-                // SettingsCurrencyGridLayout.CellClearWidth (70px) for this
-                // control, and widening that pushes MinColumnWidth past half
-                // the 884px content region the 930px window minimum leaves,
-                // dropping the whole grid from two columns to one at
-                // minimum width. "Ignore" fits the existing budget; the tag
-                // slot immediately right of it ("default 3600" / "ignored")
-                // and the tooltip carry the rest of the meaning.
+                // SettingsCurrencyGridLayout.CellClearWidth (74px) for this
+                // control, and widening that widens MinColumnWidth with it.
+                // That was load-bearing at the old 930px window minimum,
+                // whose panel could not hold two columns at all; the 1478px
+                // minimum clears the two-column threshold by ~444px, so the
+                // budget now has slack (see CellInputToClearGap). The name
+                // stays short anyway - the tag slot immediately right of it
+                // ("default 3600" / "ignored") and the tooltip carry the
+                // rest of the meaning.
                 clearCheckbox = new Checkbox()
                 {
                     Text = "Ignore",

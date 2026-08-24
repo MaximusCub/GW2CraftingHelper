@@ -116,7 +116,7 @@ gold 54+2+20=76, silver 18+2+20=40, copper 40  ->  76+6+40+6+40 = 165   (>150 fl
 **Errata (`font-and-polish`).** Two defects in that one line, left in place because sections 4-7 below carry `165` downstream and rewriting the chain would misrepresent what the report concluded:
 
 1. The printed sum slips - `76+6+40+6+40` is **168**, not 165.
-2. `54`/`18`/`18` are `xAdvance` sums. `BitmapFont.MeasureString`, which is what `TreeCostColumnMath`'s pre-scan actually calls, returns the inked rect, and Menomonia's digits are not one width: six-digit gold plus two two-digit units measures **161 (f14) / 171 (f16)** of all-nines and **171 / 181** of `0`, `2` or `7`. The shipped constant is the worst case, **181**, and `WindowSizing.MinWindowWidth` is **1478** rather than section 7's predicted 1472.
+2. `54`/`18`/`18` are `xAdvance` sums. `BitmapFont.MeasureString`, which is what `TreeCostColumnMath`'s pre-scan actually calls, returns the inked rect, and Menomonia's digits are not one width: at f16 `0` advances 10 and inks 12, `2` and `7` advance 10 and ink 11, `1` advances 6, and the rest advance 9 and ink 11. So six-digit gold plus two two-digit units measures **161 (f14) / 171 (f16)** all-nines, **168 / 178** all-twos, and **171 / 181** at the widest run (digits from `0`/`2`/`7`, ending in `0`). The shipped constant is that worst case, **181**, and `WindowSizing.MinWindowWidth` is **1478** rather than section 7's predicted 1472.
 
 Formula:
 ```

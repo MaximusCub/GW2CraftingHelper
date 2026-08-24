@@ -348,11 +348,14 @@ namespace GW2CraftingHelper.Tests.Services
         // CoinLabelIconGap(2) + CoinIconSize(20) to each of three segments
         // and CoinSegmentGap(6) sits twice between them, so the column is
         // the three digit runs' MeasureString widths + 78 of fixed chrome.
-        // For a six-digit gold plus two two-digit units that is 161
-        // (Font14) / 171 (Font16) of all-nines - '9' is the narrowest wide
-        // digit - and 171 / 181 of 0, 2 or 7, the widest. 181 is the worst
-        // case, so a minimum derived from it holds for every total; an
-        // all-nines figure would not.
+        // At Font16 '0' advances 10px and inks 12, '2' and '7' advance 10
+        // and ink 11, '1' advances 6, and every other digit advances 9 and
+        // inks 11. A run's rect is the leading digits' advances plus the
+        // last digit's ink, so the widest six-digit gold plus two two-digit
+        // units is drawn from 0/2/7 and ends in '0': 171 (Font14) / 181
+        // (Font16), against 161 / 171 for all-nines and 168 / 178 for
+        // all-twos. 181 is the worst case, so a minimum derived from it
+        // holds for every total; a figure taken at one example would not.
         private const int DeepestPlanCostColumnWidth = 181;
 
         // widestNameEnd 0 is the PINNED layout - the fallback a tree with no
