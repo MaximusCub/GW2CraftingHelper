@@ -12905,18 +12905,29 @@ once: `TreeSectionController` wires the click handler FROM the spec list,
 so a suppressed spec is a suppressed handler. Nothing under `Views/` was
 edited.
 
-The un-ignore half of the toggle is deliberately NOT suppressed. Ignores
-are keyed by item id and are restored across sessions
-(`PersistedPlan.IgnoredItemIds`), so an item ignored as an ingredient can
-later be planned as the target and arrive at the root already ignored -
-the "IGNORED" pill in the `Decision == Have` branch is the only way back
-out of that state.
+The un-ignore half of the toggle is deliberately NOT suppressed, but not
+for the reason first written here. Ignores do NOT outlive the plan they
+were set in: `TreeSectionController.ResetForNewPlan` clears
+`_ignoredItemIds` on every Generate, and `GenerateStructuredAsync` takes
+no ignore set at all, so a freshly generated plan's root can never arrive
+already ignored. The genuinely reachable route is a **multi-item batch**:
+ignores are keyed by item id and apply tree-wide within one solve, so
+ignoring an item where it appears as an *ingredient* under one requested
+root also flips a *sibling requested root* of that same item to ignored.
+That root offers no "IGNORE" pill, so the "IGNORED" pill in the
+`Decision == Have` branch is the only way back out
+(`PlanRootIgnoreTests.MultiItemBatch_IgnoringAnIngredient...`).
 
-`PersistedPlan.CurrentSchemaVersion` goes **3 -> 4**. `IsPlanRoot` is
-part of the persisted graph, so a file written before it existed would
-restore every root with the flag false and put the pill straight back;
-the bump makes such a file degrade to the ordinary "no restored plan"
-fresh start (`PlanStoreTests.LoadLatest_RootIgnoreSchemaVersion3File_*`).
+`PersistedPlan.CurrentSchemaVersion` stays at **3**. `IsPlanRoot` is
+`internal`, and Newtonsoft's default contract serializes public
+properties only, so the flag never enters the persisted graph and no bump
+is needed - a bump would have discarded every existing user's saved plan
+(overrides and ignores included) to avoid a pill that self-heals on the
+next re-solve anyway. Restore is the one path that builds a
+`CraftingPlanResult` without `CraftingTreeBuilder`, so
+`PlanStoreHelpers.DeserializePersistedPlan` re-derives the flag on the
+roots it already knows - `CraftingTree`, or every `MultiItemRoots` entry
+(`PlanStoreTests.LoadLatest_*_ReMarks*AsPlanRoot`).
 
 ### 2. A zero-cost plan must still render the whole band
 
@@ -12934,6 +12945,18 @@ show - a plan whose coin cost AND owned-materials term are both zero
 renders the full "Total Materials Value - Your Materials Used = Actual
 Cost to Craft" formula at zero, tooltips and footnote included.
 
+The zero middle term must be a **known** zero, not merely an absent one.
+`MaterialOpportunityCost` is null by contract outside
+`OwnMaterialsMode.Valued` (`SellSideEconomics.ComputeMaterialOpportunityCost`),
+so "Use Own Materials" on with "Value Own Materials" off and an inventory
+covering the whole plan produces coin cost 0, real `UsedMaterials`, and no
+valuation at all. Printing the band there would assert "Your Materials
+Used 0c" directly above a Used Materials section listing the materials
+actually consumed - a number nobody computed. That case keeps the
+collapsed single tile
+(`PlanViewModelBuilderSummaryTests.CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed`);
+Valued mode that genuinely computed 0 still gets the full band.
+
 This is fixed as a class, not for root-ignore alone: item 1 removes root
 ignore as a UI path, but ignoring every child, owning everything, or a
 currency-only plan all still reach a zero coin cost, and every one of
@@ -12943,12 +12966,14 @@ holds 1 or 3 tiles.
 
 Coverage: `PlanRootIgnoreTests` (pill suppression across every
 `BuildPillSpecs` return path, the flag's single write site, a real
-multi-item batch, and the end-to-end "ignore every ingredient" plan
-through `CraftingPlanPipeline.ResolveWithOverrides` into
-`PlanViewModelBuilder`), plus three zero-band cases in
-`PlanViewModelBuilderSummaryTests`. Two pre-existing
-`DecisionPillPlannerTests` end-to-end cases asserted an IGNORE pill on a
-`BuildTree` root and were updated to the new expectation.
+multi-item batch, the reachable ignored-sibling-root case, and the
+end-to-end "ignore every ingredient" plan through
+`CraftingPlanPipeline.ResolveWithOverrides` into `PlanViewModelBuilder`),
+five zero-band cases in `PlanViewModelBuilderSummaryTests` (including the
+unvalued-materials collapse), and two restore cases in `PlanStoreTests`.
+Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
+IGNORE pill on a `BuildTree` root and were updated to the new
+expectation.
 
 ### Desktop gate
 
@@ -12962,8 +12987,13 @@ through `CraftingPlanPipeline.ResolveWithOverrides` into
    box, and the footnote line. It does not collapse to a lone 0c tile.
 3. Un-ignore one of those children: the band returns to its ordinary
    shape and the numbers come back.
-4. Ignore an ingredient in one plan, then Generate a plan for THAT item.
-   Its root row shows HAVE + IGNORED (not IGNORE), and clicking IGNORED
-   restores the real plan.
+4. Generate a **multi-item batch** where one requested item is also an
+   ingredient of another requested item (e.g. request a weapon and one of
+   its components). Ignore that component where it appears as a child row
+   under the other root. Its own top-level row flips to HAVE + IGNORED
+   (not IGNORE), and clicking IGNORED restores it. This is the only
+   reachable ignored-root state - a fresh Generate always clears prior
+   ignores, so ignoring an ingredient and then planning that item alone
+   yields an ordinary un-ignored root.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]
