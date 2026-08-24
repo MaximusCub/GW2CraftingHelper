@@ -204,10 +204,10 @@ namespace GW2CraftingHelper.Services
         /// Size cap (bytes) used by every subsequent file-sink write's
         /// self-trim check - mirrors ModuleSettings.LogMaxSizeBytes.
         /// Exposed as its own settable property (not just a Configure(...)
-        /// parameter) so the Settings tab can push a freshly-saved value
-        /// live, the same way <see cref="DiagnosticsEnabled"/> already does
-        /// for its own setting, without needing to re-supply the
-        /// store/onError callback Configure also takes. Guarded by
+        /// parameter) so a changed setting can be pushed live, the same way
+        /// <see cref="DiagnosticsEnabled"/> already is, without needing to
+        /// re-supply the store/onError callback Configure also takes.
+        /// Guarded by
         /// <see cref="_fileGate"/>, not <see cref="_gate"/> - see the class
         /// doc comment.
         /// </summary>

@@ -304,6 +304,35 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // The guarantee Module's LogMaxSizeBytes SettingChanged handler
+        // depends on: a cap lowered after Configure governs the very next
+        // write, this session, without a reload.
+        [Fact]
+        public void MaxFileSizeBytes_LoweredAfterConfigure_TrimsOnTheNextWrite()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                var log = new ModuleLog();
+                log.Configure(store, maxFileSizeBytes: 999_999_999, onStoreError: null);
+
+                for (int i = 0; i < 20; i++)
+                {
+                    log.Write(ModuleLogLevel.Info, "t", "entry " + i);
+                }
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.Equal(20, store.ReadAll().Count);
+
+                log.MaxFileSizeBytes = 200;
+                log.Write(ModuleLogLevel.Info, "t", "after the cap dropped");
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                var onDisk = store.ReadAll();
+                Assert.True(onDisk.Count < 21, "the lowered cap did not trim: " + onDisk.Count + " entries");
+                Assert.Equal("after the cap dropped", onDisk[onDisk.Count - 1].Message);
+            }
+        }
+
         // --- Store integration: end-to-end guarantees, not "which layer
         // caught the exception" - ModuleLogStore's own public methods
         // already catch internally and never propagate (see its own doc

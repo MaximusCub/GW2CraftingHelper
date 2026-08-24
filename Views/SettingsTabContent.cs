@@ -192,6 +192,11 @@ namespace GW2CraftingHelper.Views
         private TextBox _logRetentionDaysInput;
         private Label _logRetentionDaysErrorLabel;
 
+        // Held only to be disposed - see DisposeClickVolumeSlider.
+        private TrackBar _clickVolumeSlider;
+
+        private Label _clickVolumeReadout;
+
         // Standalone
         // "Snapshot" section, its own new section (not folded into "Plan
         // Defaults", which is about per-plan choices - a different
@@ -221,6 +226,9 @@ namespace GW2CraftingHelper.Views
         public SettingsTabContent(ModuleSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
+            // Lifetime subscription, dropped in Teardown.
+            _settings.ClickSoundVolumePercent.SettingChanged += OnClickVolumeSettingChanged;
         }
 
         /// <summary>
@@ -240,6 +248,59 @@ namespace GW2CraftingHelper.Views
             _buildComplete = false;
         }
 
+        /// <summary>
+        /// Releases what outlives this tab's own control tree. Called from
+        /// Module.Unload; safe to call when the tab was never opened, and
+        /// safe to call twice.
+        /// </summary>
+        public void Teardown()
+        {
+            _settings.ClickSoundVolumePercent.SettingChanged -= OnClickVolumeSettingChanged;
+            DisposeClickVolumeSlider();
+            _clickVolumeReadout = null;
+        }
+
+        /// <summary>
+        /// Keeps the slider and readout current when the setting changes
+        /// elsewhere (Blish's Manage Modules slider - see Module.Initialize).
+        /// Terminates rather than ping-pongs: the write is skipped when the
+        /// slider already rounds to this percent, and an unchanged setting
+        /// is not re-announced.
+        /// </summary>
+        private void OnClickVolumeSettingChanged(object sender, ValueChangedEventArgs<int> e)
+        {
+            int percent = ClickSoundVolume.Clamp(e.NewValue);
+
+            var slider = _clickVolumeSlider;
+            if (slider != null
+                && ClickSoundVolume.TryPercentFromSliderValue(slider.Value, out int shown)
+                && shown != percent)
+            {
+                slider.Value = percent;
+            }
+
+            if (_clickVolumeReadout != null)
+            {
+                _clickVolumeReadout.Text = ClickSoundVolume.FormatPercent(percent);
+            }
+        }
+
+        /// <summary>
+        /// Disposed, not just dropped: TrackBar hooks the static
+        /// Control.Input.Mouse.LeftMouseButtonReleased in its constructor
+        /// and unhooks only in DisposeControl, which no Blish teardown
+        /// reaches (ViewContainer clears its children before the dispose
+        /// walk visits them - measured, 1.3.0). Left alone, each rebuild
+        /// and unload strands a live slider, and this whole object with it,
+        /// on that handler; the tab's other control types take no such
+        /// static hooks.
+        /// </summary>
+        private void DisposeClickVolumeSlider()
+        {
+            _clickVolumeSlider?.Dispose();
+            _clickVolumeSlider = null;
+        }
+
         public void Build(Container container)
         {
             _buildComplete = false;
@@ -257,6 +318,10 @@ namespace GW2CraftingHelper.Views
             _currencyCountLabel = null;
             _currencyHeaderPanel = null;
             _statusLabel = null;
+
+            // The previous cycle's slider; Teardown handles the last one.
+            DisposeClickVolumeSlider();
+            _clickVolumeReadout = null;
 
             // Dropped before the controls it describes are replaced: a
             // baseline left over from the previous Build cycle would be
@@ -296,6 +361,8 @@ namespace GW2CraftingHelper.Views
                 _rootPanel.Size = ContentSizeBelowSaveBar(container);
                 ApplyPanelWidth(container.ContentRegion.Width - RightEdgePadding);
             };
+
+            BuildSoundSection(panelWidth);
 
             BuildHomesteadRefinementSection(panelWidth);
             BuildLoggingSection(panelWidth);
@@ -518,6 +585,106 @@ namespace GW2CraftingHelper.Views
             ApplyCurrencyFilter();
         }
 
+        // Click-volume row layout; the shared HintX/ErrorX columns assume
+        // an 80px TextBox, too narrow for a usable slider.
+        private const int SliderX = NameColumnX + NameColumnWidth;
+        private const int SliderWidth = 200;
+        private const int SliderHeight = 16;
+        private const int ReadoutX = SliderX + SliderWidth + 12;
+        // Fixed width so the Test button does not shift mid-drag.
+        private const int ReadoutWidth = 44;
+        private const int TestButtonX = ReadoutX + ReadoutWidth + 8;
+        private const int TestButtonWidth = 72;
+
+        /// <summary>
+        /// The click-volume row: label, slider, live readout, Test button.
+        /// Immediate-apply, unlike the save-gated sections below (recorded
+        /// in KNOWN-ISSUES) - a volume is tuned by ear - so the row must
+        /// stay out of CaptureFormState, or every drag would count as an
+        /// unsaved change.
+        /// </summary>
+        private void BuildSoundSection(int panelWidth)
+        {
+            AddSectionHeader("Sound", panelWidth);
+            AddInfoLine("Volume of this module's own click, played whenever you press one of its buttons, rows or pills.", panelWidth);
+            AddInfoLine("Applies immediately - no Save needed. Drag to 0 to turn that click off.", panelWidth);
+            AddInfoLine("Checkboxes are the exception: they play Blish HUD's own click, which this does not change.", panelWidth);
+
+            AddClickVolumeRow(panelWidth);
+        }
+
+        private void AddClickVolumeRow(int panelWidth)
+        {
+            var rowPanel = new Panel()
+            {
+                Size = new Point(panelWidth, RowHeight),
+                Parent = _rootPanel
+            };
+            _fullWidthPanels.Add(rowPanel);
+
+            new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "Click volume",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = NameColumnWidth,
+                Location = new Point(NameColumnX, 7),
+                Parent = rowPanel
+            };
+
+            int percent = _settings.GetClampedClickSoundVolumePercent();
+
+            // Assigning MinValue/MaxValue is load-bearing even though they
+            // match TrackBar's defaults: the setters are what fill the
+            // snap table Ctrl+drag aggregates over, and on a TrackBar that
+            // never had either assigned, Ctrl+drag throws (measured, 1.3.0).
+            _clickVolumeSlider = new TrackBar()
+            {
+                MinValue = ClickSoundVolume.MinPercent,
+                MaxValue = ClickSoundVolume.MaxPercent,
+                Value = percent,
+                Size = new Point(SliderWidth, SliderHeight),
+                Location = new Point(SliderX, 7),
+                BasicTooltipText = "How loud this module's click plays. 0 turns it off. Does not change the checkbox click, which is Blish HUD's own.",
+                Parent = rowPanel
+            };
+
+            _clickVolumeReadout = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = ClickSoundVolume.FormatPercent(percent),
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Width = ReadoutWidth,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Location = new Point(ReadoutX, 7),
+                Parent = rowPanel
+            };
+
+            // Subscribed after the initial Value assignment so it does not
+            // fire during Build. The setting is all this writes; readout and
+            // player hang off SettingChanged instead, so both sliders drive
+            // them by one path (see Module.Initialize).
+            _clickVolumeSlider.ValueChanged += (_, e) =>
+            {
+                if (!ClickSoundVolume.TryPercentFromSliderValue(e.Value, out int newPercent)) return;
+
+                _settings.ClickSoundVolumePercent.Value = newPercent;
+            };
+
+            // No Click handler: a FeedbackButton's own press feedback plays
+            // the click at the slider's current value, which IS the audition.
+            new FeedbackButton()
+            {
+                Text = "Test",
+                Size = new Point(TestButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(TestButtonX, 1),
+                BasicTooltipText = "Play the click at the volume set here.",
+                Parent = rowPanel
+            };
+        }
+
         /// <summary>
         /// Three per-material efficiency
         /// tier rows (Fiber/Metal/Wood), each an integer 0/1/2 entered as
@@ -684,10 +851,10 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, 7),
                 Parent = rowPanel
             };
+
             _logDiagnosticsCheckbox.CheckedChanged += (_, e) =>
             {
                 _settings.LogDiagnosticsEnabled.Value = e.Checked;
-                ModuleLog.Shared.DiagnosticsEnabled = e.Checked;
             };
 
             new Label()
@@ -835,19 +1002,6 @@ namespace GW2CraftingHelper.Views
             if (SettingsInputParser.TryParseLogMaxSizeMb(_logMaxSizeInput?.Text, out long maxSizeBytes))
             {
                 _settings.LogMaxSizeBytes.Value = (int)maxSizeBytes;
-
-                // Pushed live immediately (not just persisted) - the
-                // running ModuleLog instance otherwise would not pick up a
-                // smaller/larger cap until the next module reload. Mirrors
-                // DiagnosticsEnabled's own immediate-apply behavior above,
-                // even though this row uses the TextBox+Save idiom rather
-                // than a plain checkbox. Routed through the same clamp as
-                // Module.cs's own Configure call (redundant here in
-                // practice, since TryParseLogMaxSizeMb already rejected
-                // anything outside 1-1000 MB above, but keeps every live
-                // consumer of this setting going through one clamped
-                // accessor rather than two separately-trusted paths).
-                ModuleLog.Shared.MaxFileSizeBytes = _settings.GetClampedLogMaxSizeBytes();
             }
             else if (_logMaxSizeErrorLabel != null)
             {
@@ -865,8 +1019,8 @@ namespace GW2CraftingHelper.Views
                 // Module.Initialize (age-based pruning does not need
                 // per-write cost - d2-log-system.md Section 4.2), so a
                 // saved value here intentionally takes effect next session,
-                // not immediately - no live push needed, unlike the size
-                // cap above.
+                // not immediately - nothing holds a live copy of it to keep
+                // current, unlike the size cap above.
                 _settings.LogRetentionDays.Value = retentionDays;
             }
             else if (_logRetentionDaysErrorLabel != null)

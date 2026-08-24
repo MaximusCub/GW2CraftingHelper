@@ -1,4 +1,3 @@
-using Blish_HUD;
 using Blish_HUD.Controls;
 using System;
 
@@ -42,28 +41,16 @@ namespace GW2CraftingHelper.Views.Rendering
         internal const float PressedOpacityFactor = 0.8f;
 
         /// <summary>
-        /// Blish's own UI click sound, the one its Checkbox, GlowButton and
-        /// CornerIcon play. Measured: <c>ContentService.Load</c> builds its
-        /// audio reader as <c>zipArchiveReader.GetSubPath("audio")</c> and
-        /// <c>PlaySoundEffectByName</c> looks up
-        /// <c>Path.Combine(subPath, name + ".wav")</c>, so the name carries
-        /// no "audio/" prefix of its own. (StandardButton passes
-        /// "audio\\button-click", which resolves to a nonexistent
-        /// audio/audio/button-click.wav and is swallowed by the
-        /// FileExists check - which is why a Blish StandardButton is silent
-        /// on click in 1.3.0. See Views/Rendering/FeedbackButton.)
-        /// </summary>
-        private const string ClickSoundName = "button-click";
-
-        /// <summary>
-        /// Plays the click sound at Blish's own audio volume
-        /// (<c>GameService.GameIntegration.Audio.Volume</c>, applied inside
-        /// PlaySoundEffectByName), and does nothing at all when the game has
-        /// no audio device.
+        /// Plays Blish's own UI click sound at the user's configured volume
+        /// (see <see cref="ClickSound"/> for why not PlaySoundEffectByName).
+        /// Reaches only the controls this module wires: Blish's Checkbox and
+        /// CornerIcon play the click themselves, ahead of the base call a
+        /// subclass would have to skip to silence it, so those stay at
+        /// Blish's volume - KNOWN-ISSUES carries the sweep and deferred fix.
         /// </summary>
         internal static void PlayClick()
         {
-            GameService.Content.PlaySoundEffectByName(ClickSoundName);
+            ClickSound.Play();
         }
 
         /// <summary>

@@ -90,6 +90,7 @@
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\PlanTableSorter.cs" />
     <Compile Include="Services\CoinSegmentMath.cs" />
+    <Compile Include="Services\ClickSoundVolume.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
@@ -181,6 +182,7 @@
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\PressFeedback.cs" />
+    <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\UsedMaterialsSectionRenderer.cs" />
