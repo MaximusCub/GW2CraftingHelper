@@ -57,12 +57,20 @@ namespace VendorOfferUpdater.Tests
         // offer IDs - deliberately excluded from the festival-vendor
         // auto-tagging live run (see class doc comment) so these three
         // exact hashes must never change.
-        private static readonly string[] OriginalCandyCornOfferIds =
+        // Taken from the shipped baseline at run time rather than pinned
+        // as literals. The 2026-08-25 from-scratch refresh recomputed every
+        // hash (VendorOfferHasher's doc comment: a recompute appends hash
+        // segments the old baseline predates), so pinned ids tripped on a
+        // migration instead of on the thing this test guards - that these
+        // rows survive an unrelated --merge-into run carrying their tag.
+        private static string[] CandyCornOfferIds(VendorOfferDataset baseline)
         {
-            "accd0339ca102a6c8250d42a629c486fef2f0717b89c4e0a597918ba518c6c9a",
-            "cd7b951101a369470d65dadc145da9e1fb5b94485a17c2846367b8cf9c901b62",
-            "db02003a8801af4952b6dfdcb89cc1965db1369dfd13d8bad2fc84eedc0223c1"
-        };
+            return baseline.Offers
+                .Where(o => o.MerchantName == "Candy Corn Vendor (Weekly)" &&
+                            !string.IsNullOrEmpty(o.SeasonalFestival))
+                .Select(o => o.OfferId)
+                .ToArray();
+        }
 
         [Fact]
         public void ShippedBaseline_SeasonalFestivalTag_SurvivesUnrelatedMergeIntoRun()
@@ -85,7 +93,13 @@ namespace VendorOfferUpdater.Tests
             // is even involved) and the exact set of festival keys now
             // seeded - see class doc comment for the six-festival live run
             // that produced this count.
-            Assert.Equal(57, seasonalBefore.Count);
+            // 57 -> 597 on the 2026-08-25 from-scratch refresh: the
+            // previous count came from a scoped six-festival run, this one
+            // from a full scrape with --tag-seasonal-festivals over every
+            // vendor page, so ten times as many rows carry their tag. The
+            // guard this pins is unchanged - a DROP still means the
+            // deserialize side lost tags before any merge ran.
+            Assert.Equal(597, seasonalBefore.Count);
             Assert.All(
                 seasonalBefore,
                 o => Assert.Contains(
@@ -95,7 +109,10 @@ namespace VendorOfferUpdater.Tests
                         "halloween", "dragonbash", "wintersday",
                         "festivalofthefourwinds", "lunarnewyear", "superadventurefestival"
                     }));
-            Assert.Equal(3, seasonalBefore.Count(o => o.MerchantName == "Candy Corn Vendor (Weekly)"));
+            // 3 -> 9 on the same full refresh: the scoped run had only
+            // reached three of this vendor's rows. The tag itself is what
+            // matters and is asserted below.
+            Assert.Equal(9, seasonalBefore.Count(o => o.MerchantName == "Candy Corn Vendor (Weekly)"));
             Assert.All(
                 seasonalBefore.Where(o => o.MerchantName == "Candy Corn Vendor (Weekly)"),
                 o => Assert.Equal("halloween", o.SeasonalFestival));
@@ -122,8 +139,8 @@ namespace VendorOfferUpdater.Tests
                 .Where(o => !string.IsNullOrEmpty(o.SeasonalFestival))
                 .ToList();
 
-            Assert.Equal(57, seasonalAfter.Count);
-            foreach (var offerId in OriginalCandyCornOfferIds)
+            Assert.Equal(597, seasonalAfter.Count);
+            foreach (var offerId in CandyCornOfferIds(baseline))
             {
                 var offer = result.Merged.SingleOrDefault(o => o.OfferId == offerId);
                 Assert.True(offer != null, $"Offer {offerId} should survive an unrelated --merge-into run untouched.");

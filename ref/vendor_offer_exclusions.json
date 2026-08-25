@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "comment": "Vendor rows the wiki still describes but the game no longer offers. The SMW scrape cannot tell a live vendor from one whose sale was removed in a patch when the page itself is not marked historical, so each entry here is a hand-verified refusal with its evidence. Applied by tools/VendorOfferUpdater at write time, so a refresh cannot reintroduce the row. Keep this list small: an entry is a claim that the wiki is wrong, and it needs a source.",
+  "exclusions": [
+    {
+      "merchantName": "Battle Master",
+      "outputItemId": 19678,
+      "outputItemName": "Gift of Battle",
+      "reason": "The Battle Master's 500 Badges of Honor sale was removed in the Spring 2016 Quarterly Update; Gift of Battle has since come only from the WvW Gift of Battle Item Reward Track. Shipping this row would price a legendary component from a vendor path that has not existed for a decade, and it contradicts this repo's own hand-verified acquisition hint for item 19678 (ref/acquisition_hints_seed.json, lastVerified 2026-07-20).",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Battle",
+      "verified": "2026-08-25"
+    }
+  ]
+}
