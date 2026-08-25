@@ -1,3 +1,6 @@
+> **Frozen record - committed 2026-08-17, written for the M38 cleanup wave.** M38 cleanup analysis, simplification lens, read-only against master at commit be8ebda.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 # M38 Cleanup Analysis - Simplification Lens (A2)
 
 Analyzed: current `master` (`be8ebda`, post-M37). Read-only; nothing modified.

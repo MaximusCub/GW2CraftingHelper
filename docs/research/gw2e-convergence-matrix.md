@@ -46,8 +46,8 @@ Every claim is labeled:
   `raw.githubusercontent.com/gw2efficiency/...`), the live app templates
   (`gw2efficiency.com/views/...`), or the query APIs
   (`api.gw2efficiency.com/recipes|items`, `api.guildwars2.com`). On our side
-  this means a file:line citation into
-  `/mnt/c/Dev/Blish/GW2CraftingHelper` (read-only for this audit).
+  this means a file:line citation into this repository (read-only for this
+  audit).
 - **inferred** - a reasonable conclusion from the measured evidence but not
   itself independently confirmed; called out explicitly wherever it appears.
 

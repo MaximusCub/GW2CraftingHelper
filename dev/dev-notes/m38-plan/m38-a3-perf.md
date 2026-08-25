@@ -1,3 +1,6 @@
+> **Frozen record - committed 2026-08-17, written for the M38 cleanup wave.** M38 cleanup analysis, memory/CPU lens, read-only against master at commit 85a738e.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 # M38 Post-Parity Cleanup — Analysis A3: Memory/CPU Efficiency
 
 Scope: current `master` (post-M37, `812d0f0` per KNOWN-ISSUES handoff notes; this

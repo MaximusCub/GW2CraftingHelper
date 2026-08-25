@@ -36,6 +36,12 @@ still described in the present tense in dozens of files here. Every file
 under `archive/` carries a two-line banner saying so; files under
 `records/` carry their branch and date in the same place.
 
+Two consequences of that, both deliberate. A record still names the
+throwaway worktree a command was run in, because that is what the record
+said and rewriting it would be an edit. And where a record is known-wrong
+today - the M38 plan's "test-count floor: 854 green", against 2,803 now -
+the correction is in that file's banner, not in its text.
+
 ## Editing rules
 
 - **Records are evidence, not documentation.** A correction to a record is a

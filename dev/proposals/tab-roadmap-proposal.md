@@ -4,8 +4,7 @@ Status: SYNTHESIS PROPOSAL (design only, no code changes). Written by the
 synthesis architect over the five per-tab design proposals
 (`d1-snapshot-about-settings.md`, `d2-log-system.md`, `d3-plan-history.md`,
 `d4-crafting-ranker.md`, `d5-next-step-feasibility.md`) and the M38 cleanup
-plan (`m38-cleanup-plan.md`). Read-only against the repo; nothing under
-`/mnt/c/Dev/Blish/wt-m38-*` touched.
+plan (`m38-cleanup-plan.md`). Read-only against the repo.
 
 Everything below is a PROPOSAL for the maintainer's reaction, not a
 commitment. Effort is classed S/M/L/XL with a one-line reason; no time
@@ -471,9 +470,8 @@ Value-positive but **defer, not never** (build later, when justified):
 ## Appendix: source proposals
 
 `d1-snapshot-about-settings.md`, `d2-log-system.md`, `d3-plan-history.md`,
-`d4-crafting-ranker.md`, `d5-next-step-feasibility.md`, all under
-`/mnt/c/Dev/Blish/m38-plan/proposals/`; M38 packages from
-`/mnt/c/Dev/Blish/m38-plan/m38-cleanup-plan.md`. All effort classes and
+`d4-crafting-ranker.md`, `d5-next-step-feasibility.md`, all in this
+directory; M38 packages from `../dev-notes/m38-plan/m38-cleanup-plan.md`. All effort classes and
 MEASURED claims above are carried from those documents; this synthesis adds no
 new code-level measurements of its own beyond cross-checking the four store
 corrections and the two collisions (diagnostics toggle, RankerStore filename)

@@ -1,3 +1,11 @@
+> **Frozen record - committed 2026-08-17, written for the M38 cleanup wave.** The M38 cleanup wave's execution plan. It ran to completion; this is the plan as written, not current process.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+>
+> Three things in it are known-wrong today and are corrected here rather than in the text, because a record is not edited:
+> the "EXECUTION PREAMBLE (every implementing agent inherits these rules)" bound the M38 wave only - current process is [`CONTRIBUTING.md`](../../../CONTRIBUTING.md) and `CLAUDE.md`;
+> the "Test-count floor: 854 green" was true in July 2026 and the suite is at 2,803 today;
+> and the citation to "KNOWN-ISSUES `THE METHOD`" is wrong - THE METHOD is in [`../HISTORY.md`](../HISTORY.md), under its own heading.
+
 # M38 Cleanup Wave - Execution Plan
 
 Synthesis of six analyst reports (architecture, simplify, perf, public-repo, tests, csharp)

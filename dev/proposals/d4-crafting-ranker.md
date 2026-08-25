@@ -4,13 +4,11 @@ Status: design proposal (no code changes). Written against `master` at
 commit `d62b7ed` (MEASURED, `git log -1` at proposal time - master is
 advancing concurrently under the M38 wave; this is a read-only reference
 point, not a claim that master is frozen). Repo accessed strictly
-read-only for this proposal; nothing under `/mnt/c/Dev/Blish/wt-m38-*` was
-touched.
+read-only for this proposal.
 
-Epistemic tags used throughout: **MEASURED** = read directly from code (or
-a cited doc/perf report) in this session; **INFERRED** = a reasoned
-conclusion this proposal draws from MEASURED facts, not itself directly
-observed; **GUESS** = a judgment call with no code evidence either way.
+Claims are tagged **MEASURED** (read directly from code or a cited report),
+**INFERRED** (reasoned from measured facts, not itself observed) or
+**GUESS** (a judgment call with no code evidence either way).
 
 ---
 

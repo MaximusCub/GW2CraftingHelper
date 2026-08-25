@@ -1,9 +1,7 @@
 # D1 - Snapshot Search, About, Settings Audit
 
 Design proposal only. No production code was changed to produce this document
-(read-only session against `/mnt/c/Dev/Blish/GW2CraftingHelper`, no build/test
-run, no worktrees under `/mnt/c/Dev/Blish/wt-m38-*` touched or referenced as
-authoritative). Covers three of the seven module tabs: **Snapshot**
+(read-only session against `master`, no build or test run). Covers three of the seven module tabs: **Snapshot**
 (redesign), **About** (new), **Settings** (extend + audit). Log, Plan History,
 and Crafting Ranker are explicitly out of scope for this document (assumed to
 be separate proposals in this same wave) and are referenced only where they
@@ -818,8 +816,7 @@ threading, no new persistence mechanism.
 `Contracts/IItemSearchProvider.cs` (full), `manifest.json` (full),
 `docs/KNOWN-ISSUES.md` item 31 (M37 concurrency/degradation audits),
 `tests/GW2CraftingHelper.Tests/Services/AccountItemIndexTests.cs` (excerpt),
-`/mnt/c/Dev/Blish/m38-plan/m38-cleanup-plan.md` WP-16/17/21/22/27/28
-sections, `Views/CraftingPlanView.cs` (targeted greps for `FrameTicker`),
+`m38-cleanup-plan.md` WP-16/17/21/22/27/28 sections, `Views/CraftingPlanView.cs` (targeted greps for `FrameTicker`),
 plus a repo-wide grep for `ResetToDefaults` (main tree only - worktrees
 under `.claude/worktrees` excluded from consideration per this session's
 constraints).

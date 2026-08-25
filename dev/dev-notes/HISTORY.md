@@ -1,3 +1,6 @@
+> **Frozen record - the pre-M38 fix-pass diary, 2026-02 to 2026-07.** Hypotheses, instrumentation and dated gate records, filed under the same item numbers as `docs/KNOWN-ISSUES.md`.
+> Point-in-time evidence - it describes the code as it stood on each entry's date and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
+
 # Development History: Fix-Pass Diary
 
 This is the full, verbatim historical fix-pass diary for this module's UI
