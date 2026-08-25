@@ -15235,15 +15235,45 @@ offset and the hover chain are untouched by construction and no resync
 call is needed. Cycling back to None restores the search's own order
 without the view keeping a second copy of it.
 
-**Two per-tick paths still measured strings.** Commit 6201777 set the
+**Two re-layout paths still measured strings.** Commit 6201777 set the
 contract for the plan's headers (position-and-width work per tick,
 measuring at build and settle only) and the Snapshot had not been held
-to it: `PlaceAmountLabel` measured a FIXED string per cell per resize
-tick, and `LayoutSectionChrome` allocated a column list, two arrays and
-two closures per grid column and measured both header labels on every
-tick. The amount width is captured at build, and the chrome now owns a
-`HeaderCellPlan` rebuilt only when the column count or a header's width
-changes.
+to it: `PlaceAmountLabel` measured a FIXED string per cell, and
+`LayoutSectionChrome` allocated a column list, two arrays and two
+closures per grid column and measured both header labels. The amount
+width is captured at build, and the chrome now owns a `HeaderCellPlan`
+rebuilt only when the column count or a header's width changes.
+
+*Correction to how often those ran.* This was first recorded as a
+per-frame path on both counts, and it is not one. The Snapshot's
+re-layout is trailing-debounced: `ScheduleRowRefit` stamps a tick and
+returns, a ThreadPool wait loops until `ResizeSettleMs` of quiet and then
+marshals `RefitResultRows` ONCE, so `LayoutResultGrid` runs once per drag
+and once per sort click, never per pixel. `HeaderCellPlan`'s OTHER
+callers - `CTableHeaderRenderer` and `ShoppingListSectionRenderer`, which
+register through `ISectionRelayoutSink` - DO run per frame, because
+`CraftingPlanView.ReplayRelayout` replays those closures straight off
+Blish's `Resized` event. One class, two rates. The fixes stand either way
+(a repeated path that allocates and measures for nothing is still worth
+removing); only the stated frequency was wrong, and the dual rate is now
+stated once, at `HeaderCellPlan`.
+
+**The repack re-stamped every tooltip on the row.** Follow-on from the
+same pass, and the cheap thing was removed while the expensive one
+stayed: the Snapshot re-fit closure called back into the row's whole
+tooltip stamp - a fresh builder closure, four `TooltipFacility.Register`
+calls (each a `TooltipContentSource` allocation plus a
+`ConditionalWeakTable` Remove+Add) and a recursive walk of the icon's
+child tree - per row, for content no part of which is a function of the
+column width. Only the two text lines were ever invalidated, and only
+because `FitRowTextLabel` wrote a plain tooltip: a non-null
+`BasicTooltipText` write nulls `Control._tooltip` and so drops the rich
+surface stamped over it. `FitRowTextLabel` no longer writes tooltips at
+all - the row owns them, as it already did for the strip, the amount and
+the icon - so the repack now fits text and moves the amount, and nothing
+else. Behaviour is unchanged: the plain note those labels carried was
+overwritten by the rich stamp on the same line and survived only as a
+fallback the builder's content can never reach.
 
 **Coin icons answered no hover.** `CoinCurrencyRenderer` built its coin
 icon as a raw `Panel` with a `BackgroundTexture`, entirely outside

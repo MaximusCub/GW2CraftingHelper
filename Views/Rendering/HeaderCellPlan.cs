@@ -7,16 +7,20 @@ namespace GW2CraftingHelper.Views.Rendering
     /// <summary>
     /// One header row's cells, described once and re-split on demand. The
     /// labels, their measured widths and their sort actions are fixed for
-    /// the life of the row; only the x's move, and they move on every frame
-    /// of a resize drag (a right-pinned column's x is a function of the
-    /// panel width).
+    /// the life of the row; only the x's move (a right-pinned column's x is
+    /// a function of the panel width).
     /// <para>
-    /// So <see cref="Sync"/> reads each label's current Location, splits
-    /// into buffers this instance owns, and hands the result to
-    /// <see cref="SortableHeaderCells"/> - no MeasureString and no
-    /// allocation per tick. That is the same rule the plan's relayout
-    /// closures already keep: position-and-width work per tick, measuring
-    /// at build and settle only.
+    /// CANONICAL NOTE on how often that is, because this class has callers
+    /// at two different rates and it is an easy one to get backwards. The
+    /// PLAN's sections re-split on every frame of a resize drag: their
+    /// closures go through ISectionRelayoutSink, and
+    /// CraftingPlanView.ReplayRelayout replays them straight off Blish's
+    /// Resized event. The SNAPSHOT re-splits once per drag, because
+    /// MainView.ScheduleRowRefit trailing-debounces its whole re-layout.
+    /// <see cref="Sync"/> is written to the stricter of the two: it reads
+    /// each label's current Location, splits into buffers this instance
+    /// owns, and hands the result to <see cref="SortableHeaderCells"/> - no
+    /// MeasureString, no allocation.
     /// </para>
     /// </summary>
     internal sealed class HeaderCellPlan
@@ -66,7 +70,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Where this column really ends, for a caller that knows: a
         /// column edge rather than the midpoint between two header words.
         /// A right-pinned column's edge moves with the panel, so this is
-        /// written per tick - an int, not a measurement.
+        /// written on every re-layout - an int, not a measurement.
         /// </summary>
         internal void SetBoundary(int index, int cellEnd)
         {

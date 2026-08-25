@@ -90,10 +90,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The same split, written into a buffer the caller owns. The
-        /// header renderers re-split on every frame of a resize drag - a
-        /// right-pinned column's x is a function of the panel width - and
-        /// that is not a path to allocate an array per header per frame on.
+        /// The same split, written into a buffer the caller owns: the
+        /// plan's header renderers re-split on every frame of a resize
+        /// drag, which is not a path to allocate an array per header on.
         /// </summary>
         public static void Partition(
             int bandWidth, IReadOnlyList<LabelExtent> labels, CellRange[] into)

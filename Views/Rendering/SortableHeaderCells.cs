@@ -67,8 +67,8 @@ namespace GW2CraftingHelper.Views.Rendering
             internal int Width;
 
             /// <summary>Whether the wash already carries the shared note.
-            /// Stamping is a wrap and an allocation, and Sync runs on every
-            /// frame of a resize drag.</summary>
+            /// Stamping is a wrap and an allocation, and Sync can run on
+            /// every frame of a drag (see HeaderCellPlan).</summary>
             internal bool Stamped;
 
             internal bool Contains(int x)
@@ -133,11 +133,11 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// Re-describes the band's cells - called at build time and
-        /// again from the section's relayout closure, because a right-pinned
-        /// column's x is a function of the panel width. Cells are reused
-        /// rather than rebuilt: a resize drag would otherwise churn a
-        /// control per column per tick.
+        /// Re-describes the band's cells - at build time and again from the
+        /// section's relayout, because a right-pinned column's x is a
+        /// function of the panel width. Cells are reused rather than
+        /// rebuilt: on the per-frame callers (see HeaderCellPlan) a drag
+        /// would otherwise churn a control per column per frame.
         /// </summary>
         internal void Sync(IReadOnlyList<Column> columns)
         {

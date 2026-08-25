@@ -1605,6 +1605,14 @@ namespace GW2CraftingHelper.Views
         /// has just created the cells at this same column width, hence
         /// <paramref name="refitText"/> false there - and the resize repack,
         /// which must also re-ellipsize.
+        /// <para>
+        /// HOW OFTEN, since the plan tab's equivalent differs and the two
+        /// share <see cref="HeaderCellPlan"/>: exactly three callers -
+        /// <see cref="RebuildContent"/>, <see cref="SortSection"/> and
+        /// <see cref="RefitResultRows"/>, which is trailing-debounced by
+        /// <see cref="ScheduleRowRefit"/>. So this runs ONCE per resize
+        /// drag, not once per frame of one.
+        /// </para>
         /// </summary>
         private void LayoutResultGrid(bool refitText)
         {
@@ -2081,9 +2089,8 @@ namespace GW2CraftingHelper.Views
             /// two runs a chrome belongs to.</summary>
             public Action ReapplyOrder;
 
-            /// <summary>Per-column click actions, built once: the header
-            /// cells are re-described on every resize tick and must not
-            /// allocate a closure per column per tick.</summary>
+            /// <summary>Per-column click actions, built once, so a
+            /// re-describe never allocates a closure per column.</summary>
             public Action SortByName;
             public Action SortByAmount;
 
@@ -2093,15 +2100,14 @@ namespace GW2CraftingHelper.Views
             public SortableHeaderCells Cells;
 
             /// <summary>The cell split over those labels. Rebuilt only when
-            /// the column count or a header's width changes; its Sync is
-            /// what runs per tick.</summary>
+            /// the column count or a header's width changes; Sync is what a
+            /// re-layout runs.</summary>
             public HeaderCellPlan CellPlan;
             public int PlanColumns;
 
             /// <summary>Header text, and everything measured from it. Fixed
             /// between sort clicks - the indicator is the only part that
-            /// moves - so nothing on the per-tick path measures a string.
-            /// </summary>
+            /// moves - so a re-layout measures no string.</summary>
             public string NameText;
             public string AmountText;
             public int NameWidth;
@@ -2280,12 +2286,11 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Re-describes the header band's hover/click cells for the grid it
-        /// now spans. Called on every resize tick, so it is position-and-
-        /// width work only: the labels, their measured widths and their
-        /// click actions are fixed between sort clicks and live on the
-        /// chrome's <see cref="HeaderCellPlan"/>, which is rebuilt only
-        /// when the column COUNT changes (or a sort click drops it, having
-        /// changed a header's width).
+        /// now spans. Position-and-width work only: the labels, their
+        /// measured widths and their click actions are fixed between sort
+        /// clicks and live on the chrome's <see cref="HeaderCellPlan"/>,
+        /// which is rebuilt only when the column COUNT changes (or a sort
+        /// click drops it, having changed a header's width).
         /// <para>
         /// Each cell's right edge is its column's own, not a midpoint
         /// between two header words: a Name cell ends where the Amount band
@@ -2466,8 +2471,8 @@ namespace GW2CraftingHelper.Views
                 out _);
 
             // Measured once here, not inside the closure below: the text is
-            // fixed for the life of the row, and the re-fit runs once per
-            // pixel of a resize drag over every row on screen.
+            // fixed for the life of the row, and the repack walks every row
+            // on screen.
             int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
             var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 4);
 
@@ -2534,9 +2539,8 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// Re-pins one amount to its column's right edge. Takes the width
         /// the caller measured at build rather than measuring here: the
-        /// text never changes, and this runs per row per pixel of a resize
-        /// drag - the same position-and-width-only rule the plan's header
-        /// cells keep.
+        /// text never changes, and this runs once per row per repack - the
+        /// same position-and-width-only rule the plan's header cells keep.
         /// </summary>
         private static void PlaceAmountLabel(Label label, int textWidth, int columnWidth, int y)
         {
