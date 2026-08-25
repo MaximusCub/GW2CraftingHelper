@@ -193,6 +193,19 @@ namespace GW2CraftingHelper.Views
         // the same reason.
         private volatile bool _buildComplete;
 
+        /// <summary>
+        /// Clears the built flag on the MAIN thread, before Blish queues
+        /// the off-thread Build. Clearing it inside Build leaves the flag
+        /// reading true for the whole interval between the tab switch and
+        /// Build's first statement, and a settle callback landing in that
+        /// window dereferences the blocks Build is about to replace.
+        /// Mirrors SettingsTabContent.BeginRebuild.
+        /// </summary>
+        public void BeginRebuild()
+        {
+            _buildComplete = false;
+        }
+
         public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
         {
             _moduleParameters = moduleParameters ?? throw new ArgumentNullException(nameof(moduleParameters));

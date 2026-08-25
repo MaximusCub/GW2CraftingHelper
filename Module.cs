@@ -697,7 +697,11 @@ namespace GW2CraftingHelper
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(157097),
-                () => new ViewAdapter("About", c => _aboutContent.Build(c)),
+                () =>
+                {
+                    _aboutContent.BeginRebuild();
+                    return new ViewAdapter("About", c => _aboutContent.Build(c));
+                },
                 "About"));
 
             // Refresh log content when switching to the Log tab

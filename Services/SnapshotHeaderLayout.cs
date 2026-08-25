@@ -110,7 +110,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int SourceFilterWidth(int panelWidth, int startX)
         {
-            int width = panelWidth - startX;
+            // Ends on the tab's shared chrome right edge, not at the raw
+            // container width: the run is the one element here whose width
+            // is content-driven, and running it past that edge also pushes
+            // its own wrap threshold past where the checkboxes may wrap.
+            int width = ChromeRightEdge(panelWidth) - startX;
             return width > 0 ? width : 0;
         }
 
@@ -161,8 +165,12 @@ namespace GW2CraftingHelper.Services
                 return new SourceFilterPlacement(true, startX, 0, SourceFilterWidth(panelWidth, startX));
             }
 
+            // Own-row mode starts at the same gutter as the search box
+            // above it, and ends on the same right edge as every other
+            // chrome element - it used to start at x=0, sixteen pixels
+            // left of the box it sits under.
             return new SourceFilterPlacement(
-                false, 0, searchRowHeight + rowGap, panelWidth > 0 ? panelWidth : 0);
+                false, Inset, searchRowHeight + rowGap, SourceFilterWidth(panelWidth, Inset));
         }
 
         /// <summary>

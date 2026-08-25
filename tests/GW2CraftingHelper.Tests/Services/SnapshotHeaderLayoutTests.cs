@@ -62,9 +62,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void SourceFilterWidth_IsWhatIsLeftOfThePanelPastTheStartOffset()
+        public void SourceFilterWidth_EndsOnTheChromeRightEdgeNotTheRawPanel()
         {
-            Assert.Equal(414, SnapshotHeaderLayout.SourceFilterWidth(884, SourceFilterX));
+            // Was panelWidth - startX (414 here), which ran the run past
+            // the edge every other chrome element on this tab pins to and
+            // moved its own wrap threshold with it.
+            Assert.Equal(
+                SnapshotHeaderLayout.ChromeRightEdge(884) - SourceFilterX,
+                SnapshotHeaderLayout.SourceFilterWidth(884, SourceFilterX));
         }
 
         [Fact]
@@ -95,13 +100,18 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void PlaceSourceFilterRun_OwnRow_SpansThePanelBelowTheSearchRow()
+        public void PlaceSourceFilterRun_OwnRow_SitsInsideTheTabsFrameBelowTheSearchRow()
         {
             var placement = Place(884, shares: false);
 
             Assert.False(placement.SharesSearchRow);
-            Assert.Equal(0, placement.X);
-            Assert.Equal(884, placement.Width);
+
+            // Was x=0 spanning the raw panel - sixteen pixels left of the
+            // search box directly above it, and past the shared right edge.
+            Assert.Equal(SnapshotHeaderLayout.Inset, placement.X);
+            Assert.Equal(
+                SnapshotHeaderLayout.ChromeRightEdge(884),
+                placement.X + placement.Width);
             Assert.Equal(SearchRowHeight + SearchToFilterGapY, placement.OffsetY);
         }
 
@@ -371,5 +381,34 @@ namespace GW2CraftingHelper.Tests.Services
                 LogToolbarLayout.CenteredY(26),
                 PlanRelayoutMath.CenterX(LogToolbarLayout.BarHeight, 26));
         }
+
+        [Theory]
+        [InlineData(1378)]
+        [InlineData(1920)]
+        [InlineData(930)]
+        public void SourceFilterRun_StartsAtTheGutterAndEndsOnTheSharedRightEdge(int containerWidth)
+        {
+            // The run is the only content-driven width on this tab, so it
+            // is the one that used to escape the tab's frame: own-row mode
+            // began at x=0 (sixteen pixels left of the search box directly
+            // above it) and both modes ran past the edge every other chrome
+            // element pins to, which also moved the run's own wrap point.
+            int chromeRight = SnapshotHeaderLayout.ChromeRightEdge(containerWidth);
+
+            var ownRow = SnapshotHeaderLayout.PlaceSourceFilterRun(
+                containerWidth, startX: 200, searchRowHeight: SearchRowHeight,
+                rowGap: 6, sharesSearchRow: false);
+
+            Assert.Equal(SnapshotHeaderLayout.Inset, ownRow.X);
+            Assert.Equal(chromeRight, ownRow.X + ownRow.Width);
+
+            var shared = SnapshotHeaderLayout.PlaceSourceFilterRun(
+                containerWidth, startX: 200, searchRowHeight: SearchRowHeight,
+                rowGap: 6, sharesSearchRow: true);
+
+            Assert.Equal(200, shared.X);
+            Assert.Equal(chromeRight, shared.X + shared.Width);
+        }
+
     }
 }
