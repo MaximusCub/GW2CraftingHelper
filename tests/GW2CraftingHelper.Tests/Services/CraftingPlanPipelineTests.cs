@@ -179,6 +179,58 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(recipe.IsMissing);
         }
 
+        // The pipeline holds no learned-recipe state between generations:
+        // every GenerateStructuredAsync asks its IAccountRecipeClient
+        // again. Any caching therefore has to live in the client, and this
+        // count stays one-per-generation whatever that client does with
+        // the request.
+        [Fact]
+        public async Task GenerateStructuredAsync_TwoGenerations_AsksTheAccountClientEachTime()
+        {
+            var recipeApi = new InMemoryRecipeApiClient();
+            recipeApi.AddSearchResult(1, 10);
+            recipeApi.AddRecipe(new RawRecipe
+            {
+                Id = 10,
+                OutputItemId = 1,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>
+                {
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                }
+            });
+
+            var priceApi = new InMemoryPriceApiClient();
+            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
+            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+
+            var itemApi = new InMemoryItemApiClient();
+            itemApi.AddItem(1, "Target Item", "target.png");
+            itemApi.AddItem(2, "Ingredient", "ingredient.png");
+
+            var accountClient = new InMemoryAccountRecipeClient();
+            accountClient.AddLearnedRecipe(10);
+
+            var pipeline = new CraftingPlanPipeline(
+                new RecipeService(recipeApi),
+                new TradingPostService(priceApi),
+                new PlanSolver(),
+                new ItemMetadataService(itemApi),
+                accountRecipeClient: accountClient);
+
+            await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            var second = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(2, accountClient.GetCallCount);
+
+            // And the ids still reach the annotation on both runs.
+            var recipe = second.RequiredRecipes.FirstOrDefault(r => r.RecipeId == 10);
+            Assert.NotNull(recipe);
+            Assert.False(recipe.IsMissing);
+        }
+
         // KNOWN-ISSUES api-degradation F4 (audit follow-up): the same
         // catch-and-degrade-to-null fix above is duplicated verbatim in
         // GenerateStructuredMultiAsync (the 2+ item path reached via the

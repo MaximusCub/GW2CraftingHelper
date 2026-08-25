@@ -18,6 +18,13 @@ namespace GW2CraftingHelper.Tests.Helpers
         /// </summary>
         public bool ThrowOnGet { get; set; }
 
+        /// <summary>
+        /// How many times GetLearnedRecipeIdsAsync has been entered,
+        /// counting failed attempts - lets a test observe whether a caller
+        /// re-queried the account endpoint or served a cache.
+        /// </summary>
+        public int GetCallCount { get; private set; }
+
         public void AddLearnedRecipe(int recipeId)
         {
             _learnedRecipes.Add(recipeId);
@@ -30,6 +37,8 @@ namespace GW2CraftingHelper.Tests.Helpers
 
         public Task<ISet<int>> GetLearnedRecipeIdsAsync(CancellationToken ct)
         {
+            GetCallCount++;
+
             if (ThrowOnGet)
             {
                 throw new InvalidOperationException("Simulated transient /v2/account/recipes failure.");
