@@ -257,13 +257,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task UnpricedIngredient_ZeroesThePlanWithoutUnlockingTheZeroBand()
+        public async Task UnpricedIngredient_ZeroesThePlanAndMarksTheZeroBand()
         {
-            // The counterexample that keeps the zero-band rule honest: an
-            // ingredient with no recipe and no price also totals 0, but
-            // that 0 is unmeasured, not free. The plan still generates
-            // (nothing gates it), so the band must stay collapsed rather
-            // than state a full market value nobody computed.
+            // An ingredient with no recipe and no price also totals 0, but
+            // that 0 is unmeasured, not free. The band keeps all three
+            // cells (dropping them read as a broken section) and says so
+            // instead: every tile carries the marker and the section
+            // carries the matching footnote.
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
             // Item 2, the sole ingredient, is deliberately left unpriced.
@@ -279,13 +279,22 @@ namespace GW2CraftingHelper.Tests.Services
             var summary = vm.Sections.Single(s => s.SectionType == PlanSectionType.Summary);
             var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+            Assert.All(costTiles, t => Assert.EndsWith(
+                PlanViewModelBuilder.UnpricedTileMarker, t.Label));
+            Assert.All(costTiles, t => Assert.Contains(
+                PlanViewModelBuilder.UnpricedTooltipSuffix, t.TooltipText));
+            Assert.Contains(
+                summary.Rows,
+                r => r.RowType == PlanRowType.SummaryFootnote
+                    && r.Label == PlanViewModelBuilder.UnpricedFootnoteText);
 
-            // The profit band obeys the same unpriced-zero rule: the
-            // target HAS a sell price here, so without the guard the band
-            // would print "Sell Value - Total Materials Value 0 = Profit
-            // if Sold" - a settled equation claiming the craft consumes
-            // nothing and profits its entire sale price.
+            // The profit band still suppresses on an unpriced zero: the
+            // target HAS a sell price here, so its tiles would not be
+            // zeros at all - "Sell Value - Total Materials Value 0 =
+            // Profit if Sold" claims the craft consumes nothing and
+            // profits its entire sale price.
             Assert.DoesNotContain(
                 summary.Rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
         }

@@ -74,9 +74,11 @@ namespace GW2CraftingHelper.Models
         // "Actual Cost to Craft" tile (one row of this type) only when
         // there is no materials-used middle term AND the plan has a real
         // cost to show; a plan whose coin cost and materials-used term
-        // are both KNOWN zeros renders all three tiles at 0
-        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule -
-        // an unpriced-node zero is NOT a known zero and stays collapsed).
+        // are both zero renders all three tiles at 0
+        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule). A
+        // zero produced by unpriceable nodes renders the tiles too, with
+        // PlanViewModelBuilder.UnpricedTileMarker on each Label and the
+        // matching SummaryFootnote row explaining it.
         // Rendered as an equal-width stat tile, same shape the old
         // CoinTotal band used - see SummarySectionRenderer.
         CostFormulaTile,
@@ -89,9 +91,10 @@ namespace GW2CraftingHelper.Models
         // is meaningless with fewer than 3 terms.
         ProfitFormulaTile,
 
-        // The Total Cost section's single subdued trading-post
-        // pricing-basis footnote row, always present exactly once at the
-        // bottom of the section.
+        // The Total Cost section's subdued footnote rows at the bottom of
+        // the section: the trading-post pricing-basis line, always
+        // present, preceded by the unpriced-items line when the plan has
+        // one (PlanViewModelBuilder.UnpricedFootnoteText).
         SummaryFootnote,
 
         // design-plan-notes.md (Notes section, Option 1): the one shared

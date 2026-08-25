@@ -13735,18 +13735,29 @@ while an ignored node maps to `Have` + `IsIgnored` - so the two are
 cleanly separable. `PlanViewModelBuilder.HasUnpricedNode` walks the
 display tree (`CraftingTree`, or every `MultiItemRoots` entry, skipping
 reference branches) from the zero-cost gate only, never on the priced
-path, and an unpriced node keeps the collapsed tile: "Total Materials
-Value 0c" would state the full market value of a craft the pipeline never
-valued, under a root row reading UNKNOWN.
+path.
+
+**SUPERSEDED (field-fixes-3, item 1).** This round made the unpriced zero
+keep the collapsed tile, on the argument that "Total Materials Value 0c"
+would state the full market value of a craft the pipeline never valued.
+The maintainer field-tested that on real plans - which routinely contain
+UNKNOWN nodes (Globs of Dark Matter, account-bound gifts) - and ruled
+against it: the band now retains all three cells at 0 in that case too,
+and the unmeasured-zero fact is carried by
+`PlanViewModelBuilder.UnpricedTileMarker` on every tile caption, an
+appended tooltip sentence, and an extra `SummaryFootnote` row. See the
+"Zero-band retention, scroll anchoring, click default, MF recipes,
+first-load snapshot" section for the current rule. The profit band's
+suppression on an unpriced zero survives unchanged. Everything below
+about `HasUnpricedNode`'s walk and the Free-mode collapse still holds.
 
 So the class fixed here is every **known** zero - ignoring every child, a
 currency-only plan, and Valued mode that priced the consumed materials at
-0 all get the same band. Two zero-cost states stay collapsed on purpose,
+0 all get the same band. One zero-cost state stays collapsed on purpose,
 because a term is unmeasured rather than zero: Free mode with owned
-materials actually consumed (the paragraph above), and a plan zeroed by
-unpriced items. Free mode with owned materials therefore still shows the
-lone 0c tile - that is the deliberate shape, not a residual of the
-reported bug; see the known-vs-absent-zero paragraph above before
+materials actually consumed (the paragraph above). It therefore still
+shows the lone 0c tile - that is the deliberate shape, not a residual of
+the reported bug; see the known-vs-absent-zero paragraph above before
 "fixing" it. Band height is unaffected either way -
 `SummarySectionLayoutMath.BodyHeight` counts one cost band whether it
 holds 1 or 3 tiles.
@@ -13756,11 +13767,11 @@ Coverage: `PlanRootIgnoreTests` (pill suppression across every
 multi-item batch, the reachable ignored-sibling-root case, the end-to-end
 "ignore every ingredient" plan through
 `CraftingPlanPipeline.ResolveWithOverrides` into `PlanViewModelBuilder`,
-and the end-to-end unpriced-ingredient counterexample that must NOT get
-the band), nine zero-band cases in `PlanViewModelBuilderSummaryTests`
-(including the unvalued-materials collapse, the unpriced single-item and
-batch collapses, and the reference-branch exemption), and two restore
-cases in `PlanStoreTests`.
+and the end-to-end unpriced-ingredient case - since superseded, it now
+asserts the marked band), zero-band cases in
+`PlanViewModelBuilderSummaryTests` (including the unvalued-materials
+collapse, the unpriced single-item and batch cases, and the
+reference-branch exemption), and two restore cases in `PlanStoreTests`.
 Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
 IGNORE pill on a `BuildTree` root and were updated to the new
 expectation.
@@ -13793,8 +13804,11 @@ expectation.
      as 0 would contradict the Used Materials section right below.
 4. Back in the step 2 state, un-ignore one of those children: the band
    returns to its ordinary shape and the numbers come back.
-5. Plan an item with **no recipe and no Trading Post price** (root row
-   reads UNKNOWN). The plan totals 0c but the band stays a **lone 0c
+5. (SUPERSEDED by field-fixes-3 item 1 - the band now renders all three
+   marked cells at 0 here; the profit-band half of this step still
+   stands.) Plan an item with **no recipe and no Trading Post price**
+   (root row reads UNKNOWN). The plan totals 0c but the band stays a
+   **lone 0c
    tile** - a zero nobody measured must not be dressed up as a priced
    equation. The profit band below obeys the same rule: on such a plan
    **no "Sell Value / Total Materials Value / Profit if Sold" tiles
