@@ -52,6 +52,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Second", _store.Load());
         }
 
+        // --- One-store convention: atomic .tmp+Replace, matching
+        // SnapshotStore/PlanStore/VendorOfferStore - previously the .tmp
+        // was written and then File.Copy'd over the target, which rewrites
+        // it in place and can leave a partial status.txt. Mirrors
+        // SnapshotStoreTests' pair so both the create (File.Move) and the
+        // overwrite (File.Replace) branch are covered. ---
+
+        [Fact]
+        public void Save_LeavesNoTmpFileBehind()
+        {
+            _store.Save("First");
+
+            Assert.False(File.Exists(Path.Combine(_tempDir, "status.txt.tmp")));
+            Assert.Equal("First", _store.Load());
+        }
+
+        [Fact]
+        public void Save_Overwrite_LeavesNoTmpFileBehindEither()
+        {
+            _store.Save("First");
+            _store.Save("Second");
+
+            Assert.False(File.Exists(Path.Combine(_tempDir, "status.txt.tmp")));
+            Assert.Equal("Second", _store.Load());
+        }
+
         // --- onError callback: real IO failure. ---
 
         [Fact]
