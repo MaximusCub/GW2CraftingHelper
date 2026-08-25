@@ -406,7 +406,13 @@ namespace GW2CraftingHelper
                 try
                 {
                     int buildId = await FetchGw2BuildIdAsync();
+
+                    // Stamp only after the staleness check: InvalidateIfStale
+                    // clears the overlay's stored build when it wipes, so the
+                    // reverse order would leave the manifest recording 0 and
+                    // the overlay would be deleted again on the next launch.
                     recipeOverlay.InvalidateIfStale(buildId);
+                    recipeOverlay.SetCurrentBuildId(buildId);
                     recipeSeed.SetCurrentBuildId(buildId);
                 }
                 catch (Exception ex)

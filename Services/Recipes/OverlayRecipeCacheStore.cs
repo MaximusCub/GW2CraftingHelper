@@ -152,6 +152,31 @@ namespace GW2CraftingHelper.Services.Recipes
             }
         }
 
+        /// <summary>
+        /// Stamps the live game build id onto the overlay, so the manifest
+        /// written by the next flush records the build the cached recipes
+        /// came from.
+        /// <para>
+        /// Must be called AFTER <see cref="InvalidateIfStale"/>, which clears
+        /// the stored build when it wipes a stale overlay - an earlier stamp
+        /// would be discarded, the manifest would record 0, and the next
+        /// launch would treat the overlay as stale and delete it again.
+        /// </para>
+        /// </summary>
+        public void SetCurrentBuildId(int buildId)
+        {
+            lock (_gate)
+            {
+                if (_storedBuildId.HasValue && _storedBuildId.Value == buildId)
+                {
+                    return;
+                }
+
+                _storedBuildId = buildId;
+                _dirty = true;
+            }
+        }
+
         public IReadOnlyList<int> TryGetSearch(int outputItemId)
         {
             lock (_gate)
@@ -237,6 +262,9 @@ namespace GW2CraftingHelper.Services.Recipes
                 AtomicWrite(_recipesPath, recipeJson);
 
                 // Write manifest
+                // 0 means "written before the live build id was known"; the
+                // next Load treats it as a mismatch and discards the overlay
+                // once, rather than serving recipes of unknown vintage.
                 var manifest = new RecipeOverlayManifest
                 {
                     Gw2BuildId = _storedBuildId ?? 0,
