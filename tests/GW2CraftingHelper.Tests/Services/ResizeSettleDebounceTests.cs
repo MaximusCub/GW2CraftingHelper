@@ -42,12 +42,23 @@ namespace GW2CraftingHelper.Tests.Services
                 SettleMs,
                 null);
 
-            while (clock.ElapsedMilliseconds < SettleMs * 3)
+            // Re-arm a few times, then STOP scheduling before measuring.
+            // The original loop scheduled and measured in the same
+            // iteration, so a CI runner that stalled inside Task.Delay
+            // could let the callback fire and then record a LATER
+            // lastEventMs on the next pass - reporting a 0ms trail for a
+            // debounce that had behaved correctly. Observed failing on a
+            // GitHub runner 2026-08-25.
+            for (int i = 0; i < 4; i++)
             {
                 debounce.Schedule();
-                lastEventMs = clock.ElapsedMilliseconds;
-                await Task.Delay(5);
+                await Task.Delay(SettleMs / 4);
             }
+
+            // Stamped BEFORE the final Schedule, so scheduling jitter can
+            // only ever make the measured trail longer, never shorter.
+            lastEventMs = clock.ElapsedMilliseconds;
+            debounce.Schedule();
 
             Assert.True(await WaitForAsync(() => Volatile.Read(ref runAtMs) >= 0, WaitMs));
 
