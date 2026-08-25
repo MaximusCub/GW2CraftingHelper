@@ -22,13 +22,27 @@ labelled otherwise.
 ## The release protocol, step by step
 
 1. Land the work on `master`.
-2. Bump `manifest.json`'s `version` (the About tab reads it live).
-3. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
+2. Re-run the recipe seeder from the repo root and commit the refreshed
+   `ref/` seeds:
+
+   ```
+   dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+   ```
+
+   Roughly 1-2 minutes against the live API (measured 2026-08-25: 1m53s
+   cold, 59s on an immediate re-run). `--output-dir ref` is not optional:
+   the tool's own default writes into its `bin/` folder, not the repo's.
+   Why it is a release step: the seed pins the GW2 build id it was built
+   against, and once that id no longer matches the live build every
+   negative row in the seed stops counting as a cache hit, putting every
+   user on the slow live-API path for their first plan of each session.
+3. Bump `manifest.json`'s `version` (the About tab reads it live).
+4. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
    user-facing voice the existing entries use, not commit-message voice.
-4. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+5. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-5. Tag the release commit `v<version>` and push the tag.
-6. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+6. Tag the release commit `v<version>` and push the tag.
+7. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
