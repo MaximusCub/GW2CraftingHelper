@@ -70,8 +70,20 @@ namespace VendorOfferUpdater
 
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--diff-summary" && i + 2 < args.Length)
+                // Matched on the flag alone, then arity-checked below, rather
+                // than on "flag plus two operands". Every other flag here falls
+                // through to the positional branch when short an operand, which
+                // for this one would mean silently discarding a read-only
+                // request and starting a 15-minute scrape that WRITES.
+                if (args[i] == "--diff-summary")
                 {
+                    if (i + 2 >= args.Length)
+                    {
+                        Console.Error.WriteLine(
+                            "ERROR: --diff-summary needs two paths: --diff-summary <old> <new>.");
+                        return 1;
+                    }
+
                     diffSummaryBefore = args[++i];
                     diffSummaryAfter = args[++i];
                 }
