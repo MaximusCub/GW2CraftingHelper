@@ -116,13 +116,25 @@ When Blish HUD prompts you to authorize an API key for this module, it needs:
 
 ## Building from source / contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for build/test prerequisites, project
-structure, and pull request expectations.
+Windows only. The module targets .NET Framework 4.8 inside Blish HUD's XNA
+host, and CI runs on `windows-latest`. From a fresh clone:
 
 ```
+nuget restore GW2CraftingHelper.sln
 dotnet build GW2CraftingHelper.csproj -p:Platform=x64
-dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
+dotnet test GW2CraftingHelper.sln
 ```
+
+The restore step is not optional, and **`dotnet restore` will not do it**:
+this is a classic `packages.config` project, which only `nuget.exe` restores
+(download it from <https://www.nuget.org/downloads>, or install it with
+`winget install Microsoft.NuGet`). Skipping it fails the build with
+`The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets`, which
+is what a missing restore looks like rather than a broken checkout.
+
+`dotnet test GW2CraftingHelper.sln` runs all three test projects, the same
+set CI runs; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the per-project
+commands, project structure, and pull request expectations.
 
 ## How this was built
 

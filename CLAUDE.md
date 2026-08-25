@@ -21,8 +21,11 @@ When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths*
 
 ## Build & Test
 
+- Restore (fresh clone only, but MANDATORY there): `nuget restore GW2CraftingHelper.sln`
+  - `packages/` is gitignored and this is a classic `packages.config` project, so nothing is on disk until `nuget.exe` restores it. **`dotnet restore` does NOT do this** - it and `dotnet msbuild -t:restore` both print "Nothing to do. None of the projects specified contain packages to restore." and leave the build failing on `The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets`. Get `nuget.exe` from <https://www.nuget.org/downloads>. Windows-only build; CI runs `windows-latest`.
 - Build: `<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
-- Tests: `<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- Tests: `<dotnet> test GW2CraftingHelper.sln`
+  - There are THREE test projects and CI runs all three (`tests/GW2CraftingHelper.Tests`, `tests/GW2CraftingHelper.RecipeSeeder.Tests`, `tests/VendorOfferUpdater.Tests`). Testing only the first misses the cross-project golden-vector suite that pins `Services/VendorOfferHasher.cs` against `tools/VendorOfferUpdater/VendorOfferHasher.cs`. The first two target `net48`, the third `net8.0`.
 - `<dotnet>` refers to whichever dotnet path resolved above
 - `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
@@ -277,9 +280,11 @@ All review happens via GitHub Pull Requests.
 Run (using the resolved `<dotnet>` from **Tool Paths**):
 
 `<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
-`<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+`<dotnet> test GW2CraftingHelper.sln`
 
-Both must pass before PR creation.
+Both must pass before PR creation. The solution-level test run is what
+matches CI; see **Build & Test** above for why the single-project command
+is not enough.
 
 ## Commit & Push
 

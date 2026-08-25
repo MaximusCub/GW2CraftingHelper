@@ -439,7 +439,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+      <ErrorText>NuGet packages have not been restored: {0} is missing. Run this from the repository root, then build again: nuget restore GW2CraftingHelper.sln -- note that dotnet restore does NOT restore a packages.config project and will report Nothing to do instead. Get nuget.exe from https://www.nuget.org/downloads (see CONTRIBUTING.md, Prerequisites).</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('packages\BlishHUD.1.3.0\build\BlishHUD.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\BlishHUD.1.3.0\build\BlishHUD.targets'))" />
     <Error Condition="!Exists('packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets'))" />

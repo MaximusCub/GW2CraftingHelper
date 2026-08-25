@@ -8,17 +8,41 @@ obvious code lives in `docs/` (see `docs/KNOWN-ISSUES.md` and
 
 ## Prerequisites
 
+- **Windows.** The module targets .NET Framework 4.8 inside Blish HUD's XNA
+  host; CI runs `windows-latest`. There is no Linux/macOS build.
 - .NET SDK 8.0 (the main module targets .NET Framework 4.8 / MonoGame via
   Blish HUD, but the SDK used to drive `dotnet build`/`dotnet test` is 8.0 -
   see `.github/workflows/tests.yml`)
 - On Windows, if `dotnet` is not already on your `PATH`, the SDK installer
   normally places it at `C:\Program Files\dotnet\dotnet.exe`.
+- **`nuget.exe`** - required, and not interchangeable with `dotnet restore`;
+  see Building below. Download it from <https://www.nuget.org/downloads> and
+  put it on your `PATH`, or install it with `winget install Microsoft.NuGet`.
 
 ## Building
 
 ```
+nuget restore GW2CraftingHelper.sln
 dotnet build GW2CraftingHelper.csproj -p:Platform=x64
 ```
+
+**The restore step is separate and mandatory on a fresh clone.** This is a
+classic `packages.config` project (24 pinned packages, every reference
+resolved through a `<HintPath>packages\...` entry) and `packages/` is
+gitignored, so nothing is on disk until it is restored. The `dotnet` CLI has
+never supported `packages.config` restore: both `dotnet restore` and
+`dotnet msbuild -t:restore` print a success-shaped "Nothing to do. None of
+the projects specified contain packages to restore." and leave the build
+broken. Only `nuget.exe restore` populates `packages/`. Without it the build
+fails with:
+
+```
+error : This project references NuGet package(s) that are missing on this
+computer. ... The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets.
+```
+
+`.github/workflows/tests.yml` runs the same `nuget restore
+GW2CraftingHelper.sln` step for the same reason.
 
 The `Platform=x64` argument is required - the project only defines output
 paths for the `x64` platform (see `GW2CraftingHelper.csproj`'s
@@ -40,12 +64,30 @@ need any of this - `README.md`'s Installing section points them at the
 ## Testing
 
 ```
-dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
+dotnet test GW2CraftingHelper.sln
 ```
 
-At the time of writing this suite is 2,803 tests, all green (measured
-2026-08-25). A few rules
-the test suite enforces and that any new test must follow:
+That runs all three test projects, which is what CI runs. To run one at a
+time (the same three steps, in the same order, as
+`.github/workflows/tests.yml`):
+
+```
+dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
+dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
+dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
+```
+
+Running only the first one is the trap worth naming: the cross-project
+golden-vector suite that pins `Services/VendorOfferHasher.cs` against
+`tools/VendorOfferUpdater/VendorOfferHasher.cs` lives in the third project,
+so a change to either hasher passes locally and fails CI.
+`GW2CraftingHelper.Tests` and `GW2CraftingHelper.RecipeSeeder.Tests` target
+`net48`; `VendorOfferUpdater.Tests` targets `net8.0`, so a solution-level
+run needs both the .NET 8 SDK and .NET Framework 4.8 on the machine.
+
+The suite runs on every push and pull request; see the CI badge at the top
+of `README.md` for its current state. A few rules the test suite enforces
+and that any new test must follow:
 
 - **Tests exercise real production code paths.** No contract-mirror tests,
   no fake logic tests, no fake file I/O tests. Storage-backed behavior (e.g.
@@ -136,7 +178,7 @@ than hand-editing a `ref/*.json` file.
 
 These files are marked `-diff -merge linguist-generated` in
 `.gitattributes`, so git and GitHub will not try to render a 14.8MB single
-line into your terminal or a pull request view. That also means a refresh's
+line (measured 2026-08-25) into your terminal or a pull request view. That also means a refresh's
 diff tells a reviewer nothing, so a pull request carrying a `data(vendor):`
 commit **must include the `--diff-summary` output in its body** -
 `tools/refresh-vendor-data.sh` prints it at the end of a refresh. See
@@ -157,7 +199,8 @@ left diffable, because those you do edit by hand and a reviewer must read.
 - **Commit trailers.** This project is AI-assisted and does not hide it:
   where a change was co-authored by an AI agent, keep the `Co-Authored-By`
   trailer. Do **not** add a session-URL trailer (the harness default
-  `Claude-Session:` line). Around 1,053 existing commits carry one, and they
+  `Claude-Session:` line). 1,054 existing commits carry one (measured
+  2026-08-25), and they
   resolve to a handful of private session IDs that 404 for every reader but
   the maintainer - a constant paste with no provenance value. Attribution
   stays; dead links do not.
