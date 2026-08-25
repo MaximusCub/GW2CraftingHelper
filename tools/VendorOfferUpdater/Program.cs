@@ -502,31 +502,7 @@ namespace VendorOfferUpdater
                     Offers = finalOffers
                 };
 
-                // System.Text.Json's DEFAULT
-                // encoder conservatively HTML-escapes '\'', '&', '<', '>'
-                // (as ' etc.) even for pure JSON output with no HTML
-                // context - but the already-checked-in ref/vendor_offers.json
-                // never does this (confirmed: 222 literal '&' characters, 0
-                // & escapes; "Hearth's Glow" stored with a literal
-                // apostrophe). UnsafeRelaxedJsonEscaping skips that extra
-                // HTML-safety escaping (while still escaping the JSON-
-                // mandatory '"'/'\\'/control characters) but ALSO stops
-                // escaping non-ASCII text, which the existing file DOES do
-                // (e.g. "Homestead Refinement-Farm"). EscapeNonAscii
-                // below restores exactly that: non-ASCII escaped, everything
-                // else literal - matching the existing file's convention so
-                // a scoped --merge-into run's diff stays confined to the
-                // offers actually changed, not every apostrophe/ampersand
-                // in the whole 53k-row dataset.
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = false,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                };
-
-                string json = EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
+                string json = SerializeDataset(dataset);
 
                 string? dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -1534,6 +1510,40 @@ namespace VendorOfferUpdater
             string json = JsonSerializer.Serialize(sorted, options);
             File.WriteAllText(path, json);
             Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+        }
+
+        /// <summary>
+        /// Serializes a dataset into exactly the byte form
+        /// ref/vendor_offers.json is checked in as.
+        /// <para>
+        /// System.Text.Json's DEFAULT encoder conservatively HTML-escapes
+        /// '\'', '&amp;', '&lt;', '&gt;' (as <c>&amp;#x27;</c> etc.) even for pure JSON
+        /// output with no HTML context - but the already-checked-in
+        /// ref/vendor_offers.json never does this (confirmed: 222 literal
+        /// '&amp;' characters, 0 <c>&amp;#x26;</c> escapes; "Hearth's Glow" stored with a
+        /// literal apostrophe). UnsafeRelaxedJsonEscaping skips that extra
+        /// HTML-safety escaping (while still escaping the JSON-mandatory
+        /// '"'/'\\'/control characters) but ALSO stops escaping non-ASCII
+        /// text, which the existing file DOES do (e.g. "Homestead
+        /// Refinement-Farm"). <see cref="EscapeNonAscii"/> restores exactly
+        /// that: non-ASCII escaped, everything else literal - matching the
+        /// existing file's convention so a scoped --merge-into run's diff
+        /// stays confined to the offers actually changed, not every
+        /// apostrophe/ampersand in the whole 53k-row dataset.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string SerializeDataset(VendorOfferDataset dataset)
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
+            return EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
         }
 
         /// <summary>
