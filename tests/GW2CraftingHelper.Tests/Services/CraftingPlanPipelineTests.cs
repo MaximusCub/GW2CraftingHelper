@@ -1911,6 +1911,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.FetchingPrices,
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
+                PlanPhase.CheckingLearnedRecipes,
                 PlanPhase.BuildingDisplay
             };
 
@@ -1926,12 +1927,21 @@ namespace GW2CraftingHelper.Tests.Services
             }
 
             // FetchingPrices/FetchingItemDetails know an up-front item
-            // count; the other three phases do not.
+            // count; the other phases do not.
             Assert.True(phaseProgress.Reports[1].Total > 0);
             Assert.True(phaseProgress.Reports[3].Total > 0);
             Assert.Null(phaseProgress.Reports[0].Total);
             Assert.Null(phaseProgress.Reports[2].Total);
             Assert.Null(phaseProgress.Reports[4].Total);
+            Assert.Null(phaseProgress.Reports[5].Total);
+
+            // The account round trip must announce itself honestly rather
+            // than leaving "Fetching item details (N items)..." on the
+            // strip while it runs.
+            var learnedEvent = phaseProgress.Reports[4];
+            Assert.Equal("Checking learned recipes", learnedEvent.DisplayName);
+            Assert.Equal(
+                "Checking learned recipes...", PlanStripTickDecision.FormatPhaseText(learnedEvent));
         }
 
         [Fact]
@@ -2017,6 +2027,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.FetchingPrices,
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
+                PlanPhase.CheckingLearnedRecipes,
                 PlanPhase.BuildingDisplay
             };
             Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
@@ -2089,16 +2100,17 @@ namespace GW2CraftingHelper.Tests.Services
                     && e.Message == "Generating plan for Orrax Manifested x1");
 
                 // Debug: one bounded entry per phase as it completes
-                // (timing + counts where known) - exactly 5, matching
-                // PlanPhase's 5 values, no per-item spam.
+                // (timing + counts where known) - one per PlanPhase value,
+                // no per-item spam.
                 var phaseDebugEntries = entries
                     .Where(e => e.Level == ModuleLogLevel.Debug && e.Tag == "plan")
                     .ToList();
-                Assert.Equal(5, phaseDebugEntries.Count);
+                Assert.Equal(6, phaseDebugEntries.Count);
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building recipe tree:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching prices:") && e.Message.Contains("items"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Solving decisions:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching item details:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Checking learned recipes:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building display:") && e.Message.Contains("ms"));
 
                 // Info on finish: one compact per-phase summary line,
@@ -2107,7 +2119,8 @@ namespace GW2CraftingHelper.Tests.Services
                     e.Level == ModuleLogLevel.Info && e.Tag == "plan"
                     && e.Message.StartsWith("Plan for Orrax Manifested x1: tree ")
                     && e.Message.Contains("prices ") && e.Message.Contains("solve ")
-                    && e.Message.Contains("item details ") && e.Message.Contains("display ")
+                    && e.Message.Contains("item details ") && e.Message.Contains("learned recipes ")
+                    && e.Message.Contains("display ")
                     && e.Message.Contains(" - total "));
 
                 // Every entry this run wrote used the "plan" category, per
@@ -2198,16 +2211,17 @@ namespace GW2CraftingHelper.Tests.Services
                     && e.Message == "Generating plan for Target Item A x1, Target Item B x1");
 
                 // Debug: one bounded entry per phase as it completes -
-                // exactly 5, same as the single-item path, confirming the
+                // the same 6 as the single-item path, confirming the
                 // multi-item branch drives the SAME PhaseTracker.
                 var phaseDebugEntries = entries
                     .Where(e => e.Level == ModuleLogLevel.Debug && e.Tag == "plan")
                     .ToList();
-                Assert.Equal(5, phaseDebugEntries.Count);
+                Assert.Equal(6, phaseDebugEntries.Count);
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building recipe tree:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching prices:") && e.Message.Contains("items"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Solving decisions:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Fetching item details:") && e.Message.Contains("items"));
+                Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Checking learned recipes:") && e.Message.Contains("ms"));
                 Assert.Contains(phaseDebugEntries, e => e.Message.StartsWith("Building display:") && e.Message.Contains("ms"));
 
                 // Info on finish: the compact per-phase summary line, named
@@ -2216,7 +2230,8 @@ namespace GW2CraftingHelper.Tests.Services
                     e.Level == ModuleLogLevel.Info && e.Tag == "plan"
                     && e.Message.StartsWith("Plan for Target Item A x1, Target Item B x1: tree ")
                     && e.Message.Contains("prices ") && e.Message.Contains("solve ")
-                    && e.Message.Contains("item details ") && e.Message.Contains("display ")
+                    && e.Message.Contains("item details ") && e.Message.Contains("learned recipes ")
+                    && e.Message.Contains("display ")
                     && e.Message.Contains(" - total "));
 
                 Assert.All(entries, e => Assert.Equal("plan", e.Tag));

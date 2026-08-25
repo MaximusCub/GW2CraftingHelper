@@ -9,14 +9,14 @@ namespace GW2CraftingHelper.Services.Diagnostics
     /// Formats a compact, coarse-phase timing summary for the
     /// CraftingPlanPipeline's "Info on
     /// finish" ModuleLog line - e.g. "tree 120ms, prices 8400ms (418
-    /// items), solve 30ms, item details 9200ms, display 250ms - total
-    /// 19036ms (phases 18158ms)". Pure function over the SAME raw
+    /// items), solve 30ms, item details 9200ms, learned recipes 900ms,
+    /// display 250ms - total 19036ms (phases 18158ms)". Pure function over the SAME raw
     /// timingLog data PlanTimingAnalyzer already parses (Build recipe
     /// tree/trees, Collect item IDs, Fetch TP prices, Query vendor offers,
     /// Inventory reduction, Solve, Fetch item metadata, Fetch currency
     /// metadata, Fetch learned recipes, Build result - see
     /// CraftingPlanPipeline's own timingLog.Add call sites), just bucketed
-    /// into the 5 coarser phases PlanPhaseEvent exposes to the live UI,
+    /// into the coarser phases PlanPhaseEvent exposes to the live UI,
     /// rather than PlanTimingAnalyzer.Summarize's own per-raw-step
     /// percentage breakdown.
     /// <para>
@@ -50,10 +50,10 @@ namespace GW2CraftingHelper.Services.Diagnostics
         // Order matters: this is the emission order of the compact
         // summary, matching PlanPhaseEvent's own BuildingTree ->
         // FetchingPrices -> SolvingDecisions -> FetchingItemDetails ->
-        // BuildingDisplay sequence.
+        // CheckingLearnedRecipes -> BuildingDisplay sequence.
         private static readonly string[] BucketOrder =
         {
-            "tree", "prices", "solve", "item details", "display"
+            "tree", "prices", "solve", "item details", "learned recipes", "display"
         };
 
         // Maps a raw timingLog step name (PlanTimingAnalyzer.ParsedPhase.Name)
@@ -72,7 +72,11 @@ namespace GW2CraftingHelper.Services.Diagnostics
                 { "Solve", "solve" },
                 { "Fetch item metadata", "item details" },
                 { "Fetch currency metadata", "item details" },
-                { "Fetch learned recipes", "item details" },
+                // Its own bucket: a single /v2/account/recipes round trip
+                // that has nothing to do with the N items "item details"
+                // is annotated with (see CountSourceByBucket below), and
+                // large enough to dominate that bucket when folded in.
+                { "Fetch learned recipes", "learned recipes" },
                 { "Build result", "display" }
             };
 
