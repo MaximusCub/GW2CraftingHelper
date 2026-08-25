@@ -1865,7 +1865,18 @@ milestone neither handler measured a single string.
 
 The module already had the answer twice over and this milestone now uses
 it once: positions and widths track the drag live, and the half that
-MEASURES text runs at drag settle. Services/ResizeSettleDebounce is
+MEASURES text runs at drag settle. Correction to the first pass of this
+work, which swept for the wrong shape and reported "no third instance":
+it looked for width-GUARDED relayouts and so found only the two tabs it
+had just written, when the predicate that matters is TEXT MEASUREMENT ON
+A RESIZE PATH. By that predicate the module's heaviest instance was
+already there and had been made 50% heavier by this very branch -
+LogTabContent's Resized handler calls RefitRows undebounced, and the new
+Tag column took it from two EllipsizeToWidth calls per row to three, so
+narrowing the window over a full 2000-entry ring cost up to 6000
+MeasureString binary searches per drag EVENT against 4000 on master. The
+Log tab now takes the same split, which is what makes the sweep true.
+Services/ResizeSettleDebounce is
 MainView's own ScheduleRowRefit/RunRowRefitAfterSettleAsync pair lifted
 out verbatim - one stamped clock, one in-flight waiter that re-arms
 against the stamp, no cancel-and-replace timer (which costs a
@@ -1878,12 +1889,25 @@ hands it the marshal - which is what makes its behaviour testable.
 
 The lever in the views is one bool, measureText, threaded through the
 layout functions so build and both halves of a resize stay one code path
-rather than three. The Label's own explicitly-written Height is the
-cache; at measureText false a paragraph keeps the wrap it has and only
-its box moves. VISIBLE COST, stated: for up to 150ms after a drag stops,
-a paragraph is wrapped to the previous width and a name that no longer
-fits still shows its "...". That is the same trade CraftingPlanView's
-re-ellipsis registry already makes.
+rather than three. On Settings and About the Label's own
+explicitly-written Height is the cache; at measureText false a paragraph
+keeps the wrap it has and only its box moves. VISIBLE COST, stated: for
+up to 150ms after a drag stops, a paragraph is wrapped to the previous
+width and a name that no longer fits still shows its "...". That is the
+same trade CraftingPlanView's re-ellipsis registry already makes.
+
+On the Log tab the cache could not be the control, because a row's
+columns MOVE on the live half while their strings stay behind: the old
+skip-the-search test compared the new band against the Label's own
+current width, which the live half has already updated, so a narrowing
+drag would have skipped exactly the re-fit it needs. Each row now records
+the width each of its three strings was fitted at, and
+LogRowLayout.KeepsFitting - Blish-free and tested, since it is the thing
+that decides whether text overflows - reads that instead. It holds the
+NARROWEST width a whole string is known to fit in, so a drag out and back
+skips both ways. Log's visible cost is its own: for up to 150ms a
+narrowing column clips its text against the row panel rather than showing
+"...".
 
 Deliberately NOT added: a per-label memo that skips a re-wrap when the
 budget is unchanged. Both tabs cap prose at a reading measure, so at
@@ -2002,7 +2026,10 @@ the existing suspended refit walk after the eviction trim.
 
 Cost, stated: one more Label per rendered row (four controls against
 three) and one more ellipsize per row per refit, both bounded by the ring
-cap and both inside the existing SuspendLayout. The rebuild path's new
+cap and both inside the existing SuspendLayout - and, on a resize, run
+once per drag rather than once per drag event (see "The resize split"
+above; a bound is not a mitigation, and this is the path where the
+difference is largest). The rebuild path's new
 per-row tag measuring is memoised per distinct tag string - the module
 writes about a dozen tags in its whole lifetime - so a filter keystroke
 walking 2000 rows measures a dozen strings, not 2000.
@@ -2139,8 +2166,21 @@ EVERY TAB, THE DRAG ITSELF
   and grid columns follow the edge frame by frame. Paragraph wrapping and
   the "..." on shortened names deliberately lag - watch for them to catch
   up within about a fifth of a second of releasing, once, not repeatedly.
+- Now the heavy one. On the Log tab, set the level filter to Debug+ with
+  an EMPTY search so the ring is as full as the session allows (leave the
+  module running a while first, or run a couple of plans and a snapshot
+  refresh, to fill it), then drag the window edge NARROWER, fast, without
+  letting go. This is the worst case in the module - three text
+  measurements for every row on screen. The drag must stay smooth and
+  the three columns must track the edge. Rows whose message no longer
+  fits will be CLIPPED mid-word during the drag, with no "..."; that is
+  the declared cost. On release, every one of them must gain its "..."
+  within about a fifth of a second, in one pass. Then widen again and
+  confirm the "..." disappear from rows that now fit.
 - Release the drag and immediately switch tabs. Nothing throws and
-  nothing appears in the Log tab at Debug+ about a re-fit wait.
+  nothing appears in the Log tab at Debug+ about a re-fit wait (the
+  warning strings to watch for are "text re-fit wait failed" and "row
+  re-fit wait failed").
 
 SETTINGS
 - 1378: two section columns; the four sections pack Sound|Homestead over
@@ -2190,9 +2230,11 @@ LOG
 - Leave Follow checked while a snapshot refresh writes [snapshot-fetch]
   rows: the band widens once, every row re-fits, and no row is left at
   the old x.
-- Drag the window from 1378 to 2560 and back: rows re-fit, no compounded
-  "...", the toolbar's search box grows to its 400 cap and no further,
-  the three buttons stay pinned.
+- Drag the window from 1378 to 2560 and back: rows re-fit once the drag
+  stops, with no compounded "..." after several out-and-back drags (the
+  re-fit always starts from the stored whole string, never from what the
+  label currently shows). The toolbar's search box grows to its 400 cap
+  and no further, and the three buttons stay pinned, both DURING the drag.
 - At 1378 confirm the search box, level dropdown, Follow checkbox and the
   three buttons share one optical centre line.
 

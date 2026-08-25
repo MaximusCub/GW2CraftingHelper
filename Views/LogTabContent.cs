@@ -18,14 +18,15 @@ namespace GW2CraftingHelper.Views
     /// clear-view, and the confirm-gated destructive delete-log-file
     /// action, backed directly by a ModuleLog's ring buffer.
     /// Pattern A (lightweight FlowPanel(CanScroll)): every row is a
-    /// fixed-height Panel of two ellipsized columns (dim prefix, message),
-    /// re-fitted by walking <see cref="_renderedRows"/> straight from the
-    /// container's own Resized handler. That is deliberately NOT the
+    /// fixed-height Panel of three ellipsized columns (time, tag, message),
+    /// re-fitted by walking <see cref="_renderedRows"/> from the container's
+    /// own Resized handler. That is deliberately NOT the
     /// PlanContentHeightMath/relayout-registry contract (that machinery is
     /// CraftingPlanView-only): rows here are uniform height, so there is no
     /// per-section height math to keep in sync, and the tail-follow scroll
-    /// overshoots rather than restoring an exact offset, so there is no
-    /// settle/verify pass to defer the re-ellipsis into.
+    /// overshoots rather than restoring an exact offset. The walk IS split
+    /// on the module's standing line - columns live, ellipses at drag
+    /// settle - being its heaviest text-measurement path.
     /// </summary>
     public class LogTabContent
     {
@@ -172,7 +173,9 @@ namespace GW2CraftingHelper.Views
         // entry point that touches them (Build's marshaled tail,
         // PollForUpdates, Refresh, the level dropdown/search box handlers
         // via RebuildRowsIfBuilt, ClearView, and the container Resized
-        // handler) runs on the main thread, and the five of those (every
+        // handler - counting with it the trailing re-fit it defers through
+        // _resizeSettle, which marshals back onto this same thread) runs on
+        // the main thread, and the five of those (every
         // one except Build's own tail, which IS the thing being awaited)
         // additionally defer to Build's tail rather than acting while it is
         // still pending. This is narrower than "every field this class
@@ -219,8 +222,9 @@ namespace GW2CraftingHelper.Views
         /// <para>
         /// Cost of the split, stated: four controls per row against three,
         /// and one more EllipsizeToWidth per row per refit. Both are bounded
-        /// by the ring cap (2000) and by what the filter admits, and the
-        /// refit loop is already SuspendLayout-wrapped.
+        /// by the ring cap (2000) and by what the filter admits, the refit
+        /// loop is SuspendLayout-wrapped, and on a resize the ellipsize half
+        /// runs once per drag rather than once per drag event.
         /// </para>
         /// <para>
         /// Accepted divergence: timestamps still do not align pixel-for-pixel
@@ -241,6 +245,11 @@ namespace GW2CraftingHelper.Views
             internal string FullTag;
             internal string FullMessage;
             internal string FullLine;
+
+            // What LogRowLayout.KeepsFitting reads; -1 until first fitted.
+            internal int FittedTimeWidth = -1;
+            internal int FittedTagWidth = -1;
+            internal int FittedMessageWidth = -1;
         }
 
         // The "Clear View" floor must not be a plain instance field
@@ -263,12 +272,25 @@ namespace GW2CraftingHelper.Views
         private readonly Func<long> _getClearedBeforeVersion;
         private readonly Action<long> _setClearedBeforeVersion;
 
+        // Holds the ellipsize half of a resize until the drag stops (see
+        // RefitRows). No Cancel counterpart, unlike the Settings and About
+        // tabs': Blish builds a fresh LogTabContent per tab visit, so an
+        // abandoned one's waiter outlives it by one settle window and then
+        // finds IsLive false.
+        private readonly ResizeSettleDebounce _resizeSettle;
+
         public LogTabContent(ModuleLog log, ModalDialog modalDialog, Func<long> getClearedBeforeVersion, Action<long> setClearedBeforeVersion)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
             _modalDialog = modalDialog ?? throw new ArgumentNullException(nameof(modalDialog));
             _getClearedBeforeVersion = getClearedBeforeVersion ?? throw new ArgumentNullException(nameof(getClearedBeforeVersion));
             _setClearedBeforeVersion = setClearedBeforeVersion ?? throw new ArgumentNullException(nameof(setClearedBeforeVersion));
+
+            _resizeSettle = new ResizeSettleDebounce(
+                RefitRowTextAfterResizeSettle,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "Log row re-fit wait failed"));
         }
 
         public void Build(Container container)
@@ -898,7 +920,8 @@ namespace GW2CraftingHelper.Views
                 // end this pass agreeing about the band - the property the
                 // worst-case template used to buy. After the eviction trim,
                 // so a row about to be disposed is not re-fitted first.
-                RefitEveryRow(metrics);
+                // Measures: a content change has no drag to settle after.
+                RefitEveryRow(metrics, measureText: true);
             }
 
             _lastSeenVersion = version;
@@ -1207,7 +1230,7 @@ namespace GW2CraftingHelper.Views
                 Parent = row.Panel
             };
 
-            ApplyRowLayout(row, metrics);
+            ApplyRowLayout(row, metrics, measureText: true);
             _renderedRows.Enqueue(row);
         }
 
@@ -1216,22 +1239,15 @@ namespace GW2CraftingHelper.Views
         /// place row text and column sizes are assigned, so the initial
         /// build and every resize re-fit cannot diverge.
         /// </summary>
-        private static void ApplyRowLayout(LogRow row, RowMetrics metrics)
+        /// <param name="measureText">
+        /// False on the live half of a resize drag: columns take their new x
+        /// and width, the three EllipsizeToWidth calls wait for the settle
+        /// pass. VISIBLE COST: for up to one settle window a narrowing
+        /// column clips against the row Panel rather than showing "...".
+        /// </param>
+        private static void ApplyRowLayout(LogRow row, RowMetrics metrics, bool measureText)
         {
             var bands = metrics.Bands;
-
-            // Every text is resolved BEFORE the columns are resized:
-            // KeepsFitting compares the new column width against the width
-            // the label is still carrying from the previous pass.
-            string timeText = KeepsFitting(row.TimeLabel, row.FullTime, bands.TimeWidth)
-                ? row.FullTime
-                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullTime, bands.TimeWidth);
-            string tagText = KeepsFitting(row.TagLabel, row.FullTag, bands.TagWidth)
-                ? row.FullTag
-                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullTag, bands.TagWidth);
-            string messageText = KeepsFitting(row.MessageLabel, row.FullMessage, bands.MessageWidth)
-                ? row.FullMessage
-                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullMessage, bands.MessageWidth);
 
             row.Panel.Size = new Point(metrics.RowWidth, metrics.RowHeight);
             row.TimeLabel.Location = new Point(bands.TimeX, 0);
@@ -1240,6 +1256,18 @@ namespace GW2CraftingHelper.Views
             row.TagLabel.Size = new Point(bands.TagWidth, metrics.RowHeight);
             row.MessageLabel.Location = new Point(bands.MessageX, 0);
             row.MessageLabel.Size = new Point(bands.MessageWidth, metrics.RowHeight);
+
+            if (!measureText)
+            {
+                return;
+            }
+
+            string timeText = FitColumn(
+                metrics.Font, row.FullTime, row.TimeLabel, bands.TimeWidth, ref row.FittedTimeWidth);
+            string tagText = FitColumn(
+                metrics.Font, row.FullTag, row.TagLabel, bands.TagWidth, ref row.FittedTagWidth);
+            string messageText = FitColumn(
+                metrics.Font, row.FullMessage, row.MessageLabel, bands.MessageWidth, ref row.FittedMessageWidth);
 
             // Assigning Label.Text invalidates layout, so only assign when
             // the displayed string actually changed - the same gate
@@ -1289,15 +1317,23 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// True when the label already shows the untruncated string and its
-        /// column only grew - it cannot have started to overflow, so the
-        /// MeasureString binary search inside EllipsizeToWidth can be
-        /// skipped. Matters on a horizontal resize drag, which re-fits every
-        /// visible row (up to the ring's 2000) on every tick.
+        /// The string one column should show at <paramref name="newWidth"/>,
+        /// recording the width it was fitted to for
+        /// <see cref="LogRowLayout.KeepsFitting"/> to read next time.
         /// </summary>
-        private static bool KeepsFitting(Label label, string full, int newWidth)
+        private static string FitColumn(
+            BitmapFont font, string full, Label label, int newWidth, ref int fittedWidth)
         {
-            return ReferenceEquals(label.Text, full) && newWidth >= label.Width;
+            bool showingWholeString = ReferenceEquals(label.Text, full);
+            if (LogRowLayout.KeepsFitting(showingWholeString, fittedWidth, newWidth))
+            {
+                // Left alone, so it stays the NARROWEST width the whole
+                // string is known to fit in and a drag back down still skips.
+                return full;
+            }
+
+            fittedWidth = newWidth;
+            return LabelHelpers.EllipsizeToWidth(font, full, newWidth);
         }
 
         /// <summary>
@@ -1325,17 +1361,36 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            RefitEveryRow(MeasureRowMetrics());
+            RefitEveryRow(MeasureRowMetrics(), measureText: false);
+
+            // Past the width guard: a vertical-only drag schedules nothing.
+            _resizeSettle.Schedule();
         }
 
-        private void RefitEveryRow(RowMetrics metrics)
+        /// <summary>
+        /// The trailing half of a resize: the ellipses the live pass left at
+        /// the previous width. Re-measures its metrics rather than carrying
+        /// the live pass's, so a rebuild in between is absorbed as IsLive
+        /// absorbs a teardown.
+        /// </summary>
+        private void RefitRowTextAfterResizeSettle()
+        {
+            if (!IsLive)
+            {
+                return;
+            }
+
+            RefitEveryRow(MeasureRowMetrics(), measureText: true);
+        }
+
+        private void RefitEveryRow(RowMetrics metrics, bool measureText)
         {
             _contentPanel.SuspendLayout();
             try
             {
                 foreach (var row in _renderedRows)
                 {
-                    ApplyRowLayout(row, metrics);
+                    ApplyRowLayout(row, metrics, measureText);
                 }
             }
             finally
