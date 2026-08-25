@@ -107,8 +107,10 @@ namespace GW2CraftingHelper.Services
             //       version gate itself or a construction site that forgot
             //       to stamp it - a module defect whose every save is
             //       silently unrestorable. Info would bury that.
-            //   above current - written by a newer build; this one cannot
-            //       know what is in it.
+            //   anything else - a version this build never shipped, i.e.
+            //       above current (a newer build wrote it, and this one
+            //       cannot know what is in it) or negative (only a
+            //       hand-edited file reaches that).
             int observed = plan.SchemaVersion;
             int expected = PersistedPlan.CurrentSchemaVersion;
             if (observed >= 1 && observed < expected)
@@ -120,7 +122,7 @@ namespace GW2CraftingHelper.Services
             {
                 throw new InvalidDataException(observed == 0
                     ? $"Persisted plan records no schema version at all, this build expects {expected} - it predates the version gate, or whatever wrote it never set PersistedPlan.SchemaVersion."
-                    : $"Persisted plan is schema {observed}, ahead of this build's {expected} - written by a newer build.");
+                    : $"Persisted plan is schema {observed}, which this build ({expected}) never shipped - written by a newer build, or the field was damaged.");
             }
 
             // a single, class-level walk of
