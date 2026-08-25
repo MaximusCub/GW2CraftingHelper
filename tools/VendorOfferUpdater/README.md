@@ -120,7 +120,6 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 ```jsonc
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-02-13T12:34:56.0000000Z",
   "source": "gw2wiki-smw",
   "offers": [
     {
@@ -138,6 +137,24 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 ```
 
 Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are omitted from the output.
+
+The payload carries **nothing that varies per run**. The run's timestamp and a
+provenance summary go in a sibling `ref/vendor_offers_manifest.json` instead:
+
+```jsonc
+{
+  "manifestVersion": 1,
+  "schemaVersion": 1,
+  "source": "gw2wiki-smw",
+  "offerCount": 59414,
+  "generatedAt": "2026-08-25T14:09:11.2810521Z"
+}
+```
+
+This is what makes a no-op refresh visible: re-scrape unchanged wiki data and
+`ref/vendor_offers.json` is byte-for-byte unchanged, so `git status` shows only
+the manifest. An embedded `generatedAt` used to guarantee a fresh 14.8MB blob on
+every run whether or not a single price had moved.
 
 ## Exit Codes
 

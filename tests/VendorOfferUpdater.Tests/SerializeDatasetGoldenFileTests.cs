@@ -74,6 +74,19 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(shipped, rewritten);
         }
 
+        /// <summary>
+        /// The whole point of moving generatedAt into the sibling manifest: a
+        /// refresh that scrapes identical data must produce identical bytes, so
+        /// an unchanged `git status` is proof the run was a no-op. Asserting on
+        /// the shipped file rather than a fixture means a future reintroduction
+        /// of any run-scoped field into the payload fails here.
+        /// </summary>
+        [Fact]
+        public void ShippedFile_CarriesNoRunScopedTimestamp()
+        {
+            Assert.DoesNotContain("\"generatedAt\"", LoadShippedJson());
+        }
+
         [Fact]
         public void SerializeDataset_IsPureFunctionOfItsInput()
         {

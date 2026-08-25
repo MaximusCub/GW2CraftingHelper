@@ -497,7 +497,6 @@ namespace VendorOfferUpdater
                 var dataset = new VendorOfferDataset
                 {
                     SchemaVersion = 1,
-                    GeneratedAt = DateTime.UtcNow.ToString("o"),
                     Source = "gw2wiki-smw",
                     Offers = finalOffers
                 };
@@ -513,6 +512,22 @@ namespace VendorOfferUpdater
                 await File.WriteAllTextAsync(outputPath, json);
                 Console.WriteLine($"Written {finalOffers.Count} offers to {outputPath}");
                 Console.WriteLine($"File size: {new FileInfo(outputPath).Length:N0} bytes");
+
+                // The run's timestamp goes in the sibling manifest, never in
+                // the data file - see VendorOfferDataset's own note. A refresh
+                // that changes nothing must leave the 14.8MB blob byte-for-byte
+                // untouched, so `git status` after it is the no-op signal.
+                string manifestPath = ManifestPathFor(outputPath);
+                var manifest = new VendorOfferManifest
+                {
+                    ManifestVersion = 1,
+                    SchemaVersion = dataset.SchemaVersion,
+                    Source = dataset.Source,
+                    OfferCount = finalOffers.Count,
+                    GeneratedAt = DateTime.UtcNow.ToString("o")
+                };
+                await File.WriteAllTextAsync(manifestPath, SerializeManifest(manifest));
+                Console.WriteLine($"Written provenance manifest to {manifestPath}");
 
                 return 0;
             }
@@ -1544,6 +1559,46 @@ namespace VendorOfferUpdater
             };
 
             return EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
+        }
+
+        /// <summary>
+        /// Sibling manifest path for a dataset path: ref/vendor_offers.json
+        /// becomes ref/vendor_offers_manifest.json. Derived from the dataset
+        /// path rather than hardcoded so a --merge-into run against a scratch
+        /// copy writes its manifest next to that copy, not over the shipped one.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string ManifestPathFor(string datasetPath)
+        {
+            string? dir = Path.GetDirectoryName(datasetPath);
+            string name = Path.GetFileNameWithoutExtension(datasetPath) + "_manifest.json";
+            return string.IsNullOrEmpty(dir) ? name : Path.Combine(dir, name);
+        }
+
+        /// <summary>
+        /// Indented, newline-terminated, camelCase - the manifest is meant to
+        /// be read in a diff, unlike the dataset it describes.
+        /// <para>
+        /// The line endings are forced to LF. System.Text.Json's WriteIndented
+        /// emits Environment.NewLine, so the same manifest content would be
+        /// written as CRLF on Windows and LF elsewhere - a determinism bug in
+        /// the file whose entire job is to make no-op refreshes provable.
+        /// (JsonSerializerOptions.NewLine only exists from .NET 9; this project
+        /// targets net8.0.) No manifest value can contain a newline, so the
+        /// replace cannot touch anything but the formatting.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string SerializeManifest(VendorOfferManifest manifest)
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            };
+
+            string json = JsonSerializer.Serialize(manifest, jsonOptions);
+            return json.Replace("\r\n", "\n") + "\n";
         }
 
         /// <summary>
