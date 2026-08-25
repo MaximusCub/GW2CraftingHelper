@@ -112,20 +112,20 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(ClickSoundVolume.MinPercent, percent);
         }
 
-        // The default is the field-test starting point and is expected to
-        // be retuned in one line; what must stay true is that it is a
-        // playable percent, and that it is clearly above the loudest the
-        // old path could ever reach. That old ceiling is Blish's own
-        // AudioIntegration volume clamp of 0.4 (measured), i.e. 40 percent
-        // on this scale.
+        // The field test has since returned 35. What must stay true is
+        // that the default is a playable percent and that it is clearly
+        // louder than what the old path actually played: Blish's
+        // fixed-volume default of 0.2 (measured), i.e. 20 percent on this
+        // scale. It sits just under that path's absolute 0.4 ceiling,
+        // which only a game peaking at full scale ever reached.
         [Fact]
-        public void DefaultPercent_IsPlayableAndLouderThanTheOldCeiling()
+        public void DefaultPercent_IsPlayableAndLouderThanTheOldFixedDefault()
         {
             int percent = ClickSoundVolume.DefaultPercent;
 
             Assert.Equal(percent, ClickSoundVolume.Clamp(percent));
             Assert.False(ClickSoundVolume.IsSilent(percent));
-            Assert.True(percent > 40, "the default must beat the 0.4 ceiling of the volume it replaces");
+            Assert.True(percent > 20, "the default must beat the 0.2 fixed volume it replaces");
         }
     }
 }

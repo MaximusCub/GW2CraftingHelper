@@ -13917,11 +13917,14 @@ therefore unit-tested (39 cases):
 Percent that reproduces today's loudness: **40** is the loudest today
 could ever be (the 0.4 clamp), and **20** is Blish's fixed-volume
 default. The shipped default is **`ClickSoundVolume.DefaultPercent =
-75`** - 1.875x the absolute old ceiling (+5.5 dB) and 3.75x the old
-fixed default (+11.5 dB), with headroom left above it. It sits at
--11.4 dBFS peak. That constant is the single line to edit when the
-maintainer's field test returns a number; nothing else encodes a
-default.
+35`** - the maintainer's field-tested number ("I found 35% or so is a
+reasonable click default volume"), which is 0.875x the absolute old
+ceiling (-1.2 dB) and 1.75x the old fixed default (+4.9 dB). It sits at
+-18.1 dBFS peak: louder than the 0.2 default ever played, and short of
+the 0.4 ceiling only a game peaking at full scale reached. It shipped at
+**75** (+5.5 dB over that ceiling) until the field test; that constant
+is the only line encoding a default, and a user who already moved the
+slider keeps their own value - only the default changed.
 
 ### Deliberate divergence 1: the slider is not save-gated
 
@@ -14139,20 +14142,21 @@ session, same as `TooltipFacility`).
    still trims at the saved cap this session (the tab no longer pushes
    it directly - `Module` does).
 7. Report the number that feels right - it replaces `DefaultPercent`.
+   ANSWERED: 35 (field-fixes-3 item 3).
 
 Gate: PASS on the render half (2026-08-23 night desktop session,
 captures preflight/gSND1-gSND2): the Sound section renders first on
-the Settings tab with the Click volume label, the TrackBar at the 75
-default, the live "75%" readout, the Test button beside it, and the
-instant-apply/zero-off/checkbox-exception prose. The audible half -
-how loud 75 actually feels, the Test button's playback at the dragged
+the Settings tab with the Click volume label, the TrackBar at the
+then-75 default, the live "75%" readout, the Test button beside it, and
+the instant-apply/zero-off/checkbox-exception prose. The audible half -
+how loud the default actually feels, the Test button's playback at the dragged
 value, silence at 0, persistence across a relaunch - is the
 maintainer's field check by nature (the sandbox cannot hear); the
 percent-to-volume mapping and clamps are pinned by
-ClickSoundVolumeTests. The maintainer's number becomes the new
-DefaultPercent in a one-line change.
+ClickSoundVolumeTests. The maintainer's number came back as **35** and
+is now the default (field-fixes-3 item 3).
 Morning re-run (2026-08-24, captures preflight/gM9-gM14): thumb DRAG
-moves the value with the readout live-updating (75 -> 21), the value
+moves the value with the readout live-updating (then-default 75 -> 21), the value
 SURVIVED a full Blish relaunch (restored at 21), and the slider was
 returned to ~the default afterwards. Notes: click-on-track does not
 jump and the wheel scrolls the panel, not the slider - both stock
