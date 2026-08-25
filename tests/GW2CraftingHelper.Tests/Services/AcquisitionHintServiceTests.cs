@@ -182,13 +182,18 @@ namespace GW2CraftingHelper.Tests.Services
 
                 // The three Endless Summer gifts from the field report.
                 // Each has an EMPTY search row in the recipe seed - the
-                // API knows no recipe - and the wiki confirms none exists
-                // (vendor purchase / achievement reward), so the bare
-                // UNKNOWN pill the maintainer saw was correct but useless.
-                // These hints are what turns it into an answer.
-                Assert.Equal("VENDOR", hints[106712].Badge);
+                // API knows no recipe - and each is bought with
+                // account-bound tokens that have no TP price, so
+                // VendorBatchSolver discards the vendor offer the module
+                // does ship and the row reads a bare, useless UNKNOWN.
+                // These hints are what turns it into an answer;
+                // AcquisitionHintSeedVendorAgreementTests pins them
+                // against that shipped offer. The badge is MERCHANT, not
+                // VENDOR: a VENDOR badge is byte-identical to the
+                // single-source VENDOR pill, which means a priced purchase.
+                Assert.Equal("MERCHANT", hints[106712].Badge);
                 Assert.Contains("Castaway Agnes", hints[106712].Hint);
-                Assert.Equal("VENDOR", hints[105804].Badge);
+                Assert.Equal("MERCHANT", hints[105804].Badge);
                 Assert.Contains("Canach", hints[105804].Hint);
                 Assert.Equal("ACHIEVEMENT", hints[106986].Badge);
                 Assert.Contains("Radiance of the Sun God", hints[106986].Hint);

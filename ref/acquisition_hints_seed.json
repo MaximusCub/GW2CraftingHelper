@@ -54,21 +54,21 @@
     },
     {
       "itemId": 106712,
-      "hint": "Purchased from Castaway Agnes in Hullgarden, Shipwreck Strand for a Concentrated Chromatic Sap, a Gift of Shipwreck Strand Exploration, a Survivor's Enchanted Compass and 500 Aether-Rich Sap. Not craftable; no recipe.",
-      "badge": "VENDOR",
+      "hint": "Purchased from Castaway Agnes in Hullgarden. Paid for in account-bound items, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
+      "badge": "MERCHANT",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Survivors",
       "lastVerified": "2026-08-24"
     },
     {
       "itemId": 105804,
-      "hint": "Purchased from Canach in Breezy Cay, Shipwreck Strand for a Gift of Starlit Weald Exploration, a Patron of the Magical Arts Plaque, a Seer Wreath of Service and 500 Antiquated Ducats. Not craftable; no recipe.",
-      "badge": "VENDOR",
+      "hint": "Purchased from Canach in Breezy Cay. Paid for in account-bound items, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
+      "badge": "MERCHANT",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_People",
       "lastVerified": "2026-08-24"
     },
     {
       "itemId": 106986,
-      "hint": "Awarded for completing the Radiance of the Sun God achievement; further copies from Shaman Palak in Shipwreck Strand. Not craftable; no recipe.",
+      "hint": "Awarded for completing the Radiance of the Sun God achievement; further copies from Palak in Hullgarden. That purchase is part barter, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
       "badge": "ACHIEVEMENT",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Hylek",
       "lastVerified": "2026-08-24"
