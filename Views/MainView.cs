@@ -2383,6 +2383,15 @@ namespace GW2CraftingHelper.Views
                 rowPanel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(columnWidth),
                 26, InfoTextColor, out _);
 
+            // The degrade path, stamped before the rich one takes the
+            // control over: Register captures this as the source's
+            // FallbackText, which is what a hover shows if the deferred
+            // builder throws (TooltipFacility.ResolveContent - the stat
+            // lookup runs inside Blish's mouse-moved handler). Width-
+            // independent, so the repack still owns no tooltip.
+            TooltipFacility.ApplyPlain(nameLabel, nameText);
+            TooltipFacility.ApplyPlain(breakdownLabel, breakdown);
+
             // The plan's own rich item tooltip, composed at hover time so a
             // stat block fetched later shows without a re-render. Stamped
             // ONCE: it says the same at any width, so the repack leaves

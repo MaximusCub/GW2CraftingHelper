@@ -15271,9 +15271,18 @@ because `FitRowTextLabel` wrote a plain tooltip: a non-null
 surface stamped over it. `FitRowTextLabel` no longer writes tooltips at
 all - the row owns them, as it already did for the strip, the amount and
 the icon - so the repack now fits text and moves the amount, and nothing
-else. Behaviour is unchanged: the plain note those labels carried was
-overwritten by the rich stamp on the same line and survived only as a
-fallback the builder's content can never reach.
+else. The plain note those labels carried was overwritten by the rich
+stamp on the same line, but it was NOT dead: `Register` captures a
+control's `BasicTooltipText` as the source's `FallbackText`, and
+`ResolveContent` returns exactly that when a deferred builder throws -
+and the item builder calls into the session stat cache from inside
+Blish's mouse-moved handler. Round 1 dropped it and called the change
+behaviour-neutral on the strength of a fallback nothing could reach,
+which was wrong. `CreateItemRow` now stamps the line's own text as a
+plain note once, at build, before the rich stamp takes the label over:
+unconditional rather than shorten-conditional as before, so the fallback
+does not depend on the column width and the repack still owns no
+tooltip.
 
 **Coin icons answered no hover.** `CoinCurrencyRenderer` built its coin
 icon as a raw `Panel` with a `BackgroundTexture`, entirely outside
