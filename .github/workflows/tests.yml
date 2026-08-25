@@ -24,7 +24,14 @@ jobs:
       - name: ASCII-only .cs source
         shell: bash
         run: |
-          violations=$(git ls-files -z '*.cs' | xargs -0 -r grep -lP '[^\x00-\x7F]' || true)
+          # LC_ALL=C is load-bearing. In a UTF-8 locale PCRE runs in UTF mode,
+          # where a byte that is not valid UTF-8 never matches [^\x00-\x7F] at
+          # all - so the step caught a UTF-8 em-dash and a BOM but waved through
+          # Windows-1252 curly quotes (0x93/0x94), the likeliest way non-ASCII
+          # reaches a Windows C# repo. Byte mode matches on bytes and catches
+          # all three. `env` because xargs execs grep directly, not via a shell.
+          violations=$(git ls-files -z '*.cs' \
+            | xargs -0 -r env LC_ALL=C grep -laP '[^\x00-\x7F]' || true)
           if [ -n "$violations" ]; then
             echo "CLAUDE.md requires ASCII-only .cs source. Represent runtime glyphs"
             echo "with escape sequences instead. Non-ASCII characters found in:"
@@ -37,8 +44,14 @@ jobs:
         run: |
           # ref/ holds data generated from the GW2 API and the wiki, not authored
           # text, so item names there are outside the rule.
+          #
+          # Byte mode here too, for the reason above - but the pattern must be
+          # the em-dash's UTF-8 bytes, not \x{2014}: under LC_ALL=C, PCRE rejects
+          # a code point above 0xFF outright ("character code point value in
+          # \x{} is too large", rc=2), and the `|| true` below would swallow
+          # that into a step that silently passes forever.
           hits=$(git ls-files -z '*.cs' '*.csproj' '*.yml' '*.yaml' '*.json' '*.config' \
-            | xargs -0 -r grep -lP '\x{2014}' | grep -v '^ref/' || true)
+            | xargs -0 -r env LC_ALL=C grep -laP '\xE2\x80\x94' | grep -v '^ref/' || true)
           if [ -n "$hits" ]; then
             echo "CLAUDE.md forbids em-dashes in source and config. Use '-' or '--'."
             echo "Found in:"
