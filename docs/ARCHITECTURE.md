@@ -18,9 +18,13 @@ diary this document distills). Each section below names the KNOWN-ISSUES
 item number(s) it is drawn from so you can go read the original
 investigation.
 
-This is a living map of *mechanisms*, not a tour of every file. See
-`docs/gw2e-parity-spec.md` for the normative behavior the solver targets,
-and `CONTRIBUTING.md` for build/test/style basics.
+This is a living map of *mechanisms*, not a tour of every file. For a map
+of *files* - which folder holds what, and the handful worth opening first -
+see [`docs/README.md`](README.md). Designs that were proposed and
+deliberately not built live in [`docs/DECISIONS.md`](DECISIONS.md), so this
+document can describe what exists rather than argue against what does not.
+See `docs/gw2e-parity-spec.md` for the normative behavior the solver
+targets, and `CONTRIBUTING.md` for build/test/style basics.
 
 ---
 
@@ -324,41 +328,14 @@ WP-24, WP-25) extracted:
   (`CoinCurrencyRenderer`, `RarityColors`, `IconControls`, `LabelHelpers`)
   also moved to `Views/Rendering/`.
 
-**TreeSectionController state/render split: rejected by decision, not
-deferred by oversight.** A later proposal to bisect `TreeSectionController`
-into a stateful collaborator (owning `_nodeOverrides`/`_ignoredItemIds`/
-`_nodeExpansion`/`_treeNodeStates`) and a separate stateless renderer,
-mirroring the per-render section renderers above, was evaluated and
-rejected (quorum verdict D-2). The invariant this class exists to hold is
-one owner, one lifetime: the whole reason it is constructed once in
-`CraftingPlanView`'s own constructor (`Views/CraftingPlanView.cs` ~614)
-instead of freshly per render is that its override state must survive a
-local pill-click re-solve, and a two-class split would either duplicate
-that lifetime management across both halves or reintroduce a second
-implicit owner - the exact class of bug section 1's "one owner" primitives
-above exist to prevent, just at the object-graph level instead of the
-thread level. It is also already the most-coupled class in
-`Views/Rendering/` outside its own file - mentioned by name in 14
-production `.cs` files (`Module.cs` plus 9 `Services/` files and 4
-`Views/` files, not counting `Models/` shape-mirroring comments or test
-files), of which 13 are comment-only; the actual compile-time coupling is
-2 references, both in `Views/CraftingPlanView.cs` (the field declaration
-and the constructor call site) - plus, as measured pre-change at `ce64423`,
-3 doc mentions (this section's own bullet and "Where:" line, plus
-`docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md` carried 42 more as historical
-narrative) - not 18, an earlier over-count that conflated this figure with
-something wider. That doc-mention count is a snapshot, not a live figure: every doc entry that names the class (including this one) adds mentions on landing, so no post-change total is stated here - reproduce the current count with `git grep -c TreeSectionController -- '*.md'`. A state/render split
-would not shrink that coupling, only relocate half of it across a new
-seam. The accepted alternative for future tree-row/pill features is not
-a class bisection: per
-the STANDING RULE (`CONTRIBUTING.md`), extract the pure text/decision
-computation for a given feature into a Blish-free, unit-tested composer
-under `Services/` first - `TreeRowTooltipComposer` (tree-tooltip-composer
-milestone) is the latest instance of the same pattern already behind
-`DecisionPillPlanner`, `ValueDetailTooltipBuilder`, `PillSubduingEvaluator`/
-`PillSubduingTooltipBuilder`, and `ReceiptCaptionHelper` - and keep wiring
-it into `TreeSectionController`'s existing single-owner shape rather than
-growing a second stateful class alongside it.
+`TreeSectionController` is constructed once, in `CraftingPlanView`'s own
+constructor (`Views/CraftingPlanView.cs` ~614), and lives as long as the
+view: one owner, one lifetime. That is what lets a pill click re-solve
+locally without resetting the user's overrides. Splitting it into a
+stateful/stateless pair was proposed and rejected - see
+[`docs/DECISIONS.md`](DECISIONS.md). New tree-row and pill features grow
+the `Services/` side of the boundary instead, under `CONTRIBUTING.md`'s
+STANDING RULE.
 
 **What stayed, and why (WP-26 cut):** The scroll/resize/wheel controller
 move (bundling `PreserveScrollAcross`, the wheel-wrap correction, and the
@@ -374,15 +351,14 @@ plan-authoring baseline down to ~2,802 lines at the time WP-26 was cut -
 real progress, even though short of the plan's own 2,000-line target - so
 the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
 fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
-`Views/CraftingPlanView.cs` has since grown well past the post-WP-26
-figure above, which is expected, not a
-regression of the decomposition: every line added since (W3B status
-strip/spinner, currency-ux-package, gate-round fixes, the
-tree-tooltip-composer extraction itself, ...) is a legitimate feature/fix
-landing in the file the STANDING RULE (see the TreeSectionController
-state/render split entry above and `CONTRIBUTING.md`) still routes pure
-logic out of on the way in, not evidence the WP-21 through WP-25
-extractions eroded.
+
+The file has since grown back past its own pre-decomposition baseline:
+**4,960 lines, measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`),
+against the ~4,802 above. `Views/Rendering/` holds 8,722 lines across 33
+files on the same date, so the split of plan-tab code is now roughly 64%
+outside the view - a ratio that can move in either direction, unlike the
+one-off before/after figure. Both numbers, and the date, so a later reader
+can re-run the two commands rather than take a characterization on trust.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
 `Views/Rendering/TreeSectionController.cs`, the seven
@@ -547,7 +523,8 @@ committed (see `docs/RELEASING.md` for the packaging implication of a
 dev machine still having them on disk locally).
 
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
-`Services/RecipeCacheSerializer.cs`, `Services/ItemNameSeedData.cs`; wiki
+`Services/Recipes/RecipeCacheSerializer.cs`,
+`Services/Recipes/ItemNameSeedData.cs`; wiki
 scraper - `tools/VendorOfferUpdater/WikiSmwClient.cs`.
 
 **Full history:** KNOWN-ISSUES items 24, 28, 33; `CONTRIBUTING.md`'s
@@ -574,10 +551,10 @@ All four are wired at three producer call sites, by name -
 edit site, `PlanViewModelBuilder.BuildNotesSection`, which reads all four
 lists to render their Notes rows. A fifth pass means touching all four
 sites; there is deliberately no `ApplyAll` seam collapsing the three
-producer calls into one - rejected on review as premature (quorum verdict
-D-3): the four calculators do not share a signature (differing inputs -
-`learnedRecipeIds`, `vendorOffers`, `characterDisciplines`), so a shared
-seam would need its own parameter object with no caller needing it today.
+producer calls into one, because the four calculators do not share a
+signature (differing inputs - `learnedRecipeIds`, `vendorOffers`,
+`characterDisciplines`). Rejected as premature; see
+[`docs/DECISIONS.md`](DECISIONS.md).
 
 The call order at each producer site - `SellSideEconomics` first,
 `CompetencyOpportunityCalculator` last - is convention (kept identical
@@ -592,5 +569,55 @@ pass's output, so any order between them is byte-identical.
 `Services/CraftingPlanPipeline.cs`; consumer in
 `Services/PlanViewModelBuilder.cs` (`BuildNotesSection`).
 
-**Full history:** quorum verdict D-3 (annotation-detection mutation-testing
-gap); each calculator's own class doc comment for its individual rationale.
+**Full history:**
+[`docs/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md)
+(the mutation-testing gap that produced these four passes); each
+calculator's own class doc comment for its individual rationale.
+
+---
+
+## 11. Typography: the measured type ramp
+
+**What:** `Services/TypeRampMetrics.cs` holds the measured Menomonia glyph
+metrics behind every vertical constant in the plan view, and names which
+ramp tier each chrome role sits in (section title, column header, status,
+body, caption). It is pure and Blish-free; `Views/Rendering/UiFonts.cs`
+is the only place that resolves an actual `BitmapFont`.
+
+**Why:** the numbers are measured, not chosen, and two of them are
+measured *defects* that a later contributor would otherwise rediscover the
+expensive way, in a live desktop session:
+
+- **18-regular is unusable for prose.** Its space glyph advances 4px,
+  against 7 at 16-regular and 9 at 18-bold, so any multi-word string at
+  18-regular renders with collapsed word gaps. The status line is
+  therefore bold at 18, not regular.
+- **22-regular is metrically a 24** - same line height, cap height and
+  advances as 24-regular, different file bytes - so there is no
+  regular-weight step between 20 and 24, and 22-regular must never be
+  loaded. 22-bold is a genuine intermediate.
+  `TypeRampMetrics.HasUsableRegularFace` refuses exactly these two sizes,
+  and `UiFonts.Regular` refuses them again at the seam.
+- **Two pixels of clearance under a descender, never one.** Blish's
+  UI-scale transform is non-integer, so a single-pixel margin can be lost
+  in the rounding. Every band height and divider clearance is a statement
+  about `TypeRampMetrics.InkBottom`, derived from the lowest ink of any
+  printable ASCII glyph at that size.
+- **Some Blish controls are locked to Font14** (`Checkbox`,
+  `StandardButton`, `TextBox`, `Dropdown`). Measure them in the caption
+  tier; do not try to restyle them.
+
+The metrics come from parsing the installed
+`Content/fonts/menomonia/menomonia-{size}-{style}.xnb` files directly -
+uncompressed MonoGame XNB containers holding one BitmapFont asset - and
+they reproduce, glyph for glyph, the figures published in
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+The atlas covers 8-36 regular and 8-24 plus 36 bold, reached via
+`ContentService.GetFont`, not only the five Blish defaults.
+
+**Where:** `Services/TypeRampMetrics.cs` (metrics, tier seats, and the
+`InkBottom`/`BaselineAlignedY` arithmetic every constant is written in);
+`Views/Rendering/UiFonts.cs` (font resolution);
+`Services/PlanContentHeightMath.cs` (the band heights those metrics feed).
+[`.impeccable.md`](../.impeccable.md) at the repo root carries the
+tool-facing design summary and points back here.

@@ -148,8 +148,8 @@ tag; see `docs/RELEASING.md`.
   `TreeRowTooltipComposer`, ...). Only the actual Blish-bound
   Panel/Label/event-wiring belongs in `TreeSectionController` itself. This
   is not a suggestion to eventually split `TreeSectionController` into a
-  stateful/stateless pair - that split was evaluated and rejected by
-  decision (see `docs/ARCHITECTURE.md` section 5); the class stays a
+  stateful/stateless pair - that split was proposed and rejected, with the
+  reasoning in `docs/DECISIONS.md`; the class stays a
   single owner with a single lifetime, and every new feature's logic grows
   the `Services/` side of that boundary, never a second stateful class.
 
