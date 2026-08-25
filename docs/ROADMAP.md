@@ -70,3 +70,10 @@
   templates) are archived at
   [`docs/archive/plans/2026-02-15/`](archive/plans/2026-02-15/).
 - Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Backlog
+
+- **First-run experience (NUX / welcome).** Requested 2026-08-24. A new
+  user opens the module to empty tabs and no explanation of what an API
+  key buys them; the first-load snapshot now fills the data, but nothing
+  yet introduces the tabs, the plan flow, or what to do without a key.

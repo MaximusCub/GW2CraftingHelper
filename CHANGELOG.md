@@ -5,6 +5,57 @@ matching `v<version>` git tag on the release commit, so any two shipped
 builds can be compared with `git diff v0.2.0..v0.2.1`. The About tab shows
 the running version.
 
+## 0.2.4 - 2026-08-25
+
+The rest of the module catches up with the crafting planner, plus a
+second field-test round.
+
+### Changed
+- **Every tab now uses the width it occupies.** Settings becomes a
+  two-column board (inputs aligned, descriptions at a readable measure,
+  Save and the "applies immediately" markers anchored right), the Log
+  gains a Time / Tag / Message gutter with the message owning the
+  remaining space, About becomes a two-column document, and the Snapshot
+  header stops hugging the left edge. No more stranded empty half-panel.
+- **One type hierarchy across the app**: section titles, column headers
+  and status lines now read as distinct tiers on Snapshot, Settings, Log
+  and About, the way the crafting plan already did.
+- **One icon treatment everywhere.** Item icons had inconsistent
+  borders and hovers depending on where they appeared; every item icon
+  now gets the same rarity frame, the same tooltip and the same
+  placeholder when art is missing.
+- The Total Cost section always shows its whole formula. It used to
+  collapse to a lone "Actual Cost to Craft" tile whenever a term was
+  zero - which is most plans - hiding two thirds of the section.
+- Item tooltips are translucent like the game's own, with the fine
+  border the game draws.
+- The default click volume is 35% (it was far too loud a jump before);
+  your own setting is untouched.
+
+### Added
+- Sortable column headers highlight on hover, and the whole header cell
+  is clickable, not just its text.
+- Snapshot rows show the same rich item tooltip the plan does.
+- On a fresh install the module now takes a snapshot immediately
+  instead of leaving you empty until the refresh timer or a manual
+  click.
+- **581 more items are recognised as vendor purchases**, including
+  Visions of Eternity gifts that previously showed as UNKNOWN.
+
+### Fixed
+- **Mystic Forge recipes no longer show as UNKNOWN.** Gift of Rays and
+  its relatives now plan properly - forge recipes added to the wiki data
+  were invisible unless the whole seed was regenerated.
+- Toggling IGNORE no longer makes the plan jump under your cursor; the
+  row you are pointing at stays where it is.
+- The plan's own root item can no longer be ignored.
+- A plan whose cost is genuinely zero shows zeros rather than an empty
+  section; costs that could not be measured say so instead of being
+  dressed up as zero.
+- The corner icon matches the size of the game's own top-row icons.
+- Closing the module with a text box focused no longer swallows your
+  keyboard in game.
+
 ## 0.2.3 - 2026-08-24
 
 The plan-view redesign (PR #173): the crafting planner stops wasting
