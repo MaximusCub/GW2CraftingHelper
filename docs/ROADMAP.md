@@ -48,7 +48,9 @@
 ## What's not done
 
 - **Plan History** and **Crafting Ranker** exist only as placeholder tabs
-  (they render a "Coming Soon" stub, no functional content).
+  (they render a "Coming Soon" stub, no functional content). Their tab
+  registration is `#if DEBUG`, so they are not present in released builds -
+  remove the two directives in `Module.cs` when the features land.
 - Further tab feature proposals (deeper snapshot search, plan history,
   a crafting ranker, and similar ideas) live in-repo at
   [`dev/proposals/`](../dev/proposals/).

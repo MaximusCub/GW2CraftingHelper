@@ -90,8 +90,9 @@ rarity) with vendor-tagged shopping rows:
   on-disk data directory (useful for attaching `snapshot.json`/`status.json`
   to a bug report).
 
-("Plan History" and "Crafting Ranker" appear as placeholder tabs reserved for
-future work; they have no functional content yet.)
+("Plan History" and "Crafting Ranker" are reserved for future work and have no
+functional content yet, so released builds do not show them. They appear as
+"Coming Soon" placeholder tabs in debug builds only.)
 
 ## Installing
 

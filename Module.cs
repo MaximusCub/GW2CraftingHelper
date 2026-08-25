@@ -677,6 +677,12 @@ namespace GW2CraftingHelper
                 "Log");
             _mainWindow.Tabs.Add(_logTab);
 
+#if DEBUG
+            // Dev builds only. Both views are BuildPlaceholder - a single
+            // "Coming Soon" label - and a released overlay should not
+            // advertise unfinished work in its own tab strip. Delete the
+            // two directives (not the tabs) when the features land; see
+            // docs/ROADMAP.md.
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156691),
                 () => new ViewAdapter("Plan History", BuildPlaceholder),
@@ -686,6 +692,7 @@ namespace GW2CraftingHelper
                 AsyncTexture2D.FromAssetId(156686),
                 () => new ViewAdapter("Crafting Ranker", BuildPlaceholder),
                 "Crafting Ranker"));
+#endif
 
             _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
@@ -1646,6 +1653,9 @@ namespace GW2CraftingHelper
             }
         }
 
+#if DEBUG
+        // Compiled only where its two callers are - see the tab
+        // registration in BuildMainWindow.
         private static void BuildPlaceholder(Container container)
         {
             new Label()
@@ -1659,6 +1669,7 @@ namespace GW2CraftingHelper
                 Parent = container,
             };
         }
+#endif
 
         private async Task<int> FetchGw2BuildIdAsync()
         {
