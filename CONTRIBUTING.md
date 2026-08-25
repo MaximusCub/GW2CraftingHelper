@@ -85,8 +85,8 @@ so a change to either hasher passes locally and fails CI.
 `net48`; `VendorOfferUpdater.Tests` targets `net8.0`, so a solution-level
 run needs both the .NET 8 SDK and .NET Framework 4.8 on the machine.
 
-The suite runs on every push and pull request; see the CI badge at the top
-of `README.md` for its current state. A few rules the test suite enforces
+The suite runs on every pull request; see the CI badge at the top of
+`README.md` for its current state. A few rules the test suite enforces
 and that any new test must follow:
 
 - **Tests exercise real production code paths.** No contract-mirror tests,
@@ -99,10 +99,15 @@ and that any new test must follow:
   be exercised without a running Blish HUD host; keep it that way when
   adding new logic.
 
-CI (`.github/workflows/tests.yml`) restores, builds the main module with
+CI (`.github/workflows/tests.yml`) restores, builds the whole solution with
 `-p:Platform=x64`, and runs this test project plus the two tool suites
 (`tests/GW2CraftingHelper.RecipeSeeder.Tests`,
-`tests/VendorOfferUpdater.Tests`) on every push and pull request.
+`tests/VendorOfferUpdater.Tests`). It runs on every pull request and on
+pushes to `master`; a docs-only change skips the Windows build job, and the
+`invariants` job still reports. That job fails the build on non-ASCII `.cs`
+source, an em-dash in source or config, a Blish HUD or `Gw2Sharp` reference
+under `tests/`, a `.cs` file missing its `<Compile Include>` entry, and a
+live doc citing a source path that does not exist.
 `.github/workflows/release.yml` builds and publishes the `.bhm` on a `v*`
 tag; see `docs/RELEASING.md`.
 
@@ -115,7 +120,9 @@ tag; see `docs/RELEASING.md`.
   is unusual compared to modern SDK-style projects (which glob `**/*.cs`
   automatically); it is a consequence of Blish HUD's module template, not
   a stylistic choice, so please don't try to "fix" it as part of an
-  unrelated change.
+  unrelated change. The `invariants` CI job diffs the `<Compile Include>`
+  list against the files on disk in both directions, so a forgotten entry
+  fails the build instead of silently dropping a file from compilation.
 - `tools/` contains standalone offline utilities (see below) that are
   separate console projects, most of them SDK-style, each with its own
   README where one exists.
@@ -130,10 +137,12 @@ tag; see `docs/RELEASING.md`.
 - **ASCII-only in `.cs` source.** Do not paste raw Unicode into code,
   comments, or string literals. If Unicode must be shown at runtime (UI
   glyphs, item names, etc.), use an escape (e.g. `"\u25BC"`) or data
-  returned by the GW2 API. CI runs an advisory (non-blocking) ASCII check
-  over `.cs` files on every push.
+  returned by the GW2 API. CI fails the build on any non-ASCII character in
+  a tracked `.cs` file.
 - No em-dashes in source, comments, or config - use a plain hyphen (`-`) or
-  double-hyphen (`--`) instead.
+  double-hyphen (`--`) instead. CI fails the build on one, in any tracked
+  `.cs`, `.csproj`, `.yml`, `.json` or `.config` file outside `ref/` (which
+  holds generated GW2 data, not authored text).
 - **XML doc where it earns its place; never as an obligation.** A
   `<summary>` belongs on a type or member whose contract is not already
   obvious from its name, and on anything carrying a measurement or an

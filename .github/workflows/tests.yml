@@ -2,39 +2,177 @@ name: tests
 
 on:
   push:
+    branches: [master]
   pull_request:
 
+# Without this, three pushes in a row leave six runs racing and the last one to
+# finish wins the status rather than the newest commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    runs-on: windows-latest
+  # Each check below passed on the commit that introduced it, so this job can
+  # only ever go red on a regression. Every rule it enforces is stated in
+  # CLAUDE.md or CONTRIBUTING.md and was, until now, enforced by prose alone.
+  invariants:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: ASCII-only source check (advisory)
+      - name: ASCII-only .cs source
         shell: bash
         run: |
-          echo "CLAUDE.md requires ASCII-only .cs source. Listing current violations below;"
-          echo "this step is advisory (non-blocking) until the pre-existing violations it"
-          echo "found are cleaned up in a follow-up pass - see M38 WP-02."
-          violations=$(grep -rlP '[^\x00-\x7F]' --include='*.cs' . \
-            | grep -v '^\./packages/' | grep -v '/obj/' | grep -v '/bin/' || true)
+          violations=$(git ls-files -z '*.cs' | xargs -0 -r grep -lP '[^\x00-\x7F]' || true)
           if [ -n "$violations" ]; then
+            echo "CLAUDE.md requires ASCII-only .cs source. Represent runtime glyphs"
+            echo "with escape sequences instead. Non-ASCII characters found in:"
             echo "$violations"
-          else
-            echo "(clean - no non-ASCII characters found in .cs source)"
+            exit 1
           fi
+
+      - name: No em-dash in source or config
+        shell: bash
+        run: |
+          # ref/ holds data generated from the GW2 API and the wiki, not authored
+          # text, so item names there are outside the rule.
+          hits=$(git ls-files -z '*.cs' '*.csproj' '*.yml' '*.yaml' '*.json' '*.config' \
+            | xargs -0 -r grep -lP '\x{2014}' | grep -v '^ref/' || true)
+          if [ -n "$hits" ]; then
+            echo "CLAUDE.md forbids em-dashes in source and config. Use '-' or '--'."
+            echo "Found in:"
+            echo "$hits"
+            exit 1
+          fi
+
+      - name: Tests stay free of Blish HUD and Gw2Sharp
+        shell: bash
+        run: |
+          # The test project references the module, so every Blish type is already
+          # on the test compiler's path: without this check a stray using would
+          # compile and pass. Comment lines are allowed, since several tests
+          # explain which Blish-bound seam they were written to avoid.
+          hits=$(git ls-files -z 'tests/*.cs' | xargs -0 -r grep -nE '(Blish_HUD|Gw2Sharp)' \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|/\*)' || true)
+          if [ -n "$hits" ]; then
+            echo "Tests must never reference Blish HUD or Gw2Sharp:"
+            echo "$hits"
+            exit 1
+          fi
+          pkgs=$(git ls-files -z 'tests/*.csproj' | xargs -0 -r grep -inE 'Blish|Gw2Sharp' || true)
+          if [ -n "$pkgs" ]; then
+            echo "Test projects must not reference Blish HUD or Gw2Sharp:"
+            echo "$pkgs"
+            exit 1
+          fi
+
+      - name: csproj Compile list matches disk
+        shell: bash
+        run: |
+          # The legacy csproj lists every source file by hand (CONTRIBUTING.md
+          # explains why it stays that way). An unregistered .cs compiles nowhere
+          # and fails nothing, so the omission is invisible without this check.
+          grep -oP '(?<=<Compile Include=")[^"]+' GW2CraftingHelper.csproj \
+            | tr '\\' '/' | sort > /tmp/compile-list.txt
+          git ls-files 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' 'Contracts/*.cs' \
+            'Properties/*.cs' 'Module.cs' | sort > /tmp/source-files.txt
+          drift=$(comm -3 /tmp/compile-list.txt /tmp/source-files.txt)
+          if [ -n "$drift" ]; then
+            echo "GW2CraftingHelper.csproj and disk disagree."
+            echo "Left column: in the csproj but not on disk."
+            echo "Right column: on disk but missing a <Compile Include> entry."
+            echo "$drift"
+            exit 1
+          fi
+
+      - name: Live docs cite source paths that exist
+        shell: bash
+        run: |
+          # docs/archive, docs/dev-notes and docs/research are dated point-in-time
+          # records, frozen by policy, so a path that moved after they were written
+          # is not a regression. Paths written with an elision are illustrative.
+          live=$(git ls-files '*.md' | grep -vE '^docs/(archive|dev-notes|research)/')
+          missing=""
+          for path in $(grep -rhoP '`(Views|Services|Models|Contracts|tools)/[^`*]+\.cs`' $live \
+            | tr -d '`' | grep -v '\.\.\.' | sort -u || true); do
+            if [ ! -f "$path" ]; then
+              missing="$missing $path"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Live docs cite source files that do not exist:$missing"
+            exit 1
+          fi
+
+  # 40% of the last 300 commits touched nothing outside docs/. A job skipped by
+  # an `if` still reports a status to branch protection, which a workflow-level
+  # paths-ignore would not - that would leave docs-only PRs unmergeable.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          # Anything we cannot resolve falls through to building, never to skipping.
+          code=true
+          base="$BASE_SHA"
+          if [ -z "$base" ]; then
+            base="$BEFORE_SHA"
+          fi
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            merge_base=$(git merge-base "$base" "$GITHUB_SHA" 2>/dev/null || true)
+            if [ -n "$merge_base" ]; then
+              base="$merge_base"
+            fi
+            changed=$(git diff --name-only "$base" "$GITHUB_SHA")
+            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^(docs/|.*\.md$)'; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "non-doc changes present: $code"
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages
+            ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('packages.config', '**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
       - name: Restore packages
         run: nuget restore GW2CraftingHelper.sln
 
-      - name: Build module
-        run: dotnet build GW2CraftingHelper.csproj -p:Platform=x64
+      # The solution, not the module alone: tools/MysticForgeSeeder (the only
+      # producer of ref/mystic_forge_recipes.json) and tools/GW2CraftingHelper.Harness
+      # have no test project, so a project-scoped build compiled neither.
+      - name: Build solution
+        run: dotnet build GW2CraftingHelper.sln -p:Platform=x64
 
       - name: Run tests
         run: dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
