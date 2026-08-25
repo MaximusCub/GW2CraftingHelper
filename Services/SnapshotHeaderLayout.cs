@@ -32,7 +32,12 @@ namespace GW2CraftingHelper.Services
         /// so anything that has to fit inside the row (the inline spinner)
         /// can be checked against the value the row is actually built from.
         /// </summary>
-        public const int StatusRowHeight = 24;
+        /// <para>
+        /// 26, not 24: the status line sits at the ramp's Status tier (18
+        /// bold, lowest ink 23 against Body's 21), drawn at y=2, so the 1px
+        /// of clearance the row has always kept needs two more pixels.
+        /// </para>
+        public const int StatusRowHeight = 26;
 
         /// <summary>
         /// Width available to the source-filter flow once it starts at

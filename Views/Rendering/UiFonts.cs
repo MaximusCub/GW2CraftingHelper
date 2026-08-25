@@ -54,21 +54,27 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static BitmapFont Caption => GameService.Content.DefaultFont14;
 
         /// <summary>
-        /// Every column header in the plan view, and the Total Cost band's
-        /// tile captions. Bold: headers used to be the same size and weight
-        /// as the rows under them, with only the dark band separating them.
+        /// Every column header the module draws - the plan's six tables,
+        /// the Snapshot tab's two runs, the Log tab's row columns - and the
+        /// Total Cost band's tile captions. Bold: headers used to be the
+        /// same size and weight as the rows under them, with only the dark
+        /// band separating them.
         /// </summary>
         internal static BitmapFont ColumnHeader =>
             Bold(TypeRampMetrics.ColumnHeaderPointSize);
 
-        /// <summary>The eight collapsible section titles.</summary>
+        /// <summary>
+        /// Every section title in the module: the plan's eight collapsible
+        /// sections, and the Snapshot/Settings/About tabs' own headings.
+        /// </summary>
         internal static BitmapFont SectionTitle =>
             Bold(TypeRampMetrics.SectionTitlePointSize);
 
         /// <summary>
-        /// The plan tab's status line. Bold rather than regular at this
-        /// size for a measured reason, not a stylistic one - see
-        /// TypeRampMetrics' note on 18-regular's space glyph.
+        /// Every tab's status line. Bold rather than regular at this size
+        /// for a measured reason, not a stylistic one - see
+        /// TypeRampMetrics' note on 18-regular's space glyph, which is also
+        /// why nothing in this ramp resolves 18-regular any more.
         /// </summary>
         internal static BitmapFont Status =>
             Bold(TypeRampMetrics.StatusPointSize);
@@ -86,15 +92,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static BitmapFont SmallHeadingBold =>
             Bold(TypeRampMetrics.SmallHeadingPointSize);
-
-        /// <summary>
-        /// Section headers OUTSIDE the plan view (the Settings and About
-        /// tabs). 18-regular, which the plan view no longer uses at all -
-        /// see TypeRampMetrics for the space-glyph defect that retired it
-        /// there. Retiring it here too would restyle two tabs this
-        /// milestone does not otherwise touch.
-        /// </summary>
-        internal static BitmapFont Title => GameService.Content.DefaultFont18;
 
         /// <summary>The plan title. No bold exists at this size.</summary>
         internal static BitmapFont Display => GameService.Content.DefaultFont32;

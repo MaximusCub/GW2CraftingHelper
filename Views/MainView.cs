@@ -249,6 +249,10 @@ namespace GW2CraftingHelper.Views
         private const int CoinCaptionGap = 8;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
+        // Same rule under every section heading in the module - see
+        // SettingsTabContent's own AddSectionHeader.
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
+
         // 56, not 52. An item cell stacks a name line at y=4 and a
         // breakdown line under it; at Font16 the name's line box ends at
         // y=24, so the breakdown moved from y=24 to y=26 and its lowest ink
@@ -261,6 +265,7 @@ namespace GW2CraftingHelper.Views
 
         // UI controls (stored for resize handler)
         private Panel _headerPanel;
+        private Panel _headerDivider;
         private Panel _statusPanel;
         private Panel _filterPanel;
         private Panel _sourceFilterPanel;
@@ -429,13 +434,25 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
+            // The tab's own section title, at the ramp's SectionTitle tier
+            // with the same 2px rule every other section heading in the
+            // module draws under itself. y=5 centres the tier's 29px line
+            // box in the 40px band the 20px one sat at y=8 in.
             new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.SectionTitle,
                 Text = "Account Snapshot",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 8),
+                Location = new Point(0, 5),
+                Parent = _headerPanel
+            };
+
+            _headerDivider = new Panel()
+            {
+                Size = new Point(w, 2),
+                Location = new Point(0, HeaderHeight - 2),
+                BackgroundColor = SectionDividerColor,
                 Parent = _headerPanel
             };
 
@@ -480,16 +497,14 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                // Y=2 (not 4) inside this 24px _statusPanel -
-                // matches the coin row's own precedent
-                // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
-                // in the same 24px height), leaving the body font the same
-                // clearance the coin row already relies on (its lowest
-                // Font16 ink is y=23).
+                // Y=2 inside _statusPanel - the coin row's own precedent
+                // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font)).
+                // SnapshotHeaderLayout.StatusRowHeight carries the
+                // clearance derivation for the Status tier's taller ink.
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
@@ -740,6 +755,7 @@ namespace GW2CraftingHelper.Views
             _containerHeight = h;
 
             _headerPanel.Size = new Point(w, HeaderHeight);
+            _headerDivider.Size = new Point(w, 2);
             _clearButton.Location = new Point(w - 220, HeaderButtonY);
             _refreshButton.Location = new Point(w - 110, HeaderButtonY);
             _statusPanel.Size = new Point(w, StatusRowHeight);
@@ -2169,18 +2185,23 @@ namespace GW2CraftingHelper.Views
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             var font = UiFonts.Body;
-            var captionFont = UiFonts.Caption;
+
+            // Body, not Caption: the caption was the one text on this tab
+            // that was both smaller AND greyer than what it labels. One
+            // channel of de-emphasis - it keeps the grey and joins the coin
+            // run's own size and y, which is also what lines it up with the
+            // numbers it introduces.
             new Label()
             {
                 Text = CoinCaption,
-                Font = captionFont,
+                Font = font,
                 TextColor = CoinCaptionColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 4),
+                Location = new Point(0, 2),
                 Parent = _coinPanel
             };
-            int captionWidth = (int)Math.Ceiling(captionFont.MeasureString(CoinCaption).Width);
+            int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
             CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156904, gold.ToString());
