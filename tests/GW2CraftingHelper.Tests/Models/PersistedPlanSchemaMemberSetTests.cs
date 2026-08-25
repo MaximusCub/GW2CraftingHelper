@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Models
@@ -19,268 +23,117 @@ namespace GW2CraftingHelper.Tests.Models
     // removal, OR retype anywhere in the persisted graph fails this test - not
     // just on the four types named in CurrentSchemaVersion's doc comment. See
     // KNOWN-ISSUES #53 for the full quality-audit rationale.
+    //
+    // The signature list itself lives in tests/shared/persisted_plan_schema.txt
+    // rather than in a C# array literal, so a shape change shows up as a
+    // readable text diff; UPDATE_SNAPSHOTS=1 regenerates it. Its SHA-256 is
+    // stored on PersistedPlan next to CurrentSchemaVersion, which is what
+    // couples the two - see PersistedPlan.SchemaShapeHash.
     public class PersistedPlanSchemaMemberSetTests
     {
         private const string ModelsNamespace = "GW2CraftingHelper.Models";
 
+        private const string SnapshotRelativePath = "tests/shared/persisted_plan_schema.txt";
+
         [Fact]
         public void CurrentSchemaVersion_MatchesExpectedValue()
         {
-            // Ties this snapshot to the version constant it exists to guard:
-            // without this, editing the literal below to make a failing run
-            // green requires no corresponding SchemaVersion bump at all.
             Assert.Equal(3, PersistedPlan.CurrentSchemaVersion);
         }
 
         [Fact]
         public void PersistedPlanGraph_PublicMemberSignature_MatchesSnapshot()
         {
-            string[] expected =
-            {
-                "AcquisitionHint.Badge:String",
-                "AcquisitionHint.Hint:String",
-                "AcquisitionHint.ItemId:Int32",
-                "AcquisitionHint.LastVerified:String",
-                "AcquisitionHint.SourceUrl:String",
-                "CompetencyOpportunity.CraftCost:Int64",
-                "CompetencyOpportunity.DeltaCost:Int64",
-                "CompetencyOpportunity.Disciplines:IReadOnlyList`1<String>",
-                "CompetencyOpportunity.ItemId:Int32",
-                "CompetencyOpportunity.MinRating:Int32",
-                "CostLine.Count:Int32",
-                "CostLine.Id:Int32",
-                "CostLine.Type:String",
-                "CraftingPlan.CurrencyCosts:List`1<CurrencyCost>",
-                "CraftingPlan.Steps:List`1<PlanStep>",
-                "CraftingPlan.TargetItemId:Int32",
-                "CraftingPlan.TargetQuantity:Int32",
-                "CraftingPlan.TimegatedItems:List`1<TimegatedItem>",
-                "CraftingPlan.TotalCoinCost:Int64",
-                "CraftingPlanResult.AcquisitionHints:IReadOnlyDictionary`2<Int32,AcquisitionHint>",
-                "CraftingPlanResult.CharacterDisciplines:IReadOnlyList`1<SnapshotCharacterDiscipline>",
-                "CraftingPlanResult.CompetencyOpportunities:List`1<CompetencyOpportunity>",
-                "CraftingPlanResult.CraftingProfit:Nullable`1<Int64>",
-                "CraftingPlanResult.CraftingTree:CraftingTreeNode",
-                "CraftingPlanResult.CurrencyMetadata:IReadOnlyDictionary`2<Int32,CurrencyMetadata>",
-                "CraftingPlanResult.DailyCooldownItems:IReadOnlyDictionary`2<Int32,DailyCooldownItem>",
-                "CraftingPlanResult.DebugLog:List`1<String>",
-                "CraftingPlanResult.ExcessCraftOutputs:List`1<ExcessCraftOutput>",
-                "CraftingPlanResult.ItemMetadata:IReadOnlyDictionary`2<Int32,ItemMetadata>",
-                "CraftingPlanResult.MaterialOpportunityCost:Nullable`1<Int64>",
-                "CraftingPlanResult.MultiItemRoots:List`1<CraftingTreeNode>",
-                "CraftingPlanResult.NetSaleValue:Nullable`1<Int64>",
-                "CraftingPlanResult.OwnedCurrencyAmounts:IReadOnlyDictionary`2<Int32,Int32>",
-                "CraftingPlanResult.Plan:CraftingPlan",
-                "CraftingPlanResult.PriceBasis:PriceBasis",
-                "CraftingPlanResult.ProbabilisticForgeOutputItemIds:List`1<Int32>",
-                "CraftingPlanResult.RecipeSheetSavingsOpportunities:List`1<RecipeSheetSavingsOpportunity>",
-                "CraftingPlanResult.RequestedItems:IReadOnlyList`1<PlanRequestItem>",
-                "CraftingPlanResult.RequiredDisciplines:List`1<RequiredDiscipline>",
-                "CraftingPlanResult.RequiredRecipes:List`1<RequiredRecipe>",
-                "CraftingPlanResult.SeasonalVendorTips:List`1<SeasonalVendorTip>",
-                "CraftingPlanResult.SellableQuantity:Int32",
-                "CraftingPlanResult.SolveContext:PlanSolveContext",
-                "CraftingPlanResult.TargetUnitSellPrice:Nullable`1<Int64>",
-                "CraftingPlanResult.UsedMaterials:List`1<UsedMaterial>",
-                "CraftingTreeNode.AcquisitionBadge:String",
-                "CraftingTreeNode.AcquisitionHint:String",
-                "CraftingTreeNode.BuyFromTpCostBreakdown:PillSourceCostBreakdown",
-                "CraftingTreeNode.BuyFromVendorCostBreakdown:PillSourceCostBreakdown",
-                "CraftingTreeNode.CanBuyTp:Boolean",
-                "CraftingTreeNode.CanBuyVendor:Boolean",
-                "CraftingTreeNode.CanCraft:Boolean",
-                "CraftingTreeNode.CheapestCraftDisciplines:IReadOnlyList`1<String>",
-                "CraftingTreeNode.CheapestCraftMinRating:Int32",
-                "CraftingTreeNode.CheapestCraftRealCost:Nullable`1<Int64>",
-                "CraftingTreeNode.CheapestCraftUntrained:Boolean",
-                "CraftingTreeNode.Children:IReadOnlyList`1<CraftingTreeNode>",
-                "CraftingTreeNode.ComponentOwnedQuantity:Int32",
-                "CraftingTreeNode.CraftCostBreakdown:PillSourceCostBreakdown",
-                "CraftingTreeNode.CraftExcludedByCompetency:Boolean",
-                "CraftingTreeNode.CraftExcludedDisciplines:IReadOnlyList`1<String>",
-                "CraftingTreeNode.CraftExcludedMinRating:Int32",
-                "CraftingTreeNode.CraftExcludedRealCost:Nullable`1<Int64>",
-                "CraftingTreeNode.CraftsNeeded:Nullable`1<Int32>",
-                "CraftingTreeNode.Decision:CraftingDecision",
-                "CraftingTreeNode.DecisionValue:Nullable`1<Int64>",
-                "CraftingTreeNode.IconUrl:String",
-                "CraftingTreeNode.IsAchievementBitDeduped:Boolean",
-                "CraftingTreeNode.IsCostComponent:Boolean",
-                "CraftingTreeNode.IsIgnored:Boolean",
-                "CraftingTreeNode.IsReferenceBranch:Boolean",
-                "CraftingTreeNode.ItemId:Int32",
-                "CraftingTreeNode.Name:String",
-                "CraftingTreeNode.NodeId:Int32",
-                "CraftingTreeNode.OwnedQuantityUsed:Int32",
-                "CraftingTreeNode.PriceSideFellBack:Boolean",
-                "CraftingTreeNode.Quantity:Int32",
-                "CraftingTreeNode.Rarity:String",
-                "CraftingTreeNode.RecipeExpectedOutputCount:Nullable`1<Double>",
-                "CraftingTreeNode.RecipeId:Nullable`1<Int32>",
-                "CraftingTreeNode.RecipeOutputCount:Nullable`1<Int32>",
-                "CraftingTreeNode.ReferenceRecipeDisciplines:List`1<String>",
-                "CraftingTreeNode.ReferenceRecipeId:Nullable`1<Int32>",
-                "CraftingTreeNode.ReferenceRecipeIsLearnedFromItem:Boolean",
-                "CraftingTreeNode.ReferenceRecipeMinRating:Int32",
-                "CraftingTreeNode.SubtreeCost:Nullable`1<Int64>",
-                "CraftingTreeNode.UnitCost:Nullable`1<Int64>",
-                "CraftingTreeNode.VendorComponentCostsUnreliable:Boolean",
-                "CraftingTreeNode.VendorCurrencyCosts:IReadOnlyList`1<CostLine>",
-                "CurrencyCost.Amount:Int64",
-                "CurrencyCost.CurrencyId:Int32",
-                "CurrencyMetadata.CurrencyId:Int32",
-                "CurrencyMetadata.IconUrl:String",
-                "CurrencyMetadata.Name:String",
-                "CurrencyValuation.ClearedCurrencyIds:IReadOnlyCollection`1<Int32>",
-                "CurrencyValuation.CopperPerUnit:IReadOnlyDictionary`2<Int32,Int64>",
-                "DailyCooldownItem.ItemId:Int32",
-                "DailyCooldownItem.LastVerified:String",
-                "DailyCooldownItem.PerDayCap:Int32",
-                "DailyCooldownItem.SourceUrl:String",
-                "ExcessCraftOutput.ExcessQuantity:Int32",
-                "ExcessCraftOutput.IsAccountBound:Boolean",
-                "ExcessCraftOutput.ItemId:Int32",
-                "ExcessCraftOutput.ReclaimValue:Nullable`1<Int64>",
-                "HomesteadEfficiencyTiers.TierByMaterialId:IReadOnlyDictionary`2<Int32,Int32>",
-                "ItemMetadata.IconUrl:String",
-                "ItemMetadata.IsAccountBound:Boolean",
-                "ItemMetadata.ItemId:Int32",
-                "ItemMetadata.Name:String",
-                "ItemMetadata.Rarity:String",
-                "ItemPrice.BuyInstant:Int32",
-                "ItemPrice.ItemId:Int32",
-                "ItemPrice.SellInstant:Int32",
-                "MaterialSourceAllocation.Quantity:Int32",
-                "MaterialSourceAllocation.Source:String",
-                "PersistedPlan.GeneratedAt:DateTime",
-                "PersistedPlan.IgnoredItemIds:IReadOnlyList`1<Int32>",
-                "PersistedPlan.NodeOverrides:IReadOnlyDictionary`2<Int32,AcquisitionSource>",
-                "PersistedPlan.PriceBasis:PriceBasis",
-                "PersistedPlan.RequestItems:IReadOnlyList`1<PlanRequestItem>",
-                "PersistedPlan.Result:CraftingPlanResult",
-                "PersistedPlan.SchemaVersion:Int32",
-                "PersistedPlan.UseOwnMaterials:Boolean",
-                "PersistedPlan.ValueOwnMaterials:Boolean",
-                "PillSourceCostBreakdown.CostLines:List`1<CostLine>",
-                "PillSourceCostBreakdown.DecisionValue:Nullable`1<Int64>",
-                "PillSourceCostBreakdown.IsAvailable:Boolean",
-                "PillSourceCostBreakdown.IsIncomplete:Boolean",
-                "PillSourceCostBreakdown.RawCoin:Int64",
-                "PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock:Boolean",
-                "PlanRequestItem.ItemId:Int32",
-                "PlanRequestItem.Quantity:Int32",
-                "PlanSolveContext.AccountItems:IReadOnlyList`1<SnapshotItemEntry>",
-                "PlanSolveContext.AcquisitionHints:IReadOnlyDictionary`2<Int32,AcquisitionHint>",
-                "PlanSolveContext.ActiveCharacterName:String",
-                "PlanSolveContext.CharacterDisciplines:IReadOnlyList`1<SnapshotCharacterDiscipline>",
-                "PlanSolveContext.CompetencyIndependentForceBuyNodeIds:ISet`1<Int32>",
-                "PlanSolveContext.CurrencyMetadata:IReadOnlyDictionary`2<Int32,CurrencyMetadata>",
-                "PlanSolveContext.CurrencyValuation:CurrencyValuation",
-                "PlanSolveContext.DailyCooldownItems:IReadOnlyDictionary`2<Int32,DailyCooldownItem>",
-                "PlanSolveContext.ForceBuyOnlyNodeIds:ISet`1<Int32>",
-                "PlanSolveContext.HomesteadTiers:HomesteadEfficiencyTiers",
-                "PlanSolveContext.LearnedRecipeIds:ISet`1<Int32>",
-                "PlanSolveContext.Metadata:IReadOnlyDictionary`2<Int32,ItemMetadata>",
-                "PlanSolveContext.OwnMaterialsMode:OwnMaterialsMode",
-                "PlanSolveContext.OwnedCurrencyAmounts:IReadOnlyDictionary`2<Int32,Int32>",
-                "PlanSolveContext.OwnedQuantityUsedByNodeId:IReadOnlyDictionary`2<Int32,Int32>",
-                "PlanSolveContext.OwnedVendorItemAmounts:IReadOnlyDictionary`2<Int32,Int32>",
-                "PlanSolveContext.PriceBasis:PriceBasis",
-                "PlanSolveContext.Prices:IReadOnlyDictionary`2<Int32,ItemPrice>",
-                "PlanSolveContext.Quantity:Int32",
-                "PlanSolveContext.RequestedItems:IReadOnlyList`1<PlanRequestItem>",
-                "PlanSolveContext.TargetItemId:Int32",
-                "PlanSolveContext.Tree:RecipeNode",
-                "PlanSolveContext.UnreducedTree:RecipeNode",
-                "PlanSolveContext.UsedMaterials:List`1<UsedMaterial>",
-                "PlanSolveContext.VendorOffers:IReadOnlyDictionary`2<Int32,IReadOnlyList`1<VendorOffer>>",
-                "PlanStep.ItemId:Int32",
-                "PlanStep.Quantity:Int32",
-                "PlanStep.RecipeId:Int32",
-                "PlanStep.Source:AcquisitionSource",
-                "PlanStep.TotalCost:Int64",
-                "PlanStep.UnitCost:Int64",
-                "PlanStep.VendorCurrencyCosts:List`1<CostLine>",
-                "PlanStep.VendorOfferCurrencyCostLinesPerBatch:List`1<CostLine>",
-                "PlanStep.VendorOfferOutputCount:Int32",
-                "RecipeNode.AchievementBit:Nullable`1<Int32>",
-                "RecipeNode.AchievementId:Nullable`1<Int32>",
-                "RecipeNode.Id:Int32",
-                "RecipeNode.IngredientType:String",
-                "RecipeNode.IsAchievementBitDeduped:Boolean",
-                "RecipeNode.IsLeaf:Boolean",
-                "RecipeNode.NodeId:Int32",
-                "RecipeNode.Quantity:Int32",
-                "RecipeNode.Recipes:List`1<RecipeOption>",
-                "RecipeOption.CraftsNeeded:Int32",
-                "RecipeOption.Disciplines:List`1<String>",
-                "RecipeOption.ExpectedOutputCount:Double",
-                "RecipeOption.Flags:List`1<String>",
-                "RecipeOption.Ingredients:List`1<RecipeNode>",
-                "RecipeOption.MinRating:Int32",
-                "RecipeOption.OutputCount:Int32",
-                "RecipeOption.RecipeId:Int32",
-                "RecipeSheetSavingsOpportunity.Discipline:String",
-                "RecipeSheetSavingsOpportunity.DisciplineBlocked:Boolean",
-                "RecipeSheetSavingsOpportunity.ItemId:Int32",
-                "RecipeSheetSavingsOpportunity.RecipeId:Int32",
-                "RecipeSheetSavingsOpportunity.RequiredRating:Int32",
-                "RecipeSheetSavingsOpportunity.SavingsPerUnit:Int64",
-                "RecipeSheetSavingsOpportunity.SheetCost:Int64",
-                "RecipeSheetSavingsOpportunity.SheetItemId:Int32",
-                "RequiredDiscipline.Discipline:String",
-                "RequiredDiscipline.MinRating:Int32",
-                "RequiredRecipe.Disciplines:List`1<String>",
-                "RequiredRecipe.IsAutoLearned:Boolean",
-                "RequiredRecipe.IsLearnedFromItem:Boolean",
-                "RequiredRecipe.IsMissing:Nullable`1<Boolean>",
-                "RequiredRecipe.MinRating:Int32",
-                "RequiredRecipe.OutputItemId:Int32",
-                "RequiredRecipe.RecipeId:Int32",
-                "SeasonalVendorTip.CostLines:List`1<CostLine>",
-                "SeasonalVendorTip.DailyCap:Nullable`1<Int32>",
-                "SeasonalVendorTip.Festival:String",
-                "SeasonalVendorTip.ItemId:Int32",
-                "SeasonalVendorTip.MerchantName:String",
-                "SeasonalVendorTip.OfferUnitCost:Int64",
-                "SeasonalVendorTip.OutputCount:Int32",
-                "SeasonalVendorTip.PlanUnitPrice:Int64",
-                "SeasonalVendorTip.WeeklyCap:Nullable`1<Int32>",
-                "SnapshotCharacterDiscipline.Active:Boolean",
-                "SnapshotCharacterDiscipline.CharacterName:String",
-                "SnapshotCharacterDiscipline.Discipline:String",
-                "SnapshotCharacterDiscipline.Rating:Int32",
-                "SnapshotItemEntry.Count:Int32",
-                "SnapshotItemEntry.IconUrl:String",
-                "SnapshotItemEntry.ItemId:Int32",
-                "SnapshotItemEntry.Name:String",
-                "SnapshotItemEntry.Source:String",
-                "TimegatedItem.CapType:TimegatedCapType",
-                "TimegatedItem.CapValue:Int32",
-                "TimegatedItem.ItemId:Int32",
-                "TimegatedItem.NeededCount:Int32",
-                "UsedMaterial.ItemId:Int32",
-                "UsedMaterial.QuantityUsed:Int32",
-                "UsedMaterial.Sources:List`1<MaterialSourceAllocation>",
-                "VendorOffer.CostLines:List`1<CostLine>",
-                "VendorOffer.DailyCap:Nullable`1<Int32>",
-                "VendorOffer.HomesteadTier:Nullable`1<Int32>",
-                "VendorOffer.Locations:List`1<String>",
-                "VendorOffer.MerchantName:String",
-                "VendorOffer.OfferId:String",
-                "VendorOffer.OutputCount:Int32",
-                "VendorOffer.OutputItemId:Int32",
-                "VendorOffer.SeasonalCap:Nullable`1<Int32>",
-                "VendorOffer.SeasonalFestival:String",
-                "VendorOffer.WeeklyCap:Nullable`1<Int32>",
-            };
+            string[] actual = CurrentSignatures();
+            string[] expected = ReadSnapshot();
 
-            string[] actual = ReachableModelTypes(typeof(PersistedPlan))
+            if (ShouldUpdateSnapshots())
+            {
+                WriteSnapshot(actual);
+                expected = actual;
+            }
+
+            // Line-by-line text, so the reviewer's diff names the property
+            // that moved instead of "collections differ at index 137".
+            Assert.Equal(string.Join("\n", expected), string.Join("\n", actual));
+        }
+
+        [Fact]
+        public void PersistedPlanGraph_ShapeHash_MatchesTheOneStoredBesideTheVersion()
+        {
+            // The coupling the pair was always described as having and did
+            // not: CurrentSchemaVersion_MatchesExpectedValue and the
+            // snapshot test are independent, so editing the snapshot alone
+            // used to make a shape change green with the version untouched.
+            // The hash lives on PersistedPlan, one line from
+            // CurrentSchemaVersion, so a graph change cannot be absorbed
+            // without editing the version's own neighbourhood.
+            string actualHash = Sha256(string.Join("\n", CurrentSignatures()));
+
+            Assert.True(
+                PersistedPlan.SchemaShapeHash == actualHash,
+                "The persisted plan graph's shape changed.\n"
+                + "  expected (PersistedPlan.SchemaShapeHash): " + PersistedPlan.SchemaShapeHash + "\n"
+                + "  actual:                                   " + actualHash + "\n"
+                + "Run the suite with UPDATE_SNAPSHOTS=1 to rewrite "
+                + SnapshotRelativePath + ", review that text diff, then set "
+                + "SchemaShapeHash to the actual value above and decide "
+                + "whether PersistedPlan.CurrentSchemaVersion must be bumped "
+                + "(it must, for any rename, removal or retype).");
+        }
+
+        private static string[] CurrentSignatures()
+        {
+            return ReachableModelTypes(typeof(PersistedPlan))
                 .SelectMany(MemberSignatures)
                 .OrderBy(s => s, StringComparer.Ordinal)
                 .ToArray();
+        }
 
-            Assert.Equal(expected.OrderBy(s => s, StringComparer.Ordinal), actual);
+        private static bool ShouldUpdateSnapshots()
+        {
+            return Environment.GetEnvironmentVariable("UPDATE_SNAPSHOTS") == "1";
+        }
+
+        private static string SnapshotPath()
+        {
+            string path = RepoFileLocator.FindRepoFile(
+                Path.Combine("tests", "shared", "persisted_plan_schema.txt"));
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new FileNotFoundException(
+                    "Could not locate " + SnapshotRelativePath
+                    + " by walking up from the test assembly's directory.");
+            }
+
+            return path;
+        }
+
+        private static string[] ReadSnapshot()
+        {
+            return File.ReadAllLines(SnapshotPath())
+                .Where(line => line.Length > 0)
+                .ToArray();
+        }
+
+        private static void WriteSnapshot(string[] signatures)
+        {
+            File.WriteAllText(SnapshotPath(), string.Join("\n", signatures) + "\n");
+        }
+
+        private static string Sha256(string value)
+        {
+            using (var sha = SHA256.Create())
+            {
+                byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(value));
+                var text = new StringBuilder(digest.Length * 2);
+                foreach (byte b in digest)
+                {
+                    text.Append(b.ToString("x2"));
+                }
+
+                return text.ToString();
+            }
         }
 
         private static IReadOnlyCollection<Type> ReachableModelTypes(Type root)

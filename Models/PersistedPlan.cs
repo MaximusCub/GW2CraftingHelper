@@ -30,6 +30,25 @@ namespace GW2CraftingHelper.Models
         public const int CurrentSchemaVersion = 3;
 
         /// <summary>
+        /// SHA-256 of the persisted graph's public member signatures, one
+        /// per line, ordinal-sorted - the same list checked in at
+        /// tests/shared/persisted_plan_schema.txt.
+        /// <para>
+        /// It lives here, next to the version it describes, for one reason:
+        /// the snapshot test and the version assertion used to be
+        /// independent, so adding a property anywhere in the graph could be
+        /// made green by editing the test's own expected list alone, with
+        /// <see cref="CurrentSchemaVersion"/> left at its old value - which
+        /// is precisely the unbumped shape change that makes
+        /// PlanStoreHelpers.DeserializePersistedPlan accept a file it can no
+        /// longer read correctly. Changing the graph now forces an edit
+        /// here, one line from the version.
+        /// </para>
+        /// </summary>
+        public const string SchemaShapeHash =
+            "4b81071d80ce7c73fd04145a9d4c3cff5a187d6e89ba80b8e5bb0f3e5c8e8df4";
+
+        /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
         /// this deliberately has NO property initializer.
         /// </summary>
