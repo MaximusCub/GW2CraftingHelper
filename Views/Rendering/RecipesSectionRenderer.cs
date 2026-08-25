@@ -207,7 +207,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 wikiHint = WikiHintText;
             }
 
-            IconControls.CreateRarityFramedIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
+            var iconFrame = IconControls.CreateItemIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
 
             var font = UiFonts.Body;
             string fullName = row.Label ?? "";
@@ -224,7 +224,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Location = new Point(NameX, NameY),
                     Parent = rowPanel
                 });
-            StampRowTooltip(rowPanel, nameLabel, fullName, wikiHint);
+            StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
 
             Label disciplineLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
@@ -291,7 +291,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    StampRowTooltip(rowPanel, nameLabel, fullName, wikiHint);
+                    StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
                 }
             });
         }
@@ -311,7 +311,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// leaves behind.
         /// </summary>
         private static void StampRowTooltip(
-            Panel rowPanel, Label nameLabel, string fullName, string wikiHint)
+            Panel rowPanel, Label nameLabel, Panel iconFrame, string fullName, string wikiHint)
         {
             string truncationLine = nameLabel.Text != fullName ? fullName : null;
             string tooltip = truncationLine == null
@@ -320,6 +320,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
             TooltipFacility.ApplyPlain(rowPanel, tooltip);
             TooltipFacility.ApplyPlain(nameLabel, tooltip);
+
+            // The icon is the row's biggest target and was the one part of
+            // it that answered a hover with nothing.
+            IconControls.ApplyPlainToIconTree(iconFrame, tooltip);
         }
     }
 }

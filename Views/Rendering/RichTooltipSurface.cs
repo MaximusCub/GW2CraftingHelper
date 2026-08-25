@@ -43,22 +43,28 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// The game's own canvas: pure black, faintly translucent, over
-        /// the whole box. Measured per-row background medians run
-        /// (20,25,28)..(57,59,56) over a bright scene, i.e. ~0.88-0.92
-        /// alpha (spec section 1.1, gap G1).
+        /// the whole box.
         /// <para>
-        /// This is the ONE translucent layer. Blish's own tooltip art is
-        /// drawn at 0.98 alpha and is suppressed entirely by the
-        /// <see cref="PaintBeforeChildren"/> override below - stacking a
-        /// second translucent layer on top of it would match neither the
-        /// game nor audit finding H6 (content bleeding through the box).
+        /// 0.82, retuned from 0.92 against the maintainer's in-game
+        /// capture: a real tooltip's interior is not flat - medians shift
+        /// ~20 levels per channel across ONE box, (34,38,40) to (43,55,55) -
+        /// which puts the game nearer 0.75-0.85. The UPPER end of that band,
+        /// since audit H6 requires content behind never to bleed through
+        /// legibly. The ONE translucent layer: Blish's own art (0.98) is
+        /// suppressed by <see cref="PaintBeforeChildren"/>.
         /// </para>
         /// </summary>
-        private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.92f;
+        private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.82f;
 
         /// <summary>1px, near-black, all four edges - measured on column
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
         private static readonly Color BorderColor = new Color(6, 10, 12);
+
+        /// <summary>The light line the game runs immediately inside its
+        /// dark border - the capture shows a pair, not one edge. This
+        /// file's own chrome grey at low alpha: a highlight on the canvas,
+        /// not a second border.</summary>
+        private static readonly Color BevelColor = new Color(166, 175, 174) * 0.22f;
 
         /// <summary>
         /// Every glyph in a game tooltip carries a dark halo (measured at
@@ -150,12 +156,27 @@ namespace GW2CraftingHelper.Views.Rendering
             var pixel = ContentService.Textures.Pixel;
             spriteBatch.DrawOnCtrl(this, pixel, bounds, BackgroundColor);
 
-            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), BorderColor);
+            DrawEdges(spriteBatch, pixel, bounds, BorderColor);
+
+            // One pixel inside the border, and only where there is room
+            // for both: at two pixels wide it would overdraw it.
+            if (bounds.Width > 2 && bounds.Height > 2)
+            {
+                DrawEdges(
+                    spriteBatch, pixel,
+                    new Rectangle(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2),
+                    BevelColor);
+            }
+        }
+
+        private void DrawEdges(SpriteBatch spriteBatch, Texture2D pixel, Rectangle bounds, Color color)
+        {
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), color);
             spriteBatch.DrawOnCtrl(
-                this, pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), BorderColor);
-            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), BorderColor);
+                this, pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), color);
+            spriteBatch.DrawOnCtrl(this, pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), color);
             spriteBatch.DrawOnCtrl(
-                this, pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), BorderColor);
+                this, pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), color);
         }
 
         public override void Show()
@@ -300,7 +321,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // (166,175,174) on the xyaren capture's left edge) rather
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
-                IconControls.CreateRarityFramedIcon(
+                IconControls.CreateItemIcon(
                     _contentPanel, row.IconUrl, HeaderIconFrameColor,
                     0, row.Y, HeaderIconSize, HeaderIconBorder);
             }

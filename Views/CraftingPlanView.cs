@@ -4372,7 +4372,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            var iconFrame = IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateItemIcon(
                 titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
                 iconSize: iconSize, borderThickness: iconBorder);
 

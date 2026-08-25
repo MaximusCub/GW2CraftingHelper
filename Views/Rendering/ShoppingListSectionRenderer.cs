@@ -234,11 +234,39 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
                 font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
 
-            SortableHeaderLabel.MakeClickable(itemLabel, () => SortBy(PlanTableColumn.Item));
-            SortableHeaderLabel.MakeClickable(sourceLabel, () => SortBy(PlanTableColumn.Source));
-            SortableHeaderLabel.MakeClickable(amountLabel, () => SortBy(PlanTableColumn.Amount));
-            SortableHeaderLabel.MakeClickable(eachLabel, () => SortBy(PlanTableColumn.Each));
-            SortableHeaderLabel.MakeClickable(totalLabel, () => SortBy(PlanTableColumn.Total));
+            // The hit area is each column's whole header CELL (see
+            // SortableHeaderCells); the labels carry only the note.
+            var labels = new[] { itemLabel, sourceLabel, amountLabel, eachLabel, totalLabel };
+            var columns = new[]
+            {
+                PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
+                PlanTableColumn.Each, PlanTableColumn.Total
+            };
+            var texts = new[]
+            {
+                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text
+            };
+
+            // Measured once, and from the strings rather than off the
+            // controls: a Blish Label's Width is not settled until its next
+            // layout pass.
+            var plan = new HeaderCellPlan(labels.Length, new SortableHeaderCells(rowPanel));
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var column = columns[i];
+                SortableHeaderLabel.MarkSortable(labels[i]);
+                plan.Set(
+                    i, labels[i],
+                    (int)System.Math.Ceiling(font.MeasureString(texts[i] ?? "").Width),
+                    () => SortBy(column));
+            }
+
+            // Each cell owns its COLUMN, not the pixels its word covers,
+            // from the same pre-scan the columns come from. The buffer is
+            // the closure's and is never reallocated.
+            var boundaries = new int[labels.Length - 1];
+            ApplyHeaderBoundaries(plan, scan, panelWidth, boundaries);
+            plan.Sync(rowPanel.Width);
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
@@ -256,7 +284,23 @@ namespace GW2CraftingHelper.Views.Rendering
                     PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), TableHeaderStyle.LabelY);
                 totalLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
+
+                // Four of the five columns are pinned off the panel edge,
+                // so their cells move with them.
+                ApplyHeaderBoundaries(plan, scan, w, boundaries);
+                plan.Sync(rowPanel.Width);
             });
+        }
+
+        private static void ApplyHeaderBoundaries(
+            HeaderCellPlan plan, ColumnScan scan, int panelWidth, int[] boundaries)
+        {
+            ShoppingColumnMath.HeaderCellBoundaries(
+                scan.EdgesFor(panelWidth), scan.SourceColumnWidth, NameToQtyGap, boundaries);
+            for (int i = 0; i < boundaries.Length; i++)
+            {
+                plan.SetBoundary(i, boundaries[i]);
+            }
         }
 
         // A ValueCellHandle's own

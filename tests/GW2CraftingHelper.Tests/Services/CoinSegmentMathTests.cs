@@ -278,5 +278,38 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(shared - (2 * (CoinSegmentMath.CoinIconSize - 13)), local);
             Assert.Equal(shared, CoinSegmentMath.TotalCoinSegmentsWidth(segments, 0));
         }
+
+        // The hover a coin icon answers with. Every denomination the coin
+        // renderer can build a segment for has to have one; anything else
+        // returns null, the icon component's "no text of my own" input.
+        [Theory]
+        [InlineData(CoinSegmentMath.GoldAssetId, "Gold")]
+        [InlineData(CoinSegmentMath.SilverAssetId, "Silver")]
+        [InlineData(CoinSegmentMath.CopperAssetId, "Copper")]
+        public void DenominationName_NamesEveryCoinIcon(int assetId, string expected)
+        {
+            Assert.Equal(expected, CoinSegmentMath.DenominationName(assetId));
+        }
+
+        [Fact]
+        public void DenominationName_IsNullForAnythingThatIsNotACoin()
+        {
+            Assert.Null(CoinSegmentMath.DenominationName(0));
+            Assert.Null(CoinSegmentMath.DenominationName(156905));
+        }
+
+        [Fact]
+        public void EverySegmentTheSplitProduces_CarriesANamedDenomination()
+        {
+            // Guards the pairing, not the three literals: a fourth
+            // denomination would otherwise ship an unnamed icon.
+            foreach (int assetId in new[]
+            {
+                CoinSegmentMath.GoldAssetId, CoinSegmentMath.SilverAssetId, CoinSegmentMath.CopperAssetId
+            })
+            {
+                Assert.False(string.IsNullOrEmpty(CoinSegmentMath.DenominationName(assetId)));
+            }
+        }
     }
 }

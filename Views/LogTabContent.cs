@@ -46,7 +46,14 @@ namespace GW2CraftingHelper.Views
         // own _statusPanel: the status label is auto-sized, so sharing the
         // toolbar row with the three right-anchored buttons ran a long
         // status underneath them at the module's default width.
-        private const int StatusRowHeight = 24;
+        // 26, not 24: the Status tier's lowest ink is 23 against Body's 21,
+        // so the same 1px of clearance needs two more pixels of band.
+        private const int StatusRowHeight = 26;
+
+        // Same band, tier and label y as every plan table's header.
+        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
+        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
+        private const int TopChromeHeight = ToolbarHeight + StatusRowHeight + ColumnHeaderRowHeight;
 
         // The FlowPanel scrolls, so a row sized to the panel's full width
         // would run under the scrollbar strip. Same allowance MainView's
@@ -82,6 +89,8 @@ namespace GW2CraftingHelper.Views
 
         private Panel _toolbarPanel;
         private Panel _statusPanel;
+        private Panel _columnHeaderPanel;
+        private Label _messageHeaderLabel;
         private FlowPanel _contentPanel;
         private Dropdown _levelDropdown;
         private TextBox _searchBox;
@@ -338,22 +347,23 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
-                // Y=2 inside this 24px row, matching MainView's own status
-                // label for the same body-font clearance (the label's lowest
-                // Font16 ink is y=23).
+                // Y=2, matching MainView's status label; StatusRowHeight
+                // carries the clearance derivation.
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
 
+            BuildColumnHeader(container, w);
+
             _contentPanel = new FlowPanel
             {
-                Size = new Point(w, container.ContentRegion.Height - ToolbarHeight - StatusRowHeight),
-                Location = new Point(0, ToolbarHeight + StatusRowHeight),
+                Size = new Point(w, container.ContentRegion.Height - TopChromeHeight),
+                Location = new Point(0, TopChromeHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
                 Parent = container
@@ -366,7 +376,8 @@ namespace GW2CraftingHelper.Views
                 int newWidth = container.ContentRegion.Width;
                 _toolbarPanel.Size = new Point(newWidth, ToolbarHeight);
                 _statusPanel.Size = new Point(newWidth, StatusRowHeight);
-                _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - ToolbarHeight - StatusRowHeight);
+                _columnHeaderPanel.Size = new Point(newWidth, ColumnHeaderRowHeight);
+                _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - TopChromeHeight);
                 PositionToolbarButtons(newWidth);
 
                 // After the panel's own resize, so RefitRows reads the new
@@ -856,6 +867,43 @@ namespace GW2CraftingHelper.Views
         // which cannot change any column - costs nothing per row.
         private int _lastLayoutWidth = -1;
 
+        /// <summary>The rows' two columns, labelled. The Message label's x
+        /// is width-derived, so it is repositioned by the same
+        /// <see cref="MeasureRowMetrics"/> pass the rows are - the header
+        /// cannot drift off the column it names.</summary>
+        private void BuildColumnHeader(Container container, int width)
+        {
+            _columnHeaderPanel = new Panel
+            {
+                Size = new Point(width, ColumnHeaderRowHeight),
+                Location = new Point(0, ToolbarHeight + StatusRowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
+                Parent = container
+            };
+
+            new Label
+            {
+                Font = TableHeaderStyle.Font,
+                TextColor = TableHeaderStyle.LabelColor,
+                Text = "Time",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel
+            };
+
+            _messageHeaderLabel = new Label
+            {
+                Font = TableHeaderStyle.Font,
+                TextColor = TableHeaderStyle.LabelColor,
+                Text = "Message",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(LogRowLayout.MessageX(0), ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel
+            };
+        }
+
         private RowMetrics MeasureRowMetrics()
         {
             var font = UiFonts.Body;
@@ -864,6 +912,12 @@ namespace GW2CraftingHelper.Views
 
             int rowWidth = Math.Max(0, contentWidth - ScrollbarAllowance);
             int prefixWidth = LogRowLayout.PrefixWidth(FullPrefixWidth(font), rowWidth);
+
+            if (_messageHeaderLabel != null)
+            {
+                _messageHeaderLabel.Location =
+                    new Point(LogRowLayout.MessageX(prefixWidth), ColumnHeaderLabelY);
+            }
 
             return new RowMetrics
             {

@@ -52,8 +52,9 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// The run the narrowest column is sized to hold without
-        /// ellipsizing: an item row's name line, which is a count prefix
-        /// ("9,999x ", 7 characters) plus a 45-character item name.
+        /// ellipsizing: an item's NAME, 45 characters. Was 52, until the
+        /// count prefix became its own right-pinned column budgeted by
+        /// <see cref="AmountColumnFloor"/>.
         /// <para>
         /// The BREAKDOWN line below it is deliberately NOT part of this
         /// budget. A full source breakdown ("Character: &lt;name&gt; 250
@@ -64,18 +65,73 @@ namespace GW2CraftingHelper.Services
         /// Per column it simply ellipsizes earlier.
         /// </para>
         /// </summary>
-        public const int NameRunChars = 52;
+        public const int NameRunChars = 45;
+
+        /// <summary>Gap before the Amount column pinned to a cell's right -
+        /// the same 12px the plan's name columns keep.</summary>
+        public const int CellAmountGap = 12;
+
+        /// <summary>Width the Amount column is assumed to want in the
+        /// minimum-column derivation. MEASURED: "Amount" is 79px at 20-bold,
+        /// and a run with wider digits ellipsizes a little earlier.</summary>
+        public const int AmountColumnFloor = 79;
 
         /// <summary>
         /// Narrowest column a cell fits in. Below twice this the grid falls
         /// back to a single column rather than clipping the name line.
         /// <para>
-        /// 516px, which puts two columns inside the 1252px grid the 1378px
-        /// window minimum leaves (626px each) and a third only once the
-        /// window reaches 1674px.
+        /// 544px - the cell's whole width, term by term: the icon column,
+        /// a 45-character name, the gap before the Amount column, that
+        /// column's own floor, and the cell's right pad. Two columns fit
+        /// inside the 1252px grid the 1378px window minimum leaves (626px
+        /// each) and a third only once the window reaches 1758px.
         /// </para>
         /// </summary>
-        public const int MinColumnWidth = CellTextX + (NameRunChars * MaxCharWidthPx) + CellTextRightPad;
+        public const int MinColumnWidth =
+            CellTextX + (NameRunChars * MaxCharWidthPx) + CellAmountGap + AmountColumnFloor + CellTextRightPad;
+
+        /// <summary>Right edge every cell's Amount column is pinned to. A
+        /// cell justifies like a plan table row: this edge is a function of
+        /// the cell width alone, and the name is what flexes.</summary>
+        public static int CellAmountRightEdge(int columnWidth)
+        {
+            return columnWidth - CellTextRightPad;
+        }
+
+        /// <summary>Width the Amount column reserves: the widest amount,
+        /// floored at its header label, which routinely out-measures the
+        /// digits under it ("Amount" 79px vs "12x" 32px).</summary>
+        public static int CellAmountBandWidth(int widestAmountWidth, int headerLabelWidth)
+        {
+            int band = widestAmountWidth > headerLabelWidth ? widestAmountWidth : headerLabelWidth;
+            return band > 0 ? band : 0;
+        }
+
+        /// <summary>Where a cell's Name header cell ends and its Amount one
+        /// begins. The name column IS everything left of the band, so a
+        /// boundary between the two header WORDS would hand it away.</summary>
+        public static int CellHeaderSplitX(int columnWidth, int amountBandWidth)
+        {
+            return PlanRelayoutMath.HeaderSplitBeforeColumn(
+                CellAmountRightEdge(columnWidth), amountBandWidth, CellAmountGap);
+        }
+
+        /// <summary>Width a cell's name line may occupy before the Amount
+        /// column - the plan tables' rule, applied to one cell.</summary>
+        public static int CellNameMaxWidth(int columnWidth, int amountBandWidth)
+        {
+            return PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                CellAmountRightEdge(columnWidth), amountBandWidth, CellAmountGap, CellTextX);
+        }
+
+        /// <summary>Width the cell's second line may occupy. It runs UNDER
+        /// the Amount column: that is one short line at the top of the
+        /// cell, and this is the row's unbounded text.</summary>
+        public static int CellFullLineMaxWidth(int columnWidth)
+        {
+            int width = CellAmountRightEdge(columnWidth) - CellTextX;
+            return width > 20 ? width : 20;
+        }
 
         public readonly struct CellPlacement
         {

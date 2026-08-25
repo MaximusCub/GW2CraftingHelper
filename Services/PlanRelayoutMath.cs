@@ -56,6 +56,18 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Boundary between a flexing name column's HEADER cell and the band
+        /// pinned to its right: <see cref="NameMaxWidthBeforeColumn"/>'s own
+        /// three terms with the gap split, because a boundary derived from
+        /// the header WORDS sits far left of it (HeaderCellMath.LabelExtent).
+        /// </summary>
+        public static int HeaderSplitBeforeColumn(
+            int columnRightXBeforeGap, int trailingColumnWidth, int gapBeforeColumn)
+        {
+            return columnRightXBeforeGap - trailingColumnWidth - (gapBeforeColumn / 2);
+        }
+
+        /// <summary>
         /// Gap every plan table keeps between its right-hand block and the
         /// panel's right edge.
         /// </summary>

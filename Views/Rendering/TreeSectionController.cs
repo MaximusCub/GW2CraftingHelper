@@ -949,7 +949,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = indent + TreeCaretColWidth;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
-            var iconFrame = IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
             Panel iconScrim = null;
             if (dimmed)
@@ -2143,7 +2143,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// trailing "+N" pill so the two can never disagree about pill
         /// chrome. Border simulated as an outer colored panel with a
         /// 1px-inset fill panel, the same nesting technique
-        /// IconControls.CreateRarityFramedIcon uses.
+        /// IconControls.CreateItemIcon uses.
         /// </summary>
         private static Panel CreatePillPanel(
             Panel rowPanel, string text, BitmapFont font, int pillWidth, int textWidth,
