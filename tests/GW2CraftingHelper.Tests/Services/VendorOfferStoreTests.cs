@@ -387,7 +387,16 @@ namespace GW2CraftingHelper.Tests.Services
                 // Vendor (Weekly)) with no content-equivalent successor.
                 // Restored here byte-for-byte from the pre-rescrape
                 // baseline (merge-base 4735064) rather than re-guessed.
-                Assert.Equal(53544, dataset.Offers.Count);
+                // 53,544 -> 59,414 on the 2026-08-25 from-scratch refresh
+                // (the local wiki cache was gone, so both passes re-scraped).
+                // Verified before committing rather than assumed: keyed by
+                // CONTENT (item, count, merchant, cost lines) only 254 of
+                // 51,679 distinct offers disappeared and EVERY one of them
+                // had all-null cost lines - unusable rows the old pass could
+                // not resolve - while 581 items became purchasable that were
+                // not before, and seasonal tags went 57 -> 597. One further
+                // row was refused by hand: see ref/vendor_offer_exclusions.json.
+                Assert.Equal(59414, dataset.Offers.Count);
 
                 Assert.All(dataset.Offers, o =>
                 {
@@ -400,14 +409,28 @@ namespace GW2CraftingHelper.Tests.Services
                     Assert.NotNull(o.CostLines);
                 });
 
-                // Keyed by the offer's own stable OfferId rather than list
-                // position, so a future re-scrape that merely reorders rows
-                // (without changing this row's content) does not trip this
-                // wire - only an actual content change should.
+                // Keyed by CONTENT, not by OfferId. The 2026-08-25
+                // from-scratch refresh proved an OfferId is NOT stable
+                // across a full re-scrape: this exact row came back with
+                // identical item, count, cost lines, merchant and location
+                // under a different hash, because VendorOfferHasher's own
+                // doc comment says a recompute appends hash segments
+                // (homesteadTier, seasonalCap) that the baseline predates -
+                // rows only kept their ids while --merge-into copied
+                // untouched baseline objects through. Pinning the hash
+                // therefore tripped on a migration rather than on the
+                // content change this wire exists to catch.
                 var knownOffer = dataset.Offers.Single(o =>
-                    o.OfferId == "00012ce13cdf45c768ceb6edb81af590edf658e90a582b02b65ccf89834024be");
-                Assert.Equal(84618, knownOffer.OutputItemId);
-                Assert.Equal("Drojkor, Spirit Squall", knownOffer.MerchantName);
+                    o.OutputItemId == 84618 &&
+                    o.MerchantName == "Drojkor, Spirit Squall");
+                Assert.Equal(1, knownOffer.OutputCount);
+                Assert.Equal(
+                    new[] { (2, 2800), (34, 20) },
+                    knownOffer.CostLines
+                        .Select(c => (c.Id, c.Count))
+                        .OrderBy(c => c.Id)
+                        .ToArray());
+                Assert.Equal(64, knownOffer.OfferId.Length);
             }
         }
 

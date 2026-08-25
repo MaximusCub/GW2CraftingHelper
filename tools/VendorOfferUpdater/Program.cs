@@ -477,6 +477,22 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
+                // Step 5c: Drop hand-verified exclusions. The SMW scrape
+                // cannot tell a live vendor from one whose sale a patch
+                // removed when the wiki page is not marked historical, so
+                // ref/vendor_offer_exclusions.json refuses those rows by
+                // (merchant, item) with the evidence for each. Applied
+                // after the merge so a baseline row cannot survive either.
+                int excludedCount = ApplyExclusions(
+                    ref finalOffers, Path.GetDirectoryName(outputPath) ?? ".");
+                if (excludedCount > 0)
+                {
+                    Console.WriteLine(
+                        $"Excluded {excludedCount} hand-verified stale offer(s) " +
+                        "(ref/vendor_offer_exclusions.json).");
+                    Console.WriteLine();
+                }
+
                 // Step 6: Write output
                 var dataset = new VendorOfferDataset
                 {
@@ -1572,5 +1588,59 @@ namespace VendorOfferUpdater
             // Fallback: current directory
             return Directory.GetCurrentDirectory();
         }
+
+        /// <summary>
+        /// Removes offers named in ref/vendor_offer_exclusions.json. A
+        /// missing or unreadable file is a warning, not a failure - the
+        /// refresh still produces data, it just carries rows a human had
+        /// refused, which the module's own agreement test then catches.
+        /// </summary>
+        internal static int ApplyExclusions(ref List<VendorOffer> offers, string outputDir)
+        {
+            string path = Path.Combine(outputDir, "vendor_offer_exclusions.json");
+            if (!File.Exists(path))
+            {
+                Console.Error.WriteLine(
+                    $"Warning: no exclusion list at {path} - shipping every scraped row.");
+                return 0;
+            }
+
+            var refused = new HashSet<(string Merchant, int ItemId)>();
+            try
+            {
+                using (var doc = JsonDocument.Parse(File.ReadAllText(path)))
+                {
+                    if (doc.RootElement.TryGetProperty("exclusions", out var arr))
+                    {
+                        foreach (var entry in arr.EnumerateArray())
+                        {
+                            if (entry.TryGetProperty("merchantName", out var m) &&
+                                entry.TryGetProperty("outputItemId", out var i))
+                            {
+                                refused.Add((m.GetString() ?? string.Empty, i.GetInt32()));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"Warning: could not read the exclusion list: {ex.Message}");
+                return 0;
+            }
+
+            if (refused.Count == 0)
+            {
+                return 0;
+            }
+
+            int before = offers.Count;
+            offers = offers
+                .Where(o => !refused.Contains((o.MerchantName ?? string.Empty, o.OutputItemId)))
+                .ToList();
+            return before - offers.Count;
+        }
+
     }
 }
