@@ -1,9 +1,15 @@
 # Minimum module width for the deepest recipe trees (GW2CraftingHelper master v0.2.0)
 
-> **Status - acted on, twice.** Written 2026-08-23 against master
-> `aa80382`, then implemented by branch `min-width-1436`, and the +2pt
-> variant taken by branch `font-and-polish` (see the paragraph at the end
-> of this block). The module minimum is now
+> **Status - acted on, three times.** Written 2026-08-23 against master
+> `aa80382`, then implemented by branch `min-width-1436`, the +2pt
+> variant taken by branch `font-and-polish`, and the premise itself
+> revisited by branch `plan-view-redesign` (v0.2.3) - **the shipped
+> minimum is now 1378 x 710**; see "The 1378 re-derivation" at the end of
+> this block and section 9 for the full chain. The two paragraphs
+> immediately below describe the 1478 era and are left as written, because
+> sections 4-7 derive from them.
+>
+> The module minimum was, through v0.2.2,
 > **1478 x 710** (`Services/WindowSizing.cs`) and
 > `PlanRelayoutMath.TreePillColumnWidth` is **256**
 > (section 6's suggestion, taken at the current fonts rather than only
@@ -38,7 +44,24 @@
 > assumption looks wrong" finding was confirmed and fixed. See the
 > "Minimum width raise (min-width-1436)" and "Font bump and decision-round
 > polish (font-and-polish)" sections of
-> [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md).
+> [`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md) (rotated 2026-08-24 to
+> `docs/archive/known-issues/2026-08-23-min-width-1436.md` and
+> `docs/archive/known-issues/2026-08-23-font-and-polish.md`).
+>
+> **The 1378 re-derivation (`plan-view-redesign`, commit `5bca9fa`).**
+> `WindowSizing.MinWindowWidth` is now **1378**, and the change is a
+> **premise change**, not a new arithmetic result: the minimum is fitted
+> to the deepest *realistic* chain (Transcendence / Conflux, depth 14,
+> widest row `429750x Pile of Glittering Dust`) rather than to the deepest
+> chain that exists. This report's own anchor measurements are what the
+> new derivation consumes - it reproduces every one of them, and the
+> shipped 629 `widestNameEnd` and 181 worst-digit cost run come straight
+> from sections 4 and 5 here. The depth-23 agony chain now reads whole to
+> depth 19 and ellipsizes from depth 20 (test-pinned), which is the
+> ellipsis-plus-tooltip idiom the rest of the view uses. Section 9 below
+> carries the full derivation, rescued from the branch's session-scratch
+> working doc `plan-redesign/minwidth.md`, which was cited by the commit
+> message and the `WindowSizing.cs` comment but committed nowhere.
 
 ## Answer
 
@@ -170,3 +193,158 @@ So the 4-pill run fits today at normal padding, would need the tightened pass af
 **Modelled / inferred**: (a) window chrome 126 px - 46 solid from `Module.cs`, 60 from the `ViewAdapter` chain in source, ~8 from Blish `Panel` border taken from the repo's own comment rather than a decompile (+/-2 px); one runtime log of `_contentPanel.Width - RightEdgePadding` at the 930 minimum would settle it, and it is the only measurement I could not make offline. (b) six-digit gold cost column (eight digits would add ~21 px). (c) widest rows for multi-recipe items (the legendary rows) are upper bounds because the simulation expands every alternative recipe while the rendered tree follows the chosen one - the defining item is unaffected (unique recipe per level). (d) the +2pt case assumes rows 14->16 and pills 12->14.
 
 **Analysis scripts**: the derivation ran from a session-scoped scratch directory outside this repo (see the provenance note in [`README.md`](README.md)) - `exact.py`+`exact.json` (SCC-exact depths/levels), `depth2.py`, `scc.py`, `chain.py`, `levels.py`, `widths.py`+`widths.json`, `table.py`+`table.json`, `final_math.py`+`final_math.json`, `font.py` (Menomonia XNB parser), `fetch_names.py`+`extra_names.json`, `legendary.py`+`legendary.json`. Every input they read is in this repo (`ref/recipes_seed.json`, `ref/recipe_search_seed.json`, `ref/mystic_forge_recipes.json`), on the machine (`C:\Blish.HUD\Content\fonts\menomonia\`), or from the official API, so the numbers are reproducible without them.
+---
+
+## 9. The 1378 re-derivation: depth-14 realistic worst case (2026-08-24)
+
+Rescued into this report from `plan-redesign/minwidth.md`, the
+`plan-view-redesign` branch's session-scratch working doc (uncommitted, and
+the exact failure mode that destroyed `m34-r1` and forced `m37-r2`'s
+re-derivation). Everything here is **measured** unless labelled otherwise.
+It reproduces the method of sections 1-4 above - XNB glyph parsing, and
+`MeasureString` inked-rect widths per the section 4 errata, NOT xAdvance
+sums - for **Transcendence (92991)** and **Conflux (93105)**, both exactly
+depth 14.
+
+### 9.1 Method validation
+
+Same installed XNBs (`C:\Blish.HUD\Content\fonts\menomonia\menomonia-{14,16,18}-regular.xnb`,
+MonoGame.Extended `BitmapFontReader`, uncompressed), same advance /
+`XOffset+Width` rule. Every anchor figure in this report reproduces exactly:
+
+| figure | this report | reproduced |
+|---|---|---|
+| f14 `"4194304x "` / `"Thermocatalytic Reagent"` | 65 / 174 | 65 / 174 |
+| f16 same (shipped `DeepestRowQtyPrefixWidth`/`DeepestRowNameWidth`) | 73 / 192 | 73 / 192 |
+| worst-digit 6-digit-gold cost column f14 / f16 (section 4 errata; shipped `DeepestPlanCostColumnWidth`) | 171 / 181 | 171 / 181 |
+| Transcendence / Conflux extent f14 (section 5) | 607 | 607 |
+| Transcendence / Conflux extent f16 (implied by section 5's 1202) | 629 | 629 |
+| agony chain `widestNameEnd` f16 | 875 | 875 |
+| shipped 1478 from agony f16 designed gutter + leaf-exact | 1478 | 1470 + 8 = 1478 |
+
+Traversal mirrors section 2 (`RecipeService.BuildNodeAsync` semantics) off
+`ref/recipes_seed.json` + `ref/recipe_search_seed.json`, expanding every
+recipe of a node (the same upper-bound convention 1478 was derived under),
+recursing only `type=="Item"`, path-set cycle guard rendering a childless
+row, `craftsNeeded = ceil(qty / (expectedOutputCount ?? outputItemCount))`.
+Names from `ref/item_name_seed.json` plus 55 ids fetched live from
+`/v2/items` (2026-08-23). Both trees measure identically: 1,399 rows, max
+depth 14, same widest rows.
+
+### 9.2 The defining row
+
+Widest row in both trees at every font size is the depth-14
+`429750x Pile of Glittering Dust` - the same dust-promotion blow-up that
+defines this report's Jade Bot rows. Path (Conflux; several
+equivalent-width paths reach it through Mystic-Forge alternatives):
+
+```
+depth  0  1x Conflux                        depth  8  2x Pile of Putrid Essence
+depth  1  1x Gift of the World              depth  9  2x Pile of Crystalline Dust
+depth  2  1x War Commendation               depth 10  250x Pile of Incandescent Dust
+depth  3  1x Gift of Warfare                depth 11  1750x Pile of Luminous Dust
+depth  4  1x Mystic Essence of Strategy     depth 12  11000x Pile of Radiant Dust
+depth  5  250x Pile of Bloodstone Dust      depth 13  68750x Pile of Shimmering Dust
+depth  6  3x Bloodstone Brick               depth 14  429750x Pile of Glittering Dust
+depth  7  6x Obsidian Shard
+```
+
+Runners-up (f16) are 619-622, so the answer is not sensitive to one path.
+The row renders only when decision overrides walk the dust-promotion
+alternatives - a **modelled** upper bound, per this report's confidence
+caveat (c), and the same convention 1478 used.
+
+### 9.3 Arithmetic chain
+
+Constants named from source: `TreeIndentPer=24`, `nameX = depth*24 + 58`,
+name gap 8 (`ComputeTreeColumnEdges`), `TableGutterBreathingRoom=24`,
+`TreePillColumnWidth=256`, `TableRightMargin=8`,
+`WindowToTabPanelChrome=126` (= 46+32+8+20+20, section 4).
+
+| term | f16 | f18 |
+|---|---|---|
+| `nameX` at depth 14 (14 x 24 + 58) | 394 | 394 |
+| qty prefix `"429750x "` | 69 | 76 |
+| name `"Pile of Glittering Dust"` | 166 | 178 |
+| **`widestNameEnd`** | **629** | **648** |
+
+Cost column at worst-case digits (fixed chrome 78 = two `CoinSegmentGap`
+plus three `CoinLabelIconGap + CoinIconSize`; digit runs maximised because
+Menomonia's digits are not one width - at f16 `0/2/7` advance 10, others 9,
+`1` 6, and the widest last digit `0` inks 11):
+
+| gold digits | f16 | f18 |
+|---|---|---|
+| 4 (Best-Path legendary band, **inferred**) | 161 | 169 |
+| 5 | 171 | 180 |
+| 6 (the shipped 181's assumption) | **181** | 191 |
+
+The 6-digit column belongs to the same override family as the 429750 row,
+so it is the internally consistent worst case.
+
+```
+panel  = widestNameEnd + gutter + pillColumn + costColumn + rightMargin
+window = panel + 126
+
+f16:  629 + 24 + 256 + 181 + 8 = 1098  -> window 1224   (designed gutter)
+      629 +  8 + 256 + 181 + 8 = 1082  -> window 1208   (hard floor)
+      1224 + 8                         -> window 1232   (vendor leaf fits exactly)
+```
+
+The +8 leaf-exact step is the shipped convention (1478 = 1470 + 8): it lets
+a `BuildVendorCostComponentLeaves` row one indent below the deepest row fit
+with zero slack. Verified by replaying `ComputeTreeColumnEdges` - at panel
+1098 the depth-14 name budget is 182 against 166 needed; at 1081 it is 165,
+one px under, so the boundary is where the formula says.
+
+### 9.4 The currency-run rider, and why the shipped number is 1378 not 1232
+
+The coin-only method above was exact for the agony chain, which has no
+currency rows. Legendary trees do: a `BuyFromVendor` node whose winning
+offer costs only currencies gets no component leaves
+(`BuildVendorCostComponentLeaves` needs 2+ cost kinds) and draws its whole
+currency run inline in the cost column
+(`TreeCostColumnMath.ShowsCurrencySegments`). Measured against this tree's
+quantities from `ref/vendor_offers.json`: a single karma offer (Obsidian
+Shard, 2,096 karma each, `521904` on the row) adds **+82px** at f16; the
+widest two-currency bulk offer (250 shards for `6250` magic + `262500`
+karma) adds **+154px**.
+
+1232 accepts that a row combining a forced-craft dust chain with a vendor
+currency run ellipsizes. The maintainer declined that trade - *"we are
+designing for a minimum resolution of 1920x1080, so cramming down to a
+smaller min-size that will result in cramped renders seems bad"* - so the
+shipped floor carries the +154 rider, and the cost column budget becomes
+181 + 154 = 335:
+
+```
+629 + 24 + 256 + 335 + 8 = 1252  -> window 1378   (shipped MinWindowWidth)
+```
+
+### 9.5 What the depth-23 agony chain does at 1378
+
+At the shipped 1378 the `+24 Agony Infusion` plan (`widestNameEnd` 875 at
+f16) reads whole to depth 19 and ellipsizes from depth 20, ending in a bare
+`4194304x ...` at depth 23 with the full name on the tooltip - pinned by the
+depth-19/20 boundary tests. That is the same degradation the 930px floor
+gives deep rows today, moved six levels past the deepest realistic plan.
+
+### 9.6 Confidence
+
+- **Measured**: all glyph metrics and string widths (the calibration table
+  in 9.1 matches the shipped test constants byte-for-byte); both trees' row
+  sets, depths and quantities; all layout constants read from source; the
+  truncation boundaries (replayed `ComputeTreeColumnEdges`); vendor currency
+  amounts from `ref/vendor_offers.json` times tree quantities.
+- **Inferred**: 4-digit gold as the Best-Path legendary price band (no live
+  TP pricing pass this round); the 8px Blish `Panel` border inside the 126px
+  chrome carries this report's +/-2px caveat.
+- **Modelled**: the 429750 row and the 6-digit column require craft-forcing
+  overrides (upper bound over recipe alternatives, as in 1478); the +8
+  vendor-leaf headroom models the leaf as the widest row one indent deeper,
+  exactly as `PlanRelayoutMathTests` does.
+- **Scripts**: session-scoped scratch outside the repo (`font.py` XNB parser
+  and measurer, `chain.py` traversal, `final_math.py` derivation and
+  replays). Every input is in this repo (`ref/*.json`), on the machine
+  (`C:\Blish.HUD\Content\fonts\menomonia\`), or from the official API, so
+  the numbers are reproducible without them.
