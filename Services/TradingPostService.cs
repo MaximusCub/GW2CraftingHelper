@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Services
         // cancellation stays strictly per-caller in both directions.
         private readonly Dictionary<int, Task> _inFlight = new Dictionary<int, Task>();
 
-        // Ids a successful batch REQUESTED but the response did not
+        // Ids an answered batch REQUESTED but the response did not
         // contain: /v2/commerce/prices omits untradeable items entirely,
         // so an account-bound id (gifts, clovers, a legendary target
         // itself) never reaches _cache above and would otherwise be
@@ -259,12 +259,12 @@ namespace GW2CraftingHelper.Services
                     {
                         // CancellationToken.None, not any caller's ct -
                         // see this method's own doc comment.
-                        var entries = await _api.GetPricesAsync(batch, CancellationToken.None);
+                        var response = await _api.GetPricesAsync(batch, CancellationToken.None);
 
                         lock (_cacheLock)
                         {
                             var returned = new HashSet<int>();
-                            foreach (var entry in entries)
+                            foreach (var entry in response.Entries)
                             {
                                 var price = new ItemPrice
                                 {
@@ -281,14 +281,24 @@ namespace GW2CraftingHelper.Services
                                 _knownMissing.Remove(entry.Id);
                             }
 
-                            // Only a batch that came back at all proves an
-                            // id is absent - a thrown batch (below) tells
-                            // us nothing and must never negative-cache.
-                            foreach (var id in batch)
+                            // Only a batch the endpoint actually answered
+                            // proves an id is absent: a thrown batch
+                            // (below) tells us nothing, and neither does a
+                            // 404, which the endpoint returns for an
+                            // outage as readily as for "every id here is
+                            // untradeable" (see
+                            // PriceBatchResult.AbsenceProven). Negative-
+                            // caching either would blank every price in
+                            // the plan for a full CacheTtl without so much
+                            // as another request to recover from.
+                            if (response.AbsenceProven)
                             {
-                                if (!returned.Contains(id))
+                                foreach (var id in batch)
                                 {
-                                    _knownMissing[id] = fetchedUtc;
+                                    if (!returned.Contains(id))
+                                    {
+                                        _knownMissing[id] = fetchedUtc;
+                                    }
                                 }
                             }
                         }

@@ -248,6 +248,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
+        // The other half of the same rule: /v2/commerce/prices answers 404
+        // for an endpoint-level outage as readily as for "every id in this
+        // batch is untradeable", and Gw2PriceApiClient turns that 404 into
+        // an empty batch WITHOUT throwing. Negative-caching those ids would
+        // latch a whole plan into "no price for anything" for a full 15
+        // minute TTL, and - because the freshness scan then skips them -
+        // without a single further request to recover on.
+        [Fact]
+        public async Task UnprovenEmptyBatch_DoesNotNegativeCacheItsIds()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            api.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 400);
+            api.UnprovenEmptyOnCallNumber = 1;
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            // The outage itself still degrades to unpriceable holes.
+            var duringOutage = await svc.GetPricesAsync(new[] { 1, 2 }, CancellationToken.None);
+            Assert.Empty(duringOutage);
+
+            clock = clock.AddMinutes(1); // well inside the 15 minute TTL
+            var afterOutage = await svc.GetPricesAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count); // the recovery request happened
+            Assert.Equal(200, afterOutage[1].BuyInstant);
+            Assert.Equal(400, afterOutage[2].BuyInstant);
+        }
+
         [Fact]
         public async Task Ttl_MixedFreshAndStaleBatchOnlyRefetchesStaleIds()
         {

@@ -31,10 +31,11 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullPriceApiClient : IPriceApiClient
     {
-        public Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public Task<PriceBatchResult> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<RawPriceEntry>>(Array.Empty<RawPriceEntry>());
+            return Task.FromResult(
+                new PriceBatchResult(Array.Empty<RawPriceEntry>(), absenceProven: true));
         }
     }
 

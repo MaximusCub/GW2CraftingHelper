@@ -30,6 +30,15 @@ namespace GW2CraftingHelper.Tests.Helpers
         public bool ThrowAlways { get; set; }
 
         /// <summary>
+        /// 1-based call number on which GetPricesAsync returns an empty
+        /// batch that does NOT prove absence - the real client's 404
+        /// branch, which an endpoint-level outage produces just as readily
+        /// as "every id in this batch is untradeable". 0 (default) disables
+        /// this.
+        /// </summary>
+        public int UnprovenEmptyOnCallNumber { get; set; }
+
+        /// <summary>
         /// When set, every call awaits this task before deciding whether to
         /// throw or return - lets a test deterministically hold a fetch
         /// "in flight" while it starts a second overlapping call, then
@@ -49,7 +58,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             };
         }
 
-        public async Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public async Task<PriceBatchResult> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
             _calls.Add(itemIds);
@@ -64,12 +73,17 @@ namespace GW2CraftingHelper.Tests.Helpers
                 throw new HttpRequestException("Simulated transient API failure.");
             }
 
+            if (UnprovenEmptyOnCallNumber > 0 && _calls.Count == UnprovenEmptyOnCallNumber)
+            {
+                return new PriceBatchResult(new List<RawPriceEntry>(), absenceProven: false);
+            }
+
             var results = itemIds
                 .Where(id => _prices.ContainsKey(id))
                 .Select(id => _prices[id])
                 .ToList();
 
-            return results;
+            return new PriceBatchResult(results, absenceProven: true);
         }
     }
 }
