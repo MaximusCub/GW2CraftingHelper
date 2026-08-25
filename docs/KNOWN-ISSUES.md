@@ -10595,13 +10595,17 @@ stale and three of its claims no longer held.
   not a confirm gating destructive state.
 - **P2, Snapshot breakdown hard-clip - DONE.** Both lines of an item row
   (and the wallet row) run through `LabelHelpers.EllipsizeToWidth`, and
-  a shortened line carries the full text through the tooltip facility's
-  plain path - stamped on the Label itself as well as the row Panel,
-  because Blish resolves a tooltip on the deepest control under the
-  cursor and does not bubble. A width change re-fits the rows in place -
+  the full text is reachable from the hover either way: an item row
+  carries the rich item tooltip (name plus the whole breakdown, deferred)
+  on the Panel, both Labels, the amount and the icon, because Blish
+  resolves a tooltip on the deepest control under the cursor and does not
+  bubble; a wallet row carries the currency name through the plain path
+  wherever its line shortened. A width change re-fits the rows in place -
   each row Panel takes the new width and each line is re-ellipsized
-  against it, tooltip re-decided - so a widened window stops showing
-  "..." on text that now fits; a height-only drag arms nothing.
+  against it - so a widened window stops showing "..." on text that now
+  fits; a height-only drag arms nothing. The repack re-decides text and
+  position only (see "The repack re-stamped every tooltip on the row"),
+  the wallet row's shorten-conditional note being the one exception.
   Fix round 1 replaced the first attempt, which routed the resize
   through the EXISTING search debounce and claimed "a drag costs nothing
   per frame". It cost a CancellationTokenSource allocated, cancelled and
@@ -12130,10 +12134,11 @@ two-column list reads the way the one-column list did.
 the batch J fix round) no longer just re-ellipsizes rows at a new panel
 width. It recomputes the grid - a widened window can gain a column, a
 narrowed one drop back to the fallback - moves every cell to its new slot,
-and re-ellipsizes each line against its COLUMN width, re-deciding the
-per-line and row-strip tooltips through the same `FitRowTextLabel` /
-`ApplyRowStripTooltip` rules as before. Still no search re-run and no
-dispose-and-recreate.
+and re-ellipsizes each line against its COLUMN width through the same
+`FitRowTextLabel` rule the build-time fit uses. Still no search re-run and
+no dispose-and-recreate. (As shipped it also re-decided every tooltip on
+the row; it no longer does - see "The repack re-stamped every tooltip on
+the row" for what the repack owns today.)
 
 **What that does and does not buy for the scroll position.** A repack that
 keeps the column count leaves the scroll alone: the grid panel's WIDTH
@@ -13159,9 +13164,11 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   (`TooltipContent.OrText`), which covers every call site including the
   recipe tree, and a builder that throws degrades to it too. The capture
   lives in the facility rather than at the icon-tree call site precisely
-  because a re-stamp - `MainView.ApplyItemRowTooltip` runs again on every
-  column resize - reads a `BasicTooltipText` the FIRST stamp already
-  nulled; the fallback is carried forward from the previous source unless
+  because a re-stamp reads a `BasicTooltipText` the FIRST stamp already
+  nulled (the case then was `MainView.ApplyItemRowTooltip` running again
+  on every column resize, which it no longer does; the tree's settle
+  re-ellipsis and the wallet row still re-stamp); the fallback is carried
+  forward from the previous source unless
   the control has since been given real plain text, or has since had it
   deliberately cleared (`ApplyPlain` records both - see "Post-review
   corrections, round 2"). The `row.ItemId > 0`
@@ -13284,9 +13291,12 @@ had told the tester to confirm the divergence.
 `control.BasicTooltipText`, a field the facility itself nulls on the
 first stamp, so a null could not be told from a deliberate clear and the
 previous source's note was carried forward over it.
-`MainView.FitRowTextLabel` clears a row line's tooltip the moment the
-line fits and then re-stamps the row's deferred builder, so widening the
-window past a Snapshot row's truncation boundary resurrected the full
+`MainView.FitRowTextLabel` cleared a row line's tooltip the moment the
+line fit and the repack then re-stamped the row's deferred builder (that
+path is gone - the repack writes no tooltips now - but the clear-then-
+re-stamp order it exposed is still reachable from every other re-stamping
+caller), so widening the window past a Snapshot row's truncation boundary
+resurrected the full
 item name - and with no stat block for that item yet (a plan restored
 from disk before the Q13 top-up) the builder returns empty content, so
 the row showed its own full name as a tooltip over the name it was

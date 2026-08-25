@@ -1533,7 +1533,11 @@ namespace GW2CraftingHelper.Views
         /// can gain a column, a narrower one drop back to the single-column
         /// fallback), every cell moves to its new slot, and each of its text
         /// lines is re-ellipsized against the new COLUMN width - not the
-        /// panel width - with its tooltip re-decided. No search re-run and no
+        /// panel width - with its amount re-pinned. Text and position only:
+        /// an item row's tooltips are stamped once at build and say the same
+        /// at any width, and the one exception is the wallet row, whose
+        /// plain note exists only where the name had to shorten and so is
+        /// re-decided here (StampWalletRowTooltip). No search re-run and no
         /// dispose-and-recreate, which is why a width change no longer goes
         /// through RebuildContent.
         /// <para>
@@ -2269,8 +2273,9 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// One placed result cell: the row Panel the grid moves and sizes,
-        /// and the closure that re-ellipsizes its text lines (re-deciding
-        /// their tooltips) against a new column width.
+        /// and the closure that re-ellipsizes its text lines against a new
+        /// column width and re-pins its amount. Text and position only -
+        /// see RefitResultRows for the wallet row's one exception.
         /// </summary>
         private sealed class ResultCell
         {
@@ -2323,9 +2328,9 @@ namespace GW2CraftingHelper.Views
         /// Ellipsizes one line to the width of the CELL it sits in - one
         /// grid column, not the whole content panel - so the build-time fit
         /// and the repack cannot drift. Text only: the ROW owns its
-        /// tooltips, and a plain note here would drop the rich surface over
-        /// the same label (a non-null BasicTooltipText nulls
-        /// Control._tooltip).
+        /// tooltips, and a note written from this path would drop the rich
+        /// surface over the same label on every repack (a non-null
+        /// BasicTooltipText nulls Control._tooltip).
         /// </summary>
         private static bool FitRowTextLabel(Label label, string text, int maxWidth)
         {
