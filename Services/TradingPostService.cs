@@ -42,6 +42,19 @@ namespace GW2CraftingHelper.Services
         // cancellation stays strictly per-caller in both directions.
         private readonly Dictionary<int, Task> _inFlight = new Dictionary<int, Task>();
 
+        // Ids a successful batch REQUESTED but the response did not
+        // contain: /v2/commerce/prices omits untradeable items entirely,
+        // so an account-bound id (gifts, clovers, a legendary target
+        // itself) never reaches _cache above and would otherwise be
+        // re-requested on every call forever. Mirrors
+        // ItemMetadataService._knownMissing, but TTL'd on the same
+        // CacheTtl clock as the positive cache rather than kept for the
+        // session: an item that becomes tradeable in a patch is then
+        // exactly as stale as an already-cached price is, no worse.
+        // Growth is bounded by the same thing _cache's is - how many
+        // distinct ids one session looks up.
+        private readonly Dictionary<int, DateTime> _knownMissing = new Dictionary<int, DateTime>();
+
         public TradingPostService(IPriceApiClient api, Func<DateTime> utcNow = null)
         {
             _api = api;
@@ -81,6 +94,11 @@ namespace GW2CraftingHelper.Services
                 foreach (var id in uniqueIds)
                 {
                     if (_cache.TryGetValue(id, out var cached) && now - cached.FetchedUtc < CacheTtl)
+                    {
+                        continue;
+                    }
+
+                    if (_knownMissing.TryGetValue(id, out var missedUtc) && now - missedUtc < CacheTtl)
                     {
                         continue;
                     }
@@ -245,6 +263,7 @@ namespace GW2CraftingHelper.Services
 
                         lock (_cacheLock)
                         {
+                            var returned = new HashSet<int>();
                             foreach (var entry in entries)
                             {
                                 var price = new ItemPrice
@@ -254,6 +273,23 @@ namespace GW2CraftingHelper.Services
                                     SellInstant = entry.BuyUnitPrice
                                 };
                                 _cache[entry.Id] = (price, fetchedUtc);
+                                returned.Add(entry.Id);
+
+                                // Newly tradeable: drop the stale negative
+                                // entry rather than leaving two records of
+                                // the same id disagreeing.
+                                _knownMissing.Remove(entry.Id);
+                            }
+
+                            // Only a batch that came back at all proves an
+                            // id is absent - a thrown batch (below) tells
+                            // us nothing and must never negative-cache.
+                            foreach (var id in batch)
+                            {
+                                if (!returned.Contains(id))
+                                {
+                                    _knownMissing[id] = fetchedUtc;
+                                }
                             }
                         }
                         succeededBatches++;

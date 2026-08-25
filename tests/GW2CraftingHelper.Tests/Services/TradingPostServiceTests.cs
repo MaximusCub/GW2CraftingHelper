@@ -163,13 +163,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
-        // Characterization: /v2/commerce/prices omits untradeable items
-        // from its response entirely, and only ids PRESENT in a response
-        // are cached - so an account-bound id (a gift, a clover, the
-        // legendary target itself) is re-requested on every single call,
-        // however recently it was asked for.
+        // /v2/commerce/prices omits untradeable items from its response
+        // entirely. An account-bound id (a gift, a clover, the legendary
+        // target itself) therefore never reaches the positive cache, and
+        // used to be re-requested on every single call however recently
+        // it was asked for; it is now negative-cached on the same clock.
         [Fact]
-        public async Task UntradeableId_RefetchedOnEveryCallWithinTtl()
+        public async Task UntradeableId_NegativeCachedWithinTtl_NotRefetched()
         {
             var api = new InMemoryPriceApiClient();
             api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
@@ -183,9 +183,68 @@ namespace GW2CraftingHelper.Tests.Services
             clock = clock.AddMinutes(1); // well inside the 15 minute TTL
             var result = await svc.GetPricesAsync(new[] { 1, 99999 }, CancellationToken.None);
 
+            Assert.Single(api.Calls); // no second round trip for either id
+            Assert.False(result.ContainsKey(99999)); // still absent, still an unpriceable hole
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        [Fact]
+        public async Task UntradeableId_RefetchedOnceTheNegativeEntryExpires()
+        {
+            var api = new InMemoryPriceApiClient();
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(16); // past the 15 minute TTL
+            await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
             Assert.Equal(2, api.Calls.Count);
-            Assert.Equal(new[] { 99999 }, api.Calls[1]); // the tradeable id was cached; this one was not
-            Assert.False(result.ContainsKey(99999));
+        }
+
+        [Fact]
+        public async Task ItemThatBecomesTradeable_IsPricedAfterTheNegativeEntryExpires()
+        {
+            var api = new InMemoryPriceApiClient();
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            var beforePatch = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+            Assert.False(beforePatch.ContainsKey(99999));
+
+            api.AddPrice(99999, buyUnitPrice: 100, sellUnitPrice: 200); // a patch makes it tradeable
+            clock = clock.AddMinutes(16);
+            var afterPatch = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
+            Assert.Equal(200, afterPatch[99999].BuyInstant);
+
+            // The negative entry was dropped, not just outvoted: the now-
+            // cached price serves the next call with no further request.
+            clock = clock.AddMinutes(1);
+            var third = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(200, third[99999].BuyInstant);
+        }
+
+        [Fact]
+        public async Task FailedBatch_DoesNotNegativeCacheItsIds()
+        {
+            // A batch that threw proves nothing about whether its ids are
+            // tradeable - only a response that came back and omitted them
+            // does. Negative-caching a transient failure would blank those
+            // prices for 15 minutes.
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            api.ThrowOnCallNumber = 1;
+            var svc = new TradingPostService(api);
+
+            await Assert.ThrowsAsync<HttpRequestException>(
+                () => svc.GetPricesAsync(new[] { 1 }, CancellationToken.None));
+
+            var result = await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count);
             Assert.Equal(200, result[1].BuyInstant);
         }
 
