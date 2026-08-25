@@ -2397,30 +2397,26 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Ellipsizes one line to the width of the CELL it sits in - one
-        /// grid column, not the whole content panel - and re-decides its
-        /// tooltip, returning whether it had to shorten. The single rule, so
-        /// the build-time fit and the resize-time repack
-        /// (<see cref="RefitResultRows"/>) cannot drift.
+        /// grid column, not the whole content panel - returning whether it
+        /// had to shorten. The single rule, so the build-time fit and the
+        /// repack (<see cref="RefitResultRows"/>) cannot drift.
         /// <para>
-        /// The label is the deepest control under the cursor, and Blish
-        /// resolves a tooltip on that control alone - it does not bubble to
-        /// the row Panel (the swallowed-hover class recorded for
-        /// ShoppingListSectionRenderer and the tree row). The Panel gets one
-        /// too, from the caller, for the strip beside the text. A line that
-        /// now fits has its tooltip cleared rather than left stale.
+        /// Text only - the ROW owns its tooltips (a label of its own is not
+        /// optional: Blish resolves a tooltip on the deepest control under
+        /// the cursor and never bubbles to the row Panel). Stamping a plain
+        /// note here would drop the rich surface a row had put on the same
+        /// label, because a non-null BasicTooltipText write nulls
+        /// Control._tooltip - so the repack would have to re-register every
+        /// line it touched, for a note the rich content already spells out.
         /// </para>
         /// </summary>
         private static bool FitRowTextLabel(Label label, string text, int maxWidth)
         {
-            var font = UiFonts.Body;
             string full = text ?? "";
-            string shown = LabelHelpers.EllipsizeToWidth(font, full, maxWidth);
+            string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Body, full, maxWidth);
 
             label.Text = shown;
-
-            bool shortened = shown != full;
-            TooltipFacility.ApplyPlain(label, shortened ? full : null);
-            return shortened;
+            return shown != full;
         }
 
         private void CreateItemRow(SnapshotSearchRow row, int columnWidth, SectionChrome chrome)
@@ -2467,7 +2463,7 @@ namespace GW2CraftingHelper.Views
                 rowPanel, nameText,
                 SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
                 4, rarity == null ? (Color?)null : RarityColors.GetRarityNameColor(rarity),
-                out bool nameShortened);
+                out _);
 
             // Measured once here, not inside the closure below: the text is
             // fixed for the life of the row, and the re-fit runs once per
@@ -2492,14 +2488,14 @@ namespace GW2CraftingHelper.Views
             // the cell, and this is the row's own unbounded text.
             var breakdownLabel = CreateRowTextLabel(
                 rowPanel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(columnWidth),
-                26, InfoTextColor, out bool breakdownShortened);
+                26, InfoTextColor, out _);
 
             // The same rich item tooltip the plan's rows show, composed at
             // hover time so a stat block fetched later in the session shows
-            // without re-rendering the grid. Both lines' own ellipsis
-            // tooltips are cleared: the stat block already opens with the
-            // item's full name, and a per-line plain tooltip on top of it
-            // would win the hover and show strictly less.
+            // without re-rendering the grid. Stamped ONCE, here: it already
+            // spells out the full name and the whole breakdown at any
+            // width, so nothing it says is a function of the column width
+            // and the repack below leaves every tooltip on the row alone.
             ApplyItemRowTooltip(
                 rowPanel, nameLabel, breakdownLabel, amountLabel, icon, row, nameText, breakdown);
 
@@ -2511,8 +2507,6 @@ namespace GW2CraftingHelper.Views
                     nameLabel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
                 FitRowTextLabel(breakdownLabel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(w));
                 PlaceAmountLabel(amountLabel, amountWidth, w, 4);
-                ApplyItemRowTooltip(
-                    rowPanel, nameLabel, breakdownLabel, amountLabel, icon, row, nameText, breakdown);
             }));
         }
 
@@ -2650,32 +2644,36 @@ namespace GW2CraftingHelper.Views
                 6, null, out bool shortened);
             int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
             var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 6);
-            StampWalletRowTooltip(rowPanel, label, icon, name, shortened);
+
+            // The icon says the currency's name at every width, so it is
+            // stamped here rather than from the repack below. Re-stated
+            // over the component's own resolution because that took the
+            // raw CurrencyName and this is the "Unknown Currency" fallback.
+            IconControls.ApplyPlainToIconTree(icon, name);
+            StampWalletRowTooltip(rowPanel, label, name, shortened);
 
             _walletCells.Add(new ResultCell(rowPanel, w =>
             {
                 bool nowShortened = FitRowTextLabel(
                     label, name, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
                 PlaceAmountLabel(amountLabel, amountWidth, w, 6);
-                StampWalletRowTooltip(rowPanel, label, icon, name, nowShortened);
+                StampWalletRowTooltip(rowPanel, label, name, nowShortened);
             }));
         }
 
         /// <summary>
         /// A wallet row's hover: the currency's full name wherever the name
-        /// line had to be shortened, on the panel, on the label over it and
-        /// on the icon beside it - Blish resolves a tooltip on the deepest
-        /// control under the cursor and never bubbles, so each of the three
-        /// is its own hole otherwise. The icon keeps its own name note when
-        /// the row is not truncated, which is why it is re-stamped with the
-        /// name rather than cleared.
+        /// line had to be shortened, on the panel AND on the label over it -
+        /// Blish resolves a tooltip on the deepest control under the cursor
+        /// and never bubbles, so either one alone is a hole. The icon is
+        /// stamped once at build, not here: what it says never depends on
+        /// the width.
         /// </summary>
         private static void StampWalletRowTooltip(
-            Panel rowPanel, Label nameLabel, Panel icon, string name, bool shortened)
+            Panel rowPanel, Label nameLabel, string name, bool shortened)
         {
             TooltipFacility.ApplyPlain(rowPanel, shortened ? name : null);
             TooltipFacility.ApplyPlain(nameLabel, shortened ? name : null);
-            IconControls.ApplyPlainToIconTree(icon, name);
         }
 
         // This used to carry its own
