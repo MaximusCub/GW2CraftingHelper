@@ -347,26 +347,20 @@ nul.*
 # Ignore Claude's local settings file
 .claude/settings.local.json
 
-# Build outputs
-bin/
-obj/
-
-# VS
-.vs/
-*.user
-*.suo
-
-# NuGet packages folder (if present)
+# NuGet packages folder (if present). Broader than the template's
+# **/[Pp]ackages/* above, which un-ignores packages/build - this repo wants
+# the whole restored tree ignored.
 packages/
 
-# Root-level tool/binary artifacts (mgfxc/SharpDX/etc)
-*.dll
-*.exe
-*.pdb
-*.xml
-*.deps.json
-*.runtimeconfig.json
-*.runtimeconfig.dev.json
+# Root-level tool/binary artifacts (mgfxc/SharpDX/etc). Root-anchored on
+# purpose: unanchored globs here matched at every depth, so a committed
+# docs/*.xml or Contracts/*.xml would have been silently skipped.
+/*.dll
+/*.exe
+/*.pdb
+/*.xml
+/*.deps.json
+/*.runtimeconfig*.json
 
 # MysticForgeSeeder intermediate cache
 ref/mf_item_id_cache.json
