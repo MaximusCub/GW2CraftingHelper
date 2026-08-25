@@ -15374,4 +15374,44 @@ fired before the handler was attached.
    status, the log shows no repeating fetch attempts, and adding the key
    mid-session starts exactly one fetch.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS with two recorded partials (2026-08-25 desktop session,
+branch build merged with master, captures preflight/gFX1-gFX8,
+gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
+
+1. ZERO BAND: live PASS on the known-zero case - crafting Green Wood
+   Dowel and ignoring its only child rendered the full three tiles
+   ("Total Materials Value 0c - Your Materials Used 0c = Actual Cost to
+   Craft 0c") with the profit band beside it, where the old build showed
+   a lone tile. PARTIAL: the unpriced-zero variant (marker + footnote)
+   could not be reached live - it needs a zero total produced by an
+   unpriceable node, and an unpriceable item has no recipe, so it is
+   absent from the craftable search index and cannot be planned
+   directly. Pinned by the round's discriminator tests instead.
+2. SCROLL ANCHORING: live PASS, measured rather than eyeballed. Scrolled
+   deep into an expanded 154-node Wupwup tree (Total Cost off-screen
+   above), clicked IGNORE on "3x Deldrimor Steel Ingot" with the cursor
+   resting on it: that row and every one of the eight rows above it held
+   their EXACT pixel y across the re-solve, while the row's own subtree
+   collapsed and new content flowed in below. This is the maintainer's
+   reported gesture, and the jar is gone.
+3. CLICK DEFAULT: ClickSoundVolume.DefaultPercent is 35. Live check
+   confirmed the other half of the contract - a persisted 78 from an
+   earlier session survived the change, so only new installs take 35.
+4. MYSTIC FORGE UNKNOWN: live PASS on the maintainer's own report -
+   "Gift of Rays" now generates a complete plan (legendary-purple
+   header, 892g 88s 38c, eight currency requirements listed) where it
+   previously rendered UNKNOWN. Note the orchestrator's stale-build lead
+   was DISPROVEN by this round's tests; the defect actually fixed was
+   the empty-seed-row cache hit, and this is its live proof.
+5. FIRST-LOAD SNAPSHOT: PARTIAL by environment. With the cached snapshot
+   deleted and a fresh launch, the module correctly did NOT fetch - the
+   sandbox has no API key and the status read "GW2 API access not
+   ready". The half that IS verifiable passed and was the actual risk:
+   the module log stayed EMPTY across the whole session, so the blocked
+   gate neither spends its one shot nor re-probes per frame. Firing on a
+   real key belongs to the maintainer's install.
+
+Bonus verified in passing: the seed-integrity fix from PR #176 works end
+to end - "Pile of Recycled Trebuchets" now autocompletes with its icon
+and resolves through VENDOR at 1940g, where its chain was previously
+absent from the local name seed.
