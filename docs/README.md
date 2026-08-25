@@ -76,25 +76,34 @@ and not compilation units. File counts measured with `ls <dir>/*.cs | wc -l`.
 
 | Folder | What lives there | Open these first |
 | --- | --- | --- |
-| `Models/` (49) | Plain data shapes passed between layers. No behavior beyond validation. | `PlanViewModel.cs`, `CraftingTreeNode.cs`, `CraftingPlanResult.cs`, `CurrencyValuation.cs` |
+| `Models/` (49) | The data shapes passed between layers: the plan result, the display tree, the view model the renderers read. | `PlanViewModel.cs`, `CraftingTreeNode.cs`, `CraftingPlanResult.cs`, `CurrencyValuation.cs` |
 | `Services/` (141, flat) | Every piece of logic in the module: the solver, pricing, the offline-seed loaders, the pure layout arithmetic, and the text/decision composers the views render. | `PlanSolver.cs`, `CraftingPlanPipeline.cs`, `PlanViewModelBuilder.cs`, `VendorBatchSolver.cs`, `PlanContentHeightMath.cs` |
 | `Services/Recipes/` (7) | Recipe cache stores and the committed seed readers behind them. | `RecipeCacheSerializer.cs`, `OverlayRecipeCacheStore.cs`, `ItemNameSeedData.cs` |
-| `Services/Diagnostics/` (2) | Opt-in plan-phase timing, off by default. | `PlanTimingAnalyzer.cs` |
+| `Services/Diagnostics/` (2) | Plan-generation phase timing, summarised into the plan's debug log by `CraftingPlanPipeline`. | `PlanTimingAnalyzer.cs`, `PlanPhaseTimingSummary.cs` |
 | `Views/` (14) | The Blish-bound layer: one file per tab, the window, and the two main-thread primitives. | `CraftingPlanView.cs` (4,960 lines - the plan tab), `MainView.cs` (Snapshot), `SettingsTabContent.cs`, `MainThreadMarshal.cs` |
 | `Views/Rendering/` (33) | Per-section renderers plus the shared drawing primitives (fonts, coin rows, rarity colors, tooltips). | `TreeSectionController.cs`, `SummarySectionRenderer.cs`, `UiFonts.cs`, `CoinCurrencyRenderer.cs` |
-| `Contracts/` (1) | One interface that predates the `Models`/`Services` split. | `IItemSearchProvider.cs` |
+| `Contracts/` (1) | The item-search seam (`IItemSearchProvider` plus its result type) and nothing else - a directory for one file. | `IItemSearchProvider.cs` |
 | `tools/` | Offline console apps that produce `ref/`. Never run by the module. | `VendorOfferUpdater/`, `GW2CraftingHelper.RecipeSeeder/`, `MysticForgeSeeder/` |
 | `ref/` | Committed seed data the module reads at runtime, produced by `tools/`. | `vendor_offers.json` (14.8MB, one line), `recipes_seed.json` |
 | `tests/` | Three test projects; see `CONTRIBUTING.md`. | `GW2CraftingHelper.Tests/`, `VendorOfferUpdater.Tests/` |
 | `Module.cs` (root) | Blish HUD entry point: `Initialize`, tab wiring, service construction, `Unload`. | - |
 
-**The one rule that makes all of this work:** `Models/` and `Services/`
-never reference Blish HUD, XNA, or `Gw2Sharp`. `Views/` is the only
-Blish-bound layer. That boundary is why the whole solver, all the pricing
-arithmetic, and every pixel constant in the plan view can be unit-tested
-with no rendering harness and no running game - and it is why
-`CONTRIBUTING.md`'s STANDING RULE routes each new tree-row feature's pure
-computation into a `Services/` composer before it is wired into a view.
+**The one rule that makes all of this work:** `Models/` is entirely
+Blish-free, and so is `Services/` apart from three deliberate adapters at
+the edge - `Gw2AccountSnapshotService.cs` and `Gw2AccountRecipeClient.cs`
+(the GW2 API, reached through Blish's `Gw2ApiManager`) and
+`ModuleSettings.cs` (Blish's settings store). Everything else compiles with
+no reference to Blish HUD, XNA or `Gw2Sharp` - measured 2026-08-25,
+`grep -rlE 'using (Blish_HUD|Microsoft\.Xna|Gw2Sharp)' --include='*.cs'
+Models Services` returns those three files and nothing else. `Views/` is
+the Blish-bound layer.
+
+That boundary is why the whole solver, all the pricing arithmetic, and
+every pixel constant in the plan view are unit-tested with no rendering
+harness and no running game, and why `CONTRIBUTING.md`'s STANDING RULE
+routes each new tree-row feature's pure computation into a `Services/`
+composer before it is wired into a view. The three adapters are named in
+test files only inside comments; nothing under `tests/` references them.
 
 ## Glossary
 
