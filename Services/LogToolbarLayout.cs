@@ -38,12 +38,14 @@ namespace GW2CraftingHelper.Services
         /// Blish's TextBox (26), Dropdown (30), Checkbox (25) and
         /// StandardButton (28) are four fixed heights that this row carries
         /// side by side; UiMetrics.ButtonHeight's own doc comment names that
-        /// as a separate, unmade decision. This is that decision.
+        /// as a separate, unmade decision. This is that decision - and it is
+        /// <see cref="PlanRelayoutMath.CenterX"/>'s rule turned on its side,
+        /// not a second one, so the Snapshot tab's own search row centres
+        /// through the same arithmetic against its own row height.
         /// </summary>
         public static int CenteredY(int controlHeight)
         {
-            int y = (BarHeight - (controlHeight > 0 ? controlHeight : 0)) / 2;
-            return y > 0 ? y : 0;
+            return PlanRelayoutMath.CenterX(BarHeight, controlHeight);
         }
 
         public readonly struct Slots

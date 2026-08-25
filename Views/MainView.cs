@@ -126,14 +126,27 @@ namespace GW2CraftingHelper.Views
 
         // Layout constants
         private const int HeaderRowY = 5;
-        private const int HeaderHeight = 40;
 
-        // Vertically centred in the 40px header panel, derived rather than
-        // written down: these two buttons were the module's only 30px ones
-        // and dropping them to the shared UiMetrics.ButtonHeight would
-        // otherwise have left them sitting 2px high against the "Account
-        // Snapshot" label beside them.
+        // The section-header band every other heading in the module draws:
+        // 38 tall with its 2px rule at 35, rather than the 40px band with a
+        // flush rule this tab had of its own.
+        private const int HeaderHeight = PlanContentHeightMath.SectionHeaderRowHeight;
+        private const int HeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
+
+        // Vertically centred in the header band, derived rather than written
+        // down - and it clears the rule beneath it by two.
         private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
+
+        /// <summary>Left gutter every element on this tab starts at.</summary>
+        private const int Inset = SnapshotHeaderLayout.Inset;
+
+        private const int HeaderButtonWidth = 100;
+
+        // Room the inline spinner trailing the status line needs, so a long
+        // status ellipsizes before it reaches the spinner rather than under
+        // it.
+        private const int StatusSpinnerReserve =
+            InlineSpinnerLayout.SnapshotStatusSize + InlineSpinnerLayout.LabelGap;
 
         // The status label gets its own full-width row beneath the
         // header rather than sharing _headerPanel with the buttons - a
@@ -243,8 +256,10 @@ namespace GW2CraftingHelper.Views
         }
 
         private const int SearchBoxWidth = 300;
+        private const int SearchBoxHeight = 26;
         private const int FilterDropdownWidth = 140;
-        private const int FilterDropdownX = SearchBoxWidth + 10;
+        private const int FilterDropdownHeight = 30;
+        private const int FilterDropdownX = Inset + SearchBoxWidth + 10;
 
         // Left x of the source-filter run, clear of the dropdown. The
         // panel itself carries this offset, so SourceFilterFlowLayout keeps
@@ -254,6 +269,11 @@ namespace GW2CraftingHelper.Views
 
         // Dim caption ahead of the wallet coin total, so the row reads as a
         // labelled figure rather than a stray unlabelled list row.
+        private Panel _coinBlockPanel;
+        private Label _resultLineLabel;
+        private int _coinBlockWidth;
+        private string _resultLineText = "";
+
         private const string CoinCaption = "Coin";
         private const int CoinCaptionGap = 8;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
@@ -463,22 +483,24 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
-            // SectionTitle over the same 2px rule every heading draws; y=5
-            // re-centres the tier's 29px line box in the 40px band.
             new Label()
             {
                 Font = UiFonts.SectionTitle,
                 Text = "Account Snapshot",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 5),
+                Location = new Point(Inset, HeaderTitleY),
                 Parent = _headerPanel
             };
 
+            // Bottom-anchored with 1px clearance, like every other section
+            // header in the module - see LabelHelpers.CreateRowDivider for
+            // why flush anchoring is unsafe. It stops at the tab's one right
+            // edge rather than the container's.
             _headerDivider = new Panel()
             {
-                Size = new Point(w, 2),
-                Location = new Point(0, HeaderHeight - 2),
+                Size = new Point(SnapshotHeaderLayout.ChromeRightEdge(w), 2),
+                Location = new Point(0, HeaderHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = _headerPanel
             };
@@ -486,8 +508,8 @@ namespace GW2CraftingHelper.Views
             _clearButton = new FeedbackButton()
             {
                 Text = "Clear Cache",
-                Size = new Point(100, UiMetrics.ButtonHeight),
-                Location = new Point(w - 220, HeaderButtonY),
+                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(Inset, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _clearCache != null
             };
@@ -498,11 +520,12 @@ namespace GW2CraftingHelper.Views
             _refreshButton = new FeedbackButton()
             {
                 Text = "Refresh Now",
-                Size = new Point(100, UiMetrics.ButtonHeight),
-                Location = new Point(w - 110, HeaderButtonY),
+                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(Inset, HeaderButtonY),
                 Parent = _headerPanel,
                 Enabled = _refreshAsync != null
             };
+            LayoutHeaderRow(w);
 
             _clearButton.Click += (_, __) => ConfirmClearCache();
 
@@ -522,17 +545,20 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
+            // Explicit width, not AutoSizeWidth: a long failure string ran
+            // off the panel with nothing to say it had. Y=2, the coin row's
+            // precedent; StatusRowHeight carries the Status tier's clearance
+            // derivation.
             _statusLabel = new Label()
             {
                 Font = UiFonts.Status,
                 Text = "",
-                AutoSizeWidth = true,
+                AutoSizeWidth = false,
                 AutoSizeHeight = true,
-                // Y=2, the coin row's precedent; StatusRowHeight carries
-                // the Status tier's clearance derivation.
-                Location = new Point(0, 2),
+                Location = new Point(Inset, 2),
                 Parent = _statusPanel
             };
+            _statusBudget = SnapshotHeaderLayout.StatusMaxWidth(w, StatusSpinnerReserve);
 
             // Trails the status text for the whole of a refresh, clicked or
             // automatic. A tab switch rebuilds this row while the refresh is
@@ -567,8 +593,9 @@ namespace GW2CraftingHelper.Views
 
             _searchBox = new TextBox()
             {
-                Size = new Point(SearchBoxWidth, 26),
-                Location = new Point(0, 5),
+                Size = new Point(SearchBoxWidth, SearchBoxHeight),
+                Location = new Point(
+                    Inset, PlanRelayoutMath.CenterX(SearchRowHeight, SearchBoxHeight)),
                 PlaceholderText = "Search items, currencies, characters...",
                 Text = _lastSearchText ?? "",
                 Parent = _filterPanel
@@ -581,8 +608,10 @@ namespace GW2CraftingHelper.Views
 
             _filterDropdown = new Dropdown()
             {
-                Size = new Point(FilterDropdownWidth, 30),
-                Location = new Point(FilterDropdownX, 5),
+                Size = new Point(FilterDropdownWidth, FilterDropdownHeight),
+                Location = new Point(
+                    FilterDropdownX,
+                    PlanRelayoutMath.CenterX(SearchRowHeight, FilterDropdownHeight)),
                 Parent = _filterPanel
             };
             _filterDropdown.Items.Add("All");
@@ -652,6 +681,30 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(w, CoinHeight),
                 Location = new Point(0, CoinRowY),
                 Parent = buildPanel
+            };
+
+            // The coin row was a caption and ~150px of coin run left-packed
+            // at x=0, with the rest of the band empty. It is a justified
+            // summary row now: what the list is showing on the left, the
+            // wallet's coin on the right.
+            _resultLineLabel = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Location = new Point(Inset, 2),
+                Parent = _coinPanel
+            };
+
+            // Its own child panel so UpdateCoinDisplay's dispose-and-rebuild
+            // cannot destroy the result line beside it.
+            _coinBlockPanel = new Panel()
+            {
+                Size = new Point(0, CoinHeight),
+                Location = new Point(0, 0),
+                Parent = _coinPanel
             };
 
             // Scrollable content
@@ -780,9 +833,7 @@ namespace GW2CraftingHelper.Views
             _containerHeight = h;
 
             _headerPanel.Size = new Point(w, HeaderHeight);
-            _headerDivider.Size = new Point(w, 2);
-            _clearButton.Location = new Point(w - 220, HeaderButtonY);
-            _refreshButton.Location = new Point(w - 110, HeaderButtonY);
+            LayoutHeaderRow(w);
             _statusPanel.Size = new Point(w, StatusRowHeight);
 
             // Re-flows the source-filter checkboxes at the new width (a
@@ -1101,6 +1152,7 @@ namespace GW2CraftingHelper.Views
             {
                 _coinPanel.Location = new Point(0, CoinRowY);
                 _coinPanel.Size = new Point(w, CoinHeight);
+                LayoutCoinRow(w);
             }
 
             if (_contentPanel != null)
@@ -1449,7 +1501,36 @@ namespace GW2CraftingHelper.Views
                 _statusLabel.TextColor = _defaultStatusColor;
             }
 
-            _statusLabel.Text = text;
+            _statusFullText = text;
+            ApplyStatusText();
+        }
+
+        // The status line's full text, so a resize re-takes the ellipsis
+        // from the original rather than compounding it onto an
+        // already-shortened string.
+        private string _statusFullText = "";
+
+        // Budget the line ellipsizes against. Held separately from
+        // Label.Width, which stays the width of the TEXT: the inline spinner
+        // is placed after the label's right edge, so a label sized to the
+        // whole budget would strand the spinner at the panel's edge.
+        private int _statusBudget;
+
+        private void ApplyStatusText()
+        {
+            if (_statusLabel == null) return;
+
+            var font = UiFonts.Status;
+            string shown = LabelHelpers.EllipsizeToWidth(font, _statusFullText, _statusBudget);
+            if (!string.Equals(_statusLabel.Text, shown, StringComparison.Ordinal))
+            {
+                _statusLabel.Text = shown;
+            }
+            _statusLabel.Width = (int)Math.Ceiling(font.MeasureString(shown).Width);
+            TooltipFacility.ApplyPlain(
+                _statusLabel,
+                string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
+
             InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
         }
 
@@ -1781,6 +1862,7 @@ namespace GW2CraftingHelper.Views
 
             if (_snapshot == null)
             {
+                SetResultLine(0, 0, 0, 0);
                 new Label()
                 {
                     Font = UiFonts.Body,
@@ -1829,6 +1911,15 @@ namespace GW2CraftingHelper.Views
 
             bool anyItemRows = itemRows != null && itemRows.Count > 0;
             bool anyWalletRows = walletRows != null && walletRows.Count > 0;
+
+            // Counts only, and only for the runs the content-type dropdown
+            // admits: a "0 of 1204 items" clause under a Wallet-only filter
+            // would report a filter the user chose as if it were a result.
+            SetResultLine(
+                itemRows?.Count ?? 0,
+                itemRows == null ? 0 : (_itemsById?.Count ?? 0),
+                walletRows?.Count ?? 0,
+                walletRows == null ? 0 : (_snapshot.Wallet?.Count ?? 0));
 
             if (!anyItemRows && !anyWalletRows)
             {
@@ -2587,6 +2678,84 @@ namespace GW2CraftingHelper.Views
         // LayoutCoinSegments already takes a caller-supplied startX and
         // lays out left-to-right from it, i.e. it is anchor-neutral by
         // construction; only the higher-level right-aligned convenience
+        /// <summary>
+        /// Places the header band's two buttons and its rule against the
+        /// tab's ONE right edge - the edge the scrolling grid's last column
+        /// also ends on. Build and the resize handler both come through
+        /// here, so the two cannot drift.
+        /// </summary>
+        private void LayoutHeaderRow(int containerWidth)
+        {
+            if (_refreshButton == null) return;
+
+            int rightEdge = SnapshotHeaderLayout.ChromeRightEdge(containerWidth);
+            int refreshX = PlanRelayoutMath.RightAlignedX(rightEdge, HeaderButtonWidth);
+
+            _refreshButton.Location = new Point(refreshX, HeaderButtonY);
+            _clearButton.Location = new Point(
+                refreshX - SnapshotHeaderLayout.HeaderButtonGap - HeaderButtonWidth, HeaderButtonY);
+            _headerDivider.Size = new Point(rightEdge, 2);
+
+            _statusBudget = SnapshotHeaderLayout.StatusMaxWidth(containerWidth, StatusSpinnerReserve);
+            ApplyStatusText();
+        }
+
+        /// <summary>
+        /// Right-pins the coin block as a unit and gives the result line
+        /// what is left of the row. CoinCurrencyRenderer is untouched, so
+        /// the icons stay to the RIGHT of their numbers - only the block's
+        /// origin moves.
+        /// </summary>
+        private void LayoutCoinRow(int containerWidth)
+        {
+            if (_coinBlockPanel == null) return;
+
+            _coinBlockPanel.Size = new Point(_coinBlockWidth, CoinHeight);
+            _coinBlockPanel.Location = new Point(
+                SnapshotHeaderLayout.CoinBlockX(containerWidth, _coinBlockWidth), 0);
+
+            if (_resultLineLabel == null) return;
+
+            int budget = SnapshotHeaderLayout.ResultLineMaxWidth(containerWidth, _coinBlockWidth);
+            _resultLineLabel.Width = budget;
+
+            string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Body, _resultLineText, budget);
+            if (!string.Equals(_resultLineLabel.Text, shown, StringComparison.Ordinal))
+            {
+                _resultLineLabel.Text = shown;
+            }
+            string full = string.Equals(shown, _resultLineText, StringComparison.Ordinal)
+                ? null
+                : _resultLineText;
+            TooltipFacility.ApplyPlain(_resultLineLabel, full);
+            TooltipFacility.ApplyPlain(_coinPanel, full);
+        }
+
+        /// <summary>
+        /// What the result grid is currently showing, in the "N of M shown"
+        /// shape the Settings tab's currency filter already uses. Counts and
+        /// names only - ids never reach it (repo invariant).
+        /// </summary>
+        private void SetResultLine(int shownItems, int totalItems, int shownWallet, int totalWallet)
+        {
+            var parts = new List<string>(2);
+            if (totalItems > 0)
+            {
+                parts.Add(shownItems == totalItems
+                    ? StatusText.Count(totalItems, "item")
+                    : $"{shownItems} of {totalItems} items");
+            }
+            if (totalWallet > 0)
+            {
+                parts.Add(shownWallet == totalWallet
+                    ? StatusText.Count(totalWallet, "currency", "currencies")
+                    : $"{shownWallet} of {totalWallet} currencies");
+            }
+
+            _resultLineText = parts.Count == 0 ? "" : "Showing " + string.Join(" - ", parts);
+            LayoutCoinRow(_containerWidth);
+        }
+
         // wrappers are direction-locked, and this call site does not use
         // them. GetCoinColor is now applied internally by
         // LayoutCoinSegments, so this call site does not need it at all -
@@ -2600,9 +2769,9 @@ namespace GW2CraftingHelper.Views
         // would be destroyed by the first snapshot update.
         private void UpdateCoinDisplay(int copper)
         {
-            if (_coinPanel == null) return;
+            if (_coinBlockPanel == null) return;
 
-            foreach (var child in _coinPanel.Children.ToArray())
+            foreach (var child in _coinBlockPanel.Children.ToArray())
             {
                 child.Dispose();
             }
@@ -2622,17 +2791,25 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 2),
-                Parent = _coinPanel
+                Parent = _coinBlockPanel
             };
             int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156904, gold.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156907, silver.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156902, cop.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.GoldAssetId, gold.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.SilverAssetId, silver.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.CopperAssetId, cop.ToString());
 
             CoinCurrencyRenderer.LayoutCoinSegments(
-                _coinPanel, segments, captionWidth + CoinCaptionGap, 2, font);
+                _coinBlockPanel, segments, captionWidth + CoinCaptionGap, 2, font);
+
+            // The block's exact extent, from the same arithmetic that laid
+            // it out - so nothing re-measures it to right-pin it.
+            // TotalCoinSegmentsWidth already drops the run's trailing gap.
+            _coinBlockWidth = captionWidth + CoinCaptionGap
+                + CoinSegmentMath.TotalCoinSegmentsWidth(segments);
+
+            LayoutCoinRow(_containerWidth);
         }
     }
 }

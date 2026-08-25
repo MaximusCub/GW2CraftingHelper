@@ -39,6 +39,68 @@ namespace GW2CraftingHelper.Services
         /// </para>
         public const int StatusRowHeight = 26;
 
+        /// <summary>Left gutter every element on this tab starts at. Five
+        /// things here used to sit at x=0.</summary>
+        public const int Inset = 16;
+
+        /// <summary>Gap between the tab's two right-anchored header buttons -
+        /// the module's one button gap, not the 20 they used to keep.</summary>
+        public const int HeaderButtonGap = 8;
+
+        /// <summary>Gap the result line keeps clear of the coin block beside
+        /// it - the module's one name-to-column gap.</summary>
+        public const int ResultLineToCoinGap = SnapshotItemGridLayout.CellAmountGap;
+
+        /// <summary>
+        /// The right edge every NON-SCROLLING element on this tab pins to.
+        /// It is derived from the SCROLLING grid's own width, not from the
+        /// container's, so the header buttons, the coin block and the grid's
+        /// rightmost column land on one vertical line.
+        /// <para>
+        /// The buttons used to pin to containerWidth - 10 while the grid's
+        /// last column ended at containerWidth - 28: eighteen pixels apart,
+        /// on the same tab, at every width.
+        /// </para>
+        /// </summary>
+        public static int ChromeRightEdge(int containerWidth)
+        {
+            return PlanRelayoutMath.PinnedRightEdge(
+                SnapshotItemGridLayout.ComputeGridWidth(containerWidth));
+        }
+
+        /// <summary>Left edge of the right-pinned coin block (its caption,
+        /// gap and coin run laid out as one unit).</summary>
+        public static int CoinBlockX(int containerWidth, int coinBlockWidth)
+        {
+            return PlanRelayoutMath.RightAlignedX(
+                ChromeRightEdge(containerWidth), coinBlockWidth > 0 ? coinBlockWidth : 0);
+        }
+
+        /// <summary>
+        /// Width the coin row's result line may occupy before the coin block
+        /// pinned to its right - the plan tables' rule, applied to a summary
+        /// row.
+        /// </summary>
+        public static int ResultLineMaxWidth(int containerWidth, int coinBlockWidth)
+        {
+            return PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                ChromeRightEdge(containerWidth),
+                coinBlockWidth > 0 ? coinBlockWidth : 0,
+                ResultLineToCoinGap,
+                Inset);
+        }
+
+        /// <summary>
+        /// Width a status line may occupy: the chrome edge, less the inset
+        /// it starts at and whatever the inline spinner trailing it needs.
+        /// </summary>
+        public static int StatusMaxWidth(int containerWidth, int spinnerReserve)
+        {
+            int width = ChromeRightEdge(containerWidth) - Inset
+                - (spinnerReserve > 0 ? spinnerReserve : 0);
+            return width > 20 ? width : 20;
+        }
+
         /// <summary>
         /// Width available to the source-filter flow once it starts at
         /// startX instead of the panel's left edge. Floors at 0 rather than

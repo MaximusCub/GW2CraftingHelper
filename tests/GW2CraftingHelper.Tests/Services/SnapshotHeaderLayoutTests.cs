@@ -229,5 +229,147 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, flow.RowCount);
             Assert.True(SnapshotHeaderLayout.SharesSearchRow(flow.RowCount));
         }
+
+        // ---- One right edge for the whole tab ----
+
+        private static readonly int ContainerAtWindowMinimum =
+            WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
+
+        [Theory]
+        [InlineData(1252)]
+        [InlineData(1632)]
+        [InlineData(2540)]
+        public void ChromeRightEdge_IsTheSameEdgeTheGridsLastColumnEndsOn(int containerWidth)
+        {
+            // The whole point of the change. The grid is laid out inside
+            // ComputeGridWidth(container) and its rightmost column's own
+            // right edge is PinnedRightEdge of that - so the header buttons,
+            // the coin block and the last column land on ONE line.
+            int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(containerWidth);
+            int columnCount = SnapshotItemGridLayout.ComputeColumnCount(gridWidth);
+            int columnWidth = SnapshotItemGridLayout.ComputeColumnWidth(gridWidth);
+
+            int lastColumnRightEdge =
+                ((columnCount - 1) * columnWidth)
+                + SnapshotItemGridLayout.CellAmountRightEdge(columnWidth);
+
+            Assert.Equal(
+                PlanRelayoutMath.PinnedRightEdge(gridWidth),
+                SnapshotHeaderLayout.ChromeRightEdge(containerWidth));
+
+            // Integer column division can leave a remainder the grid does
+            // not use; the chrome edge is never LEFT of the last column.
+            Assert.True(SnapshotHeaderLayout.ChromeRightEdge(containerWidth) >= lastColumnRightEdge);
+            Assert.True(
+                SnapshotHeaderLayout.ChromeRightEdge(containerWidth) - lastColumnRightEdge < columnCount);
+        }
+
+        [Fact]
+        public void ChromeRightEdge_IsNotTheContainersOwnEdge()
+        {
+            // It used to be: the buttons pinned to containerWidth - 10 while
+            // the grid ended at containerWidth - 28, eighteen pixels apart
+            // on the same tab at every width.
+            Assert.Equal(
+                ContainerAtWindowMinimum
+                    - WindowSizing.ScrollbarAllowance - PlanRelayoutMath.TableRightMargin,
+                SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum));
+        }
+
+        [Fact]
+        public void CoinBlockIsRightPinnedAsAUnit()
+        {
+            const int BlockWidth = 200;
+
+            Assert.Equal(
+                SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum),
+                SnapshotHeaderLayout.CoinBlockX(ContainerAtWindowMinimum, BlockWidth) + BlockWidth);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-40)]
+        public void CoinBlockX_AbsentBlock_SitsOnTheEdgeItself(int blockWidth)
+        {
+            Assert.Equal(
+                SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum),
+                SnapshotHeaderLayout.CoinBlockX(ContainerAtWindowMinimum, blockWidth));
+        }
+
+        [Fact]
+        public void ResultLineStopsBeforeTheCoinBlockWithTheModulesOwnGap()
+        {
+            const int BlockWidth = 200;
+
+            int budget = SnapshotHeaderLayout.ResultLineMaxWidth(ContainerAtWindowMinimum, BlockWidth);
+
+            Assert.Equal(
+                SnapshotHeaderLayout.CoinBlockX(ContainerAtWindowMinimum, BlockWidth)
+                    - SnapshotHeaderLayout.ResultLineToCoinGap - SnapshotHeaderLayout.Inset,
+                budget);
+            Assert.Equal(
+                PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                    SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum),
+                    BlockWidth,
+                    SnapshotHeaderLayout.ResultLineToCoinGap,
+                    SnapshotHeaderLayout.Inset),
+                budget);
+        }
+
+        [Fact]
+        public void ResultLineTakesEveryPixelAWiderWindowAdds()
+        {
+            const int BlockWidth = 200;
+
+            int narrow = SnapshotHeaderLayout.ResultLineMaxWidth(1252, BlockWidth);
+            int wide = SnapshotHeaderLayout.ResultLineMaxWidth(2252, BlockWidth);
+
+            Assert.Equal(1000, wide - narrow);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-500)]
+        public void ResultLineMaxWidth_FloorsRatherThanGoingNegative(int containerWidth)
+        {
+            Assert.True(SnapshotHeaderLayout.ResultLineMaxWidth(containerWidth, 200) >= 20);
+        }
+
+        [Fact]
+        public void StatusLineReservesRoomForTheSpinnerTrailingIt()
+        {
+            int reserve = InlineSpinnerLayout.SnapshotStatusSize + InlineSpinnerLayout.LabelGap;
+
+            Assert.Equal(
+                SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum)
+                    - SnapshotHeaderLayout.Inset - reserve,
+                SnapshotHeaderLayout.StatusMaxWidth(ContainerAtWindowMinimum, reserve));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-500)]
+        public void StatusMaxWidth_FloorsRatherThanGoingNegative(int containerWidth)
+        {
+            Assert.True(SnapshotHeaderLayout.StatusMaxWidth(containerWidth, 26) >= 20);
+        }
+
+        [Fact]
+        public void HeaderButtonGapIsTheModulesOwnButtonGap_NotTheTwentyItWas()
+        {
+            Assert.Equal(8, SnapshotHeaderLayout.HeaderButtonGap);
+        }
+
+        [Fact]
+        public void SearchRowControlsShareOneOpticalCentre()
+        {
+            // The same rule the Log toolbar states, against this tab's own
+            // 35px row - one implementation, not two.
+            Assert.Equal(4, PlanRelayoutMath.CenterX(SearchRowHeight, 26));
+            Assert.Equal(2, PlanRelayoutMath.CenterX(SearchRowHeight, 30));
+            Assert.Equal(
+                LogToolbarLayout.CenteredY(26),
+                PlanRelayoutMath.CenterX(LogToolbarLayout.BarHeight, 26));
+        }
     }
 }
