@@ -11,7 +11,7 @@ handoff-notes deletion and the personal-path-citation rewording, both
 documented below.
 
 **If you're looking for current open issues, start at
-[`docs/KNOWN-ISSUES.md`](../KNOWN-ISSUES.md) instead** - it holds the
+[`docs/KNOWN-ISSUES.md`](../../docs/KNOWN-ISSUES.md) instead** - it holds the
 numbered-item catalog (under the same item numbers cited by `KNOWN-ISSUES
 #N` comments throughout the `.cs` source) with a short resolution summary
 per item, plus the current DEFERRED backlog. Every numbered item's *full*

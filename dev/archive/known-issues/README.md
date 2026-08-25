@@ -1,7 +1,7 @@
 # Archived milestone records
 
 One file per milestone record, moved **verbatim** out of
-[`docs/KNOWN-ISSUES.md`](../../KNOWN-ISSUES.md) by the 2026-08-24 docs
+[`docs/KNOWN-ISSUES.md`](../../../docs/KNOWN-ISSUES.md) by the 2026-08-24 docs
 rotation pass. Nothing was edited during the move itself: each file is its
 section's original bytes, `## ` heading and all.
 

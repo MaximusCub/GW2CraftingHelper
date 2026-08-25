@@ -57,6 +57,12 @@ folder holds what. Released versions are listed in
 [`CHANGELOG.md`](CHANGELOG.md); what is and is not planned is in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+Underneath that sits the full engineering record - every milestone record,
+the pre-M38 fix-pass diary, the closed audits and the designs that were
+never built - in [`dev/`](dev/README.md). It is dated evidence rather than
+documentation, and it is kept in-repo so a `grep` for a constant finds the
+session that measured it.
+
 ## Screenshots
 
 Recipe tree with per-node decision pills, Best Path / Craft All / Buy All /

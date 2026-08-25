@@ -52,7 +52,7 @@ behind `DecisionPillPlanner`, `ValueDetailTooltipBuilder`,
 existing single-owner shape.
 
 **Record:**
-[`archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md`](archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md).
+[`archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md`](../dev/archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md).
 
 ---
 
@@ -72,7 +72,7 @@ cost being added is a permanent abstraction that every future pass has to
 fit. Revisit if a fifth pass arrives and its inputs are already covered.
 
 **Record:**
-[`archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md).
+[`archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](../dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md).
 
 ---
 
@@ -91,7 +91,7 @@ history.
 **Proposal:** split the flat `Services/` directory into `Services/Pricing/`,
 `Services/Planning/`, `Services/Persistence/`, `Services/Vendor/`,
 `Services/Layout/` and `Services/Api/`, as set out in
-[`dev-notes/m38-plan/m38-a1-architecture.md`](dev-notes/m38-plan/m38-a1-architecture.md)
+[`dev-notes/m38-plan/m38-a1-architecture.md`](../dev/dev-notes/m38-plan/m38-a1-architecture.md)
 section 5.
 
 **Not executed.** None of the six directories exists; `Services/` is 141

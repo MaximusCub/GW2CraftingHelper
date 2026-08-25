@@ -51,7 +51,7 @@
   (they render a "Coming Soon" stub, no functional content).
 - Further tab feature proposals (deeper snapshot search, plan history,
   a crafting ranker, and similar ideas) live in-repo at
-  [`docs/dev-notes/m38-plan/proposals/`](dev-notes/m38-plan/proposals/).
+  [`dev/proposals/`](../dev/proposals/).
   Being written down does not make them committed roadmap items: `d1`
   (snapshot/about/settings) is partly implemented, while `d3`
   (plan history) and `d4` (crafting ranker) back the two placeholder tabs
@@ -66,12 +66,12 @@
   tiers: [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) is the current-state
   tracker (numbered catalog, the open list, and a ledger of every rotated
   milestone record); the full milestone records live one file each under
-  [`docs/archive/known-issues/`](archive/known-issues/); and the pre-M38
-  fix-pass diary is [`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md).
+  [`dev/archive/known-issues/`](../dev/archive/known-issues/); and the pre-M38
+  fix-pass diary is [`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md).
 - The original per-phase project plans (Phase A through the M14-M17
   navigation/visual-parity work, each with full scope/acceptance-criteria
   templates) are archived at
-  [`docs/archive/plans/2026-02-15/`](archive/plans/2026-02-15/).
+  [`dev/archive/plans/2026-02-15/`](../dev/archive/plans/2026-02-15/).
 - Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md);
   designs proposed and deliberately not built:
   [`docs/DECISIONS.md`](DECISIONS.md).

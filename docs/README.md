@@ -18,7 +18,7 @@ are in tells you whether a page is safe to edit.
 | --- | --- | --- |
 | **Current state** | What is true right now: the tracker, the roadmap, the release protocol, the normative solver spec. | Yes - keep it current. |
 | **Durable why** | The reasoning behind mechanisms that outlive any one bug: architecture, decisions, research. | Yes, when the reasoning changes. |
-| **Frozen record** | What happened, dated: archived milestone records, the pre-M38 diary, the M38 plan set. | **No.** Correct these by adding a live note elsewhere that links to them, never by editing the record. |
+| **Frozen record** | What happened, dated: milestone records, the pre-M38 diary, the M38 plan set, unbuilt proposals. Not in this directory - it is all under [`../dev/`](../dev/README.md). | **No.** Correct these by adding a live note elsewhere that links to them, never by editing the record. |
 
 ## Current state
 
@@ -55,18 +55,21 @@ are in tells you whether a page is safe to edit.
 
 ## Frozen record
 
-- [`archive/known-issues/`](archive/known-issues/) - 70 milestone records,
-  one file each, moved out of `KNOWN-ISSUES.md` verbatim once gated and
-  swept.
-- [`dev-notes/HISTORY.md`](dev-notes/HISTORY.md) - the pre-M38 fix-pass
-  diary: hypotheses, instrumentation, root-cause traces, dated gate
-  records, under the same item numbers.
-- [`dev-notes/m38-plan/`](dev-notes/m38-plan/) - the M38 cleanup wave's own
-  analysis and work-package plan, plus
-  [`proposals/`](dev-notes/m38-plan/proposals/) (written-down ideas, not
-  committed roadmap items).
-- [`archive/`](archive/) - closed point-in-time audits and the original
-  per-phase project plans.
+The whole third tier lives outside this directory, in
+[`../dev/`](../dev/README.md), and has [its own index](../dev/README.md).
+Nothing under `dev/` is current documentation; it is the dated engineering
+record, kept because the measurements in it cannot be re-derived cheaply.
+In short:
+
+- [`../dev/records/`](../dev/records/) - one milestone record per branch.
+  Where new records land.
+- [`../dev/archive/known-issues/`](../dev/archive/known-issues/) - 68 older
+  records, rotated out of `KNOWN-ISSUES.md` verbatim in one 2026-08-24
+  pass, before per-branch files existed.
+- [`../dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) - the pre-M38
+  fix-pass diary, under the same item numbers.
+- [`../dev/proposals/`](../dev/proposals/) - designs for features that were
+  never built.
 
 ## Where the code lives
 
@@ -112,7 +115,7 @@ test files only inside comments; nothing under `tests/` references them.
   in a live desktop verification.
 - **WP-NN** - a work package inside the M38 cleanup wave specifically,
   WP-01 through WP-29, defined in
-  [`dev-notes/m38-plan/m38-cleanup-plan.md`](dev-notes/m38-plan/m38-cleanup-plan.md).
+  [`dev-notes/m38-plan/m38-cleanup-plan.md`](../dev/dev-notes/m38-plan/m38-cleanup-plan.md).
   No other milestone uses WP numbering.
 - **KNOWN-ISSUES #N** - an entry in the numbered catalog in
   [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md). Cited from `.cs` files as an anchor

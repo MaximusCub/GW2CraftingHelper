@@ -11,9 +11,9 @@ narrative (root-cause traces, live-verification transcripts, dated PASS
 records) - that history is preserved in
 [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (the current-state tracker: the
 numbered catalog, the open list, and a ledger pointing into
-[`docs/archive/known-issues/`](archive/known-issues/), where the full
+[`dev/archive/known-issues/`](../dev/archive/known-issues/), where the full
 milestone records live one file each) and
-[`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md) (the pre-M38 fix-pass
+[`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) (the pre-M38 fix-pass
 diary this document distills). Each section below names the KNOWN-ISSUES
 item number(s) it is drawn from so you can go read the original
 investigation.
@@ -158,7 +158,7 @@ asserting something the decompiled source disproves - its own defect
 (KNOWN-ISSUES #36, fourth fix-loop round).
 
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
-(`docs/dev-notes/HISTORY.md` after the WP-27 split).
+(`dev/dev-notes/HISTORY.md` after the WP-27 split).
 
 ---
 
@@ -570,7 +570,7 @@ pass's output, so any order between them is byte-identical.
 `Services/PlanViewModelBuilder.cs` (`BuildNotesSection`).
 
 **Full history:**
-[`docs/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md)
+[`dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](../dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md)
 (the mutation-testing gap that produced these four passes); each
 calculator's own class doc comment for its individual rationale.
 

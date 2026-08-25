@@ -18,10 +18,10 @@ The written record lives in three tiers:
 - **this file** - current state: the catalog, the open list, the ledger, and
   the append zone at the bottom where a branch's fresh milestone record
   lands before it rotates.
-- [`docs/archive/known-issues/`](archive/known-issues/) - the full milestone
+- [`dev/archive/known-issues/`](../dev/archive/known-issues/) - the full milestone
   records, one file per section, moved out of this file verbatim. Every
   ledger stub points at one.
-- [`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md) - the pre-M38 fix-pass
+- [`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) - the pre-M38 fix-pass
   diary: hypotheses, instrumentation, root-cause traces and dated gate PASS
   records for every numbered item, under the identical item number.
 
@@ -60,7 +60,7 @@ rather than oral.
    with the verification transcript. By then the section may no longer be
    at EOF - that is expected.
 4. **Rotation.** Once a section is gated and its follow-ups are swept, it
-   moves verbatim into `docs/archive/known-issues/YYYY-MM-DD-<slug>.md`
+   moves verbatim into `dev/archive/known-issues/YYYY-MM-DD-<slug>.md`
    (date from the section title, else the introducing merge commit; slug
    from the branch slug in the title) and leaves a stub in the ledger
    below. The stub MUST repeat, verbatim, every quoted name that `.cs`,
@@ -591,7 +591,7 @@ character is in-world) and reported only a bare "Refresh Failed" label.
 (Blish-free, by exception type name), and `Views/ApiAccessDialog` explains
 the three checks with a Retry that shares `MainView.RefreshNowAsync()`.
 Full record:
-`docs/archive/known-issues/2026-08-06-field-test-ux-wave-2-mysticforge-sublabel-drop-fix.md`.
+`dev/archive/known-issues/2026-08-06-field-test-ux-wave-2-mysticforge-sublabel-drop-fix.md`.
 
 ### 38. Review-pass fixes on item 37: ApiAccessDialog self-defense + background-refresh status parity (2026-08-06)
 
@@ -671,7 +671,7 @@ genuinely open item, not just the ones originally filed under a
   warnings respectively); a future cleanup wave candidate.
 - **(M38 `Services/` foldering - recorded 2026-08-25, not executed)** The
   target folder shape named in
-  `docs/dev-notes/m38-plan/m38-a1-architecture.md` section 5 -
+  `dev/dev-notes/m38-plan/m38-a1-architecture.md` section 5 -
   `Services/Pricing/`, `Services/Planning/`, `Services/Persistence/`,
   `Services/Vendor/`, `Services/Layout/`, `Services/Api/` - was never
   built: none of the six directories exists, and `Services/` is 141 flat
@@ -700,7 +700,7 @@ open, so they live here rather than only in the archive:
   scan `CraftingTreeBuilder.BuildNode` re-runs per node - declined at the
   time as an unrequested new abstraction on small lists, not as a wrong
   idea. Full record:
-  `docs/archive/known-issues/2026-08-16-audit-row-56-daily-craft-cooldown-notices-three.md`.
+  `dev/archive/known-issues/2026-08-16-audit-row-56-daily-craft-cooldown-notices-three.md`.
 - **(from the font-and-polish gate, 2026-08-23)** Two sub-cases left to the
   live install, never closed: grip drag-resize outward-and-back (the grip
   path is synthetically uncatchable, a longstanding limitation) together
@@ -708,7 +708,7 @@ open, so they live here rather than only in the archive:
   refresh (the keyless sandbox never starts an automatic refresh, so that
   half stands on the shared two-flag wiring plus the manual path's
   evidence). Full record:
-  `docs/archive/known-issues/2026-08-23-font-and-polish.md`.
+  `dev/archive/known-issues/2026-08-23-font-and-polish.md`.
 
 ---
 
@@ -725,168 +725,168 @@ Rotated 2026-08-24 out of a 917KB active file. See "How this file works"
 above for when the next rotation is due.
 
 - **Field-test UX wave (six S-sized display fixes, 2026-08-06)** - gate PASS 2026-08-06.
-  `docs/archive/known-issues/2026-08-06-field-test-ux-wave.md`
+  `dev/archive/known-issues/2026-08-06-field-test-ux-wave.md`
 - **Field-test UX wave 2: MysticForge sublabel drop fix (2026-08-06)** - gate PASS 2026-08-06.
-  `docs/archive/known-issues/2026-08-06-field-test-ux-wave-2-mysticforge-sublabel-drop-fix.md`
+  `dev/archive/known-issues/2026-08-06-field-test-ux-wave-2-mysticforge-sublabel-drop-fix.md`
 - **Wave-3 quick wins (2026-08-06)** - gate PASS 2026-08-06.
-  `docs/archive/known-issues/2026-08-06-wave-3-quick-wins.md`
+  `dev/archive/known-issues/2026-08-06-wave-3-quick-wins.md`
 - **W3B: Generation progress + rich logging (2026-08-08)** - gate PASS 2026-08-08.
   Cited as: W3B section.
-  `docs/archive/known-issues/2026-08-08-w3b-generation-progress-rich-logging.md`
+  `dev/archive/known-issues/2026-08-08-w3b-generation-progress-rich-logging.md`
 - **W3C: Per-character discipline display (2026-08-08)** - gate PASS 2026-08-08.
-  `docs/archive/known-issues/2026-08-08-w3c-per-character-discipline-display.md`
+  `dev/archive/known-issues/2026-08-08-w3c-per-character-discipline-display.md`
 - **W3D: Plan persistence across module restarts (2026-08-09)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-09-w3d-plan-persistence-across-module-restarts.md`
+  `dev/archive/known-issues/2026-08-09-w3d-plan-persistence-across-module-restarts.md`
 - **W4B: Vendor cost-component leaves (2026-08-15)** - gate PASS 2026-08-16.
   Cited as: tree dimming rule.
-  `docs/archive/known-issues/2026-08-15-w4b-vendor-cost-component-leaves.md`
+  `dev/archive/known-issues/2026-08-15-w4b-vendor-cost-component-leaves.md`
 - **Craft/vendor comparability parity fix (2026-08-15)** - gate: see record.
   Cited as: "Craft/vendor comparability parity".
-  `docs/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`
+  `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`
 - **Craft/vendor comparability parity fix - adversarial review follow-up (2026-08-15)** - gate: see record.
-  `docs/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix-adversarial.md`
+  `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix-adversarial.md`
 - **Craft/vendor comparability parity fix - external review, fourth-site finding (2026-08-15)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix-external.md`
+  `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix-external.md`
 - **Timestamp date display (all user-facing timestamps gain dates)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-15-timestamp-date-display.md`
+  `dev/archive/known-issues/2026-08-15-timestamp-date-display.md`
 - **Recipe-ingestion bug class: missing schema-version parameter (2026-08-15)** - gate PASS 2026-08-16.
   Cited as: recipe-ingestion bug class.
-  `docs/archive/known-issues/2026-08-15-recipe-ingestion-bug-class-missing-schema-version.md`
+  `dev/archive/known-issues/2026-08-15-recipe-ingestion-bug-class-missing-schema-version.md`
 - **W4A: Total Cost section redesign (2026-08-15)** - gate PASS 2026-08-16.
   Cited as: W4A entry.
-  `docs/archive/known-issues/2026-08-15-w4a-total-cost-section-redesign.md`
+  `dev/archive/known-issues/2026-08-15-w4a-total-cost-section-redesign.md`
 - **GuildUpgrade ingredient costing/display fix (2026-08-16)** - gate PARTIAL PASS 2026-08-16.
   Cited as: guildupgrade-ingredients fix, the corrected "Root cause" paragraph.
-  `docs/archive/known-issues/2026-08-16-guildupgrade-ingredient-costing-display-fix.md`
+  `dev/archive/known-issues/2026-08-16-guildupgrade-ingredient-costing-display-fix.md`
 - **AUDIT ROW 20/38: TP price-side fallback parity (2026-08-16)** - gate PARTIAL PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-audit-row-20-38-tp-price-side-fallback-parity.md`
+  `dev/archive/known-issues/2026-08-16-audit-row-20-38-tp-price-side-fallback-parity.md`
 - **AUDIT ROW 56: daily craft-cooldown notices + three small fixes (2026-08-16)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-audit-row-56-daily-craft-cooldown-notices-three.md`
+  `dev/archive/known-issues/2026-08-16-audit-row-56-daily-craft-cooldown-notices-three.md`
 - **Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)** - gate PASS with one deferred slice 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-currency-ux-package-defaults-plan-scope-pills-value.md`
+  `dev/archive/known-issues/2026-08-16-currency-ux-package-defaults-plan-scope-pills-value.md`
 - **Decision-invariant "Value Own Materials" (VOM, 2026-08-16)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-decision-invariant-value-own-materials.md`
+  `dev/archive/known-issues/2026-08-16-decision-invariant-value-own-materials.md`
 - **Plan Notes section: excess/reclaim, competency, forge scope (2026-08-16)** - gate PASS 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-plan-notes-section-excess-reclaim-competency-forge.md`
+  `dev/archive/known-issues/2026-08-16-plan-notes-section-excess-reclaim-competency-forge.md`
 - **UI bundle: wiki links, snapshot status row, receipt/what-if captions (2026-08-16)** - gate MIXED 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-ui-bundle-wiki-links-snapshot-status-row-receipt.md`
+  `dev/archive/known-issues/2026-08-16-ui-bundle-wiki-links-snapshot-status-row-receipt.md`
 - **Opportunity notes: recipe-sheet savings + seasonal vendor tips (2026-08-16)** - gate not yet run live.
   Cited as: RECIPE-SHEET SAVINGS entry.
-  `docs/archive/known-issues/2026-08-16-opportunity-notes-recipe-sheet-savings-seasonal.md`
+  `dev/archive/known-issues/2026-08-16-opportunity-notes-recipe-sheet-savings-seasonal.md`
 - **Source selection simplification: competency-aware default + subdued losing pills (2026-08-16)** - gate not yet run live.
-  `docs/archive/known-issues/2026-08-16-source-selection-simplification-competency-aware.md`
+  `dev/archive/known-issues/2026-08-16-source-selection-simplification-competency-aware.md`
 - **Source selection simplification: adversarial-review fix round (8 findings) (2026-08-16)** - gate not yet run live.
-  `docs/archive/known-issues/2026-08-16-source-selection-simplification-adversarial-review.md`
+  `dev/archive/known-issues/2026-08-16-source-selection-simplification-adversarial-review.md`
 - **Source selection simplification: adversarial-review fix round 2 (5 findings) (2026-08-16)** - gate not yet run live.
-  `docs/archive/known-issues/2026-08-16-source-selection-simplification-adversarial-review-2.md`
+  `dev/archive/known-issues/2026-08-16-source-selection-simplification-adversarial-review-2.md`
 - **Gate investigation: receipt/what-if captions + value-detail hover (2026-08-16)** - gate investigation outcome recorded 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-gate-investigation-receipt-what-if-captions-value.md`
+  `dev/archive/known-issues/2026-08-16-gate-investigation-receipt-what-if-captions-value.md`
 - **Shopping-list row tooltip: scope collision + swallowed hover (shoplist-have-format, 2026-08-16)** - gate not yet run live 2026-08-16.
   Cited as: shoplist-have-format.
-  `docs/archive/known-issues/2026-08-16-shoplist-have-format.md`
+  `dev/archive/known-issues/2026-08-16-shoplist-have-format.md`
 - **Festival-vendor auto-tagging follow-up (2026-08-16)** - gate not yet run live 2026-08-16.
-  `docs/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`
+  `dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`
 - **Recorded follow-ups batch sweep (2026-08-17)** - gate not applicable 2026-08-16.
-  `docs/archive/known-issues/2026-08-17-recorded-follow-ups-batch-sweep.md`
+  `dev/archive/known-issues/2026-08-17-recorded-follow-ups-batch-sweep.md`
 - **High-evidence zones: policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)** - gate PASS.
   Cited as: high-evidence-zones.
-  `docs/archive/known-issues/2026-08-17-high-evidence-zones.md`
+  `dev/archive/known-issues/2026-08-17-high-evidence-zones.md`
 - **Value-detail hover investigation, pipeline-level follow-up (value-detail-pipeline, 2026-08-17)** - gate not run live this pass.
-  `docs/archive/known-issues/2026-08-17-value-detail-pipeline.md`
+  `dev/archive/known-issues/2026-08-17-value-detail-pipeline.md`
 - **Merged-ceil remainder: largest-remainder apportionment + display-layer narrowing fix (2026-08-17)** - gate not applicable 2026-08-16.
-  `docs/archive/known-issues/2026-08-17-merged-ceil-remainder-largest-remainder.md`
+  `dev/archive/known-issues/2026-08-17-merged-ceil-remainder-largest-remainder.md`
 - **Quality-audit cleanup, phase 1: four bug fixes (B1-B4, 2026-08-17)** - gate PASS 2026-08-17.
   Cited as: Quality-audit B1, Quality-audit B2, Quality-audit B3, Quality-audit B4, quality-phase1-bugs, the full quality-audit rationale.
-  `docs/archive/known-issues/2026-08-17-quality-audit-cleanup-phase-1-four-bug-fixes.md`
+  `dev/archive/known-issues/2026-08-17-quality-audit-cleanup-phase-1-four-bug-fixes.md`
 - **Tree row tooltip composer extraction + architecture doc corrections (2026-08-17)** - gate not run live this pass.
-  `docs/archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md`
+  `dev/archive/known-issues/2026-08-17-tree-row-tooltip-composer-extraction-architecture.md`
 - **Annotation-detection: post-solve advisory-list characterization tests + B8 shape fixes (2026-08-17)** - gate not run live this pass.
-  `docs/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`
+  `dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`
 - **Quality-audit phase 2: safe-mechanical batch (quality-phase2-mechanical)** - gate PASS.
-  `docs/archive/known-issues/2026-08-17-quality-phase2-mechanical.md`
+  `dev/archive/known-issues/2026-08-17-quality-phase2-mechanical.md`
 - **Comment-minimalism sweep (repo-wide, comment-minimalism-sweep branch)** - gate PASS.
-  `docs/archive/known-issues/2026-08-17-comment-minimalism-sweep.md`
+  `dev/archive/known-issues/2026-08-17-comment-minimalism-sweep.md`
 - **Quality-audit phase 3: structural dedup (quality-phase3-dedup)** - gate PASS.
-  `docs/archive/known-issues/2026-08-17-quality-phase3-dedup.md`
+  `dev/archive/known-issues/2026-08-17-quality-phase3-dedup.md`
 - **Quality-audit phase 4a: PlanSolver best-recipe tracker (B9, quality-phase4a-tracker)** - gate PASS.
-  `docs/archive/known-issues/2026-08-17-quality-phase4a-tracker.md`
+  `dev/archive/known-issues/2026-08-17-quality-phase4a-tracker.md`
 - **Quality-audit phase 4b: pure parameter bundling (B10, quality-phase4b-bundling)** - gate PASS.
-  `docs/archive/known-issues/2026-08-17-quality-phase4b-bundling.md`
+  `dev/archive/known-issues/2026-08-17-quality-phase4b-bundling.md`
 - **Desktop gate batch: value-detail closure + partial currency coverage (2026-08-17, orchestrator live session)** - gate: see record.
-  `docs/archive/known-issues/2026-08-17-desktop-gate-batch-value-detail-closure-partial.md`
+  `dev/archive/known-issues/2026-08-17-desktop-gate-batch-value-detail-closure-partial.md`
 - **Backlog cleanup batch (B8/B11/B13/B14/B15 + solver ctor hardening, backlog-cleanup)** - gate PASS 2026-08-17.
-  `docs/archive/known-issues/2026-08-17-backlog-cleanup.md`
+  `dev/archive/known-issues/2026-08-17-backlog-cleanup.md`
 - **Final test polish: three Nice to Have items (final-test-polish)** - gate PASS.
-  `docs/archive/known-issues/2026-08-19-final-test-polish.md`
+  `dev/archive/known-issues/2026-08-19-final-test-polish.md`
 - **Log + Snapshot UX: three small items (log-snapshot-ux)** - gate PASS 2026-08-19.
-  `docs/archive/known-issues/2026-08-19-log-snapshot-ux.md`
+  `dev/archive/known-issues/2026-08-19-log-snapshot-ux.md`
 - **Per-character source checkboxes + character-name search (char-source-search)** - gate PASS on items 2026-08-19.
-  `docs/archive/known-issues/2026-08-19-char-source-search.md`
+  `dev/archive/known-issues/2026-08-19-char-source-search.md`
 - **Nice to Have batch (nth-cleanup)** - gate PASS 2026-08-19.
-  `docs/archive/known-issues/2026-08-19-nth-cleanup.md`
+  `dev/archive/known-issues/2026-08-19-nth-cleanup.md`
 - **Character-name search minimum query length (char-search-min2)** - gate PASS 2026-08-22.
   Cited as: char-search-min2.
-  `docs/archive/known-issues/2026-08-22-char-search-min2.md`
+  `dev/archive/known-issues/2026-08-22-char-search-min2.md`
 - **Audit batch I: log entry readability (audit-i-log)** - gate PASS 2026-08-22.
-  `docs/archive/known-issues/2026-08-22-audit-i-log.md`
+  `dev/archive/known-issues/2026-08-22-audit-i-log.md`
 - **Audit batch F: input flow (audit-f-input-flow)** - gate PASS 2026-08-22.
-  `docs/archive/known-issues/2026-08-22-audit-f-input-flow.md`
+  `dev/archive/known-issues/2026-08-22-audit-f-input-flow.md`
 - **Audit batch G: Settings restructure (audit-g-settings)** - gate PASS 2026-08-22.
-  `docs/archive/known-issues/2026-08-22-audit-g-settings.md`
+  `dev/archive/known-issues/2026-08-22-audit-g-settings.md`
 - **Audit batch K: Plan Notes wrapping (audit-k-notes)** - gate PASS 2026-08-22.
-  `docs/archive/known-issues/2026-08-22-audit-k-notes.md`
+  `dev/archive/known-issues/2026-08-22-audit-k-notes.md`
 - **Audit batch E: tree interaction honesty (audit-de-cost-tree)** - gate PASS 2026-08-22.
-  `docs/archive/known-issues/2026-08-22-audit-de-cost-tree.md`
+  `dev/archive/known-issues/2026-08-22-audit-de-cost-tree.md`
 - **Audit batches A+B+C tier 1 (audit-abc)** - gate PASS 2026-08-23.
   Cited as: "Audit batches A+B+C tier 1".
-  `docs/archive/known-issues/2026-08-22-audit-abc.md`
+  `dev/archive/known-issues/2026-08-22-audit-abc.md`
 - **Audit batch H: table density (audit-h-density)** - gate PASS 2026-08-23.
-  `docs/archive/known-issues/2026-08-22-audit-h-density.md`
+  `dev/archive/known-issues/2026-08-22-audit-h-density.md`
 - **Tooltip facility (tooltip-facility)** - gate PASS after one gate-found Critical was fixed and re-gated 2026-08-23.
   Cited as: "Tooltip facility", tooltip-facility.
-  `docs/archive/known-issues/2026-08-22-tooltip-facility.md`
+  `dev/archive/known-issues/2026-08-22-tooltip-facility.md`
 - **Audit batch J: consistency sweep (audit-j-consistency)** - gate PASS 2026-08-23.
-  `docs/archive/known-issues/2026-08-22-audit-j-consistency.md`
+  `dev/archive/known-issues/2026-08-22-audit-j-consistency.md`
 - **Cost band restyle (cost-band-restyle)** - gate PASS 2026-08-23.
   Cited as: "Cost band restyle", cost-band-restyle.
-  `docs/archive/known-issues/2026-08-23-cost-band-restyle.md`
+  `dev/archive/known-issues/2026-08-23-cost-band-restyle.md`
 - **Field-test fixes wave 1 (field-fixes-1)** - gate PASS after one gate-found fix 2026-08-23.
-  `docs/archive/known-issues/2026-08-23-field-fixes-1.md`
+  `dev/archive/known-issues/2026-08-23-field-fixes-1.md`
 - **Sortable plan tables (sortable-tables)** - gate PASS 2026-08-23.
   Cited as: "Sortable plan tables", sortable-tables.
-  `docs/archive/known-issues/2026-08-23-sortable-tables.md`
+  `dev/archive/known-issues/2026-08-23-sortable-tables.md`
 - **Minimum width raise (min-width-1436)** - gate PASS after two gate-found fixes 2026-08-23.
   Cited as: "Minimum width raise", min-width-1436.
-  `docs/archive/known-issues/2026-08-23-min-width-1436.md`
+  `dev/archive/known-issues/2026-08-23-min-width-1436.md`
 - **Settings dirty prompt (settings-dirty-prompt)** - gate PASS 2026-08-23.
   Cited as: "Settings dirty prompt", settings-dirty-prompt.
-  `docs/archive/known-issues/2026-08-23-settings-dirty-prompt.md`
+  `dev/archive/known-issues/2026-08-23-settings-dirty-prompt.md`
 - **Spinner and button feedback (spinner-feedback)** - gate PASS 2026-08-24.
-  `docs/archive/known-issues/2026-08-23-spinner-feedback.md`
+  `dev/archive/known-issues/2026-08-23-spinner-feedback.md`
 - **Snapshot item grid (snapshot-grid)** - gate PASS 2026-08-24.
   Cited as: "Snapshot item grid".
-  `docs/archive/known-issues/2026-08-23-snapshot-grid.md`
+  `dev/archive/known-issues/2026-08-23-snapshot-grid.md`
 - **Item stat tooltips (item-stat-tooltips)** - gate PASS 2026-08-24.
   Cited as: "Item stat tooltips", item-stat-tooltips.
-  `docs/archive/known-issues/2026-08-23-item-stat-tooltips.md`
+  `dev/archive/known-issues/2026-08-23-item-stat-tooltips.md`
 - **Font bump and decision-round polish (font-and-polish)** - gate PASS 2026-08-23.
   Cited as: "Font bump and decision-round polish", font-and-polish.
-  `docs/archive/known-issues/2026-08-23-font-and-polish.md`
+  `dev/archive/known-issues/2026-08-23-font-and-polish.md`
 - **Tooltip authenticity (tooltip-authenticity)** - gate PASS 2026-08-23.
   Cited as: "Tooltip authenticity", tooltip-authenticity; carries the
   accepted divergence from the game's "Unused Infusion Slot" wording that
   `Services/ItemStatTooltipComposer.cs` points here for.
-  `docs/archive/known-issues/2026-08-23-tooltip-authenticity.md`
+  `dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`
 - **Keyboard focus release (kb-focus-release)** - gate PASS 2026-08-23.
-  `docs/archive/known-issues/2026-08-23-kb-focus-release.md`
+  `dev/archive/known-issues/2026-08-23-kb-focus-release.md`
 - **Root ignore suppression and the zero-cost band (root-ignore-summary-zero)** - gate PASS with recorded partials 2026-08-23.
-  `docs/archive/known-issues/2026-08-23-root-ignore-summary-zero.md`
+  `dev/archive/known-issues/2026-08-23-root-ignore-summary-zero.md`
 - **Click volume slider (click-sound-gain)** - gate PASS on the render half 2026-08-23.
   Cited as: "Click volume slider", click-sound-gain.
-  `docs/archive/known-issues/2026-08-23-click-sound-gain.md`
+  `dev/archive/known-issues/2026-08-23-click-sound-gain.md`
 - **Plan-view redesign (plan-view-redesign)** - gate PASS 2026-08-24.
   Cited as: "Plan-view redesign", plan-view-redesign.
-  `docs/archive/known-issues/2026-08-23-plan-view-redesign.md`
+  `dev/archive/known-issues/2026-08-23-plan-view-redesign.md`
 
 ---
 

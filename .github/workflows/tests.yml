@@ -89,10 +89,10 @@ jobs:
       - name: Live docs cite source paths that exist
         shell: bash
         run: |
-          # docs/archive, docs/dev-notes and docs/research are dated point-in-time
-          # records, frozen by policy, so a path that moved after they were written
-          # is not a regression. Paths written with an elision are illustrative.
-          live=$(git ls-files '*.md' | grep -vE '^docs/(archive|dev-notes|research)/')
+          # dev/ and docs/research are dated point-in-time records, frozen by
+          # policy, so a path that moved after they were written is not a
+          # regression. Paths written with an elision are illustrative.
+          live=$(git ls-files '*.md' | grep -vE '^(dev/|docs/research/)')
           missing=""
           for path in $(grep -rhoP '`(Views|Services|Models|Contracts|tools)/[^`*]+\.cs`' $live \
             | tr -d '`' | grep -v '\.\.\.' | sort -u || true); do
