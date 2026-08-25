@@ -51,6 +51,11 @@ gw2efficiency is never called by the running module). The durable "why" behind
 the trickier pieces of the implementation (scroll/relayout handling, the
 merged vendor-batch math, and so on) is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/README.md`](docs/README.md) indexes the rest - the roadmap, the
+issue tracker, the release protocol, the research notes, and a map of which
+folder holds what. Released versions are listed in
+[`CHANGELOG.md`](CHANGELOG.md); what is and is not planned is in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Screenshots
 
@@ -144,8 +149,9 @@ commit history carries `Co-Authored-By` trailers rather than hiding them.
 What that is worth depends entirely on the process around it, so here is the
 process, all of it checkable from this repository:
 
-- **Every push runs the suite.** 2,803 tests for the module plus separate
-  suites for the seeder tools, on
+- **Every push runs the suite.** Three test projects - 2,803 for the module
+  plus 231 across the seeder and vendor-updater tools (measured 2026-08-25;
+  the badge above is the live answer) - on
   [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml).
   The tests are Blish-free and run against real production code paths - no
   contract mirrors, no fake I/O - which is enforced as a repo invariant in
