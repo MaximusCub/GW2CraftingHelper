@@ -104,10 +104,10 @@ dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeS
 dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
 ```
 
-Running only the first one is the trap worth naming: the cross-project
-golden-vector suite that pins `Services/VendorOfferHasher.cs` against
-`tools/VendorOfferUpdater/VendorOfferHasher.cs` lives in the third project,
-so a change to either hasher passes locally and fails CI.
+Running only the first one is the trap worth naming: the golden-vector suite
+that pins `tools/VendorOfferUpdater/VendorOfferHasher.cs` - the SHA-256
+`offerId` keying every row of the 15MB `ref/vendor_offers.json` - lives in the
+third project, so a change to the hasher passes locally and fails CI.
 `GW2CraftingHelper.Tests` and `GW2CraftingHelper.RecipeSeeder.Tests` target
 `net48`; `VendorOfferUpdater.Tests` targets `net8.0`, so a solution-level
 run needs both the .NET 8 SDK and .NET Framework 4.8 on the machine.
