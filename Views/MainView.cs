@@ -2308,17 +2308,17 @@ namespace GW2CraftingHelper.Views
             // icon reads exactly like the same item's icon in the plan: a
             // rarity frame, the neutral empty-slot placeholder when the API
             // gave no IconUrl (a data gap, never a load failure), and the
-            // row's own hover.
+            // row's own hover. Same 32px art and 1px frame the plan's rows
+            // draw - the frame grows the box to 34, which the 40px text
+            // column still clears.
             //
             // The rarity comes from the session stat cache, which is the
             // only place this tab can get one: an AccountSnapshot carries
             // no rarity and is schema-guarded against gaining fields. A row
             // whose block has not been fetched yet frames neutral rather
             // than guessing, and picks up its colour on the next rebuild.
-            // The art is inset inside the 32px box the unframed icon had,
-            // so the cell's text column does not move.
-            var icon = IconControls.CreateItemIcon(
-                rowPanel, row.IconUrl, RarityFor(row.ItemId), 2, 2, 30, 1);
+            string rarity = RarityFor(row.ItemId);
+            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, rarity, 2, 2);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2328,11 +2328,18 @@ namespace GW2CraftingHelper.Views
             // to line up down the column rather than move with each name's
             // length. Same shape as Used Materials, down to the "30x"
             // spelling of the quantity.
+            // The name takes its rarity colour only when a rarity is KNOWN.
+            // Unknown is the common case on this tab (nothing has fetched
+            // the block - see RarityFor), and the palette's unknown entry
+            // is a 200-grey: taking it unconditionally would dim every name
+            // on a fresh session, which is the small-and-grey treatment the
+            // ramp work exists to remove.
             string nameText = row.Name ?? "";
             string amountText = AmountText(row.TotalCount);
             var nameLabel = CreateRowTextLabel(
                 rowPanel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, amountBand),
-                4, RarityColors.GetRarityNameColor(RarityFor(row.ItemId)), out bool nameShortened);
+                4, rarity == null ? (Color?)null : RarityColors.GetRarityNameColor(rarity),
+                out bool nameShortened);
             var amountLabel = CreateAmountLabel(rowPanel, amountText, columnWidth, 4);
 
             // NOT the prefix notation the Amount column uses, and the one
@@ -2486,8 +2493,8 @@ namespace GW2CraftingHelper.Views
             // currency table already stamps that, and a wallet row whose
             // name line has ellipsized is exactly where it is needed.
             var icon = IconControls.CreateItemIcon(
-                rowPanel, entry.IconUrl, (string)null, 2, 2, 30, 1,
-                string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
+                rowPanel, entry.IconUrl, (string)null, 2, 2,
+                tooltipText: string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
             // Never display raw currency IDs (repo invariant). Name and
             // Amount are the same two columns the item run above uses, so
