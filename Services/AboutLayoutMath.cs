@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
@@ -36,6 +38,30 @@ namespace GW2CraftingHelper.Services
         public const int ProseTargetChars = 66;
 
         public const int ProseMeasure = 560;
+
+        public const string SourceLabel = "Source";
+        public const string AuthorLabel = "Author";
+        public const string BuiltWithLabel = "Built with";
+        public const string LicenseLabel = "License";
+        public const string CreditsLabel = "Credits";
+        public const string DataDirectoryLabel = "Data directory";
+
+        /// <summary>
+        /// The six fact labels the tab ships, in render order. They live
+        /// here rather than inline in the view so
+        /// <see cref="LabelRunChars"/> can be checked against the strings it
+        /// exists to hold - a floor derived from one label copied into a
+        /// test proves nothing about the other five.
+        /// </summary>
+        public static readonly IReadOnlyList<string> FactLabels = new[]
+        {
+            SourceLabel,
+            AuthorLabel,
+            BuiltWithLabel,
+            LicenseLabel,
+            CreditsLabel,
+            DataDirectoryLabel,
+        };
 
         /// <summary>
         /// Floor for the facts column's label band: 14 characters ("Data

@@ -157,7 +157,12 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void InsetMatchesTheGuttersEveryOtherColumnOnTheTabUses()
         {
-            Assert.Equal(LogGutterLayout.GutterX, LogToolbarLayout.Inset);
+            // LogToolbarLayout.Inset is DEFINED as LogGutterLayout.GutterX,
+            // so comparing the two is a compile-time tautology. The number
+            // is what carries information: a moved gutter has to be looked
+            // at rather than silently agreeing with itself.
+            Assert.Equal(16, LogToolbarLayout.Inset);
+            Assert.Equal(16, LogGutterLayout.GutterX);
         }
     }
 }

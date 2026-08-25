@@ -312,22 +312,25 @@ namespace GW2CraftingHelper.Tests.Services
         // two at the body width would reserve pixels they never paint.
         private const int BlishDefaultMaxCharWidthPx = 8;
 
-        // The derivation IS the test: MinColumnWidth is the name inset, a
-        // 22-character name floor, the name-to-control gap, the pinned
-        // control block, and the table right margin - nothing chosen.
+        // The RESOLVED numbers, not the const sums that produce them: a test
+        // restating a const expression is a compile-time tautology no edit
+        // can turn red. The literal-pixel boundary below is the behavioural
+        // half, with an oracle independent of the constants.
         [Fact]
         public void MinColumnWidth_CoversTheWholeCellItSizes()
         {
-            Assert.Equal(
-                SettingsCurrencyGridLayout.CellNameX
-                    + (SettingsCurrencyGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx)
-                    + SettingsCurrencyGridLayout.NameToControlGap
-                    + SettingsCurrencyGridLayout.CellInputWidth
-                    + SettingsCurrencyGridLayout.CellInputToClearGap
-                    + SettingsCurrencyGridLayout.CellClearWidth
-                    + SettingsCurrencyGridLayout.CellTagWidth
-                    + PlanRelayoutMath.TableRightMargin,
-                SettingsCurrencyGridLayout.MinColumnWidth);
+            Assert.Equal(198, SettingsCurrencyGridLayout.CellNameFloor);
+            Assert.Equal(256, SettingsCurrencyGridLayout.CellControlBlockWidth);
+            Assert.Equal(490, SettingsCurrencyGridLayout.MinColumnWidth);
+        }
+
+        [Fact]
+        public void Grid_TurnsOverToTwoColumnsBetween979And980Pixels()
+        {
+            // The boundary MinColumnWidth exists to place, in literal
+            // pixels: one short of two floors the grid stays single-column.
+            Assert.Equal(1, SettingsCurrencyGridLayout.ComputeColumnCount(979));
+            Assert.Equal(2, SettingsCurrencyGridLayout.ComputeColumnCount(980));
         }
 
         [Theory]

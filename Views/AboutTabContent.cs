@@ -257,9 +257,9 @@ namespace GW2CraftingHelper.Views
             // Trailing colons dropped from all six: inside a two-column
             // table with a rule, a colon on every label is punctuation doing
             // a column's job.
-            AddFactRow("Source", string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, copyable: true);
-            AddFactRow("Author", info.AuthorDisplay ?? NotAvailableText);
-            AddFactRow("Built with", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}");
+            AddFactRow(AboutLayoutMath.SourceLabel, string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, copyable: true);
+            AddFactRow(AboutLayoutMath.AuthorLabel, info.AuthorDisplay ?? NotAvailableText);
+            AddFactRow(AboutLayoutMath.BuiltWithLabel, $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}");
 
             // "License" (this project's own license) and the Blish HUD
             // credit are two separate, differently-sourced rows and are
@@ -268,9 +268,9 @@ namespace GW2CraftingHelper.Views
             // already-verified Blish HUD MIT-license credit line, carried
             // over unchanged. Do not collapse these into one row or drop
             // either without updating this comment.
-            AddFactRow("License", "MIT (see LICENSE in the repo)");
-            AddFactRow("Credits", BlishHudCreditLine, copyable: true);
-            AddFactRow("Data directory", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, copyable: true);
+            AddFactRow(AboutLayoutMath.LicenseLabel, "MIT (see LICENSE in the repo)");
+            AddFactRow(AboutLayoutMath.CreditsLabel, BlishHudCreditLine, copyable: true);
+            AddFactRow(AboutLayoutMath.DataDirectoryLabel, string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, copyable: true);
 
             CreateProseBlock("Disclaimer", ArenaNetDisclaimerText);
             CreateProseBlock("gw2efficiency", Gw2EfficiencyCreditText);

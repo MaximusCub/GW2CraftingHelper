@@ -11,38 +11,37 @@ namespace GW2CraftingHelper.Tests.Services
         private const int FloorColumnWidth = 616;
         private const int WideColumnWidth = 1232;
 
+        // Resolved pixels, not the const sums that produce them. Restating a
+        // const expression is a compile-time tautology the compiler already
+        // checks; pinning the resolved number is what makes a moved term
+        // visible, and the behavioural boundaries below are written in
+        // literal pixels so their oracle is independent of the constants.
         [Fact]
-        public void MinColumnWidth_IsItsOwnFiveTerms()
+        public void ClusterAndColumnFloors_ResolveToTheirShippedPixels()
         {
-            // The derivation IS the test: nothing here is chosen.
-            Assert.Equal(
-                SettingsFormLayout.CellLeftPad
-                    + (SettingsFormLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx)
-                    + SettingsFormLayout.NameToControlGap
-                    + SettingsFormLayout.WidestClusterWidth
-                    + PlanRelayoutMath.TableRightMargin,
-                SettingsFormLayout.MinColumnWidth);
+            Assert.Equal(198, SettingsFormLayout.NameFloor);
+            Assert.Equal(336, SettingsFormLayout.WidestClusterWidth);
+            Assert.Equal(570, SettingsFormLayout.MinColumnWidth);
+            Assert.Equal(546, SettingsFormLayout.ProseMeasure);
         }
 
         [Fact]
-        public void WidestClusterWidth_IsTheClickVolumeRowsOwnRun()
+        public void SettingsBoard_TurnsOverToTwoColumnsBetween1139And1140Pixels()
         {
+            // The boundary MinColumnWidth exists to place, in literal
+            // pixels: a board one pixel short of two floors stays single.
             Assert.Equal(
-                SettingsFormLayout.SliderWidth
-                    + SettingsFormLayout.SliderToReadoutGap
-                    + SettingsFormLayout.ReadoutWidth
-                    + SettingsFormLayout.ReadoutToTestGap
-                    + SettingsFormLayout.TestButtonWidth,
-                SettingsFormLayout.WidestClusterWidth);
+                1,
+                ColumnBoardLayout.ComputeColumnCount(1139, SettingsFormLayout.MinColumnWidth, 8));
+            Assert.Equal(
+                2,
+                ColumnBoardLayout.ComputeColumnCount(1140, SettingsFormLayout.MinColumnWidth, 8));
         }
 
         [Fact]
         public void NameFloor_HoldsTheWidestLabelTheTabShips()
         {
             Assert.True("Metal (Metal Forge)".Length <= SettingsFormLayout.NameRunChars);
-            Assert.Equal(
-                SettingsFormLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx,
-                SettingsFormLayout.NameFloor);
         }
 
         [Theory]
@@ -205,15 +204,6 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(
                 SettingsFormLayout.ProseMeasure,
                 SettingsFormLayout.DescriptionMaxWidth(WideColumnWidth, 0));
-        }
-
-        [Fact]
-        public void ProseMeasure_IsOneColumnsContentWidth()
-        {
-            Assert.Equal(
-                SettingsFormLayout.MinColumnWidth
-                    - SettingsFormLayout.CellLeftPad - PlanRelayoutMath.TableRightMargin,
-                SettingsFormLayout.ProseMeasure);
         }
 
         [Fact]
