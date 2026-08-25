@@ -101,11 +101,20 @@ namespace GW2CraftingHelper.Views.Rendering
             // a label swallows the hover of whatever is under it.
             if (onLeftClick != null) SortableHeaderLabel.MarkSortable(leftLabelControl);
             if (onRightClick != null) SortableHeaderLabel.MarkSortable(rightLabelControl);
-            var cells = new SortableHeaderCells(rowPanel);
-            SyncCells(
-                cells, rowPanel.Width, font, leftLabel, leftX, middleLabel,
-                middleLabelControl?.Location.X ?? 0, rightLabel, rightLabelControl.Location.X,
-                onLeftClick, onRightClick, leftLabelControl, middleLabelControl, rightLabelControl);
+
+            // Everything the cell split needs that does NOT change with the
+            // panel width, resolved once: the labels, their measured widths
+            // and their actions. Only the x's move on a resize, so the
+            // closure below neither measures a string nor allocates.
+            var plan = new HeaderCellPlan(
+                middleLabelControl == null ? 2 : 3, new SortableHeaderCells(rowPanel));
+            plan.Set(0, leftLabelControl, Measure(font, leftLabel), onLeftClick);
+            if (middleLabelControl != null)
+            {
+                plan.Set(1, middleLabelControl, Measure(font, middleLabel), null);
+            }
+            plan.Set(plan.Count - 1, rightLabelControl, Measure(font, rightLabel), onRightClick);
+            plan.Sync(rowPanel.Width);
 
             sink.AddRelayout(w =>
             {
@@ -121,55 +130,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 // A right-pinned column's x is a function of the panel
                 // width, so its cell has to follow it rather than stay
                 // where the build-time width put it.
-                SyncCells(
-                    cells, rowPanel.Width, font, leftLabel, leftX, middleLabel,
-                    middleLabelControl?.Location.X ?? 0, rightLabel, rightLabelControl.Location.X,
-                    onLeftClick, onRightClick, leftLabelControl, middleLabelControl, rightLabelControl);
+                plan.Sync(rowPanel.Width);
             });
         }
 
         /// <summary>
-        /// Describes this header's cells to <see cref="SortableHeaderCells"/>:
-        /// the band is partitioned between ALL its labels (an unsortable
-        /// middle column still separates the two beside it), and only the
-        /// sortable ones are given a click.
-        /// </summary>
-        private static void SyncCells(
-            SortableHeaderCells cells, int bandWidth, BitmapFont font,
-            string leftLabel, int leftX, string middleLabel, int middleLabelX,
-            string rightLabel, int rightLabelX,
-            Action onLeftClick, Action onRightClick,
-            Label leftControl, Label middleControl, Label rightControl)
-        {
-            var extents = new List<HeaderCellMath.LabelExtent>(3)
-            {
-                new HeaderCellMath.LabelExtent(leftX, Measure(font, leftLabel))
-            };
-            if (middleControl != null)
-            {
-                extents.Add(new HeaderCellMath.LabelExtent(middleLabelX, Measure(font, middleLabel)));
-            }
-            extents.Add(new HeaderCellMath.LabelExtent(rightLabelX, Measure(font, rightLabel)));
-
-            var ranges = HeaderCellMath.Partition(bandWidth, extents);
-            var columns = new List<SortableHeaderCells.Column>(extents.Count)
-            {
-                new SortableHeaderCells.Column(ranges[0].X, ranges[0].Width, leftControl, onLeftClick)
-            };
-            if (middleControl != null)
-            {
-                columns.Add(new SortableHeaderCells.Column(ranges[1].X, ranges[1].Width, middleControl, null));
-            }
-            int last = ranges.Count - 1;
-            columns.Add(
-                new SortableHeaderCells.Column(ranges[last].X, ranges[last].Width, rightControl, onRightClick));
-
-            cells.Sync(columns);
-        }
-
-        /// <summary>
-        /// Measured from the string rather than read off the control:
-        /// a Blish Label's own Width is not settled until its next layout
+        /// Measured from the string rather than read off the control: a
+        /// Blish Label's own Width is not settled until its next layout
         /// pass, and these cells are described in the same breath as the
         /// label is created (the same reason CreateRightAlignedLabel
         /// measures rather than reading Width).

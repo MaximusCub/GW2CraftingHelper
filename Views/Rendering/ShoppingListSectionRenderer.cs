@@ -3,7 +3,6 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
-using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 
@@ -247,16 +246,25 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             var texts = new[]
             {
-                itemLabel.Text, sourceHeaderText, amountHeaderText,
-                eachLabel.Text, totalLabel.Text
+                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text
             };
-            foreach (var label in labels)
+
+            // Widths measured once here rather than per relayout tick, and
+            // from the strings rather than off the controls: a Blish
+            // Label's Width is not settled until its next layout pass (the
+            // same reason CreateRightAlignedLabel measures).
+            var plan = new HeaderCellPlan(labels.Length, new SortableHeaderCells(rowPanel));
+            for (int i = 0; i < labels.Length; i++)
             {
-                SortableHeaderLabel.MarkSortable(label);
+                var column = columns[i];
+                SortableHeaderLabel.MarkSortable(labels[i]);
+                plan.Set(
+                    i, labels[i],
+                    (int)System.Math.Ceiling(font.MeasureString(texts[i] ?? "").Width),
+                    () => SortBy(column));
             }
 
-            var cells = new SortableHeaderCells(rowPanel);
-            SyncHeaderCells(cells, rowPanel.Width, font, labels, texts, columns);
+            plan.Sync(rowPanel.Width);
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
@@ -277,39 +285,8 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 // Four of the five columns are pinned off the panel edge,
                 // so their cells move with them.
-                SyncHeaderCells(cells, rowPanel.Width, font, labels, texts, columns);
+                plan.Sync(rowPanel.Width);
             });
-        }
-
-        /// <summary>
-        /// Partitions the header band between its five labels and hands the
-        /// ranges to the cell layer, which owns the wash and the click.
-        /// Widths are measured from the strings rather than read off the
-        /// controls: a Blish Label's Width is not settled until its next
-        /// layout pass (the same reason CreateRightAlignedLabel measures).
-        /// </summary>
-        private void SyncHeaderCells(
-            SortableHeaderCells cells, int bandWidth, BitmapFont font,
-            Label[] labels, string[] texts, PlanTableColumn[] columns)
-        {
-            var extents = new HeaderCellMath.LabelExtent[labels.Length];
-            for (int i = 0; i < labels.Length; i++)
-            {
-                extents[i] = new HeaderCellMath.LabelExtent(
-                    labels[i].Location.X,
-                    (int)System.Math.Ceiling(font.MeasureString(texts[i] ?? "").Width));
-            }
-
-            var ranges = HeaderCellMath.Partition(bandWidth, extents);
-            var cellColumns = new SortableHeaderCells.Column[labels.Length];
-            for (int i = 0; i < labels.Length; i++)
-            {
-                var column = columns[i];
-                cellColumns[i] = new SortableHeaderCells.Column(
-                    ranges[i].X, ranges[i].Width, labels[i], () => SortBy(column));
-            }
-
-            cells.Sync(cellColumns);
         }
 
         // A ValueCellHandle's own

@@ -66,6 +66,11 @@ namespace GW2CraftingHelper.Views.Rendering
             internal int X;
             internal int Width;
 
+            /// <summary>Whether the wash already carries the shared note.
+            /// Stamping is a wrap and an allocation, and Sync runs on every
+            /// frame of a resize drag.</summary>
+            internal bool Stamped;
+
             internal bool Contains(int x)
             {
                 return x >= X && x < X + Width;
@@ -168,9 +173,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 // Blish skips it in both the hit test and the draw, so it
                 // neither answers a hover nor covers the band.
                 cell.Wash.Visible = cell.OnClick != null;
-                if (cell.Wash.Visible)
+                if (cell.Wash.Visible && !cell.Stamped)
                 {
                     SortableHeaderLabel.MarkSortable(cell.Wash);
+                    cell.Stamped = true;
                 }
             }
 

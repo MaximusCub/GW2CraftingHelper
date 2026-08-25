@@ -5,18 +5,12 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Splits a column-header band into one CELL per header label, so a
     /// sortable header's hover, tooltip and click cover the whole column
-    /// they belong to rather than the handful of pixels its text happens to
-    /// occupy. Blish-free and tested: the degenerate cases this has to get
-    /// right - two labels that touch, a right-aligned label that has slid
-    /// left of the one before it at a narrow width - are invisible on a
-    /// screenshot and would only show up as a header that answers clicks
-    /// meant for its neighbour.
+    /// rather than the pixels its text happens to occupy.
     /// <para>
-    /// The split is a partition, not a set of padded boxes: every pixel of
-    /// the band belongs to exactly one cell, so there is no dead strip
-    /// between two columns where a click lands on nothing. A boundary sits
-    /// midway between one label's right edge and the next label's left
-    /// edge, which is the point a reader would put it.
+    /// A partition, not a set of padded boxes: every pixel of the band
+    /// belongs to exactly one cell, so no click lands in a dead strip
+    /// between two columns. A boundary sits midway between one label's
+    /// right edge and the next label's left edge.
     /// </para>
     /// </summary>
     public static class HeaderCellMath
@@ -50,16 +44,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// One range per label, in the order given (which is left to right
-        /// at every width a caller actually renders). The first starts at
-        /// 0 and the last ends at <paramref name="bandWidth"/>.
-        /// <para>
-        /// Boundaries are forced non-decreasing and clamped into the band,
-        /// so labels that overlap - or arrive out of order because a
-        /// right-aligned one has slid past its neighbour in a very narrow
-        /// window - yield zero-width cells rather than negative ones that
-        /// would swallow the band.
-        /// </para>
+        /// One range per label, in the order given (left to right at every
+        /// width a caller renders). The first starts at 0, the last ends at
+        /// <paramref name="bandWidth"/>, and boundaries are forced
+        /// non-decreasing and clamped into the band - so labels that
+        /// overlap, or arrive out of order because a right-aligned one has
+        /// slid past its neighbour in a narrow window, shrink a cell rather
+        /// than inverting it.
         /// </summary>
         public static IReadOnlyList<CellRange> Partition(
             int bandWidth, IReadOnlyList<LabelExtent> labels)
@@ -69,14 +60,33 @@ namespace GW2CraftingHelper.Services
                 return new CellRange[0];
             }
 
-            int band = bandWidth > 0 ? bandWidth : 0;
             var ranges = new CellRange[labels.Count];
+            Partition(bandWidth, labels, ranges);
+            return ranges;
+        }
+
+        /// <summary>
+        /// The same split, written into a buffer the caller owns. The
+        /// header renderers re-split on every frame of a resize drag - a
+        /// right-pinned column's x is a function of the panel width - and
+        /// that is not a path to allocate an array per header per frame on.
+        /// </summary>
+        public static void Partition(
+            int bandWidth, IReadOnlyList<LabelExtent> labels, CellRange[] into)
+        {
+            if (labels == null || into == null)
+            {
+                return;
+            }
+
+            int band = bandWidth > 0 ? bandWidth : 0;
+            int count = labels.Count < into.Length ? labels.Count : into.Length;
 
             int start = 0;
-            for (int i = 0; i < labels.Count; i++)
+            for (int i = 0; i < count; i++)
             {
                 int end;
-                if (i == labels.Count - 1)
+                if (i == count - 1)
                 {
                     end = band;
                 }
@@ -91,11 +101,9 @@ namespace GW2CraftingHelper.Services
                 if (end > band) end = band;
                 if (start > band) start = band;
 
-                ranges[i] = new CellRange(start, end - start);
+                into[i] = new CellRange(start, end - start);
                 start = end;
             }
-
-            return ranges;
         }
     }
 }

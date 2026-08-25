@@ -128,10 +128,35 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void TheBufferOverload_WritesTheSameSplit()
+        {
+            // The header rows re-split on every frame of a resize drag, so
+            // that path writes into a buffer it owns rather than allocating
+            // one per header per frame. It must not be a second
+            // implementation.
+            var extents = new[]
+            {
+                new HeaderCellMath.LabelExtent(50, 40),
+                new HeaderCellMath.LabelExtent(500, 79)
+            };
+            var buffer = new HeaderCellMath.CellRange[extents.Length];
+
+            HeaderCellMath.Partition(600, extents, buffer);
+            var allocated = HeaderCellMath.Partition(600, extents);
+
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                Assert.Equal(allocated[i].X, buffer[i].X);
+                Assert.Equal(allocated[i].Width, buffer[i].Width);
+            }
+        }
+
+        [Fact]
         public void NoLabels_OrNoBand_AreHandled()
         {
             Assert.Empty(HeaderCellMath.Partition(500, new HeaderCellMath.LabelExtent[0]));
             Assert.Empty(HeaderCellMath.Partition(500, null));
+            HeaderCellMath.Partition(500, null, new HeaderCellMath.CellRange[2]);
 
             var degenerate = Partition(0, (10, 20), (40, 20));
             AssertPartitions(degenerate, 0);
