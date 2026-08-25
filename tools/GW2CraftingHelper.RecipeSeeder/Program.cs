@@ -144,6 +144,64 @@ namespace GW2CraftingHelper.RecipeSeeder
                         $"Warning: Could not load mystic forge recipes: {ex.Message}");
                 }
 
+                // Step 5a: Carry forward hand-authored negative-id recipes
+                // that no generator reproduces. ref/recipes_seed.json ships
+                // four synthetic Merchant/achievement rows (ids -1592..-1595,
+                // the Infinite Trebuchet Blueprint chain) that exist in no
+                // source file: mystic_forge_recipes.json holds forge recipes
+                // only, and the API serves no negative ids, so a reseed used
+                // to delete them silently. Same defect class as the dropped
+                // expectedOutputCount overrides in MergeMysticForgeRecipes -
+                // preserve by construction rather than by remembering.
+                int preservedCount = 0;
+                if (File.Exists(recipesPath))
+                {
+                    try
+                    {
+                        Dictionary<int, RawRecipe> previous;
+                        using (var prevStream = File.OpenRead(recipesPath))
+                        {
+                            previous = RecipeCacheSerializer.LoadRecipeSeed(prevStream);
+                        }
+
+                        foreach (var kvp in previous)
+                        {
+                            if (kvp.Key >= 0 || allRecipes.ContainsKey(kvp.Key))
+                            {
+                                continue;
+                            }
+
+                            allRecipes[kvp.Key] = kvp.Value;
+                            if (!searchIndex.TryGetValue(
+                                kvp.Value.OutputItemId, out var preservedList))
+                            {
+                                preservedList = new List<int>();
+                                searchIndex[kvp.Value.OutputItemId] = preservedList;
+                            }
+
+                            if (!preservedList.Contains(kvp.Key))
+                            {
+                                preservedList.Add(kvp.Key);
+                            }
+
+                            preservedCount++;
+                        }
+
+                        if (preservedCount > 0)
+                        {
+                            Console.WriteLine(
+                                $"Preserved {preservedCount} hand-authored negative-id " +
+                                "recipe(s) from the existing seed.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(
+                            "Warning: could not read the existing recipe seed to " +
+                            $"preserve hand-authored rows: {ex.Message}");
+                    }
+                }
+
                 // Step 5b: Add negative search entries for leaf items
                 // (ingredients that aren't the output of any recipe)
                 var allIngredientIds = new HashSet<int>();

@@ -9,12 +9,12 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class AcquisitionHintServiceTests
     {
-        // In-file fixture with 6 of the now-7 real ref/acquisition_hints_
+        // In-file fixture with 6 of the now-10 real ref/acquisition_hints_
         // seed.json entries (the five wiki-verified entries from docs/
         // KNOWN-ISSUES.md item 8, plus the Gift of Battle
         // entry) - exercises AcquisitionHintService.Load's parsing shape
         // in isolation. The separate Load_ShippedSeedFile_* test below
-        // reads the actual shipped file and pins its real (7-entry) count,
+        // reads the actual shipped file and pins its real entry count,
         // so drift between this fixture and the production seed is caught
         // there, not here.
         private const string ValidEnvelopeJson = @"{
@@ -146,7 +146,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Shipped seed file (pins the real file against silent drift) ---
 
         [Fact]
-        public void Load_ShippedSeedFile_ParsesSevenEntriesWithHintAndBadge()
+        public void Load_ShippedSeedFile_ParsesEveryEntryWithHintAndBadge()
         {
             string path = FindRepoFile(Path.Combine("ref", "acquisition_hints_seed.json"));
             Assert.False(
@@ -157,7 +157,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var hints = AcquisitionHintService.Load(stream);
 
-                Assert.Equal(7, hints.Count);
+                Assert.Equal(10, hints.Count);
                 foreach (var hint in hints.Values)
                 {
                     Assert.False(string.IsNullOrEmpty(hint.Hint));
@@ -179,6 +179,24 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.True(hints.ContainsKey(43772));
                 Assert.Equal("DAILY", hints[43772].Badge);
                 Assert.Contains("1 per day per account", hints[43772].Hint);
+
+                // The three Endless Summer gifts from the field report.
+                // Each has an EMPTY search row in the recipe seed - the
+                // API knows no recipe - and each is bought with
+                // account-bound tokens that have no TP price, so
+                // VendorBatchSolver discards the vendor offer the module
+                // does ship and the row reads a bare, useless UNKNOWN.
+                // These hints are what turns it into an answer;
+                // AcquisitionHintSeedVendorAgreementTests pins them
+                // against that shipped offer. The badge is MERCHANT, not
+                // VENDOR: a VENDOR badge is byte-identical to the
+                // single-source VENDOR pill, which means a priced purchase.
+                Assert.Equal("MERCHANT", hints[106712].Badge);
+                Assert.Contains("Castaway Agnes", hints[106712].Hint);
+                Assert.Equal("MERCHANT", hints[105804].Badge);
+                Assert.Contains("Canach", hints[105804].Hint);
+                Assert.Equal("ACHIEVEMENT", hints[106986].Badge);
+                Assert.Contains("Radiance of the Sun God", hints[106986].Hint);
             }
         }
 

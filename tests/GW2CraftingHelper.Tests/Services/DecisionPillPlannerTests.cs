@@ -270,6 +270,28 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PillKind.Locked, specs[0].Kind);
         }
 
+        [Theory]
+        [InlineData("VENDOR")]
+        [InlineData("Vendor")]
+        [InlineData("CRAFT")]
+        [InlineData("TP")]
+        public void NoSource_BadgeCollidingWithASourcePill_FallsBackToUnknown(string badge)
+        {
+            // A badge pill and a single-source pill are byte-identical in
+            // text, Kind and styling but mean opposite things: the source
+            // pill's cost is in Plan.TotalCoinCost, the badge's node is
+            // Unknown and contributes 0. Compare with
+            // OnlyVendor_SingleLockedVendorPill below - that is the row this
+            // one must not be mistaken for.
+            var node = Node(CraftingDecision.Unknown, acquisitionBadge: badge);
+            var specs = DecisionPillPlanner.BuildPillSpecs(node);
+
+            Assert.Equal(2, specs.Count); // UNKNOWN + IGNORE
+            Assert.Equal("UNKNOWN", specs[0].Text);
+            Assert.Equal(PillKind.Locked, specs[0].Kind);
+            Assert.Null(specs[0].Source);
+        }
+
         // --- Exactly one feasible source: single Locked pill (+ IGNORE) ---
 
         [Fact]

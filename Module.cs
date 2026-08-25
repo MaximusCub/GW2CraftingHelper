@@ -193,6 +193,25 @@ namespace GW2CraftingHelper
         // should never be throttled by an earlier automatic failure.
         private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
 
+        // One-shot: the automatic fetch for an install with NO cached
+        // snapshot fires at most once per armed shot (see
+        // FirstLoadSnapshotGate), re-armed by ClearCache, which puts the
+        // module back into exactly the state the shot exists for.
+        // Main-thread only - Update() and the Clear Cache click handler.
+        private bool _firstLoadRefreshAttempted;
+
+        // How often Update() may re-read the live inputs of that shot's
+        // gate (see FirstLoadSnapshotGate.ShouldCheckNow). Coarse on
+        // purpose: a granted subtoken already reaches the fetch through
+        // OnSubtokenUpdated, so this poll is the backstop for the case
+        // where that event fired before the handler was attached, and a
+        // second or two of extra latency on it is invisible.
+        private static readonly TimeSpan FirstLoadGateCheckInterval = TimeSpan.FromSeconds(2);
+
+        // Seeded full so the first Update() after load checks immediately,
+        // and reset the same way whenever the shot is re-armed.
+        private TimeSpan _sinceFirstLoadGateCheck = FirstLoadGateCheckInterval;
+
         // Whether the timer-driven auto-refresh is running right now.
         // Written from RefreshSnapshotInBackgroundAsync, which starts on the
         // main thread but whose finally may resume on a ThreadPool
@@ -273,7 +292,8 @@ namespace GW2CraftingHelper
             _httpClient = new HttpClient();
             var rawRecipeApi = new Gw2RecipeApiClient(_httpClient);
             var mfSource = new ContentsManagerRecipeSource(ContentsManager);
-            var recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfSource);
+            var mfData = RecipeClientFactory.LoadData(mfSource);
+            var recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfData);
             var priceApi = new Gw2PriceApiClient(_httpClient);
             var itemApi = new Gw2ItemApiClient(_httpClient);
 
@@ -311,6 +331,13 @@ namespace GW2CraftingHelper
                 // change") - now visible in the Log tab at Warn.
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed load failed, starting with an empty seed cache: {ex.GetType().Name} - {ex.Message}");
             }
+
+            // Wiki-sourced Mystic Forge recipes are seed content, not an
+            // API fallback: folding them in here means a seed row saying
+            // "the API knows no recipe for this item" can never shadow one,
+            // and no game build id can affect whether they are found - see
+            // SeededRecipeCacheStore.MergeMysticForgeRecipes.
+            recipeSeed.MergeMysticForgeRecipes(mfData);
 
             try
             {
@@ -994,7 +1021,38 @@ namespace GW2CraftingHelper
             }
 
             if (_refreshInProgress) return;
-            if (_currentSnapshot == null) return;
+
+            if (_currentSnapshot == null)
+            {
+                // Nothing cached at all: the staleness tick below has no
+                // snapshot to age, so this is the only automatic route to
+                // a first one - see FirstLoadSnapshotGate. This branch is
+                // reached every frame for as long as nothing is cached
+                // (forever, with no API key configured), so both guards
+                // ahead of the gate are load-bearing: the spent-shot flag
+                // silences it once the shot has been used, and the
+                // interval throttle silences it while the shot is still
+                // armed - without which the gate's arguments would take a
+                // live permission probe (an enumerator allocation) and a
+                // UtcNow read per frame, on the UI thread.
+                if (!_firstLoadRefreshAttempted
+                    && FirstLoadSnapshotGate.ShouldCheckNow(
+                        _sinceFirstLoadGateCheck,
+                        gameTime.ElapsedGameTime,
+                        FirstLoadGateCheckInterval,
+                        out _sinceFirstLoadGateCheck)
+                    && FirstLoadSnapshotGate.ShouldRefreshNow(
+                        hasCachedSnapshot: false,
+                        apiReady: _snapshotService.HasRequiredPermissions(),
+                        alreadyAttempted: _firstLoadRefreshAttempted,
+                        refreshInProgress: false,
+                        inFailureBackoff: IsInRefreshFailureBackoff()))
+                {
+                    _firstLoadRefreshAttempted = true;
+                    _ = RefreshSnapshotInBackgroundAsync();
+                }
+                return;
+            }
 
             // Reads the
             // clamped setting fresh on every tick (cheap - a single
@@ -1164,6 +1222,19 @@ namespace GW2CraftingHelper
             return snapshot;
         }
 
+        /// <summary>
+        /// True while a prior failed refresh's backoff window is still
+        /// open. Read by RefreshSnapshotInBackgroundAsync itself and by
+        /// Update()'s first-load gate, which must not spend its one shot
+        /// on a call this window would turn away.
+        /// </summary>
+        private bool IsInRefreshFailureBackoff()
+        {
+            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
+            return lastFailedTicks != 0 &&
+                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff;
+        }
+
         private async Task RefreshSnapshotInBackgroundAsync()
         {
             if (_refreshInProgress) return;
@@ -1174,9 +1245,7 @@ namespace GW2CraftingHelper
             // staleness tick and OnSubtokenUpdated) can otherwise re-fire
             // far faster than any real transient failure needs to be
             // retried at.
-            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
-            if (lastFailedTicks != 0 &&
-                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff)
+            if (IsInRefreshFailureBackoff())
             {
                 Logger.Debug("Skipping snapshot refresh retry - within backoff window after a prior failure");
                 return;
@@ -1277,6 +1346,13 @@ namespace GW2CraftingHelper
                 _currentSnapshot = null;
                 _pendingSnapshot = null;
                 _snapshotDirty = false;
+
+                // Back to the state the one shot exists for - nothing
+                // cached and no staleness tick able to fetch anything - so
+                // it is re-armed here rather than leaving Clear Cache with
+                // no automatic route to a snapshot until Blish restarts.
+                _firstLoadRefreshAttempted = false;
+                _sinceFirstLoadGateCheck = FirstLoadGateCheckInterval;
             });
         }
 

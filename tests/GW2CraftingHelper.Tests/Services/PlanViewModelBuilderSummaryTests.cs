@@ -74,35 +74,44 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Cost formula band (collapse rule + arithmetic) ---
 
         [Fact]
-        public void CostBand_NoMaterialsUsed_CollapsesToSingleActualCostTile()
+        public void CostBand_NoMaterialsUsed_StillRendersTheWholeFormula()
         {
+            // The maintainer's ruling, made twice against a live plan: a
+            // term worth zero shows a zero. Owning none of what a plan
+            // needs is the ordinary case, and it used to hide two thirds
+            // of the section.
             var result = MakeResult(totalCoinCost: 123456);
             var vm = _builder.Build(result);
 
             var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
             var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal("Total Materials Value", costTiles[0].Label);
             Assert.Equal(123456L, costTiles[0].CoinValue);
-            Assert.False(string.IsNullOrEmpty(costTiles[0].TooltipText));
+            Assert.Equal("Your Materials Used", costTiles[1].Label);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.Equal(123456L, costTiles[2].CoinValue);
+            Assert.All(costTiles, tile => Assert.False(string.IsNullOrEmpty(tile.TooltipText)));
         }
 
         [Fact]
-        public void CostBand_MaterialOpportunityCostZero_StillCollapses()
+        public void CostBand_MaterialOpportunityCostZero_RendersZeroRatherThanVanishing()
         {
             // A material with no instant-sell price contributes 0, not
-            // null - the collapse rule treats null AND 0 identically
-            // (spec: "when MaterialOpportunityCost is null or 0").
+            // null. That zero is now shown, not used as a reason to drop
+            // the surrounding formula.
             var result = MakeResult(totalCoinCost: 200);
             result.MaterialOpportunityCost = 0;
 
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
-            Assert.Equal(200L, costTiles[0].CoinValue);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.Equal(200L, costTiles[2].CoinValue);
         }
 
         [Fact]
@@ -161,16 +170,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed()
+        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_SaysSoInTheTooltip()
         {
             // OwnMaterialsMode.Free leaves MaterialOpportunityCost null BY
             // CONTRACT (see SellSideEconomics) even though owned materials
             // really were consumed - "Use Own Materials" on with "Value Own
-            // Materials" off, inventory covering the whole plan. Rendering
-            // the band here would print "Your Materials Used 0c" directly
-            // above a Used Materials section listing the real materials:
-            // a valuation the pipeline deliberately declined to make. Only
-            // a KNOWN zero unlocks the band.
+            // Materials" off. The tile still renders its 0 (the band no
+            // longer disappears), so the "nobody priced these" fact moves
+            // into the tooltip instead of being implied by a missing tile.
             var result = MakeResult(
                 totalCoinCost: 0,
                 usedMaterials: new List<UsedMaterial>
@@ -182,7 +189,28 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+            Assert.Equal(3, costTiles.Count);
+            var materialsUsedTile = costTiles[1];
+            Assert.Equal("Your Materials Used", materialsUsedTile.Label);
+            Assert.Equal(0L, materialsUsedTile.CoinValue);
+            Assert.Equal(
+                PlanViewModelBuilder.UnvaluedMaterialsTooltip,
+                materialsUsedTile.TooltipText);
+
+            // The measured-zero counterpart keeps the ordinary tooltip -
+            // the two zeros must not read identically.
+            var valued = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            valued.MaterialOpportunityCost = 0;
+            var valuedTiles = _builder.Build(valued).Sections[0].Rows
+                .Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+            Assert.Equal(
+                PlanViewModelBuilder.YourMaterialsUsedTooltip,
+                valuedTiles[1].TooltipText);
         }
 
         [Fact]
@@ -248,13 +276,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostBand_ZeroCostFromAnUnpricedItem_StaysCollapsed()
+        public void CostBand_ZeroCostFromAnUnpricedItem_RendersMarkedBand()
         {
-            // The other half of the known-zero rule: this plan totals 0
-            // because nothing in it could be priced, not because it is
-            // free. "Total Materials Value 0c" would state the full market
-            // value of a craft the pipeline never valued, so the unpriced
-            // plan keeps the single result tile.
+            // This plan totals 0 because nothing in it could be priced,
+            // not because it is free. The band keeps its cells at 0 and
+            // states the difference: marker on every tile caption, the
+            // suffix in every tooltip, and the unpriced footnote row.
             var result = MakeResult(totalCoinCost: 0);
             result.MaterialOpportunityCost = 0;
             result.CraftingTree = new CraftingTreeNode
@@ -276,9 +303,69 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             var vm = _builder.Build(result);
-            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+            var rows = vm.Sections[0].Rows;
+            var costTiles = rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+            Assert.Equal("Total Materials Value*", costTiles[0].Label);
+            Assert.Equal("Your Materials Used*", costTiles[1].Label);
+            Assert.Equal("Actual Cost to Craft*", costTiles[2].Label);
+            Assert.All(costTiles, t => Assert.Contains(
+                PlanViewModelBuilder.UnpricedTooltipSuffix, t.TooltipText));
+
+            // The footnote is what a marked tile points AT - both rows
+            // render (SummarySectionRenderer draws every footnote row it
+            // is handed), unpriced line first.
+            var footnotes = rows.Where(r => r.RowType == PlanRowType.SummaryFootnote).ToList();
+            Assert.Equal(2, footnotes.Count);
+            Assert.Equal(PlanViewModelBuilder.UnpricedFootnoteText, footnotes[0].Label);
+            Assert.Equal(PlanViewModelBuilder.FootnoteText, footnotes[1].Label);
+        }
+
+        [Fact]
+        public void CostBand_KnownZero_CarriesNoUnpricedMarkerOrFootnote()
+        {
+            // The discriminator the marker exists for: a measured zero
+            // must stay visually distinct from an unmeasured one, so a
+            // plain zero plan gets neither mark nor extra footnote.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+            var costTiles = rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.DoesNotContain(
+                PlanViewModelBuilder.UnpricedTileMarker, t.Label));
+            Assert.All(costTiles, t => Assert.DoesNotContain(
+                PlanViewModelBuilder.UnpricedTooltipSuffix, t.TooltipText));
+            Assert.Equal(
+                PlanViewModelBuilder.FootnoteText,
+                Assert.Single(rows.Where(r => r.RowType == PlanRowType.SummaryFootnote)).Label);
+        }
+
+        [Fact]
+        public void CostBand_NonZeroCostWithAnUnpricedNode_IsNotMarked()
+        {
+            // Scope guard: partial pricing under a real nonzero total is
+            // pre-existing behavior with its own (unchanged) shape - the
+            // marker claims "these totals are a floor because a term is
+            // zero", which is only the zero-total plan's fact.
+            var result = MakeResult(totalCoinCost: 500);
+            result.CraftingTree = UnpricedChildTree();
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.All(
+                rows.Where(r => r.RowType == PlanRowType.CostFormulaTile),
+                t => Assert.DoesNotContain(PlanViewModelBuilder.UnpricedTileMarker, t.Label));
+            Assert.DoesNotContain(
+                rows,
+                r => r.RowType == PlanRowType.SummaryFootnote
+                    && r.Label == PlanViewModelBuilder.UnpricedFootnoteText);
         }
 
         [Fact]
@@ -351,10 +438,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostBand_ZeroCostWithAnUnpricedMultiItemRoot_StaysCollapsed()
+        public void CostBand_ZeroCostWithAnUnpricedMultiItemRoot_RendersMarkedBand()
         {
             // A batch exposes its N roots through MultiItemRoots and
-            // leaves CraftingTree null, so the guard has to walk both.
+            // leaves CraftingTree null, so the walk has to cover both -
+            // an unpriced root there marks the band exactly as a
+            // single-item tree's unpriced child does.
             var result = MakeResult(
                 totalCoinCost: 0,
                 requestedItems: new List<PlanRequestItem>
@@ -382,9 +471,17 @@ namespace GW2CraftingHelper.Tests.Services
             result.MaterialOpportunityCost = 0;
 
             var vm = _builder.Build(result);
-            var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+            var rows = vm.Sections[0].Rows;
+            var costTiles = rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.All(costTiles, t => Assert.Equal(0L, t.CoinValue));
+            Assert.All(costTiles, t => Assert.EndsWith(
+                PlanViewModelBuilder.UnpricedTileMarker, t.Label));
+            Assert.Contains(
+                rows,
+                r => r.RowType == PlanRowType.SummaryFootnote
+                    && r.Label == PlanViewModelBuilder.UnpricedFootnoteText);
         }
 
         [Fact]
@@ -394,7 +491,9 @@ namespace GW2CraftingHelper.Tests.Services
             result.PriceBasis = PriceBasis.BuyOrder;
 
             var vm = _builder.Build(result);
-            var costTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CostFormulaTile);
+            // Last of the three tiles: the formula's "= Actual Cost to
+            // Craft" term.
+            var costTile = vm.Sections[0].Rows.Last(r => r.RowType == PlanRowType.CostFormulaTile);
 
             // Caption stays short (no qualifier baked into the Label) - the
             // basis qualifier now lives in the tooltip only.
@@ -411,6 +510,79 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             Assert.DoesNotContain(vm.Sections[0].Rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
+        }
+
+        [Fact]
+        public void ProfitBand_UnpricedZeroWithSellPrice_AbsentAndAccountedForInText()
+        {
+            // The cost band keeps its cells at 0 here; the profit band
+            // cannot (its tiles would not be zeros), so the section has to
+            // say why those cells are gone rather than just drop them.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 340;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.DoesNotContain(rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
+
+            var footnotes = rows.Where(r => r.RowType == PlanRowType.SummaryFootnote).ToList();
+            Assert.Equal(3, footnotes.Count);
+            Assert.Equal(PlanViewModelBuilder.UnpricedFootnoteText, footnotes[0].Label);
+            Assert.Equal(PlanViewModelBuilder.ProfitSuppressedFootnoteText, footnotes[1].Label);
+            Assert.Equal(PlanViewModelBuilder.FootnoteText, footnotes[2].Label);
+        }
+
+        [Fact]
+        public void ProfitBand_UnpricedZeroWithoutSellPrice_CarriesNoSuppressionNote()
+        {
+            // Nothing was suppressed - the band was never going to render
+            // without a sell price - so the note must not appear and claim
+            // otherwise.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+
+            Assert.DoesNotContain(
+                vm.Sections[0].Rows,
+                r => r.Label == PlanViewModelBuilder.ProfitSuppressedFootnoteText);
         }
 
         [Fact]
@@ -980,6 +1152,30 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
 
             Assert.Equal(PriceBasis.InstantBuy, vm.PriceBasis);
+        }
+
+        // A crafted root over one node the pipeline could neither craft
+        // nor price - CraftingDecision.Unknown, the same shape
+        // CraftingTreeBuilder.BuildNode produces for such an item.
+        private static CraftingTreeNode UnpricedChildTree()
+        {
+            return new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
         }
     }
 }

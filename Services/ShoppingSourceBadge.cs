@@ -29,8 +29,17 @@ namespace GW2CraftingHelper.Services
                 case PlanRowType.ShoppingUnknown:
                     // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
                     // "EXPLORE") when one exists - "UNKNOWN" remains the
-                    // fallback for no-source items with no seeded hint.
-                    return !string.IsNullOrEmpty(row.BadgeText) ? row.BadgeText : "UNKNOWN";
+                    // fallback for no-source items with no seeded hint, and
+                    // for a badge equal to one of the three source badges
+                    // above, which would be indistinguishable from a row
+                    // that really does have that source (see
+                    // DecisionPillPlanner.IsReservedSourceBadgeText, which
+                    // guards the recipe tree's copy of this decision). The
+                    // hint TEXT still reaches TooltipForRow either way.
+                    return !string.IsNullOrEmpty(row.BadgeText) &&
+                            !DecisionPillPlanner.IsReservedSourceBadgeText(row.BadgeText)
+                        ? row.BadgeText
+                        : "UNKNOWN";
                 default: return null;
             }
         }
