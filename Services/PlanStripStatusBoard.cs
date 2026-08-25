@@ -3,7 +3,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Pull-based, thread-safe, module-level state for the Crafting Plan
     /// tab's status strip ("tab-switch strip freeze/lost completion
-    /// status" - docs/KNOWN-ISSUES.md's W3B section).
+    /// status" - KNOWN-ISSUES #45).
     ///
     /// <para>
     /// CraftingPlanView's status-strip fields and its _statusLabel control

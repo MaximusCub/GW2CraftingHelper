@@ -128,7 +128,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.Plan.TotalCoinCost);
         }
 
-        // KNOWN-ISSUES 20.4 "Conservative reading":
+        // KNOWN-ISSUES #20.4 "Conservative reading":
         // the Ignore x owned-materials interaction is NOT pinned at this
         // layer. RecipeNode (the type Solve consumes) has no ownership
         // field at all - only Id/NodeId/Quantity/achievement fields - so

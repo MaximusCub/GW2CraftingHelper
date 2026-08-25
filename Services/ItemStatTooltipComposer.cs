@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the
     /// line order the in-game item tooltip uses (spec section 1.6,
-    /// docs/KNOWN-ISSUES.md "Tooltip authenticity"): the icon+name header,
+    /// KNOWN-ISSUES #42): the icon+name header,
     /// what the item DOES (strength/defense, attributes, granted bonuses),
     /// its infusion slots, then the white identity block - rarity, type,
     /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
@@ -69,7 +69,7 @@ namespace GW2CraftingHelper.Services
                 // upgrade component, whose bonus lines FWDekker's
                 // UpgradeComponent builder breaks before - inferred, no
                 // unequipped-rune capture exists. Gap G15; the warhelm
-                // divergence this leaves is in docs/KNOWN-ISSUES.md.
+                // divergence this leaves is in KNOWN-ISSUES #42.
                 if (i > 0 || !bodyOpensUnderHeader)
                 {
                     builder.Separator();
@@ -293,7 +293,7 @@ namespace GW2CraftingHelper.Services
             // own copy is instance state /v2/items cannot know, and
             // claiming the slots are empty would be a guess. That wording
             // difference is an accepted divergence from the game's
-            // "Unused Infusion Slot" - see docs/KNOWN-ISSUES.md.
+            // "Unused Infusion Slot" - see KNOWN-ISSUES #42.
             for (int i = 0; i < stats.InfusionSlotCount; i++)
             {
                 slots.Text("Infusion Slot").EndLine();

@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // Height agreement for this new shape lives in
     // Services/SummarySectionLayoutMath.BodyHeight, not
     // PlanContentHeightMath (a high-evidence zone, formerly DO-NOT-TOUCH,
-    // for this package - see docs/KNOWN-ISSUES.md's policy note) - see
+    // for this package - see docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - see
     // that class's own doc comment for the full rationale.
     internal sealed class SummarySectionRenderer
     {

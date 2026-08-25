@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // those things are NOT relayout registrations: PreserveScrollAcross
     // (scroll preserve/restore/verify machinery, stays on
     // CraftingPlanView - see
-    // docs/KNOWN-ISSUES.md), SetStatus, the top-level RenderPlan rebuild
+    // KNOWN-ISSUES #39), SetStatus, the top-level RenderPlan rebuild
     // entry point, GetCurrentPanelWidth, the view's own _currentPlan/
     // _lastDebugLog fields, and CreateSectionHeader (shared chrome every
     // section uses, including the plain PlanSectionType sections this
@@ -91,9 +91,9 @@ namespace GW2CraftingHelper.Views.Rendering
         // This session's item stat block for an item id, or null. Null is
         // routine, not exceptional: a synthesized cost-component leaf is
         // not a real item at all, and a plan restored from disk has no
-        // stats until something re-fetches (docs/KNOWN-ISSUES.md, "Item
-        // stat tooltips"). Either way the row falls back to the tooltip it
-        // had before this feature existed.
+        // stats until something re-fetches (KNOWN-ISSUES #40). Either way
+        // the row falls back to the tooltip it had before this feature
+        // existed.
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
         // Registers one row control under a stable scroll-anchor key, so a
@@ -545,7 +545,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// re-solve - and it differs only in writing the ordinary
         /// "Plan updated" event rather than claiming "Best path restored",
         /// which is a preset's label and not a description of clearing.
-        /// See docs/KNOWN-ISSUES.md: the two buttons being one action is a
+        /// See KNOWN-ISSUES #59: the two buttons being one action is a
         /// finding for the maintainer, not something this seam invents a
         /// difference to hide.
         /// </summary>

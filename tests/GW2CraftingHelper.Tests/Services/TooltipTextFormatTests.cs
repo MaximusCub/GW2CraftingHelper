@@ -7,7 +7,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     // The single wrap seam both tooltip composers return through. Blish's
-    // own 500px cap already bounds width (see docs/KNOWN-ISSUES.md); what
+    // own 500px cap already bounds width (see KNOWN-ISSUES #43); what
     // these tests pin is what that cap does not give - a break point the
     // module controls, an over-long token hard-split instead of overflowing,
     // and no silent truncation of a long tooltip's tail.

@@ -4,7 +4,7 @@ namespace GW2CraftingHelper.Services
 {
     public static class RecipeClientFactory
     {
-        // Quality-audit B3 (docs/KNOWN-ISSUES.md): mfData.LoadWarnings was
+        // Quality-audit B3 (KNOWN-ISSUES #53): mfData.LoadWarnings was
         // collected and never logged, and this catch swallowed the load
         // exception silently. Wired both to ModuleLog (optional injection,
         // defaults to ModuleLog.Shared - see Module.cs's other

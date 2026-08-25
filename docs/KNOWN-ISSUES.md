@@ -63,8 +63,8 @@ remember. Four rules carry weight.
    entries reading "gate not yet run live" years after the fact.
 
 **Size.** CI fails the build when this file passes 250KB. Measured
-2026-08-25, right after the records moved out: the catalog, the DEFERRED
-list and the ledger cost **58KB** between them, and a merged branch now adds
+2026-08-25, after the records moved out and the citation anchors moved in:
+the catalog, the DEFERRED list and the ledger cost **72KB** between them, and a merged branch now adds
 a ledger line rather than a record - hundreds of bytes, not the ~11.5KB a
 branch used to add when records lived here. So 250KB is headroom against
 catalog growth, not a schedule; if it ever fires, the pass to run is a
@@ -150,7 +150,7 @@ Closed by the same synchronous-height-contract fix as item 12.
 Logged as a contrast follow-up to the M30 #11 pill-label fix (which only
 covered tree pills, not shopping-list source tags). No explicit resolution
 note was recorded against this item number in the original backlog; full
-context in `dev-notes/HISTORY.md`.
+context in `dev/dev-notes/HISTORY.md`.
 
 ### 16. Vendor-source items show no price
 
@@ -159,7 +159,7 @@ non-coin currency costs. The currency-icon rendering pipeline
 (`CoinCurrencyRenderer`, `CurrencyDisplayResolver`) that this item asked
 for is in production use today. No explicit "(FIXED in Mxx)" note was
 recorded against this item number in the original backlog; full context
-in `dev-notes/HISTORY.md`.
+in `dev/dev-notes/HISTORY.md`.
 
 ### 17. Seed data gaps: false UNKNOWNs in the Exordium tree (FIXED in M33)
 
@@ -178,7 +178,7 @@ different source (e.g. VENDOR). The decision-pill-must-match-committed-
 source invariant this item asked for is covered today by
 `DecisionPillPlannerTests`. No explicit "(FIXED in Mxx)" note was recorded
 against this item number in the original backlog; full context in
-`dev-notes/HISTORY.md`.
+`dev/dev-notes/HISTORY.md`.
 
 ### 19. Resize-drag scroll reset on height change (FIXED in M33)
 
@@ -230,13 +230,18 @@ in that same pass - **this gap was closed by item 30 below** (M37 live
 desktop session, 2026-07-22, scanned Required Disciplines directly and
 confirmed the same clean result the simulation predicted).
 
-### M38 view-decomposition entries (WP-21 through WP-25)
+### 39. M38 view-decomposition entries (WP-21 through WP-25)
+
+Numbered late, on 2026-08-25, so `Views/Rendering/ISectionRelayoutSink.cs`
+and `Views/Rendering/TreeSectionController.cs` can cite `#39` instead of
+"the WP-23 entry". It sits here rather than at the end of the catalog
+because renumbering is forbidden and this is where it was written.
 
 Not separately numbered in the original backlog (recorded there as
 `WP-22`/`WP-23`/`WP-23b`/`WP-23c`/`WP-23d + WP-24`/`WP-25` narrative
 entries, plus the WP-26 cut decision). See `docs/ARCHITECTURE.md` section
 5 for the durable summary of what moved where and why, and
-`dev-notes/HISTORY.md` for the full diff-evidence and live-verification
+`dev/dev-notes/HISTORY.md` for the full diff-evidence and live-verification
 record of each increment.
 
 ### 24. Homestead refinement handling (parity gap) (FIXED in M37)
@@ -259,7 +264,7 @@ M35 left sell-value/profit rollups unset for multi-item batches. Fixed:
 `SellSideEconomics.ApplyBatchSellSideEconomics` sums each qualifying
 root's own sellable quantity/net sale value/profit into batch totals.
 Deliberately diverges from gw2e in two ways (both recorded in
-`dev-notes/HISTORY.md` with the reasoning): the rollup does not filter
+`dev/dev-notes/HISTORY.md` with the reasoning): the rollup does not filter
 out a bought-but-tradable root the way gw2e's `craft === true` filter
 does, and an untradable crafted root is excluded entirely (contributes
 zero) rather than silently absorbed as a hidden cost the way gw2e's own
@@ -593,10 +598,233 @@ one. Same full record as item 37.
 
 ---
 
+### Entries 40-63: citation anchors added 2026-08-25
+
+Source used to cite this file in six shapes - `#12`, `20`, `31a-F1`,
+`31c-audit`, `DO-NOT-TOUCH #13`, and bare phrases like "tree dimming rule" -
+of which only `#N` resolved to anything. The entries below give a number to
+every record `.cs`, test and `ref/` files were citing by phrase, so `#N` is
+now the single shape and every citation resolves in one hop. Nothing was
+renumbered to do it: these are new numbers on records that already existed.
+
+### 40. Item stat tooltips (in-game-style rich hover)
+
+The rich hover block - icon+name header, what the item does, rarity, type,
+level, binding - built from `/v2/items` alone. What `/v2/items` cannot give
+is nominated stat combinations: an item with selectable stats has an open
+judgment call (Q4) about *which* combination to compute, so the module
+computes none. Cited from `Models/ItemStatBlock.cs`,
+`Services/ItemMetadataService.cs`, `Services/ItemStatBlockFactory.cs` and
+`Views/Rendering/TreeSectionController.cs`. Full record:
+`dev/archive/known-issues/2026-08-23-item-stat-tooltips.md`.
+
+### 41. Tooltip facility (one rich surface, four-edge clamp)
+
+Exactly one rich tooltip surface exists for the whole module, repointed on
+hover, because decompiling Blish 1.3.0 showed `Control.Dispose` never
+touches its `_tooltip` field - a per-control surface would leak. Blish's own
+`Tooltip.UpdateTooltipPosition` protects the top edge and shifts left, so
+the module adds the two edges Blish does not clamp. Full record:
+`dev/archive/known-issues/2026-08-22-tooltip-facility.md`.
+
+### 42. Tooltip authenticity (gap ids G1-G24, and the accepted divergences)
+
+The pass that made the rich tooltip read as a game tooltip, measured at 3x
+against wiki captures and FWDekker's replica. **This is the referent for
+every `gap G<N>` id in the codebase**: G1-G24 are that record's gap map, and
+they appear in `Services/ItemStatTooltipComposer.cs`,
+`Services/TooltipContent.cs`, `Services/TooltipLayoutMath.cs`,
+`Services/CoinSegmentMath.cs`, `Views/Rendering/RichTooltipSurface.cs`,
+`Views/Rendering/CoinCurrencyRenderer.cs` and `Views/Rendering/RarityColors.cs`.
+Comments that used to cite "spec section N.M" cited a document that is not
+in this repository and never was; they now cite this number, and the
+measurement each one stood on is inlined at the constant. Carries the
+accepted divergence from the game's "Unused Infusion Slot" wording, and the
+warhelm first-band divergence (G15). Full record:
+`dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`.
+
+### 43. Tooltip text wrapping and Blish's 500px cap (audit batches A+B+C)
+
+Blish's own tooltip already bounds width at 500px; what the module adds is
+a break point it controls and a hard split for an over-long token, rather
+than overflow. The 500px cap is NOT what keeps a tooltip inside the module
+window. Full record: `dev/archive/known-issues/2026-08-22-audit-abc.md`.
+
+### 44. Craft/vendor comparability parity
+
+Craft and vendor costs were compared across incommensurable currency mixes.
+Fixed in three passes (the fix, an adversarial-review round, and an external
+review that found a fourth site). The documented residual: a genuine tie
+where both sides' priced-material amounts are identical, which the terminal
+fallback cannot break more finely than its existing coin-tie rule. Full
+records: `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`,
+`...-adversarial.md`, `...-external.md`.
+
+### 45. W3B: generation progress + rich logging
+
+The plan-strip status board and the phase-by-phase progress reporting a
+long solve writes. Full record:
+`dev/archive/known-issues/2026-08-08-w3b-generation-progress-rich-logging.md`.
+
+### 46. W4A: Total Cost section redesign
+
+The two formula-band tile rows and the non-coin currency table that replaced
+the old coin-total row list, plus the layout arithmetic that moved to
+`Services/SummarySectionLayoutMath.cs` rather than into the high-evidence
+`PlanContentHeightMath`. Full record:
+`dev/archive/known-issues/2026-08-15-w4a-total-cost-section-redesign.md`.
+
+### 47. W4B: vendor cost-component leaves (the tree dimming rule)
+
+Synthesized cost-component leaves under a vendor node, and the rule for
+which tree rows dim. Full record:
+`dev/archive/known-issues/2026-08-15-w4b-vendor-cost-component-leaves.md`.
+
+### 48. Recipe-ingestion bug class: missing schema-version parameter
+
+The API's versioned schema keys an ingredient's item id as `id`; the module
+and the seeder both parsed the unversioned `item_id` shape, so every
+non-Item ingredient type was silently dropped. Re-running the seeder chain
+after the fix moved several committed counts, which is why the seed-count
+pins in the suite carry drift comments. Full record:
+`dev/archive/known-issues/2026-08-15-recipe-ingestion-bug-class-missing-schema-version.md`.
+
+### 49. Opportunity notes: recipe-sheet savings + seasonal vendor tips
+
+The RECIPE-SHEET SAVINGS note and the seasonal-vendor tip, including the
+`_offersForRecipeSheetItem` wiring (item 3 of that record) that no test
+covered until the end-to-end pipeline test was added. Gate not yet run live.
+Full record:
+`dev/archive/known-issues/2026-08-16-opportunity-notes-recipe-sheet-savings-seasonal.md`.
+
+### 50. Snapshot item grid
+
+The Snapshot tab's column-count thresholds, derived through the whole chrome
+chain rather than copied. Full record:
+`dev/archive/known-issues/2026-08-23-snapshot-grid.md`.
+
+### 51. Settings dirty prompt
+
+Blish's `TabChanged` has no pre-change event and no veto: `SetProperty`
+assigns, `OnTabChanged` tears the old view down, and only then is the public
+event raised - so a tab switch cannot be cancelled, and a dialog button
+labelled "Cancel" would promise something it cannot do. The alternatives
+that were measured and rejected are in the record. Full record:
+`dev/archive/known-issues/2026-08-23-settings-dirty-prompt.md`.
+
+### 52. Click volume slider (click-sound-gain)
+
+Blish's `PlaySoundEffectByName` plays at a game-derived volume capped at
+0.4, and zero when the game is quiet or closed - hence the reported
+inaudibility - so the module plays Blish's own `button-click.wav` itself.
+The accepted divergence from Blish's mute-with-game rule, and the sweep of
+controls that still play at Blish's volume (Checkbox, CornerIcon, which play
+the click ahead of the base call a subclass would have to skip), are in the
+record. Full record:
+`dev/archive/known-issues/2026-08-23-click-sound-gain.md`.
+
+### 53. Quality-audit cleanup (findings B1-B15)
+
+Four phases of audit-driven bug fixes and structural dedup. B2: restore-path
+lists were null-checked as lists but dereferenced per entry. B3:
+`mfData.LoadWarnings` was collected and never logged. B4: a merge counter
+incremented against a dictionary that mutated inside its own loop. Full
+records: `dev/archive/known-issues/2026-08-17-quality-audit-cleanup-phase-1-four-bug-fixes.md`,
+`...-quality-phase2-mechanical.md`, `...-quality-phase3-dedup.md`,
+`...-quality-phase4a-tracker.md`, `...-quality-phase4b-bundling.md`,
+`...-backlog-cleanup.md`.
+
+### 54. GuildUpgrade ingredient costing and display
+
+The versioned schema (see #48) revealed a `GuildUpgrade` ingredient type
+whose ids are a distinct id space from item and currency ids.
+`VendorBatchSolver.EvaluateVendorOffers` keyed vendor offers by the raw
+ingredient id with no type gate, so a guild-upgrade id could collide with an
+item id and be priced as one. Guild-upgrade nodes are now leaves that are
+never priced or named as items; full guild-decoration support is out of
+scope. Full record:
+`dev/archive/known-issues/2026-08-16-guildupgrade-ingredient-costing-display-fix.md`.
+
+### 55. Settings restructure (audit batch G, supersedes B14)
+
+One Save button and one status label for the whole tab, replacing four
+per-section Save rows. Also the measured Blish behavior the Snapshot tab
+depends on: **"The grid panel holds its unfiltered height"** - Blish's
+`Scrollbar` zeroes the scroll position a frame after any content-height
+change, so a repack that changes the column count snaps the list to top.
+Full record: `dev/archive/known-issues/2026-08-22-audit-g-settings.md`.
+
+### 56. Minimum width raise (1378px)
+
+The shipped minimum window width, derived from glyph ink measured off the
+installed Menomonia bitmap fonts rather than guessed. The panel width a
+layout test must assert runs through the whole chrome chain including the
+`ViewAdapter`, not just the window's content region. See also
+`docs/research/minimum-window-width.md`, which is live and editable. Full
+record: `dev/archive/known-issues/2026-08-23-min-width-1436.md`.
+
+### 57. Shopping-list row tooltip: scope collision + swallowed hover
+
+Blish resolves a tooltip on the control under the mouse and does not bubble
+to the parent, so a row's Labels each need the tooltip as well as the row
+Panel. Gate not yet run live. Full record:
+`dev/archive/known-issues/2026-08-16-shoplist-have-format.md`.
+
+### 58. W3D: plan persistence across module restarts
+
+What a persisted plan restores and what it does not: `ValueOwnMaterials` is
+restored into its live checkbox, `UseOwnMaterials` and `PriceBasis` are not.
+Full record:
+`dev/archive/known-issues/2026-08-09-w3d-plan-persistence-across-module-restarts.md`.
+
+### 59. Best Path and Clear Overrides are one action
+
+MEASURED: `TreeToolbarCommands.BestPath` and the Overrides chip's clear
+action do byte-for-byte the same work - clear the same dictionary, re-solve
+- and differ only in the status line they write and the dialog they ask.
+Recorded as a finding for the maintainer rather than papered over at the
+seam. Full record:
+`dev/archive/known-issues/2026-08-23-plan-view-redesign.md`.
+
+### 60. Field-test fixes wave 3 (field-fixes-3)
+
+Five independent maintainer reports from one live 0.2.3 session: zero-band
+retention, scroll anchoring across a re-solve, the click-sound default, the
+Mystic Forge UNKNOWN investigation (item 4 - measured: not the build bump,
+and mostly not a defect), and the first-load snapshot. Full record:
+`dev/records/field-fixes-3.md`.
+
+### 61. Daily craft-cooldown notices (AUDIT ROW 56)
+
+The notice pass keys strictly on `AcquisitionSource.Craft` steps, so an item
+that is not a recipe output anywhere in the seed can never raise a notice -
+the Craft-step-only limitation. Charged Quartz Crystal was removed from the
+seed as dead data that read as covered. Full record:
+`dev/archive/known-issues/2026-08-16-audit-row-56-daily-craft-cooldown-notices-three.md`.
+
+### 62. Receipt and what-if captions
+
+`ReceiptCaptionHelper` and the caption split it computes. The deepest
+Blish-free seam for this path is `CraftingPlanPipeline`;
+`TreeSectionController` is Blish-bound, so a render-path miss beyond that
+point cannot surface in a unit test. Full records:
+`dev/archive/known-issues/2026-08-16-ui-bundle-wiki-links-snapshot-status-row-receipt.md`,
+`dev/archive/known-issues/2026-08-16-gate-investigation-receipt-what-if-captions-value.md`.
+
+### 63. Festival-vendor auto-tagging (partial coverage)
+
+Seasonal tagging covered the known festival vendor list, not a full
+re-scrape: thousands of non-festival vendor pages remain untagged, and a
+fresh scrape of any merchant recomputes its offer ids. Gate not yet run
+live. Full record:
+`dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`.
+
+---
+
 ## DEFERRED (recorded, not implemented)
 
 Carried over verbatim from the original backlog (full context:
-`dev-notes/HISTORY.md`), plus two additional still-open items folded in
+`dev/dev-notes/HISTORY.md`), plus two additional still-open items folded in
 from items 31 and 32 below (marked as such) so this list covers every
 genuinely open item, not just the ones originally filed under a
 "DEFERRED" heading.

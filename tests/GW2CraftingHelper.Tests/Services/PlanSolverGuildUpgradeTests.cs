@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// guildupgrade-ingredients fix (docs/KNOWN-ISSUES.md): the versioned
+    /// guildupgrade-ingredients fix (KNOWN-ISSUES #54): the versioned
     /// GW2 API returns ingredient {type:"GuildUpgrade", id:&lt;upgradeId&gt;,
     /// count:N} on Guild Decoration recipes (e.g. recipe 12002 -> item
     /// 80471, guild upgrade id 829, ref/recipes_seed.json). Before this fix,
@@ -81,7 +81,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void GuildUpgradeIngredient_NeverPricedAsVendorOffer_EvenWhenVendorOfferExistsForSameId()
         {
             // The mechanism that was ACTUALLY reachable in a real pipeline
-            // run pre-fix (docs/KNOWN-ISSUES.md's corrected "Root cause"
+            // run pre-fix (KNOWN-ISSUES #54's corrected "Root cause"
             // note): VendorBatchSolver.EvaluateVendorOffers keys
             // vendorOffers by the raw ingredient id with no "Item"-type
             // gate at all, unlike the TP price table above (which

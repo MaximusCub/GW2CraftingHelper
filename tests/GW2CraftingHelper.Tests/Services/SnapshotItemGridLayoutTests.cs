@@ -34,9 +34,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ColumnThresholds_ThroughTheChromeChain_AreTheDocumentedWindowWidths()
         {
-            // The window widths the table in docs/KNOWN-ISSUES.md ("Snapshot
-            // item grid") quotes, derived rather than copied: N columns need
-            // N * MinColumnWidth of grid, and the chrome between the window
+            // The window widths the table in KNOWN-ISSUES #50 quotes,
+            // derived rather than copied: N columns need N * MinColumnWidth
+            // of grid, and the chrome between the window
             // and the grid is WindowToTabPanelChrome (this tab spends on the
             // scrollbar the 20px the chain's last term spends on padding).
             int windowForTwoColumns = 2 * SnapshotItemGridLayout.MinColumnWidth

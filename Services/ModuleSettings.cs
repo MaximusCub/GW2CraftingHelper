@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Services
         // default AND its own no-API-key fallback, and matches this repo's
         // "no invented data" posture better than assuming any upgrade
         // level. Deliberately NO master "do you even own Homestead" gate -
-        // gw2e has none either; see KNOWN-ISSUES.md item 24 for that
+        // gw2e has none either; see KNOWN-ISSUES #24 for that
         // recorded, deferred divergence option.
         public SettingEntry<int> HomesteadFiberTier { get; private set; }
         public SettingEntry<int> HomesteadMetalTier { get; private set; }

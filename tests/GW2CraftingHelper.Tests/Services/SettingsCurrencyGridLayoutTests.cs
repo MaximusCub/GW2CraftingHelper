@@ -398,7 +398,7 @@ namespace GW2CraftingHelper.Tests.Services
         // ViewAdapter, so it overstated the panel by 60px and asserted a
         // two-column grid at the old 930px minimum where the real 804px
         // panel gave ONE column - see docs/research/minimum-window-width.md
-        // and the "Minimum width raise" section of docs/KNOWN-ISSUES.md.
+        // and KNOWN-ISSUES #56.
         //
         // The chain is WindowSizing's, read from the shipped constants
         // rather than copied here, so a change to the enforced minimum or

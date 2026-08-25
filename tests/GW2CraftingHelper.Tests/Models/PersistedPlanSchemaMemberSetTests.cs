@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Tests.Models
     // for every reachable Models-namespace class, so a rename, addition,
     // removal, OR retype anywhere in the persisted graph fails this test - not
     // just on the four types named in CurrentSchemaVersion's doc comment. See
-    // docs/KNOWN-ISSUES.md for the full quality-audit rationale.
+    // KNOWN-ISSUES #53 for the full quality-audit rationale.
     public class PersistedPlanSchemaMemberSetTests
     {
         private const string ModelsNamespace = "GW2CraftingHelper.Models";

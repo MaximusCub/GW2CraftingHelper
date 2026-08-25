@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Models
     /// with no entry - matching gw2e's own hardcoded default AND its
     /// no-API-key fallback (docs/research/m37-r1-homestead.md Section 1.2/1.3).
     /// Deliberately has NO master "do you even own Homestead" gate - gw2e
-    /// has none either (Section 1.5); see KNOWN-ISSUES.md item 24 for the
+    /// has none either (Section 1.5); see KNOWN-ISSUES #24 for the
     /// deferred divergence option.
     /// </summary>
     public class HomesteadEfficiencyTiers

@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         // In-file fixture with 6 of the now-10 real ref/acquisition_hints_
         // seed.json entries (the five wiki-verified entries from docs/
-        // KNOWN-ISSUES.md item 8, plus the Gift of Battle
+        // KNOWN-ISSUES #8, plus the Gift of Battle
         // entry) - exercises AcquisitionHintService.Load's parsing shape
         // in isolation. The separate Load_ShippedSeedFile_* test below
         // reads the actual shipped file and pins its real entry count,

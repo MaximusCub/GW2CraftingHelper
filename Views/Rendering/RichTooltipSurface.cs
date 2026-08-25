@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// <summary>
     /// The module's ONE rich tooltip window. Deliberately a single shared
     /// instance repointed on hover rather than an instance per tooltip'd
-    /// control - see docs/KNOWN-ISSUES.md, "Tooltip facility", for the
+    /// control - see KNOWN-ISSUES #41 for the
     /// decompiled evidence: <c>Control.Dispose</c> never touches its
     /// <c>_tooltip</c> field, and a Tooltip is not a child of its owner
     /// (<c>Tooltip.Show</c> reparents it to the SpriteScreen), so
@@ -68,7 +68,7 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Every glyph in a game tooltip carries a dark halo (measured at
-        /// 3x, spec section 1.3, gap G8). Same pair the module's own row
+        /// 3x, KNOWN-ISSUES #42, gap G8). Same pair the module's own row
         /// labels already use.
         /// </summary>
         private static readonly Color ShadowColor = Color.Black * 0.8f;
@@ -76,7 +76,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// The header icon: ~34x34 including its 1px frame, ~32px of art,
         /// with the name ~5px to its right - all measured off the xyaren
-        /// capture (spec section 1.2, gap G11).
+        /// capture (KNOWN-ISSUES #42, gap G11).
         /// </summary>
         private const int HeaderIconSize = 32;
 
@@ -147,7 +147,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// 3 bottom, 6 left)</c>, which <c>RecalculateLayout</c> turns into
         /// the ContentRegion every child is positioned inside - already IS
         /// the game's measured 6px left padding with 3-4px on the other
-        /// edges (spec section 1.2, gap G23), so the padding needs no work
+        /// edges (KNOWN-ISSUES #42, gap G23), so the padding needs no work
         /// of its own once the art underneath it is gone.
         /// </para>
         /// </summary>
@@ -397,8 +397,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // Light blue, not green: measured on the wiki's
                 // Rune_effects_*.jpg captures (per-row peaks
                 // 95-115/118-138/148-180) and corroborated by FWDekker's
-                // #5599ff replica - see docs/KNOWN-ISSUES.md,
-                // "Tooltip authenticity", gap G3. The exact triple is the
+                // #5599ff replica - see KNOWN-ISSUES #42, gap G3. The exact triple is the
                 // spec's recommendation, not a measurement.
                 case TooltipSpanRole.Bonus:
                     return new Color(120, 170, 235);

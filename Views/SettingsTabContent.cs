@@ -256,7 +256,7 @@ namespace GW2CraftingHelper.Views
         // One status label for the whole tab, next to the one Save button in
         // the header bar (see BuildSaveBar) - the four per-section Save rows
         // and their four status labels this replaced are recorded in
-        // KNOWN-ISSUES (audit batch G supersedes B14).
+        // KNOWN-ISSUES #55 (audit batch G supersedes B14).
         private Label _statusLabel;
 
         // The save bar's own controls. The dirty chip and Discard are hidden
@@ -1198,7 +1198,7 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// The click-volume row: label, slider, live readout, Test button.
         /// Immediate-apply, unlike the save-gated sections (recorded in
-        /// KNOWN-ISSUES) - a volume is tuned by ear - so the row must stay
+        /// KNOWN-ISSUES #52) - a volume is tuned by ear - so the row must stay
         /// out of CaptureFormState, or every drag would count as an unsaved
         /// change. The section's band says so with a tag. The tab's only
         /// other immediate-apply control is the Diagnostics checkbox, which

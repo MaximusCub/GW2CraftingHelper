@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Tests.Services
     // The rich tooltip surface's arithmetic. The placement half is the
     // interesting one: it exists because BlishHUD 1.3.0's own
     // Tooltip.UpdateTooltipPosition clamps neither the bottom edge nor a
-    // negative X (measured - see docs/KNOWN-ISSUES.md, "Tooltip facility"),
+    // negative X (measured - see KNOWN-ISSUES #41),
     // so these tests pin the four-edge guarantee the module now makes.
     public class TooltipLayoutMathTests
     {

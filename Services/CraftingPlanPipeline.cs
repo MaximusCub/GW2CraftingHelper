@@ -812,7 +812,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Fetches learned recipe ids if the account client is wired up and
-        /// permitted. KNOWN-ISSUES api-degradation F4: any non-cancellation
+        /// permitted. KNOWN-ISSUES #31/api-degradation F4: any non-cancellation
         /// failure degrades to null, a state PlanResultBuilder already treats
         /// as supported rather than discarding an otherwise-priced plan.
         /// </summary>

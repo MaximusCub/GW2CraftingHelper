@@ -397,7 +397,7 @@ namespace GW2CraftingHelper.Views
             // for the Snapshot result rows' item tooltips. Optional, and a
             // pure cache read - a snapshot row whose item no plan has
             // fetched this session degrades to the ellipsis tooltip it
-            // always had. See docs/KNOWN-ISSUES.md, "Tooltip authenticity".
+            // always had. See KNOWN-ISSUES #42.
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _snapshot = snapshot;
@@ -726,7 +726,7 @@ namespace GW2CraftingHelper.Views
             buildPanel.Resized += OnPanelResized;
 
             // Same hazard family as the LogTabContent field crash
-            // (docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
+            // (KNOWN-ISSUES #36): Blish HUD runs a tab's Build() via
             // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
             // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
             // LogTabContent, this instance is never recreated per tab visit
@@ -1557,8 +1557,8 @@ namespace GW2CraftingHelper.Views
         /// - the grid panel's width moves, its height does not. A repack that
         /// changes the column count writes a new grid-panel height, and
         /// Blish's Scrollbar zeroes the scroll position a frame after any
-        /// content-height change (measured: docs/KNOWN-ISSUES.md, "The grid
-        /// panel holds its unfiltered height"), so the list snaps to top.
+        /// content-height change (measured: KNOWN-ISSUES #55, "The grid panel holds its
+        /// unfiltered height"), so the list snaps to top.
         /// Not defended against here: the tab has no scroll-restore
         /// machinery (CraftingPlanView.PreserveScrollAcross is the module's
         /// only one), and a column-count change re-flows every row anyway, so

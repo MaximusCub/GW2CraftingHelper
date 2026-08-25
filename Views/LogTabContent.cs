@@ -415,7 +415,7 @@ namespace GW2CraftingHelper.Views
                 RefitRows();
             };
 
-            // FIELD CRASH (docs/KNOWN-ISSUES.md): Build() itself
+            // FIELD CRASH (KNOWN-ISSUES #36): Build() itself
             // runs on a ThreadPool thread (see _buildComplete's own doc
             // comment for the DoLoad().ContinueWith(...) pattern), so
             // calling RebuildRows() directly here raced against Module.cs's
@@ -1295,7 +1295,7 @@ namespace GW2CraftingHelper.Views
             // Blish resolves a tooltip on the control under the mouse and
             // does not bubble to the parent, so both Labels need it as well
             // as the row Panel - the swallowed-hover class already fixed in
-            // ShoppingListSectionRenderer (docs/KNOWN-ISSUES.md).
+            // ShoppingListSectionRenderer (KNOWN-ISSUES #57).
             bool shortened =
                 !string.Equals(timeText, row.FullTime, StringComparison.Ordinal) ||
                 !string.Equals(tagText, row.FullTag, StringComparison.Ordinal) ||

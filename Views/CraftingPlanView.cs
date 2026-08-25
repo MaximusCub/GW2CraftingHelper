@@ -775,7 +775,7 @@ namespace GW2CraftingHelper.Views
             // time this plan was persisted - restoring it into the live
             // checkbox is the whole reason PersistedPlan.ValueOwnMaterials
             // exists. UseOwnMaterials/PriceBasis have the same gap (their
-            // live controls are not restored) - see docs/KNOWN-ISSUES.md.
+            // live controls are not restored) - see KNOWN-ISSUES #58.
             bool valueOwnMaterials)
         {
             if (result == null) return;

@@ -347,7 +347,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // A BuyFromTp node's children are the "what it would cost to
             // craft instead" reference branch - dimmed, default-collapsed
-            // regardless of depth (KNOWN-ISSUES tree dimming rule).
+            // regardless of depth (KNOWN-ISSUES #47, the tree dimming rule).
             var grandchildren = new List<CraftingTreeNode> { Node(3) };
             var child = Node(2, children: grandchildren);
             var root = Node(1, decision: CraftingDecision.BuyFromTp, children: new List<CraftingTreeNode> { child });
@@ -468,10 +468,11 @@ namespace GW2CraftingHelper.Tests.Services
         // UnaffectedByNewBranch, Summary_MultiItemFourCoinRowsPlusNoteRow_
         // StillOneCostTileRowHeight) asserted
         // PlanContentHeightMath.SummaryBodyHeight's shape via
-        // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES W4A
-        // entry, closed under the high-evidence-zone policy - see
-        // docs/KNOWN-ISSUES.md's policy note): CoinTotal was never emitted
-        // by PlanViewModelBuilder, and SummaryBodyHeight was unreachable
+        // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES #46,
+        // closed under the high-evidence-zone policy - see
+        // docs/KNOWN-ISSUES.md#policy-high-evidence-zones): CoinTotal was
+        // never emitted by PlanViewModelBuilder, and SummaryBodyHeight
+        // was unreachable
         // for a real Summary section once the redesign routed
         // PlanSectionType.Summary to SummarySectionLayoutMath.BodyHeight
         // instead. Deleted together with the enum member and the method

@@ -418,7 +418,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                             {
                                 Type = ing.TryGetProperty("type", out var t)
                                     ? t.GetString() ?? "Item" : "Item",
-                                // KNOWN-ISSUES recipe-ingestion bug class
+                                // KNOWN-ISSUES #48
                                 //: mirrors
                                 // Gw2RecipeApiClient.ParseRecipe's own "id"-
                                 // with-"item_id"-fallback fix. This one is

@@ -124,7 +124,7 @@ namespace GW2CraftingHelper.Services
             // item-keyed entry via the widened metadata fetch. IDs are
             // never displayed (repo invariant), so a generic label plus
             // AcquisitionHint stands in for a name. Full guild-decoration
-            // support is out of scope - see docs/KNOWN-ISSUES.md.
+            // support is out of scope - see KNOWN-ISSUES #54.
             if (node.IngredientType == "GuildUpgrade")
             {
                 treeNode.Decision = CraftingDecision.GuildUpgrade;

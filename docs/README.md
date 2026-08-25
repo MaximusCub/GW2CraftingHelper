@@ -116,7 +116,7 @@ test files only inside comments; nothing under `tests/` references them.
   in a live desktop verification.
 - **WP-NN** - a work package inside the M38 cleanup wave specifically,
   WP-01 through WP-29, defined in
-  [`dev-notes/m38-plan/m38-cleanup-plan.md`](../dev/dev-notes/m38-plan/m38-cleanup-plan.md).
+  [`dev/dev-notes/m38-plan/m38-cleanup-plan.md`](../dev/dev-notes/m38-plan/m38-cleanup-plan.md).
   No other milestone uses WP numbering.
 - **KNOWN-ISSUES #N** - an entry in the numbered catalog in
   [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md). Cited from `.cs` files as an anchor

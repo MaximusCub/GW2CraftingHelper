@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Helpers
 
         /// <summary>
         /// Recipe ids GetRecipeAsync should return null for, simulating a
-        /// 404 (KNOWN-ISSUES api-degradation F5's new null-on-404 contract)
+        /// 404 (KNOWN-ISSUES #31/api-degradation F5's new null-on-404 contract)
         /// instead of the indexer's default throw-on-missing-key behavior,
         /// which every other existing test relies on to catch a genuinely
         /// mismatched search/recipe setup.

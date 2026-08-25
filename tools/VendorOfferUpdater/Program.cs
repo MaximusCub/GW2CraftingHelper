@@ -636,7 +636,7 @@ namespace VendorOfferUpdater
                 existingKeys.Add(key);
             }
 
-            // Quality-audit B4 (docs/KNOWN-ISSUES.md): counted against
+            // Quality-audit B4 (KNOWN-ISSUES #53): counted against
             // existingKeys, not merged.ContainsKey - merged mutates during
             // this same loop, so a duplicate PageName within one fresh
             // batch was double-counted as Refreshed. addedKeys/

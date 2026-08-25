@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // KNOWN-ISSUES api-degradation F3: a single hard-failing batch
+            // KNOWN-ISSUES #31/api-degradation F3: a single hard-failing batch
             // must degrade to "treat this batch's ids as missing, fall
             // through to the retry wave/seed fallback below" instead of
             // aborting GetMetadataAsync entirely - mirroring the retry
@@ -173,7 +173,7 @@ namespace GW2CraftingHelper.Services
         /// Null is the normal answer for a plan restored from disk (nothing
         /// re-fetched its items), and callers must degrade to their
         /// pre-existing tooltip rather than showing an empty box - see
-        /// docs/KNOWN-ISSUES.md, "Item stat tooltips".
+        /// KNOWN-ISSUES #40.
         /// </para>
         /// </summary>
         public ItemStatBlock GetCachedStatBlock(int itemId)

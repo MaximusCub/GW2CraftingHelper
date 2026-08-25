@@ -23,9 +23,8 @@ namespace GW2CraftingHelper.Services
     /// Stat-SELECTABLE items (non-empty stat_choices) record only how many
     /// combinations exist. Computing numbers for one nominated combination
     /// is possible - see <see cref="ItemStatMath"/> - but WHICH one is an
-    /// open judgment call (docs/KNOWN-ISSUES.md, "Item stat tooltips",
-    /// Q4), and it is the only thing in this feature that would need a
-    /// /v2/itemstats request. Nothing is guessed here.
+    /// open judgment call (KNOWN-ISSUES #40, Q4), and it is the only thing
+    /// in this feature that would need a /v2/itemstats request. Nothing is guessed here.
     /// </para>
     /// </summary>
     public static class ItemStatBlockFactory

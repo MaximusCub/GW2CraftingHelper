@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Models
     /// never be priced or named as one - see <see cref="Services.CraftingTreeBuilder"/>'s
     /// "GuildUpgrade" branch and <see cref="Services.PlanSolver"/>'s matching ingredient-loop
     /// branch. Full guild-decoration crafting support (resolving the upgrade's real name,
-    /// verifying ownership) is out of scope - see docs/KNOWN-ISSUES.md.</item>
+    /// verifying ownership) is out of scope - see KNOWN-ISSUES #54.</item>
     /// <item><see cref="UnrecognizedIngredient"/> &lt;- set directly for an ingredient node
     /// whose <c>IngredientType</c> is neither "Item", "Currency", nor "GuildUpgrade", never
     /// via <see cref="Models.AcquisitionSource"/>. Deliberately distinct from

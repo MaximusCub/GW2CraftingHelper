@@ -783,7 +783,7 @@ namespace GW2CraftingHelper.Tests.Services
                 () => svc.BuildMultiItemTreeAsync(new List<PlanRequestItem>(), CancellationToken.None));
         }
 
-        // KNOWN-ISSUES api-degradation F5 :
+        // KNOWN-ISSUES #31/api-degradation F5 :
         // Gw2RecipeApiClient.GetRecipeAsync can now return null on a 404
         // instead of throwing. A recipe id a search result points to that
         // then 404s on its own detail lookup must not crash the tree build

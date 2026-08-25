@@ -128,7 +128,7 @@ namespace GW2CraftingHelper.Views
         // abandon the operation. It exists for the callers whose second
         // button is a CHOICE rather than an escape - the Settings tab's
         // unsaved-changes prompt cannot put the user back where they were
-        // (see KNOWN-ISSUES "Settings dirty prompt"), so a button labelled
+        // (see KNOWN-ISSUES #51), so a button labelled
         // "Cancel" there would promise something it does not do.
         // Returns false when another caller's dialog is already on screen,
         // so a caller that arms state for the dialog's lifetime (MainView

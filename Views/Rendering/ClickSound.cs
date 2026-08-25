@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// 1.3.0) - hence the reported inaudibility, and the only way past the
     /// cap is to play the effect ourselves. The asset is Blish's own
     /// button-click.wav from ref.dat, so only the volume changes; the
-    /// divergence from Blish's mute-with-game rule is in KNOWN-ISSUES.
+    /// divergence from Blish's mute-with-game rule is in KNOWN-ISSUES #52.
     /// </summary>
     internal static class ClickSound
     {

@@ -94,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
         }
 
-        // KNOWN-ISSUES 20.4: a node can be BOTH
+        // KNOWN-ISSUES #20.4: a node can be BOTH
         // manually ignored AND carry a nonzero OwnedQuantityUsed from an
         // earlier real reduction - CraftingTreeBuilder.BuildNode sets
         // OwnedQuantityUsed unconditionally BEFORE its IsIgnored early

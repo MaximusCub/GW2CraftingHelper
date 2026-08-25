@@ -105,6 +105,80 @@ jobs:
             exit 1
           fi
 
+      - name: "Every KNOWN-ISSUES #N cited from source resolves"
+        shell: bash
+        run: |
+          # Source cites the tracker over 200 times. Until 2026-08-25 it did so
+          # in six different shapes, only one of which resolved to anything;
+          # this is what keeps the surviving shape honest.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          tracker = open('docs/KNOWN-ISSUES.md', encoding='utf-8').read()
+          headings = set()
+          for m in re.finditer(r'^### (\d+)\.', tracker, re.M):
+              headings.add(int(m.group(1)))
+          for m in re.finditer(r'^### Items (\d+)-(\d+):', tracker, re.M):
+              headings.update(range(int(m.group(1)), int(m.group(2)) + 1))
+
+          files = subprocess.run(['git', 'ls-files', '*.cs'], capture_output=True,
+                                 text=True, check=True).stdout.split()
+          # A citation may wrap onto the next comment line, so comment markers and
+          # newlines are folded away before the numbers are read off.
+          cite = re.compile(r'KNOWN-ISSUES\s*((?:#\d+[a-z]?(?:\.\d+)?[/, ]*)+)')
+          bad = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              flat = re.sub(r'\n\s*(?:///|//|\*)', ' ', text)
+              for m in cite.finditer(flat):
+                  for n in re.findall(r'#(\d+)', m.group(1)):
+                      if int(n) not in headings:
+                          bad.append(f'{f}: KNOWN-ISSUES #{n}')
+          if bad:
+              print('Source cites KNOWN-ISSUES entries that have no heading:')
+              print('\n'.join(sorted(set(bad))))
+              sys.exit(1)
+          print(f'{len(headings)} catalog entries; every cited number resolves.')
+          PY
+
+      - name: KNOWN-ISSUES stays under its rotation threshold
+        shell: bash
+        run: |
+          # The previous threshold was ~100KB, prose-only, and set below the
+          # file's own post-rotation floor - true the day it was written, so it
+          # could never fire. 250KB is headroom above the measured 72KB floor.
+          bytes=$(wc -c < docs/KNOWN-ISSUES.md)
+          if [ "$bytes" -gt 256000 ]; then
+            echo "docs/KNOWN-ISSUES.md is $bytes bytes, past the 250KB threshold."
+            echo "Milestone records belong in dev/records/, one file per branch;"
+            echo "if they are already there, the ledger is due a consolidation."
+            exit 1
+          fi
+          echo "docs/KNOWN-ISSUES.md: $bytes bytes."
+
+      - name: Relative links in tracked markdown resolve
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+
+          files = subprocess.run(['git', 'ls-files', '*.md'], capture_output=True,
+                                 text=True, check=True).stdout.split('\n')
+          broken = []
+          for f in filter(None, files):
+              for target in re.findall(r'\]\(([^)]+)\)', open(f, encoding='utf-8').read()):
+                  if target.startswith(('http', 'mailto:', '#')):
+                      continue
+                  path = target.split('#')[0].replace('%20', ' ')
+                  if path and not os.path.exists(os.path.join(os.path.dirname(f), path)):
+                      broken.append(f'{f} -> {target}')
+          if broken:
+              print('Broken relative markdown links:')
+              print('\n'.join(broken))
+              sys.exit(1)
+          print(f'{len(files)} markdown files, no broken relative links.')
+          PY
+
   # 40% of the last 300 commits touched nothing outside docs/. A job skipped by
   # an `if` still reports a status to branch protection, which a workflow-level
   # paths-ignore would not - that would leave docs-only PRs unmergeable.

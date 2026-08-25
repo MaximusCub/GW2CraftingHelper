@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// TargetUnitSellPrice/CraftingProfit/MaterialOpportunityCost), moved
     /// out of CraftingPlanPipeline as a pure,
     /// move-only extraction - same fields, same order, same arithmetic. See
-    /// docs/KNOWN-ISSUES.md #25 for the full design rationale this
+    /// docs/KNOWN-ISSUES #25 for the full design rationale this
     /// class implements (single-item vs batch rollup, its documented
     /// divergences from gw2e's own multi-item economics). Blish-free and
     /// directly unit-testable; CraftingPlanPipeline calls these statics in
@@ -267,7 +267,7 @@ namespace GW2CraftingHelper.Services
         /// fee math and SellInstant/instant-sell revenue basis the
         /// single-item path already uses) and sums the survivors into the
         /// batch-level CraftingPlanResult fields. See
-        /// docs/KNOWN-ISSUES.md #25's FIXED record for the full
+        /// docs/KNOWN-ISSUES #25's FIXED record for the full
         /// design rationale; summary of how this diverges from gw2e's own
         /// multi-item rollup (the `o()` function in the live app bundle -
         /// see docs/research/m37-r2-batch-economics.md Sections 1.2/4.1):

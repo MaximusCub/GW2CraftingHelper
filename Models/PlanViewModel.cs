@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Models
         // crafted recipes." - docs/gw2e-parity-spec.md)
         // - "crafted recipes" would be
         // inaccurate for a craft-agnostic, tradable-only rollup; see
-        // docs/KNOWN-ISSUES.md #25's divergence record. Rendered via
+        // docs/KNOWN-ISSUES #25's divergence record. Rendered via
         // the same plain-text row pattern as TimegatedNotice.
         MultiItemNote,
 

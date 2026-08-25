@@ -270,7 +270,7 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
-                // Acquisition hints seed (docs/KNOWN-ISSUES.md item 8/17),
+                // Acquisition hints seed (docs/KNOWN-ISSUES #8/#17),
                 // mirroring Module.cs so Unknown-decision nodes carry the
                 // same tooltip/badge data the live module would show.
                 IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null;
@@ -411,7 +411,7 @@ namespace GW2CraftingHelper.Harness
         /// solved CraftingTreeNode tree (the decision/pricing the live
         /// module would render), for item-by-item parity
         /// research. Ids are printed freely here - this is a dev-only tool,
-        /// not the module's UI (see docs/KNOWN-ISSUES.md no-displayed-ids
+        /// not the module's UI (see the CLAUDE.md no-displayed-ids
         /// invariant, which only governs runtime UI surfaces).
         /// </summary>
         private static async Task DumpItemTree(

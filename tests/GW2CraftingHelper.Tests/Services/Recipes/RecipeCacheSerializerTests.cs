@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var recipes = RecipeCacheSerializer.LoadRecipeSeed(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class: was
+                // KNOWN-ISSUES #48: was
                 // 14736 before this fix re-ran the seeder with the schema
                 // version pinned (see Gw2RecipeApiClient.SchemaVersion) -
                 // +230 net new recipes: ~188 were previously invisible to
@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var searches = RecipeCacheSerializer.LoadSearchSeed(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class: was
+                // KNOWN-ISSUES #48: was
                 // 15774 before this fix - see the matching count-drift
                 // comment in LoadRecipeSeed_ShippedSeedFile_... above for
                 // the full breakdown. 16022 -> 16024 on the 2026-08-24

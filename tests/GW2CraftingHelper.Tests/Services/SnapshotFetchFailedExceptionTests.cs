@@ -3,7 +3,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // KNOWN-ISSUES api-degradation F1: Gw2AccountSnapshotService itself is
+    // KNOWN-ISSUES #31/api-degradation F1: Gw2AccountSnapshotService itself is
     // Blish/Gw2Sharp-coupled (constructed from Blish_HUD.Modules.Managers.
     // Gw2ApiManager) and cannot be exercised here per the repo's "tests
     // must never reference Blish HUD/Gw2Sharp" invariant - there is no fake

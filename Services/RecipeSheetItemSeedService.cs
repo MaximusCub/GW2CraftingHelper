@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// Without this loader, Module.cs had no way to populate
     /// recipeSheetItemIdByRecipeId at all - the calculator's own gate on a
     /// non-empty map meant the feature could never fire for a real plan
-    /// (docs/KNOWN-ISSUES.md RECIPE-SHEET SAVINGS entry).
+    /// (KNOWN-ISSUES #49).
     /// </summary>
     public static class RecipeSheetItemSeedService
     {

@@ -14,14 +14,14 @@ namespace GW2CraftingHelper.Services
     /// otherwise the same kind of thing both already do for every other
     /// section: both are shared infrastructure several other sections'
     /// row builders depend on and are high-evidence zones (see
-    /// docs/KNOWN-ISSUES.md's policy note) - off-limits for the broader
+    /// docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - off-limits for the broader
     /// fold-back this class's own existence sidesteps.
     /// Views/CraftingPlanView.cs's one call site
     /// (CreateCollapsibleSection) special-cases PlanSectionType.Summary to
     /// call BodyHeight below instead of
     /// PlanContentHeightMath.SectionBodyHeight, the same way every other
     /// section type still routes through that method unchanged - see
-    /// docs/KNOWN-ISSUES.md's W4A entry for the original rationale.
+    /// KNOWN-ISSUES #46 for the original rationale.
     ///
     /// The row-height CONSTANTS themselves are not redefined here - every
     /// formula below reads PlanContentHeightMath's existing public

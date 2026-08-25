@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Clear_BumpsEpoch_SoAStaleTryCommitIsSkipped()
         {
-            // KNOWN-ISSUES 31a-F1: mirrors SnapshotEpochGuardTests, but
+            // KNOWN-ISSUES #31/31a-F1: mirrors SnapshotEpochGuardTests, but
             // through the gate's own bump (Clear) rather than a bare int,
             // proving the gate's epoch actually advances.
             var gate = new SnapshotCommitGate();
@@ -68,7 +68,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ClearDuringInFlightCommit_BlocksUntilCommitFinishes_ThenSeesBumpedEpoch()
         {
-            // KNOWN-ISSUES 31a-F1 audit-of-fix: the original check-then-act
+            // KNOWN-ISSUES #31/31a-F1 audit-of-fix: the original check-then-act
             // (a bare volatile epoch re-check followed by several
             // unsynchronized field writes) left a window where a Clear
             // Cache landing between the check and the writes could

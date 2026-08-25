@@ -3,7 +3,7 @@ using System;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES 31a-F1 audit-of-the-fix: the original fix captured
+    /// KNOWN-ISSUES #31/31a-F1 audit-of-the-fix: the original fix captured
     /// <c>myEpoch</c> before a snapshot fetch's await and re-checked it
     /// against a bare <c>volatile int _snapshotEpoch</c> afterwards via
     /// <see cref="SnapshotEpochGuard"/>, with the field commit that follows

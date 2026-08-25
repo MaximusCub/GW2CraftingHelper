@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// surface's Blish-coupled shell stays thin enough to be uninteresting.
     ///
     /// The placement half is the fix Blish itself does not have. Measured
-    /// against BlishHUD 1.3.0 (see docs/KNOWN-ISSUES.md, "Tooltip facility"):
+    /// against BlishHUD 1.3.0 (see KNOWN-ISSUES #41):
     /// <c>Tooltip.UpdateTooltipPosition</c> flips above/below the cursor to
     /// protect the TOP edge and shifts left to protect the RIGHT edge, and
     /// clamps neither result - a tall tooltip placed below the cursor runs

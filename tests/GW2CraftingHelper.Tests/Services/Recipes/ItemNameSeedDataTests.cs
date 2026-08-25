@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var data = ItemNameSeedData.Load(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class: was
+                // KNOWN-ISSUES #48: was
                 // 14587 before that fix re-ran the full seeder chain
                 // (including this file - item_name_seed.json is generated
                 // from the same craftable-item-id set recipe_search_seed.json

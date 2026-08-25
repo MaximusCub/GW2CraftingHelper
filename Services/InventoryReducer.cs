@@ -93,7 +93,7 @@ namespace GW2CraftingHelper.Services
         ///   (post-reduction) Solve() toward a DIFFERENT recipe option than
         ///   the guide chose for this node.
         ///
-        ///   KNOWN RESIDUAL (not guarded/tested - see docs/KNOWN-ISSUES.md):
+        ///   KNOWN RESIDUAL (not guarded/tested - see KNOWN-ISSUES #20):
         ///   this does NOT guarantee the guide's Source/Craft-vs-Buy
         ///   decision for THIS node itself still holds after reduction. The
         ///   guide is computed on the UNREDUCED tree, but this node's OWN

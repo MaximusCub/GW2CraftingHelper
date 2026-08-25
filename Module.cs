@@ -45,7 +45,7 @@ namespace GW2CraftingHelper
         // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
         // shared inventory, materials, one call per character) so a full
         // network outage fails fast instead of stacking several ~100s HTTP
-        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
+        // timeouts sequentially (KNOWN-ISSUES #31/api-degradation F6) -
         // mirrors CurrencyMetadataService's own internal-timeout pattern,
         // just with a larger budget since this fetch does far more work on
         // a genuine success than a single /v2/currencies call.
@@ -380,7 +380,7 @@ namespace GW2CraftingHelper
             // here and passed straight to the pipeline (simpler than
             // CurrencyMetadataService, which hits a live API).
             // Acquisition hints: wiki-derived guidance for items with no
-            // priceable source (docs/KNOWN-ISSUES.md item 8).
+            // priceable source (docs/KNOWN-ISSUES #8).
             IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = LoadSeedOrNull(
                 "acquisition_hints_seed.json", "Acquisition hints unavailable",
                 AcquisitionHintService.Load);
@@ -748,9 +748,8 @@ namespace GW2CraftingHelper
         /// handler can set to veto, and the one virtual member in the chain
         /// already runs after the assignment - so by the time any module
         /// code is reached, the tab has changed and cannot be changed back
-        /// without triggering a second switch. See KNOWN-ISSUES "Settings
-        /// dirty prompt" for the alternatives that were measured and
-        /// rejected.
+        /// without triggering a second switch. See KNOWN-ISSUES #51 for
+        /// the alternatives that were measured and rejected.
         /// </para>
         ///
         /// <para>
@@ -1163,7 +1162,7 @@ namespace GW2CraftingHelper
             // Captured before the fetch starts (main thread - see the
             // field's own comment) so the post-await commit below can
             // detect a Clear Cache that ran while this fetch was still in
-            // flight (KNOWN-ISSUES 31a-F1).
+            // flight (KNOWN-ISSUES #31/31a-F1).
             int myEpoch = _snapshotCommitGate.Epoch;
 
             AccountSnapshot snapshot;
@@ -1178,7 +1177,7 @@ namespace GW2CraftingHelper
                 {
                     // The internal timeout fired, not the caller's own
                     // token - a genuine fetch failure (KNOWN-ISSUES
-                    // api-degradation F6), not a cancellation. Re-thrown as
+                    // #31/api-degradation F6), not a cancellation. Re-thrown as
                     // a plain Exception so callers' "cancelled" catch
                     // (which must stay silent) does not swallow it.
                     throw new TimeoutException(
@@ -1188,7 +1187,7 @@ namespace GW2CraftingHelper
 
             // Re-check and commit run inside SnapshotCommitGate's lock -
             // the same lock ClearCache's own bump+clear runs under below -
-            // so the two can never interleave (KNOWN-ISSUES 31a-F1
+            // so the two can never interleave (KNOWN-ISSUES #31/31a-F1
             // audit-of-fix; see SnapshotCommitGate's doc comment).
             bool committed = _snapshotCommitGate.TryCommit(myEpoch, () =>
             {
@@ -1203,7 +1202,7 @@ namespace GW2CraftingHelper
             {
                 // Clear Cache ran (fully, atomically) either before or
                 // during this check; committing now would resurrect data
-                // the user explicitly cleared (KNOWN-ISSUES 31a-F1). Drop
+                // the user explicitly cleared (KNOWN-ISSUES #31/31a-F1). Drop
                 // the result - _currentSnapshot, _pendingSnapshot,
                 // _snapshotDirty, and the on-disk file are all left
                 // untouched by this call.
@@ -1277,7 +1276,7 @@ namespace GW2CraftingHelper
                     SaveStatusThreadSafe(status);
                 }
                 // else: superseded by Clear Cache while this fetch was in
-                // flight (KNOWN-ISSUES 31a-F1, see SnapshotEpochGuard) -
+                // flight (KNOWN-ISSUES #31/31a-F1, see SnapshotEpochGuard) -
                 // Clear Cache already wrote its own status; nothing further
                 // to report here.
             }
@@ -1343,7 +1342,7 @@ namespace GW2CraftingHelper
             // flight (which captured an epoch before this call ran) either
             // commits fully before this runs, or has its post-fetch commit
             // check fail atomically against this bump - no interleaving,
-            // no torn field state (KNOWN-ISSUES 31a-F1 audit-of-fix; see
+            // no torn field state (KNOWN-ISSUES #31/31a-F1 audit-of-fix; see
             // SnapshotCommitGate's own doc comment).
             _snapshotCommitGate.Clear(() =>
             {

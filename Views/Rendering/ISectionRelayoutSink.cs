@@ -4,7 +4,7 @@ namespace GW2CraftingHelper.Views.Rendering
 {
     /// <summary>
     /// The minimal seam a section renderer needs from CraftingPlanView to
-    /// participate in the resize-relayout contract (docs/KNOWN-ISSUES.md
+    /// participate in the resize-relayout contract (KNOWN-ISSUES
     /// #13/#19) without holding a reference to the view itself.
     ///
     /// CraftingPlanView implements this over its existing private
@@ -32,8 +32,8 @@ namespace GW2CraftingHelper.Views.Rendering
     /// its own Views/Rendering class (or into the section renderer itself,
     /// if it has exactly one call site) rather than reaching back into
     /// CraftingPlanView, preserving the forward-only Views/Rendering ->
-    /// CraftingPlanView dependency direction (see docs/KNOWN-ISSUES.md's
-    /// WP-23 entry). Shared row-construction helpers with multiple callers
+    /// CraftingPlanView dependency direction (see KNOWN-ISSUES #39).
+    /// Shared row-construction helpers with multiple callers
     /// (TextRowRenderer, CTableHeaderRenderer, RowRelayoutHelpers,
     /// IconNameRowHelpers) take this interface as a plain method parameter
     /// rather than a constructor-injected field, since none of them is

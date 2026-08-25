@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)> _cache =
             new Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)>();
 
-        // KNOWN-ISSUES 31c-1: per-id in-flight tracking so a second
+        // KNOWN-ISSUES #31/31c-1: per-id in-flight tracking so a second
         // overlapping GetPricesAsync call that needs an id this call is
         // already fetching awaits THIS call's fetch instead of starting a
         // duplicate one. Every not-yet-cached id a given call decides to
@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
         // _cacheLock, and never while the lock is held across an await -
         // every access below is a plain synchronous dictionary op.
         //
-        // KNOWN-ISSUES 31c-audit: a shared FetchOwnBatchesAsync Task here
+        // KNOWN-ISSUES #31/31c-audit: a shared FetchOwnBatchesAsync Task here
         // is never tied to any single caller's CancellationToken (it
         // always runs with CancellationToken.None internally - see that
         // method) precisely because it is shared - a joiner's or the
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
 
             // joinTasks: another overlapping call's own in-flight fetch
             // that already covers one or more of our ids - we wait on it
-            // instead of re-fetching (KNOWN-ISSUES 31c-1). ownTask: this
+            // instead of re-fetching (KNOWN-ISSUES #31/31c-1). ownTask: this
             // call's own fetch for whatever ids are neither cache-fresh nor
             // already in flight elsewhere, or null if nothing needs
             // fetching.
@@ -99,7 +99,7 @@ namespace GW2CraftingHelper.Services
                 {
                     // Deliberately NOT this caller's ct - see
                     // FetchOwnBatchesAsync's own doc comment and the
-                    // KNOWN-ISSUES 31c-audit note on _inFlight above.
+                    // KNOWN-ISSUES #31/31c-audit note on _inFlight above.
                     ownTask = FetchOwnBatchesAsync(freshIds, now);
                     foreach (var id in freshIds)
                     {
@@ -113,7 +113,7 @@ namespace GW2CraftingHelper.Services
             // another overlapping caller's in-flight fetch we are joining -
             // counts toward the total-failure tally below.
             // FetchOwnBatchesAsync already degrades a single failing batch
-            // to holes internally (KNOWN-ISSUES api-degradation F2) and
+            // to holes internally (KNOWN-ISSUES #31/api-degradation F2) and
             // only faults if ALL of its own batches failed; a caller whose
             // entire request is satisfied purely via joined fetches must
             // still see a thrown error if every one of those also failed,
@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Services
                 {
                     // Respects THIS call's own ct even though ownTask
                     // itself runs with CancellationToken.None internally
-                    // (KNOWN-ISSUES 31c-audit) - see
+                    // (KNOWN-ISSUES #31/31c-audit) - see
                     // AwaitRespectingOwnCancellationAsync's doc comment.
                     await AwaitRespectingOwnCancellationAsync(ownTask, ct);
                     succeeded++;
@@ -151,7 +151,7 @@ namespace GW2CraftingHelper.Services
                     // that owns it; joining must still respect THIS
                     // caller's own ct rather than inheriting whatever
                     // that other caller's cancellation state is
-                    // (KNOWN-ISSUES 31c-audit).
+                    // (KNOWN-ISSUES #31/31c-audit).
                     await AwaitRespectingOwnCancellationAsync(task, ct);
                     succeeded++;
                 }
@@ -187,10 +187,10 @@ namespace GW2CraftingHelper.Services
         // Fetches every batch of `ids` this call itself owns, strictly one
         // batch at a time in order - identical sequencing to this method's
         // old inline for-loop, so a single caller's own batch
-        // count/order/timing is unaffected by the KNOWN-ISSUES 31c-1
+        // count/order/timing is unaffected by the KNOWN-ISSUES #31/31c-1
         // coalescing added around it.
         //
-        // KNOWN-ISSUES 31c-audit: deliberately takes no CancellationToken.
+        // KNOWN-ISSUES #31/31c-audit: deliberately takes no CancellationToken.
         // The returned Task is registered into _inFlight and may be
         // awaited by other overlapping GetPricesAsync callers besides the
         // one that decided to run it (a "joiner"); threading any single
@@ -219,7 +219,7 @@ namespace GW2CraftingHelper.Services
 
             try
             {
-                // KNOWN-ISSUES api-degradation F2: a single failing batch
+                // KNOWN-ISSUES #31/api-degradation F2: a single failing batch
                 // degrades to missing ids (unpriceable holes downstream, an
                 // already-supported state) instead of aborting the whole
                 // fetch - mirroring ItemMetadataService's retry-wave catch.
@@ -281,7 +281,7 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        // KNOWN-ISSUES 31c-audit: awaits a shared fetch Task (owned or
+        // KNOWN-ISSUES #31/31c-audit: awaits a shared fetch Task (owned or
         // joined) while respecting only THIS caller's own `ct`, never the
         // cancellation state of whichever caller happens to own `task`.
         // If `ct` fires first, throws a fresh OperationCanceledException

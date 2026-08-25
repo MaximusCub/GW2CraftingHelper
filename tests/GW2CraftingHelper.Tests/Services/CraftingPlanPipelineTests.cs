@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // KNOWN-ISSUES api-degradation F4: a failing learned-recipes fetch
+        // KNOWN-ISSUES #31/api-degradation F4: a failing learned-recipes fetch
         // must degrade to null (the same supported "unknown known-recipe
         // status" state PlanResultBuilder already handles) rather than
         // aborting an otherwise fully-successful, fully-priced plan.
@@ -179,7 +179,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(recipe.IsMissing);
         }
 
-        // KNOWN-ISSUES api-degradation F4 (audit follow-up): the same
+        // KNOWN-ISSUES #31/api-degradation F4 (audit follow-up): the same
         // catch-and-degrade-to-null fix above is duplicated verbatim in
         // GenerateStructuredMultiAsync (the 2+ item path reached via the
         // IReadOnlyList<PlanRequestItem> overload below); only the
@@ -804,7 +804,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// valid split on the resulting node. This is the deepest
         /// Blish-free seam for this path: TreeSectionController itself is
         /// Blish-bound, so a render-path miss beyond this point cannot
-        /// surface here - see KNOWN-ISSUES.md.
+        /// surface here - see KNOWN-ISSUES #62.
         /// </summary>
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit()
@@ -1148,7 +1148,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // End-to-end coverage of RecipeSheetSavingsCalculator's production
-        // wiring through _offersForRecipeSheetItem (see KNOWN-ISSUES.md
+        // wiring through _offersForRecipeSheetItem (see KNOWN-ISSUES #49,
         // item 3), a Func computed once in the pipeline constructor:
         // nulling that assignment leaves every other test green while
         // silently disabling recipe-sheet-savings notes in production, so
@@ -3959,7 +3959,7 @@ namespace GW2CraftingHelper.Tests.Services
         // healthy set of in-memory fixtures - nothing here exercised
         // cancellation or a thrown dependency until now. ---
 
-        // KNOWN-ISSUES 31c-audit: TradingPostService's
+        // KNOWN-ISSUES #31/31c-audit: TradingPostService's
         // AwaitRespectingOwnCancellationAsync races the caller's own ct
         // against the shared upstream fetch it started, throwing promptly
         // without waiting for the fetch to finish. Gating the fake price
@@ -4056,7 +4056,7 @@ namespace GW2CraftingHelper.Tests.Services
         // ingredient items - large enough to exceed TradingPostService's and
         // ItemMetadataService's shared BatchSize (200), so a single bad
         // batch's documented degrade-vs-abort boundary (KNOWN-ISSUES
-        // api-degradation F2/F3) is observable end to end through the real
+        // #31/api-degradation F2/F3) is observable end to end through the real
         // pipeline, not just at TradingPostServiceTests'/
         // ItemMetadataServiceTests' own service-level unit tests.
         private static CraftingPlanPipeline BuildManyLeafIngredientsPipeline(
@@ -4098,7 +4098,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi));
         }
 
-        // KNOWN-ISSUES api-degradation F2: TradingPostService degrades a
+        // KNOWN-ISSUES #31/api-degradation F2: TradingPostService degrades a
         // single failing batch to missing prices instead of aborting the
         // whole GetPricesAsync call. This proves that degrade behavior
         // survives being called THROUGH the pipeline, not just at
@@ -4128,7 +4128,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.Plan.Steps.Count > 0);
         }
 
-        // KNOWN-ISSUES api-degradation F2's other half: a genuine total
+        // KNOWN-ISSUES #31/api-degradation F2's other half: a genuine total
         // price-API outage (every batch fails) must still surface as a
         // thrown exception through the pipeline, not silently degrade to an
         // all-unpriceable "success".
@@ -4156,7 +4156,7 @@ namespace GW2CraftingHelper.Tests.Services
                     1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy));
         }
 
-        // KNOWN-ISSUES api-degradation F3: ItemMetadataService degrades a
+        // KNOWN-ISSUES #31/api-degradation F3: ItemMetadataService degrades a
         // single failing first-wave batch (retry wave/seed fallback/
         // omission) instead of aborting GetMetadataAsync entirely. Same
         // large-fixture shape as the price-side degrade test above, proven
@@ -4178,7 +4178,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(result.Plan.Steps.Count > 0);
         }
 
-        // KNOWN-ISSUES api-degradation F3's other half: a genuine total item
+        // KNOWN-ISSUES #31/api-degradation F3's other half: a genuine total item
         // API outage (the only first-wave batch fails) must still surface
         // as a thrown exception through the pipeline.
         [Fact]
@@ -4206,7 +4206,7 @@ namespace GW2CraftingHelper.Tests.Services
                     1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy));
         }
 
-        // KNOWN-ISSUES 20.4's "Conservative reading": Ignore (per-solve,
+        // KNOWN-ISSUES #20.4's "Conservative reading": Ignore (per-solve,
         // keyed by ItemId, zeroes cost via PlanSolver's ignoredItemIds) and
         // ownership (InventoryReducer, runs BEFORE Solve, zeroes cost by
         // reducing node.Quantity) are two independently-evolved mechanisms.

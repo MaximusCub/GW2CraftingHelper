@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// row.</description></item>
     /// </list>
     ///
-    /// LIFECYCLE (measured, see docs/KNOWN-ISSUES.md "Tooltip facility"):
+    /// LIFECYCLE (measured, see KNOWN-ISSUES #41):
     /// there is exactly ONE rich surface for the whole module, repointed on
     /// hover. <c>Control.Dispose</c> does not dispose the control's
     /// <c>Tooltip</c>, and the Tooltip is not the control's child, so

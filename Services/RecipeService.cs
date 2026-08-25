@@ -308,7 +308,7 @@ namespace GW2CraftingHelper.Services
                 {
                     var raw = await GetRecipeCachedAsync(recipeId, ct);
 
-                    // KNOWN-ISSUES api-degradation F5: GetRecipeAsync now
+                    // KNOWN-ISSUES #31/api-degradation F5: GetRecipeAsync now
                     // returns null on a 404 instead of throwing (previously
                     // unreachable here, since the search endpoint and the
                     // detail endpoint are backed by the same data - but no
@@ -459,7 +459,7 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // KNOWN-ISSUES api-degradation F5: GetRecipeAsync can now
+            // KNOWN-ISSUES #31/api-degradation F5: GetRecipeAsync can now
             // return null (a 404), which the in-memory _recipeCache above
             // tolerates fine (a session-lifetime negative cache, avoiding
             // repeat round-trips for a genuinely-missing id) - but the

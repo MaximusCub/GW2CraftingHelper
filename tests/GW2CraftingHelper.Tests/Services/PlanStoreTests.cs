@@ -814,7 +814,7 @@ namespace GW2CraftingHelper.Tests.Services
         // full-featured pipelines (vendor offers, a learned-recipe account
         // client, a real snapshot, non-default CurrencyValuation/
         // HomesteadEfficiencyTiers, and a genuine multi-item batch) so the
-        // serialization-fidelity risk item 1 of the KNOWN-ISSUES entry
+        // serialization-fidelity risk item 1 of KNOWN-ISSUES #53
         // investigated is actually exercised, not just asserted. ---
 
         [Fact]

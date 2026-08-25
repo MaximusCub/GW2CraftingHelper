@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Tests.Services
             // hints the module held no vendor data at all, and the
             // mechanism's implicit contract was "no source anywhere in our
             // data". These three break that precedent deliberately (see
-            // docs/KNOWN-ISSUES.md), so a fourth arriving unnoticed is
+            // KNOWN-ISSUES #8), so a fourth arriving unnoticed is
             // worth a manual look.
             Assert.Equal(
                 new[] { 105804, 106712, 106986 },

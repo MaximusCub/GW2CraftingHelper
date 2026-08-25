@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// The icon+name row every in-game item tooltip opens with: a
         /// ~34x34 framed item icon with the name set to its right and
-        /// vertically centred on it (spec section 1.5, gap G11). A taller
+        /// vertically centred on it (KNOWN-ISSUES #42, gap G11). A taller
         /// row than a prose one, and the only line kind that carries an
         /// icon - which is why it is a KIND rather than another span role.
         /// <para>
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// A genuine secondary annotation - the game's own grey, e.g.
         /// "0/500 in Material Storage". NOT the identity block, which the
-        /// game renders white (spec section 1.4, gap G4).
+        /// game renders white (KNOWN-ISSUES #42, gap G4).
         /// </summary>
         Muted
     }

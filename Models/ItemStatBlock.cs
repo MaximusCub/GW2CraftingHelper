@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Models
     /// every existing user's saved plan. Stat blocks are therefore a
     /// session-scoped side channel held by ItemMetadataService alone - a
     /// restored plan simply has none until something re-fetches (see
-    /// docs/KNOWN-ISSUES.md, "Item stat tooltips").
+    /// KNOWN-ISSUES #40).
     /// </para>
     /// </summary>
     public sealed class ItemStatBlock
@@ -77,8 +77,8 @@ namespace GW2CraftingHelper.Models
 
         /// <summary>How many stat combinations this item can be acquired
         /// with; 0 for a fixed-stat item. WHICH combination is a judgment
-        /// call left open - see docs/KNOWN-ISSUES.md, "Item stat
-        /// tooltips" (Q4) - so no numbers are computed from it here.</summary>
+        /// call left open - see KNOWN-ISSUES #40 (Q4) - so no numbers
+        /// are computed from it here.</summary>
         public int StatChoiceCount { get; set; }
 
         public string NourishmentDescription { get; set; }

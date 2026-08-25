@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // Trip-wire for the fixture itself (mirrors the repo's established
-        // exact-count seed-pin convention, KNOWN-ISSUES DO-NOT-TOUCH #13):
+        // exact-count seed-pin convention, KNOWN-ISSUES #13):
         // if this drops, a row went missing from tests/shared/
         // vendor_offer_hasher_vectors.json without anyone noticing the
         // Theory silently ran fewer cases.

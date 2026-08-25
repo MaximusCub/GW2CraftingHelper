@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Services
             if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason)) return false;
             if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason)) return false;
 
-            // Quality-audit B2 (docs/KNOWN-ISSUES.md): these four lists are
+            // Quality-audit B2 (KNOWN-ISSUES #53): these four lists are
             // not recomputed on the restore path and had the same per-entry
             // gap as the checks above - BuildNotesSection dereferences each
             // entry unguarded.

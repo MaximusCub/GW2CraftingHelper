@@ -325,7 +325,7 @@ namespace GW2CraftingHelper.Tests.Services
             // know what the currencies are worth. The currencies are
             // ignored identically on both sides (decision-only valuation
             // principle), not "cancelled" by any new comparison math - see
-            // KNOWN-ISSUES.md for the documented limitation this leaves for
+            // KNOWN-ISSUES #44 for the documented limitation this leaves for
             // a case where the priced-material amounts are ALSO identical
             // (a genuine tie the fallback branch cannot break any more
             // finely than its existing coin-tie rule already does).
@@ -380,9 +380,8 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(plan.Steps, s => s.Source == AcquisitionSource.Craft && s.ItemId == 1);
         }
 
-        // --- Regression: findings on the
-        // fix above. See docs/KNOWN-ISSUES.md's "Craft/vendor
-        // comparability parity fix" section for the full writeup. ---
+        // --- Regression: findings on the fix above. See KNOWN-ISSUES #44
+        // for the full writeup. ---
 
         [Fact]
         public void CoinTypedCurrencyIngredient_IsRealCoin_NeverDemotesRecipeToFallback()
@@ -517,8 +516,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void AllFallback_VendorZeroCoinPart_BeatsHigherRealCraftCost_DocumentedLimitation()
         {
             // Finding 4 (flagged, documented rather than fixed - see
-            // docs/KNOWN-ISSUES.md's "Craft/vendor comparability parity
-            // fix" section): the terminal fallback tie-break ranks purely
+            // KNOWN-ISSUES #44): the terminal fallback tie-break ranks purely
             // on each side's REAL coin part (the finding-1 fix above), the
             // SAME heuristic EvaluateVendorOffers' own DO-NOT-TOUCH
             // fallback-vs-fallback ranking already uses (coin part only -

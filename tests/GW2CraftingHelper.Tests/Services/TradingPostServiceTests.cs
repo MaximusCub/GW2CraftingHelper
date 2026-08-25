@@ -203,7 +203,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
-        // KNOWN-ISSUES 31c-1: two overlapping GetPricesAsync calls for the
+        // KNOWN-ISSUES #31/31c-1: two overlapping GetPricesAsync calls for the
         // same not-yet-cached id must coalesce into a single upstream
         // fetch instead of each starting its own. The Gate holds the fake
         // API's response until BOTH calls have been started, so joining
@@ -260,7 +260,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, result2.Count);
         }
 
-        // KNOWN-ISSUES 31c-audit: the owning caller's cancellation must
+        // KNOWN-ISSUES #31/31c-audit: the owning caller's cancellation must
         // never abandon the shared fetch a DIFFERENT, still-live caller is
         // joined onto. Caller A (owner) is cancelled while the upstream
         // fetch is still gated; caller B (joiner, never cancelled) must
@@ -289,7 +289,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(api.Calls); // still just one shared upstream fetch
         }
 
-        // KNOWN-ISSUES 31c-audit: a joining caller's own cancellation must
+        // KNOWN-ISSUES #31/31c-audit: a joining caller's own cancellation must
         // be observed - it must not silently ride along on whatever the
         // owning caller's fetch eventually does. Caller B (joiner) is
         // cancelled while the upstream fetch is still gated (unreleased);
@@ -322,7 +322,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(api.Calls); // still just one shared upstream fetch
         }
 
-        // KNOWN-ISSUES api-degradation F2: one bad batch amid otherwise-
+        // KNOWN-ISSUES #31/api-degradation F2: one bad batch amid otherwise-
         // healthy ones must degrade to missing ids (unpriceable holes
         // downstream) instead of aborting the whole call.
         [Fact]
@@ -348,7 +348,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.ContainsKey(201));
         }
 
-        // KNOWN-ISSUES api-degradation F2: a genuine total outage (every
+        // KNOWN-ISSUES #31/api-degradation F2: a genuine total outage (every
         // batch fails) must still surface as an error, not silently render
         // an all-unpriceable plan.
         [Fact]

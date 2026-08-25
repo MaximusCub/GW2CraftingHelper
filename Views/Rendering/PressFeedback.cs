@@ -46,7 +46,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Reaches only the controls this module wires: Blish's Checkbox and
         /// CornerIcon play the click themselves, ahead of the base call a
         /// subclass would have to skip to silence it, so those stay at
-        /// Blish's volume - KNOWN-ISSUES carries the sweep and deferred fix.
+        /// Blish's volume - KNOWN-ISSUES #52 carries the sweep and deferred fix.
         /// </summary>
         internal static void PlayClick()
         {

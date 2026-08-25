@@ -8,7 +8,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // KNOWN-ISSUES api-degradation F5: Gw2RecipeApiClient previously called
+    // KNOWN-ISSUES #31/api-degradation F5: Gw2RecipeApiClient previously called
     // the classic HttpClient.GetStringAsync(url) overload (no
     // CancellationToken parameter exists for it on net472), silently making
     // its own `ct` parameter a no-op, and never special-cased 404 the way
@@ -195,7 +195,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- ct threading (KNOWN-ISSUES api-degradation F5's core defect) ---
+        // --- ct threading (KNOWN-ISSUES #31/api-degradation F5's core defect) ---
         //
         // A plain token-equality check against the handler's received token
         // is not reliable here: HttpClient.GetAsync(url, ct) links the
