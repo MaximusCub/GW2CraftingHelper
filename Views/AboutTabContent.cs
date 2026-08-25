@@ -174,6 +174,9 @@ namespace GW2CraftingHelper.Views
         private Label _descriptionLabel;
         private string _descriptionText = "";
 
+        // Width the blocks below are currently placed at. Survives Build,
+        // which is why Build lays out through ApplyLayout rather than the
+        // guarded Relayout - see Relayout.
         private int _panelWidth;
 
         public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
@@ -237,7 +240,7 @@ namespace GW2CraftingHelper.Views
             CreateProseBlock("Disclaimer", ArenaNetDisclaimerText);
             CreateProseBlock("gw2efficiency", Gw2EfficiencyCreditText);
 
-            Relayout(ContentWidth(container));
+            ApplyLayout(ContentWidth(container));
 
             // The tab used to resize its root panel and nothing else, so a
             // window widened after the tab was opened left the prose wrapped
@@ -429,15 +432,38 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Places every block at the current panel width: the header band
+        /// The RESIZE entry point: a no-op when the width has not actually
+        /// moved (Resized fires on height-only changes too, and repeatedly
+        /// while the window is dragged).
+        /// <para>
+        /// Build must NOT come through here. Module reuses one
+        /// AboutTabContent instance across every tab open and Blish re-runs
+        /// Build on each of them, so the freshly-created blocks of the
+        /// second open would be measured against the width the first open
+        /// left in <see cref="_panelWidth"/>, this guard would short-circuit,
+        /// and every block would stay stacked at (0, 0) inside a
+        /// zero-height panel - a blank tab. Build calls
+        /// <see cref="ApplyLayout"/> directly instead, which is also what
+        /// SettingsTabContent does.
+        /// </para>
+        /// </summary>
+        private void Relayout(int panelWidth)
+        {
+            if (panelWidth == _panelWidth) return;
+
+            ApplyLayout(panelWidth);
+        }
+
+        /// <summary>
+        /// Places every block at the given panel width: the header band
         /// across the top, the identity card in the left column, the two
         /// prose blocks in the right one - stacked into one column below
         /// AboutLayoutMath.TwoColumnThreshold, with the text still capped at
         /// the reading measure either way.
         /// </summary>
-        private void Relayout(int panelWidth)
+        private void ApplyLayout(int panelWidth)
         {
-            if (_documentPanel == null || panelWidth <= 0 || panelWidth == _panelWidth) return;
+            if (_documentPanel == null || panelWidth <= 0) return;
 
             _panelWidth = panelWidth;
             _documentPanel.Width = panelWidth;

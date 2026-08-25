@@ -1976,7 +1976,18 @@ The tab never re-read its width after Build - the resize handler resized
 the root panel and nothing else, and the width was captured once - so
 widening the window left the prose wrapped at whatever width the tab was
 opened with, permanently. That is fixed independently of any redesign:
-Build and Resized both go through one Relayout(panelWidth).
+Build and Resized both go through one placement pass.
+
+They do NOT go through the same entry point, and that distinction is
+load-bearing. The stored width is what the resize path compares against
+to skip a height-only event, and it OUTLIVES Build, because Module holds
+one AboutTabContent for the module's lifetime and Blish re-runs Build on
+every tab selection. Build therefore calls the unguarded ApplyLayout;
+only Resized calls the guarded Relayout. Routing Build through the guard
+- which the first draft of this section did - leaves the second and every
+later open of the tab blank: eleven freshly-built blocks stacked at
+(0, 0) inside a panel still at height 0. SettingsTabContent has the same
+one-instance lifecycle and was already written this way.
 
 Two columns now: an identity card on the left (a "Module" band, the
 description, and six facts rows whose label band is MEASURED across the
@@ -2098,6 +2109,14 @@ LOG
 ABOUT
 - Open at 1378, then widen to 2560 WITHOUT closing the tab: the layout
   reflows. This is the defect that did not reflow at all before.
+- Open About, switch to Snapshot, switch BACK to About without touching
+  the window edge. The tab renders exactly as it did the first time. The
+  first draft of this milestone had Build going through the guarded
+  Relayout, and Module reuses one AboutTabContent instance across every
+  open, so the second open's fresh blocks were measured against the
+  first open's stored width, the guard short-circuited, and the tab came
+  back blank. Repeat the switch three or four times, and once more after
+  a resize, since the guard only fires when the width matches.
 - 1378: two columns; facts left, Disclaimer over gw2efficiency right;
   both prose headings draw a rule.
 - Read the gw2efficiency paragraph and count roughly 60-70 characters per
