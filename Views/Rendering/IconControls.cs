@@ -18,8 +18,10 @@ namespace GW2CraftingHelper.Views.Rendering
     /// Before this, three treatments coexisted: the plan's tables framed
     /// their icons, the Snapshot rows and the item-search dropdown drew a
     /// bare texture with no frame at all, and only some of either carried a
-    /// hover. <see cref="CreateUnframedIcon"/> is the ONE remaining
-    /// unframed path and says in its own doc comment why it has to be.
+    /// hover. <see cref="CreateUnframedIcon"/> and its asset-id twin
+    /// <see cref="CreateAssetIcon"/> are the only unframed paths left -
+    /// both serve the inline coin/currency runs, and say why in their own
+    /// doc comments.
     /// </para>
     /// </summary>
     internal static class IconControls
@@ -94,13 +96,13 @@ namespace GW2CraftingHelper.Views.Rendering
         private const string NoIconGlyph = "-";
 
         /// <summary>
-        /// The frame's interior, and the module's ONE unframed icon path.
-        /// Public to exactly one caller outside this class -
-        /// CoinCurrencyRenderer's inline coin/currency runs, where the icon
-        /// sits INSIDE a line of text at CoinSegmentMath's advance: a frame
-        /// there would add 2px to every segment's width, which is a term in
-        /// the module's own minimum-window-width derivation, and would draw
-        /// a rarity border around a denomination that has no rarity.
+        /// The frame's interior, and an unframed icon for exactly one
+        /// caller outside this class - CoinCurrencyRenderer's inline
+        /// currency runs, where the icon sits INSIDE a line of text at
+        /// CoinSegmentMath's advance: a frame there would add 2px to every
+        /// segment's width, which is a term in the module's own
+        /// minimum-window-width derivation, and would draw a rarity border
+        /// around a denomination that has no rarity.
         /// </summary>
         internal static Panel CreateUnframedIcon(
             Panel parent, string iconUrl, int x, int y, int size = 32, string tooltipText = null)
