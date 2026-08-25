@@ -2133,10 +2133,17 @@ namespace GW2CraftingHelper.Tests.Services
         // pill-click persist - a decision pill on an OLD plan stays
         // clickable while a NEW Generate is in flight) plus LoadLatest,
         // which deliberately takes NO lock and relies on the atomic
-        // .tmp+Replace write instead. Neither claim was exercised. ---
+        // .tmp+Replace write instead.
+        //
+        // One test, two phases, because the claims need opposite setups:
+        // the never-torn one needs a reader racing the writers, and that
+        // same reader makes IOException a legitimate outcome, which is
+        // exactly what an unserialized writer collision looks like. The
+        // serialization claim therefore gets its own reader-free phase
+        // where zero failures is the only permitted result. ---
 
         [Fact]
-        public async Task SaveAndLoad_ConcurrentWritersAndReader_NeverYieldATornPlan()
+        public async Task SaveAndLoad_ConcurrentWriters_SerializeAndNeverYieldATornPlan()
         {
             var shallowPipeline = BuildPipeline(out var shallowPrices);
             shallowPrices.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
@@ -2247,8 +2254,50 @@ namespace GW2CraftingHelper.Tests.Services
                     TreeDepth(sample.Result.CraftingTree));
             }
 
-            // The file survives the race intact, and the uncontended write
-            // that follows it consumes its own .tmp.
+            // Everything above is insensitive to _saveLock. Measured: with
+            // `lock (_saveLock)` deleted the phase above passes 4 runs out
+            // of 4, because a reader in the race makes IOException a
+            // permitted outcome and the writers' own collisions on the one
+            // shared .tmp path arrive as exactly that - roughly 85 of the
+            // 120 saves failing, every failure classified as tolerated
+            // contention. The torn-file assertions are real; the
+            // serialization claim needs its own phase.
+            //
+            // So: same two writers, no reader. The reader was the only
+            // legitimate source of failure, and two writers holding the
+            // lock cannot collide with anything, so a single failure here
+            // means Save is not serialized. A fresh store keeps its own
+            // failure queue, so the tolerated failures above cannot mask
+            // one; it shares the lock the writers need because they share
+            // the instance.
+            var serializedFailures = new ConcurrentQueue<Exception>();
+            var serializedStore = new PlanStore(_tempDir, (message, ex) => serializedFailures.Enqueue(ex));
+            var serializedStart = new ManualResetEventSlim(false);
+
+            Action<PersistedPlan> serializedWriter = plan => Run(serializedStart, escaped, () =>
+            {
+                for (int i = 0; i < writes; i++)
+                {
+                    serializedStore.Save(plan);
+                }
+            });
+
+            var writersOnly = Task.WhenAll(
+                Task.Run(() => serializedWriter(shallowPlan)),
+                Task.Run(() => serializedWriter(deepPlan)));
+            serializedStart.Set();
+            Assert.Same(writersOnly, await Task.WhenAny(writersOnly, Task.Delay(TimeSpan.FromSeconds(60))));
+            await writersOnly;
+
+            Assert.Empty(escaped);
+            Assert.True(
+                serializedFailures.IsEmpty,
+                $"Save must be serialized: {serializedFailures.Count} of {writes * 2} uncontended-by-a-reader "
+                + $"writes failed, first {serializedFailures.FirstOrDefault()?.GetType().Name} - "
+                + serializedFailures.FirstOrDefault()?.Message);
+
+            // The file survives both races intact, and the uncontended write
+            // that follows them consumes its own .tmp.
             store.Save(deepPlan);
             var final = store.LoadLatest();
             Assert.NotNull(final);
