@@ -381,6 +381,12 @@ missing vendor offer" -> the fix is a recipe-seed entry, not a vendor-seed entry
 
 ### 3.3 Historical vendor numbers recovered (for wiki cross-check only, NOT to be used as-is)
 
+> **Since shipped (2026-08):** the seeding purpose this section served is
+> fulfilled - `ref/vendor_offers.json` is now produced by
+> `tools/VendorOfferUpdater`'s wiki scrape, so these 2022 figures are a
+> historical cross-check only, exactly as the heading says. Kept because
+> `docs/research/m37-r3-achievement-dedup.md` cites them.
+
 I checked the last pre-emptying commit (`72d90c74`, Aug 2022) against the specific items the
 brief named. Item ids resolved via the GW2 wiki API:
 
@@ -728,6 +734,12 @@ fetched and from where so the research is reproducible.
   I did not attempt to recover it as fetching a private/inaccessible repo did not seem
   worth pursuing further given the behavioral mechanism (Section 3.2) is fully confirmed
   without it.
+- **Partly superseded (2026-08):** `calculateTreeQuantity.ts` has since been
+  fetched. It assigns no per-node `ownedQuantity` at all and excludes
+  Currency-type nodes from availability consumption entirely, so whatever
+  populates gw2e's tree pill number lives in their live `application.js`,
+  not in the published `recipe-calculation` package. Full record: entry 11
+  of `docs/gw2e-considerations.md` (matrix row 42).
 - No dedicated gw2efficiency FAQ/help page documenting calculator behavior was found via
   WebSearch; all behavioral confirmation instead came directly from the shipped Angular
   template and JS bundle, which I consider a stronger (ground-truth) source than any FAQ

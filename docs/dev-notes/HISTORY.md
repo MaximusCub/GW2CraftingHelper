@@ -2677,7 +2677,7 @@ status surfacing, partial renders, retry paths, no crashes/hangs.
 (c) Price-cache thread-safety: the M26 TTL cache + locks under
 concurrent generate/re-solve/refresh.
 
-FIXED in M37 (audits: docs/research/m37-r5-audits.md, all three
+FIXED in M37 (audits: docs/archive/m37-r5-audits.md, all three
 inventories + classified findings recorded verbatim, attributed).
 9 confirmed findings across the three audits (0 refuted - every
 blocking finding was independently adversarially re-walked against the
@@ -3092,7 +3092,7 @@ to match. M37's homestead work had added a guard comment inside
 for a wiki-scraped row); nothing outside the deleted files referenced any
 of this subsystem's types except a one-line mention in `TempDirectory.cs`'s
 doc comment (updated) and historical, point-in-time research/archive docs
-(`docs/research/m37-r4-vendor-caps.md`, `docs/research/m37-r5-audits.md`,
+(`docs/research/m37-r4-vendor-caps.md`, `docs/archive/m37-r5-audits.md`,
 `docs/archive/plans/2026-02-15/milestones-phase-b.md`) left as-is since they
 correctly describe the state of the world when they were written.
 

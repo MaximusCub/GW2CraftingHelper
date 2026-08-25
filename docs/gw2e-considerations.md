@@ -26,9 +26,17 @@ full evidence trail lives there) by matrix row number.
 new, entries 7 and 11 had wording corrected in place. See the Summary at the
 bottom for what changed and why.*
 
+*Entry headings carrying a `[DECIDED 2026-08-16: ...]` tag were ruled on by
+the maintainer in the walkthrough recorded in "Orchestrator checksum
+verdicts and decisions (2026-08-16)" at the bottom of this file. The bodies
+below still read as open questions because they are the original record;
+the tag is what tells you not to re-litigate. Entry numbers are a citation
+namespace (KNOWN-ISSUES and the convergence matrix both cite them) - never
+renumber them.*
+
 ---
 
-## 1. Should the module ship a curated default currency-value table? [constraint-blocked]
+## 1. Should the module ship a curated default currency-value table? [constraint-blocked] [DECIDED 2026-08-16: ADOPT]
 
 **The question**: gw2e ships a hardcoded table of ~46 currencies (Karma=1,
 Spirit Shard=3600, Badge of Honor=23, etc, all in copper-equivalent terms) so
@@ -103,7 +111,7 @@ you may want to know how much better our approach already is.
 
 ---
 
-## 4. Should a TP buy-price pill reflect craft-batch overproduction?
+## 4. Should a TP buy-price pill reflect craft-batch overproduction? [DECIDED 2026-08-16: KEEP, surfaced in Plan Notes]
 
 **The question**: if a recipe crafts in batches of, say, 5, and you only need
 3, should the *buy* price shown for that item reflect 3 (what you'd actually
@@ -149,7 +157,7 @@ produce)?
 
 ---
 
-## 6. Vendor-vs-craft-vs-buy: our explicit three-way comparison vs gw2e's "vendor is just a recipe"
+## 6. Vendor-vs-craft-vs-buy: our explicit three-way comparison vs gw2e's "vendor is just a recipe" [DECIDED 2026-08-16: KEEP]
 
 **The question**: gw2e never has a genuine three-way choice - a vendor
 purchase is modeled as an ordinary recipe (with a Merchant discipline) that
@@ -216,7 +224,7 @@ below as "a genuinely new observation," which overclaimed; corrected here.
 
 ---
 
-## 8. Own-materials cost annotation: replacement cost vs sell-side opportunity cost
+## 8. Own-materials cost annotation: replacement cost vs sell-side opportunity cost [DECIDED 2026-08-16: KEEP]
 
 **The question**: when you use owned materials instead of buying them fresh,
 what number should the plan show you as the "value" of having had them on
@@ -285,7 +293,7 @@ field-test finding, not a fresh question.
 
 ---
 
-## 11. Owned-currency display: per-node pill vs aggregate-only summary
+## 11. Owned-currency display: per-node pill vs aggregate-only summary [DECIDED 2026-08-16: REPLACED by the maintainer design]
 
 **The question**: should owned-currency coverage show on every tree node
 where that currency appears, or only once in the summary?
@@ -346,7 +354,7 @@ where that currency appears, or only once in the summary?
 
 ---
 
-## 13. Tree-node default expansion depth: root-only vs root-plus-children [constraint-blocked]
+## 13. Tree-node default expansion depth: root-only vs root-plus-children [constraint-blocked] [DECIDED 2026-08-16: KEEP root-plus-children]
 
 **The question**: how much of the tree should be expanded when a plan first
 renders?
@@ -365,7 +373,7 @@ renders?
 
 ---
 
-## 14. Per-item wiki-link affordance on tree rows
+## 14. Per-item wiki-link affordance on tree rows [DECIDED 2026-08-16: ADOPT]
 
 **The question**: should each tree row link out to the GW2 wiki for that
 item, the way gw2e's does?
@@ -458,7 +466,7 @@ item, the way gw2e's does?
 
 ---
 
-## 19. Guild Hall decorations / permanent guild upgrades: a genuine future-milestone candidate
+## 19. Guild Hall decorations / permanent guild upgrades: a genuine future-milestone candidate [DECIDED 2026-08-16: BACKLOGGED]
 
 **The question**: is full Guild Hall decoration crafting support (recipes
 whose "output" is an account/guild-wide unlock rather than a craftable item)
@@ -494,7 +502,7 @@ worth a future milestone?
 
 ---
 
-## 20. Policy-driven bulk force-buy list: "Daily cooldowns = Buy" and "Mystic Forge Promotions = Disallow"
+## 20. Policy-driven bulk force-buy list: "Daily cooldowns = Buy" and "Mystic Forge Promotions = Disallow" [DECIDED 2026-08-16: DEMOTED]
 
 **The question**: gw2e ships two settings that unconditionally force a
 matching item to Buy regardless of price comparison - one for items with an
@@ -531,7 +539,7 @@ precursor recipes. Do you want either as a settings toggle?
 
 ---
 
-## 21. Vendor purchase-cap indicator: inline tree-row badge vs. Crafting-Steps-only notice
+## 21. Vendor purchase-cap indicator: inline tree-row badge vs. Crafting-Steps-only notice [DECIDED 2026-08-16: PRESERVE]
 
 **The question**: should a vendor purchase cap show up as a badge on the tree
 row itself (so you see exposure before committing to a source), or only in
@@ -575,7 +583,7 @@ vendor path has won?
 
 ---
 
-## 22. Vendor offer priced entirely in an unvalued currency: which side should give way? [hard-constraint conflict]
+## 22. Vendor offer priced entirely in an unvalued currency: which side should give way? [hard-constraint conflict] [DECIDED 2026-08-16: PRESERVE, conservative]
 
 **The question**: our craft-ingredient handling and our vendor-offer handling
 disagree about what an unvalued (un-priced) non-coin currency should do to

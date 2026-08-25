@@ -1,11 +1,38 @@
 # Releasing
 
 This document describes the current, actual state of packaging and release
-for GW2 Crafting Helper - not an aspirational process. As of this writing
-there is **no GitHub Releases flow**: no tags corresponding to real
-releases of this module exist, and there is no CI step that publishes a
-`.bhm` anywhere. Everything below reflects what a contributor can do today
-with the tools already in the repo.
+for GW2 Crafting Helper - not an aspirational process.
+
+**What the project actually practices today** (the v0.2.x field-test era):
+a release is a CHANGELOG entry, a `manifest.json` version bump, and a
+matching `v<version>` git tag on the release commit, deployed by copying
+the built `.bhm` into a live Blish HUD install. `CHANGELOG.md` states the
+convention in its own header, and `v0.2.0` through `v0.2.3` exist and are
+pushed to origin (measured 2026-08-24: `git ls-remote --tags origin`).
+
+**What still does not exist:** a GitHub Releases flow. `gh release list`
+returns nothing (measured 2026-08-24), `.github/workflows/tests.yml` builds
+and tests but publishes no artifact, and there is no Blish HUD module-repo
+listing. So a non-developer still cannot install this module.
+
+Everything below reflects what a contributor can do today with the tools
+already in the repo, and is measured against the current build unless
+labelled otherwise.
+
+## The release protocol, step by step
+
+1. Land the work on `master`.
+2. Bump `manifest.json`'s `version` (the About tab reads it live).
+3. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
+   user-facing voice the existing entries use, not commit-message voice.
+4. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+   rule in the addendum - it is not optional).
+5. Tag the release commit `v<version>` and push the tag.
+6. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+   install's `modules` directory and reload Blish HUD.
+
+Because every deployed build has a tag, any two shipped builds can be
+compared with `git diff v0.2.0..v0.2.1`.
 
 ## How a `.bhm` is actually produced
 
@@ -22,7 +49,7 @@ restored) defines an `AfterTargets="Build"` target named
 `BuildBlishHUDModule` that runs automatically **on every build**. As of
 M38/WP-29, `GW2CraftingHelper.csproj` redeclares that same-named target
 after the import (the one and only hand-written pack/zip logic in this
-repo's own csproj) so its own version wins, purely to add a two-file
+repo's own csproj) so its own version wins, purely to add a three-file
 `Exclude` - see the addendum below. Otherwise it does exactly this,
 unconditionally:
 
@@ -74,14 +101,17 @@ produced by the build above shows it contains, under `ref/`:
   copy for `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json`, so
   neither file is ever copied into the output directory or the `.bhm`,
   regardless of whether they exist in the working copy. See the addendum
-  below for details.
+  below for details. The list is **three** files today: `MysticForgeSeeder`
+  later added `ref/mf_item_id_cache.json` to the same `Exclude`
+  (`GW2CraftingHelper.csproj:449`, measured).
 
 ## `manifest.json` fields
 
 - `name`, `version`, `namespace`, `package` - standard Blish HUD module
-  identity fields. `version` is currently `0.1.0` and has never been
-  bumped; there is no versioning convention enforced anywhere in the repo
-  today.
+  identity fields. `version` is bumped per release under the CHANGELOG +
+  tag convention above (`0.2.3` at the time of writing). Nothing *enforces*
+  the bump mechanically - no CI check, no analyzer - so it is a step in the
+  protocol, not a guarantee.
 - `dependencies.bh.blishhud` - minimum Blish HUD host version
   (`>=1.3.0`).
 - `url`, `contributors` - metadata shown in Blish HUD's module browser and
@@ -106,15 +136,20 @@ produced by the build above shows it contains, under `ref/`:
 ## Installing a built module today
 
 There is no GitHub Release and no in-app Blish HUD module-repository
-listing for this module. The only way to run it today is:
+listing for this module (measured 2026-08-24). The only way to run it is:
 
-1. Build in Release, `x64`: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
+1. Clear `bin/` and `obj/`, then build in Release, `x64`:
+   `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
 2. Locate the produced `.bhm` (e.g. `bin\x64\Release\GW2CraftingHelper.bhm`).
 3. Copy it into your Blish HUD installation's `modules` directory and
    (re)load Blish HUD.
 
-There is no documented, supported path for a non-developer to install this
-module without building it from source.
+This is also exactly what a release deploy does - the tag and CHANGELOG
+entry are what make a given copy of those three steps identifiable after
+the fact. There is still no documented, supported path for a
+non-developer to install this module without building it from source;
+`README.md`'s "Installing" section says the same thing and should stay
+consistent with this one.
 
 ## Addendum: the ref/ cache-file packaging gap (fixed, M38/WP-29)
 
@@ -147,7 +182,9 @@ consumer in the shipped module at all.
 above has landed. `GW2CraftingHelper.csproj` now redeclares the imported
 `BuildBlishHUDModule` target (same name, declared after the `BlishHUD.targets`
 import, so it wins) with an `Exclude` added to the `ref/**` copy for
-`ref/wiki_vendor_cache.json` and `ref/item_id_cache.json`. Neither file is
+`ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` - and, since
+`MysticForgeSeeder` landed, `ref/mf_item_id_cache.json`, making it three
+files. None of them is
 copied into `$(OutDir)ref` or zipped into the `.bhm` any more, regardless of
 whether a developer's working copy has them sitting on disk from running
 `tools/VendorOfferUpdater`. Building from an active `VendorOfferUpdater`
@@ -162,12 +199,14 @@ the `Exclude` list above.
 
 ## What a real release process would still need
 
-None of the following exist today; they are listed as concrete gaps, not
-committed-to future work:
+These are listed as concrete gaps, not committed-to future work:
 
-- A tagged release + CI job that builds Release/x64 and attaches the
-  resulting `.bhm` as a GitHub Release asset.
-- A convention for bumping `manifest.json`'s `version` per release.
+- A CI job that builds Release/x64 on a tag and attaches the resulting
+  `.bhm` as a GitHub Release asset. The tags exist; nothing consumes them.
+  This is the one gap that actually blocks a non-developer install.
+- ~~A convention for bumping `manifest.json`'s `version` per release~~ -
+  done: the CHANGELOG + `v<version>` tag protocol at the top of this file,
+  practiced across v0.2.0 through v0.2.3.
 - ~~A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
   packaging gap~~ - resolved as of M38/WP-29; see the addendum above.
 - The two stale `v1.0.0`/`v2.0.0` tags inherited from the original
