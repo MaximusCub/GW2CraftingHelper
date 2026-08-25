@@ -31,16 +31,21 @@ namespace GW2CraftingHelper.Views
     {
         private static readonly Logger Logger = Logger.GetLogger<LogTabContent>();
 
-        private const int ToolbarHeight = 40;
+        private const int ToolbarHeight = LogToolbarLayout.BarHeight;
         private const int LevelDropdownWidth = 90;
-        private const int SearchBoxWidth = 220;
         private const int FollowCheckboxWidth = 90;
         private const int ButtonWidth = 100;
+
+        // Blish's own fixed heights for the four control types this row
+        // carries side by side. Named so CenteredY is applied to the height
+        // the control actually paints.
+        private const int SearchBoxHeight = 26;
+        private const int LevelDropdownHeight = 30;
+        private const int FollowCheckboxHeight = 25;
         // Wider than ButtonWidth - "Delete Log File" is deliberately
         // spelled out in full so the destructive scope is unmistakable
         // next to the view-only "Clear View".
         private const int DeleteButtonWidth = 120;
-        private const int Gap = 8;
 
         // Full-width status row beneath the toolbar, mirroring MainView's
         // own _statusPanel: the status label is auto-sized, so sharing the
@@ -58,17 +63,6 @@ namespace GW2CraftingHelper.Views
         // The FlowPanel scrolls, so a row sized to the panel's full width
         // would run under the scrollbar strip.
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
-
-        // Prefix column allowance for the "[tag]" part, counted in 'w'
-        // glyphs and sized off the longest tag written anywhere in the tree:
-        // "snapshot-fetch", 14 characters. The margin is the glyph itself -
-        // every tag in this module is lowercase ASCII plus '-', all narrower
-        // than 'w' - so a somewhat longer tag still fits; anything past that
-        // ellipsizes rather than widening the column and pushing every
-        // message right. Load-bearing: too small an allowance renders the
-        // module's most common WARN source permanently truncated (and
-        // permanently tooltip-flagged) at every window width.
-        private const int TagColumnChars = 14;
 
         // The prefix is chrome, not content - dimmed so the message reads
         // first, but still carrying the level tint so severity is legible
@@ -89,6 +83,7 @@ namespace GW2CraftingHelper.Views
         private Panel _toolbarPanel;
         private Panel _statusPanel;
         private Panel _columnHeaderPanel;
+        private Label _tagHeaderLabel;
         private Label _messageHeaderLabel;
         private FlowPanel _contentPanel;
         private Dropdown _levelDropdown;
@@ -211,24 +206,39 @@ namespace GW2CraftingHelper.Views
         private readonly Queue<LogRow> _renderedRows = new Queue<LogRow>();
 
         /// <summary>
-        /// One rendered entry: a fixed-height Panel holding a dim
-        /// prefix Label ("[LEVEL] timestamp [tag]") at x=0 and the message
-        /// Label at the shared message-column x, each ellipsized to its own
-        /// column. The full strings are kept alongside the controls because
-        /// both are needed again on every resize - re-ellipsizing from
-        /// Label.Text would compound "..." onto already-truncated text - and
+        /// One rendered entry: a fixed-height Panel holding three columns -
+        /// a dim "[LEVEL] timestamp" Time label, a "[tag]" label, and the
+        /// message - each at its own fixed x and ellipsized to its own band.
+        /// The full strings are kept alongside the controls because all
+        /// three are needed again on every resize (re-ellipsizing from
+        /// Label.Text would compound "..." onto already-truncated text), and
         /// <see cref="FullLine"/> is the tooltip a shortened row carries,
         /// stored already wrapped through the tooltip facility's seam so the
-        /// per-render change guard in UpdateRow can compare against it
+        /// per-render change guard in ApplyRowLayout can compare against it
         /// directly.
+        /// <para>
+        /// Cost of the split, stated: four controls per row against three,
+        /// and one more EllipsizeToWidth per row per refit. Both are bounded
+        /// by the ring cap (2000) and by what the filter admits, and the
+        /// refit loop is already SuspendLayout-wrapped.
+        /// </para>
+        /// <para>
+        /// Accepted divergence: timestamps still do not align pixel-for-pixel
+        /// between an [INFO] row and a [DEBUG] one, because the level word
+        /// and the stamp share the Time label. Fixing it costs a FIFTH
+        /// control per row on the module's heaviest render path. The Tag and
+        /// Message columns - the two a reader scans - do align.
+        /// </para>
         /// </summary>
         private sealed class LogRow
         {
             internal long AbsoluteIndex;
             internal Panel Panel;
-            internal Label PrefixLabel;
+            internal Label TimeLabel;
+            internal Label TagLabel;
             internal Label MessageLabel;
-            internal string FullPrefix;
+            internal string FullTime;
+            internal string FullTag;
             internal string FullMessage;
             internal string FullLine;
         }
@@ -277,8 +287,7 @@ namespace GW2CraftingHelper.Views
             // mirror images of each other (audit batch J, M12).
             _searchBox = new TextBox
             {
-                Size = new Point(SearchBoxWidth, 26),
-                Location = new Point(0, 7),
+                Size = new Point(LogToolbarLayout.SearchMinWidth, SearchBoxHeight),
                 PlaceholderText = "Search log entries...",
                 Parent = _toolbarPanel
             }.ReleaseOnDispose().ReleaseOnEnter();
@@ -286,8 +295,7 @@ namespace GW2CraftingHelper.Views
 
             _levelDropdown = new Dropdown
             {
-                Size = new Point(LevelDropdownWidth, 30),
-                Location = new Point(SearchBoxWidth + Gap, 5),
+                Size = new Point(LevelDropdownWidth, LevelDropdownHeight),
                 Parent = _toolbarPanel
             };
             _levelDropdown.Items.Add("All");
@@ -302,8 +310,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Follow",
                 Checked = true, // d2 Section 3 default (ON)
-                Size = new Point(FollowCheckboxWidth, 25),
-                Location = new Point(LevelDropdownWidth + Gap + SearchBoxWidth + Gap, 8),
+                Size = new Point(FollowCheckboxWidth, FollowCheckboxHeight),
                 Parent = _toolbarPanel
             };
 
@@ -344,16 +351,18 @@ namespace GW2CraftingHelper.Views
                 Parent = container
             };
 
+            // Explicit width, not AutoSizeWidth: a long failure string used
+            // to run off the panel with nothing to say it had. Y=2, matching
+            // MainView's status label; StatusRowHeight carries the clearance
+            // derivation.
             _statusLabel = new Label
             {
                 Font = UiFonts.Status,
                 Text = "",
-                AutoSizeWidth = true,
+                AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
-                // Y=2, matching MainView's status label; StatusRowHeight
-                // carries the clearance derivation.
-                Location = new Point(0, 2),
+                Location = new Point(LogToolbarLayout.Inset, 2),
                 Parent = _statusPanel
             };
 
@@ -368,7 +377,7 @@ namespace GW2CraftingHelper.Views
                 Parent = container
             };
 
-            PositionToolbarButtons(w);
+            PositionToolbar(w);
 
             container.Resized += (_, __) =>
             {
@@ -377,7 +386,7 @@ namespace GW2CraftingHelper.Views
                 _statusPanel.Size = new Point(newWidth, StatusRowHeight);
                 _columnHeaderPanel.Size = new Point(newWidth, ColumnHeaderRowHeight);
                 _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - TopChromeHeight);
-                PositionToolbarButtons(newWidth);
+                PositionToolbar(newWidth);
 
                 // After the panel's own resize, so RefitRows reads the new
                 // width from it rather than being handed one.
@@ -431,14 +440,39 @@ namespace GW2CraftingHelper.Views
             });
         }
 
-        private void PositionToolbarButtons(int w)
+        /// <summary>
+        /// Places every control on the toolbar: the left cluster from the
+        /// tab's inset, the three buttons pinned to the row's right edge,
+        /// and the search box flexing into what is left. All four control
+        /// types share one optical centre - see LogToolbarLayout.CenteredY.
+        /// </summary>
+        private void PositionToolbar(int containerWidth)
         {
-            // Delete Log File sits leftmost of the three so the two
-            // view-only buttons keep their established right-edge spots
-            // and the destructive one is not the easiest to reach.
-            _deleteFileButton.Location = new Point(w - (ButtonWidth * 2) - DeleteButtonWidth - (Gap * 3), 5);
-            _copyButton.Location = new Point(w - (ButtonWidth * 2) - (Gap * 2), 5);
-            _clearViewButton.Location = new Point(w - ButtonWidth - Gap, 5);
+            int barWidth = Math.Max(0, containerWidth - ScrollbarAllowance);
+            var slots = LogToolbarLayout.Compute(
+                barWidth, LevelDropdownWidth, FollowCheckboxWidth,
+                DeleteButtonWidth, ButtonWidth, ButtonWidth);
+
+            _searchBox.Location = new Point(slots.SearchX, LogToolbarLayout.CenteredY(SearchBoxHeight));
+            _searchBox.Width = slots.SearchWidth;
+            _levelDropdown.Location =
+                new Point(slots.DropdownX, LogToolbarLayout.CenteredY(LevelDropdownHeight));
+            _followCheckbox.Location =
+                new Point(slots.FollowX, LogToolbarLayout.CenteredY(FollowCheckboxHeight));
+
+            int buttonY = LogToolbarLayout.CenteredY(UiMetrics.ButtonHeight);
+            _deleteFileButton.Location = new Point(slots.DeleteX, buttonY);
+            _copyButton.Location = new Point(slots.CopyX, buttonY);
+            _clearViewButton.Location = new Point(slots.ClearViewX, buttonY);
+
+            if (_statusLabel != null)
+            {
+                _statusLabel.Location = new Point(LogToolbarLayout.Inset, 2);
+                _statusLabel.Width = Math.Max(
+                    LogToolbarLayout.SearchMinWidth,
+                    PlanRelayoutMath.PinnedRightEdge(barWidth) - LogToolbarLayout.Inset);
+                ApplyStatusText();
+            }
         }
 
         /// <summary>
@@ -675,7 +709,31 @@ namespace GW2CraftingHelper.Views
             }
 
             _statusLabel.TextColor = isError ? ErrorColor : StatusColor;
-            _statusLabel.Text = text ?? "";
+            _statusFullText = text ?? "";
+            ApplyStatusText();
+        }
+
+        // The status line's full text, so a resize re-takes the ellipsis
+        // from the original rather than compounding it onto an
+        // already-shortened string.
+        private string _statusFullText = "";
+
+        private void ApplyStatusText()
+        {
+            if (_statusLabel == null)
+            {
+                return;
+            }
+
+            string shown = LabelHelpers.EllipsizeToWidth(
+                UiFonts.Status, _statusFullText, _statusLabel.Width);
+            if (!string.Equals(_statusLabel.Text, shown, StringComparison.Ordinal))
+            {
+                _statusLabel.Text = shown;
+            }
+            TooltipFacility.ApplyPlain(
+                _statusLabel,
+                string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
         }
 
         /// <summary>
@@ -703,6 +761,15 @@ namespace GW2CraftingHelper.Views
 
             var result = GetFilteredEntries();
             _lastSeenVersion = result.Version;
+
+            // A full rebuild is a new render generation, so the tag band is
+            // re-derived from exactly the rows about to be rendered - not
+            // carried over from a filter that admitted wider ones.
+            _widestRenderedTagWidth = 0;
+            foreach (var item in result.Filtered)
+            {
+                RaiseTagHighWaterMark(item.Entry.Tag);
+            }
 
             var metrics = MeasureRowMetrics();
             foreach (var item in result.Filtered)
@@ -782,9 +849,12 @@ namespace GW2CraftingHelper.Views
             // there is no reason to re-invoke it every entry.
             long clearedBeforeVersion = _getClearedBeforeVersion();
 
-            // Measured once per pass, not per row - see MeasureRowMetrics.
-            var metrics = MeasureRowMetrics();
-
+            // Two passes over the new entries: the first can only RAISE the
+            // tag high-water mark, and a raise moves the message column on
+            // every row already on screen - so the band has to settle before
+            // the metrics the new rows are built with are measured.
+            var admitted = new List<(ModuleLogEntry Entry, string Line, long AbsoluteIndex)>();
+            bool bandGrew = false;
             for (long absoluteIndex = from; absoluteIndex < version; absoluteIndex++)
             {
                 if (!LogViewFloor.IsVisible(absoluteIndex, clearedBeforeVersion))
@@ -798,8 +868,26 @@ namespace GW2CraftingHelper.Views
                     continue;
                 }
 
-                CreateRow(entry, line, absoluteIndex, metrics);
+                bandGrew |= RaiseTagHighWaterMark(entry.Tag);
+                admitted.Add((entry, line, absoluteIndex));
+            }
+
+            // Measured once per pass, not per row - see MeasureRowMetrics.
+            var metrics = MeasureRowMetrics();
+
+            foreach (var item in admitted)
+            {
+                CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
                 appendedAny = true;
+            }
+
+            if (bandGrew)
+            {
+                // The already-rendered rows are still at the old x. RefitRows
+                // is the existing suspended walk that re-fits every visible
+                // row, so both render paths end this pass agreeing about the
+                // band - the property the worst-case template used to buy.
+                RefitEveryRow(metrics);
             }
 
             while (_renderedRows.Count > 0 && _renderedRows.Peek().AbsoluteIndex < startIndex)
@@ -849,16 +937,27 @@ namespace GW2CraftingHelper.Views
             internal BitmapFont Font;
             internal int RowWidth;
             internal int RowHeight;
-            internal int PrefixWidth;
-            internal int MessageX;
-            internal int MessageMaxWidth;
+            internal LogGutterLayout.Bands Bands;
         }
 
-        // Cached across passes: measuring the prefix template costs a
-        // handful of MeasureString calls and the font never changes at
-        // runtime. Main-thread-only, like every other row-rendering field
-        // (see _buildComplete's own doc comment).
-        private int _fullPrefixWidth;
+        // Cached across passes: the Time band is a closed-set constant (see
+        // LogGutterLayout.TimeBand) and the font never changes at runtime,
+        // so it is measured once. Main-thread-only, like every other
+        // row-rendering field (see _buildComplete's own doc comment).
+        private int _timeBandWidth;
+
+        // Measured once for the same reason: the Tag band's floor.
+        private int _tagHeaderWidth;
+
+        // The widest tag ACTUALLY rendered this generation, as a monotonic
+        // high-water mark. This is what replaces the worst-case template,
+        // and it is what makes the two render paths agree: RebuildRows
+        // resets it and recomputes from the rows it renders (every filter
+        // change, tab switch and Clear View goes through RebuildRows), and
+        // AppendNewRows can only RAISE it - a raise re-runs the existing
+        // suspended RefitRows walk, so no already-rendered row is left at
+        // the old x.
+        private int _widestRenderedTagWidth;
 
         // Content width the currently-rendered rows were laid out against.
         // Written by MeasureRowMetrics (the single place that reads the
@@ -866,10 +965,19 @@ namespace GW2CraftingHelper.Views
         // which cannot change any column - costs nothing per row.
         private int _lastLayoutWidth = -1;
 
-        /// <summary>The rows' two columns, labelled. The Message label's x
-        /// is width-derived, so it is repositioned by the same
-        /// <see cref="MeasureRowMetrics"/> pass the rows are - the header
-        /// cannot drift off the column it names.</summary>
+        /// <summary>
+        /// The rows' three columns, labelled. Tag's and Message's x are
+        /// width- and content-derived, so both are repositioned by the same
+        /// <see cref="MeasureRowMetrics"/> pass the rows are - a header
+        /// cannot drift off the column it names.
+        /// <para>
+        /// Deliberately NOT SortableHeaderCells: a log is chronological,
+        /// "sort by tag" is a filter, and the level dropdown is where
+        /// filtering lives. That class supports inert columns through a null
+        /// OnClick, so the option stays open at no cost - but wiring it for
+        /// zero sortable columns would be infrastructure with no caller.
+        /// </para>
+        /// </summary>
         private void BuildColumnHeader(Container container, int width)
         {
             _columnHeaderPanel = new Panel
@@ -887,7 +995,18 @@ namespace GW2CraftingHelper.Views
                 Text = "Time",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, ColumnHeaderLabelY),
+                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel
+            };
+
+            _tagHeaderLabel = new Label
+            {
+                Font = TableHeaderStyle.Font,
+                TextColor = TableHeaderStyle.LabelColor,
+                Text = TagHeaderText,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
                 Parent = _columnHeaderPanel
             };
 
@@ -898,10 +1017,12 @@ namespace GW2CraftingHelper.Views
                 Text = "Message",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogRowLayout.MessageX(0), ColumnHeaderLabelY),
+                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
                 Parent = _columnHeaderPanel
             };
         }
+
+        private const string TagHeaderText = "Tag";
 
         private RowMetrics MeasureRowMetrics()
         {
@@ -910,12 +1031,18 @@ namespace GW2CraftingHelper.Views
             _lastLayoutWidth = contentWidth;
 
             int rowWidth = Math.Max(0, contentWidth - ScrollbarAllowance);
-            int prefixWidth = LogRowLayout.PrefixWidth(FullPrefixWidth(font), rowWidth);
+            var bands = LogGutterLayout.Compute(
+                rowWidth,
+                TimeBandWidth(font),
+                LogGutterLayout.TagBand(_widestRenderedTagWidth, TagHeaderWidth()));
 
+            if (_tagHeaderLabel != null)
+            {
+                _tagHeaderLabel.Location = new Point(bands.TagX, ColumnHeaderLabelY);
+            }
             if (_messageHeaderLabel != null)
             {
-                _messageHeaderLabel.Location =
-                    new Point(LogRowLayout.MessageX(prefixWidth), ColumnHeaderLabelY);
+                _messageHeaderLabel.Location = new Point(bands.MessageX, ColumnHeaderLabelY);
             }
 
             return new RowMetrics
@@ -926,28 +1053,22 @@ namespace GW2CraftingHelper.Views
                 // the panel clips its children, so a row shorter than its
                 // own text would cut the text off rather than overflow.
                 RowHeight = Measure(font, "Ag").Height + 2,
-                PrefixWidth = prefixWidth,
-                MessageX = LogRowLayout.MessageX(prefixWidth),
-                MessageMaxWidth = LogRowLayout.MessageMaxWidth(rowWidth, prefixWidth)
+                Bands = bands
             };
         }
 
         /// <summary>
-        /// Width of the widest prefix the column ever has to hold:
-        /// "[LEVEL] yyyy-MM-dd HH:mm:ss [tag]" with the widest level name,
-        /// a timestamp built from the widest decimal digit, and a
-        /// <see cref="TagColumnChars"/> tag allowance. Sizing from a
-        /// worst-case template (rather than from the rows on screen) is what
-        /// keeps the message column at the same x on every row and across
-        /// both render paths - the incremental append sees only the new
-        /// entries, so a width derived from what it can see would drift away
-        /// from the rows a full rebuild produced.
+        /// Width of the widest "[LEVEL] yyyy-MM-dd HH:mm:ss" the Time column
+        /// can ever hold: every level name, against a stamp built from the
+        /// widest decimal digit. A genuine constant, unlike the tag - the
+        /// level names are a closed set, so no row can widen this band and
+        /// neither render path can disagree about it.
         /// </summary>
-        private int FullPrefixWidth(BitmapFont font)
+        private int TimeBandWidth(BitmapFont font)
         {
-            if (_fullPrefixWidth > 0)
+            if (_timeBandWidth > 0)
             {
-                return _fullPrefixWidth;
+                return _timeBandWidth;
             }
 
             char widestDigit = '0';
@@ -966,17 +1087,61 @@ namespace GW2CraftingHelper.Views
                 CultureInfo.InvariantCulture,
                 "{0}{0}{0}{0}-{0}{0}-{0}{0} {0}{0}:{0}{0}:{0}{0}",
                 widestDigit);
-            string tagAllowance = " [" + new string('w', TagColumnChars) + "]";
 
-            int widest = 0;
+            var perLevel = new List<int>();
             foreach (ModuleLogLevel level in Enum.GetValues(typeof(ModuleLogLevel)))
             {
-                string template = "[" + level.ToString().ToUpperInvariant() + "] " + stamp + tagAllowance;
-                widest = Math.Max(widest, Measure(font, template).Width);
+                perLevel.Add(
+                    Measure(font, "[" + level.ToString().ToUpperInvariant() + "] " + stamp).Width);
             }
 
-            _fullPrefixWidth = widest;
-            return _fullPrefixWidth;
+            _timeBandWidth = LogGutterLayout.TimeBand(perLevel);
+            return _timeBandWidth;
+        }
+
+        private int TagHeaderWidth()
+        {
+            if (_tagHeaderWidth <= 0)
+            {
+                _tagHeaderWidth = Measure(TableHeaderStyle.Font, TagHeaderText).Width;
+            }
+            return _tagHeaderWidth;
+        }
+
+        /// <summary>
+        /// Raises the tag high-water mark for this render generation and
+        /// reports whether it moved. A raise means every already-rendered
+        /// row is now at the wrong x, which is what
+        /// <see cref="AppendNewRows"/> answers with a full re-fit.
+        /// </summary>
+        private bool RaiseTagHighWaterMark(string tag)
+        {
+            if (string.IsNullOrEmpty(tag)) return false;
+
+            // Memoised: a full rebuild walks up to the ring's whole 2000
+            // entries on every filter keystroke, and the module writes about
+            // a dozen distinct tags in its entire lifetime.
+            if (!_tagWidths.TryGetValue(tag, out int width))
+            {
+                width = Measure(UiFonts.Body, FormatTag(tag)).Width;
+                _tagWidths[tag] = width;
+            }
+
+            if (width <= _widestRenderedTagWidth) return false;
+
+            _widestRenderedTagWidth = width;
+            return true;
+        }
+
+        private readonly Dictionary<string, int> _tagWidths =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>The tag column's own text - the bracket form
+        /// LogLineFormat.Prefix already composes, minus its leading
+        /// space, which the column's x supplies instead.</summary>
+        private static string FormatTag(string tag)
+        {
+            return string.IsNullOrEmpty(tag) ? "" : "[" + tag + "]";
         }
 
         private static (int Width, int Height) Measure(BitmapFont font, string text)
@@ -986,11 +1151,12 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Builds one entry's row: a dim, level-tinted prefix Label at x=0
-        /// and the message Label at the shared message-column x, each with
-        /// an explicit width and each ellipsized to it. Shared by both
-        /// render paths so a full rebuild and an incremental append can
-        /// never produce differently-shaped rows.
+        /// Builds one entry's row: a dim, level-tinted Time label in the
+        /// gutter, its tag beside it, and the message at the shared
+        /// message-column x - each with an explicit width and each
+        /// ellipsized to it. Shared by both render paths so a full rebuild
+        /// and an incremental append can never produce differently-shaped
+        /// rows.
         /// </summary>
         private void CreateRow(ModuleLogEntry entry, string line, long absoluteIndex, RowMetrics metrics)
         {
@@ -999,7 +1165,8 @@ namespace GW2CraftingHelper.Views
             var row = new LogRow
             {
                 AbsoluteIndex = absoluteIndex,
-                FullPrefix = LogLineFormat.Prefix(entry),
+                FullTime = LogLineFormat.Time(entry),
+                FullTag = FormatTag(entry.Tag),
                 FullMessage = LogLineFormat.Message(entry),
                 FullLine = TooltipTextFormat.Wrap(line)
             };
@@ -1012,13 +1179,21 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            row.PrefixLabel = new Label
+            row.TimeLabel = new Label
             {
                 Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
-                Location = new Point(0, 0),
+                Parent = row.Panel
+            };
+
+            row.TagLabel = new Label
+            {
+                Font = UiFonts.Body,
+                AutoSizeWidth = false,
+                AutoSizeHeight = false,
+                TextColor = levelColor * PrefixDimFactor,
                 Parent = row.Panel
             };
 
@@ -1042,28 +1217,41 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static void ApplyRowLayout(LogRow row, RowMetrics metrics)
         {
-            // Both texts are resolved BEFORE the columns are resized:
+            var bands = metrics.Bands;
+
+            // Every text is resolved BEFORE the columns are resized:
             // KeepsFitting compares the new column width against the width
             // the label is still carrying from the previous pass.
-            string prefixText = KeepsFitting(row.PrefixLabel, row.FullPrefix, metrics.PrefixWidth)
-                ? row.FullPrefix
-                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullPrefix, metrics.PrefixWidth);
-            string messageText = KeepsFitting(row.MessageLabel, row.FullMessage, metrics.MessageMaxWidth)
+            string timeText = KeepsFitting(row.TimeLabel, row.FullTime, bands.TimeWidth)
+                ? row.FullTime
+                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullTime, bands.TimeWidth);
+            string tagText = KeepsFitting(row.TagLabel, row.FullTag, bands.TagWidth)
+                ? row.FullTag
+                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullTag, bands.TagWidth);
+            string messageText = KeepsFitting(row.MessageLabel, row.FullMessage, bands.MessageWidth)
                 ? row.FullMessage
-                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullMessage, metrics.MessageMaxWidth);
+                : LabelHelpers.EllipsizeToWidth(metrics.Font, row.FullMessage, bands.MessageWidth);
 
             row.Panel.Size = new Point(metrics.RowWidth, metrics.RowHeight);
-            row.PrefixLabel.Size = new Point(metrics.PrefixWidth, metrics.RowHeight);
-            row.MessageLabel.Location = new Point(metrics.MessageX, 0);
-            row.MessageLabel.Size = new Point(metrics.MessageMaxWidth, metrics.RowHeight);
+            row.TimeLabel.Location = new Point(bands.TimeX, 0);
+            row.TimeLabel.Size = new Point(bands.TimeWidth, metrics.RowHeight);
+            row.TagLabel.Location = new Point(bands.TagX, 0);
+            row.TagLabel.Size = new Point(bands.TagWidth, metrics.RowHeight);
+            row.MessageLabel.Location = new Point(bands.MessageX, 0);
+            row.MessageLabel.Size = new Point(bands.MessageWidth, metrics.RowHeight);
 
             // Assigning Label.Text invalidates layout, so only assign when
             // the displayed string actually changed - the same gate
             // IconNameRowHelpers.ReellipsizeName uses on the plan tab's own
             // resize path.
-            if (!string.Equals(row.PrefixLabel.Text, prefixText, StringComparison.Ordinal))
+            if (!string.Equals(row.TimeLabel.Text, timeText, StringComparison.Ordinal))
             {
-                row.PrefixLabel.Text = prefixText;
+                row.TimeLabel.Text = timeText;
+            }
+
+            if (!string.Equals(row.TagLabel.Text, tagText, StringComparison.Ordinal))
+            {
+                row.TagLabel.Text = tagText;
             }
 
             if (!string.Equals(row.MessageLabel.Text, messageText, StringComparison.Ordinal))
@@ -1080,7 +1268,8 @@ namespace GW2CraftingHelper.Views
             // as the row Panel - the swallowed-hover class already fixed in
             // ShoppingListSectionRenderer (docs/KNOWN-ISSUES.md).
             bool shortened =
-                !string.Equals(prefixText, row.FullPrefix, StringComparison.Ordinal) ||
+                !string.Equals(timeText, row.FullTime, StringComparison.Ordinal) ||
+                !string.Equals(tagText, row.FullTag, StringComparison.Ordinal) ||
                 !string.Equals(messageText, row.FullMessage, StringComparison.Ordinal);
             //
             // FullLine is stored already wrapped (see CreateRow), so this
@@ -1092,7 +1281,8 @@ namespace GW2CraftingHelper.Views
             if (!string.Equals(row.Panel.BasicTooltipText, tooltip, StringComparison.Ordinal))
             {
                 TooltipFacility.ApplyPlain(row.Panel, tooltip);
-                TooltipFacility.ApplyPlain(row.PrefixLabel, tooltip);
+                TooltipFacility.ApplyPlain(row.TimeLabel, tooltip);
+                TooltipFacility.ApplyPlain(row.TagLabel, tooltip);
                 TooltipFacility.ApplyPlain(row.MessageLabel, tooltip);
             }
         }
@@ -1134,8 +1324,11 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            var metrics = MeasureRowMetrics();
+            RefitEveryRow(MeasureRowMetrics());
+        }
 
+        private void RefitEveryRow(RowMetrics metrics)
+        {
             _contentPanel.SuspendLayout();
             try
             {

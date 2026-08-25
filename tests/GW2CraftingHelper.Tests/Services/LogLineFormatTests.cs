@@ -35,6 +35,27 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void Time_IsThePrefixsLevelAndStampHalf_TagExcluded()
+        {
+            // The Log tab bands the two separately (LogGutterLayout), so the
+            // split has to be exact: Prefix is still Time plus the tag, and
+            // the copied line is therefore unchanged by it.
+            var tagged = Entry("snapshot", "hi");
+
+            Assert.Equal("[WARN] 2026-08-16 14:03:09", LogLineFormat.Time(tagged));
+            Assert.Equal(LogLineFormat.Time(tagged) + " [snapshot]", LogLineFormat.Prefix(tagged));
+
+            var untagged = Entry(null, "hi");
+            Assert.Equal(LogLineFormat.Time(untagged), LogLineFormat.Prefix(untagged));
+        }
+
+        [Fact]
+        public void Time_NullEntry_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => LogLineFormat.Time(null));
+        }
+
+        [Fact]
         public void Line_MatchesTheFlatFormatCopyAndSearchStillUse()
         {
             // The exact strings LogTabContent.FormatLine produced before the

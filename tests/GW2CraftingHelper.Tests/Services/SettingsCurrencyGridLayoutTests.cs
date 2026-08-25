@@ -367,7 +367,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Every recovered pixel lands in the name column, not to the
             // right of the block.
             Assert.Equal(
-                wide - narrow, 1210 - SettingsCurrencyGridLayout.MinColumnWidth);
+                1210 - SettingsCurrencyGridLayout.MinColumnWidth, wide - narrow);
             Assert.True(narrow
                 >= SettingsCurrencyGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx);
         }
