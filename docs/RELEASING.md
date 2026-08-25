@@ -34,6 +34,33 @@ labelled otherwise.
 Because every deployed build has a tag, any two shipped builds can be
 compared with `git diff v0.2.0..v0.2.1`.
 
+## Required: an offer diff on every `data(vendor):` pull request
+
+`ref/vendor_offers.json` is 14.8MB on a single line, so `git diff` on a
+vendor refresh reports `1 insertion(+), 1 deletion(-)` - the whole file
+that prices every vendor in the game, replaced as one indivisible hunk.
+A reviewer facing that has two options: rubber-stamp it, or hand-write a
+JSON differ. This repo already has the scar tissue from the first option
+(`ref/vendor_offer_exclusions.json` exists because a stale row shipped).
+
+**A pull request containing a `data(vendor):` commit must carry the
+`--diff-summary` output in its body.** `tools/refresh-vendor-data.sh`
+snapshots the baseline before overwriting it and prints the summary at the
+end of the run, so it is already on screen when the PR is written. To
+produce it by hand from any two dataset copies:
+
+```
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
+    --diff-summary <old vendor_offers.json> <new vendor_offers.json>
+```
+
+It reports offers added, removed, repriced and retagged, keyed by merchant
+and item rather than by the content hash - see
+`tools/VendorOfferUpdater/README.md` for why the raw `offerId` set is not
+usable for this. A refresh that changed nothing prints "No offer changed",
+and `ref/vendor_offers.json` will be byte-for-byte unmodified: only
+`ref/vendor_offers_manifest.json` moves. That is the intended no-op signal.
+
 ## How a `.bhm` is actually produced
 
 A `.bhm` file comes from the `BlishHUD` NuGet package's own build logic,

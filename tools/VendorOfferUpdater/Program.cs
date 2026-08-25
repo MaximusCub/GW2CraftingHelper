@@ -65,10 +65,17 @@ namespace VendorOfferUpdater
             int delayMs = 250;
             bool tagSeasonalFestivals = false;
             int maxSeasonalPages = 500;
+            string? diffSummaryBefore = null;
+            string? diffSummaryAfter = null;
 
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--query" && i + 1 < args.Length)
+                if (args[i] == "--diff-summary" && i + 2 < args.Length)
+                {
+                    diffSummaryBefore = args[++i];
+                    diffSummaryAfter = args[++i];
+                }
+                else if (args[i] == "--query" && i + 1 < args.Length)
                 {
                     queryCondition = args[++i];
                 }
@@ -130,6 +137,13 @@ namespace VendorOfferUpdater
                 Console.Error.WriteLine(
                     $"ERROR: --max-seasonal-pages must be a positive integer, got {maxSeasonalPages}.");
                 return 1;
+            }
+
+            // --diff-summary is a read-only report over two dataset files, so
+            // it short-circuits before any wiki/API setup and never writes.
+            if (diffSummaryBefore != null && diffSummaryAfter != null)
+            {
+                return await RunDiffSummaryAsync(diffSummaryBefore, diffSummaryAfter);
             }
 
             var queryOptions = new QueryOptions
@@ -1525,6 +1539,48 @@ namespace VendorOfferUpdater
             string json = JsonSerializer.Serialize(sorted, options);
             File.WriteAllText(path, json);
             Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+        }
+
+        /// <summary>
+        /// --diff-summary: reports what changed between two vendor datasets.
+        /// Read-only - it exists so a `data(vendor):` pull request can carry a
+        /// reviewable summary of a change whose own diff is one 14.8MB line.
+        /// See <see cref="VendorOfferDiff"/> for what "changed" means here.
+        /// </summary>
+        private static async Task<int> RunDiffSummaryAsync(string beforePath, string afterPath)
+        {
+            foreach (string path in new[] { beforePath, afterPath })
+            {
+                if (!File.Exists(path))
+                {
+                    Console.Error.WriteLine($"ERROR: --diff-summary input not found: {path}");
+                    return 1;
+                }
+            }
+
+            var readOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var before = JsonSerializer.Deserialize<VendorOfferDataset>(
+                await File.ReadAllTextAsync(beforePath), readOptions);
+            var after = JsonSerializer.Deserialize<VendorOfferDataset>(
+                await File.ReadAllTextAsync(afterPath), readOptions);
+
+            if (before == null || after == null)
+            {
+                Console.Error.WriteLine(
+                    "ERROR: --diff-summary input deserialized to null (empty or malformed JSON).");
+                return 1;
+            }
+
+            var result = VendorOfferDiff.Compute(before.Offers, after.Offers);
+            Console.Write(VendorOfferDiff.Format(
+                result, Path.GetFileName(beforePath), Path.GetFileName(afterPath)));
+
+            return 0;
         }
 
         /// <summary>
