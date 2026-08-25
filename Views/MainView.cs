@@ -2011,12 +2011,21 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel
             };
 
-            // A missing IconUrl is a data gap (e.g. the API dropped it),
-            // never a genuine load failure - IconControls.CreateItemIcon
-            // degrades it to a neutral empty-slot square instead of
-            // Blish's alarming magenta missing-texture placeholder (audit
-            // row 56 PART B #1).
-            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, 2, 2);
+            // Through the module's one icon component, so a snapshot row's
+            // icon reads exactly like the same item's icon in the plan: a
+            // rarity frame, the neutral empty-slot placeholder when the API
+            // gave no IconUrl (a data gap, never a load failure), and the
+            // row's own hover.
+            //
+            // The rarity comes from the session stat cache, which is the
+            // only place this tab can get one: an AccountSnapshot carries
+            // no rarity and is schema-guarded against gaining fields. A row
+            // whose block has not been fetched yet frames neutral rather
+            // than guessing, and picks up its colour on the next rebuild.
+            // The art is inset inside the 32px box the unframed icon had,
+            // so the cell's text column does not move.
+            var icon = IconControls.CreateItemIcon(
+                rowPanel, row.IconUrl, RarityFor(row.ItemId), 2, 2, 30, 1);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2106,6 +2115,21 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// The rarity this tab can know for an item, or null. See
+        /// CreateItemRow for why the session stat cache is the only source
+        /// available here and why a miss frames neutral.
+        /// </summary>
+        private string RarityFor(int itemId)
+        {
+            if (_getItemStatBlock == null || itemId <= 0)
+            {
+                return null;
+            }
+
+            return _getItemStatBlock(itemId)?.Rarity;
+        }
+
         private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth)
         {
             var rowPanel = new Panel()
@@ -2114,10 +2138,14 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel
             };
 
-            // See CreateItemRow's matching comment -
-            // same data-gap-vs-failure distinction applies to a wallet
-            // currency's icon (e.g. the reported Spirit Shards row).
-            IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
+            // Same component as the item rows above. A currency has no
+            // rarity, so the frame is the component's neutral grey, and the
+            // icon carries the currency's name on hover - the plan's own
+            // currency table already stamps that, and a wallet row whose
+            // name line has ellipsized is exactly where it is needed.
+            IconControls.CreateItemIcon(
+                rowPanel, entry.IconUrl, (string)null, 2, 2, 30, 1,
+                string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
             // Never display raw currency IDs (repo invariant).
             // Quantity prefix, matching CreateItemRow above and the plan's

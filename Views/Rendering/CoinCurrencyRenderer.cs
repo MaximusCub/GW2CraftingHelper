@@ -333,7 +333,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // name text anywhere in this cell (unlike SummarySectionRenderer.
                 // CreateCurrencyRow, which prints the name as a label before
                 // the icon) - a hover tooltip is the only way to identify it.
-                var icon = IconControls.CreateItemIcon(
+                var icon = IconControls.CreateUnframedIcon(
                     parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y,
                     CoinSegmentMath.CoinIconSize, seg.Name);
 

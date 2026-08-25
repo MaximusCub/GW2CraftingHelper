@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // ellipsized name label, re-ellipsized on drag-settle" shape that
     // UsedMaterialsSectionRenderer.CreateUsedMaterialRow and
     // ShoppingListSectionRenderer.CreateShoppingRow both build byte-for-byte
-    // identically: IconControls.CreateRarityFramedIcon at a fixed (x, y),
+    // identically: IconControls.CreateItemIcon at a fixed (x, y),
     // then PlanRelayoutMath.NameMaxWidthBeforeColumn -> LabelHelpers.
     // EllipsizeToWidth -> a rarity-colored, drop-shadowed name Label at
     // (nameX, nameY) - confirmed identical at every one of those call sites
@@ -80,7 +80,7 @@ namespace GW2CraftingHelper.Views.Rendering
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
             int iconSize = 32, int borderThickness = 1)
         {
-            var iconFrame = IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);
 
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(rightEdge, qtyWidth, nameGap, nameX);

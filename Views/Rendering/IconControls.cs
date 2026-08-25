@@ -5,10 +5,22 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "11. Generic
-    // control/format helpers" region - private static -> internal static,
-    // no logic changes. Callers in CraftingPlanView now qualify as
-    // IconControls.CreateRarityFramedIcon / IconControls.CreateItemIcon.
+    /// <summary>
+    /// THE item-icon component. Every item, currency and search-result icon
+    /// in the module is built here, so all of them get the same three
+    /// things: a rarity-colored frame (neutral at unknown rarity - never
+    /// guessed), the same neutral empty-slot placeholder when the API gave
+    /// no icon url, and the same hover wiring, stamped on every control in
+    /// the icon's own tree because Blish resolves a tooltip on the deepest
+    /// control under the cursor and never bubbles.
+    /// <para>
+    /// Before this, three treatments coexisted: the plan's tables framed
+    /// their icons, the Snapshot rows and the item-search dropdown drew a
+    /// bare texture with no frame at all, and only some of either carried a
+    /// hover. <see cref="CreateUnframedIcon"/> is the ONE remaining
+    /// unframed path and says in its own doc comment why it has to be.
+    /// </para>
+    /// </summary>
     internal static class IconControls
     {
         // --- Icon helper ---
@@ -17,13 +29,20 @@ namespace GW2CraftingHelper.Views.Rendering
         /// Item icon inside a rarity-colored frame. Defaults to the tree/row
         /// size (32px icon, 1px border = 34px overall); the plan header uses
         /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
+        /// <para>
+        /// <paramref name="tooltipText"/> is for an icon whose subject is
+        /// not already spelled out beside it - a currency icon, a row whose
+        /// name can ellipsize. Callers wanting the full item hover stamp it
+        /// afterwards through <see cref="ApplyRichToIconTree"/>.
+        /// </para>
         /// </summary>
-        internal static Panel CreateRarityFramedIcon(
+        internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, string rarity, int x, int y,
-            int iconSize = 32, int borderThickness = 1)
+            int iconSize = 32, int borderThickness = 1, string tooltipText = null)
         {
-            return CreateRarityFramedIcon(
-                parent, iconUrl, RarityColors.GetRarityBorderColor(rarity), x, y, iconSize, borderThickness);
+            return CreateItemIcon(
+                parent, iconUrl, RarityColors.GetRarityBorderColor(rarity), x, y,
+                iconSize, borderThickness, tooltipText);
         }
 
         /// <summary>
@@ -33,9 +52,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// depends on panelWidth (currently only the plan header's centered
         /// title) can reposition it on relayout without recreating it.
         /// </summary>
-        internal static Panel CreateRarityFramedIcon(
+        internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, Color frameColor, int x, int y,
-            int iconSize = 32, int borderThickness = 1)
+            int iconSize = 32, int borderThickness = 1, string tooltipText = null)
         {
             int frameSize = iconSize + borderThickness * 2;
             var frame = new Panel()
@@ -45,7 +64,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 BackgroundColor = frameColor,
                 Parent = parent
             };
-            CreateItemIcon(frame, iconUrl, borderThickness, borderThickness, iconSize);
+            CreateUnframedIcon(frame, iconUrl, borderThickness, borderThickness, iconSize, tooltipText);
+
+            // The frame is a 1-2px border, so it is only ever the deepest
+            // control under the cursor along that border - but it IS
+            // hoverable there, and an unstamped frame is a hole in the
+            // icon's own hover exactly like an unstamped label is a hole in
+            // a row's. Stamped from the SAME resolution the square gets,
+            // not from the square's own already-wrapped text.
+            TooltipFacility.ApplyPlain(frame, ResolveTooltip(iconUrl, tooltipText));
             return frame;
         }
 
@@ -65,7 +92,16 @@ namespace GW2CraftingHelper.Views.Rendering
         // caret comment).
         private const string NoIconGlyph = "-";
 
-        internal static Panel CreateItemIcon(
+        /// <summary>
+        /// The frame's interior, and the module's ONE unframed icon path.
+        /// Public to exactly one caller outside this class -
+        /// CoinCurrencyRenderer's inline coin/currency runs, where the icon
+        /// sits INSIDE a line of text at CoinSegmentMath's advance: a frame
+        /// there would add 2px to every segment's width, which is a term in
+        /// the module's own minimum-window-width derivation, and would draw
+        /// a rarity border around a denomination that has no rarity.
+        /// </summary>
+        internal static Panel CreateUnframedIcon(
             Panel parent, string iconUrl, int x, int y, int size = 32, string tooltipText = null)
         {
             // Missing icon: render a neutral empty-slot square, not the
@@ -124,14 +160,59 @@ namespace GW2CraftingHelper.Views.Rendering
             // a tooltip on the deepest control under the cursor and never
             // bubbles to the parent, so the mark would otherwise swallow
             // the hover in the exact middle of the square.
-            string resolvedTooltip =
-                missing && string.IsNullOrEmpty(tooltipText) ? NoIconTooltip : tooltipText;
+            string resolvedTooltip = ResolveTooltip(iconUrl, tooltipText);
             TooltipFacility.ApplyPlain(icon, resolvedTooltip);
             if (placeholderMark != null)
             {
                 TooltipFacility.ApplyPlain(placeholderMark, resolvedTooltip);
             }
             return icon;
+        }
+
+        /// <summary>
+        /// What an icon says on hover: the caller's own text, or the
+        /// missing-icon note when there is no art and the caller had
+        /// nothing of its own to say. One rule, so the frame and the square
+        /// inside it can never disagree.
+        /// </summary>
+        private static string ResolveTooltip(string iconUrl, string tooltipText)
+        {
+            return string.IsNullOrEmpty(iconUrl) && string.IsNullOrEmpty(tooltipText)
+                ? NoIconTooltip
+                : tooltipText;
+        }
+
+        /// <summary>
+        /// The plain-text twin of <see cref="ApplyRichToIconTree"/>, for a
+        /// row whose own tooltip is composed prose rather than an item stat
+        /// block (the Crafting Steps and Required Recipes rows). Without it
+        /// the icon - the biggest target on the row - is the one place the
+        /// row's hover says nothing, since Blish resolves a tooltip on the
+        /// deepest control under the cursor and never bubbles.
+        /// <para>
+        /// A null text CLEARS, unlike the rich version's empty no-op: this
+        /// is how a row that no longer truncates retracts its own note, and
+        /// the icon's missing-art placeholder note is re-stamped by the
+        /// component itself on the next build rather than being carried
+        /// through a clear here.
+        /// </para>
+        /// </summary>
+        internal static void ApplyPlainToIconTree(Control control, string text)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            TooltipFacility.ApplyPlain(control, text);
+
+            if (control is Container container)
+            {
+                foreach (var child in container.Children)
+                {
+                    ApplyPlainToIconTree(child, text);
+                }
+            }
         }
 
         /// <summary>

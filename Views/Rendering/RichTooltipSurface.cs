@@ -300,7 +300,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // (166,175,174) on the xyaren capture's left edge) rather
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
-                IconControls.CreateRarityFramedIcon(
+                IconControls.CreateItemIcon(
                     _contentPanel, row.IconUrl, HeaderIconFrameColor,
                     0, row.Y, HeaderIconSize, HeaderIconBorder);
             }
