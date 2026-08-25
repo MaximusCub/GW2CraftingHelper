@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17.** M38 cleanup analysis, C#/.NET-practices lens, closed and kept as evidence.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
+
 # M38 Post-Parity Cleanup Analysis - Lens: C#/.NET Practices
 
 Scope: current `master` (commit `be8ebda`, "Merge pull request #56 from

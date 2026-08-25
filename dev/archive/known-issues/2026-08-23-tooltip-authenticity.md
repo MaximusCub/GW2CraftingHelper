@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `tooltip-authenticity`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Tooltip authenticity (tooltip-authenticity)
 
 The maintainer's mandate, verbatim: *"tool tips should try as hard as

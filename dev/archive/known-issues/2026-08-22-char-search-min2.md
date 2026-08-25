@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `char-search-min2`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Character-name search minimum query length (char-search-min2)
 
 Maintainer decision, closing the "Character-search minimum query length"

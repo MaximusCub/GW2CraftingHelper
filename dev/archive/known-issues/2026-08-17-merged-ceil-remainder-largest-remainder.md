@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `merged-ceil-remainder-largest-remainder`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Merged-ceil remainder: largest-remainder apportionment + display-layer narrowing fix (2026-08-17)
 
 **Milestone goal:** quorum verdict C6 (TARGETED_FIX_ONLY plus the

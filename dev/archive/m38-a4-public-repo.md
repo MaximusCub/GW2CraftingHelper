@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17.** M38 cleanup analysis, public-repo-readiness lens, closed and kept as evidence.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
+
 # M38 Analysis A4: Public GitHub Community Readiness
 
 **Scope**: What a stranger encounters landing on `github.com/MaximusCub/GW2CraftingHelper` at current `master` (`be8ebda`). This is a documentation/packaging/hygiene audit, not a code-behavior audit. All findings are read-only observations; nothing was modified.

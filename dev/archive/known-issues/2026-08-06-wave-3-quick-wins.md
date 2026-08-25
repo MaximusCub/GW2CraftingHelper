@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-06, branch `wave-3-quick-wins`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Wave-3 quick wins (2026-08-06)
 
 Four user-directed changes from the same 2026-08-06 field-testing session,

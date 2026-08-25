@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17.** Ground-work checklist for the M37 item-29 live verification, closed and kept as evidence.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
+
 # KNOWN-ISSUES item 29 - owned-materials UI live verification (M37)
 
 Ground-work deliverables for the main session to execute. Read-only research

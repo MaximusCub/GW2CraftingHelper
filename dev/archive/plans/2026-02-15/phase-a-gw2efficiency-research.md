@@ -1,3 +1,6 @@
+> **Frozen record - 2026-02-08.** Original project plan, executed and superseded.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../../docs/README.md).
+
 # Phase A – gw2efficiency Research (Reference Only)
 
 > **Purpose**: Verified observations, known gaps, and labeled inferences from gw2efficiency discovery research. Ground truth for feasibility checks and validation. NOT a roadmap or implementation guide.

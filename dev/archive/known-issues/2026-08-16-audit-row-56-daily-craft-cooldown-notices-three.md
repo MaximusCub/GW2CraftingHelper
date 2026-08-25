@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `audit-row-56-daily-craft-cooldown-notices-three`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## AUDIT ROW 56: daily craft-cooldown notices + three small fixes (2026-08-16)
 
 ### PART A: daily craft-cooldown notices

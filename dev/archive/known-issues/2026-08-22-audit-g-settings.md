@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `audit-g-settings`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Audit batch G: Settings restructure (audit-g-settings)
 
 Commits on audit-g-settings off master 47bb2c5, covering the three

@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `kb-focus-release`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Keyboard focus release (kb-focus-release)
 
 Field repro: type into the Crafting Plan search box, do not press Enter,

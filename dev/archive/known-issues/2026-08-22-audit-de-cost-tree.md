@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `audit-de-cost-tree`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Audit batch E: tree interaction honesty (audit-de-cost-tree)
 
 Four maintainer-approved UX-audit findings, all one story: a pill's

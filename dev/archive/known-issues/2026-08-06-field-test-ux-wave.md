@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-06, branch `field-test-ux-wave`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Field-test UX wave (six S-sized display fixes, 2026-08-06)
 
 Six pre-investigated display-layer fixes from a live field-test pass over

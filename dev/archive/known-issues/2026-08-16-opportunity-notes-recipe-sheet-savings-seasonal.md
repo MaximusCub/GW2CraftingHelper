@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `opportunity-notes-recipe-sheet-savings-seasonal`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Opportunity notes: recipe-sheet savings + seasonal vendor tips (2026-08-16)
 
 Extended the Plan Notes section (previous entry, immediately above) with

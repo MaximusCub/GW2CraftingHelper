@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `decision-invariant-value-own-materials`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Decision-invariant "Value Own Materials" (VOM, 2026-08-16)
 
 **Bug (audit row 31)**: `InventoryReducer.Reduce` walked the recipe

@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `tree-row-tooltip-composer-extraction-architecture`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Tree row tooltip composer extraction + architecture doc corrections (2026-08-17)
 
 **Milestone goal:** apply quorum verdict D-2 (TARGETED_FIX_ONLY): correct

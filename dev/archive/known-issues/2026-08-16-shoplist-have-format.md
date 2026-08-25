@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `shoplist-have-format`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Shopping-list row tooltip: scope collision + swallowed hover (shoplist-have-format, 2026-08-16)
 
 Follow-up review of the shoplist-have-format branch (three own commits:

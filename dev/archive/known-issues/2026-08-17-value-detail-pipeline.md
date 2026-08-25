@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `value-detail-pipeline`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Value-detail hover investigation, pipeline-level follow-up (value-detail-pipeline, 2026-08-17)
 
 Follow-up to "Gate investigation: receipt/what-if captions + value-detail

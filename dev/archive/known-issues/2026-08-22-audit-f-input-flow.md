@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `audit-f-input-flow`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Audit batch F: input flow (audit-f-input-flow)
 
 Four maintainer-approved UX-audit findings on the Crafting Plan tab's

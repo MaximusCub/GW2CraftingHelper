@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-09, branch `w3d-plan-persistence-across-module-restarts`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## W3D: Plan persistence across module restarts (2026-08-09)
 
 User-directed, field-test feedback: a generated plan started empty every

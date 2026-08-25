@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `audit-row-20-38-tp-price-side-fallback-parity`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## AUDIT ROW 20/38: TP price-side fallback parity (2026-08-16)
 
 **Bug**: `PlanSolver.GetUnitPrice` returned 0 whenever the selected

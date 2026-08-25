@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `gate-investigation-receipt-what-if-captions-value`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Gate investigation: receipt/what-if captions + value-detail hover (2026-08-16)
 
 Two live gate findings from tonight's batched desktop session against the

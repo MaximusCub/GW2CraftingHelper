@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `festival-vendor-auto-tagging-follow-up`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Festival-vendor auto-tagging follow-up (2026-08-16)
 
 **Milestone goal:** the previous SEASONAL VENDOR TIP pass (see section

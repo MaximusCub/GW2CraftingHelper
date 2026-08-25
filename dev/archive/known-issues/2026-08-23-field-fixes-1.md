@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `field-fixes-1`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Field-test fixes wave 1 (field-fixes-1)
 
 The first feedback from outside the build loop: the maintainer ran v0.2.0

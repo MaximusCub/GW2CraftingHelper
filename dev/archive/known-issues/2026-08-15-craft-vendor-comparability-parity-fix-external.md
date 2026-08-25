@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-15, branch `craft-vendor-comparability-parity-fix-external`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Craft/vendor comparability parity fix - external review, fourth-site finding (2026-08-15)
 
 An external review of the two passes above found one more defect in

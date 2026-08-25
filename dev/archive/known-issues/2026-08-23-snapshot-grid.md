@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `snapshot-grid`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Snapshot item grid (snapshot-grid)
 
 Maintainer field test: "wondering if we should consider multiple column

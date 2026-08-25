@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `click-sound-gain`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Click volume slider (click-sound-gain)
 
 Field feedback, verbatim: the module's click sound is "VERY quiet. I can

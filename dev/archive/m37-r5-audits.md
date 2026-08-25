@@ -1,3 +1,6 @@
+> **Frozen record - 2026-07-21.** M37 R5 read-only concurrency and degradation audit, closed and kept as evidence.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
+
 # M37 R5 - Concurrency and Degradation Audits (KNOWN-ISSUES item 31)
 
 Read-only audit phase for KNOWN-ISSUES item 31 (three never-formally-swept

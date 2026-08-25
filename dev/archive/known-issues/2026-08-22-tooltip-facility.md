@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `tooltip-facility`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Tooltip facility (tooltip-facility)
 
 Audit item C tier 2. Tier 1 fixed the CONTENT of two tooltips (wrapping

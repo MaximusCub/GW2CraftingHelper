@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-19, branch `nth-cleanup`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Nice to Have batch (nth-cleanup)
 
 The nine non-controversial Nice to Have findings from the PR #142 and

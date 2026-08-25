@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `audit-h-density`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Audit batch H: table density (audit-h-density)
 
 Two maintainer-approved UX-audit findings, one premise: every data table

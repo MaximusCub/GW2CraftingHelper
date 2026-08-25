@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `source-selection-simplification-adversarial-review-2`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Source selection simplification: adversarial-review fix round 2 (5 findings) (2026-08-16)
 
 A further adversarial code review of the round-1 fix round above found 5

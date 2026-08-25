@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `quality-phase3-dedup`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Quality-audit phase 3: structural dedup (quality-phase3-dedup)
 
 Two structural deduplications, no behavior change intended; module

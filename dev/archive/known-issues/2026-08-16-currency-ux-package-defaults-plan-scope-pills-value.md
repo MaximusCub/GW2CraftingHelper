@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-16, branch `currency-ux-package-defaults-plan-scope-pills-value`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)
 
 Three maintainer-approved currency-UX features shipped as one coherent

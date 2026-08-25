@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `annotation-detection-post-solve-advisory-list`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Annotation-detection: post-solve advisory-list characterization tests + B8 shape fixes (2026-08-17)
 
 **Milestone goal:** quorum verdict D-3 (TARGETED_FIX_ONLY). A mutation

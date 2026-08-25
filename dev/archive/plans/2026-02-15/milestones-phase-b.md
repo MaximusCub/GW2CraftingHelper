@@ -1,3 +1,6 @@
+> **Frozen record - 2026-02-13.** Original project plan, executed and superseded.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../../docs/README.md).
+
 # Phase B Milestone Plan
 
 ## Deliverable

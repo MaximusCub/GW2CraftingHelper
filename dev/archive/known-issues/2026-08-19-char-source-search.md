@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-19, branch `char-source-search`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Per-character source checkboxes + character-name search (char-source-search)
 
 Maintainer directive, verbatim: *"i want per character source checkboxes

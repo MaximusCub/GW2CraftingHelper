@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-15, branch `recipe-ingestion-bug-class-missing-schema-version`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Recipe-ingestion bug class: missing schema-version parameter (2026-08-15)
 
 Root-caused by two independent investigations plus orchestrator-verified

@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-23, branch `root-ignore-summary-zero`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
 
 Two maintainer findings from the same field-test round, both about what

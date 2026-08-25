@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `backlog-cleanup`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Backlog cleanup batch (B8/B11/B13/B14/B15 + solver ctor hardening, backlog-cleanup)
 
 Six commits on backlog-cleanup off master 9b63594, one per item. All

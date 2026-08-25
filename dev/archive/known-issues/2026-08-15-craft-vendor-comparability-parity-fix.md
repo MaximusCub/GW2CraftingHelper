@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-15, branch `craft-vendor-comparability-parity-fix`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Craft/vendor comparability parity fix (2026-08-15)
 
 Root-caused via user-approved investigation: `Services/PlanSolver.cs`'s

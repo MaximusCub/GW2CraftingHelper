@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-06, branch `field-test-ux-wave-2-mysticforge-sublabel-drop-fix`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Field-test UX wave 2: MysticForge sublabel drop fix (2026-08-06)
 
 One pre-investigated display-layer fix, following up on field-test wave

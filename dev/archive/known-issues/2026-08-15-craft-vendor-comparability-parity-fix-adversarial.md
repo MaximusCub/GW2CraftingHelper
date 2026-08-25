@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-15, branch `craft-vendor-comparability-parity-fix-adversarial`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Craft/vendor comparability parity fix - adversarial review follow-up (2026-08-15)
 
 A second, adversarial pass over the fix above (Code Reviewer Mode, per

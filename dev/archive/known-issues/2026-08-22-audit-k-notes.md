@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-22, branch `audit-k-notes`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Audit batch K: Plan Notes wrapping (audit-k-notes)
 
 UX audit finding M14. `Views/Rendering/NotesSectionRenderer` locked each

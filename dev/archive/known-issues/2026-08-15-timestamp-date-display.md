@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-15, branch `timestamp-date-display`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Timestamp date display (all user-facing timestamps gain dates)
 
 User-directed, field-test feedback: "a session could wrap over midnight" -

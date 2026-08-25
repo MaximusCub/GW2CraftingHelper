@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-08, branch `w3b-generation-progress-rich-logging`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## W3B: Generation progress + rich logging (2026-08-08)
 
 User-directed, field-test feedback: Generate Plan gave zero feedback while

@@ -1,3 +1,6 @@
+> **Frozen record - 2026-02-08.** Original project plan, executed and superseded.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../../docs/README.md).
+
 # Milestone 1: Recipe Tree -- Implementation Plan
 
 > **Status**: Approved. This is the reference document for the next implementation step.

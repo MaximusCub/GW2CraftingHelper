@@ -1,3 +1,6 @@
+> **Frozen record - 2026-08-17, branch `quality-audit-cleanup-phase-1-four-bug-fixes`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
+> Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+
 ## Quality-audit cleanup, phase 1: four bug fixes (B1-B4, 2026-08-17)
 
 Cross-dimension quality-audit triage (comment hygiene / dead code /
