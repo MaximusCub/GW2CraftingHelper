@@ -12,7 +12,13 @@ ref/*.json -text -diff -merge linguist-generated=true
 # the provenance manifests, the hand-curated vendor exclusions (each row
 # carries its own evidence), and the hand-maintained hint/cooldown/sheet
 # lists. These are small, and making them unreadable would defeat the point.
-ref/*_manifest.json text=auto diff merge -linguist-generated
+# eol=lf rather than text=auto on the manifests specifically: Program.cs's
+# SerializeManifest forces LF, and VendorOfferManifestTests compares the
+# shipped file's bytes to its output. text=auto would hand a Windows clone
+# (core.autocrlf=true) a CRLF working copy and fail that test on unmodified
+# code. CI stays green either way - GitHub's windows image sets autocrlf=input
+# - so the breakage would land on a contributor's machine, not the runner.
+ref/*_manifest.json text eol=lf diff merge -linguist-generated
 ref/vendor_offer_exclusions.json text=auto diff merge -linguist-generated
 ref/acquisition_hints_seed.json text=auto diff merge -linguist-generated
 ref/daily_cooldown_items.json text=auto diff merge -linguist-generated
