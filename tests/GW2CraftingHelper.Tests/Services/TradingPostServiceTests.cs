@@ -163,6 +163,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
+        // Characterization: /v2/commerce/prices omits untradeable items
+        // from its response entirely, and only ids PRESENT in a response
+        // are cached - so an account-bound id (a gift, a clover, the
+        // legendary target itself) is re-requested on every single call,
+        // however recently it was asked for.
+        [Fact]
+        public async Task UntradeableId_RefetchedOnEveryCallWithinTtl()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            // 99999 is never added: the fake omits it from the response,
+            // exactly as the real endpoint does for an account-bound item.
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 1, 99999 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(1); // well inside the 15 minute TTL
+            var result = await svc.GetPricesAsync(new[] { 1, 99999 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(new[] { 99999 }, api.Calls[1]); // the tradeable id was cached; this one was not
+            Assert.False(result.ContainsKey(99999));
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
         [Fact]
         public async Task Ttl_MixedFreshAndStaleBatchOnlyRefetchesStaleIds()
         {
