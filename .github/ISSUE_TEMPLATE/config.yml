@@ -1,0 +1,15 @@
+# Blank issues are off so the bug report template is not bypassed by
+# accident: the module version, the Blish HUD version and the Log-tab tail
+# it asks for are what make a report reproducible at all.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Building or testing from source
+    url: https://github.com/MaximusCub/GW2CraftingHelper/blob/master/CONTRIBUTING.md
+    about: Prerequisites, the mandatory nuget restore step, the three test projects, and pull request expectations.
+  - name: Known issues and deliberate non-goals
+    url: https://github.com/MaximusCub/GW2CraftingHelper/blob/master/docs/KNOWN-ISSUES.md
+    about: Worth a look before filing - the DEFERRED list records what is open and what was recorded as deliberately not implemented.
+  - name: Code of conduct concerns
+    url: https://github.com/MaximusCub/GW2CraftingHelper/blob/master/CODE_OF_CONDUCT.md
+    about: Conduct reports go to a private channel, never to a public issue.

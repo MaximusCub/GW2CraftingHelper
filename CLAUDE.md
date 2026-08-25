@@ -302,30 +302,15 @@ Use:
 
 `<gh> pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
 
-### Required PR Body Template
+where `<tempfile>` is `.github/PULL_REQUEST_TEMPLATE.md` with every section filled in.
 
-```
-## Milestone Goal
-Brief description of what this milestone accomplishes.
+### Required PR Body
 
-## What Changed
-High-level summary grouped logically (not per-file noise).
-
-## Validation Performed
-- Build command run and result
-- Test command run and result
-- Manual validation steps (if applicable)
-
-## Repo Invariants Checklist
-- [ ] No Blish HUD references added to tests
-- [ ] Tests exercise real production paths
-- [ ] No fake file I/O tests introduced
-- [ ] Pricing logic preserves multi-source correctness
-- [ ] IDs remain internal-only (not displayed)
-
-## Risks / Follow-ups
-Known tradeoffs, edge cases, or future improvements.
-```
+Fill in `.github/PULL_REQUEST_TEMPLATE.md` - that file is the only PR body
+template, for agents and humans alike, and `gh pr create` picks it up
+automatically when no `--body`/`--body-file` is passed. Do not restate it
+here: an inline copy drifted from it once already and silently dropped the
+ASCII-only/no-em-dash row from the invariants checklist.
 
 If a PR already exists:
 - Push additional commits to the same branch.
