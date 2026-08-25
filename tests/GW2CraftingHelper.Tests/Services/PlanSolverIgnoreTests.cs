@@ -139,8 +139,8 @@ namespace GW2CraftingHelper.Tests.Services
         // nothing extra about the interaction. Ownership only exists on the
         // downstream CraftingTreeNode built after Solve returns, so the
         // real pin lives one and two layers up:
-        // CraftingPlanPipelineTests (GenerateStructuredAsync Ignore x owned-
-        // materials coverage) and DecisionPillPlannerTests
+        // CraftingPlanPipelineIgnoreTests (GenerateStructuredAsync Ignore x
+        // owned-materials coverage) and DecisionPillPlannerTests
         // (Have_IgnoredAndPartiallyOwned_ShowsIgnoredNotOwnedInfo).
     }
 }

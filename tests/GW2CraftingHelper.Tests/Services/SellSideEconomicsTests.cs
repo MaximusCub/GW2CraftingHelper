@@ -11,8 +11,9 @@ namespace GW2CraftingHelper.Tests.Services
     /// Direct unit tests on the SellSideEconomics statics
     /// (KNOWN-ISSUES #25) - the move out of CraftingPlanPipeline made these
     /// directly testable without going through the whole pipeline. The
-    /// pre-existing CraftingPlanPipelineTests/MultiItemPlanTests byte-
-    /// identical assertions remain the regression net for the move itself;
+    /// pre-existing CraftingPlanPipelineEconomicsTests/MultiItemPlanTests
+    /// byte-identical assertions remain the regression net for the move
+    /// itself;
     /// these tests target the arithmetic on its own.
     /// </summary>
     public class SellSideEconomicsTests

@@ -584,7 +584,7 @@ namespace GW2CraftingHelper.Tests.Services
             // No TP price for 800/801 (force-craft, they have a recipe).
             // Shared material 900 is TP-buyable: InstantBuy cost per unit
             // is driven by the raw sellUnitPrice param (see
-            // CraftingPlanPipelineTests.BuildForceBuyPipeline's own doc
+            // CraftingPlanPipelineForceBuyTests.BuildForceBuyPipeline's own doc
             // comment on this InMemoryPriceApiClient/TradingPostService
             // mapping) - 10 coin per unit here.
             var priceApi = new InMemoryPriceApiClient();
@@ -649,7 +649,7 @@ namespace GW2CraftingHelper.Tests.Services
         ///
         /// Two INDEPENDENT roots (900 and 902, sharing no ingredients) are
         /// each shaped exactly like
-        /// CraftingPlanPipelineTests.BuildForceBuyPipeline's single-item
+        /// CraftingPlanPipelineForceBuyTests.BuildForceBuyPipeline's single-item
         /// scenario: owning 4 of the 5 needed ingredient collapses the
         /// POST-reduction craft cost below the fresh buy price, so without
         /// the force-buy pre-pass's zero-owned baseline each root would

@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi));
         }
 
-        // Mirrors CraftingPlanPipelineTests.BuildOwnMaterialsPipeline
+        // Mirrors PipelineBuilder.BuildOwnMaterialsPipeline
         // exactly (item 1 <- recipe 10 <- ingredientCount x item 2, with a
         // real InventoryReducer wired in) - reused here (rather than made
         // accessible cross-class) so this file's own fixtures stay
@@ -182,7 +182,7 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
         }
 
-        // Mirrors CraftingPlanPipelineTests.BuildForceBuyPipeline/
+        // Mirrors CraftingPlanPipelineForceBuyTests.BuildForceBuyPipeline/
         // OwnFourOfIngredient exactly: item 1's fresh (zero-owned) buy(100)
         // < craft(5x30=150)*0.85=127.5, so item 1's node is force-buy-
         // flagged under OwnMaterialsMode.Valued - the scenario that
@@ -820,7 +820,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task Save_Load_ForceBuyOnlyNodeIds_RoundTripsAndManualOverrideStillWinsAfterReload()
         {
-            // Mirrors CraftingPlanPipelineTests'
+            // Mirrors CraftingPlanPipelineForceBuyTests'
             // ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins
             // exactly, adding a persist/reload round trip in the middle -
             // PlanSolveContext.ForceBuyOnlyNodeIds (an ISet<int> computed
@@ -1852,8 +1852,9 @@ namespace GW2CraftingHelper.Tests.Services
         /// Real pipeline, real VendorOfferStore-backed offer mixing a
         /// TP-valued Item cost line with a non-coin currency cost line (2
         /// kinds) - so CraftingTreeBuilder synthesizes component leaves
-        /// (see CraftingPlanPipelineTests.GenerateMixedVendorPlanAsync for
-        /// the sibling copy of this fixture shape). Mirrors this file's own
+        /// (see CraftingPlanPipelineVendorCostComponentTests.
+        /// GenerateMixedVendorPlanAsync for the sibling copy of this
+        /// fixture shape). Mirrors this file's own
         /// "build a REAL CraftingPlanResult, never hand-construct one"
         /// discipline (see this class's own header comment).
         /// </summary>
