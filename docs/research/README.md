@@ -35,16 +35,29 @@ directory exists:
   KNOWN-ISSUES #26.
 - `m37-r4-vendor-caps.md` - vendor purchase-cap SMW properties and the
   stale-offer-sweep methodology - KNOWN-ISSUES #28.
-- `m37-r5-audits.md` - the cross-thread/degradation/thread-safety audit
-  findings - KNOWN-ISSUES #31.
 - `aa-tier-findings.md` - Wizard's Vault (Astral Acclaim) tiered-pricing
   investigation - KNOWN-ISSUES #33.
+- `gw2e-convergence-matrix.md` - the five-area, 58-row comparison of this
+  module against gw2efficiency, with per-row measured/inferred evidence
+  and EQUIVALENT/PRESERVE/ADOPT verdicts. The evidence trail both
+  `docs/gw2e-parity-spec.md` and `docs/gw2e-considerations.md` cite by row
+  number; an active work queue, not history.
+- `gw2e-currency-decision-prices.md` - verbatim extraction of gw2e's
+  64-key `CURRENCY_DECISION_PRICES` table from the live bundle and the
+  TypeScript source, plus the id-mapping proof. The provenance record
+  behind the maintainer's one-time waiver of the no-invented-data rule
+  (`Models/CurrencyDecisionDefaults.cs`).
 - `minimum-window-width.md` - how wide the window has to be for the
   deepest recipe tree in the game to render untruncated (exact graph
   depths from the committed seeds, text widths measured from the
-  installed Menomonia bitmap fonts) - the basis for the 1436px minimum.
-  The one report here that studies this module's own layout rather than
-  an external source.
+  installed Menomonia bitmap fonts). Basis for the 1436 -> 1478 -> 1378
+  minimum; section 9 carries the depth-14 realistic-worst-case
+  re-derivation the shipped 1378 comes from. The one report here that
+  studies this module's own layout rather than an external source.
+
+Moved out: `m37-r5-audits.md` (the cross-thread/degradation/thread-safety
+audit findings, KNOWN-ISSUES #31) is a closed point-in-time audit and now
+lives at [`docs/archive/m37-r5-audits.md`](../archive/m37-r5-audits.md).
 
 The normative gw2efficiency behavior spec these reports feed into lives one
 level up, at [`docs/gw2e-parity-spec.md`](../gw2e-parity-spec.md); the
