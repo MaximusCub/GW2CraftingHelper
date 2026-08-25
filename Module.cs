@@ -193,6 +193,12 @@ namespace GW2CraftingHelper
         // should never be throttled by an earlier automatic failure.
         private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
 
+        // One-shot: the automatic fetch for an install with NO cached
+        // snapshot fires at most once per module load (see
+        // FirstLoadSnapshotGate). Main-thread only - written and read from
+        // Update() alone.
+        private bool _firstLoadRefreshAttempted;
+
         // Whether the timer-driven auto-refresh is running right now.
         // Written from RefreshSnapshotInBackgroundAsync, which starts on the
         // main thread but whose finally may resume on a ThreadPool
@@ -1002,7 +1008,24 @@ namespace GW2CraftingHelper
             }
 
             if (_refreshInProgress) return;
-            if (_currentSnapshot == null) return;
+
+            if (_currentSnapshot == null)
+            {
+                // Nothing cached at all: the staleness tick below has no
+                // snapshot to age, so this is the only automatic route to
+                // a first one - see FirstLoadSnapshotGate.
+                if (FirstLoadSnapshotGate.ShouldRefreshNow(
+                        hasCachedSnapshot: false,
+                        apiReady: _snapshotService.HasRequiredPermissions(),
+                        alreadyAttempted: _firstLoadRefreshAttempted,
+                        refreshInProgress: false,
+                        inFailureBackoff: IsInRefreshFailureBackoff()))
+                {
+                    _firstLoadRefreshAttempted = true;
+                    _ = RefreshSnapshotInBackgroundAsync();
+                }
+                return;
+            }
 
             // Reads the
             // clamped setting fresh on every tick (cheap - a single
@@ -1172,6 +1195,19 @@ namespace GW2CraftingHelper
             return snapshot;
         }
 
+        /// <summary>
+        /// True while a prior failed refresh's backoff window is still
+        /// open. Read by RefreshSnapshotInBackgroundAsync itself and by
+        /// Update()'s first-load gate, which must not spend its one shot
+        /// on a call this window would turn away.
+        /// </summary>
+        private bool IsInRefreshFailureBackoff()
+        {
+            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
+            return lastFailedTicks != 0 &&
+                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff;
+        }
+
         private async Task RefreshSnapshotInBackgroundAsync()
         {
             if (_refreshInProgress) return;
@@ -1182,9 +1218,7 @@ namespace GW2CraftingHelper
             // staleness tick and OnSubtokenUpdated) can otherwise re-fire
             // far faster than any real transient failure needs to be
             // retried at.
-            var lastFailedTicks = Interlocked.Read(ref _lastFailedRefreshAttemptTicks);
-            if (lastFailedTicks != 0 &&
-                DateTime.UtcNow - new DateTime(lastFailedTicks, DateTimeKind.Utc) < RefreshFailureBackoff)
+            if (IsInRefreshFailureBackoff())
             {
                 Logger.Debug("Skipping snapshot refresh retry - within backoff window after a prior failure");
                 return;
