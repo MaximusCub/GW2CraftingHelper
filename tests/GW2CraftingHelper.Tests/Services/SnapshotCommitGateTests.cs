@@ -65,6 +65,15 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Throws<ArgumentNullException>(() => gate.Clear(null));
         }
 
+        // The two lock-ordering tests below block on purpose, so xUnit1031
+        // ("use an async test method and await instead") cannot apply: the
+        // blocking call IS the assertion. Assert.False(task.Wait(200ms))
+        // passes precisely because the task is still parked behind the other
+        // operation's lock, and awaiting it would wait for the completion the
+        // test exists to prove does not happen yet. The waits are all bounded
+        // (200ms to fail fast, 5s ceilings elsewhere), so a genuine deadlock
+        // fails the test rather than hanging the run.
+#pragma warning disable xUnit1031
         [Fact]
         public void ClearDuringInFlightCommit_BlocksUntilCommitFinishes_ThenSeesBumpedEpoch()
         {
@@ -165,5 +174,6 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(committed);
             Assert.Equal(new[] { "clear-start", "clear-end" }, events);
         }
+#pragma warning restore xUnit1031
     }
 }

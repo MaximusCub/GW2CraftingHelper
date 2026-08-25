@@ -122,11 +122,11 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Concurrency: deterministic coordination (a start gate +
-        // Task.WaitAll), not a sleep-based race - failure would show up as
+        // Task.WhenAll), not a sleep-based race - failure would show up as
         // a wrong final count/version, not a timing-dependent flake. ---
 
         [Fact]
-        public void Write_ConcurrentFromMultipleThreads_NoLostUpdatesNoCorruption()
+        public async Task Write_ConcurrentFromMultipleThreads_NoLostUpdatesNoCorruption()
         {
             var log = new ModuleLog(ringCapacity: 500);
             const int threadCount = 8;
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
 
             startGate.Set();
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             int expectedTotal = threadCount * writesPerThread;
             Assert.Equal(expectedTotal, log.Version);
@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Write_ConcurrentExceedingCapacity_RingStaysWithinCapacity()
+        public async Task Write_ConcurrentExceedingCapacity_RingStaysWithinCapacity()
         {
             var log = new ModuleLog(ringCapacity: 20);
             const int threadCount = 4;
@@ -177,7 +177,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
 
             startGate.Set();
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             Assert.Equal(threadCount * writesPerThread, log.Version);
             Assert.Equal(20, log.Snapshot().Count);

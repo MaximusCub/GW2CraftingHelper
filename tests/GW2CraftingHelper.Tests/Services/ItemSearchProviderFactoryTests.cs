@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -61,7 +62,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ValidSeed_ProviderActuallySearches()
+        public async Task ValidSeed_ProviderActuallySearches()
         {
             string json = @"[
                 {""id"": 46762, ""name"": ""Zojja's Claymore"", ""icon"": ""z.png""},
@@ -71,8 +72,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var provider = ItemSearchProviderFactory.Create(stream, out _, out _);
 
-                var results = provider.SearchAsync(
-                    "Zojja", 10, System.Threading.CancellationToken.None).Result;
+                var results = await provider.SearchAsync(
+                    "Zojja", 10, System.Threading.CancellationToken.None);
 
                 Assert.Single(results);
                 Assert.Equal(46762, results[0].ItemId);
