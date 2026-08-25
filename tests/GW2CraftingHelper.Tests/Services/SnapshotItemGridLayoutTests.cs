@@ -44,8 +44,8 @@ namespace GW2CraftingHelper.Tests.Services
             int windowForThreeColumns = 3 * SnapshotItemGridLayout.MinColumnWidth
                 + WindowSizing.WindowToTabPanelChrome;
 
-            Assert.Equal(1158, windowForTwoColumns);
-            Assert.Equal(1674, windowForThreeColumns);
+            Assert.Equal(1214, windowForTwoColumns);
+            Assert.Equal(1758, windowForThreeColumns);
 
             // The enforced minimum sits between them, which is the whole
             // claim: every client that can hold the minimum is at least
@@ -72,24 +72,54 @@ namespace GW2CraftingHelper.Tests.Services
         {
             int columnWidth = SnapshotItemGridLayout.ComputeColumnWidth(GridWidthAtWindowMinimum);
 
-            int nameRunBudget =
-                columnWidth - SnapshotItemGridLayout.CellTextX - SnapshotItemGridLayout.CellTextRightPad;
+            // Budgeted the way the cell is actually built: the name stops
+            // at the Amount column, not at the cell's right pad.
+            int nameRunBudget = SnapshotItemGridLayout.CellNameMaxWidth(
+                columnWidth, SnapshotItemGridLayout.AmountColumnFloor);
 
             Assert.True(
                 SnapshotItemGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
-                "a 52-character name line must not ellipsize in a column at the window minimum");
+                "a full-length name must not ellipsize in a column at the window minimum");
+        }
+
+        [Fact]
+        public void CellColumns_JustifyToTheCellRatherThanPullingIn()
+        {
+            // The plan view's own rule, applied to one grid cell: the
+            // Amount edge is a function of the cell width alone, and the
+            // name is the only part that flexes. A wider cell must not
+            // strand the recovered space to the right of the amount.
+            const int band = 60;
+            int narrow = SnapshotItemGridLayout.CellNameMaxWidth(600, band);
+            int wide = SnapshotItemGridLayout.CellNameMaxWidth(800, band);
+
+            Assert.Equal(200, wide - narrow);
+            Assert.Equal(
+                800 - SnapshotItemGridLayout.CellTextRightPad,
+                SnapshotItemGridLayout.CellAmountRightEdge(800));
+        }
+
+        [Fact]
+        public void AmountBand_IsFlooredAtItsOwnHeaderLabel()
+        {
+            // A header at the ColumnHeader tier out-measures the digits
+            // under it, and a name budgeted against the digits alone would
+            // run under the header.
+            Assert.Equal(79, SnapshotItemGridLayout.CellAmountBandWidth(32, 79));
+            Assert.Equal(140, SnapshotItemGridLayout.CellAmountBandWidth(140, 79));
+            Assert.Equal(0, SnapshotItemGridLayout.CellAmountBandWidth(-5, 0));
         }
 
         [Theory]
         [InlineData(0, 1)]
         [InlineData(-100, 1)]
         [InlineData(1, 1)]
-        [InlineData(515, 1)]
-        [InlineData(1031, 1)]
-        [InlineData(1032, 2)]
-        [InlineData(1547, 2)]
-        [InlineData(1548, 3)]
-        [InlineData(2580, 5)]
+        [InlineData(543, 1)]
+        [InlineData(1087, 1)]
+        [InlineData(1088, 2)]
+        [InlineData(1631, 2)]
+        [InlineData(1632, 3)]
+        [InlineData(2720, 5)]
         public void ComputeColumnCount_AddsAColumnPerWholeMinColumnWidth(int gridWidth, int expected)
         {
             Assert.Equal(expected, SnapshotItemGridLayout.ComputeColumnCount(gridWidth));
@@ -160,10 +190,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void Compute_ThreeColumns_FillsTheLastRowPartially()
         {
-            var grid = SnapshotItemGridLayout.Compute(4, 1560, 52);
+            var grid = SnapshotItemGridLayout.Compute(4, 1650, 52);
 
             Assert.Equal(3, grid.ColumnCount);
-            Assert.Equal(520, grid.ColumnWidth);
+            Assert.Equal(550, grid.ColumnWidth);
             Assert.Equal(2, grid.RowCount);
             Assert.Equal(104, grid.Height);
             Assert.Equal((0, 52, 0, 1), Cell(grid, 3));
