@@ -590,7 +590,7 @@ namespace GW2CraftingHelper
                 ids => itemMetadataService.WarmStatBlocksAsync(ids, CancellationToken.None)
             );
 
-            _settingsContent = new SettingsTabContent(_settings);
+            _settingsContent = new SettingsTabContent(_settings, _modalDialog);
 
             // DataDir and
             // _moduleIconTexture are both already in scope at this point in
