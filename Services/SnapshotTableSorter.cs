@@ -4,11 +4,8 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services
 {
-    /// <summary>
-    /// Columns the Snapshot tab's two runs expose. Name covers both an
-    /// item's name and a currency's - one enum, because the two runs are
-    /// the same two columns over different data.
-    /// </summary>
+    /// <summary>Columns the Snapshot tab's two runs expose - one enum,
+    /// because they are the same two columns over different data.</summary>
     public enum SnapshotTableColumn
     {
         Name,
@@ -16,34 +13,19 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>
-    /// Comparators behind the Snapshot tab's clickable column headers.
-    /// Blish-free, and the same shape as <see cref="PlanTableSorter"/>
-    /// except in what it returns: an ORDER over the caller's rows rather
-    /// than a sorted copy of them, because the rows it sorts are already
-    /// built controls. The caller's list is never mutated, and no sort at
-    /// all allocates nothing.
-    /// <para>
-    /// Names compare with <see cref="StringComparer.OrdinalIgnoreCase"/> -
-    /// what a reader scanning an alphabetical column expects, and what
-    /// PlanTableSorter already uses for the same job.
-    /// </para>
+    /// Comparators behind the Snapshot tab's clickable column headers, the
+    /// same shape as <see cref="PlanTableSorter"/> (case-insensitive names
+    /// included) except in what they return - see <see cref="ItemOrder"/>.
     /// </summary>
     public static class SnapshotTableSorter
     {
         /// <summary>
-        /// The sort as a PERMUTATION of the caller's own row order:
-        /// <c>order[i]</c> is the index of the row that belongs in display
-        /// position i. Null means "leave them as they are" - no sort
-        /// active, or nothing to reorder.
-        /// <para>
-        /// An order rather than a sorted copy, because the Snapshot tab's
-        /// rows are built once in the search's own order and a click moves
-        /// the controls it already has rather than re-running the account
-        /// search (see MainView.SortSection). Returning null rather than
-        /// the identity permutation is what lets the third click - the
-        /// cycle back to None - restore the search's own order without the
-        /// view keeping a second copy of it.
-        /// </para>
+        /// The sort as a PERMUTATION of the caller's rows: <c>order[i]</c>
+        /// is the index of the row belonging in display position i, null
+        /// for "leave them as they are". An order and not a sorted copy
+        /// because the rows are built controls a click only re-places
+        /// (MainView.SortSection); null and not the identity because that
+        /// is how the cycle back to None restores the search's own order.
         /// </summary>
         public static IReadOnlyList<int> ItemOrder(
             IReadOnlyList<SnapshotSearchRow> rows, TableSortState<SnapshotTableColumn> state)
@@ -75,8 +57,8 @@ namespace GW2CraftingHelper.Services
                 order[i] = i;
             }
 
-            // Index-keyed, so ties keep their original relative order - a
-            // stable sort without depending on Array.Sort being one.
+            // Index-keyed: ties keep their original relative order without
+            // depending on Array.Sort being stable.
             Array.Sort(order, (a, b) =>
             {
                 int compared = sign * compare(rows[a], rows[b], column);

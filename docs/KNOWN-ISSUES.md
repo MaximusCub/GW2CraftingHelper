@@ -15318,6 +15318,21 @@ not a compounding sort. `SortItems`/`SortWallet` are gone with the
 rebuild that used them; the comparators they wrapped are what the order
 is built from, and what the tests drive.
 
+**The wave's comment ratio was over the bar.** The brief set "well under
+25%" for new code and the wave measured 32% (896 comment lines of 2719
+added `.cs` lines against v0.2.3). The heaviest offenders were prose
+re-narrating a decision this file already records at length - the sorter's
+24-line preamble on returning an order rather than a copy, restated a
+third time on `MainView.SortSection`. Compressed to the invariant plus a
+pointer at each canonical site: the wave is now 22% (522 of 2342), and
+every file the wave ADDED is under 25% on its own
+(`SnapshotResultLayout` 16%, `SortableHeaderCells` 19%,
+`SnapshotTableSorter` 20%, `HeaderCellMath` 23%, `HeaderCellPlan` 24%).
+`MainView`'s share of the wave is 26%, against that file's own 43% at
+v0.2.3. What survived is measured numbers (the 79px header floor, the
+544px column, Blish's container-first dispatch order and its
+`BasicTooltipText` setter) stated once where they are used.
+
 ### Out of scope, untouched
 
 The sibling `field-fixes-3` branch owns the Total Cost zero-band

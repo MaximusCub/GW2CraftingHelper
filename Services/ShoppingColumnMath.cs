@@ -73,19 +73,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Where each of the five header CELLS ends, in the same left-to-
-        /// right order the header row builds its labels: Item, Source,
-        /// Amount, Each (Total closes the band and needs no boundary, so
-        /// four values are written).
-        /// <para>
-        /// These are the column edges, not the midpoints between the header
-        /// WORDS. "Item" is a 40px word over a name column hundreds of
-        /// pixels wide, so a boundary derived from the labels alone sits
-        /// roughly halfway between "Item" and "Source" - and a click above
-        /// the right-hand end of the item NAMES, still plainly inside the
-        /// Item column, would sort by Source. Each boundary here splits the
-        /// gap the two columns actually keep.
-        /// </para>
+        /// Where each of the five header CELLS ends, in the header row's own
+        /// left-to-right order (Total closes the band, so four are written).
+        /// These are COLUMN edges: "Item" is a 40px word over a name column
+        /// hundreds of pixels wide, so a label-derived boundary would sort a
+        /// click above the item NAMES by Source.
         /// </summary>
         public static void HeaderCellBoundaries(
             ColumnEdges edges, int sourceColumnWidth, int nameGap, int[] into)

@@ -5,11 +5,9 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// The split behind a sortable header's whole-cell hit area. What is
-    /// worth pinning is what a screenshot cannot show: that the band is
-    /// partitioned rather than padded (no dead strip between two columns,
-    /// no overlap where one header answers the other's click), and that the
-    /// degenerate widths produce empty cells rather than cells that swallow
+    /// The split behind a sortable header's whole-cell hit area: that the
+    /// band is partitioned rather than padded (no dead strip, no overlap),
+    /// and that degenerate widths empty a cell rather than let it swallow
     /// the band.
     /// </summary>
     public class HeaderCellMathTests
@@ -46,9 +44,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void TwoColumns_BoundaryLandsMidwayBetweenTheLabels()
         {
             // Used Materials' shape: "Item" at x=50, "Amount" right-aligned
-            // near the panel edge. The whole left half of the band belongs
-            // to Item - which is the point of the change, since the Item
-            // column IS everything left of Amount.
+            // near the edge. The Item column IS everything left of Amount.
             var ranges = Partition(600, (50, 40), (500, 79));
 
             AssertPartitions(ranges, 600);
@@ -60,8 +56,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void AnUnsortableMiddleColumn_StillSeparatesTheTwoBesideIt()
         {
-            // The tree's "Source" header is inert, but a cell that ignored
-            // it would hand its pixels to Item or Cost.
+            // "Source" is inert, but ignoring it hands its pixels away.
             var ranges = Partition(900, (50, 40), (400, 60), (800, 40));
 
             AssertPartitions(ranges, 900);
@@ -72,8 +67,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void EveryPixelOfTheBandBelongsToExactlyOneCell()
         {
-            // The Shopping List's five columns, at a width where three of
-            // them are crowded together on the right.
+            // The Shopping List's five columns, crowded on the right.
             var ranges = Partition(700, (50, 40), (300, 60), (450, 79), (540, 50), (640, 55));
 
             AssertPartitions(ranges, 700);
@@ -83,10 +77,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void OverlappingLabels_PutTheBoundaryAtTheLaterLabel()
         {
-            // A very narrow window can leave one header's text running
-            // under the next one's x. There is no midpoint to take, so the
-            // boundary is the later label's own left edge: the cells stay
-            // in order and neither inverts into the other's pixels.
+            // A narrow window can run one header's text under the next
+            // one's x. No midpoint to take, so the boundary is the later
+            // label's own left edge and neither cell inverts.
             var ranges = Partition(200, (50, 120), (100, 60));
 
             AssertPartitions(ranges, 200);
@@ -97,13 +90,12 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void LabelsOutOfOrder_ShrinkTheEarlierCellRatherThanInvertingIt()
         {
-            // The pathological case the clamp exists for: a right-aligned
-            // header that has slid LEFT of the one before it.
+            // The clamp's case: a right-aligned header slid LEFT of its
+            // predecessor.
             var ranges = Partition(200, (120, 40), (30, 40));
 
-            // The boundary is still the later label's x, so the first cell
-            // shrinks to what is left of it instead of the second cell
-            // being handed a negative width.
+            // Still the later label's x, so the first cell shrinks rather
+            // than the second being handed a negative width.
             AssertPartitions(ranges, 200);
             Assert.Equal(30, ranges[0].Width);
             Assert.Equal(170, ranges[1].Width);
@@ -130,10 +122,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void TheBufferOverload_WritesTheSameSplit()
         {
-            // The header rows re-split on every frame of a resize drag, so
-            // that path writes into a buffer it owns rather than allocating
-            // one per header per frame. It must not be a second
-            // implementation.
+            // The per-frame callers write into a buffer they own; it must
+            // not be a second implementation.
             var extents = new[]
             {
                 new HeaderCellMath.LabelExtent(50, 40),
@@ -151,10 +141,9 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // The label-gap midpoint is a fallback. A caller that knows where
-        // its column actually ends says so, and the split takes it - the
-        // difference is whole hundreds of pixels on a name column, which is
-        // the strip of header directly above the item names.
+        // The label-gap midpoint is a fallback: a caller that knows its
+        // real column edge says so, and on a name column the difference is
+        // hundreds of pixels.
         [Fact]
         public void AnExplicitBoundary_BeatsTheLabelMidpoint()
         {
@@ -201,8 +190,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MixedBoundaries_TakeEachColumnsOwnRule()
         {
-            // The Snapshot's band: two grid columns, each split at its own
-            // Amount edge, and the last cell always closing the band.
+            // Two grid columns, each split at its own Amount edge.
             var labels = new[]
             {
                 new HeaderCellMath.LabelExtent(40, 30, 460),

@@ -255,11 +255,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(400, wide - narrow);
         }
 
-        // Which column a click in the header band sorts by. The failure
-        // this pins: "Item" is a short word at x=50 and "Source" sits
-        // hundreds of pixels right, so a boundary taken between the two
-        // WORDS puts the Source cell over the right-hand end of the item
-        // names - inside the Item column, by every visual cue.
+        // Which column a click in the band sorts by. The failure pinned:
+        // a boundary between the two WORDS puts the Source cell over the
+        // right-hand end of the item NAMES.
         [Fact]
         public void HeaderCellBoundaries_SplitTheGapsBetweenTheColumns()
         {
@@ -273,12 +271,10 @@ namespace GW2CraftingHelper.Tests.Services
             // Item ends just before the source badges begin...
             Assert.Equal(edges.SourceX - 6, boundaries[0]);
 
-            // ...and every other boundary is the middle of the gap the two
-            // columns keep, so neither reaches into the other's band.
+            // ...and every other is the middle of the columns' own gap.
             Assert.Equal(edges.SourceX + 90 + 10, boundaries[1]);
 
-            // Same boundary read from the other side: the Amount band's
-            // own left edge, less half the gap.
+            // The same boundary from the other side.
             Assert.Equal((edges.QtyRightEdge - 79) - 10, boundaries[1]);
             Assert.Equal(edges.QtyRightEdge + 10, boundaries[2]);
             Assert.Equal(edges.EachRightEdge + 10, boundaries[3]);
@@ -292,8 +288,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void HeaderCellBoundaries_KeepTheItemCellOverTheWholeNameColumn()
         {
-            // The Item cell has to cover every pixel the item NAMES can
-            // occupy - that budget is the same edge the boundary sits at.
+            // The name budget and the boundary are the same edge.
             var edges = ShoppingColumnMath.ComputeEdgesForPanel(
                 panelWidth: 1400, maxEachWidth: 0, maxTotalWidth: 0,
                 maxQtyWidth: 79, sourceColumnWidth: 90);

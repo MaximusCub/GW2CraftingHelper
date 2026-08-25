@@ -5,28 +5,19 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Splits a column-header band into one CELL per header label, so a
     /// sortable header's hover, tooltip and click cover the whole column
-    /// rather than the pixels its text happens to occupy.
-    /// <para>
-    /// A partition, not a set of padded boxes: every pixel of the band
-    /// belongs to exactly one cell, so no click lands in a dead strip
-    /// between two columns. A boundary is the caller's own column edge
-    /// where it supplies one (<see cref="LabelExtent"/>), and otherwise
-    /// falls back to the midpoint of the gap between two labels.
-    /// </para>
+    /// rather than the pixels its text occupies. A partition, not padded
+    /// boxes: every pixel belongs to exactly one cell, so no click lands
+    /// in a dead strip between two columns.
     /// </summary>
     public static class HeaderCellMath
     {
         /// <summary>
         /// Where one header label sits inside its band, and - when the
-        /// caller knows it - where its COLUMN ends.
-        /// <para>
-        /// The label-gap midpoint below is a fallback, not the truth: a
-        /// header's text is far narrower than the column it names, so a
-        /// midpoint taken between two words puts the boundary well inside
-        /// the left column ("Item" over a name column hundreds of pixels
-        /// wide). A caller that already computes its column edges passes
-        /// <paramref name="cellEnd"/> and gets the real ones.
-        /// </para>
+        /// caller knows it - where its COLUMN ends. The label-gap midpoint
+        /// is a fallback, not the truth: a header's text is far narrower
+        /// than the column it names, so a midpoint between two words puts
+        /// the boundary well inside the left column ("Item" over a name
+        /// column hundreds of pixels wide).
         /// </summary>
         public readonly struct LabelExtent
         {
@@ -68,13 +59,10 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// One range per label, in the order given (left to right at every
-        /// width a caller renders). The first starts at 0, the last ends at
-        /// <paramref name="bandWidth"/>, and boundaries are forced
-        /// non-decreasing and clamped into the band - so labels that
-        /// overlap, or arrive out of order because a right-aligned one has
-        /// slid past its neighbour in a narrow window, shrink a cell rather
-        /// than inverting it.
+        /// One range per label, left to right. The first starts at 0, the
+        /// last ends at <paramref name="bandWidth"/>, and boundaries are
+        /// forced non-decreasing and clamped into the band - so overlapping
+        /// or out-of-order labels shrink a cell rather than inverting it.
         /// </summary>
         public static IReadOnlyList<CellRange> Partition(
             int bandWidth, IReadOnlyList<LabelExtent> labels)

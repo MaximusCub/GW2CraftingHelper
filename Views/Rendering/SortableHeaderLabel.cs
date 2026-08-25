@@ -32,18 +32,12 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Stamps the shared "click to sort" note on one control of a
-        /// sortable header cell. The CLICK is not wired here and
-        /// deliberately so: the hit area is the whole cell, and
-        /// <see cref="SortableHeaderCells"/> owns it (a second Click
-        /// handler on the label would fire alongside the row's for one
-        /// press, cycling the sort twice).
-        /// <para>
-        /// The tooltip is LOAD-BEARING rather than decoration, and it has
-        /// to be on BOTH the label and the cell's own surface: Blish
-        /// resolves a tooltip on the deepest control under the cursor and
-        /// never bubbles, so whichever of the two the cursor is over is the
-        /// only one that can answer.
-        /// </para>
+        /// sortable header cell. No CLICK is wired here: the hit area is
+        /// the whole cell and <see cref="SortableHeaderCells"/> owns it (a
+        /// second handler on the label would fire alongside the row's for
+        /// one press and cycle the sort twice). The note goes on BOTH the
+        /// label and the cell's own surface, because a tooltip resolves on
+        /// the deepest control under the cursor and never bubbles.
         /// </summary>
         internal static void MarkSortable(Control control)
         {

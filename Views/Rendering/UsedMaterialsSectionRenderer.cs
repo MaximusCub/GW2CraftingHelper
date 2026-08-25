@@ -118,8 +118,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),
                 // The Item column is everything left of the Amount band -
-                // the same three terms the name's own ellipsis budget uses
-                // (see CreateUsedMaterialRow), with the gap split.
+                // the name's own ellipsis terms, with the gap split.
                 leftColumnEndForWidth: w => PlanRelayoutMath.HeaderSplitBeforeColumn(
                     PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap));
 

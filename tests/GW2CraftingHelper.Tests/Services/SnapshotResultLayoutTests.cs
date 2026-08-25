@@ -4,11 +4,9 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// How the Snapshot tab stacks its two titled, column-headed runs. The
-    /// properties worth pinning are the ones a screenshot would only show
-    /// by accident: a run with no rows costs nothing at all, the wallet run
-    /// clears everything above it, and the panel height covers the last row
-    /// of the last section.
+    /// How the Snapshot tab stacks its two titled, column-headed runs: a
+    /// run with no rows costs nothing, the wallet run clears everything
+    /// above it, and the panel height covers the last row.
     /// </summary>
     public class SnapshotResultLayoutTests
     {
@@ -53,9 +51,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void AnEmptyRun_IsAbsentRatherThanEmpty_AndCostsNoHeight()
         {
-            // The Wallet filter's shape: currencies only. The item section's
-            // title and header band must not reserve 70px of nothing above
-            // it, and the wallet section must start at the top.
+            // Wallet filter: the absent item section must not reserve 70px
+            // of nothing above the currencies.
             var layout = Compute(items: 0, wallet: 3);
 
             Assert.False(layout.Items.Present);
@@ -75,8 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void TotalHeight_CoversTheLastRowOfTheLastSection()
         {
-            // Nothing in the result panel auto-sizes, so a total short by
-            // one row clips that row rather than scrolling to it.
+            // Nothing auto-sizes here: a short total clips its last row.
             var layout = Compute(items: 3, wallet: 1);
 
             int walletBottom = layout.Wallet.HeaderY + HeaderBand + layout.Wallet.Grid.Height;

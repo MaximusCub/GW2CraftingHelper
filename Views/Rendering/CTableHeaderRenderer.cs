@@ -50,11 +50,10 @@ namespace GW2CraftingHelper.Views.Rendering
     // the right column - the full panel width for every caller whose
     // columns are pinned, i.e. all of them, and clamped to the panel for a
     // caller whose derived edge ever landed past it.
-    // leftColumnEndForWidth is where the LEFT column really ends, for a
-    // caller whose left column is the flexing name column: its header
-    // cell has to reach the band pinned to its right, not stop at the
-    // midpoint between two header words (see HeaderCellMath.LabelExtent).
-    // Omitted by the inert headers, whose cells answer nothing.
+    // leftColumnEndForWidth: where the flexing name column really ends,
+    // so its header cell reaches the band pinned to its right rather than
+    // stopping between two words (HeaderCellMath.LabelExtent). Omitted by
+    // the inert headers, whose cells answer nothing.
     // onLeftClick/onRightClick turn those two labels into sort controls
     // for the one caller that has a sortable table (Used Materials).
     // Omitted everywhere else, which leaves the label inert exactly as
@@ -102,16 +101,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
                 TableHeaderStyle.LabelY);
 
-            // The hit area is the whole cell, not the text - see
-            // SortableHeaderCells. The labels only carry the note, because
-            // a label swallows the hover of whatever is under it.
+            // The hit area is the whole cell (SortableHeaderCells); the
+            // labels only carry the note, which they would swallow.
             if (onLeftClick != null) SortableHeaderLabel.MarkSortable(leftLabelControl);
             if (onRightClick != null) SortableHeaderLabel.MarkSortable(rightLabelControl);
 
-            // Everything the cell split needs that does NOT change with the
-            // panel width, resolved once: the labels, their measured widths
-            // and their actions. Only the x's move on a resize, so the
-            // closure below neither measures a string nor allocates.
+            // Everything the split needs that does NOT move with the panel
+            // width, resolved once, so the closure below neither measures
+            // a string nor allocates.
             var plan = new HeaderCellPlan(
                 middleLabelControl == null ? 2 : 3, new SortableHeaderCells(rowPanel));
             plan.Set(0, leftLabelControl, Measure(font, leftLabel), onLeftClick);
@@ -138,9 +135,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     middleLabelControl.Location = new Point(middleXForWidth(w), TableHeaderStyle.LabelY);
                 }
 
-                // A right-pinned column's x is a function of the panel
-                // width, so its cell has to follow it rather than stay
-                // where the build-time width put it.
+                // A right-pinned column's edge moves with the panel.
                 if (leftColumnEndForWidth != null)
                 {
                     plan.SetBoundary(0, leftColumnEndForWidth(w));
@@ -150,13 +145,9 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        /// <summary>
-        /// Measured from the string rather than read off the control: a
-        /// Blish Label's own Width is not settled until its next layout
-        /// pass, and these cells are described in the same breath as the
-        /// label is created (the same reason CreateRightAlignedLabel
-        /// measures rather than reading Width).
-        /// </summary>
+        /// <summary>Measured from the string, not read off the control: a
+        /// Blish Label's Width is not settled until its next layout pass,
+        /// and these cells are described as the label is created.</summary>
         private static int Measure(BitmapFont font, string text)
         {
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);

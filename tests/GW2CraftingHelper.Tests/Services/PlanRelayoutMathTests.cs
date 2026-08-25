@@ -71,9 +71,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void HeaderSplit_SitsInTheGapTheNameColumnStopsAt()
         {
-            // Used Materials at its own numbers: the Item cell must cover
-            // every pixel a name can occupy and stop before the Amount
-            // band, whatever the header WORDS are wide.
+            // Used Materials' own numbers: the Item cell covers every pixel
+            // a name can occupy, whatever the header WORDS measure.
             int qtyRightEdge = PlanRelayoutMath.PinnedRightEdge(792);
             int split = PlanRelayoutMath.HeaderSplitBeforeColumn(qtyRightEdge, 40, 12);
             int nameRightEdge = 50 + PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, 40, 12, 50);

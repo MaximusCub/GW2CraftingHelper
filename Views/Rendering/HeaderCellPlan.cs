@@ -5,22 +5,17 @@ using System;
 namespace GW2CraftingHelper.Views.Rendering
 {
     /// <summary>
-    /// One header row's cells, described once and re-split on demand. The
-    /// labels, their measured widths and their sort actions are fixed for
-    /// the life of the row; only the x's move (a right-pinned column's x is
-    /// a function of the panel width).
+    /// One header row's cells, described once and re-split on demand: the
+    /// labels, their widths and their sort actions are fixed for the life
+    /// of the row, and only the x's move.
     /// <para>
-    /// CANONICAL NOTE on how often that is, because this class has callers
-    /// at two different rates and it is an easy one to get backwards. The
-    /// PLAN's sections re-split on every frame of a resize drag: their
-    /// closures go through ISectionRelayoutSink, and
-    /// CraftingPlanView.ReplayRelayout replays them straight off Blish's
-    /// Resized event. The SNAPSHOT re-splits once per drag, because
-    /// MainView.ScheduleRowRefit trailing-debounces its whole re-layout.
-    /// <see cref="Sync"/> is written to the stricter of the two: it reads
-    /// each label's current Location, splits into buffers this instance
-    /// owns, and hands the result to <see cref="SortableHeaderCells"/> - no
-    /// MeasureString, no allocation.
+    /// CANONICAL NOTE on how often, because the two callers differ and it
+    /// is easy to get backwards. The PLAN re-splits every frame of a drag
+    /// (CraftingPlanView.ReplayRelayout replays its ISectionRelayoutSink
+    /// closures off Blish's Resized event); the SNAPSHOT re-splits once per
+    /// drag, trailing-debounced by MainView.ScheduleRowRefit.
+    /// <see cref="Sync"/> is written to the stricter: buffers this instance
+    /// owns, no MeasureString, no allocation.
     /// </para>
     /// </summary>
     internal sealed class HeaderCellPlan
@@ -53,12 +48,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal int Count => _labels.Length;
 
-        /// <summary>
-        /// One column, left to right. A null <paramref name="onClick"/> is
-        /// an inert header (the Recipe Tree's "Source"): it still divides
-        /// the band, so the cells beside it cannot claim its pixels, but it
-        /// gets no wash and answers no click.
-        /// </summary>
+        /// <summary>One column, left to right. A null
+        /// <paramref name="onClick"/> is an inert header (the Recipe Tree's
+        /// "Source"): it still divides the band, so its neighbours cannot
+        /// claim its pixels, but it washes and answers nothing.</summary>
         internal void Set(int index, Label label, int width, Action onClick)
         {
             _labels[index] = label;
@@ -66,12 +59,10 @@ namespace GW2CraftingHelper.Views.Rendering
             _onClick[index] = onClick;
         }
 
-        /// <summary>
-        /// Where this column really ends, for a caller that knows: a
-        /// column edge rather than the midpoint between two header words.
-        /// A right-pinned column's edge moves with the panel, so this is
-        /// written on every re-layout - an int, not a measurement.
-        /// </summary>
+        /// <summary>Where this column really ends, for a caller that
+        /// knows: a column edge rather than a midpoint between two header
+        /// words. Written on every re-layout - an int, not a
+        /// measurement.</summary>
         internal void SetBoundary(int index, int cellEnd)
         {
             _boundaries[index] = cellEnd;

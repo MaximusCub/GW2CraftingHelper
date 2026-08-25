@@ -45,23 +45,13 @@ namespace GW2CraftingHelper.Views.Rendering
         /// The game's own canvas: pure black, faintly translucent, over
         /// the whole box.
         /// <para>
-        /// 0.82, retuned from 0.92 against the maintainer's own in-game
-        /// inventory capture. The interior of a real GW2 tooltip is not
-        /// flat: background medians shift about 20 levels per channel
-        /// across ONE box - (34,38,40) at one end to (43,55,55) at the
-        /// other - because the scene behind it shows through, which puts
-        /// the game's alpha nearer 0.75-0.85. At 0.92 ours was a flat card
-        /// that read as opaque beside it.
-        /// </para>
-        /// <para>
-        /// The upper end of that measured band, deliberately: audit finding
-        /// H6 is that content behind a tooltip must never bleed through
-        /// LEGIBLY, and 0.82 leaves 18% of the scene rather than the 25%
-        /// the bottom of the band would. This is the ONE translucent layer
-        /// - Blish's own tooltip art (0.98 alpha) is suppressed entirely by
-        /// the <see cref="PaintBeforeChildren"/> override below, and
-        /// stacking a second translucent layer would match neither the game
-        /// nor H6.
+        /// 0.82, retuned from 0.92 against the maintainer's in-game
+        /// capture: a real tooltip's interior is not flat - medians shift
+        /// ~20 levels per channel across ONE box, (34,38,40) to (43,55,55) -
+        /// which puts the game nearer 0.75-0.85. The UPPER end of that band,
+        /// since audit H6 requires content behind never to bleed through
+        /// legibly. The ONE translucent layer: Blish's own art (0.98) is
+        /// suppressed by <see cref="PaintBeforeChildren"/>.
         /// </para>
         /// </summary>
         private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.82f;
@@ -70,13 +60,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
         private static readonly Color BorderColor = new Color(6, 10, 12);
 
-        /// <summary>
-        /// The light line the game runs immediately inside its dark border
-        /// (the maintainer's capture shows the pair, not a single edge).
-        /// The same chrome grey this file already uses for the header
-        /// icon's frame, at low alpha: a bevel is a highlight on the canvas
-        /// beneath it, not a second border.
-        /// </summary>
+        /// <summary>The light line the game runs immediately inside its
+        /// dark border - the capture shows a pair, not one edge. This
+        /// file's own chrome grey at low alpha: a highlight on the canvas,
+        /// not a second border.</summary>
         private static readonly Color BevelColor = new Color(166, 175, 174) * 0.22f;
 
         /// <summary>
@@ -171,9 +158,8 @@ namespace GW2CraftingHelper.Views.Rendering
 
             DrawEdges(spriteBatch, pixel, bounds, BorderColor);
 
-            // The bevel sits one pixel inside the border, and only where
-            // there is room for both - a box two pixels wide would
-            // otherwise have the bevel overdraw its own border.
+            // One pixel inside the border, and only where there is room
+            // for both: at two pixels wide it would overdraw it.
             if (bounds.Width > 2 && bounds.Height > 2)
             {
                 DrawEdges(

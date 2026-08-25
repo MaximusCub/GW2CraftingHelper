@@ -2,25 +2,16 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// How the Snapshot tab's result area stacks: a titled, column-headed
-    /// section for the item run and another for the wallet run, each
-    /// present only when it has rows. Blish-free and tested, because it is
-    /// the arithmetic that decides where every cell lands - the view
-    /// (MainView.LayoutResultGrid) only copies the results onto controls,
-    /// and it writes every one of these y's itself rather than betting on a
-    /// FlowPanel re-flowing a later sibling when an earlier one changes
-    /// height (the reason the two runs already shared one panel).
-    /// <para>
-    /// Each section's grid placements are computed at its own offset, so
-    /// <see cref="SnapshotItemGridLayout.Grid.Cells"/> are absolute in the
-    /// result panel and the view needs no second offset of its own.
-    /// </para>
+    /// section per run, each present only when it has rows. The view
+    /// (MainView.LayoutResultGrid) writes every one of these y's itself
+    /// rather than betting on a FlowPanel re-flowing a later sibling.
+    /// Placements are computed at each section's own offset, so
+    /// <see cref="SnapshotItemGridLayout.Grid.Cells"/> are absolute.
     /// </summary>
     public static class SnapshotResultLayout
     {
-        /// <summary>
-        /// Gap above a section that follows another one. The first section
-        /// starts flush: it sits directly under the coin row's own gap.
-        /// </summary>
+        /// <summary>Gap above a section that follows another. The first
+        /// starts flush, under the coin row's own gap.</summary>
         public const int SectionGapY = 8;
 
         public readonly struct Section
@@ -48,10 +39,8 @@ namespace GW2CraftingHelper.Services
 
             public Section Wallet { get; }
 
-            /// <summary>
-            /// Height the result panel has to be given. Nothing here
-            /// auto-sizes, and a short panel clips its own last row.
-            /// </summary>
+            /// <summary>Height the result panel has to be given: nothing
+            /// here auto-sizes, and a short panel clips its last row.</summary>
             public int TotalHeight { get; }
 
             internal Result(Section items, Section wallet, int totalHeight)

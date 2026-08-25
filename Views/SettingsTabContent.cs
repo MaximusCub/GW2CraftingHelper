@@ -83,10 +83,8 @@ namespace GW2CraftingHelper.Views
         private const int SaveBarHeight = 40;
         private const int RowHeight = 30;
 
-        // The ramp's section-title band, not a second derivation of it:
-        // PlanContentHeightMath names the height a SectionTitle line needs
-        // and the y it sits at, and this tab's headings are the same tier
-        // drawn with the same divider rule.
+        // PlanContentHeightMath's SectionTitle band, aliased rather than
+        // re-derived: these headings are the same tier and rule.
         private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
         private const int SectionHeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
 
@@ -1249,10 +1247,8 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // The plan tables' own column-header band, aliased rather than
-        // re-derived: this grid's two labels are the same ColumnHeader tier
-        // over the same kind of data columns, so the band that holds one
-        // holds the other.
+        // The plan tables' column-header band, aliased: same tier over the
+        // same kind of data columns.
         private const int CurrencyHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
         private const int CurrencyHeaderTextY = PlanContentHeightMath.CTableHeaderLabelY;
 
@@ -1574,10 +1570,9 @@ namespace GW2CraftingHelper.Views
             };
             saveButton.Click += (_, __) => SaveAll();
 
-            // Status tier, like every other tab's status line: 18 BOLD, and
-            // bold is not a style choice at this size - see TypeRampMetrics
-            // on 18-regular's collapsed word gaps. y=9 centres the taller
-            // 23px line box in the 40px bar the 20px one sat at 12 in.
+            // Status tier, like every other tab's: 18 BOLD, which is not a
+            // style choice at this size (TypeRampMetrics on 18-regular's
+            // collapsed word gaps). y=9 re-centres the taller 23px line box.
             _statusLabel = new Label()
             {
                 Font = UiFonts.Status,

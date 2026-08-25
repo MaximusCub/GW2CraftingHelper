@@ -234,10 +234,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
                 font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
 
-            // The click and the hover belong to each column's whole header
-            // CELL, not to its text - see SortableHeaderCells. The labels
-            // carry only the note, because a label swallows the hover of
-            // whatever sits under it.
+            // The hit area is each column's whole header CELL (see
+            // SortableHeaderCells); the labels carry only the note.
             var labels = new[] { itemLabel, sourceLabel, amountLabel, eachLabel, totalLabel };
             var columns = new[]
             {
@@ -249,10 +247,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text
             };
 
-            // Widths measured once here rather than per relayout tick, and
-            // from the strings rather than off the controls: a Blish
-            // Label's Width is not settled until its next layout pass (the
-            // same reason CreateRightAlignedLabel measures).
+            // Measured once, and from the strings rather than off the
+            // controls: a Blish Label's Width is not settled until its next
+            // layout pass.
             var plan = new HeaderCellPlan(labels.Length, new SortableHeaderCells(rowPanel));
             for (int i = 0; i < labels.Length; i++)
             {
@@ -264,10 +261,9 @@ namespace GW2CraftingHelper.Views.Rendering
                     () => SortBy(column));
             }
 
-            // Each cell owns its COLUMN, not the pixels its word covers -
-            // the boundaries come from the same pre-scan the columns
-            // themselves do. The buffer is the closure's, written per tick
-            // and never reallocated.
+            // Each cell owns its COLUMN, not the pixels its word covers,
+            // from the same pre-scan the columns come from. The buffer is
+            // the closure's and is never reallocated.
             var boundaries = new int[labels.Length - 1];
             ApplyHeaderBoundaries(plan, scan, panelWidth, boundaries);
             plan.Sync(rowPanel.Width);

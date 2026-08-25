@@ -46,13 +46,11 @@ namespace GW2CraftingHelper.Views
         // own _statusPanel: the status label is auto-sized, so sharing the
         // toolbar row with the three right-anchored buttons ran a long
         // status underneath them at the module's default width.
-        // 26, not 24: the status line moved to the ramp's Status tier (18
-        // bold), whose lowest ink is 23 against Body's 21, so the same 1px
-        // of clearance under a y=2 line needs two more pixels of band.
+        // 26, not 24: the Status tier's lowest ink is 23 against Body's 21,
+        // so the same 1px of clearance needs two more pixels of band.
         private const int StatusRowHeight = 26;
 
-        // The rows below are a two-column table and now say so. Same band,
-        // same tier and same label y as every plan table's header.
+        // Same band, tier and label y as every plan table's header.
         private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
         private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
         private const int TopChromeHeight = ToolbarHeight + StatusRowHeight + ColumnHeaderRowHeight;
@@ -354,8 +352,8 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
-                // Y=2 inside this row, matching MainView's own status label;
-                // StatusRowHeight carries the clearance derivation.
+                // Y=2, matching MainView's status label; StatusRowHeight
+                // carries the clearance derivation.
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
@@ -869,13 +867,10 @@ namespace GW2CraftingHelper.Views
         // which cannot change any column - costs nothing per row.
         private int _lastLayoutWidth = -1;
 
-        /// <summary>
-        /// The rows' two columns, labelled. Built once per Build cycle; the
-        /// Message label's x follows the prefix column, which is width-
-        /// derived, so it is repositioned by the same
-        /// <see cref="MeasureRowMetrics"/> pass the rows themselves are laid
-        /// out from - the header cannot drift off the column it names.
-        /// </summary>
+        /// <summary>The rows' two columns, labelled. The Message label's x
+        /// is width-derived, so it is repositioned by the same
+        /// <see cref="MeasureRowMetrics"/> pass the rows are - the header
+        /// cannot drift off the column it names.</summary>
         private void BuildColumnHeader(Container container, int width)
         {
             _columnHeaderPanel = new Panel

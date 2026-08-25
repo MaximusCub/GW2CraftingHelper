@@ -85,10 +85,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CellColumns_JustifyToTheCellRatherThanPullingIn()
         {
-            // The plan view's own rule, applied to one grid cell: the
-            // Amount edge is a function of the cell width alone, and the
-            // name is the only part that flexes. A wider cell must not
-            // strand the recovered space to the right of the amount.
+            // The plan view's rule on one grid cell: a wider cell must not
+            // strand the recovered space right of the amount.
             const int band = 60;
             int narrow = SnapshotItemGridLayout.CellNameMaxWidth(600, band);
             int wide = SnapshotItemGridLayout.CellNameMaxWidth(800, band);
@@ -99,10 +97,8 @@ namespace GW2CraftingHelper.Tests.Services
                 SnapshotItemGridLayout.CellAmountRightEdge(800));
         }
 
-        // What a click at a given x in the header band sorts by. The Name
-        // column IS everything left of the Amount band, so its cell has to
-        // reach the band - not stop halfway between the two header words,
-        // which is where a label-derived boundary lands.
+        // The Name column IS everything left of the Amount band, so its
+        // cell reaches the band rather than stopping between two words.
         [Fact]
         public void HeaderCellSplit_SitsInTheGapBetweenTheNameAndTheAmountBand()
         {
@@ -116,8 +112,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.InRange(split, nameRightEdge, amountLeftEdge);
 
-            // Every pixel a name can occupy answers the Name header, and
-            // every pixel the amounts occupy answers the Amount header.
+            // Each pixel answers the header of the column it is in.
             Assert.True(split > nameRightEdge - SnapshotItemGridLayout.CellAmountGap);
             Assert.True(split < SnapshotItemGridLayout.CellAmountRightEdge(columnWidth));
         }
@@ -132,8 +127,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SnapshotItemGridLayout.CellHeaderSplitX(800, band)
                     - SnapshotItemGridLayout.CellHeaderSplitX(600, band));
 
-            // A wider Amount band pushes the boundary left by exactly its
-            // own growth - the band is what the boundary is measured from.
+            // The boundary is measured from the band, so it moves with it.
             Assert.Equal(
                 20,
                 SnapshotItemGridLayout.CellHeaderSplitX(600, band)
@@ -143,9 +137,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void AmountBand_IsFlooredAtItsOwnHeaderLabel()
         {
-            // A header at the ColumnHeader tier out-measures the digits
-            // under it, and a name budgeted against the digits alone would
-            // run under the header.
+            // The header out-measures its digits, and a name budgeted
+            // against the digits alone would run under it.
             Assert.Equal(79, SnapshotItemGridLayout.CellAmountBandWidth(32, 79));
             Assert.Equal(140, SnapshotItemGridLayout.CellAmountBandWidth(140, 79));
             Assert.Equal(0, SnapshotItemGridLayout.CellAmountBandWidth(-5, 0));

@@ -54,27 +54,21 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static BitmapFont Caption => GameService.Content.DefaultFont14;
 
         /// <summary>
-        /// Every column header the module draws - the plan's six tables,
-        /// the Snapshot tab's two runs, the Log tab's row columns - and the
-        /// Total Cost band's tile captions. Bold: headers used to be the
-        /// same size and weight as the rows under them, with only the dark
-        /// band separating them.
+        /// Every column header the module draws, and the Total Cost band's
+        /// tile captions. Bold, because headers used to be the same size and
+        /// weight as the rows under them.
         /// </summary>
         internal static BitmapFont ColumnHeader =>
             Bold(TypeRampMetrics.ColumnHeaderPointSize);
 
-        /// <summary>
-        /// Every section title in the module: the plan's eight collapsible
-        /// sections, and the Snapshot/Settings/About tabs' own headings.
-        /// </summary>
+        /// <summary>Every section title in the module.</summary>
         internal static BitmapFont SectionTitle =>
             Bold(TypeRampMetrics.SectionTitlePointSize);
 
         /// <summary>
-        /// Every tab's status line. Bold rather than regular at this size
-        /// for a measured reason, not a stylistic one - see
-        /// TypeRampMetrics' note on 18-regular's space glyph, which is also
-        /// why nothing in this ramp resolves 18-regular any more.
+        /// Every tab's status line. Bold for a measured reason, not a
+        /// stylistic one - see TypeRampMetrics on 18-regular's space glyph,
+        /// which is why nothing here resolves 18-regular.
         /// </summary>
         internal static BitmapFont Status =>
             Bold(TypeRampMetrics.StatusPointSize);

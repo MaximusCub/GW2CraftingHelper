@@ -32,14 +32,10 @@ namespace GW2CraftingHelper.Services
         public const int SilverAssetId = 156907;
         public const int CopperAssetId = 156902;
 
-        /// <summary>
-        /// What a coin icon says on hover. A denomination icon is the one
-        /// icon in the module whose subject is a colour and a shape rather
-        /// than a word, and the currency icons rendered beside it in the
-        /// same run already name themselves. Null for anything that is not
-        /// a coin denomination, which is the icon component's own "no text
-        /// of my own" input.
-        /// </summary>
+        /// <summary>What a coin icon says on hover - the one icon whose
+        /// subject is a colour and a shape rather than a word. Null for
+        /// anything else, the icon component's "no text of my own"
+        /// input.</summary>
         public static string DenominationName(int assetId)
         {
             switch (assetId)

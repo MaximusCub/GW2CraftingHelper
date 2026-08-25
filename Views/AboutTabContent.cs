@@ -206,10 +206,9 @@ namespace GW2CraftingHelper.Views
                 nameX = NameColumnX + IconSize + 10;
             }
 
-            // SectionTitle, and y=8 rather than 10: the tier's line box is
-            // 29px against the 23px this row was built for, so re-centring
-            // it in the same 44px band is what keeps it level with the icon
-            // beside it.
+            // SectionTitle, y=8 not 10: the tier's line box is 29px against
+            // the 23px this row was built for, and re-centring keeps it
+            // level with the icon beside it.
             new Label()
             {
                 Text = $"{info.Name} v{info.Version}",
@@ -272,10 +271,9 @@ namespace GW2CraftingHelper.Views
         // values only, never wrapped).
         private void AddLabeledInfoSection(string label, string text, int panelWidth)
         {
-            // These two are the tab's own section headings, not info lines,
-            // so they take the ramp's SectionTitle tier and the band height
-            // it is derived for (PlanContentHeightMath) rather than reading
-            // as slightly-bolder prose above the prose they introduce.
+            // Section headings, not info lines: the SectionTitle tier and
+            // the band PlanContentHeightMath derives for it, rather than
+            // slightly-bolder prose above the prose they introduce.
             var labelPanel = new Panel()
             {
                 Size = new Point(panelWidth, SectionHeaderRowHeight),

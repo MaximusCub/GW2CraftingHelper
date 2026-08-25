@@ -208,11 +208,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void StatusRow_HoldsTheStatusTierItIsDrawnIn()
         {
-            // The status line moved from Body to the ramp's Status tier,
-            // whose ink runs 2px deeper. A band left at the Body height
-            // clips a descender rather than failing anywhere else, so the
-            // clearance is asserted against the measured ink rather than
-            // against the literal the row used to be.
+            // The Status tier's ink runs 2px deeper than Body's, and a band
+            // left at the old height clips a descender - so this asserts
+            // against the measured ink, not the old literal.
             const int labelY = 2;
 
             Assert.True(

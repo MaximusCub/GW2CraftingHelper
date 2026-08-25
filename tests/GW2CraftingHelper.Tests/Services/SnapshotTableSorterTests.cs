@@ -61,8 +61,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Names(rows, SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 2))));
 
             // Third click resets to None. The view keeps no copy of the
-            // search's order - its cells ARE in that order - so this has
-            // to come back as "leave them alone", not as a permutation.
+            // search's order, so this must answer "leave them alone".
             Assert.Null(SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 3)));
             Assert.Null(SnapshotTableSorter.ItemOrder(rows, new TableSortState<SnapshotTableColumn>()));
             Assert.Null(SnapshotTableSorter.ItemOrder(rows, null));
@@ -74,8 +73,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = Items();
             var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Amount, 1));
 
-            // 30 and 30 tie: "Mystic Clover" was emitted first and stays
-            // first, so a sort never silently reshuffles equal rows.
+            // Ties keep emission order: no silent reshuffle of equal rows.
             Assert.Equal(new[] { "Mystic Clover", "Ectoplasm", "copper ore" }, Names(rows, order));
         }
 
@@ -132,12 +130,9 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(rows.Count, seen.Count);
         }
 
-        /// <summary>
-        /// The rows as the tab would show them: display position i reads
-        /// row order[i], which is the indexing step MainView.PlaceCells
-        /// does over the controls it already built. A null order is the
-        /// list as the search produced it.
-        /// </summary>
+        /// <summary>The rows as the tab would show them - the indexing
+        /// step MainView.PlaceCells does over its built controls. A null
+        /// order is the search's own list.</summary>
         private static string[] Names(IReadOnlyList<SnapshotSearchRow> rows, IReadOnlyList<int> order)
         {
             var names = new string[rows.Count];

@@ -280,11 +280,8 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // The hover a coin icon answers with. Every denomination the coin
-        // renderer can build a segment for has to have one - an icon that
-        // says nothing beside a currency icon that names itself is the
-        // reported inconsistency - and anything else must return null,
-        // which is the icon component's "no text of my own" input rather
-        // than a wrong name.
+        // renderer can build a segment for has to have one; anything else
+        // returns null, the icon component's "no text of my own" input.
         [Theory]
         [InlineData(CoinSegmentMath.GoldAssetId, "Gold")]
         [InlineData(CoinSegmentMath.SilverAssetId, "Silver")]
@@ -304,9 +301,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void EverySegmentTheSplitProduces_CarriesANamedDenomination()
         {
-            // Guards the pairing rather than the three literals: a fourth
-            // denomination added to FormatSegmentTexts' own asset order
-            // would otherwise ship an unnamed icon.
+            // Guards the pairing, not the three literals: a fourth
+            // denomination would otherwise ship an unnamed icon.
             foreach (int assetId in new[]
             {
                 CoinSegmentMath.GoldAssetId, CoinSegmentMath.SilverAssetId, CoinSegmentMath.CopperAssetId
