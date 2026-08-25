@@ -693,7 +693,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefitTextAfterResizeSettle()
         {
-            if (!_buildComplete) return;
+            if (!_buildComplete || _panelWidth <= 0) return;
 
             Relayout(measureText: true);
         }

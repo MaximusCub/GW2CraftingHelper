@@ -8,24 +8,14 @@ namespace GW2CraftingHelper.Services
     /// Arms ONE trailing callback per resize drag, however many resize
     /// events that drag produces: every event only stamps the clock, and the
     /// single in-flight waiter re-arms itself against that stamp until the
-    /// drag has been quiet for <see cref="SettleMs"/>. What a view puts
-    /// behind it is the work that MEASURES text - wrapping and ellipsizing
-    /// are hundreds of MeasureString calls, and a drag delivers events at
-    /// frame rate; positions and widths are cheap arithmetic and stay on the
-    /// live path.
-    ///
-    /// <para>
-    /// Deliberately not a cancel-and-replace timer, which costs a
-    /// CancellationTokenSource and a thrown cancellation per drag FRAME on
-    /// the UI thread's own event path.
-    /// </para>
-    /// <para>
+    /// drag has been quiet for <see cref="SettleMs"/>. What views put behind
+    /// it is the work that MEASURES text; positions and widths are cheap
+    /// arithmetic and stay on the live path. Deliberately not a
+    /// cancel-and-replace timer, which costs a CancellationTokenSource and a
+    /// thrown cancellation per drag FRAME on the UI thread's own event path.
     /// Blish-free by construction: the caller supplies the marshal that puts
     /// the callback back on the UI thread, since the continuation after the
-    /// delay may resume on a ThreadPool thread. A marshal returning false
-    /// means the callback was dropped and will never run, which is what
-    /// releases the in-flight slot rather than starving every later drag.
-    /// </para>
+    /// delay may resume on a ThreadPool thread.
     /// </summary>
     public sealed class ResizeSettleDebounce
     {
@@ -38,7 +28,11 @@ namespace GW2CraftingHelper.Services
         private readonly int _settleMs;
 
         private long _lastEventTicks;
-        private bool _pending;
+
+        // Volatile: the waiter writes it too, on the paths where the
+        // callback will never run, and a stale read there starves every
+        // later drag.
+        private volatile bool _pending;
         private volatile bool _cancelled;
 
         public ResizeSettleDebounce(
@@ -72,11 +66,8 @@ namespace GW2CraftingHelper.Services
             RunAfterSettleAsync();
         }
 
-        /// <summary>
-        /// Drops the armed callback and refuses further arming - for a view
-        /// tearing its control tree down, whose callback would otherwise
-        /// reach disposed controls.
-        /// </summary>
+        /// <summary>Drops the armed callback and refuses further arming,
+        /// for a view tearing its control tree down.</summary>
         public void Cancel()
         {
             _cancelled = true;
