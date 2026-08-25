@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
@@ -65,14 +66,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Throws<ArgumentNullException>(() => gate.Clear(null));
         }
 
-        // The two lock-ordering tests below block on purpose, so xUnit1031
-        // ("use an async test method and await instead") cannot apply: the
-        // blocking call IS the assertion. Assert.False(task.Wait(200ms))
-        // passes precisely because the task is still parked behind the other
-        // operation's lock, and awaiting it would wait for the completion the
-        // test exists to prove does not happen yet. The waits are all bounded
-        // (200ms to fail fast, 5s ceilings elsewhere), so a genuine deadlock
-        // fails the test rather than hanging the run.
+        // The two lock-ordering tests below prove that one operation is
+        // PARKED on the gate's lock while the other holds it. They used to
+        // do that with Assert.False(task.Wait(200ms)), which is a negative
+        // timing assertion: it spends 200ms of every run, and on a runner
+        // slow enough to not have scheduled the second task yet it passes
+        // even with the lock deleted - it can only ever weaken, never fail
+        // loudly. They now run the second operation on a real Thread and
+        // wait for it to report WaitSleepJoin, which is what a thread
+        // blocked on Monitor.Enter reports and nothing else here can
+        // produce. That is a positive observation, it is immediate, and
+        // deleting the lock makes it impossible.
+        //
+        // xUnit1031 ("await instead of blocking") cannot apply: the parked
+        // thread IS the assertion, and awaiting it would wait for the
+        // completion the test exists to prove has not happened yet.
 #pragma warning disable xUnit1031
         [Fact]
         public void ClearDuringInFlightCommit_BlocksUntilCommitFinishes_ThenSeesBumpedEpoch()
@@ -109,20 +117,25 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.True(commitEntered.Wait(TimeSpan.FromSeconds(5)));
 
-            var clearTask = Task.Run(() =>
+            var clearReachedTheCall = new ManualResetEventSlim(false);
+            var clearBodyRan = new ManualResetEventSlim(false);
+            var clearThread = StartBlocking(() =>
             {
-                gate.Clear(() => events.Add("clear"));
+                clearReachedTheCall.Set();
+                gate.Clear(() =>
+                {
+                    events.Add("clear");
+                    clearBodyRan.Set();
+                });
             });
 
-            // Clear must be blocked behind the commit's lock - it cannot
-            // have run (and therefore cannot have bumped the epoch or
-            // touched cleared-state) while the commit is still in flight.
-            Assert.False(clearTask.Wait(TimeSpan.FromMilliseconds(200)));
+            Assert.True(clearReachedTheCall.Wait(TimeSpan.FromSeconds(5)));
+            AssertParkedOnTheLock(clearThread, clearBodyRan, "Clear");
 
             releaseCommit.Set();
 
             Assert.True(commitTask.Wait(TimeSpan.FromSeconds(5)));
-            Assert.True(clearTask.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(clearThread.Join(TimeSpan.FromSeconds(5)));
 
             Assert.True(committed);
             Assert.Equal(new[] { "commit-start", "commit-end", "clear" }, events);
@@ -159,21 +172,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(clearEntered.Wait(TimeSpan.FromSeconds(5)));
 
             bool committed = false;
-            var commitTask = Task.Run(() =>
+            var commitReachedTheCall = new ManualResetEventSlim(false);
+            var commitBodyRan = new ManualResetEventSlim(false);
+            var commitThread = StartBlocking(() =>
             {
-                committed = gate.TryCommit(myEpoch, () => events.Add("commit"));
+                commitReachedTheCall.Set();
+                committed = gate.TryCommit(myEpoch, () =>
+                {
+                    events.Add("commit");
+                    commitBodyRan.Set();
+                });
             });
 
-            Assert.False(commitTask.Wait(TimeSpan.FromMilliseconds(200)));
+            Assert.True(commitReachedTheCall.Wait(TimeSpan.FromSeconds(5)));
+            AssertParkedOnTheLock(commitThread, commitBodyRan, "TryCommit");
 
             releaseClear.Set();
 
             Assert.True(clearTask.Wait(TimeSpan.FromSeconds(5)));
-            Assert.True(commitTask.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(commitThread.Join(TimeSpan.FromSeconds(5)));
 
             Assert.False(committed);
             Assert.Equal(new[] { "clear-start", "clear-end" }, events);
         }
 #pragma warning restore xUnit1031
+
+        private static Thread StartBlocking(Action body)
+        {
+            var thread = new Thread(new ThreadStart(body));
+            thread.IsBackground = true;
+            thread.Start();
+            return thread;
+        }
+
+        /// <summary>
+        /// Spins until <paramref name="thread"/> reports WaitSleepJoin - the
+        /// state a thread blocked on Monitor.Enter is in, and the only thing
+        /// it can be blocked on here. If the gate's lock were removed the
+        /// thread would run straight through instead, which the in-loop
+        /// check on <paramref name="bodyRan"/> catches on its first pass.
+        /// The elapsed ceiling is a hang guard only: it turns a genuine
+        /// deadlock into a failing test rather than a stalled run, and no
+        /// verdict here depends on how fast the runner is.
+        /// </summary>
+        private static void AssertParkedOnTheLock(
+            Thread thread, ManualResetEventSlim bodyRan, string what)
+        {
+            var guard = Stopwatch.StartNew();
+            while ((thread.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0)
+            {
+                Assert.False(
+                    bodyRan.IsSet,
+                    what + " ran while the other operation held the gate's lock");
+                Assert.True(
+                    guard.ElapsedMilliseconds < 5000,
+                    what + " never parked on the gate's lock (state "
+                        + thread.ThreadState + ")");
+                Thread.Yield();
+            }
+
+            Assert.False(
+                bodyRan.IsSet,
+                what + " ran while the other operation held the gate's lock");
+        }
     }
 }

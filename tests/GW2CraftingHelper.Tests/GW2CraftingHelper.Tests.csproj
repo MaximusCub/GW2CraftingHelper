@@ -4,15 +4,20 @@
     <TargetFramework>net48</TargetFramework>
     <IsPackable>false</IsPackable>
     <!-- xUnit1031 is a deadlock rule, not a style rule. Blocking inside a
-         synchronous [Fact] parks a worker on xUnit's MaxConcurrencySyncContext,
-         and this project ships no xunit.runner.json, so it runs at the default
-         parallelism: enough simultaneous blocks on a low-core CI box stall the
-         run. That presents as a hung job with no failing test, which is the
-         worst thing to be handed. xUnit2009 is here because the twelve warnings
-         these two codes produced had gone unread for long enough to prove
-         nobody was reading test-project warnings at all. -->
+         synchronous [Fact] parks a worker on xUnit's MaxConcurrencySyncContext:
+         enough simultaneous blocks stall the run, which presents as a hung job
+         with no failing test - the worst thing to be handed. xunit.runner.json
+         now pins maxParallelThreads to 4, so the ceiling is the same on a
+         2-core CI box and a 16-core desktop instead of tracking whatever the
+         machine reports. xUnit2009 is here because the twelve warnings these
+         two codes produced had gone unread for long enough to prove nobody was
+         reading test-project warnings at all. -->
     <WarningsAsErrors>xUnit1031;xUnit2009</WarningsAsErrors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />

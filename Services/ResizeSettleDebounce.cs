@@ -26,6 +26,8 @@ namespace GW2CraftingHelper.Services
         private readonly Func<Action, bool> _marshal;
         private readonly Action<Exception> _onError;
         private readonly int _settleMs;
+        private readonly Func<DateTime> _utcNow;
+        private readonly Func<int, Task> _delay;
 
         private long _lastEventTicks;
 
@@ -35,11 +37,19 @@ namespace GW2CraftingHelper.Services
         private volatile bool _pending;
         private volatile bool _cancelled;
 
+        /// <param name="utcNow">Clock the settle window is measured against.
+        /// Null means DateTime.UtcNow, which is what every view passes.</param>
+        /// <param name="delay">How the waiter sleeps between re-checks. Null
+        /// means Task.Delay. Both seams exist so the debounce's own tests can
+        /// drive the window exactly instead of racing a real one - the
+        /// pattern TradingPostService already uses for its utcNow.</param>
         public ResizeSettleDebounce(
             Action onSettled,
             Func<Action, bool> marshal,
             int settleMs,
-            Action<Exception> onError)
+            Action<Exception> onError,
+            Func<DateTime> utcNow = null,
+            Func<int, Task> delay = null)
         {
             if (onSettled == null)
             {
@@ -55,6 +65,8 @@ namespace GW2CraftingHelper.Services
             _marshal = marshal;
             _settleMs = settleMs > 0 ? settleMs : DefaultSettleMs;
             _onError = onError;
+            _utcNow = utcNow ?? (() => DateTime.UtcNow);
+            _delay = delay ?? (ms => Task.Delay(ms));
         }
 
         public int SettleMs => _settleMs;
@@ -69,7 +81,7 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            Interlocked.Exchange(ref _lastEventTicks, DateTime.UtcNow.Ticks);
+            Interlocked.Exchange(ref _lastEventTicks, _utcNow().Ticks);
             if (_pending)
             {
                 return;
@@ -93,7 +105,7 @@ namespace GW2CraftingHelper.Services
                 while (true)
                 {
                     long elapsedMs =
-                        (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastEventTicks))
+                        (_utcNow().Ticks - Interlocked.Read(ref _lastEventTicks))
                         / TimeSpan.TicksPerMillisecond;
                     if (elapsedMs >= _settleMs)
                     {
@@ -103,7 +115,7 @@ namespace GW2CraftingHelper.Services
                     // Clamped: a stamp landing between the two reads above
                     // can make this negative, which Task.Delay rejects.
                     int remaining = (int)(_settleMs - elapsedMs);
-                    await Task.Delay(remaining > 0 ? remaining : 1);
+                    await _delay(remaining > 0 ? remaining : 1);
                 }
 
                 if (_cancelled || !_marshal(Invoke))
