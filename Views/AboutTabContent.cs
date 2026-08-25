@@ -183,6 +183,16 @@ namespace GW2CraftingHelper.Views
         // see Relayout.
         private readonly ResizeSettleDebounce _resizeSettle;
 
+        // False while Build is midway through replacing the blocks below.
+        // Module keeps ONE AboutTabContent and Blish re-runs Build on it at
+        // every tab open, off the UI thread, while the settle callback is
+        // marshalled onto the main thread - so without this, opening the
+        // tab inside a settle window would run ApplyLayout against blocks
+        // Build has just nulled. Volatile so the reader that sees true also
+        // sees the finished blocks; same gate SettingsTabContent uses, for
+        // the same reason.
+        private volatile bool _buildComplete;
+
         public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
         {
             _moduleParameters = moduleParameters ?? throw new ArgumentNullException(nameof(moduleParameters));
@@ -198,6 +208,8 @@ namespace GW2CraftingHelper.Views
 
         public void Build(Container container)
         {
+            _buildComplete = false;
+
             var info = LoadAboutInfo();
 
             _factRows.Clear();
@@ -263,6 +275,18 @@ namespace GW2CraftingHelper.Views
                     container.ContentRegion.Height);
                 Relayout(ContentWidth(container));
             };
+
+            _buildComplete = true;
+        }
+
+        /// <summary>
+        /// Releases what outlives this tab's control tree. Called from
+        /// Module.Unload; safe when the tab was never opened, and safe
+        /// twice. Mirrors SettingsTabContent.Teardown.
+        /// </summary>
+        public void Teardown()
+        {
+            _resizeSettle.Cancel();
         }
 
         private static int ContentWidth(Container container)
@@ -467,8 +491,15 @@ namespace GW2CraftingHelper.Views
             _resizeSettle.Schedule();
         }
 
+        /// <summary>
+        /// The trailing half of a resize. Skipped while a rebuild is in
+        /// flight, whose own Build pass measures everything anyway - see
+        /// <see cref="_buildComplete"/>.
+        /// </summary>
         private void RefitTextAfterResizeSettle()
         {
+            if (!_buildComplete || _panelWidth <= 0) return;
+
             ApplyLayout(_panelWidth, measureText: true);
         }
 

@@ -1106,6 +1106,7 @@ namespace GW2CraftingHelper
 
             Views.Rendering.ClickSound.Unload();
             _settingsContent?.Teardown();
+            _aboutContent?.Teardown();
 
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush

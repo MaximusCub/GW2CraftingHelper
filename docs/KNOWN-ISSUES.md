@@ -1887,6 +1887,17 @@ CraftingPlanView's stays separate because it steps across frames off
 DoUpdate and cannot use Task.Delay. The class is Blish-free - the caller
 hands it the marshal - which is what makes its behaviour testable.
 
+All three settle callbacks are gated, because the callback is marshalled
+onto the MAIN thread while Blish runs Build on a ThreadPool thread: Log
+tests IsLive, Settings and About test a volatile _buildComplete cleared
+at the top of Build and set at its end. About needs the flag rather than
+a liveness test for a reason the other two do not share - Module keeps
+ONE AboutTabContent for the module's lifetime and Blish re-runs Build on
+it at every open, so a settle armed by a drag can land inside the next
+open's Build, on blocks that Build has already nulled. Settings and
+About also Cancel their debounce from Teardown at Module.Unload; Log
+does not need to, since Blish builds a fresh LogTabContent per visit.
+
 The lever in the views is one bool, measureText, threaded through the
 layout functions so build and both halves of a resize stay one code path
 rather than three. On Settings and About the Label's own
@@ -2249,6 +2260,15 @@ ABOUT
   first open's stored width, the guard short-circuited, and the tab came
   back blank. Repeat the switch three or four times, and once more after
   a resize, since the guard only fires when the width matches.
+- The companion sequence, which the bullet above deliberately avoids:
+  with About open, DRAG the window edge and then - within the 150ms
+  settle window, so immediately - click Settings and click straight back
+  to About. Blish re-runs Build on the one reused AboutTabContent off the
+  UI thread while the settle callback lands on the main thread, so this
+  is the one sequence that puts the two on the same blocks. About must
+  come back fully drawn, not blank and not truncated, and the log must
+  carry no "MainThreadMarshal queued action threw". Repeat three or four
+  times, narrowing and widening.
 - 1378: two columns; facts left, Disclaimer over gw2efficiency right;
   both prose headings draw a rule.
 - Read the gw2efficiency paragraph and count roughly 60-70 characters per
