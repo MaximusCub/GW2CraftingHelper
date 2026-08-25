@@ -176,6 +176,7 @@ namespace GW2CraftingHelper.Views
             public Panel Rule;
             public Panel Chip;
             public int ChipWidth;
+            public int ChipY;
 
             public readonly List<string> Prose = new List<string>();
             public readonly List<Label> ProseLabels = new List<Label>();
@@ -766,10 +767,13 @@ namespace GW2CraftingHelper.Views
         {
             PillColors.GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
             section.ChipWidth = LabelHelpers.MeasureSmallTagWidth(text);
+
+            // Centred in the band ABOVE its rule, so the tag clears the rule
+            // the way the band's title does.
+            section.ChipY = PlanRelayoutMath.CenterX(
+                SectionHeaderRowHeight - 3, LabelHelpers.SmallTagHeight);
             section.Chip = LabelHelpers.CreateSmallTag(
-                section.Panel, text, 0,
-                (SectionHeaderRowHeight - 3 - LabelHelpers.SmallTagHeight) / 2,
-                border, fill);
+                section.Panel, text, 0, section.ChipY, border, fill);
             LabelHelpers.ApplyTagTooltip(section.Chip, tooltip);
         }
 
@@ -850,7 +854,7 @@ namespace GW2CraftingHelper.Views
                 section.Chip.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(
                         PlanRelayoutMath.PinnedRightEdge(columnWidth), section.ChipWidth),
-                    section.Chip.Location.Y);
+                    section.ChipY);
             }
 
             int y = SectionHeaderRowHeight + SettingsFormLayout.TitleToContentGap;

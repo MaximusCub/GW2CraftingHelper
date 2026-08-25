@@ -1802,3 +1802,331 @@ and it is the tripwire working as designed rather than a defect: fresh
 records land in the append zone, and the NEXT rotation takes them. They
 were deliberately left in place here rather than archived minutes after
 being written, so this release's record reads in one file.
+
+## Remaining-tabs design pass (tab-design-pass)
+
+The closing note of the app-wide UI consistency wave named exactly this
+milestone: those tabs took the wave's TYPE ramp but not its LAYOUT -
+Settings, Log and About stayed left-packed, with the panel's right half
+empty at every window width, because that wave scoped the ramp plus the
+Snapshot grid rather than a per-tab redesign. The maintainer, on the
+Settings capture: "the font hierarchy in the settings dialog ... does not
+follow consistently with the crafting plan pane which looks gorgeous. all
+the tabs need the same treatment."
+
+Measured before the change, at the 1378 window minimum (a 1232px panel):
+the widest Settings control row ended at x=604, leaving 628px empty on
+every row at the NARROWEST window the module supports; the currency grid
+ran two columns of 616 holding 454 of content, and its column count was
+hard-capped at two, so a wide window left hundreds of pixels dead inside
+each of 47 cells; the Log tab's prefix gutter was sized from a worst-case
+template (widest level + widest-digit stamp + fourteen 'w' glyphs) on
+every row whatever the rows contained; About never re-read its width
+after Build at all, so widening the window left the prose wrapped at the
+width the tab was opened with.
+
+Nothing new was invented. Every edge here is PlanRelayoutMath's
+(PinnedRightEdge, RightAlignedX, NameMaxWidthBeforeColumn, CenterX),
+every grid is SnapshotItemGridLayout's min-column-width law, every band
+is max(widest data, own header label), and every overflow is ellipsis
+plus a full-text tooltip stamped on the label AND its row panel.
+
+### The cross-cutting frame
+
+One content frame per tab: left inset 16, right edge
+PlanRelayoutMath.PinnedRightEdge(contentWidth), contentWidth = the
+container less WindowSizing.ScrollbarAllowance. That constant is new only
+as a NAME - it replaces three private copies (LogTabContent's,
+SnapshotItemGridLayout's, MainView's source-filter one), and it lives in
+WindowSizing because WindowToTabPanelChrome already accounts for the same
+20px there. WindowSizing.RightEdgePadding becomes the same number seen
+from the padding side rather than a second definition of it, since the
+chrome derivation and CraftingPlanView are written in those terms.
+SettingsTabContent.RightEdgePadding and AboutTabContent's copy are
+deleted; they subtracted 20 for a scrollbar and then placed everything
+with no right-hand relationship at all, which IS the left-pack.
+
+Accepted asymmetry, stated rather than hidden: 16 left, 8 right. The
+right margin is PlanRelayoutMath.TableRightMargin, the module's one table
+margin, reused rather than forked; the left inset is the section-title
+inset these tabs already used. A maintainer who wants 16/16 moves one
+constant.
+
+Services/ColumnBoardLayout packs variable-height blocks into N min-width
+columns, row-major, each board row as tall as its tallest block.
+Row-major rather than shortest-column masonry on purpose: masonry
+balances better but re-sorts blocks as the width changes, and a settings
+section that jumps columns mid-drag is worse than a ragged bottom.
+
+### Settings
+
+The tab's real structure is a TABLE of settings, not a form: the
+setting's NAME flexes and its CONTROL pins to the column's right edge, so
+every input in a column lands on one vertical line at every width. Two
+columns of >= 570 fit at the floor, three at a 1710 panel, four at 2280 -
+one section per column. The 570 is derived term by term (16 pad + a
+22-char name floor at MaxCharWidthPx + 12 + the widest cluster on the
+tab, which is the click-volume row's slider/readout/Test run, + 8), not
+chosen, and the test reproduces the sum rather than asserting the total.
+
+The unit hint and the error message shared no column with anything; they
+sat at two hard-coded x's 130px apart. They are one right-pinned tag slot
+now, banded at max(widest unit, widest error) across the section so the
+column does not MOVE when a row fails validation - the header-floored
+band rule, applied to a form. The Diagnostics row's 92-character
+explanation, which used to sit at a fourth left column x=186 matching
+nothing, becomes that row's own wrapped description line.
+
+The currency grid's column cap is gone (it now uses the same
+gridWidth / MinColumnWidth law its Snapshot sibling already used) and its
+cell justifies: the [amount][Ignore][tag] block pins to the cell's own
+PinnedRightEdge and the name is the only part that flexes. CORRECTION to
+the design phase's arithmetic, since the derivation is now the test: the
+re-derived MinColumnWidth is 490, not the 504 the spec computed (that sum
+double-counted a term). Two columns therefore need a 980px panel, against
+the floor's 1232 - nothing regresses at the minimum, and the two-column
+threshold still sits far below it.
+
+Six grey info lines above that section became two. Each dropped line was
+checked against the tooltips already on the controls it describes: "leave
+a currency unset" and "some currencies show a default estimate" are
+stated verbatim on the amount box's own hover and on the default tag's,
+and the price-basis pointer moved to the section title's hover. The two
+that remain are the one that says what the number means and the
+field-test line that says an amount can be typed over a default at all.
+This is copy, not layout - cheap for the maintainer to veto.
+
+State that only a dialog could see is now on the surface that owns it:
+the save bar carries a dirty chip on the left (hidden entirely at zero,
+the tree chips' own rule) and [Discard] [Save] pinned right, against the
+same content width the scrolling panel below uses so Save lands on the
+line the content's right edge holds. UnsavedChangeCount and
+DiscardChanges both already existed and were reachable only from the
+tab-switch prompt. Discard goes through the confirm matrix because the
+click destroys manual edits; Save stays always-enabled, because a
+disabled primary invites "why is this disabled?".
+
+Cost of the chip, stated: it recomputes a whole-form SettingsFormState
+(about 100 keys) on every keystroke in a settings box. Not a hot path,
+and LoadAll suspends the refresh so one load does not run fifty of them.
+
+The Sound section's "applies immediately - no Save needed" line became a
+right-pinned tag in its own title band, in neutral Locked chrome. The
+four save-gated sections carry no counterpart: a standing "Save needed"
+on four of five sections is a colour that says nothing. The section
+titles moved to the same 16px inset their own rules start at, instead of
+floating 16px inside them, and each rule now spans its own column.
+
+### Log
+
+The prefix gutter was one worst-case string. It is two aligned bands now
+- a Time band that is a genuine constant (max over the level names of
+"[LEVEL] " plus the widest-digit stamp; the level names are a closed set,
+so no row can widen it) and a Tag band at max(widest tag actually
+rendered, its own "Tag" header label). The template existed for a real
+reason, recorded in its own doc comment: the incremental append path sees
+only new entries, so a content-derived width would drift from a full
+rebuild's. That is answered rather than reverted - the widest rendered
+tag is a monotonic high-water mark per render generation, reset by
+RebuildRows (which every filter change, tab switch and Clear View already
+goes through) and only ever raised by an append, where a raise re-runs
+the existing suspended refit walk after the eviction trim.
+
+Cost, stated: one more Label per rendered row (four controls against
+three) and one more ellipsize per row per refit, both bounded by the ring
+cap and both inside the existing SuspendLayout. The rebuild path's new
+per-row tag measuring is memoised per distinct tag string - the module
+writes about a dozen tags in its whole lifetime - so a filter keystroke
+walking 2000 rows measures a dozen strings, not 2000.
+
+Accepted divergence: timestamps still do not align pixel-for-pixel
+between an [INFO] row and a [DEBUG] one, because the level word and the
+stamp share one Label. Fixing it costs a further label per row on the
+module's heaviest render path. The tag and message columns - the two a
+reader scans - do align.
+
+The header stays inert: three plain ColumnHeader labels, no
+SortableHeaderCells. A log is chronological, "sort by tag" is a filter,
+and the level dropdown is where filtering lives; that class already
+supports inert columns through a null OnClick, so the option stays open
+at no cost, but wiring it for zero sortable columns would be
+infrastructure with no caller.
+
+The toolbar's three left controls are 26, 30 and 25px tall and shared no
+optical centre; UiMetrics.ButtonHeight's own doc comment names that as a
+separate, unmade decision. This is that decision - and it is
+PlanRelayoutMath.CenterX turned on its side rather than a second rule, so
+the Snapshot tab's own search row centres through the same arithmetic
+against its own row height. The three right-hand buttons keep their
+spots, now expressed through RightAlignedX off PinnedRightEdge rather
+than three literals, and the search box is the one control that flexes
+into free width, capped at 400. SearchMinWidth is deliberately a tested
+PROPERTY of the layout rather than a clamp: it holds at every width the
+module supports, and below the narrow-screen floor the box keeps
+shrinking instead, because overlapping clusters are worse than a small
+box.
+
+The gap between the toolbar's two clusters is not stranded space - it is
+the plan tab's own controls-row shape. Stated so the gate does not flag
+it.
+
+### About
+
+The tab never re-read its width after Build - the resize handler resized
+the root panel and nothing else, and the width was captured once - so
+widening the window left the prose wrapped at whatever width the tab was
+opened with, permanently. That is fixed independently of any redesign:
+Build and Resized both go through one Relayout(panelWidth).
+
+Two columns now: an identity card on the left (a "Module" band, the
+description, and six facts rows whose label band is MEASURED across the
+six strings and whose value flexes to the column's pinned edge) and the
+two prose blocks on the right, each with the 2px rule every other
+SectionTitle band in the module draws - About's two were the only ones
+drawing none. Below the two-column threshold they stack. The module name
+is the plan header's own idiom reused verbatim: Display 32 with the
+version at SmallHeading 20 regular beside it, baseline-aligned through
+TypeRampMetrics - which is the pair SmallHeading exists for.
+
+Copy: the six fact labels lose their trailing colons (inside a table with
+a rule, a colon on every label is punctuation doing a column's job),
+"Disclaimer:" becomes "Disclaimer", "Credits: gw2efficiency" becomes
+"gw2efficiency". The two maintainer-approved literal strings (the
+ArenaNet disclaimer, the gw2efficiency credit) ship verbatim.
+
+ACCEPTED DIVERGENCE, for the maintainer to rule on: past roughly 1100px
+of panel, About stops using its width. Text is capped at a 560px measure
+- 66 characters at the module's own measured 8.4px Body-16 average -
+because a 280-character line at a 2560 window is a worse artefact than
+white space, and the plan tab's tooltip work already respects the same
+rule. The copyable value boxes are capped the same way: a 2300px box
+holding a URL is the same defect as a 2300px paragraph. Every other
+surface in this milestone uses all of its width. The lever is one
+constant, AboutLayoutMath.ProseMeasure.
+
+A second, smaller instance of the same call: the full-width Currency
+Valuations section's two remaining notes are capped at
+SettingsFormLayout.ProseMeasure, which is one section column's own
+content width (546) rather than About's 560. Two tabs, two derivations,
+each stated at its own site - deliberately not forked into a third
+shared constant, because each is derived from the surface it sits on.
+
+### Snapshot
+
+The grid, its headers, its sortable cells and its tooltips were already
+right. Two things were not.
+
+The tab had two right edges: the header buttons pinned to
+containerWidth - 10 while the grid's rightmost column ended at
+containerWidth - 28, eighteen pixels apart on the same tab at every
+width. SnapshotHeaderLayout.ChromeRightEdge derives the chrome's edge
+from the SCROLLING grid's own width, so the buttons, the coin block, the
+status line's cap and the header rule now land on one line. The
+inter-button gap drops from 20 to the module's 8.
+
+The coin row was a caption and ~150px of coin run left-packed at x=0,
+with the rest of the band empty. It is a justified row now: a result line
+on the left ("Showing N items - K currencies", through StatusText.Count
+and the "N of M shown" shape the currency filter already uses) ellipsized
+against the coin block, and the coin block right-pinned as a unit in its
+own child panel so the dispose-and-rebuild refresh cannot destroy the
+result line beside it. CoinCurrencyRenderer is untouched, so the icons
+stay to the RIGHT of their numbers; only the block's origin moved. Counts
+and names only - no ids reach the line.
+
+The header band adopts the 38px section-header band with its rule at 35
+and 1px of clearance, like every other heading in the module, instead of
+a 40px band with a flush rule; every left edge on the tab moves to the
+16px inset; and the search row's TextBox and Dropdown get the same
+centring rule the Log toolbar does.
+
+Deliberately untouched: the source-filter run's flow, cap and
+scroll-on-overflow are correct, and it is still handed the CONTAINER's
+width rather than the grid's, so a wrapped run can still reach ~20px
+right of the chrome edge. Re-deriving it would move a wrap threshold in a
+component this milestone has no complaint about.
+
+### Desktop gate checklist
+
+Take each tab at 1378 (the enforced minimum), 1638, 1836 and 2406, and
+one very wide (2560+). At EVERY width, on every tab: no band of empty
+space to the right of the content, and no text running under a
+neighbouring column.
+
+SETTINGS
+- 1378: two section columns; the four sections pack Sound|Homestead over
+  Logging|Snapshot; every input box in a column shares one right edge
+  with every other; the currency grid runs two columns whose cells'
+  Ignore checkboxes and tag slots line up with the inputs above them.
+- 1638: the currency grid goes to THREE columns while the section board
+  stays at two. Confirm this is legible rather than accidental - the two
+  grids have different cell minimums by design.
+- 1836: the section board goes to three columns. 2406: four columns, one
+  section each, nothing stretched.
+- 2560: nothing on the tab ends before the panel does, except the two
+  grey notes under Currency Valuations, which are capped at a reading
+  measure on purpose. This is the width the old two-column cap failed at.
+- Type a letter into a currency amount, press Save: the "Invalid" tag
+  appears IN the tag slot and the column does not move a pixel. Same for
+  a Homestead tier ("Must be 0, 1, or 2" is the widest string that slot
+  ever holds, so it is what the band is sized to).
+- Type into any box: the dirty chip appears on the save bar; Discard
+  appears beside Save; Discard raises the confirm dialog; discarding
+  clears the chip and the status line.
+- Drag the click-volume slider: no dirty chip (immediate-apply), and the
+  "Applies immediately" tag sits at the Sound band's right edge.
+- Filter the currency list to one match, then clear it: the tab does not
+  jump to the top (the fixed grid height still holds).
+
+LOG
+- 1378: the Tag column starts at one fixed x on every row; run the eye
+  down it. The Message column starts at one fixed x. All three headers
+  sit on their own columns.
+- Switch the level filter from Info+ to Debug+ and back: the Tag band
+  RESIZES to the widest tag actually on screen and every row re-fits
+  together. Switch to a filter that admits only [plan] rows and confirm
+  the message column visibly gains width against the old template.
+- Leave Follow checked while a snapshot refresh writes [snapshot-fetch]
+  rows: the band widens once, every row re-fits, and no row is left at
+  the old x.
+- Drag the window from 1378 to 2560 and back: rows re-fit, no compounded
+  "...", the toolbar's search box grows to its 400 cap and no further,
+  the three buttons stay pinned.
+- At 1378 confirm the search box, level dropdown, Follow checkbox and the
+  three buttons share one optical centre line.
+
+ABOUT
+- Open at 1378, then widen to 2560 WITHOUT closing the tab: the layout
+  reflows. This is the defect that did not reflow at all before.
+- 1378: two columns; facts left, Disclaimer over gw2efficiency right;
+  both prose headings draw a rule.
+- Read the gw2efficiency paragraph and count roughly 60-70 characters per
+  line at every width from 1378 up. At 2560 the columns are wide and the
+  TEXT is not - that is the declared divergence, not a bug.
+- Below ~950 panel (a narrow-screen client) the two columns stack and
+  nothing clips.
+- The module name renders at Display 32 with the version at 20 regular on
+  the same baseline; the six facts labels have no trailing colons and
+  their values flex to one right edge; the copyable boxes are capped, not
+  panel-wide.
+
+SNAPSHOT
+- 1378: put a straightedge (or a screenshot ruler) down the right side.
+  Clear Cache/Refresh Now, the coin block, the header rule's end, and the
+  last grid column's amounts all end on ONE line. This is the fix to look
+  for.
+- The coin row reads "Showing N items - K currencies" on the left and the
+  coin run on the right, with each icon to the RIGHT of its number.
+- Search until one item matches: the result line updates to "N of M" and
+  never runs under the coin block; a long line ellipsizes with the full
+  text on hover.
+- 1632: the grid goes to three columns; the coin block and header buttons
+  do not move relative to the last column.
+- Uncheck enough character filters to wrap the source-filter run: it
+  drops to its own full-width row and everything below shifts, unchanged
+  from before this milestone. The run may still reach slightly right of
+  the chrome edge - recorded above as deliberately untouched.
+- The header title sits at the 16px inset with its rule 1px clear beneath
+  the buttons.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]

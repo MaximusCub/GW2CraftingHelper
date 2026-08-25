@@ -881,23 +881,24 @@ namespace GW2CraftingHelper.Views
                 appendedAny = true;
             }
 
-            if (bandGrew)
-            {
-                // The already-rendered rows are still at the old x. RefitRows
-                // is the existing suspended walk that re-fits every visible
-                // row, so both render paths end this pass agreeing about the
-                // band - the property the worst-case template used to buy.
-                RefitEveryRow(metrics);
-            }
-
             while (_renderedRows.Count > 0 && _renderedRows.Peek().AbsoluteIndex < startIndex)
             {
                 var stale = _renderedRows.Dequeue();
 
-                // Disposing the row Panel disposes its two Labels with it
-                // (Container.Dispose walks its children), so the split does
-                // not leak the halves of an evicted row.
+                // Disposing the row Panel disposes its three column Labels
+                // with it (Container.Dispose walks its children), so the
+                // split does not leak the parts of an evicted row.
                 stale.Panel.Dispose();
+            }
+
+            if (bandGrew)
+            {
+                // The rows already on screen are still at the old x. This is
+                // the same suspended walk a resize uses, so both render paths
+                // end this pass agreeing about the band - the property the
+                // worst-case template used to buy. After the eviction trim,
+                // so a row about to be disposed is not re-fitted first.
+                RefitEveryRow(metrics);
             }
 
             _lastSeenVersion = version;
