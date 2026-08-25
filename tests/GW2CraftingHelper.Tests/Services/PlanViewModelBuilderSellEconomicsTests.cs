@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = vm.Sections[0].Rows;
             Assert.DoesNotContain(rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
 
-            var costTile = rows.Single(r => r.RowType == PlanRowType.CostFormulaTile);
+            var costTile = rows.Last(r => r.RowType == PlanRowType.CostFormulaTile);
             Assert.Equal("Actual Cost to Craft", costTile.Label);
             Assert.Equal(500L, costTile.CoinValue);
         }
@@ -106,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services
             result.PriceBasis = PriceBasis.BuyOrder;
 
             var vm = _builder.Build(result);
-            var costTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CostFormulaTile);
+            var costTile = vm.Sections[0].Rows.Last(r => r.RowType == PlanRowType.CostFormulaTile);
 
             Assert.Equal("Actual Cost to Craft", costTile.Label);
             Assert.Contains("buy-order prices", costTile.TooltipText);
@@ -157,31 +157,37 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void MaterialOpportunityCostZero_CostBandStaysCollapsed()
+        public void MaterialOpportunityCostZero_RendersTheZeroInPlace()
         {
-            // All used materials were unsellable - the sum is 0, not null,
-            // but a 0-value middle term still collapses the band.
+            // All used materials were unsellable - the sum is 0, not null.
+            // The band keeps all three tiles and shows that 0.
             var result = MakeResult(totalCoinCost: 200);
             result.MaterialOpportunityCost = 0;
 
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
         }
 
         [Fact]
-        public void MaterialOpportunityCostNull_CostBandStaysCollapsed()
+        public void MaterialOpportunityCostNull_RendersTheBandWithNothingConsumed()
         {
-            // Free mode (default) - MaterialOpportunityCost is never set.
+            // Free mode (default) - MaterialOpportunityCost is never set,
+            // and this plan consumed no owned materials either, so 0 is a
+            // known zero and the ordinary tooltip applies.
             var result = MakeResult(totalCoinCost: 200);
 
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal(
+                PlanViewModelBuilder.YourMaterialsUsedTooltip,
+                costTiles[1].TooltipText);
         }
     }
 }

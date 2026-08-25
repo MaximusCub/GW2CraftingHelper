@@ -74,35 +74,44 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Cost formula band (collapse rule + arithmetic) ---
 
         [Fact]
-        public void CostBand_NoMaterialsUsed_CollapsesToSingleActualCostTile()
+        public void CostBand_NoMaterialsUsed_StillRendersTheWholeFormula()
         {
+            // The maintainer's ruling, made twice against a live plan: a
+            // term worth zero shows a zero. Owning none of what a plan
+            // needs is the ordinary case, and it used to hide two thirds
+            // of the section.
             var result = MakeResult(totalCoinCost: 123456);
             var vm = _builder.Build(result);
 
             var summary = vm.Sections.First(s => s.SectionType == PlanSectionType.Summary);
             var costTiles = summary.Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal("Total Materials Value", costTiles[0].Label);
             Assert.Equal(123456L, costTiles[0].CoinValue);
-            Assert.False(string.IsNullOrEmpty(costTiles[0].TooltipText));
+            Assert.Equal("Your Materials Used", costTiles[1].Label);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.Equal(123456L, costTiles[2].CoinValue);
+            Assert.All(costTiles, tile => Assert.False(string.IsNullOrEmpty(tile.TooltipText)));
         }
 
         [Fact]
-        public void CostBand_MaterialOpportunityCostZero_StillCollapses()
+        public void CostBand_MaterialOpportunityCostZero_RendersZeroRatherThanVanishing()
         {
             // A material with no instant-sell price contributes 0, not
-            // null - the collapse rule treats null AND 0 identically
-            // (spec: "when MaterialOpportunityCost is null or 0").
+            // null. That zero is now shown, not used as a reason to drop
+            // the surrounding formula.
             var result = MakeResult(totalCoinCost: 200);
             result.MaterialOpportunityCost = 0;
 
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Single(costTiles);
-            Assert.Equal("Actual Cost to Craft", costTiles[0].Label);
-            Assert.Equal(200L, costTiles[0].CoinValue);
+            Assert.Equal(3, costTiles.Count);
+            Assert.Equal(0L, costTiles[1].CoinValue);
+            Assert.Equal("Actual Cost to Craft", costTiles[2].Label);
+            Assert.Equal(200L, costTiles[2].CoinValue);
         }
 
         [Fact]
@@ -161,16 +170,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_StaysCollapsed()
+        public void CostBand_ZeroCostButMaterialsConsumedUnvalued_SaysSoInTheTooltip()
         {
             // OwnMaterialsMode.Free leaves MaterialOpportunityCost null BY
             // CONTRACT (see SellSideEconomics) even though owned materials
             // really were consumed - "Use Own Materials" on with "Value Own
-            // Materials" off, inventory covering the whole plan. Rendering
-            // the band here would print "Your Materials Used 0c" directly
-            // above a Used Materials section listing the real materials:
-            // a valuation the pipeline deliberately declined to make. Only
-            // a KNOWN zero unlocks the band.
+            // Materials" off. The tile still renders its 0 (the band no
+            // longer disappears), so the "nobody priced these" fact moves
+            // into the tooltip instead of being implied by a missing tile.
             var result = MakeResult(
                 totalCoinCost: 0,
                 usedMaterials: new List<UsedMaterial>
@@ -182,7 +189,28 @@ namespace GW2CraftingHelper.Tests.Services
             var vm = _builder.Build(result);
             var costTiles = vm.Sections[0].Rows.Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
 
-            Assert.Equal("Actual Cost to Craft", Assert.Single(costTiles).Label);
+            Assert.Equal(3, costTiles.Count);
+            var materialsUsedTile = costTiles[1];
+            Assert.Equal("Your Materials Used", materialsUsedTile.Label);
+            Assert.Equal(0L, materialsUsedTile.CoinValue);
+            Assert.Equal(
+                PlanViewModelBuilder.UnvaluedMaterialsTooltip,
+                materialsUsedTile.TooltipText);
+
+            // The measured-zero counterpart keeps the ordinary tooltip -
+            // the two zeros must not read identically.
+            var valued = MakeResult(
+                totalCoinCost: 0,
+                usedMaterials: new List<UsedMaterial>
+                {
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                });
+            valued.MaterialOpportunityCost = 0;
+            var valuedTiles = _builder.Build(valued).Sections[0].Rows
+                .Where(r => r.RowType == PlanRowType.CostFormulaTile).ToList();
+            Assert.Equal(
+                PlanViewModelBuilder.YourMaterialsUsedTooltip,
+                valuedTiles[1].TooltipText);
         }
 
         [Fact]
@@ -463,7 +491,9 @@ namespace GW2CraftingHelper.Tests.Services
             result.PriceBasis = PriceBasis.BuyOrder;
 
             var vm = _builder.Build(result);
-            var costTile = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CostFormulaTile);
+            // Last of the three tiles: the formula's "= Actual Cost to
+            // Craft" term.
+            var costTile = vm.Sections[0].Rows.Last(r => r.RowType == PlanRowType.CostFormulaTile);
 
             // Caption stays short (no qualifier baked into the Label) - the
             // basis qualifier now lives in the tooltip only.

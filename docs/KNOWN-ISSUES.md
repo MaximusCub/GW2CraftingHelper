@@ -15411,6 +15411,20 @@ gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
    gate neither spends its one shot nor re-probes per frame. Firing on a
    real key belongs to the maintainer's install.
 
+FOLLOW-UP within the same session (maintainer, watching the Gift of Rays
+capture): "Actual Cost to Craft is all that that screen is showing... it
+should have 3 fields". The band still collapsed whenever the middle term
+was zero - the ORIGINAL "no middle term to subtract" rule, older than
+this round's zero-plan work, and the ordinary case for any plan whose
+materials you do not already own. Rule deleted: all three tiles now
+always render. The one genuinely unmeasured case (Free mode with
+materials consumed, where MaterialOpportunityCost is null by contract)
+keeps its 0 and moves the "nobody priced these" fact into the tile's own
+tooltip, with a test asserting the two zeros do not read identically.
+Eight tests pinned the old contract and moved with it. Live re-verified
+on the same plan: "Total Materials Value 895g 13s 39c - Your Materials
+Used 0 = Actual Cost to Craft 895g 13s 39c".
+
 Bonus verified in passing: the seed-integrity fix from PR #176 works end
 to end - "Pile of Recycled Trebuchets" now autocompletes with its icon
 and resolves through VENDOR at 1940g, where its chain was previously

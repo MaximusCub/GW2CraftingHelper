@@ -149,6 +149,8 @@ namespace GW2CraftingHelper.Services
             "Full market value of everything this craft consumes - coins you spend plus the sell value of your own materials used.";
         internal const string YourMaterialsUsedTooltip =
             "Instant-sell value (after 15% TP fees) of materials you already own that this plan consumes - what you give up by using them instead of selling them.";
+        internal const string UnvaluedMaterialsTooltip =
+            "This plan was not asked to value the materials you already own, so this term is 0. Turn on \"Value Own Materials\" to price them.";
         internal const string ActualCostTooltip =
             "What you still pay out of pocket - materials you already own are subtracted before pricing.";
         internal const string SellValueTooltip =
@@ -252,15 +254,12 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Formula band 1 ("Total Materials Value - Your Materials Used
-        /// = Actual Cost to Craft"). When MaterialOpportunityCost is null
-        /// or 0 the middle term does not exist, so the band collapses to a
-        /// single "Actual Cost to Craft" tile - unless the plan costs
-        /// nothing either AND the middle term is a KNOWN zero rather than
-        /// an unmeasured one, in which case the full band renders at zero
-        /// (a lone tile reading "0c" with the formula around it gone looks
-        /// like a broken section, not a free plan). Actual Cost to
-        /// Craft is result.Plan.TotalCoinCost; the price-basis qualifier
-        /// lives in this tile's tooltip.
+        /// = Actual Cost to Craft"). All three tiles ALWAYS render: the
+        /// maintainer's ruling, twice, is that a term worth zero shows a
+        /// zero rather than removing itself, because a lone tile with the
+        /// formula gone around it reads as a broken section. Actual Cost
+        /// to Craft is result.Plan.TotalCoinCost; the price-basis
+        /// qualifier lives in this tile's tooltip.
         /// <para>
         /// unpricedZero (a zero total that some unpriceable node produced)
         /// does NOT suppress any tile - it marks every tile it renders and
@@ -305,37 +304,32 @@ namespace GW2CraftingHelper.Services
                 result.UsedMaterials == null ||
                 result.UsedMaterials.Count == 0;
 
-            // The band collapses only when there is a real cost to show.
-            // A plan that costs nothing AND provably consumed no owned
-            // value (every node ignored or already in hand) renders the
-            // whole formula at zero instead of a lone "0c" result tile
-            // with the rest of the band missing. That holds for an
-            // unpriced zero too - the marker and footnote carry the
-            // "nobody measured this" fact the missing tiles used to.
-            bool zeroPlan = actualCost == 0 &&
-                materialsUsed == 0 &&
-                materialsUsedIsKnownZero;
-            if (materialsUsed > 0 || zeroPlan)
-            {
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.CostFormulaTile,
-                    Label = "Total Materials Value" + mark,
-                    CoinValue = actualCost + materialsUsed,
-                    TooltipText = TotalMaterialsValueTooltip + unpricedSuffix
-                });
-                section.Rows.Add(new PlanRowViewModel
-                {
-                    RowType = PlanRowType.CostFormulaTile,
-                    Label = "Your Materials Used" + mark,
-                    CoinValue = materialsUsed,
-                    TooltipText = YourMaterialsUsedTooltip + unpricedSuffix
-                });
-            }
+            // A middle term nobody computed still shows 0 - the tile
+            // stays, and its tooltip says the plan was not asked to value
+            // owned materials rather than letting a bare 0 assert a
+            // valuation. (Free mode leaves MaterialOpportunityCost null by
+            // contract; see SellSideEconomics.)
+            string materialsUsedTooltip = materialsUsedIsKnownZero
+                ? YourMaterialsUsedTooltip
+                : UnvaluedMaterialsTooltip;
 
-            // Collapsed case: this is the band's only tile. Uncollapsed:
-            // it is the formula's rightmost ("= Actual Cost to Craft")
-            // term, added last either way.
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.CostFormulaTile,
+                Label = "Total Materials Value" + mark,
+                CoinValue = actualCost + materialsUsed,
+                TooltipText = TotalMaterialsValueTooltip + unpricedSuffix
+            });
+            section.Rows.Add(new PlanRowViewModel
+            {
+                RowType = PlanRowType.CostFormulaTile,
+                Label = "Your Materials Used" + mark,
+                CoinValue = materialsUsed,
+                TooltipText = materialsUsedTooltip + unpricedSuffix
+            });
+
+            // The formula's rightmost ("= Actual Cost to Craft") term,
+            // added last.
             section.Rows.Add(actualCostTile);
         }
 
