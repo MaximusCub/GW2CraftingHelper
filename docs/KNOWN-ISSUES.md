@@ -15424,4 +15424,40 @@ rename of the icon component in the latter.
    dark border must have a light line immediately inside it, and NO text
    behind the tooltip may be legible through it (audit H6).
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-25 desktop session, branch build, captures
+preflight/gTY1-gTY15; display-sleep inhibitor held the session).
+
+A. RAMP: Settings, Log and About now carry 24-bold section titles with
+   rules where they previously had one 18-regular size and, on Log, no
+   headings at all. Settings reads as a hierarchy ("Sound", "Homestead
+   Refinement", "Logging", "Snapshot"); About's title and both labelled
+   sections match; Log gained "Time"/"Message" column headers over
+   columns that were unlabelled before.
+B. ONE ICON PATH: verified on three formerly-unframed surfaces - the
+   Snapshot item rows (Augur's Stone renders its ascended frame,
+   Zojja's Claymore its own), the neutral placeholder on an art-less row
+   (Mithril Ore), and the framed icons in the search dropdown.
+C. SNAPSHOT: the overhaul is the visible one. Two-column grid with a
+   24-bold "Items" title, per-column "Item"/"Amount" headers, amounts
+   right-pinned to their column edge, and holdings as a sublabel under
+   each name. Hovering a row now opens the rich item tooltip (account
+   binding, value, holdings) - the recorded "snapshot rows have no rich
+   tooltip" gap, closed without adding a network call on the hover path.
+D. SORTABLE HEADER CELLS: proven on the strongest case rather than the
+   easy one. Hovering EMPTY space at x=400, far from the "Item" text,
+   lit the whole cell's wash and tinted the label; CLICKING that empty
+   space sorted the table ("Item ^", Augur's Stone first). The Amount
+   cell behaves the same (1x, 5x, 30x, 42x ascending with its own
+   indicator). No dead strip between the two columns.
+E. TOOLTIP TRANSLUCENCY: 0.82 alpha plus the 1px inner bevel ships; the
+   rich tooltip over the Snapshot list reads as a translucent panel
+   rather than the old flat slab, and text behind it stays illegible
+   (audit H6 holds).
+
+Recorded, NOT a defect in this wave: these tabs now have the plan tab's
+TYPE hierarchy but not its LAYOUT - Settings, Log and About are still
+left-packed, with the panel's right half empty, because this wave scoped
+the ramp plus Snapshot's grid rather than a per-tab redesign. The
+maintainer saw the same thing on the Settings capture and asked for the
+full treatment on every tab; that is its own milestone, not a fix to
+this one.
