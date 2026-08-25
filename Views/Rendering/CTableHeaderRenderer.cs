@@ -2,7 +2,9 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
+using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
@@ -75,7 +77,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
-            SortableHeaderLabel.MakeClickable(leftLabelControl, onLeftClick);
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
@@ -94,7 +95,17 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? rightXForWidth(panelWidth)
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
                 TableHeaderStyle.LabelY);
-            SortableHeaderLabel.MakeClickable(rightLabelControl, onRightClick);
+
+            // The hit area is the whole cell, not the text - see
+            // SortableHeaderCells. The labels only carry the note, because
+            // a label swallows the hover of whatever is under it.
+            if (onLeftClick != null) SortableHeaderLabel.MarkSortable(leftLabelControl);
+            if (onRightClick != null) SortableHeaderLabel.MarkSortable(rightLabelControl);
+            var cells = new SortableHeaderCells(rowPanel);
+            SyncCells(
+                cells, rowPanel.Width, font, leftLabel, leftX, middleLabel,
+                middleLabelControl?.Location.X ?? 0, rightLabel, rightLabelControl.Location.X,
+                onLeftClick, onRightClick, leftLabelControl, middleLabelControl, rightLabelControl);
 
             sink.AddRelayout(w =>
             {
@@ -106,7 +117,66 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     middleLabelControl.Location = new Point(middleXForWidth(w), TableHeaderStyle.LabelY);
                 }
+
+                // A right-pinned column's x is a function of the panel
+                // width, so its cell has to follow it rather than stay
+                // where the build-time width put it.
+                SyncCells(
+                    cells, rowPanel.Width, font, leftLabel, leftX, middleLabel,
+                    middleLabelControl?.Location.X ?? 0, rightLabel, rightLabelControl.Location.X,
+                    onLeftClick, onRightClick, leftLabelControl, middleLabelControl, rightLabelControl);
             });
+        }
+
+        /// <summary>
+        /// Describes this header's cells to <see cref="SortableHeaderCells"/>:
+        /// the band is partitioned between ALL its labels (an unsortable
+        /// middle column still separates the two beside it), and only the
+        /// sortable ones are given a click.
+        /// </summary>
+        private static void SyncCells(
+            SortableHeaderCells cells, int bandWidth, BitmapFont font,
+            string leftLabel, int leftX, string middleLabel, int middleLabelX,
+            string rightLabel, int rightLabelX,
+            Action onLeftClick, Action onRightClick,
+            Label leftControl, Label middleControl, Label rightControl)
+        {
+            var extents = new List<HeaderCellMath.LabelExtent>(3)
+            {
+                new HeaderCellMath.LabelExtent(leftX, Measure(font, leftLabel))
+            };
+            if (middleControl != null)
+            {
+                extents.Add(new HeaderCellMath.LabelExtent(middleLabelX, Measure(font, middleLabel)));
+            }
+            extents.Add(new HeaderCellMath.LabelExtent(rightLabelX, Measure(font, rightLabel)));
+
+            var ranges = HeaderCellMath.Partition(bandWidth, extents);
+            var columns = new List<SortableHeaderCells.Column>(extents.Count)
+            {
+                new SortableHeaderCells.Column(ranges[0].X, ranges[0].Width, leftControl, onLeftClick)
+            };
+            if (middleControl != null)
+            {
+                columns.Add(new SortableHeaderCells.Column(ranges[1].X, ranges[1].Width, middleControl, null));
+            }
+            int last = ranges.Count - 1;
+            columns.Add(
+                new SortableHeaderCells.Column(ranges[last].X, ranges[last].Width, rightControl, onRightClick));
+
+            cells.Sync(columns);
+        }
+
+        /// <summary>
+        /// Measured from the string rather than read off the control:
+        /// a Blish Label's own Width is not settled until its next layout
+        /// pass, and these cells are described in the same breath as the
+        /// label is created (the same reason CreateRightAlignedLabel
+        /// measures rather than reading Width).
+        /// </summary>
+        private static int Measure(BitmapFont font, string text)
+        {
+            return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
         /// <summary>

@@ -196,6 +196,7 @@
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
     <Compile Include="Views\Rendering\SortableHeaderLabel.cs" />
+    <Compile Include="Views\Rendering\SortableHeaderCells.cs" />
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
@@ -222,6 +223,7 @@
     <Compile Include="Services\SettingsInputParser.cs" />
     <Compile Include="Services\SettingsCurrencyGridLayout.cs" />
     <Compile Include="Services\SnapshotItemGridLayout.cs" />
+    <Compile Include="Services\HeaderCellMath.cs" />
     <Compile Include="Services\SnapshotResultLayout.cs" />
     <Compile Include="Services\SnapshotTableSorter.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />

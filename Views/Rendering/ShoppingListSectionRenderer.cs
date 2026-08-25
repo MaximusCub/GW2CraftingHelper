@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 
@@ -234,11 +235,28 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
                 font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
 
-            SortableHeaderLabel.MakeClickable(itemLabel, () => SortBy(PlanTableColumn.Item));
-            SortableHeaderLabel.MakeClickable(sourceLabel, () => SortBy(PlanTableColumn.Source));
-            SortableHeaderLabel.MakeClickable(amountLabel, () => SortBy(PlanTableColumn.Amount));
-            SortableHeaderLabel.MakeClickable(eachLabel, () => SortBy(PlanTableColumn.Each));
-            SortableHeaderLabel.MakeClickable(totalLabel, () => SortBy(PlanTableColumn.Total));
+            // The click and the hover belong to each column's whole header
+            // CELL, not to its text - see SortableHeaderCells. The labels
+            // carry only the note, because a label swallows the hover of
+            // whatever sits under it.
+            var labels = new[] { itemLabel, sourceLabel, amountLabel, eachLabel, totalLabel };
+            var columns = new[]
+            {
+                PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
+                PlanTableColumn.Each, PlanTableColumn.Total
+            };
+            var texts = new[]
+            {
+                itemLabel.Text, sourceHeaderText, amountHeaderText,
+                eachLabel.Text, totalLabel.Text
+            };
+            foreach (var label in labels)
+            {
+                SortableHeaderLabel.MarkSortable(label);
+            }
+
+            var cells = new SortableHeaderCells(rowPanel);
+            SyncHeaderCells(cells, rowPanel.Width, font, labels, texts, columns);
 
             // Header column labels are font-only (fixed text) -
             // pure reposition on every drag tick, recomputing edges from
@@ -256,7 +274,42 @@ namespace GW2CraftingHelper.Views.Rendering
                     PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), TableHeaderStyle.LabelY);
                 totalLabel.Location = new Point(
                     PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
+
+                // Four of the five columns are pinned off the panel edge,
+                // so their cells move with them.
+                SyncHeaderCells(cells, rowPanel.Width, font, labels, texts, columns);
             });
+        }
+
+        /// <summary>
+        /// Partitions the header band between its five labels and hands the
+        /// ranges to the cell layer, which owns the wash and the click.
+        /// Widths are measured from the strings rather than read off the
+        /// controls: a Blish Label's Width is not settled until its next
+        /// layout pass (the same reason CreateRightAlignedLabel measures).
+        /// </summary>
+        private void SyncHeaderCells(
+            SortableHeaderCells cells, int bandWidth, BitmapFont font,
+            Label[] labels, string[] texts, PlanTableColumn[] columns)
+        {
+            var extents = new HeaderCellMath.LabelExtent[labels.Length];
+            for (int i = 0; i < labels.Length; i++)
+            {
+                extents[i] = new HeaderCellMath.LabelExtent(
+                    labels[i].Location.X,
+                    (int)System.Math.Ceiling(font.MeasureString(texts[i] ?? "").Width));
+            }
+
+            var ranges = HeaderCellMath.Partition(bandWidth, extents);
+            var cellColumns = new SortableHeaderCells.Column[labels.Length];
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var column = columns[i];
+                cellColumns[i] = new SortableHeaderCells.Column(
+                    ranges[i].X, ranges[i].Width, labels[i], () => SortBy(column));
+            }
+
+            cells.Sync(cellColumns);
         }
 
         // A ValueCellHandle's own

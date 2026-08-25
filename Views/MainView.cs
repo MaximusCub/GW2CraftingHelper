@@ -2041,6 +2041,11 @@ namespace GW2CraftingHelper.Views
             /// <summary>Cycles this run's sort and re-renders.</summary>
             public Action<SnapshotTableColumn> SortBy;
 
+            /// <summary>The header band's hover/click cells - one pair per
+            /// grid column, owned by the band and re-described whenever the
+            /// grid's column count or width changes.</summary>
+            public SortableHeaderCells Cells;
+
             public string NameHeaderText()
             {
                 return SortableHeaderLabel.Decorate(
@@ -2102,6 +2107,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel
             };
 
+            chrome.Cells = new SortableHeaderCells(chrome.HeaderPanel);
             chrome.SortBy = column =>
             {
                 sort.Cycle(column);
@@ -2144,9 +2150,12 @@ namespace GW2CraftingHelper.Views
 
             while (chrome.NameHeaders.Count < columnCount)
             {
-                chrome.NameHeaders.Add(CreateHeaderLabel(chrome, SnapshotTableColumn.Name));
-                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome, SnapshotTableColumn.Amount));
+                chrome.NameHeaders.Add(CreateHeaderLabel(chrome));
+                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome));
             }
+
+            int nameWidth = (int)Math.Ceiling(font.MeasureString(nameText).Width);
+            var cellColumns = new List<SortableHeaderCells.Column>(columnCount * 2);
 
             for (int i = 0; i < chrome.NameHeaders.Count; i++)
             {
@@ -2156,18 +2165,40 @@ namespace GW2CraftingHelper.Views
                 if (!used) continue;
 
                 int columnX = i * columnWidth;
-                chrome.NameHeaders[i].Text = nameText;
-                chrome.NameHeaders[i].Location =
-                    new Point(columnX + SnapshotItemGridLayout.CellTextX, ColumnHeaderLabelY);
+                int nameX = SnapshotItemGridLayout.CellTextX;
+                int amountX = SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - amountWidth;
 
+                chrome.NameHeaders[i].Text = nameText;
+                chrome.NameHeaders[i].Location = new Point(columnX + nameX, ColumnHeaderLabelY);
                 chrome.AmountHeaders[i].Text = amountText;
-                chrome.AmountHeaders[i].Location = new Point(
-                    columnX + SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - amountWidth,
-                    ColumnHeaderLabelY);
+                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, ColumnHeaderLabelY);
+
+                // Partitioned per GRID COLUMN, not across the whole band: a
+                // cell that ran past its column's edge would answer clicks
+                // aimed at the next column's Item header. The last column
+                // absorbs the remainder integer division leaves, so the
+                // band has no dead strip at its right edge.
+                int columnBand = i == columnCount - 1 ? gridWidth - columnX : columnWidth;
+                var ranges = HeaderCellMath.Partition(
+                    columnBand,
+                    new[]
+                    {
+                        new HeaderCellMath.LabelExtent(nameX, nameWidth),
+                        new HeaderCellMath.LabelExtent(amountX, amountWidth)
+                    });
+
+                cellColumns.Add(new SortableHeaderCells.Column(
+                    columnX + ranges[0].X, ranges[0].Width, chrome.NameHeaders[i],
+                    () => chrome.SortBy(SnapshotTableColumn.Name)));
+                cellColumns.Add(new SortableHeaderCells.Column(
+                    columnX + ranges[1].X, ranges[1].Width, chrome.AmountHeaders[i],
+                    () => chrome.SortBy(SnapshotTableColumn.Amount)));
             }
+
+            chrome.Cells.Sync(cellColumns);
         }
 
-        private Label CreateHeaderLabel(SectionChrome chrome, SnapshotTableColumn column)
+        private static Label CreateHeaderLabel(SectionChrome chrome)
         {
             var label = LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -2177,7 +2208,11 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Parent = chrome.HeaderPanel
             });
-            SortableHeaderLabel.MakeClickable(label, () => chrome.SortBy(column));
+
+            // The click and the hover belong to the whole header cell -
+            // see SortableHeaderCells. The label carries only the note,
+            // because it swallows the hover of whatever sits under it.
+            SortableHeaderLabel.MarkSortable(label);
             return label;
         }
 
