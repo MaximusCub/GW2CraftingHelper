@@ -20,12 +20,18 @@ namespace GW2CraftingHelper.Services
     /// logic living there could never be exercised by a test.
     /// </para>
     /// <para>
-    /// STALENESS IS COSMETIC. Learned recipe ids only drive the
-    /// "already known" annotation on required recipes
-    /// (PlanResultBuilder's RecipeRequirement.IsMissing); they never
-    /// affect a craft-vs-buy decision, a quantity, or a cost. A recipe
-    /// learned in-game inside the TTL window shows as still-missing until
-    /// the window passes, and nothing else about the plan differs.
+    /// STALENESS IS ADVISORY, NEVER A SOLVER INPUT. Learned recipe ids
+    /// never affect a craft-vs-buy decision, a quantity, or a cost - the
+    /// plan is solved before they are consulted. They have two consumers,
+    /// both downstream annotations: the "already known" flag on required
+    /// recipes (PlanResultBuilder's RecipeRequirement.IsMissing), and the
+    /// gate on RecipeSheetSavingsCalculator, which emits a note advising
+    /// the purchase of a recipe sheet the account does not own, carrying a
+    /// SavingsPerUnit coin figure. So a recipe learned in-game inside the
+    /// TTL window not only still reads as missing - the plan may keep
+    /// recommending the sheet that taught it, priced, until the window
+    /// passes. That is the cost of this cache; raising the TTL raises it
+    /// with it.
     /// </para>
     /// </summary>
     public class CachingAccountRecipeClient : IAccountRecipeClient
