@@ -42,22 +42,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void NoSort_ReturnsTheVerySameInstance()
-        {
-            var rows = Items();
-
-            Assert.Same(rows, SnapshotTableSorter.SortItems(rows, new TableSortState<SnapshotTableColumn>()));
-            Assert.Same(rows, SnapshotTableSorter.SortItems(rows, null));
-        }
-
-        [Fact]
         public void NameSort_IsCaseInsensitive_AndNeverMutatesTheInput()
         {
             var rows = Items();
-            var sorted = SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Name, 1));
+            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 1));
 
-            Assert.Equal(new[] { "copper ore", "Ectoplasm", "Mystic Clover" }, Names(sorted));
-            Assert.Equal(new[] { "Mystic Clover", "copper ore", "Ectoplasm" }, Names(rows));
+            Assert.Equal(new[] { "copper ore", "Ectoplasm", "Mystic Clover" }, Names(rows, order));
+            Assert.Equal(new[] { "Mystic Clover", "copper ore", "Ectoplasm" }, Names(rows, null));
         }
 
         [Fact]
@@ -67,30 +58,37 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(
                 new[] { "Mystic Clover", "Ectoplasm", "copper ore" },
-                Names(SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Name, 2))));
+                Names(rows, SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 2))));
 
-            // Third click resets to None, which is the data source's order.
-            Assert.Same(rows, SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Name, 3)));
+            // Third click resets to None. The view keeps no copy of the
+            // search's order - its cells ARE in that order - so this has
+            // to come back as "leave them alone", not as a permutation.
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 3)));
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, new TableSortState<SnapshotTableColumn>()));
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, null));
         }
 
         [Fact]
         public void AmountSort_OrdersByCount_AndTiesKeepTheirOriginalOrder()
         {
-            var sorted = SnapshotTableSorter.SortItems(Items(), Clicked(SnapshotTableColumn.Amount, 1));
+            var rows = Items();
+            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Amount, 1));
 
             // 30 and 30 tie: "Mystic Clover" was emitted first and stays
             // first, so a sort never silently reshuffles equal rows.
-            Assert.Equal(new[] { "Mystic Clover", "Ectoplasm", "copper ore" }, Names(sorted));
+            Assert.Equal(new[] { "Mystic Clover", "Ectoplasm", "copper ore" }, Names(rows, order));
         }
 
         [Fact]
         public void WalletRuns_SortByTheSameTwoColumns()
         {
-            var byName = SnapshotTableSorter.SortWallet(Wallet(), Clicked(SnapshotTableColumn.Name, 1));
-            var byAmount = SnapshotTableSorter.SortWallet(Wallet(), Clicked(SnapshotTableColumn.Amount, 2));
+            var rows = Wallet();
+            var byName = SnapshotTableSorter.WalletOrder(rows, Clicked(SnapshotTableColumn.Name, 1));
+            var byAmount = SnapshotTableSorter.WalletOrder(rows, Clicked(SnapshotTableColumn.Amount, 2));
 
-            Assert.Equal("Astral Acclaim", byName[0].CurrencyName);
-            Assert.Equal("Karma", byAmount[0].CurrencyName);
+            Assert.Equal("Astral Acclaim", rows[byName[0]].CurrencyName);
+            Assert.Equal("Karma", rows[byAmount[0]].CurrencyName);
+            Assert.Null(SnapshotTableSorter.WalletOrder(rows, null));
         }
 
         [Fact]
@@ -102,54 +100,9 @@ namespace GW2CraftingHelper.Tests.Services
                 new SnapshotSearchRow { Name = "Bolt of Silk", TotalCount = 2 }
             };
 
-            var sorted = SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Name, 1));
+            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 1));
 
-            Assert.Null(sorted[0].Name);
-        }
-
-        // The order the Snapshot tab actually renders with: its rows are
-        // built once in the search's order and a click re-PLACES them, so
-        // the permutation is what the view consumes and SortItems is the
-        // same permutation applied to a list. One has to follow the other.
-        [Fact]
-        public void ItemOrder_IsTheSamePermutationSortItemsApplies()
-        {
-            var rows = Items();
-            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Amount, 2));
-            var sorted = SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Amount, 2));
-
-            Assert.Equal(rows.Count, order.Count);
-            for (int i = 0; i < order.Count; i++)
-            {
-                Assert.Same(sorted[i], rows[order[i]]);
-            }
-        }
-
-        [Fact]
-        public void WalletOrder_IsTheSamePermutationSortWalletApplies()
-        {
-            var rows = Wallet();
-            var order = SnapshotTableSorter.WalletOrder(rows, Clicked(SnapshotTableColumn.Name, 1));
-            var sorted = SnapshotTableSorter.SortWallet(rows, Clicked(SnapshotTableColumn.Name, 1));
-
-            for (int i = 0; i < order.Count; i++)
-            {
-                Assert.Same(sorted[i], rows[order[i]]);
-            }
-        }
-
-        // The third click. The view keeps no copy of the search's order -
-        // its cells ARE in that order - so "no sort" has to come back as
-        // "leave them alone" rather than as a permutation.
-        [Fact]
-        public void CyclingBackToNone_LeavesTheSearchsOwnOrder()
-        {
-            var rows = Items();
-
-            Assert.Null(SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 3)));
-            Assert.Null(SnapshotTableSorter.ItemOrder(rows, new TableSortState<SnapshotTableColumn>()));
-            Assert.Null(SnapshotTableSorter.ItemOrder(rows, null));
-            Assert.Null(SnapshotTableSorter.WalletOrder(Wallet(), null));
+            Assert.Null(rows[order[0]].Name);
         }
 
         [Fact]
@@ -179,12 +132,18 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(rows.Count, seen.Count);
         }
 
-        private static string[] Names(IReadOnlyList<SnapshotSearchRow> rows)
+        /// <summary>
+        /// The rows as the tab would show them: display position i reads
+        /// row order[i], which is the indexing step MainView.PlaceCells
+        /// does over the controls it already built. A null order is the
+        /// list as the search produced it.
+        /// </summary>
+        private static string[] Names(IReadOnlyList<SnapshotSearchRow> rows, IReadOnlyList<int> order)
         {
             var names = new string[rows.Count];
             for (int i = 0; i < rows.Count; i++)
             {
-                names[i] = rows[i].Name;
+                names[i] = rows[order == null ? i : order[i]].Name;
             }
 
             return names;

@@ -17,10 +17,11 @@ namespace GW2CraftingHelper.Services
 
     /// <summary>
     /// Comparators behind the Snapshot tab's clickable column headers.
-    /// Blish-free, and the same shape as <see cref="PlanTableSorter"/>:
-    /// it reorders already-built rows, never mutates the caller's list, and
-    /// returns the very same instance when no sort is active, so the
-    /// default path allocates nothing.
+    /// Blish-free, and the same shape as <see cref="PlanTableSorter"/>
+    /// except in what it returns: an ORDER over the caller's rows rather
+    /// than a sorted copy of them, because the rows it sorts are already
+    /// built controls. The caller's list is never mutated, and no sort at
+    /// all allocates nothing.
     /// <para>
     /// Names compare with <see cref="StringComparer.OrdinalIgnoreCase"/> -
     /// what a reader scanning an alphabetical column expects, and what
@@ -29,32 +30,19 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class SnapshotTableSorter
     {
-        public static IReadOnlyList<SnapshotSearchRow> SortItems(
-            IReadOnlyList<SnapshotSearchRow> rows, TableSortState<SnapshotTableColumn> state)
-        {
-            return Sort(rows, state, CompareItems);
-        }
-
-        public static IReadOnlyList<SnapshotWalletEntry> SortWallet(
-            IReadOnlyList<SnapshotWalletEntry> rows, TableSortState<SnapshotTableColumn> state)
-        {
-            return Sort(rows, state, CompareWallet);
-        }
-
         /// <summary>
         /// The sort as a PERMUTATION of the caller's own row order:
         /// <c>order[i]</c> is the index of the row that belongs in display
         /// position i. Null means "leave them as they are" - no sort
         /// active, or nothing to reorder.
         /// <para>
-        /// The Snapshot tab's rows are built once, in the search's own
-        /// order, and a sort click moves the controls it already has rather
-        /// than re-running the account search and recreating every row. So
-        /// the click needs the order, not a re-sorted copy of the data;
-        /// <see cref="SortItems"/> is that same order applied to a list.
-        /// Returning null rather than the identity permutation is what lets
-        /// the third click - the cycle back to None - restore the search's
-        /// own order without the view keeping a second copy of it.
+        /// An order rather than a sorted copy, because the Snapshot tab's
+        /// rows are built once in the search's own order and a click moves
+        /// the controls it already has rather than re-running the account
+        /// search (see MainView.SortSection). Returning null rather than
+        /// the identity permutation is what lets the third click - the
+        /// cycle back to None - restore the search's own order without the
+        /// view keeping a second copy of it.
         /// </para>
         /// </summary>
         public static IReadOnlyList<int> ItemOrder(
@@ -68,23 +56,6 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<SnapshotWalletEntry> rows, TableSortState<SnapshotTableColumn> state)
         {
             return Order(rows, state, CompareWallet);
-        }
-
-        private static IReadOnlyList<T> Sort<T>(
-            IReadOnlyList<T> rows,
-            TableSortState<SnapshotTableColumn> state,
-            Func<T, T, SnapshotTableColumn, int> compare)
-        {
-            var order = Order(rows, state, compare);
-            if (order == null) return rows;
-
-            var sorted = new List<T>(rows.Count);
-            for (int i = 0; i < order.Count; i++)
-            {
-                sorted.Add(rows[order[i]]);
-            }
-
-            return sorted;
         }
 
         private static IReadOnlyList<int> Order<T>(
