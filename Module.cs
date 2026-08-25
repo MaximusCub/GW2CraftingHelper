@@ -590,7 +590,7 @@ namespace GW2CraftingHelper
                 ids => itemMetadataService.WarmStatBlocksAsync(ids, CancellationToken.None)
             );
 
-            _settingsContent = new SettingsTabContent(_settings);
+            _settingsContent = new SettingsTabContent(_settings, _modalDialog);
 
             // DataDir and
             // _moduleIconTexture are both already in scope at this point in
@@ -697,7 +697,11 @@ namespace GW2CraftingHelper
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(157097),
-                () => new ViewAdapter("About", c => _aboutContent.Build(c)),
+                () =>
+                {
+                    _aboutContent.BeginRebuild();
+                    return new ViewAdapter("About", c => _aboutContent.Build(c));
+                },
                 "About"));
 
             // Refresh log content when switching to the Log tab
@@ -1106,6 +1110,7 @@ namespace GW2CraftingHelper
 
             Views.Rendering.ClickSound.Unload();
             _settingsContent?.Teardown();
+            _aboutContent?.Teardown();
 
             // Module-level log system (d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush

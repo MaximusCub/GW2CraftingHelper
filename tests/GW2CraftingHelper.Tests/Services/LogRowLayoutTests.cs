@@ -69,5 +69,49 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, LogRowLayout.PrefixWidth(-5, rowWidth: 900));
             Assert.Equal(LogRowLayout.MessageGap, LogRowLayout.MessageX(-5));
         }
+
+        [Fact]
+        public void WideningAColumnShowingItsWholeString_SkipsTheRemeasure()
+        {
+            Assert.True(LogRowLayout.KeepsFitting(showingWholeString: true, fittedWidth: 200, newWidth: 400));
+            Assert.True(LogRowLayout.KeepsFitting(showingWholeString: true, fittedWidth: 200, newWidth: 200));
+        }
+
+        [Fact]
+        public void NarrowingAColumn_ForcesTheRemeasure()
+        {
+            // The drag case the split has to get right: a narrowing column
+            // may have started to overflow, so the string must be re-fitted.
+            Assert.False(LogRowLayout.KeepsFitting(showingWholeString: true, fittedWidth: 200, newWidth: 199));
+        }
+
+        [Fact]
+        public void AlreadyShortenedColumn_AlwaysRemeasures()
+        {
+            // A "..." string carries no evidence about how much of the whole
+            // string a wider column could now hold.
+            Assert.False(LogRowLayout.KeepsFitting(showingWholeString: false, fittedWidth: 200, newWidth: 400));
+        }
+
+        [Fact]
+        public void NeverFittedColumn_AlwaysRemeasures()
+        {
+            // A row's columns start at fittedWidth -1, before any measuring.
+            Assert.False(LogRowLayout.KeepsFitting(showingWholeString: true, fittedWidth: -1, newWidth: 400));
+        }
+
+        [Fact]
+        public void ColumnWidthTrackedApartFromTheControl_DragBackDownStillSkips()
+        {
+            // A resize drag moves the columns live and re-fits the text only
+            // at settle, so the control is already at the new width while
+            // its string still belongs to the width it was fitted at. Both
+            // halves of a 200 -> 900 -> 200 drag must skip: the string is
+            // known to fit at 200, whatever the control is currently sized
+            // to in between.
+            const int fitted = 200;
+            Assert.True(LogRowLayout.KeepsFitting(true, fitted, newWidth: 900));
+            Assert.True(LogRowLayout.KeepsFitting(true, fitted, newWidth: fitted));
+        }
     }
 }

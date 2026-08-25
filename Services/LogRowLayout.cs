@@ -55,5 +55,24 @@ namespace GW2CraftingHelper.Services
             int available = rowWidth - MessageX(prefixWidth) - RightPad;
             return available < MinMessageWidth ? MinMessageWidth : available;
         }
+
+        /// <summary>
+        /// True when a column is showing its whole string and has not
+        /// narrowed since that string was fitted, so it cannot have started
+        /// to overflow and the MeasureString binary search inside
+        /// EllipsizeToWidth can be skipped.
+        /// <para>
+        /// Against the width the TEXT was fitted at, NOT the control's: a
+        /// resize drag moves the Log tab's columns live and re-fits their
+        /// text only at settle, so in between the control already carries
+        /// the new width while its string still belongs to the old one, and
+        /// comparing against the control would skip exactly the re-fit a
+        /// narrowing drag needs. Below zero means "never fitted".
+        /// </para>
+        /// </summary>
+        public static bool KeepsFitting(bool showingWholeString, int fittedWidth, int newWidth)
+        {
+            return showingWholeString && fittedWidth >= 0 && newWidth >= fittedWidth;
+        }
     }
 }

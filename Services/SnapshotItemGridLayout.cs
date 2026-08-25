@@ -32,15 +32,12 @@ namespace GW2CraftingHelper.Services
         public const int CellTextRightPad = 8;
 
         /// <summary>
-        /// Width the vertical scrollbar of the scrolling content panel
-        /// occupies. The grid is laid out inside the panel width minus this,
-        /// so the right-hand column's text ellipsizes before it runs under
-        /// the scrollbar - the same allowance LogTabContent applies to its
-        /// own rows, and the same 20px the last term of
-        /// <see cref="WindowSizing.WindowToTabPanelChrome"/> accounts for on
-        /// tabs that pad their panel instead.
+        /// Aliased to <see cref="WindowSizing.ScrollbarAllowance"/>, which
+        /// is where this module's one scrollbar allowance is stated. Kept
+        /// as a name here because the grid-width derivation below reads in
+        /// these terms.
         /// </summary>
-        public const int ScrollbarAllowance = 20;
+        public const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
 
         /// <summary>
         /// Upper bound on one character of the body font, which averages

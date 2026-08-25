@@ -32,6 +32,19 @@ namespace GW2CraftingHelper.Services
         // being culture-substituted inside "HH:mm:ss".
         public static string Prefix(ModuleLogEntry entry)
         {
+            string tagPart = string.IsNullOrEmpty(entry?.Tag) ? string.Empty : $" [{entry.Tag}]";
+            return Time(entry) + tagPart;
+        }
+
+        /// <summary>
+        /// The prefix's LEVEL-and-stamp half, without the tag - the Log
+        /// tab's own Time column, which is banded separately from the tag
+        /// beside it (see LogGutterLayout). <see cref="Prefix"/> still
+        /// composes the two, so the copied line and the search corpus are
+        /// unchanged by the split.
+        /// </summary>
+        public static string Time(ModuleLogEntry entry)
+        {
             if (entry == null)
             {
                 throw new ArgumentNullException(nameof(entry));
@@ -39,8 +52,7 @@ namespace GW2CraftingHelper.Services
 
             string levelText = entry.Level.ToString().ToUpperInvariant();
             string timestampText = entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            string tagPart = string.IsNullOrEmpty(entry.Tag) ? string.Empty : $" [{entry.Tag}]";
-            return $"[{levelText}] {timestampText}{tagPart}";
+            return $"[{levelText}] {timestampText}";
         }
 
         /// <summary>

@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// is easy to get backwards. The PLAN re-splits every frame of a drag
     /// (CraftingPlanView.ReplayRelayout replays its ISectionRelayoutSink
     /// closures off Blish's Resized event); the SNAPSHOT re-splits once per
-    /// drag, trailing-debounced by MainView.ScheduleRowRefit.
+    /// drag, trailing-debounced through MainView's ResizeSettleDebounce.
     /// <see cref="Sync"/> is written to the stricter: buffers this instance
     /// owns, no MeasureString, no allocation.
     /// </para>

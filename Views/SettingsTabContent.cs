@@ -79,9 +79,16 @@ namespace GW2CraftingHelper.Views
         private static readonly Color SuccessTextColor = new Color(150, 200, 150);
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
-        private const int RightEdgePadding = 20;
         private const int SaveBarHeight = 40;
-        private const int RowHeight = 30;
+
+        // Every horizontal constant on this tab now comes from
+        // SettingsFormLayout, which derives them from the plan tables' own
+        // pinned-right-edge rule; these are compile-time aliases so the call
+        // sites below read as geometry rather than as lookups.
+        private const int RowHeight = SettingsFormLayout.RowHeight;
+        private const int NameColumnX = SettingsFormLayout.CellLeftPad;
+        private const int InputWidth = SettingsFormLayout.InputWidth;
+        private const int RowGap = SettingsFormLayout.RowGap;
 
         // PlanContentHeightMath's SectionTitle band, aliased rather than
         // re-derived: these headings are the same tier and rule.
@@ -90,14 +97,98 @@ namespace GW2CraftingHelper.Views
 
         // 22, not 20: an info line sits at y=2 and its lowest Font16 ink is
         // y=23, so 22 leaves the same 1px overhang 20 left Font14's y=21.
-        private const int InfoRowHeight = 22;
-        private const int NameColumnX = 16;
-        private const int NameColumnWidth = 220;
-        private const int InputWidth = 80;
-        private const int HintX = NameColumnX + NameColumnWidth + InputWidth + 8;
-        private const int ErrorX = HintX + 130;
+        private const int InfoRowHeight = SettingsFormLayout.DescriptionLineHeight;
+
+        // Y of a Body-16 label inside a RowHeight row, and of a 26px input
+        // inside the same row - both unchanged from the flat form this board
+        // replaces.
+        private const int RowLabelY = 7;
+        private const int RowInputY = 3;
+        private const int InputHeight = 26;
 
         private static readonly Logger Logger = Logger.GetLogger<SettingsTabContent>();
+
+        /// <summary>
+        /// What a settings row's control cluster is, and therefore what
+        /// <see cref="LayoutFormRow"/> has to pin to the column's right
+        /// edge. Three shapes cover the tab.
+        /// </summary>
+        private enum FormRowKind
+        {
+            /// <summary>Text box plus the shared unit/error tag slot.</summary>
+            Input,
+
+            /// <summary>Slider, live readout, Test button.</summary>
+            Volume,
+
+            /// <summary>A Checkbox standing in for the name, no cluster.</summary>
+            Checkbox
+        }
+
+        /// <summary>
+        /// One row of the section board: a flexing name and a cluster pinned
+        /// to the column's right edge, optionally with its own wrapped
+        /// description line beneath it.
+        /// </summary>
+        private sealed class FormRow
+        {
+            public FormRowKind Kind;
+            public Panel Panel;
+
+            public Label NameLabel;
+            public string NameText;
+
+            public TextBox Input;
+
+            // The row's ONE tag slot, shared by two labels at the same spot:
+            // the unit hint, replaced by the validation error while the
+            // typed value will not parse. Banded at max(widest unit, widest
+            // error) across the section so the column cannot move when a row
+            // fails - see SettingsFormLayout.TagX.
+            public Label Tag;
+            public Label Error;
+            public string UnitText;
+            public string ErrorText;
+            public int TagBandWidth;
+
+            public TrackBar Slider;
+            public Label Readout;
+            public Control TestButton;
+
+            public Checkbox Checkbox;
+
+            // A row-level counterpart to SectionBlock.Chip, for the one row
+            // whose save behaviour differs from its section's - see
+            // AddLogDiagnosticsRow. Pinned to the same right edge the tag
+            // slot above uses, so the two read as one column.
+            public Panel Chip;
+            public int ChipWidth;
+
+            public string DescriptionText;
+            public Label DescriptionLabel;
+
+            /// <summary>Width of the pinned cluster, which is what the name
+            /// column's budget is taken against.</summary>
+            public int ClusterWidth;
+        }
+
+        /// <summary>
+        /// One block on the section board: a title band with an optional
+        /// right-pinned chip, optional section-level prose, and its rows.
+        /// </summary>
+        private sealed class SectionBlock
+        {
+            public Panel Panel;
+            public Label TitleLabel;
+            public Panel Rule;
+            public Panel Chip;
+            public int ChipWidth;
+            public int ChipY;
+
+            public readonly List<string> Prose = new List<string>();
+            public readonly List<Label> ProseLabels = new List<Label>();
+            public readonly List<FormRow> Rows = new List<FormRow>();
+        }
 
         private class CurrencyRow
         {
@@ -105,11 +196,17 @@ namespace GW2CraftingHelper.Views
             public bool HasDefault;
             public long DefaultCopperPerUnit;
 
+            // Full, un-ellipsized - the cell's name column flexes with the
+            // column width, so the text it was shortened from is needed
+            // again on every resize.
+            public string Name;
+
             // The row's own one-line cell inside the currency grid, and the
             // rule along its bottom - both driven by ApplyCurrencyFilter.
             public Panel Cell;
             public Panel Divider;
 
+            public Label NameLabel;
             public TextBox Input;
 
             // The cell's single tag slot, shared by two labels at the same
@@ -136,10 +233,11 @@ namespace GW2CraftingHelper.Views
             public int MaterialItemId;
             public string MaterialLabel;
             public TextBox Input;
-            public Label ErrorLabel;
+            public FormRow Form;
         }
 
         private readonly ModuleSettings _settings;
+        private readonly ModalDialog _modalDialog;
         private readonly List<CurrencyRow> _rows = new List<CurrencyRow>();
 
         // Row names in _rows order, held so the filter keystroke path does
@@ -149,11 +247,30 @@ namespace GW2CraftingHelper.Views
 
         private FlowPanel _rootPanel;
 
+        // The four short sections, packed into as many min-width columns as
+        // the panel holds (see LayoutSectionBoard). Currency Valuations is
+        // NOT one of them - it is a full-width grid below the board.
+        private Panel _boardPanel;
+        private readonly List<SectionBlock> _sections = new List<SectionBlock>();
+
         // One status label for the whole tab, next to the one Save button in
         // the header bar (see BuildSaveBar) - the four per-section Save rows
         // and their four status labels this replaced are recorded in
         // KNOWN-ISSUES (audit batch G supersedes B14).
         private Label _statusLabel;
+
+        // The save bar's own controls. The dirty chip and Discard are hidden
+        // entirely at zero unsaved changes - see SettingsSaveBarLayout.
+        private Panel _saveBarPanel;
+        private Label _dirtyChipLabel;
+        private StandardButton _discardButton;
+        private StandardButton _saveButton;
+        private int _saveBarWidth;
+
+        // Set while LoadAll is rewriting every control, so the change
+        // handlers below do not run a full-form dirty check 50+ times for
+        // one load.
+        private bool _suspendDirtyRefresh;
 
         // The currency list's absolutely-positioned grid: one Panel holding
         // every cell, repacked by ApplyCurrencyFilter as rows are hidden and
@@ -168,8 +285,8 @@ namespace GW2CraftingHelper.Views
         // placeholder it read as a label naming the box, not as a prompt to
         // type a number into it (field test, bug 2).
         private Panel _currencyHeaderPanel;
-        private readonly Label[] _currencyHeaderNames = new Label[2];
-        private readonly Label[] _currencyHeaderUnits = new Label[2];
+        private readonly List<Label> _currencyHeaderNames = new List<Label>();
+        private readonly List<Label> _currencyHeaderUnits = new List<Label>();
 
         // Reused per filter pass (one entry per row, in _rows order) rather
         // than reallocated per keystroke: the rows whose amount did not
@@ -186,6 +303,11 @@ namespace GW2CraftingHelper.Views
         // Width the content is currently laid out at (see ApplyPanelWidth).
         private int _panelWidth;
 
+        // Holds the wrap/ellipsize half of a resize until the drag stops -
+        // see ApplyPanelWidth. Lives as long as the view, so Teardown drops
+        // it rather than leaving a waiter pointed at a disposed tree.
+        private readonly ResizeSettleDebounce _resizeSettle;
+
         // The ONE "Diagnostics" checkbox + the two log-file
         // policy rows (max size / retention) - d2-log-system.md Section 5.
         // No separate
@@ -194,9 +316,9 @@ namespace GW2CraftingHelper.Views
         // read.
         private Checkbox _logDiagnosticsCheckbox;
         private TextBox _logMaxSizeInput;
-        private Label _logMaxSizeErrorLabel;
+        private FormRow _logMaxSizeRow;
         private TextBox _logRetentionDaysInput;
-        private Label _logRetentionDaysErrorLabel;
+        private FormRow _logRetentionDaysRow;
 
         // Held only to be disposed - see DisposeClickVolumeSlider.
         private TrackBar _clickVolumeSlider;
@@ -209,7 +331,7 @@ namespace GW2CraftingHelper.Views
         // concern). TextBox+Save+error-label idiom, same shape as the
         // Homestead tier rows above.
         private TextBox _snapshotRefreshIntervalInput;
-        private Label _snapshotRefreshIntervalErrorLabel;
+        private FormRow _snapshotRefreshIntervalRow;
 
         // The control values as of the last load or successful save - what
         // an edit is measured against (see UnsavedChangeCount). Null until
@@ -229,9 +351,21 @@ namespace GW2CraftingHelper.Views
         // a half-built form has nothing to compare, not everything.
         private volatile bool _buildComplete;
 
-        public SettingsTabContent(ModuleSettings settings)
+        /// <param name="modalDialog">
+        /// Raises the Discard confirm. Null degrades to discarding without
+        /// one rather than losing the affordance - the confirm matrix is a
+        /// UX rule, not a correctness gate.
+        /// </param>
+        public SettingsTabContent(ModuleSettings settings, ModalDialog modalDialog = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _modalDialog = modalDialog;
+
+            _resizeSettle = new ResizeSettleDebounce(
+                RefitTextAfterResizeSettle,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "Settings text re-fit wait failed"));
 
             // Lifetime subscription, dropped in Teardown.
             _settings.ClickSoundVolumePercent.SettingChanged += OnClickVolumeSettingChanged;
@@ -261,6 +395,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public void Teardown()
         {
+            _resizeSettle.Cancel();
             _settings.ClickSoundVolumePercent.SettingChanged -= OnClickVolumeSettingChanged;
             DisposeClickVolumeSlider();
             _clickVolumeReadout = null;
@@ -323,7 +458,21 @@ namespace GW2CraftingHelper.Views
             _currencyFilterInput = null;
             _currencyCountLabel = null;
             _currencyHeaderPanel = null;
+            _currencyHeaderNames.Clear();
+            _currencyHeaderUnits.Clear();
             _statusLabel = null;
+            _statusFullText = "";
+
+            // Same hazard: the previous cycle's board blocks and save-bar
+            // controls are disposed with their container.
+            _sections.Clear();
+            _boardPanel = null;
+            _currencyProsePanels.Clear();
+            _currencyProseLabels.Clear();
+            _currencyProse.Clear();
+            _dirtyChipLabel = null;
+            _discardButton = null;
+            _saveButton = null;
 
             // The previous cycle's slider; Teardown handles the last one.
             DisposeClickVolumeSlider();
@@ -347,10 +496,15 @@ namespace GW2CraftingHelper.Views
             // alongside the current cycle's real rows.
             _homesteadRows.Clear();
 
-            int panelWidth = container.ContentRegion.Width - RightEdgePadding;
+            // The one content frame this tab places against: the container
+            // less the scrollbar strip. The save bar uses the SAME width
+            // even though it does not scroll, so its buttons land on the
+            // vertical line the scrolling content's right edge holds below
+            // them.
+            int panelWidth = ContentWidth(container);
             _panelWidth = panelWidth;
 
-            var saveBar = BuildSaveBar(container);
+            BuildSaveBar(container);
 
             _rootPanel = new FlowPanel()
             {
@@ -363,19 +517,35 @@ namespace GW2CraftingHelper.Views
 
             container.Resized += (_, __) =>
             {
-                saveBar.Size = new Point(container.ContentRegion.Width, SaveBarHeight);
+                _saveBarPanel.Size = new Point(container.ContentRegion.Width, SaveBarHeight);
                 _rootPanel.Size = ContentSizeBelowSaveBar(container);
-                ApplyPanelWidth(container.ContentRegion.Width - RightEdgePadding);
+                ApplySaveBarWidth(ContentWidth(container));
+                ApplyPanelWidth(ContentWidth(container));
             };
 
-            BuildSoundSection(panelWidth);
+            _boardPanel = new Panel()
+            {
+                Size = new Point(panelWidth, 0),
+                Parent = _rootPanel
+            };
+            _fullWidthPanels.Add(_boardPanel);
 
-            BuildHomesteadRefinementSection(panelWidth);
-            BuildLoggingSection(panelWidth);
-            BuildSnapshotSection(panelWidth);
+            BuildSoundSection();
+            BuildHomesteadRefinementSection();
+            BuildLoggingSection();
+            BuildSnapshotSection();
+            LayoutSectionBoard(measureText: true);
+
             BuildCurrencyValuationsSection(panelWidth);
 
             LoadAll();
+            RefreshDirtyState();
+        }
+
+        private static int ContentWidth(Container container)
+        {
+            int width = container.ContentRegion.Width - WindowSizing.ScrollbarAllowance;
+            return width > 0 ? width : 0;
         }
 
         /// <summary>
@@ -386,10 +556,20 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void LoadAll()
         {
-            LoadCurrentValuations();
-            LoadCurrentHomesteadTiers();
-            LoadCurrentLoggingSettings();
-            LoadCurrentSnapshotSettings();
+            // One dirty check at the end rather than one per control the
+            // load rewrites - the handlers each run a whole-form capture.
+            _suspendDirtyRefresh = true;
+            try
+            {
+                LoadCurrentValuations();
+                LoadCurrentHomesteadTiers();
+                LoadCurrentLoggingSettings();
+                LoadCurrentSnapshotSettings();
+            }
+            finally
+            {
+                _suspendDirtyRefresh = false;
+            }
 
             // LoadCurrentValuations clears the per-row error tags, so the
             // rows a failed Save forced past the filter have to be
@@ -468,10 +648,7 @@ namespace GW2CraftingHelper.Views
         {
             LoadAll();
 
-            if (_statusLabel != null)
-            {
-                _statusLabel.Text = "";
-            }
+            SetStatusText("");
         }
 
         private static Point ContentSizeBelowSaveBar(Container container)
@@ -481,39 +658,68 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Re-lays the whole scrolling content out at a new panel width.
-        /// Every row/header panel is built at the width the tab happened to
-        /// open at, and the currency grid additionally derives its column
-        /// count, column width and cell X positions from it - so without
-        /// this, narrowing the window leaves the second column of cells
-        /// beyond the panel's right edge, unreachable until the tab is
-        /// closed and re-opened.
+        /// The RESIZE entry point. Every row/header panel is built at the
+        /// width the tab happened to open at, and the currency grid
+        /// additionally derives its column count, column width and cell X
+        /// positions from it - so without this, narrowing the window leaves
+        /// the second column of cells beyond the panel's right edge,
+        /// unreachable until the tab is closed and re-opened.
+        /// <para>
+        /// Positions and widths track the drag; the work that MEASURES text
+        /// does not. Re-wrapping this tab's ten paragraphs and re-ellipsizing
+        /// its fifty-odd names is hundreds of MeasureString calls, and a
+        /// window drag delivers resize events at frame rate, so that half
+        /// runs once at drag settle instead - the module's standing split
+        /// (CraftingPlanView's re-ellipsis registry, MainView's row re-fit).
+        /// </para>
         /// </summary>
         private void ApplyPanelWidth(int panelWidth)
         {
-            // Resized fires on height-only changes too (and repeatedly while
-            // the window is dragged), and re-widening every row re-flows the
-            // scrolling FlowPanel once per row - so do nothing unless the
-            // width actually moved.
+            // Resized fires on height-only changes too, and re-widening
+            // every row re-flows the scrolling FlowPanel once per row - so
+            // do nothing unless the width actually moved.
             if (panelWidth <= 0 || panelWidth == _panelWidth) return;
 
             _panelWidth = panelWidth;
+            Relayout(measureText: false);
+            _resizeSettle.Schedule();
+        }
 
+        /// <summary>
+        /// The trailing half of a resize: the wraps and ellipses the live
+        /// pass left at the previous width, re-fitted once the drag has
+        /// stopped. Skipped while a rebuild is in flight, whose own Build
+        /// pass measures everything anyway.
+        /// </summary>
+        private void RefitTextAfterResizeSettle()
+        {
+            if (!_buildComplete || _panelWidth <= 0) return;
+
+            Relayout(measureText: true);
+        }
+
+        private void Relayout(bool measureText)
+        {
             foreach (var panel in _fullWidthPanels)
             {
-                panel.Width = panelWidth;
+                panel.Width = _panelWidth;
             }
+
+            LayoutSectionBoard(measureText);
+            LayoutCurrencyProse(measureText);
 
             if (_currencyGridPanel == null) return;
 
-            _currencyGridPanel.Width = panelWidth;
+            _currencyGridPanel.Width = _panelWidth;
+            LayoutCurrencyFilterRow();
             LayoutCurrencyGridHeader();
 
-            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
+            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(_panelWidth);
             foreach (var row in _rows)
             {
                 row.Cell.Width = columnWidth;
                 row.Divider.Width = columnWidth;
+                LayoutCurrencyCell(row, columnWidth, measureText);
             }
 
             SetCurrencyGridHeight();
@@ -541,26 +747,415 @@ namespace GW2CraftingHelper.Views
                 _rows.Count, _panelWidth, CurrencyRowHeight);
         }
 
+        // ---- Section board ----
+        //
+        // Four short sections packed into as many SettingsFormLayout
+        // .MinColumnWidth columns as the panel holds. Every block is
+        // measured at the resolved column width first (a description wraps,
+        // so a block's height is a function of that width) and placed
+        // second; ColumnBoardLayout owns the packing.
+
+        private SectionBlock BeginSection(string title, params string[] prose)
+        {
+            var section = new SectionBlock
+            {
+                Panel = new Panel()
+                {
+                    Size = new Point(SettingsFormLayout.MinColumnWidth, SectionHeaderRowHeight),
+                    Parent = _boardPanel
+                }
+            };
+
+            section.TitleLabel = new Label()
+            {
+                Text = title,
+                Font = UiFonts.SectionTitle,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, SectionHeaderTitleY),
+                Parent = section.Panel
+            };
+
+            // Same header rule as every CraftingPlanView section: 2px in
+            // SectionDividerColor, bottom-anchored with 1px clearance (see
+            // LabelHelpers.CreateRowDivider for why 1px lines and flush
+            // anchoring are unsafe here). It spans the COLUMN now, and the
+            // title sits at the column's own inset, so the two share a left
+            // edge instead of the title floating inside its own rule.
+            section.Rule = new Panel()
+            {
+                Size = new Point(SettingsFormLayout.MinColumnWidth, 2),
+                Location = new Point(0, SectionHeaderRowHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = section.Panel
+            };
+
+            foreach (string line in prose)
+            {
+                section.Prose.Add(line);
+                section.ProseLabels.Add(CreateWrappedLabel(section.Panel));
+            }
+
+            _sections.Add(section);
+            return section;
+        }
+
+        /// <summary>
+        /// The tab's one chip word. Only immediate-apply controls carry it:
+        /// a standing "Save needed" on everything else is a colour that says
+        /// nothing, and the save bar already carries the dirty state.
+        /// </summary>
+        private const string ImmediateApplyTagText = "Applies immediately";
+
+        /// <summary>
+        /// A right-pinned tag in a section's title band, for a section whose
+        /// every control applies immediately.
+        /// </summary>
+        private static void AddSectionChip(SectionBlock section, string text, string tooltip)
+        {
+            PillColors.GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
+            section.ChipWidth = LabelHelpers.MeasureSmallTagWidth(text);
+
+            // Centred in the band ABOVE its rule, so the tag clears the rule
+            // the way the band's title does.
+            section.ChipY = PlanRelayoutMath.CenterX(
+                SectionHeaderRowHeight - 3, LabelHelpers.SmallTagHeight);
+            section.Chip = LabelHelpers.CreateSmallTag(
+                section.Panel, text, 0, section.ChipY, border, fill);
+            LabelHelpers.ApplyTagTooltip(section.Chip, tooltip);
+        }
+
+        /// <summary>
+        /// The same tag on ONE row, for a control whose save behaviour
+        /// differs from its section's. Same chrome and same right edge as
+        /// the section band's, so the two read as one vocabulary rather than
+        /// two. The row's name column is budgeted against the tag through
+        /// ClusterWidth, exactly as an input row is budgeted against its
+        /// box.
+        /// </summary>
+        private static void AddRowChip(FormRow row, string text, string tooltip)
+        {
+            PillColors.GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
+
+            row.ChipWidth = LabelHelpers.MeasureSmallTagWidth(text);
+            row.ClusterWidth = row.ChipWidth;
+            row.Chip = LabelHelpers.CreateSmallTag(
+                row.Panel, text, 0,
+                PlanRelayoutMath.CenterX(RowHeight, LabelHelpers.SmallTagHeight),
+                border, fill);
+            LabelHelpers.ApplyTagTooltip(row.Chip, tooltip);
+        }
+
+        private static Label CreateWrappedLabel(Panel parent)
+        {
+            return new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "",
+                AutoSizeWidth = false,
+                AutoSizeHeight = false,
+                TextColor = InfoTextColor,
+                Parent = parent
+            };
+        }
+
+        /// <summary>
+        /// Wraps one paragraph into an already-created label at (x, y) and
+        /// returns the height it took: one
+        /// <see cref="SettingsFormLayout.DescriptionLineHeight"/> row per
+        /// physical line, which is NotesSectionLayoutMath's own precedent.
+        /// <para>
+        /// At <paramref name="measureText"/> false the paragraph keeps the
+        /// wrap it already has and only its box moves - see
+        /// <see cref="ApplyPanelWidth"/> for why. The label's own Height is
+        /// the cache: it is written explicitly here, never auto-sized.
+        /// </para>
+        /// </summary>
+        private static int LayoutWrappedLabel(
+            Label label, string text, int x, int y, int budget, bool measureText)
+        {
+            if (budget < 20) budget = 20;
+
+            if (measureText)
+            {
+                var wrapped = TextWrapMath.Wrap(
+                    text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
+                string joined = string.Join("\n", wrapped.Lines);
+
+                if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+                {
+                    label.Text = joined;
+                }
+                label.Size = new Point(budget, wrapped.Lines.Count * InfoRowHeight);
+
+                // The wrap only drops text at the line cap, and then the
+                // full paragraph is the hover - the module's one overflow
+                // idiom.
+                TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
+            }
+            else
+            {
+                label.Width = budget;
+            }
+
+            label.Location = new Point(x, y);
+            return label.Height;
+        }
+
+        private void LayoutSectionBoard(bool measureText)
+        {
+            if (_boardPanel == null || _sections.Count == 0) return;
+
+            int boardWidth = _panelWidth;
+            int columnCount = ColumnBoardLayout.ComputeColumnCount(
+                boardWidth, SettingsFormLayout.MinColumnWidth, _sections.Count);
+            int columnWidth = ColumnBoardLayout.ComputeColumnWidth(boardWidth, columnCount);
+
+            var heights = new List<int>(_sections.Count);
+            foreach (var section in _sections)
+            {
+                heights.Add(LayoutSection(section, columnWidth, measureText));
+            }
+
+            var board = ColumnBoardLayout.Compute(
+                heights, boardWidth, SettingsFormLayout.MinColumnWidth, SettingsFormLayout.SectionGap);
+
+            for (int i = 0; i < _sections.Count; i++)
+            {
+                var placement = board.Blocks[i];
+                _sections[i].Panel.Location = new Point(placement.X, placement.Y);
+                _sections[i].Panel.Size = new Point(placement.Width, heights[i]);
+            }
+
+            _boardPanel.Height = board.Height;
+        }
+
+        private static int LayoutSection(SectionBlock section, int columnWidth, bool measureText)
+        {
+            section.Rule.Size = new Point(columnWidth, 2);
+            if (section.Chip != null)
+            {
+                section.Chip.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(
+                        PlanRelayoutMath.PinnedRightEdge(columnWidth), section.ChipWidth),
+                    section.ChipY);
+            }
+
+            int y = SectionHeaderRowHeight + SettingsFormLayout.TitleToContentGap;
+
+            for (int i = 0; i < section.Prose.Count; i++)
+            {
+                y += LayoutWrappedLabel(
+                    section.ProseLabels[i], section.Prose[i], NameColumnX, y,
+                    SettingsFormLayout.SectionProseMaxWidth(columnWidth), measureText);
+            }
+            if (section.Prose.Count > 0) y += RowGap;
+
+            for (int i = 0; i < section.Rows.Count; i++)
+            {
+                var row = section.Rows[i];
+                row.Panel.Location = new Point(0, y);
+                row.Panel.Size = new Point(columnWidth, RowHeight);
+                LayoutFormRow(row, columnWidth, measureText);
+                y += RowHeight;
+
+                if (row.DescriptionLabel != null)
+                {
+                    // No gap: a description belongs to the row above it.
+                    y += LayoutWrappedLabel(
+                        row.DescriptionLabel, row.DescriptionText, NameColumnX, y,
+                        SettingsFormLayout.DescriptionMaxWidth(columnWidth, row.ClusterWidth),
+                        measureText);
+                }
+
+                if (i < section.Rows.Count - 1) y += RowGap;
+            }
+
+            return y;
+        }
+
+        private static void LayoutFormRow(FormRow row, int columnWidth, bool measureText)
+        {
+            switch (row.Kind)
+            {
+                case FormRowKind.Input:
+                    row.Input.Location = new Point(
+                        SettingsFormLayout.InputX(columnWidth, row.TagBandWidth), RowInputY);
+                    int tagX = SettingsFormLayout.TagX(columnWidth, row.TagBandWidth);
+                    row.Tag.Location = new Point(tagX, RowLabelY);
+                    row.Error.Location = new Point(tagX, RowLabelY);
+                    break;
+
+                case FormRowKind.Volume:
+                    row.Slider.Location =
+                        new Point(SettingsFormLayout.VolumeSliderX(columnWidth), RowLabelY);
+                    row.Readout.Location =
+                        new Point(SettingsFormLayout.VolumeReadoutX(columnWidth), RowLabelY);
+                    row.TestButton.Location =
+                        new Point(SettingsFormLayout.TestButtonX(columnWidth), 1);
+                    break;
+            }
+
+            if (row.Chip != null)
+            {
+                row.Chip.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(
+                        PlanRelayoutMath.PinnedRightEdge(columnWidth), row.ChipWidth),
+                    PlanRelayoutMath.CenterX(RowHeight, LabelHelpers.SmallTagHeight));
+            }
+
+            if (row.NameLabel == null) return;
+
+            int budget = SettingsFormLayout.NameMaxWidth(columnWidth, row.ClusterWidth);
+            row.NameLabel.Width = budget;
+            if (!measureText) return;
+
+            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.NameText, budget);
+            if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
+            {
+                row.NameLabel.Text = shortName;
+            }
+
+            // Blish resolves a tooltip on the control under the cursor and
+            // never bubbles, so the row panel carries it too.
+            string full = string.Equals(shortName, row.NameText, StringComparison.Ordinal)
+                ? null
+                : row.NameText;
+            TooltipFacility.ApplyPlain(row.NameLabel, full);
+            TooltipFacility.ApplyPlain(row.Panel, full);
+        }
+
+        /// <summary>
+        /// The tag slot's two labels share one spot, so only one is ever
+        /// shown: the red error takes it while a value will not parse, and
+        /// the unit hint comes back when it does.
+        /// </summary>
+        private static void SetRowError(FormRow row, string text)
+        {
+            if (row == null) return;
+
+            row.Error.Text = text ?? "";
+            row.Tag.Visible = row.Error.Text.Length == 0;
+        }
+
+        /// <summary>
+        /// Bands a section's tag slot at max(widest unit, widest error)
+        /// across its rows - the header-floored band rule, applied to a form
+        /// - so the column cannot move when one row fails validation.
+        /// Font-derived, so it is measured once at build and never again.
+        /// </summary>
+        private static void BandSectionTagSlot(SectionBlock section)
+        {
+            var font = UiFonts.Body;
+            int band = 0;
+            foreach (var row in section.Rows)
+            {
+                if (row.Kind != FormRowKind.Input) continue;
+                band = Math.Max(band, (int)Math.Ceiling(font.MeasureString(row.UnitText ?? "").Width));
+                band = Math.Max(band, (int)Math.Ceiling(font.MeasureString(row.ErrorText ?? "").Width));
+            }
+
+            foreach (var row in section.Rows)
+            {
+                if (row.Kind != FormRowKind.Input) continue;
+                row.TagBandWidth = band;
+                row.ClusterWidth = SettingsFormLayout.InputClusterWidth(band);
+            }
+        }
+
+        /// <summary>
+        /// One settings row: a flexing name label and a text box plus its
+        /// shared unit/error tag slot, both pinned to the column's right
+        /// edge. The caller bands the slot once the section's rows all
+        /// exist (see <see cref="BandSectionTagSlot"/>).
+        /// </summary>
+        private FormRow AddInputRow(
+            SectionBlock section, string name, string unitText, string errorText, string description)
+        {
+            var row = new FormRow
+            {
+                Kind = FormRowKind.Input,
+                NameText = name,
+                UnitText = unitText,
+                ErrorText = errorText,
+                DescriptionText = description
+            };
+
+            row.Panel = new Panel()
+            {
+                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Parent = section.Panel
+            };
+
+            row.NameLabel = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = name,
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, RowLabelY),
+                Parent = row.Panel
+            };
+
+            row.Input = new TextBox()
+            {
+                Size = new Point(InputWidth, InputHeight),
+                Parent = row.Panel
+            }.ReleaseOnDispose().ReleaseOnEnter();
+            row.Input.TextChanged += (_, __) => RefreshDirtyState();
+
+            row.Tag = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = unitText,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = InfoTextColor,
+                Parent = row.Panel
+            };
+
+            row.Error = new Label()
+            {
+                Font = UiFonts.Body,
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = ErrorTextColor,
+                Parent = row.Panel
+            };
+
+            if (description != null)
+            {
+                row.DescriptionLabel = CreateWrappedLabel(section.Panel);
+            }
+
+            section.Rows.Add(row);
+            return row;
+        }
+
         private void BuildCurrencyValuationsSection(int panelWidth)
         {
-            AddSectionHeader("Currency Valuations", panelWidth);
+            AddSectionHeader(
+                "Currency Valuations", panelWidth,
+                "Price basis and both \"own materials\" choices are set per plan in the Crafting Plan tab.");
             AddInfoLine("Coin value per unit of each currency, used to compare vendor offers.", panelWidth);
             // The one sentence that names the interaction. Field test, bug
             // 2: with the unit inside the box and only a grey "default N"
             // beside it, the row read as three read-only labels - nothing
             // said an amount could be typed over the default at all.
             AddInfoLine("Type a whole number of copper in a currency's box and press Save to override its default.", panelWidth);
-            AddInfoLine("Leave a currency unset to keep it out of price comparisons.", panelWidth);
-            // A currency with a curated
-            // default (see CurrencyDecisionDefaults) is used automatically
-            // even when its box is left blank - "unset" now means "use the
-            // default, if any", not "excluded". Tick Ignore to suppress a
-            // default entirely.
-            AddInfoLine("Some currencies show a default estimate and are valued automatically unless ignored.", panelWidth);
-            // What the "Plan Defaults" section header used to introduce: it
-            // owned three info lines and no controls at all, so it is a note
-            // under the pricing section it points at, not a section.
-            AddInfoLine("Price basis and both \"own materials\" choices are set per plan in the Crafting Plan tab.", panelWidth);
+            // "Leave a currency unset..." and "Some currencies show a
+            // default estimate..." used to sit here. Both are carried by the
+            // hovers of the controls they describe (the amount box's own
+            // tooltip and the default tag's, in AddCurrencyRow), reworded to
+            // suit the control rather than repeated verbatim - so on the
+            // panel they were a second copy of a sentence the reader already
+            // has where it applies. Note the amount box states the
+            // leave-it-blank clause on BOTH of its branches: the default
+            // tag, which is the other place that clause lives, does not
+            // exist on the rows with no default. The price-basis pointer
+            // moved to this section's title hover: it points at another tab
+            // rather than instructing about a control here.
             // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
             // for Astral Acclaim specifically - it is untradable and earned
             // via capped seasonal play, so unlike the other currencies
@@ -591,51 +1186,61 @@ namespace GW2CraftingHelper.Views
             ApplyCurrencyFilter();
         }
 
-        // Click-volume row layout; the shared HintX/ErrorX columns assume
-        // an 80px TextBox, too narrow for a usable slider.
-        private const int SliderX = NameColumnX + NameColumnWidth;
-        private const int SliderWidth = 200;
+        // The slider stays FIXED at this width whatever the column does:
+        // only the name flexes, exactly as in a plan table, because a 700px
+        // volume slider on a wide column is a worse artefact than the space
+        // it fills. Its cluster's own geometry is SettingsFormLayout's.
+        private const int SliderWidth = SettingsFormLayout.SliderWidth;
         private const int SliderHeight = 16;
-        private const int ReadoutX = SliderX + SliderWidth + 12;
-        // Fixed width so the Test button does not shift mid-drag.
-        private const int ReadoutWidth = 44;
-        private const int TestButtonX = ReadoutX + ReadoutWidth + 8;
-        private const int TestButtonWidth = 72;
+        private const int ReadoutWidth = SettingsFormLayout.ReadoutWidth;
+        private const int TestButtonWidth = SettingsFormLayout.TestButtonWidth;
 
         /// <summary>
         /// The click-volume row: label, slider, live readout, Test button.
-        /// Immediate-apply, unlike the save-gated sections below (recorded
-        /// in KNOWN-ISSUES) - a volume is tuned by ear - so the row must
-        /// stay out of CaptureFormState, or every drag would count as an
-        /// unsaved change.
+        /// Immediate-apply, unlike the save-gated sections (recorded in
+        /// KNOWN-ISSUES) - a volume is tuned by ear - so the row must stay
+        /// out of CaptureFormState, or every drag would count as an unsaved
+        /// change. The section's band says so with a tag. The tab's only
+        /// other immediate-apply control is the Diagnostics checkbox, which
+        /// sits in a save-gated section and so carries the same tag on its
+        /// own row; nothing else on the tab is tagged.
         /// </summary>
-        private void BuildSoundSection(int panelWidth)
+        private void BuildSoundSection()
         {
-            AddSectionHeader("Sound", panelWidth);
-            AddInfoLine("Volume of this module's own click, played whenever you press one of its buttons, rows or pills.", panelWidth);
-            AddInfoLine("Applies immediately - no Save needed. Drag to 0 to turn that click off.", panelWidth);
-            AddInfoLine("Checkboxes are the exception: they play Blish HUD's own click, which this does not change.", panelWidth);
+            var section = BeginSection("Sound");
+            AddSectionChip(
+                section, ImmediateApplyTagText,
+                "Changes in this section take effect as you make them. Nothing here waits for Save.");
 
-            AddClickVolumeRow(panelWidth);
+            AddClickVolumeRow(section);
         }
 
-        private void AddClickVolumeRow(int panelWidth)
+        private void AddClickVolumeRow(SectionBlock section)
         {
+            var row = new FormRow
+            {
+                Kind = FormRowKind.Volume,
+                NameText = "Click volume",
+                ClusterWidth = SettingsFormLayout.WidestClusterWidth,
+                DescriptionText =
+                    "Volume of this module's own click, played whenever you press one of its buttons, rows or pills. Drag to 0 to turn it off."
+            };
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
+                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Parent = section.Panel
             };
-            _fullWidthPanels.Add(rowPanel);
+            row.Panel = rowPanel;
+            row.DescriptionLabel = CreateWrappedLabel(section.Panel);
 
-            new Label()
+            row.NameLabel = new Label()
             {
                 Font = UiFonts.Body,
-                Text = "Click volume",
+                Text = row.NameText,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
+                Location = new Point(NameColumnX, RowLabelY),
                 Parent = rowPanel
             };
 
@@ -651,10 +1256,10 @@ namespace GW2CraftingHelper.Views
                 MaxValue = ClickSoundVolume.MaxPercent,
                 Value = percent,
                 Size = new Point(SliderWidth, SliderHeight),
-                Location = new Point(SliderX, 7),
                 BasicTooltipText = "How loud this module's click plays. 0 turns it off. Does not change the checkbox click, which is Blish HUD's own.",
                 Parent = rowPanel
             };
+            row.Slider = _clickVolumeSlider;
 
             _clickVolumeReadout = new Label()
             {
@@ -664,9 +1269,9 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Width = ReadoutWidth,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Location = new Point(ReadoutX, 7),
                 Parent = rowPanel
             };
+            row.Readout = _clickVolumeReadout;
 
             // Subscribed after the initial Value assignment so it does not
             // fire during Build. The setting is all this writes; readout and
@@ -681,14 +1286,18 @@ namespace GW2CraftingHelper.Views
 
             // No Click handler: a FeedbackButton's own press feedback plays
             // the click at the slider's current value, which IS the audition.
-            new FeedbackButton()
+            // Its hover carries the checkbox footnote - the one fact about
+            // this control that is Blish's behaviour rather than the
+            // module's.
+            row.TestButton = new FeedbackButton()
             {
                 Text = "Test",
                 Size = new Point(TestButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(TestButtonX, 1),
-                BasicTooltipText = "Play the click at the volume set here.",
+                BasicTooltipText = "Play the click at the volume set here. Checkboxes are the exception: they play Blish HUD's own click, which this does not change.",
                 Parent = rowPanel
             };
+
+            section.Rows.Add(row);
         }
 
         /// <summary>
@@ -701,72 +1310,30 @@ namespace GW2CraftingHelper.Views
         /// Labels name the material family only - no raw item/vendor ids
         /// are ever displayed (repo invariant).
         /// </summary>
-        private void BuildHomesteadRefinementSection(int panelWidth)
+        private void BuildHomesteadRefinementSection()
         {
-            AddSectionHeader("Homestead Refinement", panelWidth);
-            AddInfoLine("Efficiency upgrades owned per material (0 = none, 1 = one upgrade, 2 = both).", panelWidth);
-            AddInfoLine("Raises how much Refined Homestead material each trade produces.", panelWidth);
+            var section = BeginSection(
+                "Homestead Refinement",
+                "Efficiency upgrades owned per material (0 = none, 1 = one upgrade, 2 = both).",
+                "Raises how much Refined Homestead material each trade produces.");
 
-            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadFiberItemId, "Fiber (Farm)", panelWidth);
-            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)", panelWidth);
-            AddHomesteadTierRow(Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)", panelWidth);
+            AddHomesteadTierRow(section, Gw2Constants.RefinedHomesteadFiberItemId, "Fiber (Farm)");
+            AddHomesteadTierRow(section, Gw2Constants.RefinedHomesteadMetalItemId, "Metal (Metal Forge)");
+            AddHomesteadTierRow(section, Gw2Constants.RefinedHomesteadWoodItemId, "Wood (Lumber Mill)");
+
+            BandSectionTagSlot(section);
         }
 
-        private void AddHomesteadTierRow(int materialItemId, string materialLabel, int panelWidth)
+        private void AddHomesteadTierRow(SectionBlock section, int materialItemId, string materialLabel)
         {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
-            };
-            _fullWidthPanels.Add(rowPanel);
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = materialLabel,
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
-            };
-
-            var input = new TextBox()
-            {
-                Size = new Point(InputWidth, 26),
-                Location = new Point(NameColumnX + NameColumnWidth, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "tier (0-2)",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(HintX, 7),
-                Parent = rowPanel
-            };
-
-            var errorLabel = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = ErrorTextColor,
-                Location = new Point(ErrorX, 7),
-                Parent = rowPanel
-            };
+            var form = AddInputRow(section, materialLabel, "tier (0-2)", "Must be 0, 1, or 2", null);
 
             _homesteadRows.Add(new HomesteadTierRow
             {
                 MaterialItemId = materialItemId,
                 MaterialLabel = materialLabel,
-                Input = input,
-                ErrorLabel = errorLabel
+                Input = form.Input,
+                Form = form
             });
         }
 
@@ -777,7 +1344,7 @@ namespace GW2CraftingHelper.Views
             foreach (var row in _homesteadRows)
             {
                 row.Input.Text = tiers.GetTier(row.MaterialItemId).ToString(CultureInfo.InvariantCulture);
-                row.ErrorLabel.Text = "";
+                SetRowError(row.Form, "");
             }
         }
 
@@ -788,7 +1355,7 @@ namespace GW2CraftingHelper.Views
 
             foreach (var row in _homesteadRows)
             {
-                row.ErrorLabel.Text = "";
+                SetRowError(row.Form, "");
 
                 if (SettingsInputParser.TryParseTier(row.Input.Text, out int tier))
                 {
@@ -800,7 +1367,7 @@ namespace GW2CraftingHelper.Views
                     // previously persisted for this material is preserved,
                     // matching the currency valuation Save button's
                     // "invalid rows are not saved" contract.
-                    row.ErrorLabel.Text = "Must be 0, 1, or 2";
+                    SetRowError(row.Form, row.Form.ErrorText);
                     invalidCount++;
                 }
             }
@@ -830,149 +1397,77 @@ namespace GW2CraftingHelper.Views
         /// tab-roadmap-proposal synthesis (Section 2.1) - no separate
         /// ScrollDiagnosticsEnabled checkbox is added alongside it.
         /// </summary>
-        private void BuildLoggingSection(int panelWidth)
+        private void BuildLoggingSection()
         {
-            AddSectionHeader("Logging", panelWidth);
-            AddInfoLine("Controls the module's own log file (data/module_log.jsonl), separate from Blish HUD's own log.", panelWidth);
-            AddInfoLine("The Log tab always shows the current session regardless of these settings.", panelWidth);
+            var section = BeginSection(
+                "Logging",
+                "Controls the module's own log file (data/module_log.jsonl), separate from Blish HUD's own log.",
+                "The Log tab always shows the current session regardless of these settings.");
 
-            AddLogDiagnosticsRow(panelWidth);
-            AddLogMaxSizeRow(panelWidth);
-            AddLogRetentionDaysRow(panelWidth);
+            AddLogDiagnosticsRow(section);
+
+            _logMaxSizeRow = AddInputRow(
+                section, "Log max size", "MB (1-1000)", "Must be 1-1000", null);
+            _logMaxSizeInput = _logMaxSizeRow.Input;
+
+            _logRetentionDaysRow = AddInputRow(
+                section, "Log retention", "days (1-365)", "Must be 1-365", null);
+            _logRetentionDaysInput = _logRetentionDaysRow.Input;
+
+            BandSectionTagSlot(section);
         }
 
-        private void AddLogDiagnosticsRow(int panelWidth)
+        /// <summary>
+        /// A Checkbox row: the box IS the name control, and its 92-character
+        /// explanation is the row's own wrapped description line rather than
+        /// a fourth left column at x=186 matching nothing.
+        /// <para>
+        /// It is also the tab's one immediate-apply control inside a
+        /// save-gated section, so it carries the "Applies immediately" tag
+        /// at ROW level that Sound carries at section level. Without it the
+        /// chip vocabulary lies by omission: the tab teaches that an
+        /// untagged section waits for Save, and this box does not - ticking
+        /// it writes the setting there and then, and Discard cannot take it
+        /// back (LoadCurrentLoggingSettings never touches the checkbox,
+        /// because CaptureFormState deliberately excludes it).
+        /// </para>
+        /// </summary>
+        private void AddLogDiagnosticsRow(SectionBlock section)
         {
-            var rowPanel = new Panel()
+            var row = new FormRow
             {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
+                Kind = FormRowKind.Checkbox,
+                DescriptionText =
+                    "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file."
             };
-            _fullWidthPanels.Add(rowPanel);
+
+            row.Panel = new Panel()
+            {
+                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Parent = section.Panel
+            };
+            row.DescriptionLabel = CreateWrappedLabel(section.Panel);
+
+            AddRowChip(
+                row, ImmediateApplyTagText,
+                "This box takes effect the moment you tick it - it does not wait for Save, "
+                    + "and Discard does not undo it. The two boxes below it do wait for Save.");
 
             _logDiagnosticsCheckbox = new Checkbox()
             {
                 Text = "Diagnostics logging",
                 Checked = _settings.LogDiagnosticsEnabled.Value,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
+                Location = new Point(NameColumnX, RowLabelY),
+                Parent = row.Panel
             };
+            row.Checkbox = _logDiagnosticsCheckbox;
 
             _logDiagnosticsCheckbox.CheckedChanged += (_, e) =>
             {
                 _settings.LogDiagnosticsEnabled.Value = e.Checked;
             };
 
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(NameColumnX + 170, 7),
-                Parent = rowPanel
-            };
-        }
-
-        private void AddLogMaxSizeRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
-            };
-            _fullWidthPanels.Add(rowPanel);
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Log max size",
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
-            };
-
-            _logMaxSizeInput = new TextBox()
-            {
-                Size = new Point(InputWidth, 26),
-                Location = new Point(NameColumnX + NameColumnWidth, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "MB (1-1000)",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(HintX, 7),
-                Parent = rowPanel
-            };
-
-            _logMaxSizeErrorLabel = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = ErrorTextColor,
-                Location = new Point(ErrorX, 7),
-                Parent = rowPanel
-            };
-        }
-
-        private void AddLogRetentionDaysRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
-            };
-            _fullWidthPanels.Add(rowPanel);
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Log retention",
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
-            };
-
-            _logRetentionDaysInput = new TextBox()
-            {
-                Size = new Point(InputWidth, 26),
-                Location = new Point(NameColumnX + NameColumnWidth, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "days (1-365)",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(HintX, 7),
-                Parent = rowPanel
-            };
-
-            _logRetentionDaysErrorLabel = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = ErrorTextColor,
-                Location = new Point(ErrorX, 7),
-                Parent = rowPanel
-            };
+            section.Rows.Add(row);
         }
 
         private void LoadCurrentLoggingSettings()
@@ -982,43 +1477,31 @@ namespace GW2CraftingHelper.Views
                 long mb = _settings.LogMaxSizeBytes.Value / (1024 * 1024);
                 _logMaxSizeInput.Text = mb.ToString(CultureInfo.InvariantCulture);
             }
-            if (_logMaxSizeErrorLabel != null)
-            {
-                _logMaxSizeErrorLabel.Text = "";
-            }
+            SetRowError(_logMaxSizeRow, "");
 
             if (_logRetentionDaysInput != null)
             {
                 _logRetentionDaysInput.Text = _settings.LogRetentionDays.Value.ToString(CultureInfo.InvariantCulture);
             }
-            if (_logRetentionDaysErrorLabel != null)
-            {
-                _logRetentionDaysErrorLabel.Text = "";
-            }
+            SetRowError(_logRetentionDaysRow, "");
         }
 
         private int SaveLoggingSettings()
         {
             int invalidCount = 0;
 
-            if (_logMaxSizeErrorLabel != null)
-            {
-                _logMaxSizeErrorLabel.Text = "";
-            }
+            SetRowError(_logMaxSizeRow, "");
             if (SettingsInputParser.TryParseLogMaxSizeMb(_logMaxSizeInput?.Text, out long maxSizeBytes))
             {
                 _settings.LogMaxSizeBytes.Value = (int)maxSizeBytes;
             }
-            else if (_logMaxSizeErrorLabel != null)
+            else if (_logMaxSizeRow != null)
             {
-                _logMaxSizeErrorLabel.Text = "Must be 1-1000";
+                SetRowError(_logMaxSizeRow, _logMaxSizeRow.ErrorText);
                 invalidCount++;
             }
 
-            if (_logRetentionDaysErrorLabel != null)
-            {
-                _logRetentionDaysErrorLabel.Text = "";
-            }
+            SetRowError(_logRetentionDaysRow, "");
             if (SettingsInputParser.TryParseRetentionDays(_logRetentionDaysInput?.Text, out int retentionDays))
             {
                 // Retention is only enforced once per session at
@@ -1029,9 +1512,9 @@ namespace GW2CraftingHelper.Views
                 // current, unlike the size cap above.
                 _settings.LogRetentionDays.Value = retentionDays;
             }
-            else if (_logRetentionDaysErrorLabel != null)
+            else if (_logRetentionDaysRow != null)
             {
-                _logRetentionDaysErrorLabel.Text = "Must be 1-365";
+                SetRowError(_logRetentionDaysRow, _logRetentionDaysRow.ErrorText);
                 invalidCount++;
             }
 
@@ -1046,62 +1529,16 @@ namespace GW2CraftingHelper.Views
         /// read the same number and can never silently disagree about what
         /// "stale" means.
         /// </summary>
-        private void BuildSnapshotSection(int panelWidth)
+        private void BuildSnapshotSection()
         {
-            AddSectionHeader("Snapshot", panelWidth);
-            AddInfoLine("How long a cached account snapshot may sit before an automatic background refresh runs.", panelWidth);
+            var section = BeginSection("Snapshot");
 
-            AddSnapshotRefreshIntervalRow(panelWidth);
-        }
+            _snapshotRefreshIntervalRow = AddInputRow(
+                section, "Refresh interval", "minutes (1-120)", "Must be 1-120",
+                "How long a cached account snapshot may sit before an automatic background refresh runs.");
+            _snapshotRefreshIntervalInput = _snapshotRefreshIntervalRow.Input;
 
-        private void AddSnapshotRefreshIntervalRow(int panelWidth)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
-            };
-            _fullWidthPanels.Add(rowPanel);
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Refresh interval",
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = NameColumnWidth,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
-            };
-
-            _snapshotRefreshIntervalInput = new TextBox()
-            {
-                Size = new Point(InputWidth, 26),
-                Location = new Point(NameColumnX + NameColumnWidth, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "minutes (1-120)",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(HintX, 7),
-                Parent = rowPanel
-            };
-
-            _snapshotRefreshIntervalErrorLabel = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = ErrorTextColor,
-                Location = new Point(ErrorX, 7),
-                Parent = rowPanel
-            };
+            BandSectionTagSlot(section);
         }
 
         private void LoadCurrentSnapshotSettings()
@@ -1110,34 +1547,35 @@ namespace GW2CraftingHelper.Views
             {
                 _snapshotRefreshIntervalInput.Text = _settings.SnapshotRefreshIntervalMinutes.Value.ToString(CultureInfo.InvariantCulture);
             }
-            if (_snapshotRefreshIntervalErrorLabel != null)
-            {
-                _snapshotRefreshIntervalErrorLabel.Text = "";
-            }
+            SetRowError(_snapshotRefreshIntervalRow, "");
         }
 
         private int SaveSnapshotSettings()
         {
             int invalidCount = 0;
 
-            if (_snapshotRefreshIntervalErrorLabel != null)
-            {
-                _snapshotRefreshIntervalErrorLabel.Text = "";
-            }
+            SetRowError(_snapshotRefreshIntervalRow, "");
             if (SettingsInputParser.TryParseRefreshIntervalMinutes(_snapshotRefreshIntervalInput?.Text, out int minutes))
             {
                 _settings.SnapshotRefreshIntervalMinutes.Value = minutes;
             }
-            else if (_snapshotRefreshIntervalErrorLabel != null)
+            else if (_snapshotRefreshIntervalRow != null)
             {
-                _snapshotRefreshIntervalErrorLabel.Text = "Must be 1-120";
+                SetRowError(_snapshotRefreshIntervalRow, _snapshotRefreshIntervalRow.ErrorText);
                 invalidCount++;
             }
 
             return invalidCount;
         }
 
-        private void AddSectionHeader(string title, int panelWidth)
+        // The full-width Currency Valuations section's own header and notes.
+        // The board sections build their own (BeginSection); this shape is
+        // for the one section that is a grid rather than a block.
+        private readonly List<Panel> _currencyProsePanels = new List<Panel>();
+        private readonly List<Label> _currencyProseLabels = new List<Label>();
+        private readonly List<string> _currencyProse = new List<string>();
+
+        private void AddSectionHeader(string title, int panelWidth, string tooltip = null)
         {
             var headerPanel = new Panel()
             {
@@ -1146,7 +1584,7 @@ namespace GW2CraftingHelper.Views
             };
             _fullWidthPanels.Add(headerPanel);
 
-            new Label()
+            var titleLabel = new Label()
             {
                 Text = title,
                 Font = UiFonts.SectionTitle,
@@ -1155,6 +1593,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(NameColumnX, SectionHeaderTitleY),
                 Parent = headerPanel
             };
+            TooltipFacility.ApplyPlain(titleLabel, tooltip);
 
             // Same header rule as every CraftingPlanView section: 2px in
             // SectionDividerColor, bottom-anchored with 1px clearance
@@ -1169,6 +1608,13 @@ namespace GW2CraftingHelper.Views
             });
         }
 
+        /// <summary>
+        /// One wrapped note under the full-width section's header. Capped at
+        /// <see cref="SettingsFormLayout.ProseMeasure"/> rather than run to
+        /// the panel edge: the section is a table, but a sentence under it is
+        /// still prose, and a 280-character line at a wide window is not
+        /// readable.
+        /// </summary>
         private void AddInfoLine(string text, int panelWidth)
         {
             var rowPanel = new Panel()
@@ -1178,16 +1624,27 @@ namespace GW2CraftingHelper.Views
             };
             _fullWidthPanels.Add(rowPanel);
 
-            new Label()
+            _currencyProsePanels.Add(rowPanel);
+            _currencyProseLabels.Add(CreateWrappedLabel(rowPanel));
+            _currencyProse.Add(text);
+
+            LayoutCurrencyProseLine(_currencyProse.Count - 1, panelWidth, measureText: true);
+        }
+
+        private void LayoutCurrencyProseLine(int index, int panelWidth, bool measureText)
+        {
+            int height = LayoutWrappedLabel(
+                _currencyProseLabels[index], _currencyProse[index], NameColumnX, 2,
+                SettingsFormLayout.SectionProseMaxWidth(panelWidth), measureText);
+            _currencyProsePanels[index].Height = height + 2;
+        }
+
+        private void LayoutCurrencyProse(bool measureText)
+        {
+            for (int i = 0; i < _currencyProse.Count; i++)
             {
-                Font = UiFonts.Body,
-                Text = text,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                TextColor = InfoTextColor,
-                Location = new Point(NameColumnX, 2),
-                Parent = rowPanel
-            };
+                LayoutCurrencyProseLine(i, _panelWidth, measureText);
+            }
         }
 
         // One line per currency: name, input, Clear, and one tag slot that
@@ -1201,11 +1658,7 @@ namespace GW2CraftingHelper.Views
         // (30 - 2 - CellDividerClearance).
         private const int CurrencyRowHeight = 32;
         private const int CellNameX = SettingsCurrencyGridLayout.CellNameX;
-        private const int CellNameWidth = SettingsCurrencyGridLayout.CellNameWidth;
-        private const int CellInputX = SettingsCurrencyGridLayout.CellInputX;
         private const int CellInputWidth = SettingsCurrencyGridLayout.CellInputWidth;
-        private const int CellClearX = SettingsCurrencyGridLayout.CellClearX;
-        private const int CellTagX = SettingsCurrencyGridLayout.CellTagX;
         private const int CellTextY = 6;
         // 1, not 2: the input then ends at y=27, clear of the row rule
         // LabelHelpers.CreateRowDivider puts at
@@ -1235,6 +1688,9 @@ namespace GW2CraftingHelper.Views
             }.ReleaseOnDispose().ReleaseOnEnter();
             _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
 
+            // Right-pinned, like every other count on a justified row: the
+            // box states the query, the count states the result, and the
+            // row uses the width between them.
             _currencyCountLabel = new Label()
             {
                 Font = UiFonts.Body,
@@ -1245,6 +1701,23 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(CellNameX + CurrencyFilterWidth + 12, CellTextY),
                 Parent = rowPanel
             };
+
+            LayoutCurrencyFilterRow();
+        }
+
+        // Measured rather than read off the label: AutoSizeWidth resolves on
+        // Blish's next layout pass, so Label.Width is still the PREVIOUS
+        // text's width in the same call that assigned the new one.
+        private void LayoutCurrencyFilterRow()
+        {
+            if (_currencyCountLabel == null) return;
+
+            int width = (int)Math.Ceiling(
+                UiFonts.Body.MeasureString(_currencyCountLabel.Text ?? "").Width);
+            _currencyCountLabel.Location = new Point(
+                PlanRelayoutMath.RightAlignedX(
+                    PlanRelayoutMath.PinnedRightEdge(_panelWidth), width),
+                CellTextY);
         }
 
         // The plan tables' column-header band, aliased: same tier over the
@@ -1254,10 +1727,11 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// One "Currency"/"Copper per unit" pair per grid column, sitting on
-        /// the same X's as the cells below it. Both pairs are built once and
-        /// the second is simply hidden in the one-column layout - the grid's
-        /// column count only ever changes with the panel width, and building
-        /// two labels costs less than rebuilding them per resize tick.
+        /// the same X's as the cells below it - repositioned in the same
+        /// pass the cells are, so a header cannot drift off the column it
+        /// names. The pairs are built once and hidden past the live column
+        /// count: the count only changes with the panel width, and building
+        /// labels costs more than hiding them per resize tick.
         /// </summary>
         private void AddCurrencyGridHeader(int panelWidth)
         {
@@ -1269,31 +1743,21 @@ namespace GW2CraftingHelper.Views
             };
             _fullWidthPanels.Add(_currencyHeaderPanel);
 
-            for (int i = 0; i < _currencyHeaderNames.Length; i++)
-            {
-                _currencyHeaderNames[i] = new Label()
-                {
-                    Font = TableHeaderStyle.Font,
-                    TextColor = TableHeaderStyle.LabelColor,
-                    Text = "Currency",
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(CellNameX, CurrencyHeaderTextY),
-                    Parent = _currencyHeaderPanel
-                };
-                _currencyHeaderUnits[i] = new Label()
-                {
-                    Font = TableHeaderStyle.Font,
-                    TextColor = TableHeaderStyle.LabelColor,
-                    Text = "Copper per unit",
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(CellInputX, CurrencyHeaderTextY),
-                    Parent = _currencyHeaderPanel
-                };
-            }
-
             LayoutCurrencyGridHeader();
+        }
+
+        private Label CreateCurrencyHeaderLabel(string text)
+        {
+            return new Label()
+            {
+                Font = TableHeaderStyle.Font,
+                TextColor = TableHeaderStyle.LabelColor,
+                Text = text,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(CellNameX, CurrencyHeaderTextY),
+                Parent = _currencyHeaderPanel
+            };
         }
 
         private void LayoutCurrencyGridHeader()
@@ -1303,7 +1767,17 @@ namespace GW2CraftingHelper.Views
             int columnCount = SettingsCurrencyGridLayout.ComputeColumnCount(_panelWidth);
             int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(_panelWidth);
 
-            for (int i = 0; i < _currencyHeaderNames.Length; i++)
+            // Grown, never shrunk: the count is uncapped now, so a wide
+            // window needs pairs a narrow one did not, and a pair built once
+            // is cheaper to hide than to rebuild on the next resize tick.
+            while (_currencyHeaderNames.Count < columnCount)
+            {
+                _currencyHeaderNames.Add(CreateCurrencyHeaderLabel("Currency"));
+                _currencyHeaderUnits.Add(CreateCurrencyHeaderLabel("Copper per unit"));
+            }
+
+            int unitX = SettingsCurrencyGridLayout.CellInputX(columnWidth);
+            for (int i = 0; i < _currencyHeaderNames.Count; i++)
             {
                 bool visible = i < columnCount;
                 _currencyHeaderNames[i].Visible = visible;
@@ -1313,7 +1787,7 @@ namespace GW2CraftingHelper.Views
                 _currencyHeaderNames[i].Location =
                     new Point((i * columnWidth) + CellNameX, CurrencyHeaderTextY);
                 _currencyHeaderUnits[i].Location =
-                    new Point((i * columnWidth) + CellInputX, CurrencyHeaderTextY);
+                    new Point((i * columnWidth) + unitX, CurrencyHeaderTextY);
             }
         }
 
@@ -1327,28 +1801,25 @@ namespace GW2CraftingHelper.Views
                 Parent = _currencyGridPanel
             };
 
-            string shortName = LabelHelpers.EllipsizeToWidth(
-                UiFonts.Body, name, CellNameWidth);
+            // Width and text are resolved by LayoutCurrencyCell, which the
+            // resize path calls too - the name is the only flexing part of
+            // the cell, so build and relayout must go through one function.
             var nameLabel = new Label()
             {
                 Font = UiFonts.Body,
-                Text = shortName,
+                Text = name,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
-                Width = CellNameWidth,
                 Location = new Point(CellNameX, CellTextY),
                 Parent = cellPanel
             };
-            // Only when the name did not fit - an always-on tooltip
-            // repeating the visible text is noise.
-            TooltipFacility.ApplyPlain(nameLabel, shortName == name ? null : name);
 
             bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
 
             var input = new TextBox()
             {
-                Size = new Point(CellInputWidth, 26),
-                Location = new Point(CellInputX, CellInputY),
+                Size = new Point(CellInputWidth, InputHeight),
+                Location = new Point(CellNameX, CellInputY),
                 // Digits, not the unit: "copper" named what the box HELD
                 // and so read as a unit label on a read-only field (field
                 // test, bug 2). The greyed default is the number currently
@@ -1370,9 +1841,15 @@ namespace GW2CraftingHelper.Views
             }.ReleaseOnDispose().ReleaseOnEnter();
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
+            // The "leave it blank" clause is on BOTH branches deliberately.
+            // It used to be a panel info line; it is the only statement that
+            // unset is a supported state rather than an unfinished one, and
+            // the four currencies it matters most for (the ones with no
+            // default, so no default tag and no default-tag hover) would
+            // otherwise carry it nowhere at all.
             TooltipFacility.ApplyPlain(input, hasDefault
-                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it."
-                : "Coin value of one unit, in copper. Type an amount here and press Save.");
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it. Left blank and not ignored, it keeps the default."
+                : "Coin value of one unit, in copper. Type an amount here and press Save, or leave it blank to keep this currency out of price comparisons.");
 
             var defaultLabel = new Label()
             {
@@ -1381,7 +1858,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Location = new Point(CellTagX, CellTextY),
+                Location = new Point(CellNameX, CellTextY),
                 Parent = cellPanel
             };
             TooltipFacility.ApplyPlain(defaultLabel, hasDefault
@@ -1396,7 +1873,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = ErrorTextColor,
                 BasicTooltipText = "Enter a positive whole number of copper, or leave the box blank.",
-                Location = new Point(CellTagX, CellTextY),
+                Location = new Point(CellNameX, CellTextY),
                 Parent = cellPanel
             };
 
@@ -1421,9 +1898,10 @@ namespace GW2CraftingHelper.Views
                 clearCheckbox = new Checkbox()
                 {
                     Text = "Ignore",
-                    Location = new Point(CellClearX, CellTextY),
+                    Location = new Point(CellNameX, CellTextY),
                     Parent = cellPanel
                 };
+                clearCheckbox.CheckedChanged += (_, __) => RefreshDirtyState();
                 TooltipFacility.ApplyPlain(
                     clearCheckbox,
                     "Ignore this currency's default estimate - it will not be valued unless you enter your own amount.");
@@ -1432,9 +1910,10 @@ namespace GW2CraftingHelper.Views
             // Appended in the same step as the row it names - the filter
             // maps grid.Cells[i] back onto _rows[i] by index.
             _currencyNames.Add(name);
-            _rows.Add(new CurrencyRow
+            var row = new CurrencyRow
             {
                 CurrencyId = currencyId,
+                Name = name,
                 HasDefault = hasDefault,
                 DefaultCopperPerUnit = defaultCopperPerUnit,
                 Cell = cellPanel,
@@ -1443,10 +1922,53 @@ namespace GW2CraftingHelper.Views
                 Divider = LabelHelpers.CreateRowDivider(
                     cellPanel, columnWidth, CurrencyRowHeight, CellDividerClearance),
                 Input = input,
+                NameLabel = nameLabel,
                 DefaultLabel = defaultLabel,
                 ErrorLabel = errorLabel,
                 ClearCheckbox = clearCheckbox
-            });
+            };
+
+            input.TextChanged += (_, __) => RefreshDirtyState();
+
+            LayoutCurrencyCell(row, columnWidth, measureText: true);
+            _rows.Add(row);
+        }
+
+        /// <summary>
+        /// Places one cell's pinned control block against the cell's own
+        /// right edge and re-fits the name to whatever is left. Called from
+        /// the build and from ApplyPanelWidth, so the two cannot drift.
+        /// </summary>
+        private static void LayoutCurrencyCell(CurrencyRow row, int columnWidth, bool measureText)
+        {
+            row.Input.Location = new Point(
+                SettingsCurrencyGridLayout.CellInputX(columnWidth), CellInputY);
+
+            int tagX = SettingsCurrencyGridLayout.CellTagX(columnWidth);
+            row.DefaultLabel.Location = new Point(tagX, CellTextY);
+            row.ErrorLabel.Location = new Point(tagX, CellTextY);
+
+            if (row.ClearCheckbox != null)
+            {
+                row.ClearCheckbox.Location = new Point(
+                    SettingsCurrencyGridLayout.CellClearX(columnWidth), CellTextY);
+            }
+
+            int budget = SettingsCurrencyGridLayout.CellNameMaxWidth(columnWidth);
+            row.NameLabel.Width = budget;
+            if (!measureText) return;
+
+            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.Name, budget);
+            if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
+            {
+                row.NameLabel.Text = shortName;
+            }
+
+            // Only when the name did not fit - an always-on tooltip
+            // repeating the visible text is noise.
+            string full = string.Equals(shortName, row.Name, StringComparison.Ordinal) ? null : row.Name;
+            TooltipFacility.ApplyPlain(row.NameLabel, full);
+            TooltipFacility.ApplyPlain(row.Cell, full);
         }
 
         /// <summary>
@@ -1485,8 +2007,9 @@ namespace GW2CraftingHelper.Views
             if (_currencyCountLabel != null)
             {
                 _currencyCountLabel.Text = grid.VisibleCount == _rows.Count
-                    ? $"{_rows.Count} currencies"
+                    ? StatusText.Count(_rows.Count, "currency", "currencies")
                     : $"{grid.VisibleCount} of {_rows.Count} shown";
+                LayoutCurrencyFilterRow();
             }
         }
 
@@ -1552,38 +2075,193 @@ namespace GW2CraftingHelper.Views
         /// being final at Build time, whose failure mode is a Save bar
         /// floating over the rows.
         /// </summary>
-        private Panel BuildSaveBar(Container container)
+        private void BuildSaveBar(Container container)
         {
-            var barPanel = new Panel()
+            _saveBarPanel = new Panel()
             {
                 Size = new Point(container.ContentRegion.Width, SaveBarHeight),
                 Parent = container
             };
 
-            var saveButton = new FeedbackButton()
+            // The bar's own state, on the surface that owns it: how many
+            // fields differ from the last save used to be visible ONLY
+            // inside Module's tab-switch prompt, so the user could not see
+            // their own dirty state while looking at the form.
+            _dirtyChipLabel = new Label()
             {
-                Text = "Save",
-                Size = new Point(80, UiMetrics.ButtonHeight),
-                Location = new Point(NameColumnX, 6),
-                BasicTooltipText = "Save every section on this tab.",
-                Parent = barPanel
+                Font = UiFonts.Body,
+                Text = "",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                TextColor = WarningTextColor,
+                Location = new Point(SettingsSaveBarLayout.Inset, 10),
+                Visible = false,
+                Parent = _saveBarPanel
             };
-            saveButton.Click += (_, __) => SaveAll();
+            TooltipFacility.ApplyPlain(
+                _dirtyChipLabel, "Fields edited since the last load or save. Press Save to persist them.");
 
             // Status tier, like every other tab's: 18 BOLD, which is not a
             // style choice at this size (TypeRampMetrics on 18-regular's
             // collapsed word gaps). y=9 re-centres the taller 23px line box.
+            // Explicit width, not AutoSizeWidth: a long status used to run
+            // straight under the buttons.
             _statusLabel = new Label()
             {
                 Font = UiFonts.Status,
                 Text = "",
-                AutoSizeWidth = true,
+                AutoSizeWidth = false,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX + 80 + 12, 9),
-                Parent = barPanel
+                Location = new Point(SettingsSaveBarLayout.Inset, 9),
+                Parent = _saveBarPanel
             };
 
-            return barPanel;
+            // Destructive - it throws away the user's typed edits - so it
+            // goes through the confirm matrix, and it is hidden entirely
+            // while there is nothing to discard.
+            _discardButton = new FeedbackButton()
+            {
+                Text = "Discard",
+                Size = new Point(DiscardButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
+                BasicTooltipText = "Throw away every unsaved edit on this tab and restore the last saved values.",
+                Visible = false,
+                Parent = _saveBarPanel
+            };
+            _discardButton.Click += (_, __) => ConfirmDiscardChanges();
+
+            // Always enabled, even at zero changes: a disabled primary
+            // invites "why is this disabled?", the reasoning already
+            // recorded for the tree chips.
+            _saveButton = new FeedbackButton()
+            {
+                Text = "Save",
+                Size = new Point(SaveButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
+                BasicTooltipText = "Save every section on this tab.",
+                Parent = _saveBarPanel
+            };
+            _saveButton.Click += (_, __) => SaveAll();
+
+            ApplySaveBarWidth(ContentWidth(container));
+        }
+
+        private const int SaveButtonWidth = 80;
+        private const int DiscardButtonWidth = 90;
+
+        // Centred in the 40px bar, derived rather than written down.
+        private const int SaveBarButtonY = (SaveBarHeight - UiMetrics.ButtonHeight) / 2;
+
+        /// <summary>
+        /// Places the bar's four slots. The bar does not scroll, but it is
+        /// measured against the SAME content width the scrolling panel below
+        /// it uses, so Save lands on the vertical line the content's right
+        /// edge holds.
+        /// </summary>
+        private void ApplySaveBarWidth(int barWidth)
+        {
+            // Resized fires on height-only drags too; the bar's slots are a
+            // function of width alone.
+            if (barWidth <= 0 || barWidth == _saveBarWidth) return;
+
+            _saveBarWidth = barWidth;
+            LayoutSaveBar();
+        }
+
+        private void LayoutSaveBar()
+        {
+            if (_saveButton == null) return;
+
+            int chipWidth = _dirtyChipLabel != null && _dirtyChipLabel.Visible
+                ? (int)Math.Ceiling(UiFonts.Body.MeasureString(_dirtyChipLabel.Text ?? "").Width)
+                : 0;
+            int discardWidth = _discardButton != null && _discardButton.Visible ? DiscardButtonWidth : 0;
+
+            var slots = SettingsSaveBarLayout.Compute(
+                _saveBarWidth, chipWidth, discardWidth, SaveButtonWidth);
+
+            if (_dirtyChipLabel != null)
+            {
+                _dirtyChipLabel.Location = new Point(slots.ChipX, 10);
+            }
+
+            if (_statusLabel != null)
+            {
+                _statusLabel.Location = new Point(slots.StatusX, 9);
+                _statusLabel.Width = slots.StatusMaxWidth;
+                ApplyStatusText();
+            }
+
+            if (_discardButton != null)
+            {
+                _discardButton.Location = new Point(slots.DiscardX, SaveBarButtonY);
+            }
+            _saveButton.Location = new Point(slots.SaveX, SaveBarButtonY);
+        }
+
+        // The status line's full text, so the ellipsis is re-taken from the
+        // original on every resize rather than compounded onto an already-
+        // shortened string.
+        private string _statusFullText = "";
+
+        private void SetStatusText(string text)
+        {
+            _statusFullText = text ?? "";
+            ApplyStatusText();
+        }
+
+        private void ApplyStatusText()
+        {
+            if (_statusLabel == null) return;
+
+            int budget = _statusLabel.Width;
+            string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Status, _statusFullText, budget);
+            if (!string.Equals(_statusLabel.Text, shown, StringComparison.Ordinal))
+            {
+                _statusLabel.Text = shown;
+            }
+            TooltipFacility.ApplyPlain(
+                _statusLabel,
+                string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
+        }
+
+        /// <summary>
+        /// Recomputes the dirty chip and the Discard button from the live
+        /// form. Both are hidden entirely at zero - see
+        /// SettingsSaveBarLayout.
+        /// </summary>
+        private void RefreshDirtyState()
+        {
+            if (_suspendDirtyRefresh || _dirtyChipLabel == null) return;
+
+            int unsaved = UnsavedChangeCount();
+            _dirtyChipLabel.Text = StatusText.Count(unsaved, "unsaved change");
+            _dirtyChipLabel.Visible = unsaved > 0;
+            if (_discardButton != null) _discardButton.Visible = unsaved > 0;
+
+            LayoutSaveBar();
+        }
+
+        private void ConfirmDiscardChanges()
+        {
+            if (_modalDialog == null)
+            {
+                DiscardChanges();
+                RefreshDirtyState();
+                return;
+            }
+
+            int unsaved = UnsavedChangeCount();
+            string changeWord = unsaved == 1 ? "change" : "changes";
+            _modalDialog.Show(
+                $"Discard {unsaved} unsaved {changeWord} on this tab and restore the last saved values?",
+                () =>
+                {
+                    DiscardChanges();
+                    RefreshDirtyState();
+                },
+                null,
+                confirmText: "Discard");
         }
 
         /// <summary>
@@ -1639,6 +2317,10 @@ namespace GW2CraftingHelper.Views
                 _baseline = CaptureFormState();
             }
 
+            // The chip reads the freshly-rebased baseline, so a clean save
+            // clears it and a failed one leaves it standing.
+            RefreshDirtyState();
+
             var outcome = new SaveOutcome(invalidCount, !valuationsSaved);
 
             if (_statusLabel == null) return outcome;
@@ -1648,20 +2330,20 @@ namespace GW2CraftingHelper.Views
                 // Defensive branch (see SaveValuations' catch): the other
                 // three sections did persist, but a failed write is the
                 // headline and the per-row errors stay on screen.
-                _statusLabel.Text = "Save failed - see log";
+                SetStatusText("Save failed - see log");
                 _statusLabel.TextColor = ErrorTextColor;
                 return outcome;
             }
 
             if (invalidCount == 0)
             {
-                _statusLabel.Text = StatusText.Stamp("Saved", DateTime.Now);
+                SetStatusText(StatusText.Stamp("Saved", DateTime.Now));
                 _statusLabel.TextColor = SuccessTextColor;
             }
             else
             {
                 string entryWord = invalidCount == 1 ? "entry" : "entries";
-                _statusLabel.Text = $"Saved - {invalidCount} invalid {entryWord} not saved";
+                SetStatusText($"Saved - {invalidCount} invalid {entryWord} not saved");
                 _statusLabel.TextColor = WarningTextColor;
             }
 

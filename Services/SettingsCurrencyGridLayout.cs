@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// Pure placement arithmetic (Blish-free, unit-testable) for the
     /// Settings tab's currency list: the horizontal extent of one cell,
     /// which rows a filter query keeps, and where each surviving row's cell
-    /// sits in the one- or two-column grid. The view
+    /// sits in the grid. The view
     /// (SettingsTabContent.AddCurrencyRow / ApplyCurrencyFilter) only copies
     /// the results onto controls.
     /// </summary>
@@ -17,28 +17,19 @@ namespace GW2CraftingHelper.Services
         // than in the view so MinColumnWidth below is derived from the same
         // numbers the controls are placed with and cannot drift from them,
         // and so the arithmetic is covered by Blish-free tests.
-        public const int CellNameX = 8;
-        public const int CellNameWidth = 190;
-        public const int CellInputX = CellNameX + CellNameWidth;
+        //
+        // The cell justifies like a plan table row: the
+        // [amount][Ignore][tag] block pins to the cell's own right edge (see
+        // PlanRelayoutMath.PinnedRightEdge) and the NAME is the only part
+        // that flexes. 16, not the 8 the name used to sit at, so the first
+        // column's names line up with the section titles above them.
+        public const int CellNameX = SettingsFormLayout.CellLeftPad;
         public const int CellInputWidth = 70;
-        public const int CellClearX = CellInputX + CellInputWidth + CellInputToClearGap;
 
         /// <summary>
         /// Gap between the amount box and the "Ignore" checkbox. Was 6, with
         /// the checkbox on 70; the label rename needed four more pixels and
         /// they came from here rather than from the cell's total extent.
-        /// <para>
-        /// Two columns need a 908px panel (2 * MinColumnWidth), i.e. a
-        /// 1034px window once the 126px of window-to-panel chrome is
-        /// counted. At the old 930px minimum that made the cell extent
-        /// load-bearing - and in fact the grid was already falling back to
-        /// one column there, the "864px settings panel" this comment used
-        /// to cite having been derived without the ViewAdapter's own
-        /// padding. The 1378px minimum clears the two-column threshold by
-        /// ~344px even after the font bump widened all three text-derived
-        /// terms, so the cell has room to grow now; it is still derived
-        /// rather than estimated (see MinColumnWidth).
-        /// </para>
         /// </summary>
         public const int CellInputToClearGap = 2;
 
@@ -55,8 +46,6 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int CellClearWidth = 74;
 
-        public const int CellTagX = CellClearX + CellClearWidth;
-
         /// <summary>
         /// Room for the widest string the cell's one tag slot shows:
         /// "default 3600" (12 characters; 3600 is the largest value in
@@ -67,12 +56,64 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int CellTagWidth = 110;
 
+        /// <summary>Gap between the flexing name and the pinned control
+        /// block - the module's one name-to-column gap.</summary>
+        public const int NameToControlGap = SettingsFormLayout.NameToControlGap;
+
         /// <summary>
-        /// Narrowest column a two-up cell fits in - the full extent of the
-        /// cell above, tag included. Below twice this the grid falls back to
-        /// a single column rather than clipping the right-hand cells.
+        /// The run the narrowest column holds without ellipsizing a currency
+        /// name: 22 characters at
+        /// <see cref="SnapshotItemGridLayout.MaxCharWidthPx"/> - what the
+        /// old fixed 190px name column was itself sized from ("Pristine
+        /// Fractal Relic").
         /// </summary>
-        public const int MinColumnWidth = CellTagX + CellTagWidth;
+        public const int NameRunChars = 22;
+
+        public const int CellNameFloor = NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
+
+        /// <summary>The pinned block: amount box, gap, Ignore checkbox, tag
+        /// slot.</summary>
+        public const int CellControlBlockWidth =
+            CellInputWidth + CellInputToClearGap + CellClearWidth + CellTagWidth;
+
+        /// <summary>
+        /// Narrowest column a cell fits in, term by term: the name inset, a
+        /// 22-character name floor, the name-to-control gap, the pinned
+        /// control block, and the table right margin. Below this the grid
+        /// falls back to a single column rather than clipping.
+        /// </summary>
+        public const int MinColumnWidth =
+            CellNameX + CellNameFloor + NameToControlGap + CellControlBlockWidth
+            + PlanRelayoutMath.TableRightMargin;
+
+        /// <summary>Right edge the cell's control block pins to.</summary>
+        public static int CellRightEdge(int columnWidth)
+        {
+            return PlanRelayoutMath.PinnedRightEdge(columnWidth);
+        }
+
+        public static int CellTagX(int columnWidth)
+        {
+            return CellRightEdge(columnWidth) - CellTagWidth;
+        }
+
+        public static int CellClearX(int columnWidth)
+        {
+            return CellTagX(columnWidth) - CellClearWidth;
+        }
+
+        public static int CellInputX(int columnWidth)
+        {
+            return CellClearX(columnWidth) - CellInputToClearGap - CellInputWidth;
+        }
+
+        /// <summary>Width a currency name may occupy before the control
+        /// block - the plan tables' rule, applied to one cell.</summary>
+        public static int CellNameMaxWidth(int columnWidth)
+        {
+            return PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                CellRightEdge(columnWidth), CellControlBlockWidth, NameToControlGap, CellNameX);
+        }
 
         public readonly struct CellPlacement
         {
@@ -112,9 +153,17 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        /// <summary>
+        /// As many whole <see cref="MinColumnWidth"/> columns as fit, never
+        /// fewer than one. Not capped at two: the module has ONE grid law,
+        /// stated on <see cref="SnapshotItemGridLayout.ComputeColumnCount"/>,
+        /// and this grid used to disagree with its sibling by holding 454px
+        /// of content in a 1210px column at a wide window.
+        /// </summary>
         public static int ComputeColumnCount(int panelWidth)
         {
-            return panelWidth >= 2 * MinColumnWidth ? 2 : 1;
+            int columns = panelWidth / MinColumnWidth;
+            return columns > 1 ? columns : 1;
         }
 
         public static int ComputeColumnWidth(int panelWidth)
