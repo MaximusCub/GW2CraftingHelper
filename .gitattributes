@@ -28,9 +28,12 @@ ref/recipe_sheet_items.json text=auto diff merge -linguist-generated
 # The glob above assumes seeder output is one opaque line, which is true of
 # vendor_offers.json and item_name_seed.json but not of these: at two-space
 # indent they diff line-by-line and auto-merge like any other text file, and
-# mystic_forge_recipes.json is hand-curated on top of its seeded rows. -diff
+# recipe_search_seed.json and recipes_seed.json ARE seeder output, so they say
+# so - linguist-generated collapses them in a PR view by default while diff and
+# merge keep them readable when someone opens them. mystic_forge_recipes.json is
+# hand-curated on top of its seeded rows, so it is not marked generated. -diff
 # renders all three as "Binary files differ" in review, and -merge turns a
 # concurrent edit into a whole-file binary conflict.
 ref/mystic_forge_recipes.json text=auto diff merge -linguist-generated
-ref/recipe_search_seed.json text=auto diff merge -linguist-generated
-ref/recipes_seed.json text=auto diff merge -linguist-generated
+ref/recipe_search_seed.json text=auto diff merge linguist-generated=true
+ref/recipes_seed.json text=auto diff merge linguist-generated=true
