@@ -1791,3 +1791,14 @@ the ramp plus Snapshot's grid rather than a per-tab redesign. The
 maintainer saw the same thing on the Settings capture and asked for the
 full treatment on every tab; that is its own milestone, not a fix to
 this one.
+
+## Rotation note: the append zone is due a pass
+
+At the merge that landed this rotation the active file sat at ~112KB -
+the ~65KB rotated core plus the three milestone records this release
+cycle added (seed-integrity, field-fixes-3, app-typography), all three
+of which are gated and closed. That is past the ~100KB tripwire above,
+and it is the tripwire working as designed rather than a defect: fresh
+records land in the append zone, and the NEXT rotation takes them. They
+were deliberately left in place here rather than archived minutes after
+being written, so this release's record reads in one file.
