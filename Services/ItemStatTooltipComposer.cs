@@ -74,6 +74,7 @@ namespace GW2CraftingHelper.Services
                 {
                     builder.Separator();
                 }
+
                 builder.Append(blocks[i]);
             }
 
@@ -88,6 +89,7 @@ namespace GW2CraftingHelper.Services
                 {
                     builder.Separator();
                 }
+
                 builder.Append(value);
             }
 
@@ -403,6 +405,7 @@ namespace GW2CraftingHelper.Services
             {
                 builder.Styled(span.Text, span.Role);
             }
+
             builder.EndLine();
         }
 
@@ -484,8 +487,10 @@ namespace GW2CraftingHelper.Services
                 {
                     sb.Append(' ');
                 }
+
                 sb.Append(c);
             }
+
             return sb.ToString();
         }
 
@@ -496,6 +501,7 @@ namespace GW2CraftingHelper.Services
             {
                 return $"{totalMinutes} m";
             }
+
             int hours = totalMinutes / 60;
             int minutes = totalMinutes % 60;
             return minutes == 0 ? $"{hours} h" : $"{hours} h {minutes} m";
@@ -523,10 +529,12 @@ namespace GW2CraftingHelper.Services
             {
                 sb.Append(gold).Append("g ");
             }
+
             if (silver != null)
             {
                 sb.Append(silver).Append("s ");
             }
+
             return sb.Append(cop).Append('c').ToString();
         }
     }

@@ -84,9 +84,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 var row = section.Rows[i];
 
                 int statusWidth = MeasureWidth(font, row.StatusTag);
-                if (statusWidth > statusColumnWidth) statusColumnWidth = statusWidth;
+                if (statusWidth > statusColumnWidth)
+                {
+                    statusColumnWidth = statusWidth;
+                }
 
-                if (string.IsNullOrEmpty(row.Sublabel)) continue;
+                if (string.IsNullOrEmpty(row.Sublabel))
+                {
+                    continue;
+                }
 
                 if (!anyDiscipline)
                 {
@@ -95,7 +101,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 int disciplineWidth = MeasureWidth(font, row.Sublabel);
-                if (disciplineWidth > disciplineColumnWidth) disciplineColumnWidth = disciplineWidth;
+                if (disciplineWidth > disciplineColumnWidth)
+                {
+                    disciplineColumnWidth = disciplineWidth;
+                }
             }
 
             var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
@@ -222,7 +231,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(NameX, NameY),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
 
@@ -243,7 +252,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
                         Location = new Point(edges.DisciplineX, NameY),
-                        Parent = rowPanel
+                        Parent = rowPanel,
                     });
             }
 
@@ -259,6 +268,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     statusColor = new Color(150, 200, 150);
                 }
+
                 statusLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.StatusTag, font, statusColor, edges.StatusRightEdge, NameY);
             }
@@ -278,6 +288,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         disciplineLabel.Location = new Point(e.DisciplineX, NameY);
                     }
+
                     if (statusLabel != null)
                     {
                         statusLabel.Location = new Point(

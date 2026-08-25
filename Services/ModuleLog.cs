@@ -375,7 +375,7 @@ namespace GW2CraftingHelper.Services
                 TimestampUtc = DateTime.UtcNow,
                 Level = level,
                 Tag = tag,
-                Message = message ?? string.Empty
+                Message = message ?? string.Empty,
             };
 
             lock (_gate)

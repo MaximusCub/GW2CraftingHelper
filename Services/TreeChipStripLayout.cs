@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Services
             CountsOnly,
 
             /// <summary>Neither: not even the counts clear the buttons.</summary>
-            Hidden
+            Hidden,
         }
 
         /// <summary>

@@ -23,7 +23,11 @@ namespace GW2CraftingHelper.Services
         {
             try
             {
-                if (!File.Exists(_filePath)) return "";
+                if (!File.Exists(_filePath))
+                {
+                    return "";
+                }
+
                 return File.ReadAllText(_filePath);
             }
             catch (Exception ex)
@@ -38,7 +42,11 @@ namespace GW2CraftingHelper.Services
             try
             {
                 string dir = Path.GetDirectoryName(_filePath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
                 string tmpPath = _filePath + ".tmp";
                 File.WriteAllText(tmpPath, status ?? "");
                 File.Copy(tmpPath, _filePath, true);

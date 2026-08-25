@@ -68,6 +68,6 @@ namespace GW2CraftingHelper.Models
         Currency,
         Unknown,
         GuildUpgrade,
-        UnrecognizedIngredient
+        UnrecognizedIngredient,
     }
 }

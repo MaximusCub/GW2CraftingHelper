@@ -148,6 +148,7 @@ namespace GW2CraftingHelper.Services
                         TooltipSpan.FromText("Unit price: "),
                         TooltipSpan.FromCoin(node.UnitCost.Value, FormatCoin(node.UnitCost.Value))));
                 }
+
                 if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
                 {
                     var unitCurrencyAmounts = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(

@@ -67,7 +67,10 @@ namespace GW2CraftingHelper.Services
             int statusX = safeChip > 0 ? Inset + safeChip + ChipToStatusGap : Inset;
 
             int statusMaxWidth = discardX - ChipToStatusGap - statusX;
-            if (statusMaxWidth < MinStatusWidth) statusMaxWidth = MinStatusWidth;
+            if (statusMaxWidth < MinStatusWidth)
+            {
+                statusMaxWidth = MinStatusWidth;
+            }
 
             return new Slots(chipX, statusX, statusMaxWidth, discardX, saveX);
         }

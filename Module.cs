@@ -52,7 +52,9 @@ namespace GW2CraftingHelper
         private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
 
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
+
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
+
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
 
         private CornerIcon _cornerIcon;
@@ -235,7 +237,9 @@ namespace GW2CraftingHelper
         private bool _backgroundRefreshSpinnerApplied;
 
         [ImportingConstructor]
-        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
+        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters)
+        {
+        }
 
         protected override void DefineSettings(SettingCollection settings)
         {
@@ -311,6 +315,7 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Vendor baseline load failed, starting with an empty baseline: {ex.GetType().Name} - {ex.Message}");
                 _vendorOfferStore.LoadBaseline(null);
             }
+
             _vendorOfferStore.LoadOverlay();
 
             // Recipe cache: seed + overlay
@@ -645,7 +650,7 @@ namespace GW2CraftingHelper
                 Location = new Point(
                     Math.Max(0, (GameService.Graphics.SpriteScreen.Width - minWindowWidth) / 2),
                     Math.Max(0, (GameService.Graphics.SpriteScreen.Height - WindowSizing.MinWindowHeight) / 2)),
-                SavesPosition = true
+                SavesPosition = true,
             };
 
             _mainWindow.Tabs.Add(new Tab(
@@ -725,7 +730,7 @@ namespace GW2CraftingHelper
                 IconName = "GW2 Crafting Helper",
                 Icon = new AsyncTexture2D(_cornerIconTexture),
                 Priority = 1245846523,
-                Parent = GameService.Graphics.SpriteScreen
+                Parent = GameService.Graphics.SpriteScreen,
             };
 
             _cornerIcon.Click += (s, e) =>
@@ -775,10 +780,16 @@ namespace GW2CraftingHelper
         /// </summary>
         private void PromptForUnsavedSettings()
         {
-            if (_settingsContent == null || _modalDialog == null) return;
+            if (_settingsContent == null || _modalDialog == null)
+            {
+                return;
+            }
 
             int unsaved = _settingsContent.UnsavedChangeCount();
-            if (unsaved <= 0) return;
+            if (unsaved <= 0)
+            {
+                return;
+            }
 
             string changeWord = unsaved == 1 ? "change" : "changes";
             _modalDialog.Show(
@@ -799,7 +810,10 @@ namespace GW2CraftingHelper
         // this message lands in the window that is already on screen.
         private void ReportSaveOutcome(SettingsTabContent.SaveOutcome outcome)
         {
-            if (outcome.AllSaved) return;
+            if (outcome.AllSaved)
+            {
+                return;
+            }
 
             string message;
             if (outcome.WriteFailed)
@@ -1023,7 +1037,10 @@ namespace GW2CraftingHelper
                 _snapshotContent.SetBackgroundRefreshInFlight(backgroundRefreshing);
             }
 
-            if (_refreshInProgress) return;
+            if (_refreshInProgress)
+            {
+                return;
+            }
 
             if (_currentSnapshot == null)
             {
@@ -1054,6 +1071,7 @@ namespace GW2CraftingHelper
                     _firstLoadRefreshAttempted = true;
                     _ = RefreshSnapshotInBackgroundAsync();
                 }
+
                 return;
             }
 
@@ -1063,8 +1081,15 @@ namespace GW2CraftingHelper
             // than caching it, so a Settings tab save takes effect on the
             // very next Update() without any separate live-push plumbing.
             var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
-            if (!StatusText.IsStale(DateTime.UtcNow - _currentSnapshot.CapturedAt, staleThreshold)) return;
-            if (!_snapshotService.HasRequiredPermissions()) return;
+            if (!StatusText.IsStale(DateTime.UtcNow - _currentSnapshot.CapturedAt, staleThreshold))
+            {
+                return;
+            }
+
+            if (!_snapshotService.HasRequiredPermissions())
+            {
+                return;
+            }
 
             _ = RefreshSnapshotInBackgroundAsync();
         }
@@ -1241,7 +1266,10 @@ namespace GW2CraftingHelper
 
         private async Task RefreshSnapshotInBackgroundAsync()
         {
-            if (_refreshInProgress) return;
+            if (_refreshInProgress)
+            {
+                return;
+            }
 
             // Refuse to auto-retrigger again so
             // soon after a failed attempt - see _lastFailedRefreshAttemptTicks'
@@ -1275,6 +1303,7 @@ namespace GW2CraftingHelper
                     var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                     SaveStatusThreadSafe(status);
                 }
+
                 // else: superseded by Clear Cache while this fetch was in
                 // flight (KNOWN-ISSUES #31/31a-F1, see SnapshotEpochGuard) -
                 // Clear Cache already wrote its own status; nothing further
@@ -1314,7 +1343,11 @@ namespace GW2CraftingHelper
 
         private async Task<AccountSnapshot> UserRefreshAsync()
         {
-            if (_refreshInProgress) return null;
+            if (_refreshInProgress)
+            {
+                return null;
+            }
+
             _refreshInProgress = true;
 
             _refreshCts?.Cancel();
@@ -1401,9 +1434,13 @@ namespace GW2CraftingHelper
         private sealed class PersistedPlanMetadata
         {
             public DateTime GeneratedAt { get; }
+
             public IReadOnlyList<PlanRequestItem> RequestItems { get; }
+
             public bool UseOwnMaterials { get; }
+
             public PriceBasis PriceBasis { get; }
+
             public bool ValueOwnMaterials { get; }
 
             public PersistedPlanMetadata(
@@ -1453,7 +1490,10 @@ namespace GW2CraftingHelper
                 _generateCompletedThisSession = true;
             }
 
-            if (myPersistGen != _persistGenerateSequence) return result;
+            if (myPersistGen != _persistGenerateSequence)
+            {
+                return result;
+            }
 
             var generatedAt = DateTime.Now;
             var metadata = new PersistedPlanMetadata(
@@ -1480,7 +1520,7 @@ namespace GW2CraftingHelper
                 ValueOwnMaterials = valueOwnMaterials,
                 Result = result,
                 NodeOverrides = new Dictionary<int, AcquisitionSource>(),
-                IgnoredItemIds = new List<int>()
+                IgnoredItemIds = new List<int>(),
             });
 
             return result;
@@ -1521,7 +1561,10 @@ namespace GW2CraftingHelper
             ISet<int> ignoredItemIds)
         {
             var metadata = _lastPersistedPlanMetadata;
-            if (metadata == null) return;
+            if (metadata == null)
+            {
+                return;
+            }
 
             // Copied via an explicit loop, not the Dictionary(IDictionary<>)
             // constructor - overrides is IReadOnlyDictionary<>, which does
@@ -1558,13 +1601,17 @@ namespace GW2CraftingHelper
                 ValueOwnMaterials = metadata.ValueOwnMaterials,
                 Result = result,
                 NodeOverrides = overridesSnapshot,
-                IgnoredItemIds = ignoredSnapshot
+                IgnoredItemIds = ignoredSnapshot,
             };
 
             lock (_pendingPlanSaveLock)
             {
                 _pendingPlanSave = persisted;
-                if (_planSaveWorkerRunning) return;
+                if (_planSaveWorkerRunning)
+                {
+                    return;
+                }
+
                 _planSaveWorkerRunning = true;
             }
 
@@ -1609,7 +1656,7 @@ namespace GW2CraftingHelper
                 AutoSizeHeight = true,
                 Location = new Point(20, 20),
                 TextColor = new Color(150, 150, 150),
-                Parent = container
+                Parent = container,
             };
         }
 

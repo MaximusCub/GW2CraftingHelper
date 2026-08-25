@@ -14,12 +14,14 @@ namespace GW2CraftingHelper.Models
         public int NodeId { get; set; }
 
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
 
         // GW2 API rarity string (e.g. "Fine", "Exotic"); null/empty = unknown.
         public string Rarity { get; set; }
 
         public int Quantity { get; set; }
+
         public CraftingDecision Decision { get; set; }
 
         // How many units of this node's own demand were covered by owned
@@ -45,7 +47,9 @@ namespace GW2CraftingHelper.Models
 
         // Feasible acquisition paths for this node (drives override cycling).
         public bool CanCraft { get; set; }
+
         public bool CanBuyTp { get; set; }
+
         public bool CanBuyVendor { get; set; }
 
         public int? RecipeId { get; set; }
@@ -60,6 +64,7 @@ namespace GW2CraftingHelper.Models
         // decision. Read by ExcessCraftOutputCalculator to aggregate
         // sellable/stranded surplus - never fed back into any cost or total.
         public int? CraftsNeeded { get; set; }
+
         public int? RecipeOutputCount { get; set; }
 
         // The basis CraftsNeeded was actually derived from (ceil(Quantity
@@ -72,6 +77,7 @@ namespace GW2CraftingHelper.Models
         public double? RecipeExpectedOutputCount { get; set; }
 
         public long? UnitCost { get; set; }
+
         public long? SubtreeCost { get; set; }
 
         // Passthrough of SolverDecision.ComparisonValue. DECISION-ONLY:
@@ -132,7 +138,9 @@ namespace GW2CraftingHelper.Models
         // recipe without re-walking the solver tree. Set only alongside
         // IsReferenceBranch; never used for cost math or display.
         public int? ReferenceRecipeId { get; set; }
+
         public List<string> ReferenceRecipeDisciplines { get; set; }
+
         public int ReferenceRecipeMinRating { get; set; }
 
         // True when ReferenceRecipeId's own recipe carries the GW2 API's
@@ -178,7 +186,9 @@ namespace GW2CraftingHelper.Models
         // nodes that have no real source choice. Consumed by
         // PillSubduingEvaluator; never fed back into any displayed cost.
         public PillSourceCostBreakdown CraftCostBreakdown { get; set; }
+
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; set; }
+
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; set; }
 
         // Passthrough of SolverDecision's matching fields - true when
@@ -188,8 +198,11 @@ namespace GW2CraftingHelper.Models
         // displayed cost. The companion fields describe the recipe that
         // would have won.
         public bool CraftExcludedByCompetency { get; set; }
+
         public long? CraftExcludedRealCost { get; set; }
+
         public IReadOnlyList<string> CraftExcludedDisciplines { get; set; }
+
         public int CraftExcludedMinRating { get; set; }
 
         // Passthrough of SolverDecision's matching fields - true whenever
@@ -200,8 +213,11 @@ namespace GW2CraftingHelper.Models
         // never fed back into any displayed cost. See
         // SolverDecision.CheapestCraftUntrained for the force-buy gating.
         public bool CheapestCraftUntrained { get; set; }
+
         public long? CheapestCraftRealCost { get; set; }
+
         public IReadOnlyList<string> CheapestCraftDisciplines { get; set; }
+
         public int CheapestCraftMinRating { get; set; }
 
         public IReadOnlyList<CraftingTreeNode> Children

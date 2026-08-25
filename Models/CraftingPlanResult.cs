@@ -5,9 +5,13 @@ namespace GW2CraftingHelper.Models
     public class CraftingPlanResult
     {
         public CraftingPlan Plan { get; set; }
+
         public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
+
         public List<UsedMaterial> UsedMaterials { get; set; }
+
         public List<RequiredDiscipline> RequiredDisciplines { get; set; }
+
         public List<RequiredRecipe> RequiredRecipes { get; set; }
 
         // Nodes where craft was excluded from the automatic pick because
@@ -17,7 +21,9 @@ namespace GW2CraftingHelper.Models
         // qualifies. Rendered as concrete "would save N" Plan Notes -
         // never fed back into any cost/comparison.
         public List<CompetencyOpportunity> CompetencyOpportunities { get; set; }
+
         public CraftingTreeNode CraftingTree { get; set; }
+
         public List<string> DebugLog { get; set; }
 
         /// <summary>Price basis used for material costs in this plan.</summary>

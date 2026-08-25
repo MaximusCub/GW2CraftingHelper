@@ -72,11 +72,21 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 var row = section.Rows[i];
-                if (row.RowType == PlanRowType.TimegatedNotice) continue;
-                if (string.IsNullOrEmpty(row.Sublabel)) continue;
+                if (row.RowType == PlanRowType.TimegatedNotice)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(row.Sublabel))
+                {
+                    continue;
+                }
 
                 int width = (int)System.Math.Ceiling(sublabelFont.MeasureString(row.Sublabel).Width);
-                if (width > maxSublabelWidth) maxSublabelWidth = width;
+                if (width > maxSublabelWidth)
+                {
+                    maxSublabelWidth = width;
+                }
             }
 
             // A TimegatedNotice row (vendor-cap informational
@@ -135,7 +145,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(badgeSize, badgeSize),
                 Location = new Point(badgeX, badgeY),
                 BackgroundColor = Color.White * 0.08f,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             // Digits only, so the space-glyph defect that retired
             // 18-regular elsewhere is not the reason this moved - the badge
@@ -154,7 +164,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(badgeX + (badgeSize - numberWidth) / 2, badgeY + (badgeSize - numberHeight) / 2),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             var iconFrame = IconControls.CreateItemIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
@@ -171,7 +181,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = CraftPrefix, Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel
+                    Location = new Point(x, 13), Parent = rowPanel,
                 });
             x += craftLabel.Width;
 
@@ -180,7 +190,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel
+                    Location = new Point(x, 13), Parent = rowPanel,
                 });
             x += qtyLabel.Width;
 
@@ -200,7 +210,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                     ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(nameX, 13), Parent = rowPanel
+                    Location = new Point(nameX, 13), Parent = rowPanel,
                 });
             StampNameTooltip(rowPanel, nameLabel, iconFrame, fullName);
 

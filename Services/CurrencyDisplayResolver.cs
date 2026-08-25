@@ -34,6 +34,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Name;
             }
+
             return Gw2Constants.ResolveCurrencyName(currencyId);
         }
 
@@ -50,6 +51,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.IconUrl;
             }
+
             return null;
         }
 
@@ -104,9 +106,10 @@ namespace GW2CraftingHelper.Services
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
                     OwnedQuantity = owned,
-                    RawOwnedQuantity = rawOwned
+                    RawOwnedQuantity = rawOwned,
                 });
             }
+
             return result;
         }
 
@@ -203,9 +206,10 @@ namespace GW2CraftingHelper.Services
                     BundleLabel = evenly ? null : $"{line.Count} for {divisor}",
                     UnitRate = (double)line.Count / divisor,
                     Name = ResolveName(line.Id, currencyMetadata),
-                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
+                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
                 });
             }
+
             return result;
         }
     }

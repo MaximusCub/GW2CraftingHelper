@@ -95,7 +95,10 @@ namespace GW2CraftingHelper.Services
             int fixedLeft = Gap + dropdownWidth + Gap + followWidth;
             int available = deleteX - Gap - Inset - fixedLeft;
             int searchWidth = available > SearchMaxWidth ? SearchMaxWidth : available;
-            if (searchWidth < 0) searchWidth = 0;
+            if (searchWidth < 0)
+            {
+                searchWidth = 0;
+            }
 
             int dropdownX = Inset + searchWidth + Gap;
             int followX = dropdownX + dropdownWidth + Gap;

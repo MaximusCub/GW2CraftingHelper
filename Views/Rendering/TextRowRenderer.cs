@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
-                Parent = parent
+                Parent = parent,
             };
             LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 4),
-                Parent = rowPanel
+                Parent = rowPanel,
             });
 
             // Not width-dependent beyond the row's own cosmetic width (fixed

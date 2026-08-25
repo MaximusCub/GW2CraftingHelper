@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
-            WriteIndented = true
+            WriteIndented = true,
         };
 
         public VendorOfferDataset Load(Stream stream)

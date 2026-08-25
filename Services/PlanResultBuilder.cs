@@ -122,6 +122,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!recipeOptionIndex.TryGetValue(step.RecipeId, out var option))
                 {
                     continue;
@@ -147,7 +148,7 @@ namespace GW2CraftingHelper.Services
                 {
                     RecipeId = option.RecipeId,
                     Disciplines = realDisciplines,
-                    MinRating = option.MinRating
+                    MinRating = option.MinRating,
                 });
             }
 
@@ -188,6 +189,7 @@ namespace GW2CraftingHelper.Services
                 {
                     disciplineMap[covering] = o.MinRating;
                 }
+
                 return true;
             });
 
@@ -235,7 +237,7 @@ namespace GW2CraftingHelper.Services
                 .Select(kv => new RequiredDiscipline
                 {
                     Discipline = kv.Key,
-                    MinRating = kv.Value
+                    MinRating = kv.Value,
                 })
                 .ToList();
 
@@ -305,7 +307,7 @@ namespace GW2CraftingHelper.Services
                     IsLearnedFromItem = isLearnedFromItem,
                     MinRating = option.MinRating,
                     Disciplines = new List<string>(option.Disciplines),
-                    IsMissing = isMissing
+                    IsMissing = isMissing,
                 });
             }
 
@@ -336,7 +338,7 @@ namespace GW2CraftingHelper.Services
                 RequiredDisciplines = requiredDisciplines,
                 RequiredRecipes = requiredRecipes,
                 ProbabilisticForgeOutputItemIds = probabilisticForgeOutputItemIds,
-                DebugLog = debugLog
+                DebugLog = debugLog,
             };
         }
 

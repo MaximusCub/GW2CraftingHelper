@@ -29,6 +29,7 @@ namespace GW2CraftingHelper.Services
     public class SnapshotFetchFailedException : Exception
     {
         public int FailedSourceCount { get; }
+
         public int TotalSourceCount { get; }
 
         /// <summary>

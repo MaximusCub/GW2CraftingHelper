@@ -9,6 +9,7 @@ namespace GW2CraftingHelper.Services
     public class FlowCellPlacement
     {
         public int X { get; set; }
+
         public int Y { get; set; }
     }
 
@@ -19,7 +20,9 @@ namespace GW2CraftingHelper.Services
     public class SourceFilterFlowResult
     {
         public List<FlowCellPlacement> Cells { get; } = new List<FlowCellPlacement>();
+
         public int RowCount { get; set; }
+
         public int TotalHeight { get; set; }
     }
 

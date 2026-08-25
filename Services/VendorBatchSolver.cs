@@ -274,6 +274,7 @@ namespace GW2CraftingHelper.Services
                         {
                             unitPrice = PlanSolver.GetUnitPrice(itemPrice, priceBasis, out itemPriceSideFellBack);
                         }
+
                         if (unitPrice > 0)
                         {
                             coinCost += (long)cost.Count * unitPrice;
@@ -359,12 +360,13 @@ namespace GW2CraftingHelper.Services
                             itemsScalable = false;
                             break;
                         }
+
                         scaledItemCosts.Add(new VendorItemCostLine
                         {
                             ItemId = ic.ItemId,
                             Quantity = (int)scaledQty,
                             GoldValue = (long)ic.Count * unitsNeeded * ic.UnitPrice,
-                            PriceSideFellBack = ic.PriceSideFellBack
+                            PriceSideFellBack = ic.PriceSideFellBack,
                         });
                     }
                 }
@@ -398,12 +400,13 @@ namespace GW2CraftingHelper.Services
                             scalable = false;
                             break;
                         }
+
                         totalCurrencyUnits += scaled;
                         scaledCurrencyCosts.Add(new CostLine
                         {
                             Type = cc.Type,
                             Id = cc.Id,
-                            Count = (int)scaled
+                            Count = (int)scaled,
                         });
 
                         if (allValued)
@@ -462,9 +465,10 @@ namespace GW2CraftingHelper.Services
                             CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
                             DailyCap = offer.DailyCap,
                             WeeklyCap = offer.WeeklyCap,
-                            SeasonalCap = offer.SeasonalCap
+                            SeasonalCap = offer.SeasonalCap,
                         };
                     }
+
                     continue;
                 }
 
@@ -495,7 +499,7 @@ namespace GW2CraftingHelper.Services
                         CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
                         DailyCap = offer.DailyCap,
                         WeeklyCap = offer.WeeklyCap,
-                        SeasonalCap = offer.SeasonalCap
+                        SeasonalCap = offer.SeasonalCap,
                     };
                 }
             }
@@ -546,7 +550,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = merged[idx].Type,
                         Id = merged[idx].Id,
-                        Count = ClampToInt(summed)
+                        Count = ClampToInt(summed),
                     };
                 }
                 else
@@ -641,7 +645,7 @@ namespace GW2CraftingHelper.Services
                                 ? TimegatedCapType.Daily
                                 : TimegatedCapType.Weekly,
                             CapValue = cap.Value,
-                            NeededCount = unitsNeeded
+                            NeededCount = unitsNeeded,
                         });
                     }
 
@@ -657,14 +661,14 @@ namespace GW2CraftingHelper.Services
                             ItemId = step.ItemId,
                             CapType = TimegatedCapType.Seasonal,
                             CapValue = batch.SeasonalCap.Value,
-                            NeededCount = unitsNeeded
+                            NeededCount = unitsNeeded,
                         });
                     }
                 }
+
                 // Conflict intentionally produces no cap notice - a cap
                 // cannot be soundly computed across genuinely different
                 // offers (see this method's doc comment).
-
                 if (step.VendorCurrencyCosts != null)
                 {
                     foreach (var cc in step.VendorCurrencyCosts)
@@ -743,6 +747,7 @@ namespace GW2CraftingHelper.Services
                 {
                     totalQuantity += occurrences[i].Quantity;
                 }
+
                 if (totalQuantity <= 0)
                 {
                     // Defensive only: vendorOccurrences' construction
@@ -789,6 +794,7 @@ namespace GW2CraftingHelper.Services
                         {
                             break;
                         }
+
                         shares[i]++;
                         leftover--;
                     }
@@ -827,10 +833,12 @@ namespace GW2CraftingHelper.Services
             {
                 return linesA == null && linesB == null;
             }
+
             if (linesA.Count != linesB.Count)
             {
                 return false;
             }
+
             for (int i = 0; i < linesA.Count; i++)
             {
                 if (linesA[i].Id != linesB[i].Id ||
@@ -840,6 +848,7 @@ namespace GW2CraftingHelper.Services
                     return false;
                 }
             }
+
             return true;
         }
 
@@ -864,9 +873,10 @@ namespace GW2CraftingHelper.Services
                 {
                     Type = line.Type,
                     Id = line.Id,
-                    Count = ClampToInt(count)
+                    Count = ClampToInt(count),
                 });
             }
+
             return scaled;
         }
 

@@ -91,13 +91,22 @@ namespace GW2CraftingHelper.Services
             }
 
             int height = 0;
-            if (hasCostBand) height += CostBandHeight(currencyRowCount > 0);
-            if (hasProfitBand) height += PlanContentHeightMath.CostTileRowHeight;
+            if (hasCostBand)
+            {
+                height += CostBandHeight(currencyRowCount > 0);
+            }
+
+            if (hasProfitBand)
+            {
+                height += PlanContentHeightMath.CostTileRowHeight;
+            }
+
             if (currencyRowCount > 0)
             {
                 height += PlanContentHeightMath.CTableHeaderRowHeight
                     + currencyRowCount * PlanContentHeightMath.CurrencyRowHeight;
             }
+
             height += noteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             height += footnoteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             return height;
@@ -246,7 +255,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string CurrencyRequirementNote(int currencyRowCount)
         {
-            if (currencyRowCount <= 0) return null;
+            if (currencyRowCount <= 0)
+            {
+                return null;
+            }
+
             // Deliberately short: it sits under a caption inside one tile
             // slice of a three-tile band, and the reason WHY it matters
             // lives in the hover text rather than widening this line past
@@ -264,14 +277,24 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string CurrencyRequirementNoteTooltip(IReadOnlyList<PlanRowViewModel> currencyRows)
         {
-            if (currencyRows == null || currencyRows.Count == 0) return null;
+            if (currencyRows == null || currencyRows.Count == 0)
+            {
+                return null;
+            }
 
             var names = new List<string>(currencyRows.Count);
             foreach (var row in currencyRows)
             {
-                if (!string.IsNullOrEmpty(row.Label)) names.Add(row.Label);
+                if (!string.IsNullOrEmpty(row.Label))
+                {
+                    names.Add(row.Label);
+                }
             }
-            if (names.Count == 0) return null;
+
+            if (names.Count == 0)
+            {
+                return null;
+            }
 
             return string.Join(", ", names)
                 + "\nThese are spent on top of the coin cost shown - see the Currency table below.";
@@ -372,6 +395,5 @@ namespace GW2CraftingHelper.Services
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
         }
-
     }
 }

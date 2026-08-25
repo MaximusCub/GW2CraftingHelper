@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
         // BuildingDisplay sequence.
         private static readonly string[] BucketOrder =
         {
-            "tree", "prices", "solve", "item details", "display"
+            "tree", "prices", "solve", "item details", "display",
         };
 
         // Maps a raw timingLog step name (PlanTimingAnalyzer.ParsedPhase.Name)
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
                 { "Fetch item metadata", "item details" },
                 { "Fetch currency metadata", "item details" },
                 { "Fetch learned recipes", "item details" },
-                { "Build result", "display" }
+                { "Build result", "display" },
             };
 
         // Which single raw step supplies a bucket's optional "(N items)"
@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 { "prices", "Fetch TP prices" },
-                { "item details", "Fetch item metadata" }
+                { "item details", "Fetch item metadata" },
             };
 
         /// <summary>

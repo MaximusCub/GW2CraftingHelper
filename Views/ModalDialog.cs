@@ -101,7 +101,7 @@ namespace GW2CraftingHelper.Views
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "Confirm",
                 Id = WindowId,
-                TopMost = true
+                TopMost = true,
             };
 
             _window.Moved += OnWindowMoved;
@@ -135,7 +135,11 @@ namespace GW2CraftingHelper.Views
         // disables its Snapshot buttons) knows not to arm it.
         public bool Show(string message, Action onConfirm, Action onCancel, string confirmText, string cancelText = "Cancel")
         {
-            if (_isShowing) return false;
+            if (_isShowing)
+            {
+                return false;
+            }
+
             _isShowing = true;
             _onConfirm = onConfirm;
             _onCancel = onCancel;
@@ -175,7 +179,7 @@ namespace GW2CraftingHelper.Views
                 Text = string.Join("\n", wrapped.Lines),
                 Font = font,
                 AutoSizeWidth = true,
-                AutoSizeHeight = true
+                AutoSizeHeight = true,
             };
             messageLabel.Location = new Point(
                 System.Math.Max(0, (ContentWidth - messageLabel.Width) / 2),
@@ -213,7 +217,7 @@ namespace GW2CraftingHelper.Views
                 Text = confirmText,
                 Size = new Point(btnW, ButtonHeight),
                 Location = new Point(btnX, btnY),
-                Parent = _window
+                Parent = _window,
             };
             confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
 
@@ -222,7 +226,7 @@ namespace GW2CraftingHelper.Views
                 Text = cancelLabel,
                 Size = new Point(cancelW, ButtonHeight),
                 Location = new Point(btnX + btnW + btnGap, btnY),
-                Parent = _window
+                Parent = _window,
             };
             cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
 
@@ -271,7 +275,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ShowBackdrop()
         {
-            if (_blockedSurface == null) return;
+            if (_blockedSurface == null)
+            {
+                return;
+            }
 
             if (_backdrop == null)
             {
@@ -365,7 +372,10 @@ namespace GW2CraftingHelper.Views
 
         private void OnWindowMoved(object sender, MovedEventArgs e)
         {
-            if (_suppressMoved) return;
+            if (_suppressMoved)
+            {
+                return;
+            }
 
             var screen = GameService.Graphics.SpriteScreen;
             int maxX = Math.Max(0, screen.Width - _window.Width);

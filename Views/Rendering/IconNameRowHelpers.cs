@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(nameX, nameY),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
 
             return new IconNameHandle
@@ -104,7 +104,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 NameLabel = nameLabel,
                 FullName = fullName,
                 NameX = nameX,
-                IconFrame = iconFrame
+                IconFrame = iconFrame,
             };
         }
 

@@ -41,9 +41,13 @@ namespace GW2CraftingHelper.Services
         public sealed class Board
         {
             public IReadOnlyList<Placement> Blocks { get; }
+
             public int ColumnCount { get; }
+
             public int ColumnWidth { get; }
+
             public int RowCount { get; }
+
             public int Height { get; }
 
             internal Board(
@@ -72,7 +76,11 @@ namespace GW2CraftingHelper.Services
             }
 
             int columns = boardWidth / minColumnWidth;
-            if (columns < 1) columns = 1;
+            if (columns < 1)
+            {
+                columns = 1;
+            }
+
             return columns > blockCount ? blockCount : columns;
         }
 
@@ -105,18 +113,28 @@ namespace GW2CraftingHelper.Services
                 for (int i = first; i < count && i < first + columnCount; i++)
                 {
                     int height = blockHeights[i] > 0 ? blockHeights[i] : 0;
-                    if (height > rowHeight) rowHeight = height;
+                    if (height > rowHeight)
+                    {
+                        rowHeight = height;
+                    }
                 }
 
                 for (int column = 0; column < columnCount; column++)
                 {
                     int i = first + column;
-                    if (i >= count) break;
+                    if (i >= count)
+                    {
+                        break;
+                    }
+
                     blocks[i] = new Placement(column * columnWidth, y, column, row, columnWidth);
                 }
 
                 y += rowHeight;
-                if (row < rowCount - 1) y += safeRowGap;
+                if (row < rowCount - 1)
+                {
+                    y += safeRowGap;
+                }
             }
 
             return new Board(blocks, columnCount, columnWidth, rowCount, y);

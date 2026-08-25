@@ -18,16 +18,22 @@ namespace GW2CraftingHelper.Services
         private class DailyCooldownEnvelope
         {
             public int SchemaVersion { get; set; }
+
             public string GeneratedAt { get; set; }
+
             public string Source { get; set; }
+
             public List<DailyCooldownEntry> Items { get; set; }
         }
 
         private class DailyCooldownEntry
         {
             public int ItemId { get; set; }
+
             public int PerDayCap { get; set; }
+
             public string SourceUrl { get; set; }
+
             public string LastVerified { get; set; }
         }
 
@@ -53,6 +59,7 @@ namespace GW2CraftingHelper.Services
                     // ItemId; harmless divergence.
                     continue;
                 }
+
                 // Last-write-wins on duplicate item ids, matching
                 // AcquisitionHintService.
                 result[entry.ItemId] = new DailyCooldownItem
@@ -60,9 +67,10 @@ namespace GW2CraftingHelper.Services
                     ItemId = entry.ItemId,
                     PerDayCap = entry.PerDayCap,
                     SourceUrl = entry.SourceUrl,
-                    LastVerified = entry.LastVerified
+                    LastVerified = entry.LastVerified,
                 };
             }
+
             return result;
         }
     }

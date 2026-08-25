@@ -42,6 +42,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 foreach (var offer in list)
                 {
                     if (offer != null && !string.IsNullOrEmpty(offer.SeasonalFestival))
@@ -50,6 +51,7 @@ namespace GW2CraftingHelper.Services
                         break;
                     }
                 }
+
                 if (anySeasonal)
                 {
                     break;
@@ -95,6 +97,7 @@ namespace GW2CraftingHelper.Services
                         kept.Add(offer);
                     }
                 }
+
                 filtered[kvp.Key] = kept;
             }
 

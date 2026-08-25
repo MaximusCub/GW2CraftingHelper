@@ -45,6 +45,6 @@ namespace GW2CraftingHelper.Services
         /// the cause is "an incomplete fetch", not "access is broken" or
         /// "the API is down".
         /// </summary>
-        PartialFailure
+        PartialFailure,
     }
 }

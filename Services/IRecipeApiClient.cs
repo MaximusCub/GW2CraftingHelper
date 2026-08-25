@@ -7,7 +7,9 @@ namespace GW2CraftingHelper.Services
     public class RawIngredient
     {
         public string Type { get; set; }
+
         public int Id { get; set; }
+
         public int Count { get; set; }
 
         // Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e
@@ -20,13 +22,16 @@ namespace GW2CraftingHelper.Services
         // the same upstream ingredient objects and costs nothing extra to
         // keep; it is never read by the dedup logic itself.
         public int? AchievementId { get; set; }
+
         public int? AchievementBit { get; set; }
     }
 
     public class RawRecipe
     {
         public int Id { get; set; }
+
         public int OutputItemId { get; set; }
+
         public int OutputItemCount { get; set; }
 
         // Optional fractional expected-output count (Mystic Clover-style
@@ -40,8 +45,11 @@ namespace GW2CraftingHelper.Services
         public double? ExpectedOutputCount { get; set; }
 
         public List<RawIngredient> Ingredients { get; set; } = new List<RawIngredient>();
+
         public List<string> Disciplines { get; set; } = new List<string>();
+
         public int MinRating { get; set; }
+
         public List<string> Flags { get; set; } = new List<string>();
 
         // Recipe-level achievement_id, mirroring
@@ -59,6 +67,7 @@ namespace GW2CraftingHelper.Services
     public interface IRecipeApiClient
     {
         Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct);
+
         Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct);
     }
 }

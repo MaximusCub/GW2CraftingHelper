@@ -9,7 +9,9 @@ namespace GW2CraftingHelper.Services
     public class SnapshotFailureClassification
     {
         public SnapshotFailureKind Kind { get; }
+
         public int FailedSourceCount { get; }
+
         public int TotalSourceCount { get; }
 
         public SnapshotFailureClassification(SnapshotFailureKind kind, int failedSourceCount, int totalSourceCount)

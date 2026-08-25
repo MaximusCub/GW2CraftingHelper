@@ -274,7 +274,10 @@ namespace GW2CraftingHelper.Views.Rendering
             string currencyNoteText = null, string currencyNoteTooltip = null)
         {
             int tileCount = tileRows.Count;
-            if (tileCount == 0) return;
+            if (tileCount == 0)
+            {
+                return;
+            }
 
             const int totalMargin = 40;
             const int minTileWidth = 80;
@@ -292,7 +295,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, rowHeight),
-                Parent = parent
+                Parent = parent,
             };
 
             // The tile caption is this band's column header - it names the
@@ -362,8 +365,16 @@ namespace GW2CraftingHelper.Views.Rendering
                 if (boxed)
                 {
                     int widest = captionWidth;
-                    if (noteWidth > widest) widest = noteWidth;
-                    if (segmentsWidth > widest) widest = segmentsWidth;
+                    if (noteWidth > widest)
+                    {
+                        widest = noteWidth;
+                    }
+
+                    if (segmentsWidth > widest)
+                    {
+                        widest = segmentsWidth;
+                    }
+
                     int boxWidth = SummarySectionLayoutMath.CostBandBoxWidth(widest);
 
                     box = CreateHighlightBox(
@@ -385,7 +396,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Location = new Point(
                         TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, captionWidth),
                         captionY - hostTop),
-                    Parent = host
+                    Parent = host,
                 });
                 TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
@@ -402,7 +413,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         Location = new Point(
                             TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, noteWidth),
                             noteY - hostTop),
-                        Parent = host
+                        Parent = host,
                     });
                     TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
                 }
@@ -419,7 +430,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     NoteLabel = noteLabel,
                     AmountY = amountY,
                     NoteY = noteY,
-                    Box = box
+                    Box = box,
                 });
             }
 
@@ -448,7 +459,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
                         Location = new Point(boundaryX - symbolWidth / 2, amountY),
-                        Parent = rowPanel
+                        Parent = rowPanel,
                     };
                     operatorLabels.Add(operatorLabel);
                 }
@@ -545,7 +556,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(width, height),
                 Location = new Point(x, y),
                 BackgroundColor = ResultHighlightFill,
-                Parent = parent
+                Parent = parent,
             };
 
             const int b = HighlightBoxBorder;
@@ -559,14 +570,17 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private static void AddHighlightBoxEdge(Panel box, int x, int y, int width, int height)
         {
-            if (width <= 0 || height <= 0) return;
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
 
             new Panel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
                 BackgroundColor = ResultHighlightBorder,
-                Parent = box
+                Parent = box,
             };
         }
 
@@ -608,7 +622,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // set for its own 4-column (Item/Amount/Each/Total) header, rather
         // than stretching CTableHeaderRenderer's signature to fit a shape
         // it was not designed for.
-
         private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
 
         private void CreateCurrencyTable(List<PlanRowViewModel> rows, FlowPanel parent, int panelWidth)
@@ -633,7 +646,10 @@ namespace GW2CraftingHelper.Views.Rendering
             foreach (var row in rows)
             {
                 int rowWidest = MeasureWidestCurrencyNumber(row, font);
-                if (rowWidest > widestNumberWidth) widestNumberWidth = rowWidest;
+                if (rowWidest > widestNumberWidth)
+                {
+                    widestNumberWidth = rowWidest;
+                }
             }
 
             CreateCurrencyTableHeaderRow(parent, panelWidth, widestNumberWidth);
@@ -650,7 +666,9 @@ namespace GW2CraftingHelper.Views.Rendering
         // The same three strings the header row draws, so the floor they
         // set can never be measured from a label that is no longer there.
         private static readonly string[] CurrencyHeaderLabels =
-            { RequiredHeaderText, HaveHeaderText, NeededHeaderText };
+            {
+                RequiredHeaderText, HaveHeaderText, NeededHeaderText,
+            };
 
         /// <summary>
         /// Widest of the currency table's three number-column headers, in
@@ -663,8 +681,12 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < CurrencyHeaderLabels.Length; i++)
             {
                 int width = (int)System.Math.Ceiling(font.MeasureString(CurrencyHeaderLabels[i]).Width);
-                if (width > widest) widest = width;
+                if (width > widest)
+                {
+                    widest = width;
+                }
             }
+
             return widest;
         }
 
@@ -681,11 +703,17 @@ namespace GW2CraftingHelper.Views.Rendering
 
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
             int haveWidth = (int)System.Math.Ceiling(font.MeasureString(haveText).Width);
-            if (haveWidth > widest) widest = haveWidth;
+            if (haveWidth > widest)
+            {
+                widest = haveWidth;
+            }
 
             string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
             int neededWidth = (int)System.Math.Ceiling(font.MeasureString(neededText).Width);
-            if (neededWidth > widest) widest = neededWidth;
+            if (neededWidth > widest)
+            {
+                widest = neededWidth;
+            }
 
             return widest;
         }
@@ -704,7 +732,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(panelWidth, rowHeight),
                 BackgroundColor = background,
-                Parent = parent
+                Parent = parent,
             };
         }
 
@@ -719,7 +747,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
-                Parent = band
+                Parent = band,
             });
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
@@ -803,7 +831,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = displayName, Font = font, TextColor = Color.White,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(nameX, 4), Parent = rowPanel
+                Location = new Point(nameX, 4), Parent = rowPanel,
             });
             if (displayName != fullName)
             {
@@ -884,7 +912,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
-                Parent = parent
+                Parent = parent,
             };
             LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -894,7 +922,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(8, 7),
-                Parent = rowPanel
+                Parent = rowPanel,
             });
 
             // Not width-dependent beyond the row's own cosmetic width (m2

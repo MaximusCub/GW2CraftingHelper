@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Services
                         .Select(sg => new MaterialSourceAllocation
                         {
                             Source = sg.Key,
-                            Quantity = sg.Sum(a => a.Quantity)
+                            Quantity = sg.Sum(a => a.Quantity),
                         })
                         .Where(a => a.Quantity > 0)
                         .OrderBy(a => a.Source, StringComparer.Ordinal)
@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = g.Key,
                         QuantityUsed = g.Sum(u => u.QuantityUsed),
-                        Sources = allSources
+                        Sources = allSources,
                     };
                 })
                 .Where(u => u.QuantityUsed > 0)
@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Services
             {
                 ReducedTree = clone,
                 UsedMaterials = aggregated,
-                OwnedQuantityUsedByNode = ownedUsageByNode
+                OwnedQuantityUsedByNode = ownedUsageByNode,
             };
         }
 
@@ -185,7 +185,7 @@ namespace GW2CraftingHelper.Services
                         allocations.Add(new MaterialSourceAllocation
                         {
                             Source = source,
-                            Quantity = consume
+                            Quantity = consume,
                         });
                         totalConsumed += consume;
                         remaining -= consume;
@@ -198,7 +198,7 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = node.Id,
                         QuantityUsed = totalConsumed,
-                        Sources = allocations
+                        Sources = allocations,
                     });
                     ownedUsageByNode[node] = totalConsumed;
                     node.Quantity -= totalConsumed;
@@ -341,7 +341,7 @@ namespace GW2CraftingHelper.Services
                 // actually consume.
                 AchievementId = node.AchievementId,
                 AchievementBit = node.AchievementBit,
-                IsAchievementBitDeduped = node.IsAchievementBitDeduped
+                IsAchievementBitDeduped = node.IsAchievementBitDeduped,
             };
 
             foreach (var option in node.Recipes)
@@ -368,7 +368,7 @@ namespace GW2CraftingHelper.Services
                 ExpectedOutputCount = option.ExpectedOutputCount,
                 Disciplines = new List<string>(option.Disciplines),
                 MinRating = option.MinRating,
-                Flags = new List<string>(option.Flags)
+                Flags = new List<string>(option.Flags),
             };
 
             foreach (var ingredient in option.Ingredients)

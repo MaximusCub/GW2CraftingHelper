@@ -14,8 +14,11 @@ namespace GW2CraftingHelper.Models
     public class SnapshotCharacterDiscipline
     {
         public string CharacterName { get; set; } = "";
-        public string Discipline    { get; set; } = "";
-        public int    Rating        { get; set; }
-        public bool   Active        { get; set; }
+
+        public string Discipline { get; set; } = "";
+
+        public int Rating { get; set; }
+
+        public bool Active { get; set; }
     }
 }

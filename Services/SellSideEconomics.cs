@@ -75,6 +75,7 @@ namespace GW2CraftingHelper.Services
                 {
                     profit -= materialOpportunityCost.Value;
                 }
+
                 result.CraftingProfit = profit;
             }
         }
@@ -218,7 +219,7 @@ namespace GW2CraftingHelper.Services
                 SellableQuantity = sellableQuantity,
                 NetSaleValue = netSaleValue,
                 TargetUnitSellPrice = targetUnitSellPrice,
-                ItemCraftCost = itemCraftCost
+                ItemCraftCost = itemCraftCost,
             };
         }
 
@@ -256,6 +257,7 @@ namespace GW2CraftingHelper.Services
                     sum += TradingPostMath.NetSaleRevenue(matPrice.SellInstant, used.QuantityUsed);
                 }
             }
+
             return sum;
         }
 
@@ -397,6 +399,7 @@ namespace GW2CraftingHelper.Services
             {
                 profit -= materialOpportunityCost.Value;
             }
+
             result.CraftingProfit = profit;
         }
     }

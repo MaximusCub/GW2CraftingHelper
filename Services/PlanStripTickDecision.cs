@@ -49,7 +49,10 @@ namespace GW2CraftingHelper.Services
     {
         public static PlanStripTickAction Decide(PlanStripStatusSnapshot snapshot, int myGen)
         {
-            if (snapshot == null || snapshot.Sequence != myGen) return PlanStripTickAction.Stop;
+            if (snapshot == null || snapshot.Sequence != myGen)
+            {
+                return PlanStripTickAction.Stop;
+            }
 
             return snapshot.InFlight ? PlanStripTickAction.RenderSpinner : PlanStripTickAction.RenderFinalAndStop;
         }
@@ -73,9 +76,21 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string FormatPhaseText(PlanPhaseEvent pe)
         {
-            if (pe == null || string.IsNullOrEmpty(pe.DisplayName)) return "Generating...";
-            if (pe.Total.HasValue) return $"{pe.DisplayName} ({pe.Total.Value} items)...";
-            if (!string.IsNullOrEmpty(pe.Detail)) return $"{pe.DisplayName} ({pe.Detail})...";
+            if (pe == null || string.IsNullOrEmpty(pe.DisplayName))
+            {
+                return "Generating...";
+            }
+
+            if (pe.Total.HasValue)
+            {
+                return $"{pe.DisplayName} ({pe.Total.Value} items)...";
+            }
+
+            if (!string.IsNullOrEmpty(pe.Detail))
+            {
+                return $"{pe.DisplayName} ({pe.Detail})...";
+            }
+
             return $"{pe.DisplayName}...";
         }
     }

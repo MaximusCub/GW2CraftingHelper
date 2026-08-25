@@ -71,14 +71,21 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static void Wire(Control control, Func<bool> suppress = null)
         {
-            if (control == null) return;
+            if (control == null)
+            {
+                return;
+            }
 
             float restingOpacity = 1f;
             bool held = false;
 
             Action release = () =>
             {
-                if (!held) return;
+                if (!held)
+                {
+                    return;
+                }
+
                 held = false;
                 control.Opacity = restingOpacity;
             };
@@ -88,8 +95,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 // Blish raises this before its own Enabled check (only
                 // Click is gated on Enabled), so a disabled Generate button
                 // would otherwise answer a click it is about to ignore.
-                if (held || !control.Enabled) return;
-                if (suppress != null && suppress()) return;
+                if (held || !control.Enabled)
+                {
+                    return;
+                }
+
+                if (suppress != null && suppress())
+                {
+                    return;
+                }
 
                 held = true;
                 restingOpacity = control.Opacity;

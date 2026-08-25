@@ -55,7 +55,7 @@ namespace GW2CraftingHelper.Services
                 VendorValue = ResolveVendorValue(raw.VendorValue, flags),
                 Description = raw.Description ?? "",
                 Attributes = NoAttributes,
-                UpgradeBonuses = NoStrings
+                UpgradeBonuses = NoStrings,
             };
 
             var detail = raw.Detail;
@@ -93,9 +93,11 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     attributes.Add(new ItemAttributeLine(
                         ItemStatMath.AttributeDisplayName(attribute.Attribute), attribute.Modifier));
                 }
+
                 if (attributes.Count > 0)
                 {
                     block.Attributes = attributes;
@@ -129,18 +131,22 @@ namespace GW2CraftingHelper.Services
             {
                 return "Soulbound on Acquire";
             }
+
             if (flags.Contains("SoulBindOnUse"))
             {
                 return "Soulbound on Use";
             }
+
             if (flags.Contains("AccountBindOnUse"))
             {
                 return "Account Bound on Use";
             }
+
             if (flags.Contains("AccountBound"))
             {
                 return "Account Bound";
             }
+
             return null;
         }
 
@@ -150,6 +156,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             return vendorValue;
         }
     }

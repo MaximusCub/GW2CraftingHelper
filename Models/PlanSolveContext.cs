@@ -11,13 +11,21 @@ namespace GW2CraftingHelper.Models
     public class PlanSolveContext
     {
         public int TargetItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public RecipeNode Tree { get; set; }
+
         public IReadOnlyDictionary<int, ItemPrice> Prices { get; set; }
+
         public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; set; }
+
         public IReadOnlyDictionary<int, ItemMetadata> Metadata { get; set; }
+
         public ISet<int> LearnedRecipeIds { get; set; }
+
         public List<UsedMaterial> UsedMaterials { get; set; }
+
         public PriceBasis PriceBasis { get; set; }
 
         /// <summary>

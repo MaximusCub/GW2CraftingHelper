@@ -95,7 +95,7 @@ namespace GW2CraftingHelper.Models
             { 65, 135 },     // Testimony of Jade Heroics
             { 67, 35 },      // Canach Coins
             { 68, 320 },     // Imperial Favor
-            { 69, 32 }       // Tales of Dungeon Delving
+            { 69, 32 },       // Tales of Dungeon Delving
         };
 
         /// <summary>

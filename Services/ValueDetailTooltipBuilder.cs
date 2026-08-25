@@ -84,10 +84,12 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             if (node.Decision != CraftingDecision.Craft && node.Decision != CraftingDecision.BuyFromVendor)
             {
                 return false;
             }
+
             // a currency-type
             // vendor cost-component leaf also has Decision == BuyFromVendor
             // and is kept out today only because BuildVendorCostComponentLeaves
@@ -101,6 +103,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             // a
             // merged vendor decision's VendorComponentCostsUnreliable is
             // already the documented signal (see that field's own doc
@@ -115,6 +118,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             if (!node.DecisionValue.HasValue || !node.SubtreeCost.HasValue)
             {
                 return false;

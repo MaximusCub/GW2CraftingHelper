@@ -20,6 +20,7 @@ namespace GW2CraftingHelper.Services.Recipes
         private int _hasCurrent;
 
         public RecipeCacheStats Stats => _stats;
+
         public int? SeedBuildId => _seedBuildId;
 
         public int? CurrentBuildId
@@ -35,6 +36,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 {
                     return false;
                 }
+
                 return _seedBuildId.Value != Volatile.Read(ref _currentBuildId);
             }
         }
@@ -45,6 +47,7 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 throw new ArgumentNullException(nameof(searchStream));
             }
+
             if (recipesStream == null)
             {
                 throw new ArgumentNullException(nameof(recipesStream));
@@ -133,9 +136,11 @@ namespace GW2CraftingHelper.Services.Recipes
                     _stats.IncrementSearchMiss();
                     return null;
                 }
+
                 _stats.IncrementSearchHit();
                 return result;
             }
+
             _stats.IncrementSearchMiss();
             return null;
         }
@@ -147,6 +152,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 _stats.IncrementRecipeHit();
                 return result;
             }
+
             _stats.IncrementRecipeMiss();
             return null;
         }

@@ -10,25 +10,30 @@ namespace GW2CraftingHelper.Services.Recipes
     public class RecipeSearchSeedData
     {
         public int SchemaVersion { get; set; }
+
         public Dictionary<string, List<int>> Searches { get; set; }
     }
 
     public class RecipeSeedData
     {
         public int SchemaVersion { get; set; }
+
         public List<RawRecipe> Recipes { get; set; }
     }
 
     public class RecipeSeedManifest
     {
         public int SeedVersion { get; set; }
+
         public int Gw2BuildId { get; set; }
+
         public string CreatedUtc { get; set; }
     }
 
     public class RecipeOverlayManifest
     {
         public int Gw2BuildId { get; set; }
+
         public string UpdatedUtc { get; set; }
     }
 
@@ -38,7 +43,7 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
-            WriteIndented = true
+            WriteIndented = true,
         };
 
         public static Dictionary<int, IReadOnlyList<int>> LoadSearchSeed(Stream stream)
@@ -68,6 +73,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 result[key] = kvp.Value?.AsReadOnly()
                               ?? (IReadOnlyList<int>)Array.Empty<int>();
             }
+
             return result;
         }
 
@@ -96,6 +102,7 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 result[recipe.Id] = recipe;
             }
+
             return result;
         }
 
@@ -119,7 +126,7 @@ namespace GW2CraftingHelper.Services.Recipes
             var data = new RecipeSearchSeedData
             {
                 SchemaVersion = 1,
-                Searches = new Dictionary<string, List<int>>()
+                Searches = new Dictionary<string, List<int>>(),
             };
 
             foreach (var kvp in searches.OrderBy(k => k.Key))
@@ -136,7 +143,7 @@ namespace GW2CraftingHelper.Services.Recipes
             var data = new RecipeSeedData
             {
                 SchemaVersion = 1,
-                Recipes = recipes.Values.OrderBy(r => r.Id).ToList()
+                Recipes = recipes.Values.OrderBy(r => r.Id).ToList(),
             };
 
             return JsonSerializer.Serialize(data, Options);

@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Views
                     buildPanel.ContentRegion.Width - 2 * OUTER_PADDING,
                     buildPanel.ContentRegion.Height - 2 * OUTER_PADDING),
                 ShowBorder = true,
-                Title = _title
+                Title = _title,
             };
 
             // Inner content panel with additional padding so view content
@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(INNER_PADDING, INNER_PADDING),
                 Size = new Point(
                     borderedPanel.ContentRegion.Width - 2 * INNER_PADDING,
-                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING)
+                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING),
             };
 
             buildPanel.Resized += (s, e) =>

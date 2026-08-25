@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Services
         {
             "InvalidAccessTokenException",
             "AuthorizationRequiredException",
-            "MissingScopesException"
+            "MissingScopesException",
         };
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace GW2CraftingHelper.Services
             "TooManyRequestsException",
             "RequestCanceledException",
             "TimeoutException",
-            "HttpRequestException"
+            "HttpRequestException",
         };
 
         /// <summary>
@@ -132,7 +132,11 @@ namespace GW2CraftingHelper.Services
 
         private static bool ContainsAny(IReadOnlyList<string> typeNames, HashSet<string> candidates)
         {
-            if (typeNames == null) return false;
+            if (typeNames == null)
+            {
+                return false;
+            }
+
             return typeNames.Any(name => name != null && candidates.Contains(name));
         }
     }

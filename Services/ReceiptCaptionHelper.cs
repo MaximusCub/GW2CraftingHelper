@@ -89,14 +89,17 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             if (childIndex == 0)
             {
                 return VendorPriceCaption;
             }
+
             if (childIndex == splitIndex)
             {
                 return CraftReferenceCaption;
             }
+
             return null;
         }
     }

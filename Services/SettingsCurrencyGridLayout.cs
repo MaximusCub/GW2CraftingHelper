@@ -134,10 +134,15 @@ namespace GW2CraftingHelper.Services
         public sealed class Grid
         {
             public IReadOnlyList<CellPlacement> Cells { get; }
+
             public int ColumnCount { get; }
+
             public int ColumnWidth { get; }
+
             public int RowCount { get; }
+
             public int Height { get; }
+
             public int VisibleCount { get; }
 
             internal Grid(
@@ -195,8 +200,16 @@ namespace GW2CraftingHelper.Services
         public static bool Matches(string name, string filter)
         {
             string trimmed = filter == null ? null : filter.Trim();
-            if (string.IsNullOrEmpty(trimmed)) return true;
-            if (string.IsNullOrEmpty(name)) return false;
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
             return name.IndexOf(trimmed, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 

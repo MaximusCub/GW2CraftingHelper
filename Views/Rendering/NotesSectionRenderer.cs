@@ -80,6 +80,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 totalLines += CreateNoteRow(row, contentFlow, panelWidth);
             }
+
             return NotesSectionLayoutMath.BodyHeight(totalLines);
         }
 
@@ -124,7 +125,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(labelX, 4),
-                    Parent = linePanel
+                    Parent = linePanel,
                 });
 
                 if (i == 0 && hasCoin)
@@ -166,6 +167,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     linePanel.Size = new Point(w, rowHeight);
                 }
+
                 if (capturedCoinHandle != null)
                 {
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(

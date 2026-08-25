@@ -32,6 +32,7 @@ namespace GW2CraftingHelper.Models
         public int PerDayCap { get; set; }
 
         public string SourceUrl { get; set; }
+
         public string LastVerified { get; set; }
     }
 }

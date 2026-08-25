@@ -60,7 +60,10 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public void Clear(Action clear)
         {
-            if (clear == null) throw new ArgumentNullException(nameof(clear));
+            if (clear == null)
+            {
+                throw new ArgumentNullException(nameof(clear));
+            }
 
             lock (_lock)
             {
@@ -79,11 +82,17 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public bool TryCommit(int myEpoch, Action commit)
         {
-            if (commit == null) throw new ArgumentNullException(nameof(commit));
+            if (commit == null)
+            {
+                throw new ArgumentNullException(nameof(commit));
+            }
 
             lock (_lock)
             {
-                if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _epoch)) return false;
+                if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _epoch))
+                {
+                    return false;
+                }
 
                 commit();
                 return true;

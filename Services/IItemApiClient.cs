@@ -7,8 +7,11 @@ namespace GW2CraftingHelper.Services
     public class RawItem
     {
         public int Id { get; set; }
+
         public string Name { get; set; }
+
         public string Icon { get; set; }
+
         public string Rarity { get; set; }
 
         // design-plan-notes.md (Notes section, excess/reclaim account-bound
@@ -25,8 +28,11 @@ namespace GW2CraftingHelper.Services
         // whose "details" block is absent (every crafting material) - which
         // is why they live here and not on RawItemDetail.
         public string ItemType { get; set; }
+
         public int Level { get; set; }
+
         public int VendorValue { get; set; }
+
         public string Description { get; set; }
 
         // Profession/race restriction strings; empty (never null) from the
@@ -110,6 +116,7 @@ namespace GW2CraftingHelper.Services
     public class RawItemAttribute
     {
         public string Attribute { get; set; }
+
         public int Modifier { get; set; }
     }
 

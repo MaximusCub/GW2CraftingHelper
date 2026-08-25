@@ -81,7 +81,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, rowHeight - 2 - bottomClearance),
                 BackgroundColor = RowDividerColor,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
         }
 
@@ -128,7 +128,10 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static Label WithDescenderClearance(Label label)
         {
             var font = label?.Font;
-            if (font == null) return label;
+            if (font == null)
+            {
+                return label;
+            }
 
             label.VerticalAlignment = VerticalAlignment.Top;
             label.AutoSizeHeight = false;
@@ -149,7 +152,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(rightEdgeX - width, y),
-                Parent = parent
+                Parent = parent,
             });
         }
 
@@ -172,14 +175,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(width, SmallTagHeight),
                 Location = new Point(x, y),
                 BackgroundColor = border,
-                Parent = parent
+                Parent = parent,
             };
             var inner = new Panel()
             {
                 Size = new Point(width - 2, SmallTagHeight - 2),
                 Location = new Point(1, 1),
                 BackgroundColor = fill,
-                Parent = outer
+                Parent = outer,
             };
             new Label()
             {
@@ -193,7 +196,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point((width - 2 - textWidth) / 2, 1),
-                Parent = inner
+                Parent = inner,
             };
 
             return outer;
@@ -210,7 +213,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static void ApplyTagTooltip(Control control, string text)
         {
-            if (control == null) return;
+            if (control == null)
+            {
+                return;
+            }
 
             TooltipFacility.ApplyPlain(control, text);
             if (control is Container container)

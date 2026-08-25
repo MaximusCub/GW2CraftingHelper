@@ -122,7 +122,7 @@ namespace GW2CraftingHelper.Services
                             OfferUnitCost = bestUnitCost,
                             PlanUnitPrice = step.UnitCost,
                             DailyCap = bestOffer.DailyCap,
-                            WeeklyCap = bestOffer.WeeklyCap
+                            WeeklyCap = bestOffer.WeeklyCap,
                         });
                     }
                 }

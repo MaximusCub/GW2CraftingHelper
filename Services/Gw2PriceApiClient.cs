@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Id = item.Value<int>("id"),
                         BuyUnitPrice = item["buys"]?.Value<int>("unit_price") ?? 0,
-                        SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0
+                        SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0,
                     });
                 }
 

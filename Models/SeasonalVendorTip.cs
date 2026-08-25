@@ -42,6 +42,7 @@ namespace GW2CraftingHelper.Models
         public long PlanUnitPrice { get; set; }
 
         public int? DailyCap { get; set; }
+
         public int? WeeklyCap { get; set; }
     }
 }

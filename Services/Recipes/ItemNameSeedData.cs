@@ -8,7 +8,9 @@ namespace GW2CraftingHelper.Services.Recipes
     public class ItemNameEntry
     {
         public int Id { get; set; }
+
         public string Name { get; set; }
+
         public string Icon { get; set; }
     }
 
@@ -30,7 +32,7 @@ namespace GW2CraftingHelper.Services.Recipes
 
             var options = new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
             };
 
             // See VendorOfferLoader.Load for why this reads the UTF-8 bytes

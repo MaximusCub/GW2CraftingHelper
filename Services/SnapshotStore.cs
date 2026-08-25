@@ -22,7 +22,11 @@ namespace GW2CraftingHelper.Services
         {
             try
             {
-                if (!File.Exists(_filePath)) return null;
+                if (!File.Exists(_filePath))
+                {
+                    return null;
+                }
+
                 string json = File.ReadAllText(_filePath);
                 return Deserialize(json);
             }
@@ -42,7 +46,11 @@ namespace GW2CraftingHelper.Services
             try
             {
                 string dir = Path.GetDirectoryName(_filePath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
                 string json = Serialize(snapshot);
                 string tmpPath = _filePath + ".tmp";
                 File.WriteAllText(tmpPath, json);
@@ -66,7 +74,10 @@ namespace GW2CraftingHelper.Services
         {
             try
             {
-                if (File.Exists(_filePath)) File.Delete(_filePath);
+                if (File.Exists(_filePath))
+                {
+                    File.Delete(_filePath);
+                }
             }
             catch (Exception ex)
             {

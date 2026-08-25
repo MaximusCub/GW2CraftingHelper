@@ -45,6 +45,6 @@ namespace GW2CraftingHelper.Models
         Craft,
         Currency,
         BuyFromVendor,
-        UnknownSource
+        UnknownSource,
     }
 }

@@ -16,7 +16,9 @@ namespace GW2CraftingHelper.Models
     public class VendorItemCostLine
     {
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public long GoldValue { get; set; }
 
         // true when this

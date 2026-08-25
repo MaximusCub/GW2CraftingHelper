@@ -24,14 +24,19 @@ namespace GW2CraftingHelper.Services
             IEnumerable<SnapshotWalletEntry> walletEntries)
         {
             if (walletEntries == null)
+            {
                 return (0, new List<SnapshotWalletEntry>());
+            }
 
             int coinCopper = 0;
             var wallet = new List<SnapshotWalletEntry>();
 
             foreach (var entry in walletEntries)
             {
-                if (entry == null) continue;
+                if (entry == null)
+                {
+                    continue;
+                }
 
                 if (entry.CurrencyId == 1)
                 {
@@ -52,7 +57,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static string SerializeSnapshot(AccountSnapshot snapshot)
         {
-            if (snapshot == null) return null;
+            if (snapshot == null)
+            {
+                return null;
+            }
+
             return JsonConvert.SerializeObject(snapshot, Formatting.Indented);
         }
 
@@ -62,7 +71,10 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static AccountSnapshot DeserializeSnapshot(string json)
         {
-            if (string.IsNullOrWhiteSpace(json)) return null;
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
 
             try
             {

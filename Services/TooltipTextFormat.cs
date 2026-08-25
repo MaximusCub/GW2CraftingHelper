@@ -115,6 +115,7 @@ namespace GW2CraftingHelper.Services
             {
                 AppendWrapped(line, wrapped);
             }
+
             return wrapped;
         }
 
@@ -149,6 +150,7 @@ namespace GW2CraftingHelper.Services
             {
                 return new[] { text };
             }
+
             return text.Replace("\r\n", "\n").Split('\n', '\r');
         }
     }

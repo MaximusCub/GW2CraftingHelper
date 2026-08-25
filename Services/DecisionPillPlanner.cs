@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Services
         // override), and TreeSectionController assumes Selected/Locked are
         // the only Kinds a committed decision can carry. Never applied to
         // the Selected pill.
-        Subdued
+        Subdued,
     }
 
     public readonly struct PillSpec
@@ -155,6 +155,7 @@ namespace GW2CraftingHelper.Services
                         null,
                         PillKind.OwnedInfo));
                 }
+
                 return specs;
             }
 
@@ -167,6 +168,7 @@ namespace GW2CraftingHelper.Services
                     specs.Add(new PillSpec("COUNTED ELSEWHERE", null, PillKind.AchievementBitDeduped));
                     return specs;
                 }
+
                 specs.Add(new PillSpec("HAVE", null, PillKind.Have));
                 // A node collapses to Have both for genuine full ownership
                 // and for a manually "Ignore"-d item - only the latter
@@ -180,8 +182,10 @@ namespace GW2CraftingHelper.Services
                 {
                     specs.Add(new PillSpec("IGNORED", null, PillKind.Ignore));
                 }
+
                 return specs;
             }
+
             if (node.Decision == CraftingDecision.Currency)
             {
                 specs.Add(new PillSpec(CurrencyPillText, null, PillKind.Locked));
@@ -190,6 +194,7 @@ namespace GW2CraftingHelper.Services
                 AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
                 return specs;
             }
+
             // A distinct locked pill from CURRENCY (see
             // CraftingDecision.GuildUpgrade) - no AcquisitionSource
             // represents it, so it is single and non-interactive.
@@ -198,6 +203,7 @@ namespace GW2CraftingHelper.Services
                 specs.Add(new PillSpec("GUILD UPGRADE", null, PillKind.Locked));
                 return specs;
             }
+
             // A distinct locked pill from UNKNOWN: sharing a Decision
             // value once routed this leaf to the interactive IGNORE pill,
             // keyed on a raw non-item id that could silently zero an
@@ -210,9 +216,20 @@ namespace GW2CraftingHelper.Services
             }
 
             var options = new List<(AcquisitionSource src, string text)>(3);
-            if (node.CanCraft) options.Add((AcquisitionSource.Craft, CraftPillText));
-            if (node.CanBuyTp) options.Add((AcquisitionSource.BuyFromTp, TpPillText));
-            if (node.CanBuyVendor) options.Add((AcquisitionSource.BuyFromVendor, VendorPillText));
+            if (node.CanCraft)
+            {
+                options.Add((AcquisitionSource.Craft, CraftPillText));
+            }
+
+            if (node.CanBuyTp)
+            {
+                options.Add((AcquisitionSource.BuyFromTp, TpPillText));
+            }
+
+            if (node.CanBuyVendor)
+            {
+                options.Add((AcquisitionSource.BuyFromVendor, VendorPillText));
+            }
 
             if (options.Count == 0)
             {
@@ -233,6 +250,7 @@ namespace GW2CraftingHelper.Services
                 AppendOwnershipPills(specs, node);
                 return specs;
             }
+
             if (options.Count == 1)
             {
                 specs.Add(new PillSpec(options[0].text, null, PillKind.Locked));
@@ -286,6 +304,7 @@ namespace GW2CraftingHelper.Services
                     selected ? PillKind.Selected : kind,
                     subduingResult));
             }
+
             AppendOwnershipPills(specs, node);
             return specs;
         }

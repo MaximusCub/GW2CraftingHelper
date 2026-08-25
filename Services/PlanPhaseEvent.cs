@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
         FetchingPrices,
         SolvingDecisions,
         FetchingItemDetails,
-        BuildingDisplay
+        BuildingDisplay,
     }
 
     /// <summary>

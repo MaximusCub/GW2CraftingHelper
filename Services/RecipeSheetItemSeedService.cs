@@ -26,14 +26,18 @@ namespace GW2CraftingHelper.Services
         private class RecipeSheetItemEnvelope
         {
             public int SchemaVersion { get; set; }
+
             public string GeneratedAt { get; set; }
+
             public string Source { get; set; }
+
             public List<RecipeSheetItemEntry> Items { get; set; }
         }
 
         private class RecipeSheetItemEntry
         {
             public int RecipeId { get; set; }
+
             public int SheetItemId { get; set; }
 
             // Sheet/crafted item name, discipline, minRating, note,
@@ -62,10 +66,12 @@ namespace GW2CraftingHelper.Services
                     // DailyCooldownItemService.Load.
                     continue;
                 }
+
                 // Last-write-wins on duplicate recipe ids, matching
                 // DailyCooldownItemService/AcquisitionHintService.
                 result[entry.RecipeId] = entry.SheetItemId;
             }
+
             return result;
         }
     }

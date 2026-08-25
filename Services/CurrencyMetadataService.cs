@@ -89,7 +89,7 @@ namespace GW2CraftingHelper.Services
                             {
                                 CurrencyId = id,
                                 Name = entry.Value<string>("name") ?? "",
-                                IconUrl = entry.Value<string>("icon") ?? ""
+                                IconUrl = entry.Value<string>("icon") ?? "",
                             };
                         }
 
@@ -99,6 +99,7 @@ namespace GW2CraftingHelper.Services
                             {
                                 _cache[kvp.Key] = kvp.Value;
                             }
+
                             _fetched = true;
                             return new Dictionary<int, CurrencyMetadata>(_cache);
                         }

@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
         private static readonly IReadOnlyList<ItemSearchResult> AllItems = new List<ItemSearchResult>
         {
             new ItemSearchResult { ItemId = 46762, Name = "Zojja's Claymore", IconUrl = null, IsPlanTarget = true },
-            new ItemSearchResult { ItemId = 19684, Name = "Mithril Ingot", IconUrl = null, IsPlanTarget = true }
+            new ItemSearchResult { ItemId = 19684, Name = "Mithril Ingot", IconUrl = null, IsPlanTarget = true },
         };
 
         /// <inheritdoc />

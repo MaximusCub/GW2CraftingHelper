@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Services
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = $"Building recipe tree ({FirstRunTreeHint})..."
+                Message = $"Building recipe tree ({FirstRunTreeHint})...",
             });
             // These RecipeService diagnostics explain a slow first run and a
             // stale recipe seed; RecipeService bounds each to one Info line
@@ -130,6 +130,7 @@ namespace GW2CraftingHelper.Services
             {
                 _recipeService.OnStatusUpdate = null;
             }
+
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
@@ -183,7 +184,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching prices ({allItemIds.Count} items)...",
-                Total = allItemIds.Count
+                Total = allItemIds.Count,
             });
             sw.Restart();
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
@@ -276,6 +277,7 @@ namespace GW2CraftingHelper.Services
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
+
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
@@ -319,6 +321,7 @@ namespace GW2CraftingHelper.Services
             {
                 metadataIds.Add(targetItemId);
             }
+
             if (usedMaterials != null)
             {
                 foreach (var um in usedMaterials)
@@ -326,6 +329,7 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+
             // Vendor cost-component item leaves are never tree ingredients,
             // so allItemIds never collects them; add them before the bulk
             // metadata fetch (see AddVendorItemComponentIds).
@@ -337,7 +341,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
-                Total = metadataIds.Count
+                Total = metadataIds.Count,
             });
             sw.Restart();
 
@@ -441,7 +445,7 @@ namespace GW2CraftingHelper.Services
                 // PlanSolveContext.UnreducedTree.
                 UnreducedTree = useForceBuyPrePass ? tree : null,
                 AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
-                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
+                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null,
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -566,7 +570,7 @@ namespace GW2CraftingHelper.Services
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = $"Building recipe trees ({FirstRunTreeHint})..."
+                Message = $"Building recipe trees ({FirstRunTreeHint})...",
             });
             _recipeService.OnStatusUpdate = msg =>
             {
@@ -583,6 +587,7 @@ namespace GW2CraftingHelper.Services
             {
                 _recipeService.OnStatusUpdate = null;
             }
+
             sw.Stop();
             timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
 
@@ -725,6 +730,7 @@ namespace GW2CraftingHelper.Services
             {
                 result.DebugLog = new List<string>();
             }
+
             result.DebugLog.Insert(0,
                 "Local re-solve with " + StatusText.Count(overrides?.Count ?? 0, "override") +
                 ", " + StatusText.Count(ignoredItemIds?.Count ?? 0, "ignored item"));
@@ -768,6 +774,7 @@ namespace GW2CraftingHelper.Services
             {
                 vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
             }
+
             sw.Stop();
             timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
@@ -805,6 +812,7 @@ namespace GW2CraftingHelper.Services
                     currencyMetadata = null;
                 }
             }
+
             sw.Stop();
             timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
             return currencyMetadata;
@@ -840,6 +848,7 @@ namespace GW2CraftingHelper.Services
                     learnedRecipeIds = null;
                 }
             }
+
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
             return learnedRecipeIds;
@@ -855,6 +864,7 @@ namespace GW2CraftingHelper.Services
             {
                 result.DebugLog = new List<string>();
             }
+
             result.DebugLog.InsertRange(0, timingLog);
             var summary = PlanTimingAnalyzer.Summarize(timingLog);
             result.DebugLog.InsertRange(timingLog.Count, summary);
@@ -880,7 +890,11 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var offer in offerList)
                 {
-                    if (offer.CostLines == null) continue;
+                    if (offer.CostLines == null)
+                    {
+                        continue;
+                    }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Item", StringComparison.Ordinal) &&
@@ -899,8 +913,16 @@ namespace GW2CraftingHelper.Services
 
             var costPrices = await _tradingPostService.GetPricesAsync(costItemIds, ct);
             var merged = new Dictionary<int, ItemPrice>(prices.Count + costPrices.Count);
-            foreach (var kvp in prices) merged[kvp.Key] = kvp.Value;
-            foreach (var kvp in costPrices) merged[kvp.Key] = kvp.Value;
+            foreach (var kvp in prices)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
+            foreach (var kvp in costPrices)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
             return merged;
         }
 
@@ -940,6 +962,7 @@ namespace GW2CraftingHelper.Services
                                context.Prices.TryGetValue(node.Id, out var price) &&
                                PlanSolver.GetUnitPrice(price, context.PriceBasis) > 0;
                 }
+
                 if (feasible)
                 {
                     overrides[node.NodeId] = source;
@@ -990,6 +1013,7 @@ namespace GW2CraftingHelper.Services
                             currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
                     }
                 }
+
                 result.CraftingTree = null;
                 result.MultiItemRoots = roots;
             }
@@ -1016,10 +1040,12 @@ namespace GW2CraftingHelper.Services
             {
                 return result;
             }
+
             foreach (var kvp in ownedQuantityUsedByNode)
             {
                 result[kvp.Key.NodeId] = kvp.Value;
             }
+
             return result;
         }
 
@@ -1035,6 +1061,7 @@ namespace GW2CraftingHelper.Services
                 _cachedAccountIndex = new AccountItemIndex(context.AccountItems);
                 _cachedAccountIndexContext = context;
             }
+
             return _cachedAccountIndex;
         }
 
@@ -1052,6 +1079,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             var projected = new List<SnapshotItemEntry>(items.Count);
             foreach (var entry in items)
             {
@@ -1059,9 +1087,10 @@ namespace GW2CraftingHelper.Services
                 {
                     ItemId = entry.ItemId,
                     Count = entry.Count,
-                    Source = entry.Source
+                    Source = entry.Source,
                 });
             }
+
             return projected;
         }
 
@@ -1092,6 +1121,7 @@ namespace GW2CraftingHelper.Services
                     currencyIds.Add(cc.CurrencyId);
                 }
             }
+
             AddAllVendorOfferCurrencyComponentIds(vendorOffers, currencyIds);
             if (currencyIds.Count == 0)
             {
@@ -1104,6 +1134,7 @@ namespace GW2CraftingHelper.Services
             {
                 result[currencyId] = currencyIndex.GetQuantity(currencyId);
             }
+
             return result;
         }
 
@@ -1120,18 +1151,21 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var offers in vendorOffers.Values)
             {
                 if (offers == null)
                 {
                     continue;
                 }
+
                 foreach (var offer in offers)
                 {
                     if (offer?.CostLines == null)
                     {
                         continue;
                     }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal)
@@ -1157,12 +1191,14 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var decision in decisions.Values)
             {
                 if (decision.VendorItemCosts == null)
                 {
                     continue;
                 }
+
                 foreach (var line in decision.VendorItemCosts)
                 {
                     metadataIds.Add(line.ItemId);
@@ -1185,18 +1221,21 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var offers in vendorOffers.Values)
             {
                 if (offers == null)
                 {
                     continue;
                 }
+
                 foreach (var offer in offers)
                 {
                     if (offer?.CostLines == null)
                     {
                         continue;
                     }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
@@ -1242,8 +1281,10 @@ namespace GW2CraftingHelper.Services
                 {
                     total += itemIndex.GetQuantity(itemId, source);
                 }
+
                 result[itemId] = total;
             }
+
             return result;
         }
 
@@ -1324,7 +1365,7 @@ namespace GW2CraftingHelper.Services
                     Phase = phase,
                     DisplayName = displayName,
                     Total = total,
-                    Detail = detail
+                    Detail = detail,
                 });
             }
 

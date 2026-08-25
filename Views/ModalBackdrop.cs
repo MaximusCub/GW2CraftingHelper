@@ -88,8 +88,15 @@ namespace GW2CraftingHelper.Views
             var bounds = surface.AbsoluteBounds;
             var location = new Point(bounds.X, bounds.Y);
             var size = new Point(bounds.Width, bounds.Height);
-            if (Location != location) Location = location;
-            if (Size != size) Size = size;
+            if (Location != location)
+            {
+                Location = location;
+            }
+
+            if (Size != size)
+            {
+                Size = size;
+            }
 
             // WindowBase2.ZIndex throws unless the window is a direct child
             // of SpriteScreen (it derives its rank from that list), and
@@ -97,7 +104,10 @@ namespace GW2CraftingHelper.Views
             if (_dialogWindow.Parent == GameService.Graphics.SpriteScreen)
             {
                 int target = _dialogWindow.ZIndex - 1;
-                if (ZIndex != target) ZIndex = target;
+                if (ZIndex != target)
+                {
+                    ZIndex = target;
+                }
             }
         }
 
@@ -107,7 +117,11 @@ namespace GW2CraftingHelper.Views
             // confirm is open, and the z-order ladder shifts with window
             // interaction, so both are re-derived per frame - but only while
             // the backdrop is up, which is the length of one confirm.
-            if (!Visible) return;
+            if (!Visible)
+            {
+                return;
+            }
+
             Sync();
         }
 

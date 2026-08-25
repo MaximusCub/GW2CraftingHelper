@@ -41,8 +41,15 @@ namespace GW2CraftingHelper.Services
             int settleMs,
             Action<Exception> onError)
         {
-            if (onSettled == null) throw new ArgumentNullException(nameof(onSettled));
-            if (marshal == null) throw new ArgumentNullException(nameof(marshal));
+            if (onSettled == null)
+            {
+                throw new ArgumentNullException(nameof(onSettled));
+            }
+
+            if (marshal == null)
+            {
+                throw new ArgumentNullException(nameof(marshal));
+            }
 
             _onSettled = onSettled;
             _marshal = marshal;
@@ -57,10 +64,16 @@ namespace GW2CraftingHelper.Services
 
         public void Schedule()
         {
-            if (_cancelled) return;
+            if (_cancelled)
+            {
+                return;
+            }
 
             Interlocked.Exchange(ref _lastEventTicks, DateTime.UtcNow.Ticks);
-            if (_pending) return;
+            if (_pending)
+            {
+                return;
+            }
 
             _pending = true;
             RunAfterSettleAsync();
@@ -82,7 +95,10 @@ namespace GW2CraftingHelper.Services
                     long elapsedMs =
                         (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastEventTicks))
                         / TimeSpan.TicksPerMillisecond;
-                    if (elapsedMs >= _settleMs) break;
+                    if (elapsedMs >= _settleMs)
+                    {
+                        break;
+                    }
 
                     // Clamped: a stamp landing between the two reads above
                     // can make this negative, which Task.Delay rejects.
@@ -109,7 +125,10 @@ namespace GW2CraftingHelper.Services
             // Cleared BEFORE the callback, so a resize landing during it
             // arms a fresh waiter instead of being swallowed.
             _pending = false;
-            if (_cancelled) return;
+            if (_cancelled)
+            {
+                return;
+            }
 
             _onSettled();
         }

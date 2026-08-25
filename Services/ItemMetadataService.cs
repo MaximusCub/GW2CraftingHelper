@@ -155,7 +155,7 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = id,
                         Name = seed.Name,
-                        IconUrl = seed.Icon
+                        IconUrl = seed.Icon,
                     };
                 }
             }
@@ -246,10 +246,12 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     lock (_statBlocksLock)
                     {
                         _statBlocks[entry.Id] = statBlock;
                     }
+
                     filled++;
                 }
             }
@@ -283,7 +285,7 @@ namespace GW2CraftingHelper.Services
                     // the production Gw2ItemApiClient parser never returns
                     // a null Flags list - a test fixture or future client
                     // implementation might.
-                    IsAccountBound = entry.Flags != null && entry.Flags.Contains("AccountBound")
+                    IsAccountBound = entry.Flags != null && entry.Flags.Contains("AccountBound"),
                 };
                 _cache[entry.Id] = meta;
             }

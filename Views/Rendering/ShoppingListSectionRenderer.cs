@@ -131,18 +131,34 @@ namespace GW2CraftingHelper.Views.Rendering
             foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
-                if (eachW > maxEachWidth) maxEachWidth = eachW;
+                if (eachW > maxEachWidth)
+                {
+                    maxEachWidth = eachW;
+                }
 
                 int totalW = CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
-                if (totalW > maxTotalWidth) maxTotalWidth = totalW;
+                if (totalW > maxTotalWidth)
+                {
+                    maxTotalWidth = totalW;
+                }
 
                 int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
-                if (qtyW > maxQtyWidth) maxQtyWidth = qtyW;
+                if (qtyW > maxQtyWidth)
+                {
+                    maxQtyWidth = qtyW;
+                }
 
                 string badge = ShoppingSourceBadge.ForRow(row);
-                if (string.IsNullOrEmpty(badge)) continue;
+                if (string.IsNullOrEmpty(badge))
+                {
+                    continue;
+                }
+
                 int badgeW = LabelHelpers.MeasureSmallTagWidth(badge);
-                if (badgeW > sourceColumnWidth) sourceColumnWidth = badgeW;
+                if (badgeW > sourceColumnWidth)
+                {
+                    sourceColumnWidth = badgeW;
+                }
             }
 
             // The header and every data row derive their build-time edges
@@ -197,7 +213,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(panelWidth, TableHeaderStyle.RowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent
+                Parent = parent,
             };
             var font = TableHeaderStyle.Font;
             var color = TableHeaderStyle.LabelColor;
@@ -214,7 +230,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Text = SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)),
                 Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
+                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel,
             });
             // Left-aligned at the column's x, like the badges under it -
             // the other three right-align off their own bands.
@@ -222,7 +238,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = sourceHeaderText, Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel
+                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel,
             });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, amountHeaderText,
@@ -240,11 +256,11 @@ namespace GW2CraftingHelper.Views.Rendering
             var columns = new[]
             {
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
-                PlanTableColumn.Each, PlanTableColumn.Total
+                PlanTableColumn.Each, PlanTableColumn.Total,
             };
             var texts = new[]
             {
-                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text
+                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text,
             };
 
             // Measured once, and from the strings rather than off the
@@ -319,11 +335,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 TooltipFacility.ApplyRichDeferred(cell.DashLabel, build);
                 return;
             }
+
             foreach (var (label, icon) in cell.CoinSegments.Controls)
             {
                 TooltipFacility.ApplyRichDeferred(label, build);
                 TooltipFacility.ApplyRichDeferred(icon, build);
             }
+
             foreach (var (label, icon) in cell.CurrencySegments.Controls)
             {
                 TooltipFacility.ApplyRichDeferred(label, build);
@@ -379,7 +397,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
 
             // Each/Total cells: coin-only rows render exactly as before;
@@ -442,6 +460,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
             }
+
             SetValueCellTooltip(eachCell, buildTooltip);
             SetValueCellTooltip(totalCell, buildTooltip);
 
@@ -465,6 +484,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         tagPanel.Location = new Point(e.SourceX, 9);
                     }
+
                     qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
@@ -482,7 +502,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static void TintUnpricedDash(CoinCurrencyRenderer.ValueCellHandle cell)
         {
-            if (cell?.DashLabel == null) return;
+            if (cell?.DashLabel == null)
+            {
+                return;
+            }
+
             cell.DashLabel.TextColor = ShoppingBadgeColors.UnknownBorder;
         }
     }

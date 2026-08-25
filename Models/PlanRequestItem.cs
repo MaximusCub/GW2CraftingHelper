@@ -9,6 +9,7 @@ namespace GW2CraftingHelper.Models
     public class PlanRequestItem
     {
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
     }
 }

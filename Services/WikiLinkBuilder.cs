@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
             "Unknown Item",
             "Guild upgrade (unresolved)",
             "Unrecognized ingredient type",
-            "Currency"
+            "Currency",
         };
 
         /// <summary>

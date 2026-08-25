@@ -20,7 +20,11 @@ namespace GW2CraftingHelper.Services
     {
         public static string ForRow(PlanRowViewModel row)
         {
-            if (row == null) return null;
+            if (row == null)
+            {
+                return null;
+            }
+
             switch (row.RowType)
             {
                 case PlanRowType.ShoppingBuy: return "TP";
@@ -59,7 +63,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string TooltipForRow(PlanRowViewModel row)
         {
-            if (row == null) return null;
+            if (row == null)
+            {
+                return null;
+            }
+
             switch (row.RowType)
             {
                 case PlanRowType.ShoppingBuy:

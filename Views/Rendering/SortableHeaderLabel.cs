@@ -41,7 +41,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static void MarkSortable(Control control)
         {
-            if (control == null) return;
+            if (control == null)
+            {
+                return;
+            }
 
             TooltipFacility.ApplyPlain(control, HeaderTooltip);
         }

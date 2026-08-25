@@ -149,9 +149,13 @@ namespace GW2CraftingHelper.Services
         public sealed class Grid
         {
             public IReadOnlyList<CellPlacement> Cells { get; }
+
             public int ColumnCount { get; }
+
             public int ColumnWidth { get; }
+
             public int RowCount { get; }
+
             public int Height { get; }
 
             internal Grid(

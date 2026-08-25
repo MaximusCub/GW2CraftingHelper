@@ -11,6 +11,7 @@ namespace GW2CraftingHelper.Views
     public class AutocompleteTextBox : TextBox
     {
         public event EventHandler<int> ArrowPressed;
+
         public event EventHandler<AutocompleteEnterEventArgs> EnterKeyPressed;
 
         protected override void MoveLine(int delta)

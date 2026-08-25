@@ -48,16 +48,45 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static bool SameRow(CraftingTreeNode built, CraftingTreeNode fresh)
         {
-            if (built == null || fresh == null) return false;
+            if (built == null || fresh == null)
+            {
+                return false;
+            }
 
-            if (built.ItemId != fresh.ItemId) return false;
-            if (built.IsCostComponent != fresh.IsCostComponent) return false;
-            if (!string.Equals(built.Name, fresh.Name, StringComparison.Ordinal)) return false;
-            if (!string.Equals(built.IconUrl, fresh.IconUrl, StringComparison.Ordinal)) return false;
-            if (!string.Equals(built.Rarity, fresh.Rarity, StringComparison.Ordinal)) return false;
+            if (built.ItemId != fresh.ItemId)
+            {
+                return false;
+            }
 
-            if (built.Children.Count != fresh.Children.Count) return false;
-            if ((built.Quantity > 0) != (fresh.Quantity > 0)) return false;
+            if (built.IsCostComponent != fresh.IsCostComponent)
+            {
+                return false;
+            }
+
+            if (!string.Equals(built.Name, fresh.Name, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!string.Equals(built.IconUrl, fresh.IconUrl, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!string.Equals(built.Rarity, fresh.Rarity, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (built.Children.Count != fresh.Children.Count)
+            {
+                return false;
+            }
+
+            if ((built.Quantity > 0) != (fresh.Quantity > 0))
+            {
+                return false;
+            }
 
             return true;
         }

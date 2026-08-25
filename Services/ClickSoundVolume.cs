@@ -27,8 +27,16 @@ namespace GW2CraftingHelper.Services
         // settings file must never reach Play unclamped.
         public static int Clamp(int percent)
         {
-            if (percent < MinPercent) return MinPercent;
-            if (percent > MaxPercent) return MaxPercent;
+            if (percent < MinPercent)
+            {
+                return MinPercent;
+            }
+
+            if (percent > MaxPercent)
+            {
+                return MaxPercent;
+            }
+
             return percent;
         }
 
@@ -58,10 +66,17 @@ namespace GW2CraftingHelper.Services
         {
             percent = MinPercent;
 
-            if (float.IsNaN(sliderValue)) return false;
+            if (float.IsNaN(sliderValue))
+            {
+                return false;
+            }
 
             // Bound the infinities before the rounding cast can overflow.
-            if (sliderValue <= MinPercent) return true;
+            if (sliderValue <= MinPercent)
+            {
+                return true;
+            }
+
             if (sliderValue >= MaxPercent)
             {
                 percent = MaxPercent;

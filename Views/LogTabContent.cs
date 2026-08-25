@@ -300,7 +300,7 @@ namespace GW2CraftingHelper.Views
             _toolbarPanel = new Panel
             {
                 Size = new Point(w, ToolbarHeight),
-                Parent = container
+                Parent = container,
             };
 
             // Textbox first, then the dropdown that narrows it - the
@@ -311,14 +311,14 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(LogToolbarLayout.SearchMinWidth, SearchBoxHeight),
                 PlaceholderText = "Search log entries...",
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
 
             _levelDropdown = new Dropdown
             {
                 Size = new Point(LevelDropdownWidth, LevelDropdownHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             _levelDropdown.Items.Add("All");
             _levelDropdown.Items.Add("Error+");
@@ -333,14 +333,14 @@ namespace GW2CraftingHelper.Views
                 Text = "Follow",
                 Checked = true, // d2 Section 3 default (ON)
                 Size = new Point(FollowCheckboxWidth, FollowCheckboxHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
 
             _clearViewButton = new FeedbackButton
             {
                 Text = "Clear View",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             TooltipFacility.ApplyPlain(
                 _clearViewButton,
@@ -351,7 +351,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Copy",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             _copyButton.Click += (_, __) => CopyToClipboard();
 
@@ -359,7 +359,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Delete Log File",
                 Size = new Point(DeleteButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             TooltipFacility.ApplyPlain(
                 _deleteFileButton,
@@ -370,7 +370,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, StatusRowHeight),
                 Location = new Point(0, ToolbarHeight),
-                Parent = container
+                Parent = container,
             };
 
             // Explicit width, not AutoSizeWidth: a long failure string used
@@ -385,7 +385,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
                 Location = new Point(LogToolbarLayout.Inset, 2),
-                Parent = _statusPanel
+                Parent = _statusPanel,
             };
 
             BuildColumnHeader(container, w);
@@ -396,7 +396,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, TopChromeHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = container
+                Parent = container,
             };
 
             PositionToolbar(w);
@@ -753,6 +753,7 @@ namespace GW2CraftingHelper.Views
             {
                 _statusLabel.Text = shown;
             }
+
             TooltipFacility.ApplyPlain(
                 _statusLabel,
                 string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
@@ -779,6 +780,7 @@ namespace GW2CraftingHelper.Views
             {
                 child.Dispose();
             }
+
             _renderedRows.Clear();
 
             var result = GetFilteredEntries();
@@ -815,7 +817,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeHeight = true,
                     Location = new Point(8, 8),
                     TextColor = EmptyStateColor,
-                    Parent = _contentPanel
+                    Parent = _contentPanel,
                 };
             }
             else if (_followCheckbox != null && _followCheckbox.Checked)
@@ -1009,7 +1011,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(width, ColumnHeaderRowHeight),
                 Location = new Point(0, ToolbarHeight + StatusRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = container
+                Parent = container,
             };
 
             new Label
@@ -1020,7 +1022,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Parent = _columnHeaderPanel,
             };
 
             _tagHeaderLabel = new Label
@@ -1031,7 +1033,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Parent = _columnHeaderPanel,
             };
 
             _messageHeaderLabel = new Label
@@ -1042,7 +1044,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Parent = _columnHeaderPanel,
             };
         }
 
@@ -1064,6 +1066,7 @@ namespace GW2CraftingHelper.Views
             {
                 _tagHeaderLabel.Location = new Point(bands.TagX, ColumnHeaderLabelY);
             }
+
             if (_messageHeaderLabel != null)
             {
                 _messageHeaderLabel.Location = new Point(bands.MessageX, ColumnHeaderLabelY);
@@ -1077,7 +1080,7 @@ namespace GW2CraftingHelper.Views
                 // the panel clips its children, so a row shorter than its
                 // own text would cut the text off rather than overflow.
                 RowHeight = Measure(font, "Ag").Height + 2,
-                Bands = bands
+                Bands = bands,
             };
         }
 
@@ -1129,6 +1132,7 @@ namespace GW2CraftingHelper.Views
             {
                 _tagHeaderWidth = Measure(TableHeaderStyle.Font, TagHeaderText).Width;
             }
+
             return _tagHeaderWidth;
         }
 
@@ -1140,7 +1144,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool RaiseTagHighWaterMark(string tag)
         {
-            if (string.IsNullOrEmpty(tag)) return false;
+            if (string.IsNullOrEmpty(tag))
+            {
+                return false;
+            }
 
             // Memoised: a full rebuild walks up to the ring's whole 2000
             // entries on every filter keystroke, and the module writes about
@@ -1151,7 +1158,10 @@ namespace GW2CraftingHelper.Views
                 _tagWidths[tag] = width;
             }
 
-            if (width <= _widestRenderedTagWidth) return false;
+            if (width <= _widestRenderedTagWidth)
+            {
+                return false;
+            }
 
             _widestRenderedTagWidth = width;
             return true;
@@ -1192,7 +1202,7 @@ namespace GW2CraftingHelper.Views
                 FullTime = LogLineFormat.Time(entry),
                 FullTag = FormatTag(entry.Tag),
                 FullMessage = LogLineFormat.Message(entry),
-                FullLine = TooltipTextFormat.Wrap(line)
+                FullLine = TooltipTextFormat.Wrap(line),
             };
 
             row.Panel = new Panel
@@ -1200,7 +1210,7 @@ namespace GW2CraftingHelper.Views
                 // Sized before it is parented so the flow panel does not
                 // see a zero-sized child first.
                 Size = new Point(metrics.RowWidth, metrics.RowHeight),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             row.TimeLabel = new Label
@@ -1209,7 +1219,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.TagLabel = new Label
@@ -1218,7 +1228,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.MessageLabel = new Label
@@ -1227,7 +1237,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             ApplyRowLayout(row, metrics, measureText: true);

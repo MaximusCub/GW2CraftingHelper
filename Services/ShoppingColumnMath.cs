@@ -135,13 +135,17 @@ namespace GW2CraftingHelper.Services
         public static int SegmentRunWidth(
             IReadOnlyList<int> segmentTextWidths, int iconSize, int labelIconGap, int segmentGap)
         {
-            if (segmentTextWidths == null || segmentTextWidths.Count == 0) return 0;
+            if (segmentTextWidths == null || segmentTextWidths.Count == 0)
+            {
+                return 0;
+            }
 
             int width = 0;
             foreach (var textWidth in segmentTextWidths)
             {
                 width += textWidth + labelIconGap + iconSize + segmentGap;
             }
+
             return width - segmentGap;
         }
 
@@ -162,13 +166,17 @@ namespace GW2CraftingHelper.Services
         public static int SegmentRunWidth(
             int[] segmentTextWidths, int iconSize, int labelIconGap, int segmentGap)
         {
-            if (segmentTextWidths == null || segmentTextWidths.Length == 0) return 0;
+            if (segmentTextWidths == null || segmentTextWidths.Length == 0)
+            {
+                return 0;
+            }
 
             int width = 0;
             for (int i = 0; i < segmentTextWidths.Length; i++)
             {
                 width += segmentTextWidths[i] + labelIconGap + iconSize + segmentGap;
             }
+
             return width - segmentGap;
         }
     }

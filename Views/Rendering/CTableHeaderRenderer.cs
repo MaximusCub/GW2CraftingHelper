@@ -73,14 +73,14 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(BandWidth(rightXForWidth, panelWidth), TableHeaderStyle.RowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent
+                Parent = parent,
             };
             var font = TableHeaderStyle.Font;
             var leftLabelControl = LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = leftLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
+                Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel,
             });
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
@@ -91,9 +91,10 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true, AutoSizeHeight = true,
                     Location = new Point(
                         middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, TableHeaderStyle.LabelY),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             }
+
             var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, rightLabel, font, TableHeaderStyle.LabelColor,
                 rightXForWidth != null
@@ -103,8 +104,15 @@ namespace GW2CraftingHelper.Views.Rendering
 
             // The hit area is the whole cell (SortableHeaderCells); the
             // labels only carry the note, which they would swallow.
-            if (onLeftClick != null) SortableHeaderLabel.MarkSortable(leftLabelControl);
-            if (onRightClick != null) SortableHeaderLabel.MarkSortable(rightLabelControl);
+            if (onLeftClick != null)
+            {
+                SortableHeaderLabel.MarkSortable(leftLabelControl);
+            }
+
+            if (onRightClick != null)
+            {
+                SortableHeaderLabel.MarkSortable(rightLabelControl);
+            }
 
             // Everything the split needs that does NOT move with the panel
             // width, resolved once, so the closure below neither measures
@@ -116,6 +124,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 plan.Set(1, middleLabelControl, Measure(font, middleLabel), null);
             }
+
             plan.Set(plan.Count - 1, rightLabelControl, Measure(font, rightLabel), onRightClick);
             if (leftColumnEndForWidth != null)
             {
@@ -161,10 +170,17 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static int BandWidth(Func<int, int> rightXForWidth, int panelWidth)
         {
-            if (rightXForWidth == null) return panelWidth;
+            if (rightXForWidth == null)
+            {
+                return panelWidth;
+            }
 
             int width = rightXForWidth(panelWidth) + PlanRelayoutMath.TableRightMargin;
-            if (width > panelWidth) width = panelWidth;
+            if (width > panelWidth)
+            {
+                width = panelWidth;
+            }
+
             return width > 0 ? width : 0;
         }
     }

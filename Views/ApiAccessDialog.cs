@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Views
         {
             "1. You are logged into a character in the game world (not the character-select screen) - Blish only learns which account is active once you are in-world.",
             "2. A Guild Wars 2 API key is added in Blish HUD settings.",
-            "3. This module has permission to use the API key (Blish settings > Manage Modules > GW2 Crafting Helper)."
+            "3. This module has permission to use the API key (Blish settings > Manage Modules > GW2 Crafting Helper).",
         };
 
         private readonly StandardWindow _window;
@@ -92,7 +92,7 @@ namespace GW2CraftingHelper.Views
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "GW2 API access not ready",
                 Id = WindowId,
-                TopMost = true
+                TopMost = true,
             };
 
             // Resets _isShowing whenever the window's own Visible=false
@@ -113,8 +113,16 @@ namespace GW2CraftingHelper.Views
             // field (e.g. MainView's _headerPanel liveness check) is not a
             // substitute for this dialog checking its own disposal state -
             // see the class doc comment.
-            if (_disposed) return;
-            if (_isShowing) return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (_isShowing)
+            {
+                return;
+            }
+
             _isShowing = true;
             _onRetry = onRetry;
 
@@ -143,7 +151,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Retry",
                 Size = new Point(btnW, 25),
                 Location = new Point(btnX, btnY),
-                Parent = _window
+                Parent = _window,
             };
             retryBtn.Click += (_, __) =>
             {
@@ -157,7 +165,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Close",
                 Size = new Point(closeW, 25),
                 Location = new Point(btnX + btnW + btnGap, btnY),
-                Parent = _window
+                Parent = _window,
             };
             closeBtn.Click += (_, __) =>
             {
@@ -175,14 +183,22 @@ namespace GW2CraftingHelper.Views
 
         public void Hide()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _isShowing = false;
             _window.Hide();
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
 
             _window.Hidden -= OnWindowHidden;
@@ -224,7 +240,7 @@ namespace GW2CraftingHelper.Views
                 Font = font,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, y)
+                Location = new Point(0, y),
             };
 
             int nextY = y + label.Height + LineSpacing;

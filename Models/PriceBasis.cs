@@ -27,6 +27,6 @@ namespace GW2CraftingHelper.Models
         /// Place buy orders at the highest current buy order
         /// (buys.unit_price). Cheaper but not instant.
         /// </summary>
-        BuyOrder = 1
+        BuyOrder = 1,
     }
 }

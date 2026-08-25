@@ -50,6 +50,7 @@ namespace GW2CraftingHelper.Services
         public readonly struct ForceBuyPrePassResult
         {
             public ISet<int> ForceBuyOnlyNodeIds { get; }
+
             public ISet<int> CompetencyIndependentForceBuyNodeIds { get; }
 
             public ForceBuyPrePassResult(
@@ -107,6 +108,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 forced.Add(kvp.Key);
 
                 // Second, competency-blind evaluation of the same 0.85
@@ -119,6 +121,7 @@ namespace GW2CraftingHelper.Services
                     competencyIndependentForced.Add(kvp.Key);
                 }
             }
+
             return new ForceBuyPrePassResult(forced, competencyIndependentForced);
         }
     }

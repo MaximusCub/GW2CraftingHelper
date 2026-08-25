@@ -62,6 +62,7 @@ namespace GW2CraftingHelper.Services
                     visible.Add(row);
                 }
             }
+
             return visible;
         }
 
@@ -80,6 +81,7 @@ namespace GW2CraftingHelper.Services
             {
                 return $"Required Recipes (showing {visibleCount} missing of {totalCount})";
             }
+
             return $"Required Recipes ({totalCount})";
         }
 

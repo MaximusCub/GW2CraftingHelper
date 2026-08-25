@@ -17,12 +17,19 @@ namespace GW2CraftingHelper.Services
         private sealed class BuildContext
         {
             public IReadOnlyDictionary<int, SolverDecision> Decisions { get; }
+
             public IReadOnlyDictionary<int, ItemMetadata> Metadata { get; }
+
             public IReadOnlyDictionary<int, AcquisitionHint> Hints { get; }
+
             public IReadOnlyDictionary<int, int> OwnedQuantityUsedByNodeId { get; }
+
             public ISet<int> IgnoredItemIds { get; }
+
             public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; }
+
             public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; }
+
             public IReadOnlyDictionary<int, int> OwnedVendorItemAmounts { get; }
 
             public BuildContext(
@@ -92,7 +99,7 @@ namespace GW2CraftingHelper.Services
                 OwnedQuantityUsed = ctx.OwnedQuantityUsedByNodeId != null &&
                     ctx.OwnedQuantityUsedByNodeId.TryGetValue(node.NodeId, out int ownedUsed)
                         ? ownedUsed
-                        : 0
+                        : 0,
             };
 
             // Quantity-zero nodes are already owned - or zeroed by
@@ -302,6 +309,7 @@ namespace GW2CraftingHelper.Services
                         treeNode.IsReferenceBranch = true;
                         ApplyReferenceRecipeInfo(treeNode, node.Recipes[0]);
                     }
+
                     treeNode.Children = componentLeaves;
                 }
                 else if (wantsReferenceBranch)
@@ -393,7 +401,7 @@ namespace GW2CraftingHelper.Services
                         // the non-preferred side; threaded through so the
                         // fell-back-price tooltip caveat catches this leaf
                         // too.
-                        PriceSideFellBack = line.PriceSideFellBack
+                        PriceSideFellBack = line.PriceSideFellBack,
                     });
                 }
             }
@@ -416,7 +424,7 @@ namespace GW2CraftingHelper.Services
                         Quantity = line.Count,
                         Decision = CraftingDecision.BuyFromVendor,
                         IsCostComponent = true,
-                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, ctx.OwnedCurrencyAmounts)
+                        ComponentOwnedQuantity = ResolveOwnedQuantity(line.Id, ctx.OwnedCurrencyAmounts),
                     });
                 }
             }
@@ -452,6 +460,7 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             return owned;
         }
 
@@ -472,14 +481,17 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             if (!hints.TryGetValue(treeNode.ItemId, out var hint) || hint == null)
             {
                 return;
             }
+
             if (!string.IsNullOrEmpty(hint.Hint))
             {
                 treeNode.AcquisitionHint = hint.Hint;
             }
+
             if (!string.IsNullOrEmpty(hint.Badge))
             {
                 treeNode.AcquisitionBadge = hint.Badge;
@@ -496,6 +508,7 @@ namespace GW2CraftingHelper.Services
             {
                 children.Add(BuildNode(ingredient, ctx, insideReferenceBranch));
             }
+
             return children;
         }
 
@@ -533,6 +546,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Name;
             }
+
             return "Unknown Item";
         }
 
@@ -544,6 +558,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.IconUrl;
             }
+
             return null;
         }
 
@@ -555,6 +570,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Rarity;
             }
+
             return null;
         }
 

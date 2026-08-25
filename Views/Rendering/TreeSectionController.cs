@@ -480,10 +480,11 @@ namespace GW2CraftingHelper.Views.Rendering
                     var rootDivider = new Panel()
                     {
                         Size = new Point(panelWidth, PlanContentHeightMath.MultiRootDividerHeight),
-                        Parent = treeFlow
+                        Parent = treeFlow,
                     };
                     _sink.AddRelayout(w => rootDivider.Size = new Point(w, PlanContentHeightMath.MultiRootDividerHeight));
                 }
+
                 RenderTreeNode(_treeRoots[i], treeFlow, panelWidth, 0, dimmed: false);
             }
 #if DEBUG
@@ -522,7 +523,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 GetIgnoredCount = () => _ignoredItemIds.Count,
                 CanReSolve = () => _lastResult?.SolveContext != null,
                 CraftAllWouldChange = () => PresetWouldChange(AcquisitionSource.Craft),
-                BuyAllWouldChange = () => PresetWouldChange(AcquisitionSource.BuyFromTp)
+                BuyAllWouldChange = () => PresetWouldChange(AcquisitionSource.BuyFromTp),
             });
         }
 
@@ -533,7 +534,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // invokable with no dialog wiring at all.
         private void ApplyBestPathPreset()
         {
-            if (_nodeOverrides.Count == 0) return;
+            if (_nodeOverrides.Count == 0)
+            {
+                return;
+            }
+
             _nodeOverrides.Clear();
             ApplyOverridesAndResolve(isBestPathPreset: true);
         }
@@ -551,7 +556,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private void ClearOverrides()
         {
-            if (_nodeOverrides.Count == 0) return;
+            if (_nodeOverrides.Count == 0)
+            {
+                return;
+            }
+
             _nodeOverrides.Clear();
             ApplyOverridesAndResolve();
         }
@@ -563,7 +572,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private void ClearIgnored()
         {
-            if (_ignoredItemIds.Count == 0) return;
+            if (_ignoredItemIds.Count == 0)
+            {
+                return;
+            }
+
             _ignoredItemIds.Clear();
             ApplyOverridesAndResolve();
         }
@@ -585,10 +598,16 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private bool? PresetWouldChange(AcquisitionSource source)
         {
-            if (_lastResult?.SolveContext == null) return null;
+            if (_lastResult?.SolveContext == null)
+            {
+                return null;
+            }
 
             var preset = CraftingPlanPipeline.BuildPresetOverrides(_lastResult.SolveContext, source);
-            if (preset.Count != _nodeOverrides.Count) return true;
+            if (preset.Count != _nodeOverrides.Count)
+            {
+                return true;
+            }
 
             foreach (var kvp in preset)
             {
@@ -597,6 +616,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -619,13 +639,16 @@ namespace GW2CraftingHelper.Views.Rendering
                                 s.Node.Children[childIndex], s.ChildContainer, _getCurrentPanelWidth(),
                                 s.Depth + 1, s.ChildDimmed, childCaption);
                         }
+
                         s.ChildrenBuilt = true;
                     }
+
                     s.IsExpanded = true;
                     _nodeExpansion[s.Node.NodeId] = true;
                     s.ChildContainer.Visible = true;
                     s.ArrowLabel.Text = "v";
                 }
+
                 RefreshTreeContainerHeights();
             });
             HoverChainResync.AfterRebuild();
@@ -642,6 +665,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     s.ChildContainer.Visible = false;
                     s.ArrowLabel.Text = ">";
                 }
+
                 RefreshTreeContainerHeights();
             });
             HoverChainResync.AfterRebuild();
@@ -652,7 +676,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // ApplyOverridesAndResolve) are this class's own.
         private void ApplyPreset(AcquisitionSource source)
         {
-            if (_lastResult?.SolveContext == null) return;
+            if (_lastResult?.SolveContext == null)
+            {
+                return;
+            }
+
             _nodeOverrides.Clear();
             // Walk the full solver tree (not the display tree, which hides
             // children under bought nodes) so one click reaches every level.
@@ -662,6 +690,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 _nodeOverrides[kvp.Key] = kvp.Value;
             }
+
             ApplyOverridesAndResolve();
         }
 
@@ -800,6 +829,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     width = (int)Math.Ceiling(font.MeasureString(text).Width);
                     measured[text] = width;
                 }
+
                 return width;
             };
 
@@ -879,7 +909,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(panelWidth, TreeRowHeight),
                 BackgroundColor = Color.Transparent,
-                Parent = parent
+                Parent = parent,
             };
 
             // Hover wash (pattern per SuggestionPanel row highlighting).
@@ -915,13 +945,17 @@ namespace GW2CraftingHelper.Views.Rendering
             if (dimmed)
             {
                 int ruleX = indent - TreeDimmedRuleOffset;
-                if (ruleX < 0) ruleX = 0;
+                if (ruleX < 0)
+                {
+                    ruleX = 0;
+                }
+
                 new Panel()
                 {
                     Size = new Point(TreeDimmedRuleWidth, TreeRowHeight),
                     Location = new Point(ruleX, 0),
                     BackgroundColor = TreeDimmedRuleColor,
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 };
             }
 
@@ -939,7 +973,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(indent, 12),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 };
             }
 
@@ -959,7 +993,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Size = new Point(TreeIconSize, TreeIconSize),
                     Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
                     BackgroundColor = Color.Black * 0.5f,
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 };
             }
 
@@ -1008,7 +1042,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 NameX = nameX,
                 QtyWidth = qtyWidth,
                 CostColumnWidth = costColumnWidth,
-                ColumnWidths = columnWidths
+                ColumnWidths = columnWidths,
             };
             if (_treeRowsByNodeId.ContainsKey(node.NodeId))
             {
@@ -1021,6 +1055,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // id cannot say which row the user was on either.
                 _registerRowScrollAnchor?.Invoke(node.NodeId, rowPanel);
             }
+
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
             Color qtyColor = new Color(170, 170, 170);
@@ -1048,9 +1083,10 @@ namespace GW2CraftingHelper.Views.Rendering
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
                         Location = new Point(nameX, 12),
-                        Parent = rowPanel
+                        Parent = rowPanel,
                     });
             }
+
             var nameLabel = LabelHelpers.WithDescenderClearance(
                 new Label()
                 {
@@ -1062,7 +1098,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(nameX + qtyWidth, 12),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             handle.QtyLabel = qtyLabel;
             handle.NameLabel = nameLabel;
@@ -1212,7 +1248,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Size = new Point(panelWidth, 0),
                     FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                    Parent = parent
+                    Parent = parent,
                 };
 
                 var state = new TreeNodeState
@@ -1221,7 +1257,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Depth = depth,
                     ChildContainer = childFlow,
                     ArrowLabel = arrowLabel,
-                    ChildDimmed = childDimmed
+                    ChildDimmed = childDimmed,
                 };
                 _treeNodeStates.Add(state);
                 handle.State = state;
@@ -1236,6 +1272,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         string childCaption = ReceiptCaptionHelper.CaptionForChildIndex(captionSplitIndex, childIndex);
                         RenderTreeNode(node.Children[childIndex], childFlow, panelWidth, depth + 1, childDimmed, childCaption);
                     }
+
                     state.ChildrenBuilt = true;
                     state.IsExpanded = true;
                     childFlow.Visible = true;
@@ -1250,7 +1287,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     // Pills have their own click actions; do not also treat
                     // a pill click as an expand/collapse toggle.
-                    if (AnyPillHovered(pillPanels)) return;
+                    if (AnyPillHovered(pillPanels))
+                    {
+                        return;
+                    }
 
                     _preserveScrollAcross(() =>
                     {
@@ -1269,8 +1309,10 @@ namespace GW2CraftingHelper.Views.Rendering
                                     state.Node.Children[childIndex], state.ChildContainer, currentWidth,
                                     state.Depth + 1, state.ChildDimmed, childCaption);
                             }
+
                             state.ChildrenBuilt = true;
                         }
+
                         state.IsExpanded = !state.IsExpanded;
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
@@ -1309,6 +1351,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         x += pill.Width + PillGap;
                     }
                 }
+
                 if (handle.CostCell != null)
                 {
                     CoinCurrencyRenderer.RepositionValueCellInSubColumns(
@@ -1317,6 +1360,7 @@ namespace GW2CraftingHelper.Views.Rendering
                             e.CostRightEdge, handle.ColumnWidths, handle.RowDrawsCurrency),
                         12);
                 }
+
                 if (childFlow != null)
                 {
                     childFlow.Size = new Point(w, childFlow.Height);
@@ -1359,7 +1403,10 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             handle.CostCell = null;
             handle.RowDrawsCurrency = false;
-            if (!node.SubtreeCost.HasValue) return;
+            if (!node.SubtreeCost.HasValue)
+            {
+                return;
+            }
 
             // TreeCostColumnMath.ShowsCurrencySegments, not a
             // hand-repeated cost-component check: the pre-scan reserves
@@ -1417,21 +1464,45 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal bool TryRefreshInPlace(IReadOnlyList<CraftingTreeNode> newRoots)
         {
-            if (_treeRoots == null || _treeFlow == null || newRoots == null) return false;
-            if (_treeRowIdsAmbiguous || _treeRowsByNodeId.Count == 0) return false;
-            if (newRoots.Count != _treeRoots.Count) return false;
+            if (_treeRoots == null || _treeFlow == null || newRoots == null)
+            {
+                return false;
+            }
+
+            if (_treeRowIdsAmbiguous || _treeRowsByNodeId.Count == 0)
+            {
+                return false;
+            }
+
+            if (newRoots.Count != _treeRoots.Count)
+            {
+                return false;
+            }
 
             var scan = ScanTreeColumns(newRoots);
-            if (scan.NodeCount != _scannedNodeCount) return false;
-            if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths)) return false;
+            if (scan.NodeCount != _scannedNodeCount)
+            {
+                return false;
+            }
+
+            if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths))
+            {
+                return false;
+            }
 
             var plan = new List<KeyValuePair<TreeRowHandle, CraftingTreeNode>>(_treeRowsByNodeId.Count);
-            if (!MatchRows(newRoots, 0, false, plan)) return false;
+            if (!MatchRows(newRoots, 0, false, plan))
+            {
+                return false;
+            }
 
             // Every built row has to be accounted for. A shorter plan means
             // the new tree reaches fewer rows than are on screen, which is
             // a structural change the walk cannot see from the top.
-            if (plan.Count != _treeRowsByNodeId.Count) return false;
+            if (plan.Count != _treeRowsByNodeId.Count)
+            {
+                return false;
+            }
 
             int panelWidth = _getCurrentPanelWidth();
             foreach (var pair in plan)
@@ -1464,17 +1535,35 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < newSiblings.Count; i++)
             {
                 var newNode = newSiblings[i];
-                if (!_treeRowsByNodeId.TryGetValue(newNode.NodeId, out var handle)) return false;
-                if (handle.Depth != depth || handle.Dimmed != dimmed) return false;
-                if (!TreeRowIdentity.SameRow(handle.Node, newNode)) return false;
+                if (!_treeRowsByNodeId.TryGetValue(newNode.NodeId, out var handle))
+                {
+                    return false;
+                }
+
+                if (handle.Depth != depth || handle.Dimmed != dimmed)
+                {
+                    return false;
+                }
+
+                if (!TreeRowIdentity.SameRow(handle.Node, newNode))
+                {
+                    return false;
+                }
 
                 plan.Add(new KeyValuePair<TreeRowHandle, CraftingTreeNode>(handle, newNode));
 
-                if (handle.State == null || !handle.State.ChildrenBuilt) continue;
+                if (handle.State == null || !handle.State.ChildrenBuilt)
+                {
+                    continue;
+                }
 
                 bool childDimmed = dimmed || newNode.Decision != CraftingDecision.Craft;
-                if (!MatchRows(newNode.Children, depth + 1, childDimmed, plan)) return false;
+                if (!MatchRows(newNode.Children, depth + 1, childDimmed, plan))
+                {
+                    return false;
+                }
             }
+
             return true;
         }
 
@@ -1558,6 +1647,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 pill.Dispose();
             }
+
             pills.Clear();
         }
 
@@ -1569,7 +1659,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static void DisposeValueCell(CoinCurrencyRenderer.ValueCellHandle cell)
         {
-            if (cell == null) return;
+            if (cell == null)
+            {
+                return;
+            }
 
             cell.DashLabel?.Dispose();
             DisposeSegments(cell.CoinSegments);
@@ -1578,7 +1671,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private static void DisposeSegments(CoinCurrencyRenderer.SegmentLayoutHandle segments)
         {
-            if (segments.Controls == null) return;
+            if (segments.Controls == null)
+            {
+                return;
+            }
 
             for (int i = 0; i < segments.Controls.Length; i++)
             {
@@ -1737,6 +1833,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 pillWidths.Add((int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding);
             }
+
             int maxRightEdge = pillColX + TreePillColumnWidth - 4;
             var fit = PlanRelayoutMath.ComputePillFit(
                 pillWidths, PillPadding - TightPillPadding, PillGap, pillColX, maxRightEdge,
@@ -1762,6 +1859,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     textColor *= PillColors.NonInteractiveTextAlpha;
                 }
+
                 if (dimmed)
                 {
                     // PillColors.DimmedPillFactor, not the 0.35 this row's
@@ -1841,6 +1939,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         {
                             _ignoredItemIds.Add(itemId);
                         }
+
                         ApplyOverridesAndResolve();
                     };
                     Color restingBorder = borderColor;
@@ -1867,6 +1966,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         tooltipText = "Paid in a non-coin currency - no gold value to show here";
                     }
+
                     // The UNKNOWN pill (node.Decision == Unknown - no
                     // feasible source at all) is a different situation from
                     // every other locked pill (exactly one feasible source,
@@ -1879,6 +1979,7 @@ namespace GW2CraftingHelper.Views.Rendering
                             ? node.AcquisitionHint
                             : "No known acquisition source";
                     }
+
                     // guildupgrade-ingredients fix: the GUILD UPGRADE pill
                     // is the same "no available source" situation as
                     // UNKNOWN above (not "exactly one feasible source" -
@@ -1892,6 +1993,7 @@ namespace GW2CraftingHelper.Views.Rendering
                             ? node.AcquisitionHint
                             : "Requires a claimed Guild Hall upgrade";
                     }
+
                     // The UNRECOGNIZED pill is the same "no available
                     // source" situation as UNKNOWN/GUILD UPGRADE, not
                     // "exactly one feasible source" - without this branch
@@ -1902,6 +2004,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         tooltipText = "Unrecognized ingredient type - no known acquisition source";
                     }
+
                     // The plain CURRENCY pill must not fall into the "Only
                     // available source" default - a currency ingredient is
                     // paid from the wallet, so no "source" wording applies.
@@ -2034,10 +2137,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     pillTooltip.Separator().Append(subduingContent);
                 }
+
                 if (valueDetailContent != null)
                 {
                     pillTooltip.Separator().Append(valueDetailContent);
                 }
+
                 if (dimmed && clickableWhenActive)
                 {
                     pillTooltip.Separator().Text(DimmedPillTooltip);
@@ -2106,6 +2211,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 hiddenTexts.Add(specs[i].Text);
             }
+
             string tooltipText = $"No room to show: {string.Join(", ", hiddenTexts)}";
 
             var outer = CreatePillPanel(
@@ -2155,14 +2261,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(pillWidth, PillHeight),
                 Location = new Point(x, pillY),
                 BackgroundColor = borderColor,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             inner = new Panel()
             {
                 Size = new Point(pillWidth - 2, PillHeight - 2),
                 Location = new Point(1, 1),
                 BackgroundColor = fillColor,
-                Parent = outer
+                Parent = outer,
             };
             // Clamped: a decision pill's width is its text plus padding, so
             // the offset is always positive there, but the "+N" pill's
@@ -2170,7 +2276,11 @@ namespace GW2CraftingHelper.Views.Rendering
             // digit-count change would otherwise start its label left of
             // its own pill.
             int labelX = (pillWidth - 2 - textWidth) / 2;
-            if (labelX < 0) labelX = 0;
+            if (labelX < 0)
+            {
+                labelX = 0;
+            }
+
             label = new Label()
             {
                 Text = text,
@@ -2179,7 +2289,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(labelX, 2),
-                Parent = inner
+                Parent = inner,
             };
             return outer;
         }

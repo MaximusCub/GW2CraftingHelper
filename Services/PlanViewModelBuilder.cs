@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
                 // branching is needed.
                 CurrencyPlanTotals = BuildCurrencyPlanTotals(result.Plan.CurrencyCosts),
                 OwnedCurrencyAmounts = result.OwnedCurrencyAmounts,
-                VendorCapsByItemId = BuildVendorCapsByItemId(result.Plan.TimegatedItems)
+                VendorCapsByItemId = BuildVendorCapsByItemId(result.Plan.TimegatedItems),
             };
 
             if (isMultiItem)
@@ -139,6 +139,7 @@ namespace GW2CraftingHelper.Services
             {
                 return firstName;
             }
+
             return firstName + " and " + StatusText.Count(rest, "other");
         }
 
@@ -147,16 +148,22 @@ namespace GW2CraftingHelper.Services
         // exact wording lives in one place.
         internal const string TotalMaterialsValueTooltip =
             "Full market value of everything this craft consumes - coins you spend plus the sell value of your own materials used.";
+
         internal const string YourMaterialsUsedTooltip =
             "Instant-sell value (after 15% TP fees) of materials you already own that this plan consumes - what you give up by using them instead of selling them.";
+
         internal const string UnvaluedMaterialsTooltip =
             "This plan was not asked to value the materials you already own, so this term is 0. Turn on \"Value Own Materials\" to price them.";
+
         internal const string ActualCostTooltip =
             "What you still pay out of pocket - materials you already own are subtracted before pricing.";
+
         internal const string SellValueTooltip =
             "Instant-sell revenue after 15% TP fees.";
+
         internal const string ProfitTooltip =
             "Sell Value minus Total Materials Value.";
+
         internal const string FootnoteText =
             "Prices are Trading Post data - actual purchase and sale prices are likely to vary.";
 
@@ -170,6 +177,7 @@ namespace GW2CraftingHelper.Services
         internal const string UnpricedTileMarker = "*";
         internal const string UnpricedFootnoteText =
             "* Some items in this plan have no recipe and no Trading Post price, so they count as 0 here. These totals are a floor, not a measured cost.";
+
         internal const string UnpricedTooltipSuffix =
             "\nSome items in this plan could not be priced and count as 0, so this figure is a floor rather than a measured total.";
 
@@ -192,7 +200,7 @@ namespace GW2CraftingHelper.Services
             {
                 SectionType = PlanSectionType.Summary,
                 Title = "Total Cost",
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             // Walked once here rather than per band: HasUnpricedNode is a
@@ -216,7 +224,7 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.MultiItemNote,
-                    Label = "Sell value and profit are the sum across every requested item that has a live Trading Post sell price."
+                    Label = "Sell value and profit are the sum across every requested item that has a live Trading Post sell price.",
                 });
             }
 
@@ -225,7 +233,7 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.SummaryFootnote,
-                    Label = UnpricedFootnoteText
+                    Label = UnpricedFootnoteText,
                 });
 
                 // Same condition BuildProfitFormulaBand returns on, so the
@@ -236,7 +244,7 @@ namespace GW2CraftingHelper.Services
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.SummaryFootnote,
-                        Label = ProfitSuppressedFootnoteText
+                        Label = ProfitSuppressedFootnoteText,
                     });
                 }
             }
@@ -246,7 +254,7 @@ namespace GW2CraftingHelper.Services
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.SummaryFootnote,
-                Label = FootnoteText
+                Label = FootnoteText,
             });
 
             return section;
@@ -285,7 +293,7 @@ namespace GW2CraftingHelper.Services
                 RowType = PlanRowType.CostFormulaTile,
                 Label = "Actual Cost to Craft" + mark,
                 CoinValue = actualCost,
-                TooltipText = actualCostTooltip + unpricedSuffix
+                TooltipText = actualCostTooltip + unpricedSuffix,
             };
 
             long materialsUsed = result.MaterialOpportunityCost.HasValue && result.MaterialOpportunityCost.Value > 0
@@ -318,14 +326,14 @@ namespace GW2CraftingHelper.Services
                 RowType = PlanRowType.CostFormulaTile,
                 Label = "Total Materials Value" + mark,
                 CoinValue = actualCost + materialsUsed,
-                TooltipText = TotalMaterialsValueTooltip + unpricedSuffix
+                TooltipText = TotalMaterialsValueTooltip + unpricedSuffix,
             });
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.CostFormulaTile,
                 Label = "Your Materials Used" + mark,
                 CoinValue = materialsUsed,
-                TooltipText = materialsUsedTooltip + unpricedSuffix
+                TooltipText = materialsUsedTooltip + unpricedSuffix,
             });
 
             // The formula's rightmost ("= Actual Cost to Craft") term,
@@ -478,14 +486,14 @@ namespace GW2CraftingHelper.Services
                 RowType = PlanRowType.ProfitFormulaTile,
                 Label = "Sell Value",
                 CoinValue = netSaleValue,
-                TooltipText = SellValueTooltip + sellQualifier
+                TooltipText = SellValueTooltip + sellQualifier,
             });
             section.Rows.Add(new PlanRowViewModel
             {
                 RowType = PlanRowType.ProfitFormulaTile,
                 Label = totalMaterialsValueLabel,
                 CoinValue = totalMaterialsValue,
-                TooltipText = totalMaterialsValueTooltip
+                TooltipText = totalMaterialsValueTooltip,
             });
 
             // FormulaResultIsExact is false exactly when profit < 0 - the
@@ -496,7 +504,7 @@ namespace GW2CraftingHelper.Services
                 Label = profit >= 0 ? "Profit if Sold" : "Loss if Sold",
                 CoinValue = Math.Abs(profit),
                 TooltipText = ProfitTooltip + profitQualifier,
-                FormulaResultIsExact = profit >= 0
+                FormulaResultIsExact = profit >= 0,
             });
         }
 
@@ -532,6 +540,7 @@ namespace GW2CraftingHelper.Services
                 {
                     owned = ownedRaw;
                 }
+
                 int? needed = owned.HasValue ? Math.Max(0, required - owned.Value) : (int?)null;
                 bool fullyCovered = owned.HasValue && owned.Value >= required;
 
@@ -543,7 +552,7 @@ namespace GW2CraftingHelper.Services
                     IconUrl = iconUrl,
                     CurrencyOwnedQuantity = owned,
                     CurrencyNeededQuantity = needed,
-                    CurrencyFullyCovered = fullyCovered
+                    CurrencyFullyCovered = fullyCovered,
                 });
             }
 
@@ -571,6 +580,7 @@ namespace GW2CraftingHelper.Services
             {
                 totals[cc.CurrencyId] = cc.Amount;
             }
+
             return totals;
         }
 
@@ -591,6 +601,7 @@ namespace GW2CraftingHelper.Services
             {
                 byItemId[item.ItemId] = item;
             }
+
             return byItemId;
         }
 
@@ -600,7 +611,7 @@ namespace GW2CraftingHelper.Services
             {
                 SectionType = PlanSectionType.UsedMaterials,
                 Title = $"Used Materials ({result.UsedMaterials.Count})",
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             foreach (var um in result.UsedMaterials)
@@ -616,7 +627,7 @@ namespace GW2CraftingHelper.Services
                     Label = name,
                     IconUrl = iconUrl,
                     Rarity = rarity,
-                    Quantity = um.QuantityUsed
+                    Quantity = um.QuantityUsed,
                 });
             }
 
@@ -630,7 +641,7 @@ namespace GW2CraftingHelper.Services
             {
                 SectionType = PlanSectionType.ShoppingList,
                 Title = $"Shopping List ({steps.Count})",
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             foreach (var step in steps)
@@ -659,7 +670,7 @@ namespace GW2CraftingHelper.Services
                     CurrencyCosts = CurrencyDisplayResolver.ResolveAmounts(
                         step.VendorCurrencyCosts, result.CurrencyMetadata, result.OwnedCurrencyAmounts),
                     UnitCurrencyCosts = CurrencyDisplayResolver.ResolveUnitAmounts(
-                        step.VendorOfferOutputCount, step.VendorOfferCurrencyCostLinesPerBatch, result.CurrencyMetadata)
+                        step.VendorOfferOutputCount, step.VendorOfferCurrencyCostLinesPerBatch, result.CurrencyMetadata),
                 });
             }
 
@@ -681,11 +692,13 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             if (acquisitionHints.TryGetValue(itemId, out var hint) &&
                 hint != null && !string.IsNullOrEmpty(hint.Hint))
             {
                 return hint.Hint;
             }
+
             return null;
         }
 
@@ -704,11 +717,13 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             if (acquisitionHints.TryGetValue(itemId, out var hint) &&
                 hint != null && !string.IsNullOrEmpty(hint.Badge))
             {
                 return hint.Badge;
             }
+
             return null;
         }
 
@@ -719,7 +734,7 @@ namespace GW2CraftingHelper.Services
             {
                 SectionType = PlanSectionType.CraftingSteps,
                 Title = $"Crafting Steps ({steps.Count})",
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             var planDiscNames = BuildPlanDiscNames(result);
@@ -750,7 +765,7 @@ namespace GW2CraftingHelper.Services
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
                     Rarity = rarity,
-                    Quantity = step.Quantity
+                    Quantity = step.Quantity,
                 });
             }
 
@@ -783,7 +798,7 @@ namespace GW2CraftingHelper.Services
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.TimegatedNotice,
-                        Label = $"{itemName} is timegated - {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})"
+                        Label = $"{itemName} is timegated - {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})",
                     });
                 }
             }
@@ -852,7 +867,7 @@ namespace GW2CraftingHelper.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.TimegatedNotice,
-                    Label = label
+                    Label = label,
                 });
             }
         }
@@ -863,7 +878,7 @@ namespace GW2CraftingHelper.Services
             {
                 SectionType = PlanSectionType.RequiredDisciplines,
                 Title = $"Required Disciplines ({result.RequiredDisciplines.Count})",
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             foreach (var disc in result.RequiredDisciplines)
@@ -873,7 +888,7 @@ namespace GW2CraftingHelper.Services
                     RowType = PlanRowType.DisciplineRow,
                     Label = disc.Discipline,
                     Sublabel = $"Level {disc.MinRating}",
-                    CharacterAvailabilityText = BuildCharacterAvailabilityText(disc, result.CharacterDisciplines)
+                    CharacterAvailabilityText = BuildCharacterAvailabilityText(disc, result.CharacterDisciplines),
                 });
             }
 
@@ -957,7 +972,7 @@ namespace GW2CraftingHelper.Services
             var section = new PlanSectionViewModel
             {
                 SectionType = PlanSectionType.Notes,
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             // "(N)" counts real entries, not rollup or continuation rows.
@@ -996,7 +1011,7 @@ namespace GW2CraftingHelper.Services
                     {
                         RowType = PlanRowType.NoteLine,
                         Label = $"Excess: {excess.ExcessQuantity}x {name}{suffix}",
-                        CoinValue = coinValue
+                        CoinValue = coinValue,
                     }));
                     noteEntryCount++;
                 }
@@ -1016,7 +1031,7 @@ namespace GW2CraftingHelper.Services
                         Label = anyUnpriced
                             ? "Total reclaimable value (excludes unpriced items)"
                             : "Total reclaimable value",
-                        CoinValue = totalReclaim
+                        CoinValue = totalReclaim,
                     });
                 }
             }
@@ -1043,7 +1058,7 @@ namespace GW2CraftingHelper.Services
                     section.Rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.NoteLine,
-                        Label = label
+                        Label = label,
                     });
                     noteEntryCount++;
                 }
@@ -1071,7 +1086,7 @@ namespace GW2CraftingHelper.Services
                         RowType = PlanRowType.NoteLine,
                         Label = $"{name}: could be crafted for less - no character has " +
                             $"{disciplines} {opportunity.MinRating}",
-                        CoinValue = opportunity.DeltaCost
+                        CoinValue = opportunity.DeltaCost,
                     }));
                     noteEntryCount++;
                 }
@@ -1101,13 +1116,13 @@ namespace GW2CraftingHelper.Services
                     {
                         RowType = PlanRowType.NoteLine,
                         Label = leadIn,
-                        CoinValue = opp.SheetCost
+                        CoinValue = opp.SheetCost,
                     });
                     rows.Add(new PlanRowViewModel
                     {
                         RowType = PlanRowType.NoteLine,
                         Label = "  Saves per unit crafted",
-                        CoinValue = opp.SavingsPerUnit
+                        CoinValue = opp.SavingsPerUnit,
                     });
 
                     sheetRows.Add((itemName, rows));
@@ -1158,14 +1173,14 @@ namespace GW2CraftingHelper.Services
                         new PlanRowViewModel
                         {
                             RowType = PlanRowType.NoteLine,
-                            Label = tradeLabel
+                            Label = tradeLabel,
                         },
                         new PlanRowViewModel
                         {
                             RowType = PlanRowType.NoteLine,
                             Label = "  Cheaper than this plan's price per unit",
-                            CoinValue = tip.PlanUnitPrice
-                        }
+                            CoinValue = tip.PlanUnitPrice,
+                        },
                     };
 
                     tipRows.Add((itemName, rows));
@@ -1193,7 +1208,7 @@ namespace GW2CraftingHelper.Services
                     Label = "This plan includes a Mystic Clover-style Mystic Forge yield - its expected " +
                         "output is already probability-adjusted. True multi-outcome Mystic Forge gambles " +
                         "(e.g. precursor forging) are a different mechanic. This plan never models or " +
-                        "shows them."
+                        "shows them.",
                 });
                 noteEntryCount++;
             }
@@ -1211,7 +1226,7 @@ namespace GW2CraftingHelper.Services
             var section = new PlanSectionViewModel
             {
                 SectionType = PlanSectionType.RequiredRecipes,
-                IsDefaultExpanded = true
+                IsDefaultExpanded = true,
             };
 
             var planDiscNames = BuildPlanDiscNames(result);
@@ -1276,7 +1291,7 @@ namespace GW2CraftingHelper.Services
                     IconUrl = iconUrl,
                     Rarity = rarity,
                     StatusTag = statusTag,
-                    WikiUrl = wikiUrl
+                    WikiUrl = wikiUrl,
                 });
             }
 
@@ -1298,6 +1313,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             foreach (var discipline in disciplines)
             {
                 if (discipline != "MysticForge")
@@ -1305,6 +1321,7 @@ namespace GW2CraftingHelper.Services
                     return false;
                 }
             }
+
             return true;
         }
 
@@ -1330,6 +1347,7 @@ namespace GW2CraftingHelper.Services
                 {
                     return null;
                 }
+
                 parts.Add($"{line.Count}x {ResolveName(line.Id, metadata)}");
             }
 
@@ -1358,6 +1376,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Name;
             }
+
             return "Unknown Item";
         }
 
@@ -1369,6 +1388,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.IconUrl;
             }
+
             return null;
         }
 
@@ -1380,6 +1400,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Rarity;
             }
+
             return null;
         }
 
@@ -1389,6 +1410,7 @@ namespace GW2CraftingHelper.Services
             {
                 return new HashSet<string>();
             }
+
             return new HashSet<string>(result.RequiredDisciplines.Select(d => d.Discipline));
         }
 

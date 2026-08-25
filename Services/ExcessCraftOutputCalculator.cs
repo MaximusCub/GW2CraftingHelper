@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Services
                     ItemId = itemId,
                     ExcessQuantity = excessQuantity,
                     ReclaimValue = reclaimValue,
-                    IsAccountBound = isAccountBound
+                    IsAccountBound = isAccountBound,
                 });
             }
 

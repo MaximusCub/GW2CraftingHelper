@@ -163,7 +163,11 @@ namespace GW2CraftingHelper.Services
         public static int SectionProseMaxWidth(int columnWidth)
         {
             int available = ClusterRightEdge(columnWidth) - CellLeftPad;
-            if (available < 20) available = 20;
+            if (available < 20)
+            {
+                available = 20;
+            }
+
             return available < ProseMeasure ? available : ProseMeasure;
         }
     }

@@ -47,7 +47,11 @@ namespace GW2CraftingHelper.Services
             var sb = new StringBuilder();
             for (int i = 0; i < MaxVisibleEntries; i++)
             {
-                if (i > 0) sb.Append(", ");
+                if (i > 0)
+                {
+                    sb.Append(", ");
+                }
+
                 sb.Append(entries[i]);
             }
 

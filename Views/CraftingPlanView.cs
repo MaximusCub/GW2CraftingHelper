@@ -275,6 +275,7 @@ namespace GW2CraftingHelper.Views
         // and the comparators; these fields are only the live state.
         private readonly TableSortState<PlanTableColumn> _usedMaterialsSort =
             new TableSortState<PlanTableColumn>();
+
         private readonly TableSortState<PlanTableColumn> _shoppingListSort =
             new TableSortState<PlanTableColumn>();
 
@@ -309,6 +310,7 @@ namespace GW2CraftingHelper.Views
 
         // Debug log from last plan generation
         private IReadOnlyList<string> _lastDebugLog;
+
         public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
 
         #endregion // 2. Generate orchestration (state, continued)
@@ -627,6 +629,7 @@ namespace GW2CraftingHelper.Views
                 _scrollDiagFrameCounter++;
                 _scrollDiagLastFrameTime = current.Value;
             }
+
             return _scrollDiagFrameCounter;
         }
 
@@ -719,7 +722,6 @@ namespace GW2CraftingHelper.Views
                 (nodeId, rowPanel) => RegisterScrollAnchor(TreeRowAnchorKey(nodeId), rowPanel));
         }
 
-
         public void SetStatus(string status)
         {
             if (_statusLabel != null)
@@ -778,7 +780,10 @@ namespace GW2CraftingHelper.Views
             // live controls are not restored) - see KNOWN-ISSUES #58.
             bool valueOwnMaterials)
         {
-            if (result == null) return;
+            if (result == null)
+            {
+                return;
+            }
 
             PlanViewModel vm;
             try
@@ -827,7 +832,10 @@ namespace GW2CraftingHelper.Views
             // not at render time, so there is nothing to wait for.
             StartRestoredStatWarmup(result);
 
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             _lastRenderedWidth = _contentPanel.Width;
             try
@@ -1071,6 +1079,7 @@ namespace GW2CraftingHelper.Views
                     candidates.Add(new ScrollAnchorCandidate(entry.Key, top.Value, entry.Value.Height));
                 }
             }
+
             return candidates;
         }
 
@@ -1228,6 +1237,7 @@ namespace GW2CraftingHelper.Views
                 {
                     return;
                 }
+
                 _lastFrameTime = current;
 
                 bool keepGoing;
@@ -1264,7 +1274,11 @@ namespace GW2CraftingHelper.Views
 
             public void Cancel()
             {
-                if (_canceled) return;
+                if (_canceled)
+                {
+                    return;
+                }
+
                 _canceled = true;
                 Dispose();
             }
@@ -1363,6 +1377,7 @@ namespace GW2CraftingHelper.Views
                     contentHeight = child.Bottom;
                 }
             }
+
             return contentHeight;
         }
 
@@ -1410,6 +1425,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
                     }
+
                     return false;
                 }
 
@@ -1427,6 +1443,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
                         }
+
                         return false;
                     }
 
@@ -1459,6 +1476,7 @@ namespace GW2CraftingHelper.Views
                             {
                                 LogScrollDiag($"verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
                             }
+
                             return false;
                         }
                     }
@@ -1472,6 +1490,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
                         }
+
                         return false;
                     }
                     else
@@ -1486,6 +1505,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                         }
+
                         return false;
                     }
 
@@ -1498,6 +1518,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                     }
+
                     return false;
                 }
                 catch (Exception ex)
@@ -1509,6 +1530,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
                     }
+
                     return false;
                 }
             }
@@ -1691,6 +1713,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
                         }
+
                         return false;
                     }
 
@@ -1805,7 +1828,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, RowHeight),
                 Location = new Point(0, index * RowHeight),
-                Parent = _inputPanel
+                Parent = _inputPanel,
             };
             row.RowPanel = rowPanel;
 
@@ -1815,7 +1838,7 @@ namespace GW2CraftingHelper.Views
                 Text = row.TypedText ?? row.ItemName ?? "",
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
-                Parent = rowPanel
+                Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             row.SearchBox = searchBox;
 
@@ -1855,7 +1878,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(210, 7),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             var qtyInput = new TextBox()
@@ -1863,7 +1886,7 @@ namespace GW2CraftingHelper.Views
                 Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
                 Size = new Point(QtyInputWidth, 28),
                 Location = new Point(QtyInputX, 3),
-                Parent = rowPanel
+                Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
             row.QtyInput = qtyInput;
@@ -1877,7 +1900,7 @@ namespace GW2CraftingHelper.Views
                     Size = new Point(RowButtonSize, RowButtonSize),
                     Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
-                    BasicTooltipText = "Remove this item from the plan"
+                    BasicTooltipText = "Remove this item from the plan",
                 };
                 removeButton.Click += (_, __) => RemoveItemRow(row);
                 nextX += RowButtonSize + RowButtonGap;
@@ -1893,7 +1916,7 @@ namespace GW2CraftingHelper.Views
                     Parent = rowPanel,
                     // Sitting next to the quantity field, a bare "+" reads
                     // as a stepper. Say what it actually adds.
-                    BasicTooltipText = "Add another item to this plan"
+                    BasicTooltipText = "Add another item to this plan",
                 };
                 addButton.Click += (_, __) => AddItemRow();
             }
@@ -1924,10 +1947,16 @@ namespace GW2CraftingHelper.Views
 
         private void RemoveItemRow(ItemRowState row)
         {
-            if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count)) return;
+            if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
+            {
+                return;
+            }
 
             int index = _itemRows.IndexOf(row);
-            if (index < 0) return;
+            if (index < 0)
+            {
+                return;
+            }
 
             row.SuggestionPanel?.Dispose();
             row.RowPanel?.Dispose();
@@ -1953,7 +1982,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReflowTopRegion(bool rebuildItemRows = false)
         {
-            if (_buildPanel == null || _inputPanel == null) return;
+            if (_buildPanel == null || _inputPanel == null)
+            {
+                return;
+            }
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
@@ -2055,7 +2087,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, layout.InputPanelHeight),
                 Location = new Point(0, InputRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
             RebuildItemRowControls(w);
 
@@ -2064,7 +2096,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, RowHeight),
                 Location = new Point(0, layout.ControlsRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             _ownMaterialsCheckbox = new Checkbox()
@@ -2072,7 +2104,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Use Own Materials",
                 Checked = _useOwnMaterials,
                 Location = new Point(0, 7),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
             // CheckedChanged is wired further down, AFTER
             // _valueOwnMaterialsCheckbox is constructed - the handler
@@ -2088,13 +2120,13 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(170, 7),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
             var priceBasisDropdown = new Dropdown()
             {
                 Size = new Point(110, 28),
                 Location = new Point(218, 3),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
             priceBasisDropdown.Items.Add("Instant Buy");
             priceBasisDropdown.Items.Add("Buy Orders");
@@ -2146,7 +2178,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Generate Plan",
                 Size = new Point(120, UiMetrics.ButtonHeight),
                 Location = new Point(w - 120 - RightEdgePadding, 3),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
@@ -2172,7 +2204,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, layout.StatusRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
@@ -2184,7 +2216,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(w - RightEdgePadding, 2),
                 Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
@@ -2195,7 +2227,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, layout.ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Unconditional wheel-recency tracking StartScrollVerify
@@ -2303,7 +2335,7 @@ namespace GW2CraftingHelper.Views
             // one writer of them.
             _treeToolbarPanel = new Panel()
             {
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             CreateTreeStateChips();
@@ -2318,7 +2350,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Text = text,
                     Size = new Point(slot.Width, TreeToolbarButtonHeight),
-                    Parent = _treeToolbarPanel
+                    Parent = _treeToolbarPanel,
                 };
                 TooltipFacility.ApplyPlain(button, tooltipText);
                 button.Click += (_, __) => onClick();
@@ -2368,11 +2400,14 @@ namespace GW2CraftingHelper.Views
         // Every predicate is read at CLICK time from the live tree state
         // (TreeToolbarCommands), never cached per render: two of them
         // build a preset to compare against.
-
         private void InvokeTreeCommand(Func<TreeToolbarCommands, Action> pick)
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
+            if (commands == null)
+            {
+                return;
+            }
+
             pick(commands)?.Invoke();
         }
 
@@ -2385,7 +2420,11 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ShowTreeConfirm(string message, string confirmText, Action onConfirm)
         {
-            if (onConfirm == null) return;
+            if (onConfirm == null)
+            {
+                return;
+            }
+
             _modalDialog?.Show(message, onConfirm, null, confirmText);
         }
 
@@ -2398,7 +2437,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool TreeCommandUnavailable(TreeToolbarCommands commands)
         {
-            if (commands.CanReSolve?.Invoke() != false) return false;
+            if (commands.CanReSolve?.Invoke() != false)
+            {
+                return false;
+            }
 
             SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
             return true;
@@ -2407,8 +2449,15 @@ namespace GW2CraftingHelper.Views
         private void ConfirmBestPath()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2426,8 +2475,15 @@ namespace GW2CraftingHelper.Views
         private void ConfirmClearOverrides()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2481,8 +2537,15 @@ namespace GW2CraftingHelper.Views
             string noOpStatus, string question, string confirmText)
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             bool? wouldChange = pickPredicate(commands)?.Invoke();
             if (wouldChange == null)
@@ -2508,14 +2571,24 @@ namespace GW2CraftingHelper.Views
         private void ConfirmClearIgnored()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             // The control is hidden at zero, so the predicate is always
             // true when it is clickable - the guard is what makes that a
             // fact rather than an assumption.
             int ignored = commands.GetIgnoredCount?.Invoke() ?? 0;
-            if (ignored == 0) return;
+            if (ignored == 0)
+            {
+                return;
+            }
 
             ShowTreeConfirm(
                 "Stop ignoring " + StatusText.Count(ignored, "item") +
@@ -2587,7 +2660,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Visible = false,
                 Location = new Point(0, TreeToolbarButtonY + 3),
-                Parent = _treeToolbarPanel
+                Parent = _treeToolbarPanel,
             };
         }
 
@@ -2598,7 +2671,7 @@ namespace GW2CraftingHelper.Views
                 Text = text,
                 Size = new Point(width, TreeToolbarButtonHeight),
                 Visible = false,
-                Parent = _treeToolbarPanel
+                Parent = _treeToolbarPanel,
             };
             TooltipFacility.ApplyPlain(button, tooltipText);
             button.Click += (_, __) => onClick();
@@ -2621,7 +2694,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefreshTreeStateChips()
         {
-            if (_overridesChipLabel == null) return;
+            if (_overridesChipLabel == null)
+            {
+                return;
+            }
 
             var commands = _treeToolbarCommands;
             int overrides = commands?.GetOverrideCount?.Invoke() ?? 0;
@@ -2641,6 +2717,7 @@ namespace GW2CraftingHelper.Views
             {
                 overridesWidth = SetChipText(_overridesChipLabel, StatusText.ForOverridesChip(overrides));
             }
+
             if (showIgnored)
             {
                 ignoredWidth = SetChipText(_ignoredChipLabel, StatusText.ForIgnoredChip(ignored));
@@ -2714,7 +2791,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
         {
-            if (_treeToolbarPanel == null) return;
+            if (_treeToolbarPanel == null)
+            {
+                return;
+            }
 
             _treeToolbarPanel.Visible = _treeToolbarVisible;
             _treeToolbarPanel.Size = new Point(
@@ -2750,7 +2830,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyTreeToolbarVisibility(bool visible)
         {
-            if (_treeToolbarVisible == visible) return;
+            if (_treeToolbarVisible == visible)
+            {
+                return;
+            }
 
             _treeToolbarVisible = visible;
             ReflowTopRegion();
@@ -2789,6 +2872,7 @@ namespace GW2CraftingHelper.Views
                     row.RowPanel.Size = new Point(w, RowHeight);
                 }
             }
+
             _controlsPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
@@ -3033,8 +3117,15 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
-            if (_contentPanel == null) return;
-            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
+
+            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0)
+            {
+                return;
+            }
 
 #if DEBUG
             // Invariant (KNOWN-ISSUES #13): a pure width/text
@@ -3055,6 +3146,7 @@ namespace GW2CraftingHelper.Views
                 {
                     relayout(panelWidth);
                 }
+
                 foreach (var relayout in _treeRelayoutActions)
                 {
                     relayout(panelWidth);
@@ -3196,6 +3288,7 @@ namespace GW2CraftingHelper.Views
             {
                 reellipsis(panelWidth);
             }
+
             foreach (var reellipsis in _treeReellipsisActions)
             {
                 reellipsis(panelWidth);
@@ -3207,7 +3300,10 @@ namespace GW2CraftingHelper.Views
         #region 2. Generate orchestration (continued)
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
         {
-            if (_suppressToggle) return;
+            if (_suppressToggle)
+            {
+                return;
+            }
 
             bool newValue = e.Checked;
 
@@ -3339,7 +3435,10 @@ namespace GW2CraftingHelper.Views
                 // switched away, module unloading) - nothing to
                 // generate into, same bail every other deferred
                 // callback in this file takes.
-                if (_contentPanel == null || _contentPanel.Parent == null) return;
+                if (_contentPanel == null || _contentPanel.Parent == null)
+                {
+                    return;
+                }
 
                 bool anyAmbiguous = AdoptTypedRowMatches(matches);
                 _ = GenerateFromResolvedRows(anyAmbiguous);
@@ -3525,9 +3624,14 @@ namespace GW2CraftingHelper.Views
                 if (qtyInvalid)
                 {
                     qty = 1;
-                    if (row.QtyInput != null) row.QtyInput.Text = "1";
+                    if (row.QtyInput != null)
+                    {
+                        row.QtyInput.Text = "1";
+                    }
+
                     anyQtyInvalid = true;
                 }
+
                 row.QuantityText = qty.ToString();
                 rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
 
@@ -3540,7 +3644,11 @@ namespace GW2CraftingHelper.Views
                 // same order/count as requestItems, using the name the
                 // row's own search selection already resolved (no extra
                 // network round trip).
-                if (!row.ItemId.HasValue) continue;
+                if (!row.ItemId.HasValue)
+                {
+                    continue;
+                }
+
                 string name = string.IsNullOrEmpty(row.ItemName) ? "Unknown Item" : row.ItemName;
                 labelParts.Add($"{name} x{row.QuantityText}");
             }
@@ -3646,7 +3754,11 @@ namespace GW2CraftingHelper.Views
             // its own lock to reject exactly that.
             var phaseProgress = new Progress<PlanPhaseEvent>(pe =>
             {
-                if (pe == null) return;
+                if (pe == null)
+                {
+                    return;
+                }
+
                 _statusBoard.UpdatePhase(myGen, (int)pe.Phase, PlanStripTickDecision.FormatPhaseText(pe));
             });
 
@@ -3672,7 +3784,10 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 MainThreadMarshal.Run(() =>
                 {
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
 
                     // Plain-state writes happen before any control mutation
                     // so a disposed-control bail below can never strand this
@@ -3704,7 +3819,10 @@ namespace GW2CraftingHelper.Views
                     // disabled) while generation was in flight - a disposed
                     // control's Parent is nulled on disposal (see
                     // ResizeDebounceStep) - nothing left to render into.
-                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    if (_contentPanel == null || _contentPanel.Parent == null)
+                    {
+                        return;
+                    }
 
                     _lastRenderedWidth = _contentPanel.Width;
                     RenderPlan(vm);
@@ -3718,7 +3836,10 @@ namespace GW2CraftingHelper.Views
                     // A superseded generation's failure must not clobber a
                     // newer generation's (possibly successful) state or
                     // status - same reasoning as the success path above.
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
 
                     _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
 
@@ -3744,7 +3865,11 @@ namespace GW2CraftingHelper.Views
                 // actually runs is allowed to re-enable.
                 MainThreadMarshal.Run(() =>
                 {
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
+
                     // This callback runs back-to-back with the
                     // success/catch callback in the same main-thread
                     // drain - no engine frame can land between them. A
@@ -3760,7 +3885,11 @@ namespace GW2CraftingHelper.Views
                     RenderFromBoard(_statusBoard.Snapshot());
                     _spinnerTicker?.Cancel();
                     _spinnerTicker = null;
-                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    if (_contentPanel == null || _contentPanel.Parent == null)
+                    {
+                        return;
+                    }
+
                     _generateButton.Enabled = true;
 
                     // The single restore point for the dim applied at the
@@ -3794,7 +3923,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void SetContentDimmed(bool dimmed)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             float opacity = dimmed ? StalePlanOpacity : 1f;
             _contentPanel.Opacity = opacity;
@@ -3803,6 +3935,7 @@ namespace GW2CraftingHelper.Views
             {
                 _treeToolbarPanel.Opacity = opacity;
             }
+
             foreach (var entry in _treeToolbarButtons)
             {
                 entry.Button.Enabled = !dimmed;
@@ -3812,8 +3945,15 @@ namespace GW2CraftingHelper.Views
             // so they go dead with the five beside them. The count labels
             // dim with the panel and keep reading, which is right: the
             // counts are still true of what is still on screen.
-            if (_clearOverridesButton != null) _clearOverridesButton.Enabled = !dimmed;
-            if (_clearIgnoredButton != null) _clearIgnoredButton.Enabled = !dimmed;
+            if (_clearOverridesButton != null)
+            {
+                _clearOverridesButton.Enabled = !dimmed;
+            }
+
+            if (_clearIgnoredButton != null)
+            {
+                _clearIgnoredButton.Enabled = !dimmed;
+            }
         }
 
         /// <summary>
@@ -3838,7 +3978,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RenderFromBoard(PlanStripStatusSnapshot snapshot)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             // The spinner is shown on exactly the condition the old ASCII
             // glyph was appended on, and every branch below re-anchors it
@@ -3935,7 +4078,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool SpinnerTick(int myGen, GameTime gameTime)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return false;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return false;
+            }
 
             var snapshot = _statusBoard.Snapshot();
             switch (PlanStripTickDecision.Decide(snapshot, myGen))
@@ -3951,6 +4097,7 @@ namespace GW2CraftingHelper.Views
                         _lastSpinnerTickUtc = now;
                         RenderFromBoard(snapshot);
                     }
+
                     return true;
 
                 default: // Stop (or any future action - fail safe by stopping, never spin forever)
@@ -4047,7 +4194,10 @@ namespace GW2CraftingHelper.Views
                 _scrollAnchors.Clear();
             }
 
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             // Detached, not disposed, and BEFORE the sweep: a preserved
             // tree's controls are children of the very panel being emptied.
@@ -4074,6 +4224,7 @@ namespace GW2CraftingHelper.Views
         // this is that pattern.
         private const string EmptyPlanText =
             "No plan yet. Search for an item above, then click Generate Plan.";
+
         private const int EmptyPlanTopGap = 48;
         private static readonly Color EmptyPlanTextColor = new Color(150, 150, 150);
 
@@ -4093,7 +4244,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ShowEmptyPlanState()
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             // Starts from the same "nothing rendered yet" point RenderPlan
             // does, and for the same reason: this method registers a
@@ -4107,12 +4261,15 @@ namespace GW2CraftingHelper.Views
             ResetContentPanelToEmpty();
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
-            if (panelWidth < 0) panelWidth = 0;
+            if (panelWidth < 0)
+            {
+                panelWidth = 0;
+            }
 
             var topGap = new Panel()
             {
                 Size = new Point(panelWidth, EmptyPlanTopGap),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             var label = new Label()
@@ -4124,7 +4281,7 @@ namespace GW2CraftingHelper.Views
                 Width = panelWidth,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextColor = EmptyPlanTextColor,
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             _relayoutActions.Add(w =>
@@ -4146,7 +4303,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RenderPlanAfterResolve(PlanViewModel vm)
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             var treeRoots = ResolveTreeRoots(vm);
             if (treeRoots != null && _treeSectionControls != null &&
@@ -4161,7 +4321,10 @@ namespace GW2CraftingHelper.Views
 
         private void RenderPlan(PlanViewModel vm, bool preserveTree = false)
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             ResetContentPanelToEmpty(preserveTree);
 
@@ -4174,7 +4337,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, 2),
                 BackgroundColor = new Color(180, 180, 180),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
             _relayoutActions.Add(w => headerSeparator.Size = new Point(w, 2));
 
@@ -4194,6 +4357,7 @@ namespace GW2CraftingHelper.Views
                     break;
                 }
             }
+
             if (summarySection != null)
             {
                 CreateCollapsibleSection(summarySection, panelWidth);
@@ -4228,6 +4392,7 @@ namespace GW2CraftingHelper.Views
                 {
                     control.Dispose();
                 }
+
                 _treeSectionControls = null;
                 _treeController.ResetTreeRenderState();
                 _treeRelayoutActions.Clear();
@@ -4236,7 +4401,11 @@ namespace GW2CraftingHelper.Views
 
             foreach (var section in vm.Sections)
             {
-                if (section.SectionType == PlanSectionType.Summary) continue;
+                if (section.SectionType == PlanSectionType.Summary)
+                {
+                    continue;
+                }
+
                 CreateCollapsibleSection(section, panelWidth);
             }
 
@@ -4267,6 +4436,7 @@ namespace GW2CraftingHelper.Views
             {
                 captured.Add(_contentPanel.Children[i]);
             }
+
             return captured;
         }
 
@@ -4287,11 +4457,16 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static List<CraftingTreeNode> ResolveTreeRoots(PlanViewModel vm)
         {
-            if (vm == null) return null;
+            if (vm == null)
+            {
+                return null;
+            }
+
             if (vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0)
             {
                 return vm.MultiItemRoots;
             }
+
             return vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null;
         }
 
@@ -4369,7 +4544,7 @@ namespace GW2CraftingHelper.Views
             var titlePanel = new Panel()
             {
                 Size = new Point(panelWidth, headerHeight),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             var iconFrame = IconControls.CreateItemIcon(
@@ -4387,7 +4562,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(textX, textY),
-                Parent = titlePanel
+                Parent = titlePanel,
             };
 
             // PlanViewModel carries no target item id of its own, so the
@@ -4428,7 +4603,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(textX + nameWidth, qtyY),
-                    Parent = titlePanel
+                    Parent = titlePanel,
                 };
                 TooltipFacility.ApplyRichDeferred(qtyLabel, buildStatContent);
             }
@@ -4476,7 +4651,7 @@ namespace GW2CraftingHelper.Views
             var topGap = new Panel()
             {
                 Size = new Point(panelWidth, SectionSpacing),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             bool expanded = _sectionExpansion.TryGetValue(sectionKey, out bool userExpanded)
@@ -4487,7 +4662,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, SectionHeaderRowHeight),
                 BackgroundColor = Color.Transparent,
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
             // The section's scroll anchor is its header band: a coarse
             // anchor that still absorbs every height change in the
@@ -4513,7 +4688,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(4, PlanContentHeightMath.SectionHeaderCaretY),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // The top of the ramp below the plan title: a section header
@@ -4528,7 +4703,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(22, PlanContentHeightMath.SectionHeaderTitleY),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // Divider under the header - identical chrome for every section.
@@ -4554,7 +4729,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // Standard (explicit) height, not
@@ -4572,7 +4747,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 0),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 Visible = expanded,
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             headerPanel.Click += (_, __) =>
@@ -4581,6 +4756,7 @@ namespace GW2CraftingHelper.Views
                 {
                     return;
                 }
+
                 PreserveScrollAcross(() =>
                 {
                     contentFlow.Visible = !contentFlow.Visible;
@@ -4607,7 +4783,7 @@ namespace GW2CraftingHelper.Views
             {
                 HeaderPanel = headerPanel,
                 ArrowLabel = headerArrow,
-                ContentFlow = contentFlow
+                ContentFlow = contentFlow,
             };
         }
 
@@ -4630,7 +4806,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RerenderForSortChange()
         {
-            if (_currentPlan == null) return;
+            if (_currentPlan == null)
+            {
+                return;
+            }
 
             // The tree is a pure function of the plan, and a sort click
             // does not change the plan - only the row ORDER of one flat
@@ -4745,6 +4924,7 @@ namespace GW2CraftingHelper.Views
                     {
                         TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
                     }
+
                     break;
             }
 
@@ -4834,7 +5014,7 @@ namespace GW2CraftingHelper.Views
                 Checked = _hideUnlockedRecipes,
                 Size = new Point(checkboxWidth, 24),
                 Location = new Point(panelWidth - checkboxWidth, 3),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
             TooltipFacility.ApplyPlain(
                 hideUnlockedCheckbox,
@@ -4874,7 +5054,7 @@ namespace GW2CraftingHelper.Views
                     SectionType = section.SectionType,
                     Title = headerTitle,
                     Rows = visibleRows,
-                    IsDefaultExpanded = section.IsDefaultExpanded
+                    IsDefaultExpanded = section.IsDefaultExpanded,
                 };
                 new RecipesSectionRenderer(this).Render(filteredSection, contentFlow, panelWidth);
             }
@@ -4937,7 +5117,6 @@ namespace GW2CraftingHelper.Views
         // banner row, and the per-currency CreateCurrencyRow rows) moved to
         // Views/Rendering/SummarySectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
-
         #endregion // 7. Section builders (continued)
 
         #region 8. Tree rendering (continued)
@@ -4952,7 +5131,6 @@ namespace GW2CraftingHelper.Views
         // together) all moved onto Views/Rendering/TreeSectionController -
         // see that class's own doc comment for the full inventory and
         // every non-move edit.
-
         #endregion // 8. Tree rendering (continued)
     }
 }

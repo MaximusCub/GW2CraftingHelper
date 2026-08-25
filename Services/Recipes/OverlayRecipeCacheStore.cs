@@ -161,6 +161,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     _stats.IncrementSearchHit();
                     return result;
                 }
+
                 _stats.IncrementSearchMiss();
                 return null;
             }
@@ -175,6 +176,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     _stats.IncrementRecipeHit();
                     return result;
                 }
+
                 _stats.IncrementRecipeMiss();
                 return null;
             }
@@ -240,7 +242,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 var manifest = new RecipeOverlayManifest
                 {
                     Gw2BuildId = _storedBuildId ?? 0,
-                    UpdatedUtc = DateTime.UtcNow.ToString("o")
+                    UpdatedUtc = DateTime.UtcNow.ToString("o"),
                 };
                 string manifestJson = RecipeCacheSerializer.SerializeManifest(manifest);
                 AtomicWrite(_manifestPath, manifestJson);
@@ -274,10 +276,12 @@ namespace GW2CraftingHelper.Services.Recipes
                 {
                     File.Delete(_searchPath);
                 }
+
                 if (File.Exists(_recipesPath))
                 {
                     File.Delete(_recipesPath);
                 }
+
                 if (File.Exists(_manifestPath))
                 {
                     File.Delete(_manifestPath);

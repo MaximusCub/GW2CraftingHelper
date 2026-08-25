@@ -15,7 +15,9 @@ namespace GW2CraftingHelper.Views
     public class ItemSelectedEventArgs : EventArgs
     {
         public int ItemId { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
     }
 
@@ -76,7 +78,10 @@ namespace GW2CraftingHelper.Views
 
         private async void OnTextChanged(object sender, EventArgs e)
         {
-            if (_suppressTextChanged || _disposed) return;
+            if (_suppressTextChanged || _disposed)
+            {
+                return;
+            }
 
             string text = _textBox.Text;
             if (string.IsNullOrWhiteSpace(text))
@@ -123,8 +128,15 @@ namespace GW2CraftingHelper.Views
             // dismissal.
             MainThreadMarshal.Run(() =>
             {
-                if (ct.IsCancellationRequested || _disposed || !_textBox.Focused) return;
-                if (_textBox.Text == null || _textBox.Text.Trim() != query) return;
+                if (ct.IsCancellationRequested || _disposed || !_textBox.Focused)
+                {
+                    return;
+                }
+
+                if (_textBox.Text == null || _textBox.Text.Trim() != query)
+                {
+                    return;
+                }
 
                 if (results == null || results.Count == 0)
                 {
@@ -141,20 +153,33 @@ namespace GW2CraftingHelper.Views
 
         private void OnArrowPressed(object sender, int delta)
         {
-            if (_disposed || _results.Count == 0 || _panel == null || !_panel.Visible) return;
+            if (_disposed || _results.Count == 0 || _panel == null || !_panel.Visible)
+            {
+                return;
+            }
 
             _highlightIndex += delta;
 
             // Wrap around
-            if (_highlightIndex < 0) _highlightIndex = _results.Count - 1;
-            if (_highlightIndex >= _results.Count) _highlightIndex = 0;
+            if (_highlightIndex < 0)
+            {
+                _highlightIndex = _results.Count - 1;
+            }
+
+            if (_highlightIndex >= _results.Count)
+            {
+                _highlightIndex = 0;
+            }
 
             UpdateHighlights();
         }
 
         private void OnEnterPressed(object sender, AutocompleteEnterEventArgs e)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
 
             if (_panel != null && _panel.Visible && _results.Count > 0)
             {
@@ -165,7 +190,10 @@ namespace GW2CraftingHelper.Views
 
         private void OnFocusChanged(object sender, EventArgs e)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
 
             bool hasFocus = _textBox.Focused;
             if (!hasFocus)
@@ -199,14 +227,17 @@ namespace GW2CraftingHelper.Views
 
         private void EnsurePanel()
         {
-            if (_panel != null) return;
+            if (_panel != null)
+            {
+                return;
+            }
 
             _panel = new Panel()
             {
                 Parent = GameService.Graphics.SpriteScreen,
                 ZIndex = Screen.TOOLTIP_BASEZINDEX,
                 BackgroundColor = new Color(30, 30, 30, 240),
-                Visible = false
+                Visible = false,
             };
 
             _rowContainer = new FlowPanel()
@@ -214,7 +245,7 @@ namespace GW2CraftingHelper.Views
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 WidthSizingMode = SizingMode.Fill,
                 HeightSizingMode = SizingMode.AutoSize,
-                Parent = _panel
+                Parent = _panel,
             };
         }
 
@@ -241,7 +272,7 @@ namespace GW2CraftingHelper.Views
                     BackgroundColor = i == _highlightIndex
                         ? new Color(60, 60, 60, 255)
                         : new Color(30, 30, 30, 240),
-                    Parent = _rowContainer
+                    Parent = _rowContainer,
                 };
 
                 // Item icon, through the module's one icon component: same
@@ -268,7 +299,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(2 + IconSize + IconPad, (RowHeight - nameFont.LineHeight) / 2),
-                    Parent = row
+                    Parent = row,
                 };
 
                 row.MouseEntered += (_, __) =>
@@ -309,7 +340,10 @@ namespace GW2CraftingHelper.Views
 
         private void PositionPanel()
         {
-            if (_panel == null) return;
+            if (_panel == null)
+            {
+                return;
+            }
 
             var tbBounds = _textBox.AbsoluteBounds;
             int panelHeight = _panel.Height;
@@ -342,7 +376,10 @@ namespace GW2CraftingHelper.Views
 
         private void ShowPanel()
         {
-            if (_panel == null) return;
+            if (_panel == null)
+            {
+                return;
+            }
 
             // Invariant: _pressOverPanel never outlives the press that sets
             // it. TextInputBase hooks the same global press event when the
@@ -380,7 +417,10 @@ namespace GW2CraftingHelper.Views
 
         private void OnGlobalMouseClick(object sender, MouseEventArgs e)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
 
             if (_panel != null && !_panel.MouseOver && !_textBox.MouseOver)
             {
@@ -390,7 +430,10 @@ namespace GW2CraftingHelper.Views
 
         private void SelectItem(int index)
         {
-            if (index < 0 || index >= _results.Count) return;
+            if (index < 0 || index >= _results.Count)
+            {
+                return;
+            }
 
             var item = _results[index];
 
@@ -405,13 +448,17 @@ namespace GW2CraftingHelper.Views
             {
                 ItemId = item.ItemId,
                 Name = item.Name,
-                IconUrl = item.IconUrl
+                IconUrl = item.IconUrl,
             });
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
             _pressOverPanel = false;
 

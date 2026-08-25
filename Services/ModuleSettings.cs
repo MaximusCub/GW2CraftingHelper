@@ -7,6 +7,7 @@ namespace GW2CraftingHelper.Services
     public class ModuleSettings
     {
         public SettingEntry<int> ModalDialogX { get; private set; }
+
         public SettingEntry<int> ModalDialogY { get; private set; }
 
         // User-provided coin valuations for non-coin currencies (karma,
@@ -54,7 +55,9 @@ namespace GW2CraftingHelper.Services
         // gw2e has none either; see KNOWN-ISSUES #24 for that
         // recorded, deferred divergence option.
         public SettingEntry<int> HomesteadFiberTier { get; private set; }
+
         public SettingEntry<int> HomesteadMetalTier { get; private set; }
+
         public SettingEntry<int> HomesteadWoodTier { get; private set; }
 
         // Gates the scroll-machinery diagnostic
@@ -194,15 +197,23 @@ namespace GW2CraftingHelper.Services
             {
                 { Gw2Constants.RefinedHomesteadFiberItemId, ClampTier(HomesteadFiberTier.Value) },
                 { Gw2Constants.RefinedHomesteadMetalItemId, ClampTier(HomesteadMetalTier.Value) },
-                { Gw2Constants.RefinedHomesteadWoodItemId, ClampTier(HomesteadWoodTier.Value) }
+                { Gw2Constants.RefinedHomesteadWoodItemId, ClampTier(HomesteadWoodTier.Value) },
             };
             return new HomesteadEfficiencyTiers(map);
         }
 
         private static int ClampTier(int tier)
         {
-            if (tier < 0) return 0;
-            if (tier > 2) return 2;
+            if (tier < 0)
+            {
+                return 0;
+            }
+
+            if (tier > 2)
+            {
+                return 2;
+            }
+
             return tier;
         }
 
@@ -221,8 +232,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampLogMaxSizeBytes(int maxSizeBytes)
         {
-            if (maxSizeBytes < MinLogMaxSizeBytes) return MinLogMaxSizeBytes;
-            if (maxSizeBytes > MaxLogMaxSizeBytes) return MaxLogMaxSizeBytes;
+            if (maxSizeBytes < MinLogMaxSizeBytes)
+            {
+                return MinLogMaxSizeBytes;
+            }
+
+            if (maxSizeBytes > MaxLogMaxSizeBytes)
+            {
+                return MaxLogMaxSizeBytes;
+            }
+
             return maxSizeBytes;
         }
 
@@ -237,8 +256,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampRetentionDays(int retentionDays)
         {
-            if (retentionDays < MinLogRetentionDays) return MinLogRetentionDays;
-            if (retentionDays > MaxLogRetentionDays) return MaxLogRetentionDays;
+            if (retentionDays < MinLogRetentionDays)
+            {
+                return MinLogRetentionDays;
+            }
+
+            if (retentionDays > MaxLogRetentionDays)
+            {
+                return MaxLogRetentionDays;
+            }
+
             return retentionDays;
         }
 
@@ -278,8 +305,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampSnapshotRefreshIntervalMinutes(int minutes)
         {
-            if (minutes < MinSnapshotRefreshIntervalMinutes) return MinSnapshotRefreshIntervalMinutes;
-            if (minutes > MaxSnapshotRefreshIntervalMinutes) return MaxSnapshotRefreshIntervalMinutes;
+            if (minutes < MinSnapshotRefreshIntervalMinutes)
+            {
+                return MinSnapshotRefreshIntervalMinutes;
+            }
+
+            if (minutes > MaxSnapshotRefreshIntervalMinutes)
+            {
+                return MaxSnapshotRefreshIntervalMinutes;
+            }
+
             return minutes;
         }
 

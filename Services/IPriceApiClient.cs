@@ -7,7 +7,9 @@ namespace GW2CraftingHelper.Services
     public class RawPriceEntry
     {
         public int Id { get; set; }
+
         public int BuyUnitPrice { get; set; }
+
         public int SellUnitPrice { get; set; }
     }
 

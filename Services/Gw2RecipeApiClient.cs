@@ -42,6 +42,7 @@ namespace GW2CraftingHelper.Services
             {
                 return new List<int>();
             }
+
             return JsonConvert.DeserializeObject<List<int>>(json);
         }
 
@@ -53,6 +54,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             return ParseRecipe(json);
         }
 
@@ -87,7 +89,7 @@ namespace GW2CraftingHelper.Services
                 Id = obj.Value<int>("id"),
                 OutputItemId = obj.Value<int>("output_item_id"),
                 OutputItemCount = obj.Value<int>("output_item_count"),
-                MinRating = obj.Value<int?>("min_rating") ?? 0
+                MinRating = obj.Value<int?>("min_rating") ?? 0,
             };
 
             var disciplines = obj["disciplines"];
@@ -136,7 +138,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = ing.Value<string>("type") ?? "Item",
                         Id = id.Value,
-                        Count = count.Value
+                        Count = count.Value,
                     });
                 }
             }

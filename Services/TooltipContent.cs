@@ -62,6 +62,7 @@ namespace GW2CraftingHelper.Services
             {
                 return content;
             }
+
             return string.IsNullOrEmpty(fallbackText) ? Empty : FromText(fallbackText);
         }
 
@@ -124,8 +125,10 @@ namespace GW2CraftingHelper.Services
                 {
                     sb.Append('\n');
                 }
+
                 _lines[i].AppendPlainText(sb);
             }
+
             return sb.ToString();
         }
 
@@ -142,6 +145,7 @@ namespace GW2CraftingHelper.Services
                 line.AppendPlainText(sb);
                 lines.Add(sb.ToString());
             }
+
             return lines;
         }
     }
@@ -154,7 +158,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>The icon+name header row - see
         /// <see cref="TooltipContent.HeaderLine"/>.</summary>
-        Header
+        Header,
     }
 
     public sealed class TooltipLine
@@ -252,7 +256,7 @@ namespace GW2CraftingHelper.Services
         /// "0/500 in Material Storage". NOT the identity block, which the
         /// game renders white (KNOWN-ISSUES #42, gap G4).
         /// </summary>
-        Muted
+        Muted,
     }
 
     /// <summary>
@@ -369,6 +373,7 @@ namespace GW2CraftingHelper.Services
             {
                 EndLine();
             }
+
             _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
             return this;
         }
@@ -392,10 +397,12 @@ namespace GW2CraftingHelper.Services
                 {
                     Current().Add(template.WithText(piece));
                 }
+
                 if (brk < 0)
                 {
                     return this;
                 }
+
                 EndLine();
                 start = brk + 1;
             }
@@ -431,10 +438,12 @@ namespace GW2CraftingHelper.Services
             {
                 return this;
             }
+
             if (_current != null)
             {
                 EndLine();
             }
+
             _lines.Add(new TooltipLine(new List<TooltipSpan>()));
             return this;
         }
@@ -445,10 +454,12 @@ namespace GW2CraftingHelper.Services
             {
                 return this;
             }
+
             if (_current != null)
             {
                 EndLine();
             }
+
             _lines.AddRange(other.Lines);
             return this;
         }
@@ -459,6 +470,7 @@ namespace GW2CraftingHelper.Services
             {
                 EndLine();
             }
+
             return _lines.Count == 0 ? TooltipContent.Empty : new TooltipContent(_lines);
         }
 

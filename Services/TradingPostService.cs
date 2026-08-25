@@ -251,11 +251,12 @@ namespace GW2CraftingHelper.Services
                                 {
                                     ItemId = entry.Id,
                                     BuyInstant = entry.SellUnitPrice,
-                                    SellInstant = entry.BuyUnitPrice
+                                    SellInstant = entry.BuyUnitPrice,
                                 };
                                 _cache[entry.Id] = (price, fetchedUtc);
                             }
                         }
+
                         succeededBatches++;
                     }
                     catch (Exception ex) when (!(ex is OperationCanceledException))

@@ -188,6 +188,7 @@ namespace GW2CraftingHelper.Services
                     ? FallbackTextRowHeight
                     : CraftStepRowHeight;
             }
+
             return height;
         }
 
@@ -208,6 +209,7 @@ namespace GW2CraftingHelper.Services
             {
                 return overrideValue;
             }
+
             return !dimmed && depth < 2;
         }
 
@@ -220,7 +222,11 @@ namespace GW2CraftingHelper.Services
         public static int TreeNodeHeight(
             CraftingTreeNode node, int depth, bool dimmed, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (node == null) return 0;
+            if (node == null)
+            {
+                return 0;
+            }
+
             return TreeRowHeight + TreeChildFlowHeight(node, depth, dimmed, expansionOverrides);
         }
 
@@ -234,8 +240,15 @@ namespace GW2CraftingHelper.Services
         public static int TreeChildFlowHeight(
             CraftingTreeNode node, int depth, bool dimmed, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (node?.Children == null || node.Children.Count == 0) return 0;
-            if (!IsNodeExpanded(node.NodeId, depth, dimmed, expansionOverrides)) return 0;
+            if (node?.Children == null || node.Children.Count == 0)
+            {
+                return 0;
+            }
+
+            if (!IsNodeExpanded(node.NodeId, depth, dimmed, expansionOverrides))
+            {
+                return 0;
+            }
 
             bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
             return ChildrenHeight(node.Children, depth + 1, childDimmed, expansionOverrides);
@@ -254,12 +267,17 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<CraftingTreeNode> children, int childDepth, bool childDimmed,
             IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (children == null) return 0;
+            if (children == null)
+            {
+                return 0;
+            }
+
             int total = 0;
             foreach (var child in children)
             {
                 total += TreeNodeHeight(child, childDepth, childDimmed, expansionOverrides);
             }
+
             return total;
         }
 
@@ -300,13 +318,22 @@ namespace GW2CraftingHelper.Services
         public static int MultiRootTreeFlowHeight(
             IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (roots == null || roots.Count == 0) return 0;
+            if (roots == null || roots.Count == 0)
+            {
+                return 0;
+            }
+
             int total = CTableHeaderRowHeight;
             for (int i = 0; i < roots.Count; i++)
             {
-                if (i > 0) total += MultiRootDividerHeight;
+                if (i > 0)
+                {
+                    total += MultiRootDividerHeight;
+                }
+
                 total += TreeNodeHeight(roots[i], 0, false, expansionOverrides);
             }
+
             return total;
         }
     }

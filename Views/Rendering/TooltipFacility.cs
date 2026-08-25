@@ -124,6 +124,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 source.FallbackText = wrapped;
             }
+
             control.BasicTooltipText = wrapped;
         }
 
@@ -140,6 +141,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Clear(control);
                 return;
             }
+
             Register(control, new TooltipContentSource(content));
         }
 
@@ -157,6 +159,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Clear(control);
                 return;
             }
+
             Register(control, new TooltipContentSource(build));
         }
 
@@ -178,6 +181,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return;
             }
+
             Contents.Remove(control);
             control.Tooltip = null;
             control.BasicTooltipText = null;
@@ -249,6 +253,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return null;
             }
+
             if (!Contents.TryGetValue(control, out var source))
             {
                 return null;

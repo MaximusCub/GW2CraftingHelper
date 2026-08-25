@@ -17,7 +17,9 @@ namespace GW2CraftingHelper.Services.Diagnostics
         public class ParsedPhase
         {
             public string Name { get; set; }
+
             public long ElapsedMs { get; set; }
+
             public int? Count { get; set; }
         }
 
@@ -48,7 +50,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
                 var phase = new ParsedPhase
                 {
                     Name = match.Groups[1].Value,
-                    ElapsedMs = long.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture)
+                    ElapsedMs = long.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture),
                 };
 
                 if (match.Groups[3].Success)
@@ -76,7 +78,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
             var summary = new List<string>
             {
                 SummaryHeaderLine,
-                string.Format(CultureInfo.InvariantCulture, "Total: {0}ms", total)
+                string.Format(CultureInfo.InvariantCulture, "Total: {0}ms", total),
             };
 
             foreach (var phase in sorted)

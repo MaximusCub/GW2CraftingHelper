@@ -209,15 +209,25 @@ namespace GW2CraftingHelper.Services
         private sealed class EvaluateContext
         {
             public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+
             public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
+
             public Dictionary<int, Decision> Memo { get; }
+
             public PriceBasis PriceBasis { get; }
+
             public IReadOnlyDictionary<int, AcquisitionSource> Overrides { get; }
+
             public CurrencyValuation CurrencyValuation { get; }
+
             public ISet<int> ForceBuyOnlyNodeIds { get; }
+
             public ISet<int> CompetencyIndependentForceBuyNodeIds { get; }
+
             public Dictionary<int, (long? BuyCost, long? CraftCost)> CostDiagnostics { get; }
+
             public Dictionary<int, long?> RawCraftCostDiagnostics { get; }
+
             public ISet<int> IgnoredItemIds { get; }
 
             /// <summary>Never null - normalized in the constructor.</summary>
@@ -282,12 +292,19 @@ namespace GW2CraftingHelper.Services
         private sealed class CollectContext
         {
             public Dictionary<int, Decision> Memo { get; }
+
             public Dictionary<(int, AcquisitionSource, int), PlanStep> StepMap { get; }
+
             public Dictionary<int, long> CurrencyMap { get; }
+
             public Dictionary<(int, int), int> CraftOrder { get; }
+
             public Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> VendorBatchTracking { get; }
+
             public Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> VendorOccurrences { get; }
+
             public Dictionary<(int, AcquisitionSource, int), List<int>> CraftOccurrences { get; }
+
             public ISet<int> IgnoredItemIds { get; }
 
             public CollectContext(
@@ -523,14 +540,15 @@ namespace GW2CraftingHelper.Services
                             {
                                 break;
                             }
+
                             currencyShares[i]++;
                             leftover--;
                         }
                     }
                 }
+
                 // else: totalQuantity <= 0 is defensive only - currencyShares
                 // stays all-zero rather than divide by zero.
-
                 for (int i = 0; i < occurrences.Count; i++)
                 {
                     int nodeId = occurrences[i].NodeId;
@@ -623,6 +641,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
@@ -633,7 +652,7 @@ namespace GW2CraftingHelper.Services
                 Steps = steps,
                 TotalCoinCost = totalCoinCost,
                 CurrencyCosts = currencyCosts,
-                TimegatedItems = timegatedItems
+                TimegatedItems = timegatedItems,
             };
 
             // Convert internal memo to public decisions dict
@@ -665,14 +684,14 @@ namespace GW2CraftingHelper.Services
                     CheapestCraftUntrained = kvp.Value.CheapestCraftUntrained,
                     CheapestCraftRealCost = kvp.Value.CheapestCraftRealCost,
                     CheapestCraftDisciplines = kvp.Value.CheapestCraftDisciplines,
-                    CheapestCraftMinRating = kvp.Value.CheapestCraftMinRating
+                    CheapestCraftMinRating = kvp.Value.CheapestCraftMinRating,
                 };
             }
 
             return new SolveResult
             {
                 Plan = plan,
-                Decisions = decisions
+                Decisions = decisions,
             };
         }
 
@@ -720,7 +739,7 @@ namespace GW2CraftingHelper.Services
                     // are explicitly false rather than omitted.
                     CraftCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                     BuyFromTpCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
-                    BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false }
+                    BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                 };
                 return 0L;
             }
@@ -846,6 +865,7 @@ namespace GW2CraftingHelper.Services
                         {
                             hasUnvaluedCurrency = true;
                         }
+
                         continue;
                     }
 
@@ -1052,7 +1072,7 @@ namespace GW2CraftingHelper.Services
                 {
                     IsAvailable = true,
                     RawCoin = buyTotalCost.Value,
-                    DecisionValue = buyTotalCost.Value
+                    DecisionValue = buyTotalCost.Value,
                 }
                 : new PillSourceCostBreakdown { IsAvailable = false };
 
@@ -1144,7 +1164,7 @@ namespace GW2CraftingHelper.Services
                     CheapestCraftUntrained = cheapestCraftUntrained,
                     CheapestCraftRealCost = cheapestCraftUntrained ? cheapestCraftRealCostOverall : null,
                     CheapestCraftDisciplines = cheapestCraftUntrained ? cheapestCraftOptionOverall?.Disciplines : null,
-                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0
+                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0,
                 };
                 return comparisonValue;
             }
@@ -1162,10 +1182,12 @@ namespace GW2CraftingHelper.Services
                         ? Commit(AcquisitionSource.Craft, bestComparable.RealCost, bestComparable.Cost, bestComparable.RecipeId, null)
                         : Commit(AcquisitionSource.Craft, bestFallback.RealCost, bestFallback.Cost, bestFallback.RecipeId, null, hasUnvaluedCurrency: true);
                 }
+
                 if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
                 {
                     return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
                 }
+
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
                     return comparableVendorValue.HasValue
@@ -1299,6 +1321,7 @@ namespace GW2CraftingHelper.Services
             {
                 lines.AddRange(currencyCosts);
             }
+
             if (itemCosts != null)
             {
                 foreach (var line in itemCosts)
@@ -1313,7 +1336,7 @@ namespace GW2CraftingHelper.Services
                 IsAvailable = true,
                 RawCoin = (coinCost ?? 0L) - itemFoldedValue,
                 CostLines = lines,
-                DecisionValue = decisionValue
+                DecisionValue = decisionValue,
             };
         }
 
@@ -1348,6 +1371,7 @@ namespace GW2CraftingHelper.Services
                         rawCoin += ingredient.Quantity;
                         continue;
                     }
+
                     var key = ("Currency", ingredient.Id);
                     lineTotals[key] = lineTotals.TryGetValue(key, out int existing)
                         ? existing + ingredient.Quantity
@@ -1381,7 +1405,7 @@ namespace GW2CraftingHelper.Services
                 CostLines = lines,
                 DecisionValue = decisionValue,
                 IsIncomplete = isIncomplete,
-                RawQuantitiesReducedByOwnedStock = rawQuantitiesReducedByOwnedStock
+                RawQuantitiesReducedByOwnedStock = rawQuantitiesReducedByOwnedStock,
             };
         }
 
@@ -1403,6 +1427,7 @@ namespace GW2CraftingHelper.Services
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -1424,6 +1449,7 @@ namespace GW2CraftingHelper.Services
                 {
                     ctx.CurrencyMap[node.Id] = node.Quantity;
                 }
+
                 return;
             }
 
@@ -1482,6 +1508,7 @@ namespace GW2CraftingHelper.Services
                         Collect(itemRoot, ctx, ref craftCounter);
                     }
                 }
+
                 return;
             }
 
@@ -1544,6 +1571,7 @@ namespace GW2CraftingHelper.Services
                     craftOccurrenceList = new List<int>();
                     craftOccurrences[stepKey] = craftOccurrenceList;
                 }
+
                 craftOccurrenceList.Add(node.NodeId);
             }
 
@@ -1566,7 +1594,7 @@ namespace GW2CraftingHelper.Services
                     vendorBatchTracking[stepKey] = new VendorBatchSolver.VendorBatchState
                     {
                         Batch = batch,
-                        Conflict = false
+                        Conflict = false,
                     };
                 }
 
@@ -1579,6 +1607,7 @@ namespace GW2CraftingHelper.Services
                     occurrenceList = new List<(int NodeId, int Quantity)>();
                     vendorOccurrences[stepKey] = occurrenceList;
                 }
+
                 occurrenceList.Add((node.NodeId, node.Quantity));
             }
 
@@ -1594,6 +1623,7 @@ namespace GW2CraftingHelper.Services
                 {
                     existing.UnitCost = existing.TotalCost / existing.Quantity;
                 }
+
                 if (decision.Source == AcquisitionSource.BuyFromVendor)
                 {
                     existing.VendorCurrencyCosts = _vendorBatchSolver.MergeVendorCurrencyCosts(
@@ -1620,7 +1650,7 @@ namespace GW2CraftingHelper.Services
                     RecipeId = decision.RecipeId,
                     VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                         ? _vendorBatchSolver.MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
-                        : null
+                        : null,
                 };
             }
         }
@@ -1648,6 +1678,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!stepMap.TryGetValue(kvp.Key, out var step) || step.VendorOfferOutputCount <= 0)
                 {
                     continue;
@@ -1718,14 +1749,17 @@ namespace GW2CraftingHelper.Services
                         {
                             craftRealCost += ingredient.Quantity;
                         }
+
                         continue;
                     }
+
                     if (ingredient.IngredientType != "Item")
                     {
                         // Non-Item ingredient: never a real coin
                         // contribution and carries no memo entry; skip.
                         continue;
                     }
+
                     craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;
                 }
             }
@@ -1809,6 +1843,7 @@ namespace GW2CraftingHelper.Services
                                 // Evaluate() time); defense in depth only.
                             }
                         }
+
                         continue;
                     }
 
@@ -1884,6 +1919,7 @@ namespace GW2CraftingHelper.Services
                     return (long)quantity * unitPrice;
                 }
             }
+
             return null;
         }
 

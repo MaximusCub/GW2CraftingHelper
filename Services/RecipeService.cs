@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Services
                 RecipeId = Gw2Constants.MultiItemWrapperRecipeId,
                 OutputCount = 1,
                 CraftsNeeded = 1,
-                ExpectedOutputCount = 1
+                ExpectedOutputCount = 1,
             };
             wrapperRecipe.Ingredients.AddRange(itemTrees);
 
@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Services
             {
                 Id = Gw2Constants.MultiItemWrapperItemId,
                 IngredientType = "Item",
-                Quantity = 1
+                Quantity = 1,
             };
             wrapper.Recipes.Add(wrapperRecipe);
             return wrapper;
@@ -287,7 +287,7 @@ namespace GW2CraftingHelper.Services
                 IngredientType = ingredientType,
                 Quantity = quantity,
                 AchievementId = achievementId,
-                AchievementBit = achievementBit
+                AchievementBit = achievementBit,
             };
 
             if (ingredientType != "Item")
@@ -364,7 +364,7 @@ namespace GW2CraftingHelper.Services
                         ExpectedOutputCount = expectedOutputCount,
                         Disciplines = new List<string>(raw.Disciplines),
                         MinRating = raw.MinRating,
-                        Flags = new List<string>(raw.Flags)
+                        Flags = new List<string>(raw.Flags),
                     };
 
                     foreach (var ingredient in raw.Ingredients)
@@ -408,6 +408,7 @@ namespace GW2CraftingHelper.Services
                         _searchCache[itemId] = stored;
                     }
                 }
+
                 return stored;
             }
 
@@ -446,6 +447,7 @@ namespace GW2CraftingHelper.Services
                         _recipeCache[recipeId] = stored;
                     }
                 }
+
                 return stored;
             }
 
@@ -476,6 +478,7 @@ namespace GW2CraftingHelper.Services
             {
                 _cacheStore.PutRecipe(recipeId, result);
             }
+
             return result;
         }
     }

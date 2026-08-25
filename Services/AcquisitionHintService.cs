@@ -19,17 +19,24 @@ namespace GW2CraftingHelper.Services
         private class AcquisitionHintEnvelope
         {
             public int SchemaVersion { get; set; }
+
             public string GeneratedAt { get; set; }
+
             public string Source { get; set; }
+
             public List<AcquisitionHintEntry> Hints { get; set; }
         }
 
         private class AcquisitionHintEntry
         {
             public int ItemId { get; set; }
+
             public string Hint { get; set; }
+
             public string Badge { get; set; }
+
             public string SourceUrl { get; set; }
+
             public string LastVerified { get; set; }
         }
 
@@ -50,6 +57,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 // Last-write-wins on duplicate item ids.
                 result[entry.ItemId] = new AcquisitionHint
                 {
@@ -57,9 +65,10 @@ namespace GW2CraftingHelper.Services
                     Hint = entry.Hint,
                     Badge = entry.Badge,
                     SourceUrl = entry.SourceUrl,
-                    LastVerified = entry.LastVerified
+                    LastVerified = entry.LastVerified,
                 };
             }
+
             return result;
         }
     }

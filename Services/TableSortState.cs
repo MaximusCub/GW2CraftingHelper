@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         None,
         Ascending,
-        Descending
+        Descending,
     }
 
     /// <summary>

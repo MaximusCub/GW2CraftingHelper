@@ -181,6 +181,7 @@ namespace GW2CraftingHelper.Services
                     node.Recipes.Clear();
                     return;
                 }
+
                 seenBitItemIds.Add(node.Id);
             }
 

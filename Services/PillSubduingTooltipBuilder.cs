@@ -52,6 +52,7 @@ namespace GW2CraftingHelper.Services
                 {
                     AppendCoin(builder.Text(" ("), result.ValueMarginCopper.Value).Text(" more)");
                 }
+
                 return builder.Build();
             }
 
@@ -90,6 +91,7 @@ namespace GW2CraftingHelper.Services
             {
                 builder.Text("always more expensive");
             }
+
             return builder.Build();
         }
 
@@ -116,18 +118,22 @@ namespace GW2CraftingHelper.Services
             {
                 sb.Append(gold).Append('g');
             }
+
             if (silver > 0 || gold > 0)
             {
                 if (sb.Length > 0)
                 {
                     sb.Append(' ');
                 }
+
                 sb.Append(silver).Append('s');
             }
+
             if (sb.Length > 0)
             {
                 sb.Append(' ');
             }
+
             sb.Append(cop).Append('c');
             return sb.ToString();
         }

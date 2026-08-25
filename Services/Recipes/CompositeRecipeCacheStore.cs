@@ -9,8 +9,11 @@ namespace GW2CraftingHelper.Services.Recipes
         private readonly RecipeCacheStats _stats = new RecipeCacheStats();
 
         public RecipeCacheStats Stats => _stats;
+
         public bool SeedIsStale => _seed.SeedIsStale;
+
         public int? SeedBuildId => _seed.SeedBuildId;
+
         public int? CurrentBuildId => _seed.CurrentBuildId;
 
         public CompositeRecipeCacheStore(

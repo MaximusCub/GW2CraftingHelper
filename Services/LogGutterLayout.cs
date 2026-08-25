@@ -47,12 +47,19 @@ namespace GW2CraftingHelper.Services
         public static int TimeBand(IReadOnlyList<int> perLevelWidths)
         {
             int band = 0;
-            if (perLevelWidths == null) return band;
+            if (perLevelWidths == null)
+            {
+                return band;
+            }
 
             for (int i = 0; i < perLevelWidths.Count; i++)
             {
-                if (perLevelWidths[i] > band) band = perLevelWidths[i];
+                if (perLevelWidths[i] > band)
+                {
+                    band = perLevelWidths[i];
+                }
             }
+
             return band;
         }
 

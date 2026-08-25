@@ -17,6 +17,7 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             return Math.Max(1L, RoundHalfUp(totalValue, 5));
         }
 
@@ -26,6 +27,7 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             return Math.Max(1L, RoundHalfUp(totalValue, 10));
         }
 

@@ -53,6 +53,7 @@ namespace GW2CraftingHelper.Services
             {
                 extras.Add(hintText);
             }
+
             extras.AddRange(BuildCurrencyLines(currencyCosts));
 
             return ItemRowTooltipComposer.BuildRowContent(stats, fullName, nameTruncated, extras);
@@ -134,8 +135,10 @@ namespace GW2CraftingHelper.Services
                 {
                     line += $" (wallet {rawHeld})";
                 }
+
                 lines.Add(line);
             }
+
             return lines;
         }
     }

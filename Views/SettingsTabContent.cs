@@ -46,7 +46,7 @@ namespace GW2CraftingHelper.Views
             63, // Astral Acclaim
             78, // Fine Rift Essence
             79, // Rare Rift Essence
-            80  // Masterwork Rift Essence
+            80,  // Masterwork Rift Essence
         };
 
         // ModuleSettings.GetEffectiveCurrencyValuation applies EVERY entry
@@ -68,6 +68,7 @@ namespace GW2CraftingHelper.Views
             {
                 ids.Add(id);
             }
+
             var result = new int[ids.Count];
             ids.CopyTo(result);
             return result;
@@ -122,7 +123,7 @@ namespace GW2CraftingHelper.Views
             Volume,
 
             /// <summary>A Checkbox standing in for the name, no cluster.</summary>
-            Checkbox
+            Checkbox,
         }
 
         /// <summary>
@@ -512,7 +513,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, SaveBarHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = container
+                Parent = container,
             };
 
             container.Resized += (_, __) =>
@@ -526,7 +527,7 @@ namespace GW2CraftingHelper.Views
             _boardPanel = new Panel()
             {
                 Size = new Point(panelWidth, 0),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
             _fullWidthPanels.Add(_boardPanel);
 
@@ -634,7 +635,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public int UnsavedChangeCount()
         {
-            if (!_buildComplete) return 0;
+            if (!_buildComplete)
+            {
+                return 0;
+            }
 
             return CaptureFormState().ChangedKeys(_baseline).Count;
         }
@@ -678,7 +682,10 @@ namespace GW2CraftingHelper.Views
             // Resized fires on height-only changes too, and re-widening
             // every row re-flows the scrolling FlowPanel once per row - so
             // do nothing unless the width actually moved.
-            if (panelWidth <= 0 || panelWidth == _panelWidth) return;
+            if (panelWidth <= 0 || panelWidth == _panelWidth)
+            {
+                return;
+            }
 
             _panelWidth = panelWidth;
             Relayout(measureText: false);
@@ -693,7 +700,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefitTextAfterResizeSettle()
         {
-            if (!_buildComplete || _panelWidth <= 0) return;
+            if (!_buildComplete || _panelWidth <= 0)
+            {
+                return;
+            }
 
             Relayout(measureText: true);
         }
@@ -708,7 +718,10 @@ namespace GW2CraftingHelper.Views
             LayoutSectionBoard(measureText);
             LayoutCurrencyProse(measureText);
 
-            if (_currencyGridPanel == null) return;
+            if (_currencyGridPanel == null)
+            {
+                return;
+            }
 
             _currencyGridPanel.Width = _panelWidth;
             LayoutCurrencyFilterRow();
@@ -741,7 +754,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void SetCurrencyGridHeight()
         {
-            if (_currencyGridPanel == null) return;
+            if (_currencyGridPanel == null)
+            {
+                return;
+            }
 
             _currencyGridPanel.Height = SettingsCurrencyGridLayout.ComputeHeight(
                 _rows.Count, _panelWidth, CurrencyRowHeight);
@@ -754,7 +770,6 @@ namespace GW2CraftingHelper.Views
         // measured at the resolved column width first (a description wraps,
         // so a block's height is a function of that width) and placed
         // second; ColumnBoardLayout owns the packing.
-
         private SectionBlock BeginSection(string title, params string[] prose)
         {
             var section = new SectionBlock
@@ -762,8 +777,8 @@ namespace GW2CraftingHelper.Views
                 Panel = new Panel()
                 {
                     Size = new Point(SettingsFormLayout.MinColumnWidth, SectionHeaderRowHeight),
-                    Parent = _boardPanel
-                }
+                    Parent = _boardPanel,
+                },
             };
 
             section.TitleLabel = new Label()
@@ -773,7 +788,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX, SectionHeaderTitleY),
-                Parent = section.Panel
+                Parent = section.Panel,
             };
 
             // Same header rule as every CraftingPlanView section: 2px in
@@ -787,7 +802,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(SettingsFormLayout.MinColumnWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = section.Panel
+                Parent = section.Panel,
             };
 
             foreach (string line in prose)
@@ -855,7 +870,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = InfoTextColor,
-                Parent = parent
+                Parent = parent,
             };
         }
 
@@ -874,7 +889,10 @@ namespace GW2CraftingHelper.Views
         private static int LayoutWrappedLabel(
             Label label, string text, int x, int y, int budget, bool measureText)
         {
-            if (budget < 20) budget = 20;
+            if (budget < 20)
+            {
+                budget = 20;
+            }
 
             if (measureText)
             {
@@ -886,6 +904,7 @@ namespace GW2CraftingHelper.Views
                 {
                     label.Text = joined;
                 }
+
                 label.Size = new Point(budget, wrapped.Lines.Count * InfoRowHeight);
 
                 // The wrap only drops text at the line cap, and then the
@@ -904,7 +923,10 @@ namespace GW2CraftingHelper.Views
 
         private void LayoutSectionBoard(bool measureText)
         {
-            if (_boardPanel == null || _sections.Count == 0) return;
+            if (_boardPanel == null || _sections.Count == 0)
+            {
+                return;
+            }
 
             int boardWidth = _panelWidth;
             int columnCount = ColumnBoardLayout.ComputeColumnCount(
@@ -949,7 +971,11 @@ namespace GW2CraftingHelper.Views
                     section.ProseLabels[i], section.Prose[i], NameColumnX, y,
                     SettingsFormLayout.SectionProseMaxWidth(columnWidth), measureText);
             }
-            if (section.Prose.Count > 0) y += RowGap;
+
+            if (section.Prose.Count > 0)
+            {
+                y += RowGap;
+            }
 
             for (int i = 0; i < section.Rows.Count; i++)
             {
@@ -968,7 +994,10 @@ namespace GW2CraftingHelper.Views
                         measureText);
                 }
 
-                if (i < section.Rows.Count - 1) y += RowGap;
+                if (i < section.Rows.Count - 1)
+                {
+                    y += RowGap;
+                }
             }
 
             return y;
@@ -1004,11 +1033,17 @@ namespace GW2CraftingHelper.Views
                     PlanRelayoutMath.CenterX(RowHeight, LabelHelpers.SmallTagHeight));
             }
 
-            if (row.NameLabel == null) return;
+            if (row.NameLabel == null)
+            {
+                return;
+            }
 
             int budget = SettingsFormLayout.NameMaxWidth(columnWidth, row.ClusterWidth);
             row.NameLabel.Width = budget;
-            if (!measureText) return;
+            if (!measureText)
+            {
+                return;
+            }
 
             string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.NameText, budget);
             if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
@@ -1032,7 +1067,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static void SetRowError(FormRow row, string text)
         {
-            if (row == null) return;
+            if (row == null)
+            {
+                return;
+            }
 
             row.Error.Text = text ?? "";
             row.Tag.Visible = row.Error.Text.Length == 0;
@@ -1050,14 +1088,22 @@ namespace GW2CraftingHelper.Views
             int band = 0;
             foreach (var row in section.Rows)
             {
-                if (row.Kind != FormRowKind.Input) continue;
+                if (row.Kind != FormRowKind.Input)
+                {
+                    continue;
+                }
+
                 band = Math.Max(band, (int)Math.Ceiling(font.MeasureString(row.UnitText ?? "").Width));
                 band = Math.Max(band, (int)Math.Ceiling(font.MeasureString(row.ErrorText ?? "").Width));
             }
 
             foreach (var row in section.Rows)
             {
-                if (row.Kind != FormRowKind.Input) continue;
+                if (row.Kind != FormRowKind.Input)
+                {
+                    continue;
+                }
+
                 row.TagBandWidth = band;
                 row.ClusterWidth = SettingsFormLayout.InputClusterWidth(band);
             }
@@ -1078,13 +1124,13 @@ namespace GW2CraftingHelper.Views
                 NameText = name,
                 UnitText = unitText,
                 ErrorText = errorText,
-                DescriptionText = description
+                DescriptionText = description,
             };
 
             row.Panel = new Panel()
             {
                 Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
-                Parent = section.Panel
+                Parent = section.Panel,
             };
 
             row.NameLabel = new Label()
@@ -1094,13 +1140,13 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX, RowLabelY),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.Input = new TextBox()
             {
                 Size = new Point(InputWidth, InputHeight),
-                Parent = row.Panel
+                Parent = row.Panel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             row.Input.TextChanged += (_, __) => RefreshDirtyState();
 
@@ -1111,7 +1157,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.Error = new Label()
@@ -1121,7 +1167,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = ErrorTextColor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             if (description != null)
@@ -1172,7 +1218,7 @@ namespace GW2CraftingHelper.Views
             _currencyGridPanel = new Panel()
             {
                 Size = new Point(panelWidth, 0),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
 
             int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
@@ -1223,13 +1269,13 @@ namespace GW2CraftingHelper.Views
                 NameText = "Click volume",
                 ClusterWidth = SettingsFormLayout.WidestClusterWidth,
                 DescriptionText =
-                    "Volume of this module's own click, played whenever you press one of its buttons, rows or pills. Drag to 0 to turn it off."
+                    "Volume of this module's own click, played whenever you press one of its buttons, rows or pills. Drag to 0 to turn it off.",
             };
 
             var rowPanel = new Panel()
             {
                 Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
-                Parent = section.Panel
+                Parent = section.Panel,
             };
             row.Panel = rowPanel;
             row.DescriptionLabel = CreateWrappedLabel(section.Panel);
@@ -1241,7 +1287,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX, RowLabelY),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             int percent = _settings.GetClampedClickSoundVolumePercent();
@@ -1257,7 +1303,7 @@ namespace GW2CraftingHelper.Views
                 Value = percent,
                 Size = new Point(SliderWidth, SliderHeight),
                 BasicTooltipText = "How loud this module's click plays. 0 turns it off. Does not change the checkbox click, which is Blish HUD's own.",
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             row.Slider = _clickVolumeSlider;
 
@@ -1269,7 +1315,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Width = ReadoutWidth,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             row.Readout = _clickVolumeReadout;
 
@@ -1279,7 +1325,10 @@ namespace GW2CraftingHelper.Views
             // them by one path (see Module.Initialize).
             _clickVolumeSlider.ValueChanged += (_, e) =>
             {
-                if (!ClickSoundVolume.TryPercentFromSliderValue(e.Value, out int newPercent)) return;
+                if (!ClickSoundVolume.TryPercentFromSliderValue(e.Value, out int newPercent))
+                {
+                    return;
+                }
 
                 _settings.ClickSoundVolumePercent.Value = newPercent;
             };
@@ -1294,7 +1343,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Test",
                 Size = new Point(TestButtonWidth, UiMetrics.ButtonHeight),
                 BasicTooltipText = "Play the click at the volume set here. Checkboxes are the exception: they play Blish HUD's own click, which this does not change.",
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             section.Rows.Add(row);
@@ -1333,7 +1382,7 @@ namespace GW2CraftingHelper.Views
                 MaterialItemId = materialItemId,
                 MaterialLabel = materialLabel,
                 Input = form.Input,
-                Form = form
+                Form = form,
             });
         }
 
@@ -1376,10 +1425,12 @@ namespace GW2CraftingHelper.Views
             {
                 _settings.HomesteadFiberTier.Value = fiberTier;
             }
+
             if (parsedTiers.TryGetValue(Gw2Constants.RefinedHomesteadMetalItemId, out int metalTier))
             {
                 _settings.HomesteadMetalTier.Value = metalTier;
             }
+
             if (parsedTiers.TryGetValue(Gw2Constants.RefinedHomesteadWoodItemId, out int woodTier))
             {
                 _settings.HomesteadWoodTier.Value = woodTier;
@@ -1438,13 +1489,13 @@ namespace GW2CraftingHelper.Views
             {
                 Kind = FormRowKind.Checkbox,
                 DescriptionText =
-                    "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file."
+                    "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file.",
             };
 
             row.Panel = new Panel()
             {
                 Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
-                Parent = section.Panel
+                Parent = section.Panel,
             };
             row.DescriptionLabel = CreateWrappedLabel(section.Panel);
 
@@ -1458,7 +1509,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Diagnostics logging",
                 Checked = _settings.LogDiagnosticsEnabled.Value,
                 Location = new Point(NameColumnX, RowLabelY),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
             row.Checkbox = _logDiagnosticsCheckbox;
 
@@ -1477,12 +1528,14 @@ namespace GW2CraftingHelper.Views
                 long mb = _settings.LogMaxSizeBytes.Value / (1024 * 1024);
                 _logMaxSizeInput.Text = mb.ToString(CultureInfo.InvariantCulture);
             }
+
             SetRowError(_logMaxSizeRow, "");
 
             if (_logRetentionDaysInput != null)
             {
                 _logRetentionDaysInput.Text = _settings.LogRetentionDays.Value.ToString(CultureInfo.InvariantCulture);
             }
+
             SetRowError(_logRetentionDaysRow, "");
         }
 
@@ -1547,6 +1600,7 @@ namespace GW2CraftingHelper.Views
             {
                 _snapshotRefreshIntervalInput.Text = _settings.SnapshotRefreshIntervalMinutes.Value.ToString(CultureInfo.InvariantCulture);
             }
+
             SetRowError(_snapshotRefreshIntervalRow, "");
         }
 
@@ -1580,7 +1634,7 @@ namespace GW2CraftingHelper.Views
             var headerPanel = new Panel()
             {
                 Size = new Point(panelWidth, SectionHeaderRowHeight),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
             _fullWidthPanels.Add(headerPanel);
 
@@ -1591,7 +1645,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(NameColumnX, SectionHeaderTitleY),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
             TooltipFacility.ApplyPlain(titleLabel, tooltip);
 
@@ -1604,7 +1658,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = headerPanel
+                Parent = headerPanel,
             });
         }
 
@@ -1620,7 +1674,7 @@ namespace GW2CraftingHelper.Views
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, InfoRowHeight),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
             _fullWidthPanels.Add(rowPanel);
 
@@ -1672,7 +1726,7 @@ namespace GW2CraftingHelper.Views
             var rowPanel = new Panel()
             {
                 Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
             _fullWidthPanels.Add(rowPanel);
 
@@ -1684,7 +1738,7 @@ namespace GW2CraftingHelper.Views
                 // module's other three search boxes use (audit batch J,
                 // M12). This box was the lone "Filter ..." spelling.
                 PlaceholderText = "Search currencies...",
-                Parent = rowPanel
+                Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
 
@@ -1699,7 +1753,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
                 Location = new Point(CellNameX + CurrencyFilterWidth + 12, CellTextY),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             LayoutCurrencyFilterRow();
@@ -1710,7 +1764,10 @@ namespace GW2CraftingHelper.Views
         // text's width in the same call that assigned the new one.
         private void LayoutCurrencyFilterRow()
         {
-            if (_currencyCountLabel == null) return;
+            if (_currencyCountLabel == null)
+            {
+                return;
+            }
 
             int width = (int)Math.Ceiling(
                 UiFonts.Body.MeasureString(_currencyCountLabel.Text ?? "").Width);
@@ -1739,7 +1796,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, CurrencyHeaderRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
             _fullWidthPanels.Add(_currencyHeaderPanel);
 
@@ -1756,13 +1813,16 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(CellNameX, CurrencyHeaderTextY),
-                Parent = _currencyHeaderPanel
+                Parent = _currencyHeaderPanel,
             };
         }
 
         private void LayoutCurrencyGridHeader()
         {
-            if (_currencyHeaderPanel == null) return;
+            if (_currencyHeaderPanel == null)
+            {
+                return;
+            }
 
             int columnCount = SettingsCurrencyGridLayout.ComputeColumnCount(_panelWidth);
             int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(_panelWidth);
@@ -1782,7 +1842,10 @@ namespace GW2CraftingHelper.Views
                 bool visible = i < columnCount;
                 _currencyHeaderNames[i].Visible = visible;
                 _currencyHeaderUnits[i].Visible = visible;
-                if (!visible) continue;
+                if (!visible)
+                {
+                    continue;
+                }
 
                 _currencyHeaderNames[i].Location =
                     new Point((i * columnWidth) + CellNameX, CurrencyHeaderTextY);
@@ -1798,7 +1861,7 @@ namespace GW2CraftingHelper.Views
             var cellPanel = new Panel()
             {
                 Size = new Point(columnWidth, CurrencyRowHeight),
-                Parent = _currencyGridPanel
+                Parent = _currencyGridPanel,
             };
 
             // Width and text are resolved by LayoutCurrencyCell, which the
@@ -1811,7 +1874,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Location = new Point(CellNameX, CellTextY),
-                Parent = cellPanel
+                Parent = cellPanel,
             };
 
             bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
@@ -1837,7 +1900,7 @@ namespace GW2CraftingHelper.Views
                 PlaceholderText = hasDefault
                     ? defaultCopperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "",
-                Parent = cellPanel
+                Parent = cellPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
@@ -1859,7 +1922,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
                 Location = new Point(CellNameX, CellTextY),
-                Parent = cellPanel
+                Parent = cellPanel,
             };
             TooltipFacility.ApplyPlain(defaultLabel, hasDefault
                 ? "This currency is valued automatically at its default estimate unless you type your own amount or tick Ignore."
@@ -1874,7 +1937,7 @@ namespace GW2CraftingHelper.Views
                 TextColor = ErrorTextColor,
                 BasicTooltipText = "Enter a positive whole number of copper, or leave the box blank.",
                 Location = new Point(CellNameX, CellTextY),
-                Parent = cellPanel
+                Parent = cellPanel,
             };
 
             Checkbox clearCheckbox = null;
@@ -1899,7 +1962,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Text = "Ignore",
                     Location = new Point(CellNameX, CellTextY),
-                    Parent = cellPanel
+                    Parent = cellPanel,
                 };
                 clearCheckbox.CheckedChanged += (_, __) => RefreshDirtyState();
                 TooltipFacility.ApplyPlain(
@@ -1925,7 +1988,7 @@ namespace GW2CraftingHelper.Views
                 NameLabel = nameLabel,
                 DefaultLabel = defaultLabel,
                 ErrorLabel = errorLabel,
-                ClearCheckbox = clearCheckbox
+                ClearCheckbox = clearCheckbox,
             };
 
             input.TextChanged += (_, __) => RefreshDirtyState();
@@ -1956,7 +2019,10 @@ namespace GW2CraftingHelper.Views
 
             int budget = SettingsCurrencyGridLayout.CellNameMaxWidth(columnWidth);
             row.NameLabel.Width = budget;
-            if (!measureText) return;
+            if (!measureText)
+            {
+                return;
+            }
 
             string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.Name, budget);
             if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
@@ -1978,7 +2044,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyCurrencyFilter()
         {
-            if (_currencyGridPanel == null) return;
+            if (_currencyGridPanel == null)
+            {
+                return;
+            }
 
             for (int i = 0; i < _rows.Count && i < _currencyForceVisible.Length; i++)
             {
@@ -1999,6 +2068,7 @@ namespace GW2CraftingHelper.Views
                 {
                     row.Cell.Location = new Point(placement.X, placement.Y);
                 }
+
                 // Hidden cells report Row = -1, so the guard below also
                 // keeps their rule off.
                 row.Divider.Visible = placement.Row >= 0 && placement.Row < grid.RowCount - 1;
@@ -2080,7 +2150,7 @@ namespace GW2CraftingHelper.Views
             _saveBarPanel = new Panel()
             {
                 Size = new Point(container.ContentRegion.Width, SaveBarHeight),
-                Parent = container
+                Parent = container,
             };
 
             // The bar's own state, on the surface that owns it: how many
@@ -2096,7 +2166,7 @@ namespace GW2CraftingHelper.Views
                 TextColor = WarningTextColor,
                 Location = new Point(SettingsSaveBarLayout.Inset, 10),
                 Visible = false,
-                Parent = _saveBarPanel
+                Parent = _saveBarPanel,
             };
             TooltipFacility.ApplyPlain(
                 _dirtyChipLabel, "Fields edited since the last load or save. Press Save to persist them.");
@@ -2113,7 +2183,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Location = new Point(SettingsSaveBarLayout.Inset, 9),
-                Parent = _saveBarPanel
+                Parent = _saveBarPanel,
             };
 
             // Destructive - it throws away the user's typed edits - so it
@@ -2126,7 +2196,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
                 BasicTooltipText = "Throw away every unsaved edit on this tab and restore the last saved values.",
                 Visible = false,
-                Parent = _saveBarPanel
+                Parent = _saveBarPanel,
             };
             _discardButton.Click += (_, __) => ConfirmDiscardChanges();
 
@@ -2139,7 +2209,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(SaveButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
                 BasicTooltipText = "Save every section on this tab.",
-                Parent = _saveBarPanel
+                Parent = _saveBarPanel,
             };
             _saveButton.Click += (_, __) => SaveAll();
 
@@ -2162,7 +2232,10 @@ namespace GW2CraftingHelper.Views
         {
             // Resized fires on height-only drags too; the bar's slots are a
             // function of width alone.
-            if (barWidth <= 0 || barWidth == _saveBarWidth) return;
+            if (barWidth <= 0 || barWidth == _saveBarWidth)
+            {
+                return;
+            }
 
             _saveBarWidth = barWidth;
             LayoutSaveBar();
@@ -2170,7 +2243,10 @@ namespace GW2CraftingHelper.Views
 
         private void LayoutSaveBar()
         {
-            if (_saveButton == null) return;
+            if (_saveButton == null)
+            {
+                return;
+            }
 
             int chipWidth = _dirtyChipLabel != null && _dirtyChipLabel.Visible
                 ? (int)Math.Ceiling(UiFonts.Body.MeasureString(_dirtyChipLabel.Text ?? "").Width)
@@ -2196,6 +2272,7 @@ namespace GW2CraftingHelper.Views
             {
                 _discardButton.Location = new Point(slots.DiscardX, SaveBarButtonY);
             }
+
             _saveButton.Location = new Point(slots.SaveX, SaveBarButtonY);
         }
 
@@ -2212,7 +2289,10 @@ namespace GW2CraftingHelper.Views
 
         private void ApplyStatusText()
         {
-            if (_statusLabel == null) return;
+            if (_statusLabel == null)
+            {
+                return;
+            }
 
             int budget = _statusLabel.Width;
             string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Status, _statusFullText, budget);
@@ -2220,6 +2300,7 @@ namespace GW2CraftingHelper.Views
             {
                 _statusLabel.Text = shown;
             }
+
             TooltipFacility.ApplyPlain(
                 _statusLabel,
                 string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
@@ -2232,12 +2313,18 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefreshDirtyState()
         {
-            if (_suspendDirtyRefresh || _dirtyChipLabel == null) return;
+            if (_suspendDirtyRefresh || _dirtyChipLabel == null)
+            {
+                return;
+            }
 
             int unsaved = UnsavedChangeCount();
             _dirtyChipLabel.Text = StatusText.Count(unsaved, "unsaved change");
             _dirtyChipLabel.Visible = unsaved > 0;
-            if (_discardButton != null) _discardButton.Visible = unsaved > 0;
+            if (_discardButton != null)
+            {
+                _discardButton.Visible = unsaved > 0;
+            }
 
             LayoutSaveBar();
         }
@@ -2323,7 +2410,10 @@ namespace GW2CraftingHelper.Views
 
             var outcome = new SaveOutcome(invalidCount, !valuationsSaved);
 
-            if (_statusLabel == null) return outcome;
+            if (_statusLabel == null)
+            {
+                return outcome;
+            }
 
             if (!valuationsSaved)
             {
@@ -2390,6 +2480,7 @@ namespace GW2CraftingHelper.Views
             {
                 entries[kvp.Key] = kvp.Value;
             }
+
             var cleared = new HashSet<int>(persisted.ClearedCurrencyIds);
 
             invalidCount = 0;
@@ -2417,6 +2508,7 @@ namespace GW2CraftingHelper.Views
                     {
                         cleared.Remove(row.CurrencyId);
                     }
+
                     continue;
                 }
 

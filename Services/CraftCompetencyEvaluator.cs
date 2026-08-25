@@ -69,6 +69,7 @@ namespace GW2CraftingHelper.Services
                     best[cd.Discipline] = cd.Rating;
                 }
             }
+
             return best;
         }
 
@@ -95,6 +96,7 @@ namespace GW2CraftingHelper.Services
             {
                 return true;
             }
+
             if (disciplines == null || disciplines.Count == 0)
             {
                 return true;
@@ -107,6 +109,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 anyRealDiscipline = true;
                 if (bestRatingByDiscipline.TryGetValue(discipline, out int rating) && rating >= minRating)
                 {

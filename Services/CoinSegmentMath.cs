@@ -61,6 +61,7 @@ namespace GW2CraftingHelper.Services
             {
                 copper = 0;
             }
+
             return (copper / 10000, (copper % 10000) / 100, copper % 100);
         }
 
@@ -117,13 +118,18 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments, int iconSize = 0)
         {
-            if (segments.Count == 0) return 0;
+            if (segments.Count == 0)
+            {
+                return 0;
+            }
+
             int effectiveIcon = iconSize > 0 ? iconSize : CoinIconSize;
             int width = 0;
             foreach (var seg in segments)
             {
                 width += seg.TextWidth + CoinLabelIconGap + effectiveIcon + CoinSegmentGap;
             }
+
             return width - CoinSegmentGap;
         }
 
@@ -135,7 +141,11 @@ namespace GW2CraftingHelper.Services
         public static int TotalCurrencySegmentsWidth(List<CurrencySegmentSpec> segments)
         {
             var widths = new List<int>(segments.Count);
-            foreach (var seg in segments) widths.Add(seg.TextWidth);
+            foreach (var seg in segments)
+            {
+                widths.Add(seg.TextWidth);
+            }
+
             return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
         }
     }

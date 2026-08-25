@@ -106,8 +106,15 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)) return;
-                if (!PhaseOrdinalGuard.ShouldApply(phaseOrdinal, _phaseOrdinal)) return;
+                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight))
+                {
+                    return;
+                }
+
+                if (!PhaseOrdinalGuard.ShouldApply(phaseOrdinal, _phaseOrdinal))
+                {
+                    return;
+                }
 
                 _phaseOrdinal = phaseOrdinal;
                 _phaseText = phaseText;
@@ -141,7 +148,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)) return;
+                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight))
+                {
+                    return;
+                }
 
                 _inFlight = false;
                 _finalStatusText = finalStatusText;
@@ -193,7 +203,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (_sequence != 0 || _inFlight) return;
+                if (_sequence != 0 || _inFlight)
+                {
+                    return;
+                }
 
                 _sequence = 0;
                 _inFlight = false;
@@ -231,7 +244,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (_sequence != 0 || _inFlight) return false;
+                if (_sequence != 0 || _inFlight)
+                {
+                    return false;
+                }
 
                 _finalStatusText = null;
                 return true;

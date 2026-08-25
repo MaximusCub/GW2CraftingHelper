@@ -95,7 +95,11 @@ namespace GW2CraftingHelper.Views.Rendering
             };
             _rowPanel.LeftMouseButtonPressed += (_, __) =>
             {
-                if (_hovered < 0) return;
+                if (_hovered < 0)
+                {
+                    return;
+                }
+
                 _held = true;
                 Repaint();
                 PressFeedback.PlayClick();
@@ -138,8 +142,8 @@ namespace GW2CraftingHelper.Views.Rendering
                             // Blish draws children in ZIndex order, and a
                             // wash created after its label must not cover it.
                             ZIndex = -1,
-                            Parent = _rowPanel
-                        }
+                            Parent = _rowPanel,
+                        },
                     });
                 }
 
@@ -196,7 +200,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void SetHovered(int index)
         {
-            if (index == _hovered) return;
+            if (index == _hovered)
+            {
+                return;
+            }
 
             _hovered = index;
             _held = false;

@@ -100,7 +100,10 @@ namespace GW2CraftingHelper.Views.Rendering
             foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
-                if (qtyWidth > maxQtyWidth) maxQtyWidth = qtyWidth;
+                if (qtyWidth > maxQtyWidth)
+                {
+                    maxQtyWidth = qtyWidth;
+                }
             }
 
             // Item/Amount column header. This was the one plan table with
@@ -192,7 +195,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(qtyRightEdge - qtyWidth, 9),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
 

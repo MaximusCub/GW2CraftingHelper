@@ -32,8 +32,11 @@ namespace GW2CraftingHelper.Models
     public class SnapshotSourceFilter
     {
         public bool Bank { get; set; } = true;
+
         public bool MaterialStorage { get; set; } = true;
+
         public bool SharedInventory { get; set; } = true;
+
         public HashSet<string> UncheckedCharacters { get; set; } = new HashSet<string>(StringComparer.Ordinal);
     }
 }

@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Models
         // PlanViewModel.TreeRoot, not a row list) - used only as a
         // dictionary key so its header expansion persists like every
         // other section's.
-        RecipeTree
+        RecipeTree,
     }
 
     public enum PlanRowType
@@ -107,18 +107,22 @@ namespace GW2CraftingHelper.Models
         // only when CoinValue > 0, mirroring CoinCurrencyRenderer's own
         // "hasCoin = copper > 0" convention. Never carries StatusTag/
         // BadgeText (no pills in this section, per the brief).
-        NoteLine
+        NoteLine,
     }
 
     public class PlanViewModel
     {
         public string TargetItemName { get; set; }
+
         public string TargetIconUrl { get; set; }
 
         // GW2 API rarity string; null/empty = unknown (neutral color/border).
         public string TargetRarity { get; set; }
+
         public int TargetQuantity { get; set; }
+
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
+
         public CraftingTreeNode TreeRoot { get; set; }
 
         // Populated INSTEAD of TreeRoot for a genuine multi-item batch
@@ -178,6 +182,7 @@ namespace GW2CraftingHelper.Models
         // was available - distinct from "0 owned", and the tree renderer
         // must treat it that way (omit the pill entirely, not show HAVE 0).
         public IReadOnlyDictionary<int, long> CurrencyPlanTotals { get; set; }
+
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         // currency-ux-package (Feature 3, maintainer-ratified #21
@@ -199,7 +204,9 @@ namespace GW2CraftingHelper.Models
     public class CurrencyAmountViewModel
     {
         public long Amount { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
 
         // Non-null only for a fractional-per-unit "Each" amount:
@@ -247,8 +254,11 @@ namespace GW2CraftingHelper.Models
     public class PlanSectionViewModel
     {
         public PlanSectionType SectionType { get; set; }
+
         public string Title { get; set; }
+
         public List<PlanRowViewModel> Rows { get; set; } = new List<PlanRowViewModel>();
+
         public bool IsDefaultExpanded { get; set; }
     }
 
@@ -268,19 +278,25 @@ namespace GW2CraftingHelper.Models
         // RowIdIsAnItemId guards on the tree side.
         // Never displayed (repo invariant: ids are internal-only).
         public int ItemId { get; set; }
+
         public string Label { get; set; }
+
         public string Sublabel { get; set; }
+
         public string IconUrl { get; set; }
 
         // GW2 API rarity string; null/empty = unknown (neutral border).
         public string Rarity { get; set; }
+
         public int Quantity { get; set; }
+
         public long CoinValue { get; set; }
 
         // Per-unit price (CoinValue is the row's total for Quantity units).
         // Only populated for shopping rows, which show both a unit-price and
         // a total-price table column.
         public long UnitCoinValue { get; set; }
+
         public string StatusTag { get; set; }
 
         // Wiki-derived acquisition guidance for unknown-source rows,

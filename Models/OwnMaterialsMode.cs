@@ -38,6 +38,6 @@ namespace GW2CraftingHelper.Models
         /// their instant-sell opportunity cost (net of Trading Post fees);
         /// CraftingProfit is reduced by that amount.
         /// </summary>
-        Valued = 1
+        Valued = 1,
     }
 }

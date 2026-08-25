@@ -21,6 +21,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 _stats.IncrementSearchHit();
                 return result;
             }
+
             _stats.IncrementSearchMiss();
             return null;
         }
@@ -32,6 +33,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 _stats.IncrementRecipeHit();
                 return result;
             }
+
             _stats.IncrementRecipeMiss();
             return null;
         }

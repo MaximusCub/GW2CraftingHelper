@@ -112,9 +112,20 @@ namespace GW2CraftingHelper.Services
                     end = gapEnd > gapStart ? gapStart + ((gapEnd - gapStart) / 2) : gapEnd;
                 }
 
-                if (end < start) end = start;
-                if (end > band) end = band;
-                if (start > band) start = band;
+                if (end < start)
+                {
+                    end = start;
+                }
+
+                if (end > band)
+                {
+                    end = band;
+                }
+
+                if (start > band)
+                {
+                    start = band;
+                }
 
                 into[i] = new CellRange(start, end - start);
                 start = end;

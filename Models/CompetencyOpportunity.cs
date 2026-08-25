@@ -24,6 +24,7 @@ namespace GW2CraftingHelper.Models
         public long DeltaCost { get; set; }
 
         public IReadOnlyList<string> Disciplines { get; set; }
+
         public int MinRating { get; set; }
     }
 }

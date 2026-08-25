@@ -49,6 +49,7 @@ namespace GW2CraftingHelper.Services
             {
                 _baseline = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
             }
+
             RebuildIndex();
         }
 
@@ -73,6 +74,7 @@ namespace GW2CraftingHelper.Services
                 _onError?.Invoke("Failed to load vendor overlay", ex);
                 _overlay = new VendorOfferDataset { SchemaVersion = 1, Offers = new List<VendorOffer>() };
             }
+
             RebuildIndex();
         }
 
@@ -139,6 +141,7 @@ namespace GW2CraftingHelper.Services
             {
                 return offers;
             }
+
             return Array.Empty<VendorOffer>();
         }
 
@@ -154,6 +157,7 @@ namespace GW2CraftingHelper.Services
                     result[id] = offers;
                 }
             }
+
             return result;
         }
 
@@ -175,6 +179,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     _mergedById[offer.OfferId] = offer;
                 }
             }
@@ -187,6 +192,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     _mergedById[offer.OfferId] = offer;
                 }
             }
@@ -199,6 +205,7 @@ namespace GW2CraftingHelper.Services
                     list = new List<VendorOffer>();
                     _mergedByOutput[offer.OutputItemId] = list;
                 }
+
                 list.Add(offer);
             }
 

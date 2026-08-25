@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Models
             { "wintersday", "Wintersday" },
             { "festivalofthefourwinds", "Festival of the Four Winds" },
             { "lunarnewyear", "Lunar New Year" },
-            { "superadventurefestival", "Super Adventure Festival" }
+            { "superadventurefestival", "Super Adventure Festival" },
         };
 
         public static string ResolveFestivalDisplayName(string festivalName)
@@ -84,6 +84,7 @@ namespace GW2CraftingHelper.Models
             {
                 return display;
             }
+
             return festivalName;
         }
 
@@ -147,7 +148,7 @@ namespace GW2CraftingHelper.Models
             { 69, "Tales of Dungeon Delving" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
-            { 80, "Masterwork Rift Essence" }
+            { 80, "Masterwork Rift Essence" },
         };
 
         public static string ResolveCurrencyName(int currencyId)
@@ -156,6 +157,7 @@ namespace GW2CraftingHelper.Models
             {
                 return name;
             }
+
             return "Currency";
         }
     }

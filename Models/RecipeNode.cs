@@ -6,9 +6,13 @@ namespace GW2CraftingHelper.Models
     public class RecipeNode
     {
         public int Id { get; set; }
+
         public string IngredientType { get; set; }
+
         public int Quantity { get; set; }
+
         public int NodeId { get; set; }
+
         public List<RecipeOption> Recipes { get; set; } = new List<RecipeOption>();
 
         // Computed, not stored - Newtonsoft would
@@ -27,6 +31,7 @@ namespace GW2CraftingHelper.Models
         // Null for every ordinary ingredient (the vast majority). Preserved
         // across InventoryReducer.CloneNode.
         public int? AchievementId { get; set; }
+
         public int? AchievementBit { get; set; }
 
         // True when AchievementBitDedupPrePass zeroed THIS occurrence

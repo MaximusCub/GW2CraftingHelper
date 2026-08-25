@@ -302,7 +302,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // neither the game nor H6.
                 BackgroundColor = Color.Transparent,
                 ShowBorder = false,
-                Parent = this
+                Parent = this,
             };
 
             foreach (var row in layout.Rows)
@@ -381,7 +381,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(placed.X, textY),
-                    Parent = _contentPanel
+                    Parent = _contentPanel,
                 });
             }
         }
@@ -456,6 +456,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 child.Dispose();
             }
+
             _contentPanel = null;
         }
 

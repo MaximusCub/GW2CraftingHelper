@@ -191,7 +191,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = row.Label ?? "", Font = font,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(8, 7), Parent = rowPanel
+                    Location = new Point(8, 7), Parent = rowPanel,
                 });
             int levelRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
             var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, levelRightEdge, 7);
@@ -230,7 +230,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         Text = charDisplayText, Font = charFont, TextColor = charColor,
                         AutoSizeWidth = true, AutoSizeHeight = true,
-                        Location = new Point(charX, 9), Parent = rowPanel
+                        Location = new Point(charX, 9), Parent = rowPanel,
                     });
                 if (charLabel.Text != fullCharText)
                 {

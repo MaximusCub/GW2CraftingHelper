@@ -67,7 +67,11 @@ namespace GW2CraftingHelper.Services
 
         public static int ColumnWidth(int panelWidth)
         {
-            if (panelWidth <= 0) return 0;
+            if (panelWidth <= 0)
+            {
+                return 0;
+            }
+
             return ColumnCount(panelWidth) == 1 ? panelWidth : (panelWidth - ColumnGutter) / 2;
         }
 
@@ -86,7 +90,11 @@ namespace GW2CraftingHelper.Services
         public static int TextBudget(int columnWidth)
         {
             int available = PlanRelayoutMath.PinnedRightEdge(columnWidth) - Inset;
-            if (available < 20) available = 20;
+            if (available < 20)
+            {
+                available = 20;
+            }
+
             return available < ProseMeasure ? available : ProseMeasure;
         }
 
@@ -116,7 +124,11 @@ namespace GW2CraftingHelper.Services
         public static int CopyBoxWidth(int columnWidth, int labelBandWidth)
         {
             int width = ValueMaxWidth(columnWidth, labelBandWidth);
-            if (width < ValueFloor) width = ValueFloor;
+            if (width < ValueFloor)
+            {
+                width = ValueFloor;
+            }
+
             return width < ProseMeasure ? width : ProseMeasure;
         }
     }

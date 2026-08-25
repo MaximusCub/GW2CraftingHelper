@@ -255,7 +255,7 @@ namespace GW2CraftingHelper.Services
                     Name = name,
                     IconUrl = kvp.Value.IconUrl ?? string.Empty,
                     TotalCount = total,
-                    Breakdown = breakdown
+                    Breakdown = breakdown,
                 });
             }
 

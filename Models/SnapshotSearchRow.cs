@@ -15,9 +15,13 @@ namespace GW2CraftingHelper.Models
     public class SnapshotSearchRow
     {
         public int ItemId { get; set; }
+
         public string Name { get; set; } = "";
+
         public string IconUrl { get; set; } = "";
+
         public int TotalCount { get; set; }
+
         public List<SnapshotSourceCount> Breakdown { get; set; } = new List<SnapshotSourceCount>();
     }
 
@@ -32,6 +36,7 @@ namespace GW2CraftingHelper.Models
     public class SnapshotSourceCount
     {
         public string Label { get; set; } = "";
+
         public int Count { get; set; }
     }
 }

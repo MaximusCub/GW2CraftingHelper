@@ -68,7 +68,10 @@ namespace GW2CraftingHelper.Services
         public static TextWrapMath.WrappedText WrapNote(
             string label, int panelWidth, int coinCellWidth, Func<string, int> measure)
         {
-            if (measure == null) throw new ArgumentNullException(nameof(measure));
+            if (measure == null)
+            {
+                throw new ArgumentNullException(nameof(measure));
+            }
 
             int indentWidth = measure(LineIndent);
             int firstBudget = Clamp(TextBudget(panelWidth, coinCellWidth) - indentWidth);

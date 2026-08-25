@@ -146,16 +146,19 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (child.Decision != CraftingDecision.Craft &&
                     child.Decision != CraftingDecision.BuyFromTp &&
                     child.Decision != CraftingDecision.BuyFromVendor)
                 {
                     return;
                 }
+
                 if (!child.SubtreeCost.HasValue)
                 {
                     return;
                 }
+
                 // SubtreeCost is coin-only, so a karma-priced descendant
                 // anywhere under this child would silently vanish from
                 // craftTotal; bail rather than under-count.
@@ -163,9 +166,11 @@ namespace GW2CraftingHelper.Services
                 {
                     return;
                 }
+
                 craftTotal += child.SubtreeCost.Value;
                 countedChildren++;
             }
+
             if (countedChildren == 0)
             {
                 return;
@@ -192,6 +197,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 // Skip a seasonal-only offer for the sheet - the plan
                 // always assumes the regular market. No such data exists
                 // today; guards against a future seasonal sheet offer
@@ -200,10 +206,12 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!CostLineValuation.TryGetCoinCost(offer.CostLines, prices, priceBasis, out long coinCost))
                 {
                     continue;
                 }
+
                 long perSheet = coinCost / offer.OutputCount;
                 if (!cheapestSheetCost.HasValue || perSheet < cheapestSheetCost.Value)
                 {
@@ -254,7 +262,7 @@ namespace GW2CraftingHelper.Services
                 SavingsPerUnit = savingsPerUnit,
                 DisciplineBlocked = disciplineBlocked,
                 Discipline = discipline,
-                RequiredRating = requiredRating
+                RequiredRating = requiredRating,
             });
         }
 
@@ -269,10 +277,12 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             if (node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0)
             {
                 return true;
             }
+
             foreach (var child in node.Children)
             {
                 if (SubtreeHasVendorCurrencyCosts(child))
@@ -280,6 +290,7 @@ namespace GW2CraftingHelper.Services
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -303,6 +314,7 @@ namespace GW2CraftingHelper.Services
                     best = cd.Rating;
                 }
             }
+
             return best;
         }
     }

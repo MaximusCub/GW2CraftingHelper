@@ -40,7 +40,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public static bool Run(Action action)
         {
-            if (action == null) return false;
+            if (action == null)
+            {
+                return false;
+            }
 
             var overlay = GameService.Overlay;
             if (overlay == null)
