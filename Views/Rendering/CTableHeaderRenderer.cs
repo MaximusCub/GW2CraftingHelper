@@ -50,6 +50,11 @@ namespace GW2CraftingHelper.Views.Rendering
     // the right column - the full panel width for every caller whose
     // columns are pinned, i.e. all of them, and clamped to the panel for a
     // caller whose derived edge ever landed past it.
+    // leftColumnEndForWidth is where the LEFT column really ends, for a
+    // caller whose left column is the flexing name column: its header
+    // cell has to reach the band pinned to its right, not stop at the
+    // midpoint between two header words (see HeaderCellMath.LabelExtent).
+    // Omitted by the inert headers, whose cells answer nothing.
     // onLeftClick/onRightClick turn those two labels into sort controls
     // for the one caller that has a sortable table (Used Materials).
     // Omitted everywhere else, which leaves the label inert exactly as
@@ -62,7 +67,8 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
-            Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null)
+            Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
+            Func<int, int> leftColumnEndForWidth = null)
         {
             var rowPanel = new Panel()
             {
@@ -114,6 +120,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 plan.Set(1, middleLabelControl, Measure(font, middleLabel), null);
             }
             plan.Set(plan.Count - 1, rightLabelControl, Measure(font, rightLabel), onRightClick);
+            if (leftColumnEndForWidth != null)
+            {
+                plan.SetBoundary(0, leftColumnEndForWidth(panelWidth));
+            }
+
             plan.Sync(rowPanel.Width);
 
             sink.AddRelayout(w =>
@@ -130,6 +141,11 @@ namespace GW2CraftingHelper.Views.Rendering
                 // A right-pinned column's x is a function of the panel
                 // width, so its cell has to follow it rather than stay
                 // where the build-time width put it.
+                if (leftColumnEndForWidth != null)
+                {
+                    plan.SetBoundary(0, leftColumnEndForWidth(w));
+                }
+
                 plan.Sync(rowPanel.Width);
             });
         }

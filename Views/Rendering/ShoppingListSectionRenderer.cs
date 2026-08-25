@@ -264,6 +264,12 @@ namespace GW2CraftingHelper.Views.Rendering
                     () => SortBy(column));
             }
 
+            // Each cell owns its COLUMN, not the pixels its word covers -
+            // the boundaries come from the same pre-scan the columns
+            // themselves do. The buffer is the closure's, written per tick
+            // and never reallocated.
+            var boundaries = new int[labels.Length - 1];
+            ApplyHeaderBoundaries(plan, scan, panelWidth, boundaries);
             plan.Sync(rowPanel.Width);
 
             // Header column labels are font-only (fixed text) -
@@ -285,8 +291,20 @@ namespace GW2CraftingHelper.Views.Rendering
 
                 // Four of the five columns are pinned off the panel edge,
                 // so their cells move with them.
+                ApplyHeaderBoundaries(plan, scan, w, boundaries);
                 plan.Sync(rowPanel.Width);
             });
+        }
+
+        private static void ApplyHeaderBoundaries(
+            HeaderCellPlan plan, ColumnScan scan, int panelWidth, int[] boundaries)
+        {
+            ShoppingColumnMath.HeaderCellBoundaries(
+                scan.EdgesFor(panelWidth), scan.SourceColumnWidth, NameToQtyGap, boundaries);
+            for (int i = 0; i < boundaries.Length; i++)
+            {
+                plan.SetBoundary(i, boundaries[i]);
+            }
         }
 
         // A ValueCellHandle's own

@@ -66,6 +66,36 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(20, result);
         }
 
+        // --- HeaderSplitBeforeColumn (the sortable header's hit area) ---
+
+        [Fact]
+        public void HeaderSplit_SitsInTheGapTheNameColumnStopsAt()
+        {
+            // Used Materials at its own numbers: the Item cell must cover
+            // every pixel a name can occupy and stop before the Amount
+            // band, whatever the header WORDS are wide.
+            int qtyRightEdge = PlanRelayoutMath.PinnedRightEdge(792);
+            int split = PlanRelayoutMath.HeaderSplitBeforeColumn(qtyRightEdge, 40, 12);
+            int nameRightEdge = 50 + PlanRelayoutMath.NameMaxWidthBeforeColumn(qtyRightEdge, 40, 12, 50);
+
+            Assert.Equal(qtyRightEdge - 40 - 6, split);
+            Assert.InRange(split, nameRightEdge, qtyRightEdge - 40);
+        }
+
+        [Fact]
+        public void HeaderSplit_TracksThePanelAndTheBandItStopsAt()
+        {
+            Assert.Equal(
+                400,
+                PlanRelayoutMath.HeaderSplitBeforeColumn(PlanRelayoutMath.PinnedRightEdge(1400), 40, 12)
+                    - PlanRelayoutMath.HeaderSplitBeforeColumn(PlanRelayoutMath.PinnedRightEdge(1000), 40, 12));
+
+            Assert.Equal(
+                30,
+                PlanRelayoutMath.HeaderSplitBeforeColumn(800, 40, 12)
+                    - PlanRelayoutMath.HeaderSplitBeforeColumn(800, 70, 12));
+        }
+
         // --- PinnedRightEdge (the justified-width invariant) ---
         //
         // Replaces the pull-in family (RightBlockX/RightBlockRightEdge):

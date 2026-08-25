@@ -255,6 +255,70 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(400, wide - narrow);
         }
 
+        // Which column a click in the header band sorts by. The failure
+        // this pins: "Item" is a short word at x=50 and "Source" sits
+        // hundreds of pixels right, so a boundary taken between the two
+        // WORDS puts the Source cell over the right-hand end of the item
+        // names - inside the Item column, by every visual cue.
+        [Fact]
+        public void HeaderCellBoundaries_SplitTheGapsBetweenTheColumns()
+        {
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1000, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: 79, sourceColumnWidth: 90);
+
+            var boundaries = new int[4];
+            ShoppingColumnMath.HeaderCellBoundaries(edges, 90, 12, boundaries);
+
+            // Item ends just before the source badges begin...
+            Assert.Equal(edges.SourceX - 6, boundaries[0]);
+
+            // ...and every other boundary is the middle of the gap the two
+            // columns keep, so neither reaches into the other's band.
+            Assert.Equal(edges.SourceX + 90 + 10, boundaries[1]);
+
+            // Same boundary read from the other side: the Amount band's
+            // own left edge, less half the gap.
+            Assert.Equal((edges.QtyRightEdge - 79) - 10, boundaries[1]);
+            Assert.Equal(edges.QtyRightEdge + 10, boundaries[2]);
+            Assert.Equal(edges.EachRightEdge + 10, boundaries[3]);
+
+            for (int i = 1; i < boundaries.Length; i++)
+            {
+                Assert.True(boundaries[i] > boundaries[i - 1], "boundaries run left to right");
+            }
+        }
+
+        [Fact]
+        public void HeaderCellBoundaries_KeepTheItemCellOverTheWholeNameColumn()
+        {
+            // The Item cell has to cover every pixel the item NAMES can
+            // occupy - that budget is the same edge the boundary sits at.
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1400, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: 79, sourceColumnWidth: 90);
+
+            var boundaries = new int[4];
+            ShoppingColumnMath.HeaderCellBoundaries(edges, 90, 12, boundaries);
+
+            int nameRightEdge = 50 + PlanRelayoutMath.NameMaxWidthBeforeColumn(edges.SourceX, 0, 12, 50);
+
+            Assert.True(boundaries[0] >= nameRightEdge - 6);
+            Assert.True(boundaries[0] < edges.SourceX);
+        }
+
+        [Fact]
+        public void HeaderCellBoundaries_IgnoreABufferItCannotFill()
+        {
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(1000, 0, 0);
+
+            ShoppingColumnMath.HeaderCellBoundaries(edges, 90, 12, null);
+            var tooShort = new int[2];
+            ShoppingColumnMath.HeaderCellBoundaries(edges, 90, 12, tooShort);
+
+            Assert.Equal(new[] { 0, 0 }, tooShort);
+        }
+
         [Fact]
         public void ComputeEdgesForPanel_NarrowPanel_StillEndsOneMarginInFromTheEdge()
         {

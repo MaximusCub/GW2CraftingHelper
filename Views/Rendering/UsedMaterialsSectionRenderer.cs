@@ -116,7 +116,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
                 amountHeaderText, _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
-                onRightClick: () => SortBy(PlanTableColumn.Amount));
+                onRightClick: () => SortBy(PlanTableColumn.Amount),
+                // The Item column is everything left of the Amount band -
+                // the same three terms the name's own ellipsis budget uses
+                // (see CreateUsedMaterialRow), with the gap split.
+                leftColumnEndForWidth: w => PlanRelayoutMath.HeaderSplitBeforeColumn(
+                    PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap));
 
             for (int i = 0; i < rows.Count; i++)
             {
