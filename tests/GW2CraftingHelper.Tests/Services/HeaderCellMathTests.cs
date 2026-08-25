@@ -151,6 +151,74 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // The label-gap midpoint is a fallback. A caller that knows where
+        // its column actually ends says so, and the split takes it - the
+        // difference is whole hundreds of pixels on a name column, which is
+        // the strip of header directly above the item names.
+        [Fact]
+        public void AnExplicitBoundary_BeatsTheLabelMidpoint()
+        {
+            var labels = new[]
+            {
+                new HeaderCellMath.LabelExtent(50, 40, 500),
+                new HeaderCellMath.LabelExtent(560, 79)
+            };
+
+            var ranges = HeaderCellMath.Partition(700, labels);
+
+            AssertPartitions(ranges, 700);
+            Assert.Equal(500, ranges[0].Width);
+            Assert.Equal(500, ranges[1].X);
+
+            // What the same two labels would have given without it.
+            var derived = Partition(700, (50, 40), (560, 79));
+            Assert.Equal(325, derived[0].Width);
+        }
+
+        [Fact]
+        public void AnExplicitBoundary_IsStillClampedIntoTheBand()
+        {
+            var past = HeaderCellMath.Partition(
+                200,
+                new[]
+                {
+                    new HeaderCellMath.LabelExtent(10, 30, 900),
+                    new HeaderCellMath.LabelExtent(120, 40)
+                });
+            AssertPartitions(past, 200);
+
+            var before = HeaderCellMath.Partition(
+                200,
+                new[]
+                {
+                    new HeaderCellMath.LabelExtent(10, 30, -50),
+                    new HeaderCellMath.LabelExtent(120, 40)
+                });
+            AssertPartitions(before, 200);
+            Assert.Equal(0, before[0].Width);
+        }
+
+        [Fact]
+        public void MixedBoundaries_TakeEachColumnsOwnRule()
+        {
+            // The Snapshot's band: two grid columns, each split at its own
+            // Amount edge, and the last cell always closing the band.
+            var labels = new[]
+            {
+                new HeaderCellMath.LabelExtent(40, 30, 460),
+                new HeaderCellMath.LabelExtent(500, 79, 600),
+                new HeaderCellMath.LabelExtent(640, 30, 1060),
+                new HeaderCellMath.LabelExtent(1100, 79)
+            };
+
+            var ranges = HeaderCellMath.Partition(1200, labels);
+
+            AssertPartitions(ranges, 1200);
+            Assert.Equal(460, ranges[0].Width);
+            Assert.Equal(600, ranges[2].X);
+            Assert.Equal(1060, ranges[3].X);
+        }
+
         [Fact]
         public void NoLabels_OrNoBand_AreHandled()
         {

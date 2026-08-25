@@ -99,6 +99,47 @@ namespace GW2CraftingHelper.Tests.Services
                 SnapshotItemGridLayout.CellAmountRightEdge(800));
         }
 
+        // What a click at a given x in the header band sorts by. The Name
+        // column IS everything left of the Amount band, so its cell has to
+        // reach the band - not stop halfway between the two header words,
+        // which is where a label-derived boundary lands.
+        [Fact]
+        public void HeaderCellSplit_SitsInTheGapBetweenTheNameAndTheAmountBand()
+        {
+            const int columnWidth = 600;
+            const int band = 79;
+
+            int split = SnapshotItemGridLayout.CellHeaderSplitX(columnWidth, band);
+            int amountLeftEdge = SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - band;
+            int nameRightEdge = SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, band)
+                + SnapshotItemGridLayout.CellTextX;
+
+            Assert.InRange(split, nameRightEdge, amountLeftEdge);
+
+            // Every pixel a name can occupy answers the Name header, and
+            // every pixel the amounts occupy answers the Amount header.
+            Assert.True(split > nameRightEdge - SnapshotItemGridLayout.CellAmountGap);
+            Assert.True(split < SnapshotItemGridLayout.CellAmountRightEdge(columnWidth));
+        }
+
+        [Fact]
+        public void HeaderCellSplit_TracksTheColumnWidthLikeTheAmountEdgeDoes()
+        {
+            const int band = 79;
+
+            Assert.Equal(
+                200,
+                SnapshotItemGridLayout.CellHeaderSplitX(800, band)
+                    - SnapshotItemGridLayout.CellHeaderSplitX(600, band));
+
+            // A wider Amount band pushes the boundary left by exactly its
+            // own growth - the band is what the boundary is measured from.
+            Assert.Equal(
+                20,
+                SnapshotItemGridLayout.CellHeaderSplitX(600, band)
+                    - SnapshotItemGridLayout.CellHeaderSplitX(600, band + 20));
+        }
+
         [Fact]
         public void AmountBand_IsFlooredAtItsOwnHeaderLabel()
         {

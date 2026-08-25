@@ -9,25 +9,49 @@ namespace GW2CraftingHelper.Services
     /// <para>
     /// A partition, not a set of padded boxes: every pixel of the band
     /// belongs to exactly one cell, so no click lands in a dead strip
-    /// between two columns. A boundary sits midway between one label's
-    /// right edge and the next label's left edge.
+    /// between two columns. A boundary is the caller's own column edge
+    /// where it supplies one (<see cref="LabelExtent"/>), and otherwise
+    /// falls back to the midpoint of the gap between two labels.
     /// </para>
     /// </summary>
     public static class HeaderCellMath
     {
-        /// <summary>Where one header label sits inside its band.</summary>
+        /// <summary>
+        /// Where one header label sits inside its band, and - when the
+        /// caller knows it - where its COLUMN ends.
+        /// <para>
+        /// The label-gap midpoint below is a fallback, not the truth: a
+        /// header's text is far narrower than the column it names, so a
+        /// midpoint taken between two words puts the boundary well inside
+        /// the left column ("Item" over a name column hundreds of pixels
+        /// wide). A caller that already computes its column edges passes
+        /// <paramref name="cellEnd"/> and gets the real ones.
+        /// </para>
+        /// </summary>
         public readonly struct LabelExtent
         {
+            /// <summary>No explicit column edge - derive one from the gap.</summary>
+            public const int NoBoundary = int.MinValue;
+
             public readonly int X;
             public readonly int Width;
+            public readonly int CellEnd;
 
             public LabelExtent(int x, int width)
+                : this(x, width, NoBoundary)
+            {
+            }
+
+            public LabelExtent(int x, int width, int cellEnd)
             {
                 X = x;
                 Width = width;
+                CellEnd = cellEnd;
             }
 
             public int Right => X + (Width > 0 ? Width : 0);
+
+            public bool HasBoundary => CellEnd != NoBoundary;
         }
 
         /// <summary>One cell's horizontal span inside the band.</summary>
@@ -89,6 +113,10 @@ namespace GW2CraftingHelper.Services
                 if (i == count - 1)
                 {
                     end = band;
+                }
+                else if (labels[i].HasBoundary)
+                {
+                    end = labels[i].CellEnd;
                 }
                 else
                 {

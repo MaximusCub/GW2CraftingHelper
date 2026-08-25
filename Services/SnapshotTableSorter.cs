@@ -41,13 +41,59 @@ namespace GW2CraftingHelper.Services
             return Sort(rows, state, CompareWallet);
         }
 
+        /// <summary>
+        /// The sort as a PERMUTATION of the caller's own row order:
+        /// <c>order[i]</c> is the index of the row that belongs in display
+        /// position i. Null means "leave them as they are" - no sort
+        /// active, or nothing to reorder.
+        /// <para>
+        /// The Snapshot tab's rows are built once, in the search's own
+        /// order, and a sort click moves the controls it already has rather
+        /// than re-running the account search and recreating every row. So
+        /// the click needs the order, not a re-sorted copy of the data;
+        /// <see cref="SortItems"/> is that same order applied to a list.
+        /// Returning null rather than the identity permutation is what lets
+        /// the third click - the cycle back to None - restore the search's
+        /// own order without the view keeping a second copy of it.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<int> ItemOrder(
+            IReadOnlyList<SnapshotSearchRow> rows, TableSortState<SnapshotTableColumn> state)
+        {
+            return Order(rows, state, CompareItems);
+        }
+
+        /// <summary>The wallet run's twin of <see cref="ItemOrder"/>.</summary>
+        public static IReadOnlyList<int> WalletOrder(
+            IReadOnlyList<SnapshotWalletEntry> rows, TableSortState<SnapshotTableColumn> state)
+        {
+            return Order(rows, state, CompareWallet);
+        }
+
         private static IReadOnlyList<T> Sort<T>(
             IReadOnlyList<T> rows,
             TableSortState<SnapshotTableColumn> state,
             Func<T, T, SnapshotTableColumn, int> compare)
         {
-            if (rows == null || rows.Count < 2) return rows;
-            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue) return rows;
+            var order = Order(rows, state, compare);
+            if (order == null) return rows;
+
+            var sorted = new List<T>(rows.Count);
+            for (int i = 0; i < order.Count; i++)
+            {
+                sorted.Add(rows[order[i]]);
+            }
+
+            return sorted;
+        }
+
+        private static IReadOnlyList<int> Order<T>(
+            IReadOnlyList<T> rows,
+            TableSortState<SnapshotTableColumn> state,
+            Func<T, T, SnapshotTableColumn, int> compare)
+        {
+            if (rows == null || rows.Count < 2) return null;
+            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue) return null;
 
             SnapshotTableColumn column = state.Column.Value;
             int sign = state.Direction == TableSortDirection.Descending ? -1 : 1;
@@ -66,13 +112,7 @@ namespace GW2CraftingHelper.Services
                 return compared != 0 ? compared : a.CompareTo(b);
             });
 
-            var sorted = new List<T>(rows.Count);
-            for (int i = 0; i < order.Length; i++)
-            {
-                sorted.Add(rows[order[i]]);
-            }
-
-            return sorted;
+            return order;
         }
 
         private static int CompareItems(SnapshotSearchRow left, SnapshotSearchRow right, SnapshotTableColumn column)

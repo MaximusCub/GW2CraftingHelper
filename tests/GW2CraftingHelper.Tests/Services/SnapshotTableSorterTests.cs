@@ -107,6 +107,78 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(sorted[0].Name);
         }
 
+        // The order the Snapshot tab actually renders with: its rows are
+        // built once in the search's order and a click re-PLACES them, so
+        // the permutation is what the view consumes and SortItems is the
+        // same permutation applied to a list. One has to follow the other.
+        [Fact]
+        public void ItemOrder_IsTheSamePermutationSortItemsApplies()
+        {
+            var rows = Items();
+            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Amount, 2));
+            var sorted = SnapshotTableSorter.SortItems(rows, Clicked(SnapshotTableColumn.Amount, 2));
+
+            Assert.Equal(rows.Count, order.Count);
+            for (int i = 0; i < order.Count; i++)
+            {
+                Assert.Same(sorted[i], rows[order[i]]);
+            }
+        }
+
+        [Fact]
+        public void WalletOrder_IsTheSamePermutationSortWalletApplies()
+        {
+            var rows = Wallet();
+            var order = SnapshotTableSorter.WalletOrder(rows, Clicked(SnapshotTableColumn.Name, 1));
+            var sorted = SnapshotTableSorter.SortWallet(rows, Clicked(SnapshotTableColumn.Name, 1));
+
+            for (int i = 0; i < order.Count; i++)
+            {
+                Assert.Same(sorted[i], rows[order[i]]);
+            }
+        }
+
+        // The third click. The view keeps no copy of the search's order -
+        // its cells ARE in that order - so "no sort" has to come back as
+        // "leave them alone" rather than as a permutation.
+        [Fact]
+        public void CyclingBackToNone_LeavesTheSearchsOwnOrder()
+        {
+            var rows = Items();
+
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 3)));
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, new TableSortState<SnapshotTableColumn>()));
+            Assert.Null(SnapshotTableSorter.ItemOrder(rows, null));
+            Assert.Null(SnapshotTableSorter.WalletOrder(Wallet(), null));
+        }
+
+        [Fact]
+        public void ADegenerateRun_HasNoOrderToApply()
+        {
+            Assert.Null(SnapshotTableSorter.ItemOrder(null, Clicked(SnapshotTableColumn.Name, 1)));
+            Assert.Null(SnapshotTableSorter.ItemOrder(
+                new List<SnapshotSearchRow>(), Clicked(SnapshotTableColumn.Name, 1)));
+            Assert.Null(SnapshotTableSorter.ItemOrder(
+                new List<SnapshotSearchRow> { new SnapshotSearchRow { Name = "Only" } },
+                Clicked(SnapshotTableColumn.Name, 1)));
+        }
+
+        [Fact]
+        public void EveryOrder_IsAPermutation_NoRowDroppedOrDoubled()
+        {
+            var rows = Items();
+            var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Amount, 1));
+
+            var seen = new HashSet<int>();
+            foreach (int index in order)
+            {
+                Assert.InRange(index, 0, rows.Count - 1);
+                Assert.True(seen.Add(index), "an index may appear once");
+            }
+
+            Assert.Equal(rows.Count, seen.Count);
+        }
+
         private static string[] Names(IReadOnlyList<SnapshotSearchRow> rows)
         {
             var names = new string[rows.Count];

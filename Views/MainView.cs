@@ -112,6 +112,19 @@ namespace GW2CraftingHelper.Views
         private const int ResizeSettleMs = 150;
         private readonly List<ResultCell> _itemCells = new List<ResultCell>();
         private readonly List<ResultCell> _walletCells = new List<ResultCell>();
+
+        // The rows those cells were built from, in the same order - the
+        // search's order, never the sorted one. A sort click re-derives the
+        // placement order below from these rather than re-running the
+        // account search, so cycling back to None restores the search's own
+        // order without a second copy of it.
+        private readonly List<SnapshotSearchRow> _itemRows = new List<SnapshotSearchRow>();
+        private readonly List<SnapshotWalletEntry> _walletRows = new List<SnapshotWalletEntry>();
+
+        // Placement order for each run: display position i shows cell
+        // [order[i]]. Null is the identity - no sort active.
+        private IReadOnlyList<int> _itemOrder;
+        private IReadOnlyList<int> _walletOrder;
         private int _lastRowLayoutWidth = -1;
         private bool _rowRefitPending;
         private long _lastResizeEventTicks;
@@ -1613,16 +1626,24 @@ namespace GW2CraftingHelper.Views
             LayoutSectionChrome(_itemChrome, layout.Items, gridWidth);
             LayoutSectionChrome(_walletChrome, layout.Wallet, gridWidth);
 
-            PlaceCells(_itemCells, layout.Items.Grid, ItemRowHeight, refitText);
-            PlaceCells(_walletCells, layout.Wallet.Grid, WalletRowHeight, refitText);
+            PlaceCells(_itemCells, _itemOrder, layout.Items.Grid, ItemRowHeight, refitText);
+            PlaceCells(_walletCells, _walletOrder, layout.Wallet.Grid, WalletRowHeight, refitText);
         }
 
+        /// <summary>
+        /// Places one run's cells in the grid. The cells are held in the
+        /// search's own order and <paramref name="order"/> is the sort
+        /// applied over them, so a sort click moves controls instead of
+        /// recreating them.
+        /// </summary>
         private static void PlaceCells(
-            List<ResultCell> cells, SnapshotItemGridLayout.Grid grid, int rowHeight, bool refitText)
+            List<ResultCell> cells, IReadOnlyList<int> order,
+            SnapshotItemGridLayout.Grid grid, int rowHeight, bool refitText)
         {
+            bool ordered = order != null && order.Count == cells.Count;
             for (int i = 0; i < cells.Count; i++)
             {
-                var cell = cells[i];
+                var cell = cells[ordered ? order[i] : i];
                 cell.Panel.Location = new Point(grid.Cells[i].X, grid.Cells[i].Y);
                 cell.Panel.Size = new Point(grid.ColumnWidth, rowHeight);
 
@@ -1753,6 +1774,10 @@ namespace GW2CraftingHelper.Views
             // destroys the very panel that field points at.
             _itemCells.Clear();
             _walletCells.Clear();
+            _itemRows.Clear();
+            _walletRows.Clear();
+            _itemOrder = null;
+            _walletOrder = null;
             _resultGridPanel = null;
             _itemChrome = null;
             _walletChrome = null;
@@ -1875,48 +1900,51 @@ namespace GW2CraftingHelper.Views
             int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
             int columnWidth = SnapshotItemGridLayout.ComputeColumnWidth(gridWidth);
 
-            // The header the user clicked decides the order both runs are
-            // built in; each run has its own state, so sorting the items
-            // does not disturb the currencies beneath them.
-            var sortedItems = SnapshotTableSorter.SortItems(itemRows, _itemSortState);
-            var sortedWallet = SnapshotTableSorter.SortWallet(walletRows, _walletSortState);
-
             _resultGridPanel = new Panel()
             {
                 Size = new Point(gridWidth, 0),
                 Parent = _contentPanel
             };
 
-            _itemChrome = anyItemRows
-                ? CreateSectionChrome("Items", "Item", _itemSortState, () => RebuildContent())
-                : null;
-            _walletChrome = anyWalletRows
-                ? CreateSectionChrome("Currencies", "Currency", _walletSortState, () => RebuildContent())
-                : null;
+            _itemChrome = anyItemRows ? CreateSectionChrome("Items", "Item", _itemSortState) : null;
+            _walletChrome = anyWalletRows ? CreateSectionChrome("Currencies", "Currency", _walletSortState) : null;
 
-            // Both bands are data-derived and width-invariant, so they are
-            // measured once here and captured by every cell's re-fit
-            // closure rather than re-scanned on each resize.
+            // Cells are built in the SEARCH's own order and stay in it for
+            // the life of the render; a sort is a placement order over
+            // them (see SortSection), not a different set of rows. Each
+            // run's Amount band is data-derived and width-invariant, so it
+            // is measured once here - the header label it is floored at is
+            // the only part a later sort click can change.
             if (_itemChrome != null)
             {
-                _itemChrome.AmountBand = MeasureAmountBand(
-                    sortedItems, r => AmountText(r.TotalCount), _itemChrome);
-                foreach (var row in sortedItems)
+                _itemRows.AddRange(itemRows);
+                _itemChrome.ReapplyOrder =
+                    () => _itemOrder = SnapshotTableSorter.ItemOrder(_itemRows, _itemSortState);
+                _itemChrome.WidestAmount = MeasureWidestAmount(itemRows, r => AmountText(r.TotalCount));
+                _itemChrome.RefreshHeaders();
+                foreach (var row in itemRows)
                 {
-                    CreateItemRow(row, columnWidth, _itemChrome.AmountBand);
+                    CreateItemRow(row, columnWidth, _itemChrome);
                 }
+
+                _itemChrome.ReapplyOrder();
             }
 
             // After the item cells, and laid out below them by
             // LayoutResultGrid - the order the single-column list had.
             if (_walletChrome != null)
             {
-                _walletChrome.AmountBand = MeasureAmountBand(
-                    sortedWallet, e => AmountText(e.Value), _walletChrome);
-                foreach (var entry in sortedWallet)
+                _walletRows.AddRange(walletRows);
+                _walletChrome.ReapplyOrder =
+                    () => _walletOrder = SnapshotTableSorter.WalletOrder(_walletRows, _walletSortState);
+                _walletChrome.WidestAmount = MeasureWidestAmount(walletRows, e => AmountText(e.Value));
+                _walletChrome.RefreshHeaders();
+                foreach (var entry in walletRows)
                 {
-                    CreateWalletRow(entry, columnWidth, _walletChrome.AmountBand);
+                    CreateWalletRow(entry, columnWidth, _walletChrome);
                 }
+
+                _walletChrome.ReapplyOrder();
             }
 
             // Places the cells the two loops just created and gives the grid
@@ -1940,13 +1968,13 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// The Amount column's reserved width for one run: the widest
-        /// amount it renders, floored at its own header label (see
-        /// SnapshotItemGridLayout.CellAmountBandWidth for why the floor
-        /// matters at the ColumnHeader tier).
+        /// The widest amount one run renders. Data-derived, so it is
+        /// measured once per rebuild; the header label it is floored
+        /// against is the only other term in the Amount band, and that one
+        /// moves with the sort indicator (see SectionChrome.RefreshHeaders
+        /// and SnapshotItemGridLayout.CellAmountBandWidth).
         /// </summary>
-        private static int MeasureAmountBand<T>(
-            IReadOnlyList<T> rows, Func<T, string> amountOf, SectionChrome chrome)
+        private static int MeasureWidestAmount<T>(IReadOnlyList<T> rows, Func<T, string> amountOf)
         {
             var font = UiFonts.Body;
             int widest = 0;
@@ -1956,7 +1984,7 @@ namespace GW2CraftingHelper.Views
                 if (width > widest) widest = width;
             }
 
-            return SnapshotItemGridLayout.CellAmountBandWidth(widest, chrome.MeasureAmountHeader());
+            return widest;
         }
 
         /// <summary>
@@ -2031,37 +2059,80 @@ namespace GW2CraftingHelper.Views
 
             public TableSortState<SnapshotTableColumn> Sort;
 
-            /// <summary>Width the Amount column reserves for this run - see
-            /// MeasureAmountBand.</summary>
+            /// <summary>Widest amount this run renders - see
+            /// MeasureWidestAmount.</summary>
+            public int WidestAmount;
+
+            /// <summary>Width the Amount column reserves for this run: the
+            /// widest amount, floored at the header label above it (see
+            /// SnapshotItemGridLayout.CellAmountBandWidth). Read live by
+            /// every cell's re-fit closure, because the sort indicator
+            /// moves the floor.</summary>
             public int AmountBand;
 
             public readonly List<Label> NameHeaders = new List<Label>();
             public readonly List<Label> AmountHeaders = new List<Label>();
 
-            /// <summary>Cycles this run's sort and re-renders.</summary>
+            /// <summary>Cycles this run's sort and re-places its cells.</summary>
             public Action<SnapshotTableColumn> SortBy;
+
+            /// <summary>Re-derives this run's placement order from its own
+            /// rows and sort state - the one place that knows which of the
+            /// two runs a chrome belongs to.</summary>
+            public Action ReapplyOrder;
+
+            /// <summary>Per-column click actions, built once: the header
+            /// cells are re-described on every resize tick and must not
+            /// allocate a closure per column per tick.</summary>
+            public Action SortByName;
+            public Action SortByAmount;
 
             /// <summary>The header band's hover/click cells - one pair per
             /// grid column, owned by the band and re-described whenever the
             /// grid's column count or width changes.</summary>
             public SortableHeaderCells Cells;
 
-            public string NameHeaderText()
+            /// <summary>The cell split over those labels. Rebuilt only when
+            /// the column count or a header's width changes; its Sync is
+            /// what runs per tick.</summary>
+            public HeaderCellPlan CellPlan;
+            public int PlanColumns;
+
+            /// <summary>Header text, and everything measured from it. Fixed
+            /// between sort clicks - the indicator is the only part that
+            /// moves - so nothing on the per-tick path measures a string.
+            /// </summary>
+            public string NameText;
+            public string AmountText;
+            public int NameWidth;
+            public int AmountWidth;
+
+            /// <summary>
+            /// Re-resolves the two header labels against the current sort
+            /// state and re-floors the Amount band on the new label width.
+            /// The cell plan is dropped rather than patched: it caches
+            /// those widths, and a click is not a path worth a partial
+            /// update for.
+            /// </summary>
+            public void RefreshHeaders()
             {
-                return SortableHeaderLabel.Decorate(
+                var font = TableHeaderStyle.Font;
+                NameText = SortableHeaderLabel.Decorate(
                     NameTitle, Sort.IndicatorFor(SnapshotTableColumn.Name));
-            }
-
-            public string AmountHeaderText()
-            {
-                return SortableHeaderLabel.Decorate(
+                AmountText = SortableHeaderLabel.Decorate(
                     AmountHeaderTitle, Sort.IndicatorFor(SnapshotTableColumn.Amount));
-            }
+                NameWidth = (int)Math.Ceiling(font.MeasureString(NameText).Width);
+                AmountWidth = (int)Math.Ceiling(font.MeasureString(AmountText).Width);
+                AmountBand = SnapshotItemGridLayout.CellAmountBandWidth(WidestAmount, AmountWidth);
 
-            public int MeasureAmountHeader()
-            {
-                return (int)Math.Ceiling(
-                    TableHeaderStyle.Font.MeasureString(AmountHeaderText()).Width);
+                for (int i = 0; i < NameHeaders.Count; i++)
+                {
+                    NameHeaders[i].Text = NameText;
+                    AmountHeaders[i].Text = AmountText;
+                }
+
+                CellPlan = null;
+                PlanColumns = 0;
             }
 
             public const string AmountHeaderTitle = "Amount";
@@ -2074,7 +2145,7 @@ namespace GW2CraftingHelper.Views
         /// knows how many columns the grid resolved to.
         /// </summary>
         private SectionChrome CreateSectionChrome(
-            string title, string nameTitle, TableSortState<SnapshotTableColumn> sort, Action onSortChanged)
+            string title, string nameTitle, TableSortState<SnapshotTableColumn> sort)
         {
             var chrome = new SectionChrome { NameTitle = nameTitle, Sort = sort };
 
@@ -2108,13 +2179,51 @@ namespace GW2CraftingHelper.Views
             };
 
             chrome.Cells = new SortableHeaderCells(chrome.HeaderPanel);
-            chrome.SortBy = column =>
-            {
-                sort.Cycle(column);
-                onSortChanged();
-            };
+            chrome.SortBy = column => SortSection(chrome, column);
+            chrome.SortByName = () => chrome.SortBy(SnapshotTableColumn.Name);
+            chrome.SortByAmount = () => chrome.SortBy(SnapshotTableColumn.Amount);
+            chrome.RefreshHeaders();
 
             return chrome;
+        }
+
+        /// <summary>
+        /// Applies a header click: the run's sort state cycles, its headers
+        /// re-resolve, and its cells are RE-PLACED in the new order.
+        /// <para>
+        /// Nothing is re-queried and nothing is disposed. The old path
+        /// called RebuildContent, which re-ran the whole account search and
+        /// then destroyed and recreated every control - on a full snapshot
+        /// that is thousands of rows of synchronous work, it dropped the
+        /// scroll position (Blish's Scrollbar zeroes itself when the
+        /// content height changes), and it replaced the header panel under
+        /// a stationary cursor, which leaves MouseOver false until the
+        /// mouse moves (the class Views/Rendering/HoverChainResync exists
+        /// for). Placement-only sorting has none of those: the row set, the
+        /// row count and the grid height are identical before and after, so
+        /// the scroll offset and the hover chain are both untouched by
+        /// construction, and no resync call is needed.
+        /// </para>
+        /// </summary>
+        private void SortSection(SectionChrome chrome, SnapshotTableColumn column)
+        {
+            // Parent-null is the module-unload case the rest of this file
+            // guards the same way; a chrome with no order to reapply was
+            // never handed its run's rows and has nothing to place.
+            if (chrome?.ReapplyOrder == null) return;
+            if (_resultGridPanel == null || _resultGridPanel.Parent == null) return;
+
+            chrome.Sort.Cycle(column);
+
+            // The indicator changes the header label's width, which is the
+            // Amount band's floor and therefore the name column's budget -
+            // the only reason a sort click ever re-ellipsizes anything.
+            int bandBefore = chrome.AmountBand;
+            chrome.RefreshHeaders();
+
+            chrome.ReapplyOrder();
+
+            LayoutResultGrid(refitText: chrome.AmountBand != bandBefore);
         }
 
         /// <summary>
@@ -2143,19 +2252,12 @@ namespace GW2CraftingHelper.Views
 
             int columnCount = section.Grid.ColumnCount;
             int columnWidth = section.Grid.ColumnWidth;
-            var font = TableHeaderStyle.Font;
-            string nameText = chrome.NameHeaderText();
-            string amountText = chrome.AmountHeaderText();
-            int amountWidth = (int)Math.Ceiling(font.MeasureString(amountText).Width);
 
             while (chrome.NameHeaders.Count < columnCount)
             {
-                chrome.NameHeaders.Add(CreateHeaderLabel(chrome));
-                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome));
+                chrome.NameHeaders.Add(CreateHeaderLabel(chrome, chrome.NameText));
+                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome, chrome.AmountText));
             }
-
-            int nameWidth = (int)Math.Ceiling(font.MeasureString(nameText).Width);
-            var cellColumns = new List<SortableHeaderCells.Column>(columnCount * 2);
 
             for (int i = 0; i < chrome.NameHeaders.Count; i++)
             {
@@ -2165,44 +2267,69 @@ namespace GW2CraftingHelper.Views
                 if (!used) continue;
 
                 int columnX = i * columnWidth;
-                int nameX = SnapshotItemGridLayout.CellTextX;
-                int amountX = SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - amountWidth;
+                int amountX =
+                    SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
 
-                chrome.NameHeaders[i].Text = nameText;
-                chrome.NameHeaders[i].Location = new Point(columnX + nameX, ColumnHeaderLabelY);
-                chrome.AmountHeaders[i].Text = amountText;
+                chrome.NameHeaders[i].Location =
+                    new Point(columnX + SnapshotItemGridLayout.CellTextX, ColumnHeaderLabelY);
                 chrome.AmountHeaders[i].Location = new Point(columnX + amountX, ColumnHeaderLabelY);
-
-                // Partitioned per GRID COLUMN, not across the whole band: a
-                // cell that ran past its column's edge would answer clicks
-                // aimed at the next column's Item header. The last column
-                // absorbs the remainder integer division leaves, so the
-                // band has no dead strip at its right edge.
-                int columnBand = i == columnCount - 1 ? gridWidth - columnX : columnWidth;
-                var ranges = HeaderCellMath.Partition(
-                    columnBand,
-                    new[]
-                    {
-                        new HeaderCellMath.LabelExtent(nameX, nameWidth),
-                        new HeaderCellMath.LabelExtent(amountX, amountWidth)
-                    });
-
-                cellColumns.Add(new SortableHeaderCells.Column(
-                    columnX + ranges[0].X, ranges[0].Width, chrome.NameHeaders[i],
-                    () => chrome.SortBy(SnapshotTableColumn.Name)));
-                cellColumns.Add(new SortableHeaderCells.Column(
-                    columnX + ranges[1].X, ranges[1].Width, chrome.AmountHeaders[i],
-                    () => chrome.SortBy(SnapshotTableColumn.Amount)));
             }
 
-            chrome.Cells.Sync(cellColumns);
+            SyncHeaderCells(chrome, columnCount, columnWidth, gridWidth);
         }
 
-        private static Label CreateHeaderLabel(SectionChrome chrome)
+        /// <summary>
+        /// Re-describes the header band's hover/click cells for the grid it
+        /// now spans. Called on every resize tick, so it is position-and-
+        /// width work only: the labels, their measured widths and their
+        /// click actions are fixed between sort clicks and live on the
+        /// chrome's <see cref="HeaderCellPlan"/>, which is rebuilt only
+        /// when the column COUNT changes (or a sort click drops it, having
+        /// changed a header's width).
+        /// <para>
+        /// Each cell's right edge is its column's own, not a midpoint
+        /// between two header words: a Name cell ends where the Amount band
+        /// begins, and an Amount cell ends at the grid column's edge, so no
+        /// cell answers a click aimed at the column beside it. The last
+        /// column absorbs the remainder integer division leaves.
+        /// </para>
+        /// </summary>
+        private static void SyncHeaderCells(
+            SectionChrome chrome, int columnCount, int columnWidth, int gridWidth)
+        {
+            if (columnCount <= 0) return;
+
+            if (chrome.CellPlan == null || chrome.PlanColumns != columnCount)
+            {
+                chrome.CellPlan = new HeaderCellPlan(columnCount * 2, chrome.Cells);
+                for (int i = 0; i < columnCount; i++)
+                {
+                    chrome.CellPlan.Set(i * 2, chrome.NameHeaders[i], chrome.NameWidth, chrome.SortByName);
+                    chrome.CellPlan.Set(
+                        (i * 2) + 1, chrome.AmountHeaders[i], chrome.AmountWidth, chrome.SortByAmount);
+                }
+
+                chrome.PlanColumns = columnCount;
+            }
+
+            int splitX = SnapshotItemGridLayout.CellHeaderSplitX(columnWidth, chrome.AmountBand);
+            for (int i = 0; i < columnCount; i++)
+            {
+                int columnX = i * columnWidth;
+                chrome.CellPlan.SetBoundary(i * 2, columnX + splitX);
+                chrome.CellPlan.SetBoundary(
+                    (i * 2) + 1, i == columnCount - 1 ? gridWidth : columnX + columnWidth);
+            }
+
+            chrome.CellPlan.Sync(gridWidth);
+        }
+
+        private static Label CreateHeaderLabel(SectionChrome chrome, string text)
         {
             var label = LabelHelpers.WithDescenderClearance(new Label()
             {
                 Font = TableHeaderStyle.Font,
+                Text = text,
                 TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -2296,7 +2423,7 @@ namespace GW2CraftingHelper.Views
             return shortened;
         }
 
-        private void CreateItemRow(SnapshotSearchRow row, int columnWidth, int amountBand)
+        private void CreateItemRow(SnapshotSearchRow row, int columnWidth, SectionChrome chrome)
         {
             var rowPanel = new Panel()
             {
@@ -2337,10 +2464,16 @@ namespace GW2CraftingHelper.Views
             string nameText = row.Name ?? "";
             string amountText = AmountText(row.TotalCount);
             var nameLabel = CreateRowTextLabel(
-                rowPanel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, amountBand),
+                rowPanel, nameText,
+                SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
                 4, rarity == null ? (Color?)null : RarityColors.GetRarityNameColor(rarity),
                 out bool nameShortened);
-            var amountLabel = CreateAmountLabel(rowPanel, amountText, columnWidth, 4);
+
+            // Measured once here, not inside the closure below: the text is
+            // fixed for the life of the row, and the re-fit runs once per
+            // pixel of a resize drag over every row on screen.
+            int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
+            var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 4);
 
             // NOT the prefix notation the Amount column uses, and the one
             // deliberate exemption from M9's sweep beside the tabular Amount
@@ -2374,9 +2507,10 @@ namespace GW2CraftingHelper.Views
             // so this closure only re-fits what the new column width changed.
             _itemCells.Add(new ResultCell(rowPanel, w =>
             {
-                FitRowTextLabel(nameLabel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(w, amountBand));
+                FitRowTextLabel(
+                    nameLabel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
                 FitRowTextLabel(breakdownLabel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(w));
-                PlaceAmountLabel(amountLabel, amountText, w, 4);
+                PlaceAmountLabel(amountLabel, amountWidth, w, 4);
                 ApplyItemRowTooltip(
                     rowPanel, nameLabel, breakdownLabel, amountLabel, icon, row, nameText, breakdown);
             }));
@@ -2387,7 +2521,8 @@ namespace GW2CraftingHelper.Views
         /// pins to, so the numbers line up down each grid column however
         /// long the names beside them are.
         /// </summary>
-        private static Label CreateAmountLabel(Panel rowPanel, string text, int columnWidth, int y)
+        private static Label CreateAmountLabel(
+            Panel rowPanel, string text, int textWidth, int columnWidth, int y)
         {
             var label = LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -2398,15 +2533,21 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Parent = rowPanel
             });
-            PlaceAmountLabel(label, text, columnWidth, y);
+            PlaceAmountLabel(label, textWidth, columnWidth, y);
             return label;
         }
 
-        private static void PlaceAmountLabel(Label label, string text, int columnWidth, int y)
+        /// <summary>
+        /// Re-pins one amount to its column's right edge. Takes the width
+        /// the caller measured at build rather than measuring here: the
+        /// text never changes, and this runs per row per pixel of a resize
+        /// drag - the same position-and-width-only rule the plan's header
+        /// cells keep.
+        /// </summary>
+        private static void PlaceAmountLabel(Label label, int textWidth, int columnWidth, int y)
         {
-            int width = (int)Math.Ceiling(UiFonts.Body.MeasureString(text ?? "").Width);
             label.Location = new Point(
-                SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - width, y);
+                SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - textWidth, y);
         }
 
         /// <summary>
@@ -2479,7 +2620,7 @@ namespace GW2CraftingHelper.Views
             return _getItemStatBlock(itemId)?.Rarity;
         }
 
-        private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth, int amountBand)
+        private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth, SectionChrome chrome)
         {
             var rowPanel = new Panel()
             {
@@ -2505,16 +2646,17 @@ namespace GW2CraftingHelper.Views
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
             string amountText = AmountText(entry.Value);
             var label = CreateRowTextLabel(
-                rowPanel, name, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, amountBand),
+                rowPanel, name, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
                 6, null, out bool shortened);
-            var amountLabel = CreateAmountLabel(rowPanel, amountText, columnWidth, 6);
+            int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
+            var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 6);
             StampWalletRowTooltip(rowPanel, label, icon, name, shortened);
 
             _walletCells.Add(new ResultCell(rowPanel, w =>
             {
                 bool nowShortened = FitRowTextLabel(
-                    label, name, SnapshotItemGridLayout.CellNameMaxWidth(w, amountBand));
-                PlaceAmountLabel(amountLabel, amountText, w, 6);
+                    label, name, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
+                PlaceAmountLabel(amountLabel, amountWidth, w, 6);
                 StampWalletRowTooltip(rowPanel, label, icon, name, nowShortened);
             }));
         }

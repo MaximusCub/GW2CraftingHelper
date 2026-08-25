@@ -125,6 +125,20 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// Where a cell's Name header cell ends and its Amount header cell
+        /// begins: the gap between the flexing name and the Amount band,
+        /// split down the middle. The name column IS everything left of
+        /// that band, so a boundary taken between the two header WORDS
+        /// would hand the pixels above the right-hand end of the names to
+        /// the Amount header (see HeaderCellMath.LabelExtent).
+        /// </summary>
+        public static int CellHeaderSplitX(int columnWidth, int amountBandWidth)
+        {
+            return PlanRelayoutMath.HeaderSplitBeforeColumn(
+                CellAmountRightEdge(columnWidth), amountBandWidth, CellAmountGap);
+        }
+
+        /// <summary>
         /// Width a cell's name line may occupy before the Amount column -
         /// the plan tables' own rule, applied to one grid cell rather than
         /// to a full-width row.

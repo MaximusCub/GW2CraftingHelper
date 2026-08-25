@@ -24,6 +24,7 @@ namespace GW2CraftingHelper.Views.Rendering
         private readonly SortableHeaderCells _cells;
         private readonly Label[] _labels;
         private readonly int[] _widths;
+        private readonly int[] _boundaries;
         private readonly Action[] _onClick;
         private readonly HeaderCellMath.LabelExtent[] _extents;
         private readonly HeaderCellMath.CellRange[] _ranges;
@@ -34,10 +35,16 @@ namespace GW2CraftingHelper.Views.Rendering
             _cells = cells;
             _labels = new Label[count];
             _widths = new int[count];
+            _boundaries = new int[count];
             _onClick = new Action[count];
             _extents = new HeaderCellMath.LabelExtent[count];
             _ranges = new HeaderCellMath.CellRange[count];
             _columns = new SortableHeaderCells.Column[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                _boundaries[i] = HeaderCellMath.LabelExtent.NoBoundary;
+            }
         }
 
         internal int Count => _labels.Length;
@@ -55,11 +62,23 @@ namespace GW2CraftingHelper.Views.Rendering
             _onClick[index] = onClick;
         }
 
+        /// <summary>
+        /// Where this column really ends, for a caller that knows: a
+        /// column edge rather than the midpoint between two header words.
+        /// A right-pinned column's edge moves with the panel, so this is
+        /// written per tick - an int, not a measurement.
+        /// </summary>
+        internal void SetBoundary(int index, int cellEnd)
+        {
+            _boundaries[index] = cellEnd;
+        }
+
         internal void Sync(int bandWidth)
         {
             for (int i = 0; i < _labels.Length; i++)
             {
-                _extents[i] = new HeaderCellMath.LabelExtent(_labels[i].Location.X, _widths[i]);
+                _extents[i] = new HeaderCellMath.LabelExtent(
+                    _labels[i].Location.X, _widths[i], _boundaries[i]);
             }
 
             HeaderCellMath.Partition(bandWidth, _extents, _ranges);
