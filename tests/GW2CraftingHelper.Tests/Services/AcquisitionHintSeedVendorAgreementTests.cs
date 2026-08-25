@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
             foreach (var hint in LoadShippedHints().Values)
             {
                 Assert.False(
-                    DecisionPillPlanner.IsSourcePillText(hint.Badge),
+                    DecisionPillPlanner.IsReservedSourceBadgeText(hint.Badge),
                     $"Hint badge '{hint.Badge}' for item {hint.ItemId} renders identically to an " +
                     "acquisition-source pill, which means the opposite thing (a priced source whose " +
                     "cost is in Plan.TotalCoinCost, versus an Unknown node contributing 0). " +

@@ -83,6 +83,32 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("SALVAGE", ShoppingSourceBadge.ForRow(ShoppingRows(vm)[0]));
         }
 
+        [Theory]
+        [InlineData("VENDOR")]
+        [InlineData("TP")]
+        [InlineData("CURRENCY")]
+        public void UnknownSource_SeededBadgeCollidingWithASourceBadge_FallsBackToUnknown(string badge)
+        {
+            // The unknown row and the real source row would carry the same
+            // badge in the same list while meaning opposite things - the
+            // source row has a cost in Plan.TotalCoinCost, the unknown row
+            // contributes 0. The hint text still reaches TooltipForRow.
+            var hints = new Dictionary<int, AcquisitionHint>
+            {
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Bought with account-bound tokens.", Badge = badge }
+            };
+            var vm = _builder.Build(MakeResult(
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                },
+                acquisitionHints: hints));
+
+            var row = ShoppingRows(vm)[0];
+            Assert.Equal("UNKNOWN", ShoppingSourceBadge.ForRow(row));
+            Assert.Equal("Bought with account-bound tokens.", ShoppingSourceBadge.TooltipForRow(row));
+        }
+
         /// <summary>
         /// The regression this finding is about: an unbadged shopping row
         /// used to silently mean "Trading Post". No row in a mixed list may

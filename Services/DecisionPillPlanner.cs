@@ -67,26 +67,30 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class DecisionPillPlanner
     {
-        // The three acquisition-source pill texts. A source pill means the
-        // node has a priced source whose cost is in Plan.TotalCoinCost; an
-        // AcquisitionBadge means the opposite (Decision == Unknown,
-        // contributes 0 and still counts as unpriced - see
-        // PlanViewModelBuilder.HasUnpricedNode), so a badge is never
-        // allowed to render one of these strings.
+        // The module-owned source badge texts, shared with
+        // ShoppingSourceBadge (the other renderer of a seeded
+        // AcquisitionHint badge). A source badge means the item has a real
+        // source whose cost is in Plan.TotalCoinCost; a hint badge means
+        // the opposite (Decision == Unknown, contributes 0 and still
+        // counts as unpriced - see PlanViewModelBuilder.HasUnpricedNode),
+        // so a hint badge is never allowed to render one of these strings.
         private const string CraftPillText = "CRAFT";
         private const string TpPillText = "TP";
         private const string VendorPillText = "VENDOR";
+        private const string CurrencyPillText = "CURRENCY";
 
         /// <summary>
-        /// True when <paramref name="text"/> would render identically to an
-        /// acquisition-source pill. Case-insensitive: the pill layer
-        /// upper-cases nothing, so "Vendor" collides just as badly.
+        /// True when <paramref name="text"/> would render identically to a
+        /// module-owned source badge. Case-insensitive: nothing
+        /// upper-cases a badge on the way to the screen, so "Vendor"
+        /// collides just as badly.
         /// </summary>
-        public static bool IsSourcePillText(string text)
+        public static bool IsReservedSourceBadgeText(string text)
         {
             return string.Equals(text, CraftPillText, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(text, TpPillText, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(text, VendorPillText, StringComparison.OrdinalIgnoreCase);
+                string.Equals(text, VendorPillText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, CurrencyPillText, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -141,7 +145,7 @@ namespace GW2CraftingHelper.Services
                     // ordinary currency leaf gets (see
                     // AppendCurrencyOwnershipPill); an item-type component
                     // keeps its OWN badge.
-                    specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                    specs.Add(new PillSpec(CurrencyPillText, null, PillKind.Locked));
                     AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
                 }
                 else if (node.ComponentOwnedQuantity > 0)
@@ -180,7 +184,7 @@ namespace GW2CraftingHelper.Services
             }
             if (node.Decision == CraftingDecision.Currency)
             {
-                specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                specs.Add(new PillSpec(CurrencyPillText, null, PillKind.Locked));
                 // Every ordinary currency leaf gets the same plan-scope
                 // HAVE/TOTAL pill the cost-component branch above adds.
                 AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
@@ -222,7 +226,7 @@ namespace GW2CraftingHelper.Services
                 // meaning the opposite. The hint TEXT still reaches the
                 // row tooltip either way.
                 string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge) &&
-                        !IsSourcePillText(node.AcquisitionBadge)
+                        !IsReservedSourceBadgeText(node.AcquisitionBadge)
                     ? node.AcquisitionBadge
                     : "UNKNOWN";
                 specs.Add(new PillSpec(badgeText, null, PillKind.Locked));

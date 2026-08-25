@@ -15198,8 +15198,13 @@ purchase inside `Plan.TotalCoinCost` rather than an Unknown node
 contributing 0 - and on this very plan would have sat directly above
 item 1's new "no recipe and no Trading Post price ... count as 0"
 footnote, arguing with it. `DecisionPillPlanner` now drops any badge
-equal to a source-pill text back to `UNKNOWN`, so the seed cannot
-reintroduce the collision.
+equal to a module-owned source badge back to `UNKNOWN`, so the seed
+cannot reintroduce the collision. The sweep found one sibling with the
+same defect - `ShoppingSourceBadge.ForRow`, which renders the same
+seeded badge on a Shopping List `ShoppingUnknown` row next to real
+`TP`/`VENDOR`/`CURRENCY` rows - and it now shares the one predicate. The
+hint TEXT still reaches the tooltip in both places, so the guard costs
+nothing but the misleading badge.
 
 `SeededRecipeCacheStore.MergeMysticForgeRecipes` is kept but is a
 **measured no-op on today's data** - every iteration hits
