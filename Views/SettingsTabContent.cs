@@ -157,6 +157,13 @@ namespace GW2CraftingHelper.Views
 
             public Checkbox Checkbox;
 
+            // A row-level counterpart to SectionBlock.Chip, for the one row
+            // whose save behaviour differs from its section's - see
+            // AddLogDiagnosticsRow. Pinned to the same right edge the tag
+            // slot above uses, so the two read as one column.
+            public Panel Chip;
+            public int ChipWidth;
+
             public string DescriptionText;
             public Label DescriptionLabel;
 
@@ -794,10 +801,15 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// A right-pinned tag in a section's title band. Neutral chrome, and
-        /// only the immediate-apply section gets one: a standing "Save
-        /// needed" on the four save-gated sections is a colour that says
-        /// nothing.
+        /// The tab's one chip word. Only immediate-apply controls carry it:
+        /// a standing "Save needed" on everything else is a colour that says
+        /// nothing, and the save bar already carries the dirty state.
+        /// </summary>
+        private const string ImmediateApplyTagText = "Applies immediately";
+
+        /// <summary>
+        /// A right-pinned tag in a section's title band, for a section whose
+        /// every control applies immediately.
         /// </summary>
         private static void AddSectionChip(SectionBlock section, string text, string tooltip)
         {
@@ -811,6 +823,27 @@ namespace GW2CraftingHelper.Views
             section.Chip = LabelHelpers.CreateSmallTag(
                 section.Panel, text, 0, section.ChipY, border, fill);
             LabelHelpers.ApplyTagTooltip(section.Chip, tooltip);
+        }
+
+        /// <summary>
+        /// The same tag on ONE row, for a control whose save behaviour
+        /// differs from its section's. Same chrome and same right edge as
+        /// the section band's, so the two read as one vocabulary rather than
+        /// two. The row's name column is budgeted against the tag through
+        /// ClusterWidth, exactly as an input row is budgeted against its
+        /// box.
+        /// </summary>
+        private static void AddRowChip(FormRow row, string text, string tooltip)
+        {
+            PillColors.GetPillColors(PillKind.Locked, false, out Color border, out Color fill);
+
+            row.ChipWidth = LabelHelpers.MeasureSmallTagWidth(text);
+            row.ClusterWidth = row.ChipWidth;
+            row.Chip = LabelHelpers.CreateSmallTag(
+                row.Panel, text, 0,
+                PlanRelayoutMath.CenterX(RowHeight, LabelHelpers.SmallTagHeight),
+                border, fill);
+            LabelHelpers.ApplyTagTooltip(row.Chip, tooltip);
         }
 
         private static Label CreateWrappedLabel(Panel parent)
@@ -961,6 +994,14 @@ namespace GW2CraftingHelper.Views
                     row.TestButton.Location =
                         new Point(SettingsFormLayout.TestButtonX(columnWidth), 1);
                     break;
+            }
+
+            if (row.Chip != null)
+            {
+                row.Chip.Location = new Point(
+                    PlanRelayoutMath.RightAlignedX(
+                        PlanRelayoutMath.PinnedRightEdge(columnWidth), row.ChipWidth),
+                    PlanRelayoutMath.CenterX(RowHeight, LabelHelpers.SmallTagHeight));
             }
 
             if (row.NameLabel == null) return;
@@ -1156,14 +1197,16 @@ namespace GW2CraftingHelper.Views
         /// Immediate-apply, unlike the save-gated sections (recorded in
         /// KNOWN-ISSUES) - a volume is tuned by ear - so the row must stay
         /// out of CaptureFormState, or every drag would count as an unsaved
-        /// change. The section's band says so with a tag; the other four
-        /// sections carry no counterpart.
+        /// change. The section's band says so with a tag. The tab's only
+        /// other immediate-apply control is the Diagnostics checkbox, which
+        /// sits in a save-gated section and so carries the same tag on its
+        /// own row; nothing else on the tab is tagged.
         /// </summary>
         private void BuildSoundSection()
         {
             var section = BeginSection("Sound");
             AddSectionChip(
-                section, "Applies immediately",
+                section, ImmediateApplyTagText,
                 "Changes in this section take effect as you make them. Nothing here waits for Save.");
 
             AddClickVolumeRow(section);
@@ -1375,6 +1418,16 @@ namespace GW2CraftingHelper.Views
         /// A Checkbox row: the box IS the name control, and its 92-character
         /// explanation is the row's own wrapped description line rather than
         /// a fourth left column at x=186 matching nothing.
+        /// <para>
+        /// It is also the tab's one immediate-apply control inside a
+        /// save-gated section, so it carries the "Applies immediately" tag
+        /// at ROW level that Sound carries at section level. Without it the
+        /// chip vocabulary lies by omission: the tab teaches that an
+        /// untagged section waits for Save, and this box does not - ticking
+        /// it writes the setting there and then, and Discard cannot take it
+        /// back (LoadCurrentLoggingSettings never touches the checkbox,
+        /// because CaptureFormState deliberately excludes it).
+        /// </para>
         /// </summary>
         private void AddLogDiagnosticsRow(SectionBlock section)
         {
@@ -1391,6 +1444,11 @@ namespace GW2CraftingHelper.Views
                 Parent = section.Panel
             };
             row.DescriptionLabel = CreateWrappedLabel(section.Panel);
+
+            AddRowChip(
+                row, ImmediateApplyTagText,
+                "This box takes effect the moment you tick it - it does not wait for Save, "
+                    + "and Discard does not undo it. The two boxes below it do wait for Save.");
 
             _logDiagnosticsCheckbox = new Checkbox()
             {

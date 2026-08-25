@@ -1954,7 +1954,22 @@ and LoadAll suspends the refresh so one load does not run fifty of them.
 The Sound section's "applies immediately - no Save needed" line became a
 right-pinned tag in its own title band, in neutral Locked chrome. The
 four save-gated sections carry no counterpart: a standing "Save needed"
-on four of five sections is a colour that says nothing. The section
+on four of five sections is a colour that says nothing.
+
+That rule has exactly one exception, and leaving it out was a bug rather
+than restraint. The Diagnostics checkbox writes its setting straight
+through on CheckedChanged and is deliberately absent from
+CaptureFormState, so it applies immediately - but it sits INSIDE the
+save-gated Logging section, directly above two boxes that do wait for
+Save. Untagged, it inherited a promise the tab had just started making:
+tick it, see no dirty chip, conclude nothing was recorded, hit Discard to
+revert - and Discard cannot, because the value is already live. The tag
+therefore also exists at ROW level, same word, same chrome, same pinned
+right edge, budgeted into the row's name column through ClusterWidth the
+way an input row is budgeted against its box. One word, two scopes; a
+control tagged nowhere waits for Save, and that is now true.
+
+The section
 titles moved to the same 16px inset their own rules start at, instead of
 floating 16px inside them, and each rule now spans its own column.
 
@@ -2137,6 +2152,12 @@ SETTINGS
   clears the chip and the status line.
 - Drag the click-volume slider: no dirty chip (immediate-apply), and the
   "Applies immediately" tag sits at the Sound band's right edge.
+- In Logging, confirm the Diagnostics row carries the SAME tag on its own
+  row, pinned to the same right edge as the two input boxes below it, and
+  that the two input rows do NOT. Tick the box: no dirty chip appears
+  (correct - it is already saved), and its hover says so. Then type into
+  Log max size, click Discard, and confirm the box stays ticked while the
+  box below reverts. That difference is what the tag is there to declare.
 - Filter the currency list to one match, then clear it: the tab does not
   jump to the top (the fixed grid height still holds).
 
