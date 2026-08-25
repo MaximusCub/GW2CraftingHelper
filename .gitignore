@@ -362,14 +362,21 @@ packages/
 /*.deps.json
 /*.runtimeconfig*.json
 
-# MysticForgeSeeder intermediate cache
+# Regenerated caches written by the offline tools under tools/ while they run.
+# Untracked for the ordinary reason: they are derived, they are large, and a
+# refresh rewrites them wholesale, so tracking them would put megabytes of
+# machine-generated churn in every diff. Any developer who needs one gets it by
+# running the tool.
+#
+# This is NOT what keeps them out of the shipped .bhm. An earlier version of
+# this comment said it was - that BlishHUD.targets packs all of ref/
+# "regardless", so untracking was the only defence - and that has not been true
+# since GW2CraftingHelper.csproj overrode BuildBlishHUDModule to add an Exclude.
+# It was never quite true anyway: gitignore governs what git stores, and the
+# packer reads the disk, so a working copy that had run the tools shipped them
+# regardless of this file. The Exclude in that target is the single control over
+# what ships, tracked and untracked alike (see docs/RELEASING.md).
 ref/mf_item_id_cache.json
-
-# VendorOfferUpdater intermediate caches - developer-side inputs to
-# tools/VendorOfferUpdater only. Not wired into GW2CraftingHelper.csproj
-# via <Content Include>, but BlishHUD.targets copies the entire ref/
-# directory into the packed .bhm regardless, so they must stay out of the
-# repo tree to stay out of the shipped module (see docs/RELEASING.md).
 ref/wiki_vendor_cache.json
 ref/item_id_cache.json
 ref/seasonal_wikitext_cache.json

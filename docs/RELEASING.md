@@ -108,7 +108,7 @@ restored) defines an `AfterTargets="Build"` target named
 `BuildBlishHUDModule` that runs automatically **on every build**. As of
 M38/WP-29, `GW2CraftingHelper.csproj` redeclares that same-named target
 after the import (the one and only hand-written pack/zip logic in this
-repo's own csproj) so its own version wins, purely to add a three-file
+repo's own csproj) so its own version wins, purely to add a four-file
 `Exclude` - see the addendum below. Otherwise it does exactly this,
 unconditionally:
 
@@ -137,11 +137,24 @@ which `ref/*.json` files are wired into `GW2CraftingHelper.csproj` via
 `<Content Include>`/`CopyToOutputDirectory`. Inspecting the actual `.bhm`
 produced by the build above shows it contains, under `ref/`:
 
-- `acquisition_hints_seed.json`, `emblem.png`, `icon.png`,
-  `item_name_seed.json`, `mystic_forge_recipes.json`, `recipes_seed.json`,
+- The thirteen files the module actually ships, measured from the zip's own
+  entry list on a clean Debug rebuild (2026-08-25):
+  `acquisition_hints_seed.json`, `corner-icon.png`,
+  `daily_cooldown_items.json`, `emblem.png`, `icon.png`,
+  `item_name_seed.json`, `mystic_forge_recipes.json`,
   `recipe_search_seed.json`, `recipe_seed_manifest.json`,
-  `vendor_offers.json` - these are the files also wired into the csproj as
-  `<Content Include>`, so their presence is expected.
+  `recipe_sheet_items.json`, `recipes_seed.json`, `vendor_offers.json`,
+  `vendor_offers_manifest.json`.
+
+  This list used to be written as "the files also wired into the csproj as
+  `<Content Include>`", and it named nine. That framing was the bug: the
+  `<Content Include>` list never determined what shipped, so the doc
+  inherited its omissions - `corner-icon.png`, `daily_cooldown_items.json`,
+  `recipe_sheet_items.json`, `vendor_offers_manifest.json` and
+  `vendor_offer_exclusions.json` were all in the `.bhm` and absent here.
+  The `<Content Include>` entries have since been deleted outright and the
+  packing target is the only owner, so the way to answer "what ships?" is
+  `ref/` minus that target's `Exclude`, or simply to list the zip.
 - **`item_id_cache.json` and `wiki_vendor_cache.json`** - these are *not*
   wired into the csproj as `<Content Include>` items (they exist purely as
   developer-side inputs to `tools/VendorOfferUpdater`), but because the
@@ -244,7 +257,19 @@ above has landed. `GW2CraftingHelper.csproj` now redeclares the imported
 import, so it wins) with an `Exclude` added to the `ref/**` copy for
 `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` - and, since
 `MysticForgeSeeder` landed, `ref/mf_item_id_cache.json`, making it three
-files. None of them is
+files.
+
+**Four, as of the repo-hygiene branch:** `ref/vendor_offer_exclusions.json`
+joined them. It is the odd one out in being *tracked* - it is hand-verified
+data, not a regenerable cache - but it is still a build-time input read only
+by `tools/VendorOfferUpdater` (`Program.cs`, `ApplyExclusions`), with no
+reader anywhere in `Services/`, `Views/` or `Models/`, so it has no business
+in a player's download. It had been shipping in every `.bhm` since it was
+created, because it appeared in no `<Content Include>` entry and the packing
+glob never consulted that list anyway. Those `<Content Include>` entries are
+now gone entirely and this target is the sole owner of what ships.
+
+None of the four is
 copied into `$(OutDir)ref` or zipped into the `.bhm` any more, regardless of
 whether a developer's working copy has them sitting on disk from running
 `tools/VendorOfferUpdater`. Building from an active `VendorOfferUpdater`

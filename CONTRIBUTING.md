@@ -54,6 +54,33 @@ A successful build also produces a `.bhm` file next to the built DLL (e.g.
 `bin\x64\Release\GW2CraftingHelper.bhm`) - see `docs/RELEASING.md` for how
 that packaging step works and what it currently does and does not cover.
 
+### The build emits zero warnings, and that is enforced
+
+`GW2CraftingHelper.csproj` sets `TreatWarningsAsErrors`, so a build that
+prints anything at all is a build that failed. **Do not report warning
+counts in a commit message.** There is nothing to count and nothing to
+compare against a remembered number; if the build succeeded, it was clean.
+
+This replaces a convention that ran for months: commit bodies carried a
+hand-maintained tally ("1745 -> 1744", "1782 pre-existing warnings, none
+new"). That is a person doing a compiler's job, it does not survive being
+handed to someone new, and by the time it was removed the last quoted
+figure was off by roughly 940.
+
+Getting there meant admitting what the analyzer noise actually was. The
+rules still outstanding sit in that project's `<NoWarn>`: 26 StyleCop rule
+IDs covering 1,192 diagnostics, down from 38 rules and 2,723 (measured
+2026-08-25). Each ID is a bounded piece of work, not a judgement that the
+rule is wrong. To take one on: delete the ID, fix what the build then
+reports, and commit the two together - the diff is confined to that one
+rule and the build proves it stays fixed. **The list only ever shrinks.**
+Suppressing a new rule to make a build pass is not a use of this list.
+
+The three largest remaining are `SA1117` (202, parameter layout), `SA1201`
+(173, member ordering) and `SA1401` (172, public fields). None has a
+mechanical fix that leaves the code better than it found it, which is why
+they are still here and the whitespace rules are not.
+
 To **run** what you built rather than develop against it, build in Release
 for `x64` and copy `bin\x64\Release\GW2CraftingHelper.bhm` into your Blish
 HUD installation's `modules` folder, then reload Blish HUD. Players do not
