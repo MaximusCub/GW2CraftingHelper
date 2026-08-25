@@ -194,9 +194,10 @@ namespace GW2CraftingHelper
         private static readonly TimeSpan RefreshFailureBackoff = TimeSpan.FromSeconds(60);
 
         // One-shot: the automatic fetch for an install with NO cached
-        // snapshot fires at most once per module load (see
-        // FirstLoadSnapshotGate). Main-thread only - written and read from
-        // Update() alone.
+        // snapshot fires at most once per armed shot (see
+        // FirstLoadSnapshotGate), re-armed by ClearCache, which puts the
+        // module back into exactly the state the shot exists for.
+        // Main-thread only - Update() and the Clear Cache click handler.
         private bool _firstLoadRefreshAttempted;
 
         // Whether the timer-driven auto-refresh is running right now.
@@ -1013,8 +1014,13 @@ namespace GW2CraftingHelper
             {
                 // Nothing cached at all: the staleness tick below has no
                 // snapshot to age, so this is the only automatic route to
-                // a first one - see FirstLoadSnapshotGate.
-                if (FirstLoadSnapshotGate.ShouldRefreshNow(
+                // a first one - see FirstLoadSnapshotGate. The spent-shot
+                // flag is read here as well as passed in: this branch runs
+                // every frame for as long as nothing is cached (forever,
+                // with no API key configured), and HasRequiredPermissions
+                // allocates an enumerator per call.
+                if (!_firstLoadRefreshAttempted
+                    && FirstLoadSnapshotGate.ShouldRefreshNow(
                         hasCachedSnapshot: false,
                         apiReady: _snapshotService.HasRequiredPermissions(),
                         alreadyAttempted: _firstLoadRefreshAttempted,
@@ -1319,6 +1325,12 @@ namespace GW2CraftingHelper
                 _currentSnapshot = null;
                 _pendingSnapshot = null;
                 _snapshotDirty = false;
+
+                // Back to the state the one shot exists for - nothing
+                // cached and no staleness tick able to fetch anything - so
+                // it is re-armed here rather than leaving Clear Cache with
+                // no automatic route to a snapshot until Blish restarts.
+                _firstLoadRefreshAttempted = false;
             });
         }
 

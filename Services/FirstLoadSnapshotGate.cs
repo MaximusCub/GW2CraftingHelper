@@ -22,7 +22,9 @@ namespace GW2CraftingHelper.Services
         /// stays a ONE-shot: a fetch that fails must leave the tab empty
         /// with its failure status rather than retry forever, and a fetch
         /// that succeeds hands over to the interval timer, which from then
-        /// on has a snapshot to age.
+        /// on has a snapshot to age. Clear Cache re-arms the shot
+        /// (Module.ClearCache) - it recreates the nothing-cached state
+        /// this gate is the only automatic answer to.
         /// <para>
         /// An attempt is only spent when it actually starts. Not-ready
         /// inputs - no API key yet, a refresh already running, the shared
