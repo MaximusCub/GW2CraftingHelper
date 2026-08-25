@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -2079,6 +2080,169 @@ namespace GW2CraftingHelper.Tests.Services
                 node = node.Children?.FirstOrDefault(c => !c.IsCostComponent);
             }
             Assert.True(walked >= depth, $"walked only {walked} levels of {depth}");
+        }
+
+        // --- The concurrency PlanStore._saveLock exists for. Two
+        // genuinely independent writers (Module.PersistAfterGenerateAsync's
+        // post-Generate persist and PersistResolvedPlanInBackground's
+        // pill-click persist - a decision pill on an OLD plan stays
+        // clickable while a NEW Generate is in flight) plus LoadLatest,
+        // which deliberately takes NO lock and relies on the atomic
+        // .tmp+Replace write instead. Neither claim was exercised. ---
+
+        [Fact]
+        public async Task SaveAndLoad_ConcurrentWritersAndReader_NeverYieldATornPlan()
+        {
+            var shallowPipeline = BuildPipeline(out var shallowPrices);
+            shallowPrices.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            shallowPrices.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var shallowResult = await shallowPipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            var deepPipeline = BuildDeepPipeline(out _);
+            var deepResult = await deepPipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Header marker (RequestItems quantity) and payload (tree
+            // depth) are written by the same Save and must always be read
+            // back together - that pairing is what makes a torn read
+            // detectable at all, rather than merely "parsed, so probably
+            // fine".
+            var shallowPlan = Wrap(shallowResult, new DateTime(2026, 8, 25, 9, 0, 0, DateTimeKind.Local), quantity: 1);
+            var deepPlan = Wrap(deepResult, new DateTime(2026, 8, 25, 10, 0, 0, DateTimeKind.Local), quantity: 7);
+            int shallowDepth = TreeDepth(shallowPlan.Result.CraftingTree);
+            int deepDepth = TreeDepth(deepPlan.Result.CraftingTree);
+            Assert.NotEqual(shallowDepth, deepDepth);
+
+            // Seed the file so the race runs entirely against the
+            // File.Replace branch (the one a reader can actually collide
+            // with), not the one-shot File.Move branch.
+            var storeFailures = new ConcurrentQueue<Exception>();
+            var store = new PlanStore(_tempDir, (message, ex) => storeFailures.Enqueue(ex));
+            store.Save(shallowPlan);
+
+            const int writes = 60;
+            var escaped = new ConcurrentQueue<Exception>();
+            var samples = new ConcurrentQueue<PersistedPlan>();
+            int nullLoads = 0;
+            var start = new ManualResetEventSlim(false);
+
+            Action<PersistedPlan> writer = plan => Run(start, escaped, () =>
+            {
+                for (int i = 0; i < writes; i++)
+                {
+                    store.Save(plan);
+                }
+            });
+
+            var tasks = new[]
+            {
+                Task.Run(() => writer(shallowPlan)),
+                Task.Run(() => writer(deepPlan)),
+                Task.Run(() => Run(start, escaped, () =>
+                {
+                    for (int i = 0; i < writes * 2; i++)
+                    {
+                        // Paced deliberately. An unpaced reader keeps a
+                        // handle on plan.json almost continuously and
+                        // starves the race of anything to observe: measured
+                        // 111 of 120 loads returning null and 60 of 120
+                        // saves losing their File.Replace to the reader's
+                        // handle. With the pause it is 111 real samples,
+                        // 9 nulls and 8 lost writes - still genuinely
+                        // overlapping, but actually sampling the file.
+                        Thread.Sleep(1);
+                        var loaded = store.LoadLatest();
+                        if (loaded == null)
+                        {
+                            Interlocked.Increment(ref nullLoads);
+                        }
+                        else
+                        {
+                            samples.Enqueue(loaded);
+                        }
+                    }
+                }))
+            };
+
+            start.Set();
+            var all = Task.WhenAll(tasks);
+            Assert.Same(all, await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(60))));
+            await all;
+
+            // Nothing may escape the public surface: Save and LoadLatest
+            // both degrade IO failure to their callbacks, and a lost write
+            // under contention is tolerated - a thrown exception is not.
+            Assert.Empty(escaped);
+
+            // What contention IS allowed to cost: a lost write or a skipped
+            // read, both reported as OS access failures. A torn or
+            // half-written file would instead surface here as a DATA
+            // verdict - gzip's InvalidDataException, a JsonReaderException,
+            // or PlanStoreHelpers' own corrupt-file throw - so this is the
+            // assertion that actually pins "never partially written".
+            foreach (var failure in storeFailures)
+            {
+                Assert.True(
+                    failure is IOException || failure is UnauthorizedAccessException,
+                    $"contention must fail as IO, not data: {failure.GetType().Name} - {failure.Message}");
+            }
+
+            // Every load landed on exactly one of the two permitted
+            // outcomes - a whole plan, or null - and the reader ran to
+            // completion rather than dying part-way.
+            Assert.Equal(writes * 2, samples.Count + nullLoads);
+            Assert.True(samples.Count > 0, $"every one of the {writes * 2} loads returned null");
+            foreach (var sample in samples)
+            {
+                int quantity = sample.RequestItems.Single().Quantity;
+                Assert.Contains(quantity, new[] { 1, 7 });
+                Assert.Equal(
+                    quantity == 1 ? shallowDepth : deepDepth,
+                    TreeDepth(sample.Result.CraftingTree));
+            }
+
+            // The file survives the race intact, and the uncontended write
+            // that follows it consumes its own .tmp.
+            store.Save(deepPlan);
+            var final = store.LoadLatest();
+            Assert.NotNull(final);
+            Assert.Equal(7, final.RequestItems.Single().Quantity);
+            Assert.Equal(deepDepth, TreeDepth(final.Result.CraftingTree));
+            Assert.False(File.Exists(Path.Combine(_tempDir, "plan.json.tmp")));
+        }
+
+        private static void Run(ManualResetEventSlim start, ConcurrentQueue<Exception> escaped, Action body)
+        {
+            start.Wait();
+            try
+            {
+                body();
+            }
+            catch (Exception ex)
+            {
+                escaped.Enqueue(ex);
+            }
+        }
+
+        // Longest non-cost-component chain, root inclusive - cost-component
+        // children are currency leaves, not crafting steps.
+        private static int TreeDepth(CraftingTreeNode node)
+        {
+            if (node == null) return 0;
+
+            int deepestChild = 0;
+            if (node.Children != null)
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child.IsCostComponent) continue;
+                    int depth = TreeDepth(child);
+                    if (depth > deepestChild) deepestChild = depth;
+                }
+            }
+
+            return deepestChild + 1;
         }
     }
 }
