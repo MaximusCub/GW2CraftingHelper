@@ -30,33 +30,6 @@ namespace GW2CraftingHelper.Services
     public static class TreeRowTooltipComposer
     {
         /// <summary>
-        /// Returns a fresh, never-null list (empty when nothing applies) so
-        /// the caller can hand it straight to <c>UpdateTreeRowTooltip</c>
-        /// and capture the SAME list in its settle re-ellipsis closure,
-        /// matching <c>RenderTreeNode</c>'s own "computed once, reused
-        /// verbatim" comment on <c>extraTooltipLines</c> - only the "is the
-        /// name actually truncated" line is reconsidered on resize, never
-        /// this list's contents.
-        /// </summary>
-        public static List<string> BuildExtraTooltipLines(
-            CraftingTreeNode node,
-            string captionText,
-            PlanViewModel currentPlan)
-        {
-            // Single wrap seam (see TooltipTextFormat): the vendor
-            // price-side caveats run to 83 characters, past the budget, so
-            // the break lands where this module put it rather than wherever
-            // Blish's own 500px cap happens to fall. An over-budget line
-            // becomes several list entries, which is what the caller's
-            // newline join already renders. Applied HERE and not in
-            // BuildExtraTooltipContent because the rich path wraps the same
-            // content against a real font at a real pixel width - one wrap
-            // policy per path, never both on one string.
-            return TooltipTextFormat.WrapLines(
-                BuildExtraTooltipContent(node, captionText, currentPlan).ToPlainLines());
-        }
-
-        /// <summary>
         /// A row's item stat block as tooltip content, or empty content
         /// when the session has no stats for it - or when the row's id is
         /// not an item id in the first place (see
@@ -112,11 +85,26 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The structured form <see cref="BuildExtraTooltipLines"/> is a
-        /// plain-text view of. The unit-price line keeps its gold figure as
-        /// a coin span so the rich tooltip surface can draw it with real
-        /// coin icons instead of spelling it "1g 23s 45c". Deliberately
-        /// UNWRAPPED - see <see cref="BuildExtraTooltipLines"/>.
+        /// A row's extra tooltip lines as content. Returns fresh,
+        /// never-null content (empty when nothing applies) so the caller can
+        /// hand it straight to <c>UpdateTreeRowTooltip</c> and capture the
+        /// SAME instance in its settle re-ellipsis closure, matching
+        /// <c>RenderTreeNode</c>'s own "computed once, reused verbatim"
+        /// comment on <c>extraTooltipLines</c> - only the "is the name
+        /// actually truncated" line is reconsidered on resize, never this
+        /// content.
+        /// <para>
+        /// The unit-price line keeps its gold figure as a coin span so the
+        /// rich tooltip surface can draw it with real coin icons instead of
+        /// spelling it "1g 23s 45c".
+        /// </para>
+        /// <para>
+        /// Returned UNWRAPPED - including the vendor price-side caveats,
+        /// which run to 83 characters. The surface measures and wraps
+        /// against a real font at a real pixel width. (There was once a
+        /// second entry point returning pre-wrapped strings; nothing called
+        /// it and it is gone.)
+        /// </para>
         /// </summary>
         public static TooltipContent BuildExtraTooltipContent(
             CraftingTreeNode node,

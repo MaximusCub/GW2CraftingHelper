@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 
 namespace GW2CraftingHelper.Services
 {
@@ -12,10 +11,12 @@ namespace GW2CraftingHelper.Services
     /// gold/silver/copper icons (icons RIGHT of their numbers, repo
     /// invariant) by the rich tooltip surface.
     ///
-    /// Every span carries plain text too, so <see cref="ToPlainText"/>
-    /// reproduces byte-for-byte what the composers used to return. That is
-    /// what lets each composer keep ONE implementation while still serving
-    /// the plain <c>BasicTooltipText</c> path and its existing tests.
+    /// Every span carries its own plain text as well as its structure. The
+    /// rich surface draws that text; a coin span additionally keeps the
+    /// copper value, so the surface can replace "1g 23s 45c" with icons.
+    /// There is deliberately no plain-string projection on this type - the
+    /// composers have one output shape, and the tests that want to assert on
+    /// wording flatten it themselves (Tests/Helpers/TooltipContentPlainText).
     /// </summary>
     public sealed class TooltipContent
     {
@@ -108,46 +109,6 @@ namespace GW2CraftingHelper.Services
         {
             return new TooltipLine(spans ?? new TooltipSpan[0]);
         }
-
-        /// <summary>
-        /// The exact string the plain path assigns to
-        /// <c>BasicTooltipText</c>. Coin spans render their own plain text,
-        /// which is why the two composers' deliberately different coin
-        /// formats (always-three-units vs leading-units-omitted) survive
-        /// the round trip unchanged.
-        /// </summary>
-        public string ToPlainText()
-        {
-            var sb = new StringBuilder();
-            for (int i = 0; i < _lines.Count; i++)
-            {
-                if (i > 0)
-                {
-                    sb.Append('\n');
-                }
-
-                _lines[i].AppendPlainText(sb);
-            }
-
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// One plain string per line - the shape
-        /// <c>TreeRowTooltipComposer</c>'s callers already pass around.
-        /// </summary>
-        public List<string> ToPlainLines()
-        {
-            var lines = new List<string>(_lines.Count);
-            foreach (var line in _lines)
-            {
-                var sb = new StringBuilder();
-                line.AppendPlainText(sb);
-                lines.Add(sb.ToString());
-            }
-
-            return lines;
-        }
     }
 
     /// <summary>What a line IS, structurally. Prose unless stated.</summary>
@@ -190,14 +151,6 @@ namespace GW2CraftingHelper.Services
         /// prose row.
         /// </summary>
         public string IconUrl { get; }
-
-        internal void AppendPlainText(StringBuilder sb)
-        {
-            foreach (var span in _spans)
-            {
-                sb.Append(span.Text);
-            }
-        }
     }
 
     /// <summary>

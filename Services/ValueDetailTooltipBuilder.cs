@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Services
     /// and fallback tier propagates transitively up through every Craft
     /// ancestor, so an unvalued currency or GuildUpgrade ingredient
     /// anywhere in a chosen subtree forces delta = 0 for that node AND
-    /// every ancestor above it - TryBuild's delta &lt;= 0 guard below then
+    /// every ancestor above it - TryBuildContent's delta &lt;= 0 guard then
     /// suppresses the hover for the whole chain. Documented here, not
     /// fixed, so a future reader treats this as a known scope limit of the
     /// current solver rollup rather than rediscovering it as a bug.
@@ -38,40 +38,23 @@ namespace GW2CraftingHelper.Services
     {
         /// <summary>
         /// Attempts to build the value-detail tooltip for <paramref name="node"/>.
-        /// Returns false (and a null <paramref name="tooltipText"/>) when
-        /// this node's decision is not CRAFT/BuyFromVendor, either cost
-        /// figure is unavailable, or the two figures do not diverge - the
-        /// caller must show nothing in all of those cases, not an empty or
-        /// misleading tooltip.
-        /// </summary>
-        public static bool TryBuild(
-            CraftingTreeNode node,
-            IReadOnlyDictionary<int, TimegatedItem> vendorCapsByItemId,
-            out string tooltipText)
-        {
-            tooltipText = null;
-            if (!TryBuildContent(node, vendorCapsByItemId, out var content))
-            {
-                return false;
-            }
-
-            // Single wrap seam (see TooltipTextFormat): the opportunity-cost
-            // sentence is 76 characters, just past the budget, so the break
-            // lands where this module put it instead of wherever Blish's
-            // own 500px cap happens to fall. Applied HERE and not in
-            // TryBuildContent because the rich path wraps the same content
-            // against a real font at a real pixel width - one wrap policy
-            // per path, never both on one string.
-            tooltipText = TooltipTextFormat.Wrap(content.ToPlainText());
-            return true;
-        }
-
-        /// <summary>
-        /// The structured form <see cref="TryBuild"/> is a plain-text view
-        /// of. Each gold figure stays a coin span, which is what lets the
-        /// rich tooltip surface draw it with real coin icons instead of
-        /// spelling it "1g 23s 45c". Deliberately UNWRAPPED - see
-        /// <see cref="TryBuild"/>.
+        /// Returns false (and a null <paramref name="content"/>) when this
+        /// node's decision is not CRAFT/BuyFromVendor, either cost figure is
+        /// unavailable, or the two figures do not diverge - the caller must
+        /// show nothing in all of those cases, not an empty or misleading
+        /// tooltip.
+        /// <para>
+        /// Each gold figure stays a coin span, which is what lets the rich
+        /// tooltip surface draw it with real coin icons instead of spelling
+        /// it "1g 23s 45c".
+        /// </para>
+        /// <para>
+        /// Returned UNWRAPPED. The surface that renders this measures and
+        /// wraps against a real font at a real pixel width, so pre-breaking
+        /// the text here would only fight it. (There was once a second,
+        /// plain-string entry point that applied TooltipTextFormat's
+        /// character budget; nothing called it and it is gone.)
+        /// </para>
         /// </summary>
         public static bool TryBuildContent(
             CraftingTreeNode node,

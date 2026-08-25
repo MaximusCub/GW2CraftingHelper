@@ -12,21 +12,15 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class PillSubduingTooltipBuilder
     {
-        public static string Build(
-            PillSubduingResult result,
-            IReadOnlyDictionary<int, ItemMetadata> itemMetadata,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
-        {
-            return BuildContent(result, itemMetadata, currencyMetadata)?.ToPlainText();
-        }
-
         /// <summary>
-        /// The structured form <see cref="Build"/> is a plain-text view of.
-        /// The gold margin stays a coin span so the rich tooltip surface
-        /// can draw it with real coin icons; every other part is prose.
-        /// Unwrapped - the caller's path decides its own wrap (the plain
-        /// path through <c>TooltipTextFormat</c>, the rich path against a
-        /// real font at a real pixel width).
+        /// The tooltip for a subdued pill, or null when there is no reason
+        /// to show one. The gold margin stays a coin span so the rich
+        /// tooltip surface can draw it with real coin icons; every other
+        /// part is prose.
+        /// <para>
+        /// Unwrapped: the surface that renders this wraps against a real
+        /// font at a real pixel width.
+        /// </para>
         /// </summary>
         public static TooltipContent BuildContent(
             PillSubduingResult result,
