@@ -654,15 +654,22 @@ namespace GW2CraftingHelper
                 SavesPosition = true
             };
 
-            _mainWindow.Tabs.Add(new Tab(
-                AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
-                "Snapshot"));
-
+            // Crafting Plan first, and Blish opens on the first tab. It is
+            // the one tab that works with no API key at all - recipes,
+            // prices and vendor offers are public data - whereas Snapshot
+            // can only say "No snapshot available. Click Refresh Now.",
+            // which is not an instruction a key-less user can carry out.
+            // Nothing reads a tab by index; the two tabs held as fields
+            // (_logTab, _settingsTab) are compared by reference.
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156711),
                 () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
                 "Crafting Plan"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156699),
+                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
+                "Snapshot"));
 
             _logTab = new Tab(
                 AsyncTexture2D.FromAssetId(156701),
