@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Services.Recipes;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
@@ -34,17 +35,18 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var recipes = RecipeCacheSerializer.LoadRecipeSeed(stream);
 
-                // KNOWN-ISSUES #48: was
-                // 14736 before this fix re-ran the seeder with the schema
-                // version pinned (see Gw2RecipeApiClient.SchemaVersion) -
-                // +230 net new recipes: ~188 were previously invisible to
-                // every unversioned /v2/recipes call (the currency-
-                // ingredient-era bug this fix closes, e.g. 14025 below),
-                // the remainder is ordinary game-content growth accrued
-                // since this seed was last regenerated (build 195497,
-                // -> build 205505, - about six
-                // months of real GW2 patches).
-                Assert.Equal(14966, recipes.Count);
+                // Row count and bytes, both against what the seeder itself
+                // recorded in ref/recipe_seed_manifest.json - see
+                // ShippedSeedManifest for why the exact literal that used to
+                // sit here (and the changelog of past reseeds above it) was
+                // a tripwire nobody could read.
+                ShippedSeedManifest.AssertRecipeSeedMatches(
+                    "recipes_seed.json", recipes.Count);
+
+                // Secondary sanity band, independent of the manifest: a
+                // seeder run that agreed with its own manifest but emitted a
+                // tenth of the corpus is still wrong.
+                Assert.InRange(recipes.Count, 12000, 30000);
 
                 // Amalgamated Rift Essence (recipe 14025 -> item 100930):
                 // the concrete recipe that was invisible to every
@@ -183,15 +185,9 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var searches = RecipeCacheSerializer.LoadSearchSeed(stream);
 
-                // KNOWN-ISSUES #48: was
-                // 15774 before this fix - see the matching count-drift
-                // comment in LoadRecipeSeed_ShippedSeedFile_... above for
-                // the full breakdown. 16022 -> 16024 on the 2026-08-24
-                // reseed at build 205780: the four hand-authored
-                // negative-id rows (-1592..-1595) now get search entries
-                // like every other recipe, because the seeder preserves
-                // them explicitly instead of losing them (Step 5a).
-                Assert.Equal(16024, searches.Count);
+                ShippedSeedManifest.AssertRecipeSeedMatches(
+                    "recipe_search_seed.json", searches.Count);
+                Assert.InRange(searches.Count, 13000, 32000);
 
                 // Amalgamated Rift Essence's search entry (item 100930):
                 // previously a STALE NEGATIVE entry ("100930": []) - the

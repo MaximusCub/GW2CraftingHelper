@@ -550,6 +550,7 @@ namespace VendorOfferUpdater
                     SchemaVersion = dataset.SchemaVersion,
                     Source = dataset.Source,
                     OfferCount = finalOffers.Count,
+                    Sha256 = HashFile(outputPath),
                     GeneratedAt = DateTime.UtcNow.ToString("o")
                 };
                 await File.WriteAllTextAsync(manifestPath, SerializeManifest(manifest));
@@ -1627,6 +1628,21 @@ namespace VendorOfferUpdater
             };
 
             return EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
+        }
+
+        /// <summary>
+        /// Lowercase hex SHA-256 of a file's bytes. Same definition the
+        /// module side uses (RecipeCacheSerializer.HashFile) - this project
+        /// does not reference the module, so the four lines are repeated
+        /// rather than shared, and both are pinned by the seed tests that
+        /// compare a manifest digest against the file it describes.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string HashFile(string path)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
         }
 
         /// <summary>

@@ -14,6 +14,17 @@ namespace VendorOfferUpdater.Models
         public int SchemaVersion { get; set; } = 1;
         public string Source { get; set; } = string.Empty;
         public int OfferCount { get; set; }
+
+        /// <summary>
+        /// Lowercase hex SHA-256 of ref/vendor_offers.json's bytes. Pairs
+        /// with <see cref="OfferCount"/> to give the seed tests something the
+        /// UPDATER produced to check against, instead of a row-count literal
+        /// typed into a test file - which trips on any change but cannot tell
+        /// a legitimate re-scrape from a hand edit, and trains contributors
+        /// to green a failing seed test by editing the number.
+        /// </summary>
+        public string Sha256 { get; set; } = string.Empty;
+
         public string GeneratedAt { get; set; } = string.Empty;
     }
 }

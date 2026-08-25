@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
@@ -309,13 +310,22 @@ namespace GW2CraftingHelper.Tests.Services
                     .Where(o => !Gw2Constants.HomesteadRefinementMaterialIds.Contains(o.OutputItemId))
                     .ToList();
 
-                // Exact-count trip-wires (this repo's established seed-pin
-                // style): any change to these numbers means a wiki
-                // re-scrape altered the shipped Homestead Refinement rows
-                // and warrants a manual look before this test is updated.
-                Assert.Equal(237, homesteadOffers.Count);
-                Assert.Equal(216, materialRows.Count);
-                Assert.Equal(21, nonMaterialRows.Count);
+                // Sanity bands, not exact literals. The tripwire for "the
+                // shipped rows changed" is the sha256 in
+                // ref/vendor_offers_manifest.json, asserted in
+                // Load_ShippedDataset_... below; it covers every row in the
+                // file rather than these three subsets, and only a
+                // VendorOfferUpdater run can move it. What these bands are
+                // for is the shape: a re-scrape that halved the Homestead
+                // section, or one that left the 21 one-time Upgrade rows
+                // outnumbering the material conversions, is wrong however
+                // legitimately it was generated.
+                Assert.InRange(homesteadOffers.Count, 150, 400);
+                Assert.InRange(materialRows.Count, 150, 350);
+                Assert.InRange(nonMaterialRows.Count, 10, 50);
+                Assert.Equal(
+                    homesteadOffers.Count, materialRows.Count + nonMaterialRows.Count);
+                Assert.True(materialRows.Count > nonMaterialRows.Count);
 
                 foreach (var offer in materialRows)
                 {
@@ -387,16 +397,15 @@ namespace GW2CraftingHelper.Tests.Services
                 // Vendor (Weekly)) with no content-equivalent successor.
                 // Restored here byte-for-byte from the pre-rescrape
                 // baseline (merge-base 4735064) rather than re-guessed.
-                // 53,544 -> 59,414 on the 2026-08-25 from-scratch refresh
-                // (the local wiki cache was gone, so both passes re-scraped).
-                // Verified before committing rather than assumed: keyed by
-                // CONTENT (item, count, merchant, cost lines) only 254 of
-                // 51,679 distinct offers disappeared and EVERY one of them
-                // had all-null cost lines - unusable rows the old pass could
-                // not resolve - while 581 items became purchasable that were
-                // not before, and seasonal tags went 57 -> 597. One further
-                // row was refused by hand: see ref/vendor_offer_exclusions.json.
-                Assert.Equal(59414, dataset.Offers.Count);
+                // Offer count and bytes against what VendorOfferUpdater
+                // recorded in ref/vendor_offers_manifest.json. The exact
+                // literal that used to sit here, under a changelog of the
+                // 53,544 -> 59,414 re-scrape, tripped on any change but
+                // could not tell a legitimate refresh from a hand edit -
+                // see ShippedSeedManifest. One row is refused by hand: see
+                // ref/vendor_offer_exclusions.json.
+                ShippedSeedManifest.AssertVendorOffersMatch(dataset.Offers.Count);
+                Assert.InRange(dataset.Offers.Count, 40000, 120000);
 
                 Assert.All(dataset.Offers, o =>
                 {
