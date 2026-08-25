@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -27,23 +28,23 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void TryBuild_NoDivergence_ReturnsFalse()
+        public void TryBuildContent_NoDivergence_ReturnsFalse()
         {
             var node = Node(CraftingDecision.Craft, subtreeCost: 100, decisionValue: 100);
 
-            bool result = ValueDetailTooltipBuilder.TryBuild(node, null, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
 
             Assert.False(result);
-            Assert.Null(text);
+            Assert.Null(content);
         }
 
         [Fact]
-        public void TryBuild_NullNode_ReturnsFalse()
+        public void TryBuildContent_NullNode_ReturnsFalse()
         {
-            bool result = ValueDetailTooltipBuilder.TryBuild(null, null, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(null, null, out var content);
 
             Assert.False(result);
-            Assert.Null(text);
+            Assert.Null(content);
         }
 
         [Theory]
@@ -52,69 +53,74 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(CraftingDecision.Currency)]
         [InlineData(CraftingDecision.GuildUpgrade)]
         [InlineData(CraftingDecision.Unknown)]
-        public void TryBuild_NonCraftNonVendorDecision_ReturnsFalseEvenWithDivergentValues(CraftingDecision decision)
+        public void TryBuildContent_NonCraftNonVendorDecision_ReturnsFalseEvenWithDivergentValues(CraftingDecision decision)
         {
             var node = Node(decision, subtreeCost: 100, decisionValue: 350);
 
-            bool result = ValueDetailTooltipBuilder.TryBuild(node, null, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
 
             Assert.False(result);
-            Assert.Null(text);
+            Assert.Null(content);
         }
 
         [Fact]
-        public void TryBuild_MissingSubtreeCost_ReturnsFalse()
+        public void TryBuildContent_MissingSubtreeCost_ReturnsFalse()
         {
             var node = Node(CraftingDecision.Craft, subtreeCost: null, decisionValue: 350);
 
-            Assert.False(ValueDetailTooltipBuilder.TryBuild(node, null, out _));
+            Assert.False(ValueDetailTooltipBuilder.TryBuildContent(node, null, out _));
         }
 
         [Fact]
-        public void TryBuild_MissingDecisionValue_ReturnsFalse()
+        public void TryBuildContent_MissingDecisionValue_ReturnsFalse()
         {
             var node = Node(CraftingDecision.Craft, subtreeCost: 100, decisionValue: null);
 
-            Assert.False(ValueDetailTooltipBuilder.TryBuild(node, null, out _));
+            Assert.False(ValueDetailTooltipBuilder.TryBuildContent(node, null, out _));
         }
 
         [Fact]
-        public void TryBuild_CraftDivergence_ProducesExpectedLines()
+        public void TryBuildContent_CraftDivergence_ProducesExpectedLines()
         {
             // 50 real gold vs 300 decision total (currency contributed 250).
             var node = Node(CraftingDecision.Craft, subtreeCost: 5000, decisionValue: 30000);
 
-            bool result = ValueDetailTooltipBuilder.TryBuild(node, null, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
 
             Assert.True(result);
-            Assert.Contains("Crafting gold price: 0g 50s 0c", text);
-            Assert.Contains("Currencies: 2g 50s 0c", text);
-            Assert.Contains("Optimization price: 3g 0s 0c", text);
+            Assert.Contains("Crafting gold price: 0g 50s 0c", content.ToPlainText());
+            Assert.Contains("Currencies: 2g 50s 0c", content.ToPlainText());
+            Assert.Contains("Optimization price: 3g 0s 0c", content.ToPlainText());
 
-            // The opportunity-cost sentence is 76 characters, so the
-            // builder's TooltipTextFormat seam wraps it - the words survive
-            // across the break, and no line exceeds the budget.
+            // Unwrapped, and deliberately so: the rich surface this content
+            // reaches wraps against a real font at a real pixel width. The
+            // 76-character sentence is therefore one line here, not two.
+            // (The character-budget wrap this used to assert belonged to the
+            // deleted plain wrapper; TooltipTextFormatTests still covers the
+            // seam itself, which LogTabContent and TooltipFacility still use.)
             Assert.Contains(
                 "This is an estimated opportunity cost for the used currencies in the recipe.",
-                text.Replace("\n", " "));
-            Assert.All(
-                text.Split('\n'),
-                l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars, l));
+                content.ToPlainLines());
+
+            // Each gold figure survives as a coin span - real gold, the
+            // currency delta, the optimization total - which is what lets
+            // the surface draw coin icons instead of spelling them out.
+            Assert.Equal(new long[] { 5000, 25000, 30000 }, content.CoinValues());
         }
 
         [Fact]
-        public void TryBuild_VendorDivergence_NoCapMap_OmitsVendorCapLine()
+        public void TryBuildContent_VendorDivergence_NoCapMap_OmitsVendorCapLine()
         {
             var node = Node(CraftingDecision.BuyFromVendor, subtreeCost: 0, decisionValue: 250);
 
-            bool result = ValueDetailTooltipBuilder.TryBuild(node, null, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
 
             Assert.True(result);
-            Assert.DoesNotContain("Vendor cap", text);
+            Assert.DoesNotContain("Vendor cap", content.ToPlainText());
         }
 
         [Fact]
-        public void TryBuild_VendorDivergence_WithMatchingCap_AppendsVendorCapLine()
+        public void TryBuildContent_VendorDivergence_WithMatchingCap_AppendsVendorCapLine()
         {
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 7, subtreeCost: 0, decisionValue: 250);
             var caps = new Dictionary<int, TimegatedItem>
@@ -122,17 +128,17 @@ namespace GW2CraftingHelper.Tests.Services
                 { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } }
             };
 
-            bool result = ValueDetailTooltipBuilder.TryBuild(node, caps, out string text);
+            bool result = ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
 
             Assert.True(result);
-            Assert.Contains("Vendor cap: 5 per day", text);
+            Assert.Contains("Vendor cap: 5 per day", content.ToPlainText());
         }
 
         [Theory]
         [InlineData(TimegatedCapType.Daily, "day")]
         [InlineData(TimegatedCapType.Weekly, "week")]
         [InlineData(TimegatedCapType.Seasonal, "season")]
-        public void TryBuild_VendorDivergence_CapPeriodTextMatchesCapType(TimegatedCapType capType, string expectedPeriod)
+        public void TryBuildContent_VendorDivergence_CapPeriodTextMatchesCapType(TimegatedCapType capType, string expectedPeriod)
         {
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 3, subtreeCost: 0, decisionValue: 100);
             var caps = new Dictionary<int, TimegatedItem>
@@ -140,13 +146,13 @@ namespace GW2CraftingHelper.Tests.Services
                 { 3, new TimegatedItem { ItemId = 3, CapType = capType, CapValue = 2, NeededCount = 10 } }
             };
 
-            ValueDetailTooltipBuilder.TryBuild(node, caps, out string text);
+            ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
 
-            Assert.Contains($"Vendor cap: 2 per {expectedPeriod}", text);
+            Assert.Contains($"Vendor cap: 2 per {expectedPeriod}", content.ToPlainText());
         }
 
         [Fact]
-        public void TryBuild_VendorDivergence_CapPresentButDifferentItemId_OmitsVendorCapLine()
+        public void TryBuildContent_VendorDivergence_CapPresentButDifferentItemId_OmitsVendorCapLine()
         {
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 7, subtreeCost: 0, decisionValue: 250);
             var caps = new Dictionary<int, TimegatedItem>
@@ -154,13 +160,13 @@ namespace GW2CraftingHelper.Tests.Services
                 { 999, new TimegatedItem { ItemId = 999, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 10 } }
             };
 
-            ValueDetailTooltipBuilder.TryBuild(node, caps, out string text);
+            ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
 
-            Assert.DoesNotContain("Vendor cap", text);
+            Assert.DoesNotContain("Vendor cap", content.ToPlainText());
         }
 
         [Fact]
-        public void TryBuild_CraftDivergence_NeverAppendsVendorCapLine_EvenIfCapMapHasEntry()
+        public void TryBuildContent_CraftDivergence_NeverAppendsVendorCapLine_EvenIfCapMapHasEntry()
         {
             // Vendor cap only applies to BuyFromVendor - a Craft node must
             // never show one, even if the item id happens to collide with
@@ -171,9 +177,9 @@ namespace GW2CraftingHelper.Tests.Services
                 { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } }
             };
 
-            ValueDetailTooltipBuilder.TryBuild(node, caps, out string text);
+            ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
 
-            Assert.DoesNotContain("Vendor cap", text);
+            Assert.DoesNotContain("Vendor cap", content.ToPlainText());
         }
     }
 }

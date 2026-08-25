@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -47,16 +48,10 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ValueDetail_PlainViewMatchesTheWrappedTryBuildOutput()
+        public void ValueDetail_RendersItsThreeFigureLines()
         {
             Assert.True(ValueDetailTooltipBuilder.TryBuildContent(
                 ValueNode(10000, 35000), null, out var content));
-            Assert.True(ValueDetailTooltipBuilder.TryBuild(
-                ValueNode(10000, 35000), null, out string text));
-
-            // TryBuild is TryBuildContent plus the character-budget wrap
-            // seam, and nothing else.
-            Assert.Equal(TooltipTextFormat.Wrap(content.ToPlainText()), text);
             Assert.Contains("Crafting gold price: 1g 0s 0c", content.ToPlainText());
             Assert.Contains("Optimization price: 3g 50s 0c", content.ToPlainText());
         }
@@ -98,7 +93,6 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(
                 "More expensive at your current currency values (1g 23s 45c more)",
                 content.ToPlainText());
-            Assert.Equal(PillSubduingTooltipBuilder.Build(result, null, null), content.ToPlainText());
         }
 
         [Fact]
@@ -133,7 +127,6 @@ namespace GW2CraftingHelper.Tests.Services
                 "Always more expensive - needs everything the selected option needs, " +
                 "plus 50s 0c more, 10 more Glob of Ectoplasm",
                 content.ToPlainText());
-            Assert.Equal(PillSubduingTooltipBuilder.Build(result, itemMetadata, null), content.ToPlainText());
         }
 
         [Fact]
@@ -165,7 +158,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void TreeRow_PlainViewIsTheWrappedContent()
+        public void TreeRow_LongCaveat_StaysOneUnwrappedLine()
         {
             // The 83-character price-side caveat: still wrapped by the
             // character seam on the plain path, still one unwrapped line in
@@ -181,11 +174,10 @@ namespace GW2CraftingHelper.Tests.Services
 
             var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
             var content = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan);
-            var plain = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
 
-            Assert.Equal(TooltipTextFormat.WrapLines(content.ToPlainLines()), plain);
+            // Left long on purpose: the rich surface measures and wraps it
+            // against a real font, so the composer must not pre-break it.
             Assert.Contains(content.ToPlainLines(), l => l.Length > TooltipTextFormat.LineBudgetChars);
-            Assert.All(plain, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars, l));
         }
 
         [Fact]

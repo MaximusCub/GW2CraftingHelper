@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -15,8 +16,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NoneRule_ReturnsNull()
         {
-            Assert.Null(PillSubduingTooltipBuilder.Build(PillSubduingResult.None, null, null));
-            Assert.Null(PillSubduingTooltipBuilder.Build(null, null, null));
+            Assert.Null(PillSubduingTooltipBuilder.BuildContent(PillSubduingResult.None, null, null));
+            Assert.Null(PillSubduingTooltipBuilder.BuildContent(null, null, null));
         }
 
         [Fact]
@@ -24,10 +25,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = new PillSubduingResult(PillSubduingRule.Weighted, 12345, null, hasNonCoinCost: true);
 
-            string text = PillSubduingTooltipBuilder.Build(result, null, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, null, null);
 
-            Assert.Contains("More expensive at your current currency values", text);
-            Assert.Contains("1g 23s 45c", text);
+            Assert.Contains("More expensive at your current currency values", content.ToPlainText());
+            Assert.Contains("1g 23s 45c", content.ToPlainText());
+            // The margin is a coin span, not prose - the surface draws icons.
+            Assert.Equal(new long[] { 12345 }, content.CoinValues());
         }
 
         [Fact]
@@ -42,10 +45,10 @@ namespace GW2CraftingHelper.Tests.Services
             // was ever involved.
             var result = new PillSubduingResult(PillSubduingRule.Weighted, 30000, null, hasNonCoinCost: false);
 
-            string text = PillSubduingTooltipBuilder.Build(result, null, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, null, null);
 
-            Assert.Equal("More expensive (3g 0s 0c more)", text);
-            Assert.DoesNotContain("currency values", text);
+            Assert.Equal("More expensive (3g 0s 0c more)", content.ToPlainText());
+            Assert.DoesNotContain("currency values", content.ToPlainText());
         }
 
         [Fact]
@@ -58,10 +61,10 @@ namespace GW2CraftingHelper.Tests.Services
             var deltas = new List<PillCostDelta> { new PillCostDelta("Item", 100, 10) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
-            string text = PillSubduingTooltipBuilder.Build(result, itemMetadata, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, itemMetadata, null);
 
-            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 10 more Glob of Ectoplasm", text);
-            Assert.DoesNotContain("100", text);
+            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 10 more Glob of Ectoplasm", content.ToPlainText());
+            Assert.DoesNotContain("100", content.ToPlainText());
         }
 
         [Fact]
@@ -70,9 +73,9 @@ namespace GW2CraftingHelper.Tests.Services
             var deltas = new List<PillCostDelta> { new PillCostDelta("Item", 100, 10) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
-            string text = PillSubduingTooltipBuilder.Build(result, null, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, null, null);
 
-            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 10 more Unknown Item", text);
+            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 10 more Unknown Item", content.ToPlainText());
         }
 
         [Fact]
@@ -85,9 +88,9 @@ namespace GW2CraftingHelper.Tests.Services
             var deltas = new List<PillCostDelta> { new PillCostDelta("Currency", 23, 500) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
-            string text = PillSubduingTooltipBuilder.Build(result, null, currencyMetadata);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, null, currencyMetadata);
 
-            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 500 more Karma", text);
+            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 500 more Karma", content.ToPlainText());
         }
 
         [Fact]
@@ -96,9 +99,9 @@ namespace GW2CraftingHelper.Tests.Services
             var deltas = new List<PillCostDelta> { new PillCostDelta("Coin", 0, 150) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
-            string text = PillSubduingTooltipBuilder.Build(result, null, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, null, null);
 
-            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 1s 50c more", text);
+            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 1s 50c more", content.ToPlainText());
         }
 
         [Fact]
@@ -115,9 +118,9 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
-            string text = PillSubduingTooltipBuilder.Build(result, itemMetadata, null);
+            var content = PillSubduingTooltipBuilder.BuildContent(result, itemMetadata, null);
 
-            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 50c more, 3 more Ecto", text);
+            Assert.Equal("Always more expensive - needs everything the selected option needs, plus 50c more, 3 more Ecto", content.ToPlainText());
         }
     }
 }

@@ -4596,12 +4596,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(140L, root.SubtreeCost);
                 Assert.Equal(360140L, root.DecisionValue);
 
-                bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+                bool fired = ValueDetailTooltipBuilder.TryBuildContent(root, null, out var tooltip);
 
                 Assert.True(fired, "Value-detail hover must fire for the craft root live pipeline case.");
-                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltipText);
-                Assert.Contains("Currencies: 36g 0s 0c", tooltipText);
-                Assert.Contains("Optimization price: 36g 1s 40c", tooltipText);
+                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
             }
         }
 
@@ -4707,12 +4707,12 @@ namespace GW2CraftingHelper.Tests.Services
                 var craftSpec = Assert.Single(specs, s => s.Text == "CRAFT");
                 Assert.Equal(PillKind.Selected, craftSpec.Kind);
 
-                bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+                bool fired = ValueDetailTooltipBuilder.TryBuildContent(root, null, out var tooltip);
 
                 Assert.True(fired, "Value-detail hover must fire when the committed pill is genuinely Selected (2+ options).");
-                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltipText);
-                Assert.Contains("Currencies: 36g 0s 0c", tooltipText);
-                Assert.Contains("Optimization price: 36g 1s 40c", tooltipText);
+                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
             }
         }
     }
