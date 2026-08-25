@@ -15140,19 +15140,66 @@ pill is offered on every non-root item row, so an ignored row is not
 evidence of an UNKNOWN one, and an ignored row reads IGNORED, not
 UNKNOWN.
 
-The other three are correct UNKNOWNs, not a recipe-lookup failure. Each
-has an EMPTY search row in the seed (the seeder's "the API knows no
-recipe for this item"), and the wiki confirms none exists: **Gift of the
-Survivors** (106712) is bought from Castaway Agnes in Hullgarden,
-**Gift of the People** (105804) from Canach in Breezy Cay, and **Gift of
-the Hylek** (106986) is awarded by the Radiance of the Sun God
-achievement. Their names come from the item API, so the fact that they
-are absent from `ref/item_name_seed.json` never mattered. The fix for
-them is therefore not a recipe but the pre-existing acquisition-hint
-mechanism: three wiki-verified entries in
-`ref/acquisition_hints_seed.json`, which turn the bare UNKNOWN pill into
-`VENDOR` / `ACHIEVEMENT` with the acquisition text in the row tooltip
-(`CraftingTreeBuilder.ApplyAcquisitionHint`, unchanged).
+The other three are not a recipe-lookup failure either - each has an
+EMPTY search row in the seed (the seeder's "the API knows no recipe for
+this item") and the wiki confirms none exists - but calling them
+"correct UNKNOWNs" was wrong. **The module ships a vendor offer for all
+three and silently discards it.** Audited directly against
+`ref/vendor_offers.json` (and against the unpacked shipped 0.2.3 `.bhm`,
+which carries the same rows): 106712 -> Castaway Agnes (Hullgarden),
+paid in items 105848 + 106467 + 106370 and 500 of currency 83; 105804 ->
+Canach (Breezy Cay), items 105933 + 106672 + 106627 and 500 of currency
+81; 106986 -> Palak (Hullgarden), 250x item 19717, 300,000 karma and 200
+copper. None carries a seasonal tag, so `SeasonalOfferFilter` is not
+involved.
+
+The mechanism is `VendorBatchSolver.EvaluateVendorOffers`: an `Item`
+cost line whose item has no Trading Post price sets `priceable = false`
+and discards the WHOLE offer. These are barter offers paid in
+account-bound tokens, which can never have a TP price, so every offer
+for the node is discarded, nothing comparable and no fallback survives,
+and `PlanSolver` commits `UnknownSource` - exactly what the maintainer's
+`plan.json` records (Source `UnknownSource`, RecipeId 0, for all three).
+`AcquisitionHintSeedVendorAgreementTests.ShippedBarterOffer_...` proves
+it on the real solver path with the real shipped offer.
+
+**Class size, counted from `ref/vendor_offers.json`:** 17,802 of 53,544
+offers carry an `Item` cost line, and 4,664 of the 14,965 distinct
+output items have NO offer that is free of one. Every one of those
+renders a bare UNKNOWN while the module holds the merchant and location
+on disk. **Follow-up (not done in this wave):** when every offer for a
+node is discarded as unpriceable, surface that offer's merchant and
+location on the node itself, instead of hand-typing them into a second
+file. That would cover the class; the three hints below cover only the
+three items the report named.
+
+So the fix for these three is the pre-existing acquisition-hint
+mechanism (`CraftingTreeBuilder.ApplyAcquisitionHint`, unchanged), with
+two corrections from review. **They break the precedent the other seven
+hints set**: all seven pre-existing entries (71994, 70698, 70797, 71943,
+74528, 19678, 43772) are for items with ZERO vendor offers, so the
+mechanism's implicit contract was "no source anywhere in our data".
+These three each have exactly one offer, and 106986's first draft
+contradicted it (it said "Shaman Palak in Shipwreck Strand"; the record
+says Palak, Hullgarden). The vendor record is now the authority: each
+hint names only the merchant and location that record carries, makes no
+cost claim at all, and adds only what the record has no field for (the
+achievement, "not craftable", and why the row still counts as 0).
+`AcquisitionHintSeedVendorAgreementTests` pins that agreement against
+both real files and trip-wires on a fourth hinted item gaining an offer,
+so a re-scrape that relocates a merchant now fails a test instead of
+showing two answers. Their names come from the item API, so their
+absence from `ref/item_name_seed.json` never mattered.
+
+The badges are `MERCHANT` / `MERCHANT` / `ACHIEVEMENT`, not `VENDOR`: a
+`VENDOR` badge was byte-identical to the single-source VENDOR pill
+(`DecisionPillPlanner`), which means the opposite thing - a priced
+purchase inside `Plan.TotalCoinCost` rather than an Unknown node
+contributing 0 - and on this very plan would have sat directly above
+item 1's new "no recipe and no Trading Post price ... count as 0"
+footnote, arguing with it. `DecisionPillPlanner` now drops any badge
+equal to a source-pill text back to `UNKNOWN`, so the seed cannot
+reintroduce the collision.
 
 `SeededRecipeCacheStore.MergeMysticForgeRecipes` is kept but is a
 **measured no-op on today's data** - every iteration hits
@@ -15242,10 +15289,13 @@ frame on a decision the spent shot had already settled.
    read CRAFT, not UNKNOWN, and expand into Gift of the Sun, Gift of
    the Beach, Gift of Infused Gems and Purified Rift Essence. Gift of
    the Survivors, Gift of the People and Gift of the Hylek are NOT
-   craftable (vendor / achievement - verified on the wiki), so they
-   correctly stay uncraftable, but their pill must now read **VENDOR**,
-   **VENDOR** and **ACHIEVEMENT** instead of UNKNOWN, with the vendor
-   name and location in each row's hover text.
+   craftable (barter purchase / achievement - verified on the wiki and
+   against the shipped vendor offer), so they correctly stay
+   uncraftable, but their pill must now read **MERCHANT**, **MERCHANT**
+   and **ACHIEVEMENT** instead of UNKNOWN, with the merchant name and
+   location in each row's hover text - and NOT "VENDOR", which is the
+   priced single-source pill and must not appear on a row the Total Cost
+   footnote simultaneously calls unpriced.
 6. **First-load snapshot**: with a valid API key set, clear the cached
    snapshot (Clear Cache) and restart Blish. The Snapshot tab starts
    fetching by itself within a few seconds - spinner visible, then real
