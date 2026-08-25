@@ -490,8 +490,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_WrongSchema_MissingResult_ReturnsNullAndLogsWarn()
+        public void LoadLatest_MissingResult_ReturnsNullAndLogsWarn()
         {
+            // Renamed from LoadLatest_WrongSchema_MissingResult_...: the
+            // version and structural verdicts are separate throws now, and
+            // this file takes the structural (corrupt) one - Result/Plan
+            // has existed since schema 1, so a document without it was
+            // never a valid plan at any version.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath, "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"UseOwnMaterials\": true }");
 
@@ -505,13 +510,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Regression: SchemaVersion is what makes the
-        // "old-schema file = fresh start with one Warn log line" tolerance
+        // "old-schema file = fresh start with one log line" tolerance
         // contract enforceable against a FUTURE member rename/removal, not
         // just a Result/Plan structurally missing entirely - see
-        // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment. ---
+        // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment.
+        //
+        // All three of these assert the INFO channel, not the error one.
+        // They asserted onError (wired to Warn in Module.cs) until the
+        // 2026-08-23 investigation: a schema mismatch is an expected,
+        // self-healing outcome, and logging it at the same severity and in
+        // the same words as real corruption is what made that incident
+        // unexplainable from the log alone. ---
 
         [Fact]
-        public void LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn()
+        public void LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsInfo()
         {
             string filePath = Path.Combine(_tempDir, "plan.json");
             // Structurally valid (Result/Plan present, would have passed
@@ -520,17 +532,20 @@ namespace GW2CraftingHelper.Tests.Services
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
         }
 
         [Fact]
-        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsWarn()
+        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsInfo()
         {
             // CurrentSchemaVersion bumped 1 -> 2
             // for the new PersistedPlan.ValueOwnMaterials field. A
@@ -540,21 +555,35 @@ namespace GW2CraftingHelper.Tests.Services
             // test above uses) - must be rejected exactly the same way,
             // degrading to Module's "no restored plan" fresh-start path,
             // not silently defaulting ValueOwnMaterials to false.
+            //
+            // This is the exact file the 2026-08-23 incident hit: a plan
+            // written at schema 1 on 2026-08-15, read 8 days later by a
+            // build at 3. Renamed from ...LogsWarn and re-pointed at the
+            // Info channel - the outcome is unchanged (null, fresh start),
+            // only the severity is now honest. The message must name both
+            // versions, which is what that investigation had to recover
+            // from commit timestamps instead.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
+            Assert.Contains("schema 1", capturedInfo);
+            Assert.Contains(PersistedPlan.CurrentSchemaVersion.ToString(), capturedInfo);
+            Assert.DoesNotContain("corrupt", capturedInfo, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
-        public void LoadLatest_QualityAuditSchemaVersion2File_ReturnsNullAndLogsWarn()
+        public void LoadLatest_QualityAuditSchemaVersion2File_ReturnsNullAndLogsInfo()
         {
             // Quality-audit fix (B1): CurrentSchemaVersion bumped 2 -> 3
             // because the persisted graph grew ~275 lines of new members
@@ -571,13 +600,68 @@ namespace GW2CraftingHelper.Tests.Services
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 2, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
+        }
+
+        [Fact]
+        public void LoadLatest_SchemaDriftAndCorruption_ReportDistinctMessagesAndSeverities()
+        {
+            // The 2026-08-23 blocker itself: both verdicts threw one
+            // InvalidDataException whose text said "corrupt or old-schema
+            // file", so the log could not tell an expected version
+            // rejection from real damage. This test fails if they are ever
+            // merged again - in EITHER direction (same words, or same
+            // channel). Severity is the channel: PlanStore takes no logger,
+            // and Module.cs wires onError -> Warn and onInfo -> Info (one
+            // site each, see Module.Initialize).
+            string filePath = Path.Combine(_tempDir, "plan.json");
+
+            // Drift: a recognizable plan, wrong version.
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string driftError = null;
+            string driftInfo = null;
+            var driftStore = new PlanStore(
+                _tempDir, (message, ex) => driftError = message, message => driftInfo = message);
+            Assert.Null(driftStore.LoadLatest());
+
+            // Damage: current version, but no Result/Plan at all - a shape
+            // that was never a valid plan file at ANY schema version.
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": " + PersistedPlan.CurrentSchemaVersion + ", \"Result\": { } }");
+
+            string damageError = null;
+            string damageInfo = null;
+            Exception damageException = null;
+            var damageStore = new PlanStore(
+                _tempDir,
+                (message, ex) => { damageError = message; damageException = ex; },
+                message => damageInfo = message);
+            Assert.Null(damageStore.LoadLatest());
+
+            // Distinct severities: each verdict uses one channel and only
+            // one, so neither can borrow the other's level.
+            Assert.NotNull(driftInfo);
+            Assert.Null(driftError);
+            Assert.NotNull(damageError);
+            Assert.Null(damageInfo);
+
+            // Distinct messages: only damage says "corrupt", and only
+            // drift names the versions.
+            Assert.Contains("corrupt", damageException.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("corrupt", driftInfo, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("schema 1", driftInfo);
+            Assert.NotEqual(driftInfo, damageException.Message);
         }
 
         [Fact]
@@ -704,28 +788,34 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
+        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsInfo()
         {
             // The ONE class of old file that
             // can actually exist (written before the SchemaVersion field
             // existed, or by any code that forgets to set it) omits the
             // member entirely, rather than writing an explicit 0 the way
-            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn above
+            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsInfo above
             // does. Newtonsoft only overwrites properties present in the
             // JSON, so this is the exact case a `= CurrentSchemaVersion`
             // property initializer would have let sail through silently -
-            // see PersistedPlan.SchemaVersion's own doc comment.
+            // see PersistedPlan.SchemaVersion's own doc comment. Reported
+            // on the Info channel with the rest of the version rejections
+            // (see the block comment above them) - an absent field is drift
+            // (it reads as version 0), not damage.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath,
                 "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
         }
 
         [Fact]
