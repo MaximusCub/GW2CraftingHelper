@@ -19,8 +19,9 @@ namespace GW2CraftingHelper.Services
         /// dust-promotion blow-up "429750x Pile of Glittering Dust".
         /// <para>
         /// Chain, all terms measured at Menomonia 16 against the installed
-        /// XNBs (plan-redesign/minwidth.md, which reproduces the method and
-        /// every anchor figure of docs/research/minimum-window-width.md):
+        /// XNBs (docs/research/minimum-window-width.md section 9, which
+        /// reproduces the method and every anchor figure of that report's
+        /// own 1478-era derivation):
         /// <code>
         ///  629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
         ///  +24  the designed name-to-pill gutter at the deepest row

@@ -9,8 +9,11 @@ durable "why" for each of those pieces: what it is, why it exists, and
 where it lives. It intentionally does not repeat the full investigation
 narrative (root-cause traces, live-verification transcripts, dated PASS
 records) - that history is preserved in
-[`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (the current short tracker) and
-[`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md) (the full fix-pass
+[`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (the current-state tracker: the
+numbered catalog, the open list, and a ledger pointing into
+[`docs/archive/known-issues/`](archive/known-issues/), where the full
+milestone records live one file each) and
+[`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md) (the pre-M38 fix-pass
 diary this document distills). Each section below names the KNOWN-ISSUES
 item number(s) it is drawn from so you can go read the original
 investigation.
@@ -314,7 +317,9 @@ WP-24, WP-25) extracted:
   which must survive a local pill-click re-solve (a pill click never
   resets the user's overrides). Because of that, it is constructed once in
   `CraftingPlanView`'s own constructor and held as a persistent field,
-  unlike the six per-render renderers above.
+  unlike the per-render renderers above. (`NotesSectionRenderer` joined
+  them on 2026-08-16 for the Plan Notes section, making **seven** today -
+  same stateless, freshly-constructed-per-render shape.)
 - Tier-1 static rendering primitives with no instance state
   (`CoinCurrencyRenderer`, `RarityColors`, `IconControls`, `LabelHelpers`)
   also moved to `Views/Rendering/`.
@@ -323,7 +328,7 @@ WP-24, WP-25) extracted:
 deferred by oversight.** A later proposal to bisect `TreeSectionController`
 into a stateful collaborator (owning `_nodeOverrides`/`_ignoredItemIds`/
 `_nodeExpansion`/`_treeNodeStates`) and a separate stateless renderer,
-mirroring the six per-render section renderers above, was evaluated and
+mirroring the per-render section renderers above, was evaluated and
 rejected (quorum verdict D-2). The invariant this class exists to hold is
 one owner, one lifetime: the whole reason it is constructed once in
 `CraftingPlanView`'s own constructor (`Views/CraftingPlanView.cs` ~614)
@@ -380,8 +385,9 @@ logic out of on the way in, not evidence the WP-21 through WP-25
 extractions eroded.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
-`Views/Rendering/TreeSectionController.cs`, the six
-`Views/Rendering/*SectionRenderer.cs` files, and the surviving
+`Views/Rendering/TreeSectionController.cs`, the seven
+`Views/Rendering/*SectionRenderer.cs` files (the six M38 ones plus
+`NotesSectionRenderer`), and the surviving
 `_relayoutActions`/`_reellipsisActions` registries plus scroll/resize/wheel
 machinery in `Views/CraftingPlanView.cs`.
 

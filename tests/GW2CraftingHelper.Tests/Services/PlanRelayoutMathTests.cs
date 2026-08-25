@@ -225,11 +225,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // The measurements the window minimum and the 256px pill column
-        // are derived from - plan-redesign/minwidth.md, which reproduces
-        // the method of docs/research/minimum-window-width.md (XNB glyph
-        // parse, MonoGame.Extended's own advance / XOffset+Width rule,
-        // which is what TreeSectionController's nameFont.MeasureString
-        // computes) and every anchor figure it published.
+        // are derived from - docs/research/minimum-window-width.md section
+        // 9, which reproduces the method of that report's own earlier
+        // derivation (XNB glyph parse, MonoGame.Extended's own advance /
+        // XOffset+Width rule, which is what TreeSectionController's
+        // nameFont.MeasureString computes) and every anchor figure it
+        // published.
         //
         // Two chains matter, and they are not the same chain:
         //
