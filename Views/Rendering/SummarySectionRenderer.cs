@@ -782,9 +782,13 @@ namespace GW2CraftingHelper.Views.Rendering
             if (!string.IsNullOrEmpty(row.IconUrl))
             {
                 int iconY = (rowHeight - SummarySectionLayoutMath.CurrencyIconSize) / 2;
+                // Framed like every other icon in the module, with the art
+                // inset inside the box the unframed icon occupied so the
+                // currency column's own x's do not move.
                 IconControls.CreateItemIcon(
-                    rowPanel, row.IconUrl, SummarySectionLayoutMath.CurrencyIconX, iconY,
-                    SummarySectionLayoutMath.CurrencyIconSize, row.Label);
+                    rowPanel, row.IconUrl, (string)null,
+                    SummarySectionLayoutMath.CurrencyIconX, iconY,
+                    SummarySectionLayoutMath.CurrencyIconSize - 2, 1, row.Label);
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;

@@ -244,13 +244,17 @@ namespace GW2CraftingHelper.Views
                     Parent = _rowContainer
                 };
 
-                // Item icon. A missing IconUrl is a data gap, never a
-                // genuine load failure - IconControls.CreateItemIcon
-                // degrades it to a neutral empty-slot square instead of
-                // Blish's alarming magenta missing-texture placeholder
-                // (audit row 56 PART B #1, sibling of the same fix in
-                // MainView.cs's snapshot/wallet rows).
-                IconControls.CreateItemIcon(row, item.IconUrl, 2, (RowHeight - IconSize) / 2, IconSize);
+                // Item icon, through the module's one icon component: same
+                // frame, same empty-slot placeholder for a missing IconUrl
+                // (a data gap, never a load failure), same hover wiring as
+                // every other item icon in the module. The search cache
+                // carries no rarity, so the frame is the component's own
+                // neutral unknown-rarity grey - never a guessed rarity.
+                // The art is inset rather than the box grown, so the row's
+                // own geometry is exactly what it was.
+                IconControls.CreateItemIcon(
+                    row, item.IconUrl, (string)null, 2, (RowHeight - IconSize) / 2,
+                    IconSize - 2, 1);
 
                 // Item name. Centred against the FONT's own line box rather
                 // than a hand-tuned stand-in for it: these rows stack flush

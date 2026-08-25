@@ -82,6 +82,12 @@ namespace GW2CraftingHelper.Views
         private const int RightEdgePadding = 20;
         private const int SaveBarHeight = 40;
         private const int RowHeight = 30;
+
+        // PlanContentHeightMath's SectionTitle band, aliased rather than
+        // re-derived: these headings are the same tier and rule.
+        private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
+        private const int SectionHeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
+
         // 22, not 20: an info line sits at y=2 and its lowest Font16 ink is
         // y=23, so 22 leaves the same 1px overhang 20 left Font14's y=21.
         private const int InfoRowHeight = 22;
@@ -1135,7 +1141,7 @@ namespace GW2CraftingHelper.Views
         {
             var headerPanel = new Panel()
             {
-                Size = new Point(panelWidth, RowHeight),
+                Size = new Point(panelWidth, SectionHeaderRowHeight),
                 Parent = _rootPanel
             };
             _fullWidthPanels.Add(headerPanel);
@@ -1143,21 +1149,21 @@ namespace GW2CraftingHelper.Views
             new Label()
             {
                 Text = title,
-                Font = UiFonts.Title,
+                Font = UiFonts.SectionTitle,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX, 4),
+                Location = new Point(NameColumnX, SectionHeaderTitleY),
                 Parent = headerPanel
             };
 
             // Same header rule as every CraftingPlanView section: 2px in
             // SectionDividerColor, bottom-anchored with 1px clearance
-            // inside a 30px header (see LabelHelpers.CreateRowDivider for
-            // why 1px lines and flush anchoring are unsafe here).
+            // (see LabelHelpers.CreateRowDivider for why 1px lines and
+            // flush anchoring are unsafe here).
             _fullWidthPanels.Add(new Panel()
             {
                 Size = new Point(panelWidth, 2),
-                Location = new Point(0, RowHeight - 3),
+                Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = headerPanel
             });
@@ -1241,10 +1247,10 @@ namespace GW2CraftingHelper.Views
             };
         }
 
-        // 26, not 24: the header labels sit at CurrencyHeaderTextY and
-        // their lowest Font16 ink is y=25.
-        private const int CurrencyHeaderRowHeight = 26;
-        private const int CurrencyHeaderTextY = 4;
+        // The plan tables' column-header band, aliased: same tier over the
+        // same kind of data columns.
+        private const int CurrencyHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
+        private const int CurrencyHeaderTextY = PlanContentHeightMath.CTableHeaderLabelY;
 
         /// <summary>
         /// One "Currency"/"Copper per unit" pair per grid column, sitting on
@@ -1258,6 +1264,7 @@ namespace GW2CraftingHelper.Views
             _currencyHeaderPanel = new Panel()
             {
                 Size = new Point(panelWidth, CurrencyHeaderRowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = _rootPanel
             };
             _fullWidthPanels.Add(_currencyHeaderPanel);
@@ -1266,7 +1273,8 @@ namespace GW2CraftingHelper.Views
             {
                 _currencyHeaderNames[i] = new Label()
                 {
-                    Font = UiFonts.Body,
+                    Font = TableHeaderStyle.Font,
+                    TextColor = TableHeaderStyle.LabelColor,
                     Text = "Currency",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1275,7 +1283,8 @@ namespace GW2CraftingHelper.Views
                 };
                 _currencyHeaderUnits[i] = new Label()
                 {
-                    Font = UiFonts.Body,
+                    Font = TableHeaderStyle.Font,
+                    TextColor = TableHeaderStyle.LabelColor,
                     Text = "Copper per unit",
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1561,13 +1570,16 @@ namespace GW2CraftingHelper.Views
             };
             saveButton.Click += (_, __) => SaveAll();
 
+            // Status tier, like every other tab's: 18 BOLD, which is not a
+            // style choice at this size (TypeRampMetrics on 18-regular's
+            // collapsed word gaps). y=9 re-centres the taller 23px line box.
             _statusLabel = new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX + 80 + 12, 12),
+                Location = new Point(NameColumnX + 80 + 12, 9),
                 Parent = barPanel
             };
 

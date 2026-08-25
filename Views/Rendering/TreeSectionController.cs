@@ -96,6 +96,13 @@ namespace GW2CraftingHelper.Views.Rendering
         // had before this feature existed.
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
+        // Registers one row control under a stable scroll-anchor key, so a
+        // re-solve can put the row the user was looking at back under
+        // their cursor instead of merely restoring the scroll offset (see
+        // Services/ScrollAnchorMath). Optional - a null one simply leaves
+        // the view anchoring at section granularity.
+        private readonly Action<int, Control> _registerRowScrollAnchor;
+
         private static readonly Logger Logger = Logger.GetLogger<TreeSectionController>();
 
         internal TreeSectionController(
@@ -111,7 +118,8 @@ namespace GW2CraftingHelper.Views.Rendering
             Action<IReadOnlyList<string>> setLastDebugLog,
             Func<string, PlanSectionType, int, bool, Func<bool>, (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow)> createSectionHeader,
             Action<TreeToolbarCommands> setTreeToolbar,
-            Func<int, ItemStatBlock> getItemStatBlock = null)
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            Action<int, Control> registerRowScrollAnchor = null)
         {
             // resolveOverridesSync is deliberately NOT null-guarded - the
             // sole production call site (CraftingPlanView's own
@@ -137,6 +145,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // above: null simply means "no stat tooltips this session",
             // which every reader below already treats as the fallback.
             _getItemStatBlock = getItemStatBlock;
+            _registerRowScrollAnchor = registerRowScrollAnchor;
         }
 
         // Per-node user decision overrides (keyed by solver NodeId) and
@@ -940,7 +949,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = indent + TreeCaretColWidth;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
-            var iconFrame = IconControls.CreateRarityFramedIcon(
+            var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
             Panel iconScrim = null;
             if (dimmed)
@@ -1008,6 +1017,9 @@ namespace GW2CraftingHelper.Views.Rendering
             else
             {
                 _treeRowsByNodeId[node.NodeId] = handle;
+                // Same NodeId identity, same ambiguity guard: a duplicated
+                // id cannot say which row the user was on either.
+                _registerRowScrollAnchor?.Invoke(node.NodeId, rowPanel);
             }
             string displayName = LabelHelpers.EllipsizeToWidth(nameFont, fullName, edges.NameMaxWidth);
 
@@ -2131,7 +2143,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// trailing "+N" pill so the two can never disagree about pill
         /// chrome. Border simulated as an outer colored panel with a
         /// 1px-inset fill panel, the same nesting technique
-        /// IconControls.CreateRarityFramedIcon uses.
+        /// IconControls.CreateItemIcon uses.
         /// </summary>
         private static Panel CreatePillPanel(
             Panel rowPanel, string text, BitmapFont font, int pillWidth, int textWidth,

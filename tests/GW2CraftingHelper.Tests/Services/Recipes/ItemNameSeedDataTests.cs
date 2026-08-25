@@ -88,7 +88,12 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 // ordinary game-content growth (see the matching
                 // RecipeCacheSerializerTests count-drift comment for the
                 // full breakdown).
-                Assert.Equal(14762, data.Items.Count);
+                // 14762 -> 14766 on the 2026-08-24 reseed at build
+                // 205780: the four preserved negative-id rows made their
+                // outputs craftable-visible, so the Infinite Trebuchet
+                // Blueprint chain now carries names and icons locally
+                // instead of resolving live.
+                Assert.Equal(14766, data.Items.Count);
                 Assert.All(data.Items, item =>
                 {
                     Assert.True(item.Id > 0);

@@ -88,6 +88,8 @@
     <Compile Include="Services\TreeRowIdentity.cs" />
     <Compile Include="Services\TypeRampMetrics.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
+    <Compile Include="Services\FirstLoadSnapshotGate.cs" />
+    <Compile Include="Services\ScrollAnchorMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
@@ -196,6 +198,8 @@
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\TableHeaderStyle.cs" />
     <Compile Include="Views\Rendering\SortableHeaderLabel.cs" />
+    <Compile Include="Views\Rendering\SortableHeaderCells.cs" />
+    <Compile Include="Views\Rendering\HeaderCellPlan.cs" />
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
@@ -222,6 +226,9 @@
     <Compile Include="Services\SettingsInputParser.cs" />
     <Compile Include="Services\SettingsCurrencyGridLayout.cs" />
     <Compile Include="Services\SnapshotItemGridLayout.cs" />
+    <Compile Include="Services\HeaderCellMath.cs" />
+    <Compile Include="Services\SnapshotResultLayout.cs" />
+    <Compile Include="Services\SnapshotTableSorter.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />
     <Compile Include="Services\ModuleLogEntry.cs" />
     <Compile Include="Services\ModuleLog.cs" />

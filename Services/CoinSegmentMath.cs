@@ -32,6 +32,21 @@ namespace GW2CraftingHelper.Services
         public const int SilverAssetId = 156907;
         public const int CopperAssetId = 156902;
 
+        /// <summary>What a coin icon says on hover - the one icon whose
+        /// subject is a colour and a shape rather than a word. Null for
+        /// anything else, the icon component's "no text of my own"
+        /// input.</summary>
+        public static string DenominationName(int assetId)
+        {
+            switch (assetId)
+            {
+                case GoldAssetId: return "Gold";
+                case SilverAssetId: return "Silver";
+                case CopperAssetId: return "Copper";
+                default: return null;
+            }
+        }
+
         /// <summary>
         /// The three-way coin split every display site uses: 10000 copper
         /// per gold, 100 per silver. Negative input clamps to 0, matching

@@ -72,6 +72,27 @@ namespace GW2CraftingHelper.Services
             return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge, sourceX);
         }
 
+        /// <summary>
+        /// Where each of the five header CELLS ends, in the header row's own
+        /// left-to-right order (Total closes the band, so four are written).
+        /// These are COLUMN edges: "Item" is a 40px word over a name column
+        /// hundreds of pixels wide, so a label-derived boundary would sort a
+        /// click above the item NAMES by Source.
+        /// </summary>
+        public static void HeaderCellBoundaries(
+            ColumnEdges edges, int sourceColumnWidth, int nameGap, int[] into)
+        {
+            if (into == null || into.Length < 4)
+            {
+                return;
+            }
+
+            into[0] = edges.SourceX - (nameGap / 2);
+            into[1] = edges.SourceX + sourceColumnWidth + (ColumnGap / 2);
+            into[2] = edges.QtyRightEdge + (ColumnGap / 2);
+            into[3] = edges.EachRightEdge + (ColumnGap / 2);
+        }
+
         private static int EffectiveTotalWidth(int maxTotalWidth)
         {
             return maxTotalWidth > TotalMinWidth ? maxTotalWidth : TotalMinWidth;

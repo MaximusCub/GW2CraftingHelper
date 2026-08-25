@@ -6,6 +6,7 @@ using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -111,6 +112,14 @@ namespace GW2CraftingHelper.Views
         private const int ResizeSettleMs = 150;
         private readonly List<ResultCell> _itemCells = new List<ResultCell>();
         private readonly List<ResultCell> _walletCells = new List<ResultCell>();
+
+        // In the SEARCH's order, never the sorted one.
+        private readonly List<SnapshotSearchRow> _itemRows = new List<SnapshotSearchRow>();
+        private readonly List<SnapshotWalletEntry> _walletRows = new List<SnapshotWalletEntry>();
+
+        // Display position i shows cell [order[i]]; null is the identity.
+        private IReadOnlyList<int> _itemOrder;
+        private IReadOnlyList<int> _walletOrder;
         private int _lastRowLayoutWidth = -1;
         private bool _rowRefitPending;
         private long _lastResizeEventTicks;
@@ -249,6 +258,19 @@ namespace GW2CraftingHelper.Views
         private const int CoinCaptionGap = 8;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
+        // Same rule under every section heading in the module - see
+        // SettingsTabContent's own AddSectionHeader.
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
+
+        // PlanContentHeightMath's own heights, not re-derived here.
+        private const int SectionTitleBandHeight = PlanContentHeightMath.SectionHeaderRowHeight;
+        private const int SectionTitleTextY = PlanContentHeightMath.SectionHeaderTitleY;
+        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
+        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
+
+        // The treatment the plan tables give a quantity column.
+        private static readonly Color AmountTextColor = new Color(200, 200, 200);
+
         // 56, not 52. An item cell stacks a name line at y=4 and a
         // breakdown line under it; at Font16 the name's line box ends at
         // y=24, so the breakdown moved from y=24 to y=26 and its lowest ink
@@ -261,6 +283,7 @@ namespace GW2CraftingHelper.Views
 
         // UI controls (stored for resize handler)
         private Panel _headerPanel;
+        private Panel _headerDivider;
         private Panel _statusPanel;
         private Panel _filterPanel;
         private Panel _sourceFilterPanel;
@@ -278,6 +301,17 @@ namespace GW2CraftingHelper.Views
         // Null until the first rebuild, and whenever the result set is empty
         // enough to render a message instead.
         private Panel _resultGridPanel;
+
+        // Null for a run with no rows: the section is absent, not empty.
+        private SectionChrome _itemChrome;
+        private SectionChrome _walletChrome;
+
+        // Session-sticky like the search text. One state per run: sorting
+        // the items must not disturb the currencies beneath them.
+        private readonly TableSortState<SnapshotTableColumn> _itemSortState =
+            new TableSortState<SnapshotTableColumn>();
+        private readonly TableSortState<SnapshotTableColumn> _walletSortState =
+            new TableSortState<SnapshotTableColumn>();
 
         private TextBox _searchBox;
         private Dropdown _filterDropdown;
@@ -429,13 +463,23 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel
             };
 
+            // SectionTitle over the same 2px rule every heading draws; y=5
+            // re-centres the tier's 29px line box in the 40px band.
             new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.SectionTitle,
                 Text = "Account Snapshot",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 8),
+                Location = new Point(0, 5),
+                Parent = _headerPanel
+            };
+
+            _headerDivider = new Panel()
+            {
+                Size = new Point(w, 2),
+                Location = new Point(0, HeaderHeight - 2),
+                BackgroundColor = SectionDividerColor,
                 Parent = _headerPanel
             };
 
@@ -480,16 +524,12 @@ namespace GW2CraftingHelper.Views
 
             _statusLabel = new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = "",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                // Y=2 (not 4) inside this 24px _statusPanel -
-                // matches the coin row's own precedent
-                // (LayoutCoinSegments(_coinPanel, segments, 0, 2, font), y=2
-                // in the same 24px height), leaving the body font the same
-                // clearance the coin row already relies on (its lowest
-                // Font16 ink is y=23).
+                // Y=2, the coin row's precedent; StatusRowHeight carries
+                // the Status tier's clearance derivation.
                 Location = new Point(0, 2),
                 Parent = _statusPanel
             };
@@ -740,6 +780,7 @@ namespace GW2CraftingHelper.Views
             _containerHeight = h;
 
             _headerPanel.Size = new Point(w, HeaderHeight);
+            _headerDivider.Size = new Point(w, 2);
             _clearButton.Location = new Point(w - 220, HeaderButtonY);
             _refreshButton.Location = new Point(w - 110, HeaderButtonY);
             _statusPanel.Size = new Point(w, StatusRowHeight);
@@ -1492,7 +1533,11 @@ namespace GW2CraftingHelper.Views
         /// can gain a column, a narrower one drop back to the single-column
         /// fallback), every cell moves to its new slot, and each of its text
         /// lines is re-ellipsized against the new COLUMN width - not the
-        /// panel width - with its tooltip re-decided. No search re-run and no
+        /// panel width - with its amount re-pinned. Text and position only:
+        /// an item row's tooltips are stamped once at build and say the same
+        /// at any width, and the one exception is the wallet row, whose
+        /// plain note exists only where the name had to shorten and so is
+        /// re-decided here (StampWalletRowTooltip). No search re-run and no
         /// dispose-and-recreate, which is why a width change no longer goes
         /// through RebuildContent.
         /// <para>
@@ -1548,6 +1593,12 @@ namespace GW2CraftingHelper.Views
         /// has just created the cells at this same column width, hence
         /// <paramref name="refitText"/> false there - and the resize repack,
         /// which must also re-ellipsize.
+        /// <para>
+        /// HOW OFTEN, since the plan tab differs and they share
+        /// <see cref="HeaderCellPlan"/>: three callers, and the only one a
+        /// drag reaches (<see cref="RefitResultRows"/>) is trailing-
+        /// debounced. Once per drag, not once per frame of one.
+        /// </para>
         /// </summary>
         private void LayoutResultGrid(bool refitText)
         {
@@ -1560,22 +1611,30 @@ namespace GW2CraftingHelper.Views
 
             int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
 
-            var itemGrid = SnapshotItemGridLayout.Compute(_itemCells.Count, gridWidth, ItemRowHeight);
-            var walletGrid = SnapshotItemGridLayout.Compute(
-                _walletCells.Count, gridWidth, WalletRowHeight, itemGrid.Height);
+            var layout = SnapshotResultLayout.Compute(
+                _itemCells.Count, _walletCells.Count, gridWidth, ItemRowHeight, WalletRowHeight,
+                SectionTitleBandHeight, ColumnHeaderRowHeight);
 
-            _resultGridPanel.Size = new Point(gridWidth, itemGrid.Height + walletGrid.Height);
+            _resultGridPanel.Size = new Point(gridWidth, layout.TotalHeight);
 
-            PlaceCells(_itemCells, itemGrid, ItemRowHeight, refitText);
-            PlaceCells(_walletCells, walletGrid, WalletRowHeight, refitText);
+            LayoutSectionChrome(_itemChrome, layout.Items, gridWidth);
+            LayoutSectionChrome(_walletChrome, layout.Wallet, gridWidth);
+
+            PlaceCells(_itemCells, _itemOrder, layout.Items.Grid, ItemRowHeight, refitText);
+            PlaceCells(_walletCells, _walletOrder, layout.Wallet.Grid, WalletRowHeight, refitText);
         }
 
+        /// <summary>Places one run's cells. They are held in the search's
+        /// order and <paramref name="order"/> is the sort over them, so a
+        /// click moves controls instead of recreating them.</summary>
         private static void PlaceCells(
-            List<ResultCell> cells, SnapshotItemGridLayout.Grid grid, int rowHeight, bool refitText)
+            List<ResultCell> cells, IReadOnlyList<int> order,
+            SnapshotItemGridLayout.Grid grid, int rowHeight, bool refitText)
         {
+            bool ordered = order != null && order.Count == cells.Count;
             for (int i = 0; i < cells.Count; i++)
             {
-                var cell = cells[i];
+                var cell = cells[ordered ? order[i] : i];
                 cell.Panel.Location = new Point(grid.Cells[i].X, grid.Cells[i].Y);
                 cell.Panel.Size = new Point(grid.ColumnWidth, rowHeight);
 
@@ -1706,7 +1765,13 @@ namespace GW2CraftingHelper.Views
             // destroys the very panel that field points at.
             _itemCells.Clear();
             _walletCells.Clear();
+            _itemRows.Clear();
+            _walletRows.Clear();
+            _itemOrder = null;
+            _walletOrder = null;
             _resultGridPanel = null;
+            _itemChrome = null;
+            _walletChrome = null;
             _lastRowLayoutWidth = _contentPanel.Width;
 
             foreach (var child in _contentPanel.Children.ToArray())
@@ -1832,22 +1897,41 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            if (itemRows != null)
+            _itemChrome = anyItemRows ? CreateSectionChrome("Items", "Item", _itemSortState) : null;
+            _walletChrome = anyWalletRows ? CreateSectionChrome("Currencies", "Currency", _walletSortState) : null;
+
+            // Data-derived and width-invariant, so measured once here; the
+            // header label it is floored at is what a sort click moves.
+            if (_itemChrome != null)
             {
+                _itemRows.AddRange(itemRows);
+                _itemChrome.ReapplyOrder =
+                    () => _itemOrder = SnapshotTableSorter.ItemOrder(_itemRows, _itemSortState);
+                _itemChrome.WidestAmount = MeasureWidestAmount(itemRows, r => AmountText(r.TotalCount));
+                _itemChrome.RefreshHeaders();
                 foreach (var row in itemRows)
                 {
-                    CreateItemRow(row, columnWidth);
+                    CreateItemRow(row, columnWidth, _itemChrome);
                 }
+
+                _itemChrome.ReapplyOrder();
             }
 
             // After the item cells, and laid out below them by
             // LayoutResultGrid - the order the single-column list had.
-            if (walletRows != null)
+            if (_walletChrome != null)
             {
+                _walletRows.AddRange(walletRows);
+                _walletChrome.ReapplyOrder =
+                    () => _walletOrder = SnapshotTableSorter.WalletOrder(_walletRows, _walletSortState);
+                _walletChrome.WidestAmount = MeasureWidestAmount(walletRows, e => AmountText(e.Value));
+                _walletChrome.RefreshHeaders();
                 foreach (var entry in walletRows)
                 {
-                    CreateWalletRow(entry, columnWidth);
+                    CreateWalletRow(entry, columnWidth, _walletChrome);
                 }
+
+                _walletChrome.ReapplyOrder();
             }
 
             // Places the cells the two loops just created and gives the grid
@@ -1857,6 +1941,30 @@ namespace GW2CraftingHelper.Views
             // already runs once per pause in typing over a list that can
             // reach into the thousands of rows.
             LayoutResultGrid(refitText: false);
+        }
+
+        /// <summary>Amount column text: the module's "30x" quantity
+        /// spelling, thousands separator kept because a wallet balance runs
+        /// to seven figures where an item count does not.</summary>
+        private static string AmountText(int amount)
+        {
+            return amount.ToString("N0", CultureInfo.CurrentCulture) + "x";
+        }
+
+        /// <summary>The widest amount one run renders: data-derived, so
+        /// measured once per rebuild. The header label it is floored
+        /// against is the band's only other term.</summary>
+        private static int MeasureWidestAmount<T>(IReadOnlyList<T> rows, Func<T, string> amountOf)
+        {
+            var font = UiFonts.Body;
+            int widest = 0;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                int width = (int)Math.Ceiling(font.MeasureString(amountOf(rows[i])).Width);
+                if (width > widest) widest = width;
+            }
+
+            return widest;
         }
 
         /// <summary>
@@ -1899,18 +2007,275 @@ namespace GW2CraftingHelper.Views
             return null;
         }
 
-        // Left edge of a result row's text column (past the 32px icon at
-        // x=2) and the gap kept clear of the row's right edge. Both live in
-        // SnapshotItemGridLayout so the minimum column width is derived from
-        // the same numbers the cells are placed with - the Settings tab's
-        // currency grid shares its own cell constants the same way.
+        // Left edge of a row's text column, past the icon at x=2. It lives
+        // in SnapshotItemGridLayout with every other edge in the cell.
         private const int RowTextX = SnapshotItemGridLayout.CellTextX;
-        private const int RowTextRightPad = SnapshotItemGridLayout.CellTextRightPad;
+
+        /// <summary>One run's chrome: its section title with the rule under
+        /// it, and the sortable header band above its cells. The band spans
+        /// the whole grid and carries ONE label pair per column - the
+        /// alternative labels columns two and three with nothing.</summary>
+        private sealed class SectionChrome
+        {
+            public Panel TitlePanel;
+            public Panel TitleDivider;
+            public Panel HeaderPanel;
+
+            /// <summary>The name column's header title, without its sort
+            /// indicator - "Item" or "Currency".</summary>
+            public string NameTitle;
+
+            public TableSortState<SnapshotTableColumn> Sort;
+
+            /// <summary>Widest amount this run renders - see
+            /// MeasureWidestAmount.</summary>
+            public int WidestAmount;
+
+            /// <summary>Width the Amount column reserves: the widest amount
+            /// floored at its header label. Read live by every cell's re-fit
+            /// closure - the sort indicator moves the floor.</summary>
+            public int AmountBand;
+
+            public readonly List<Label> NameHeaders = new List<Label>();
+            public readonly List<Label> AmountHeaders = new List<Label>();
+
+            /// <summary>Cycles this run's sort and re-places its cells.</summary>
+            public Action<SnapshotTableColumn> SortBy;
+
+            /// <summary>Re-derives this run's placement order - the one
+            /// place that knows which run a chrome belongs to.</summary>
+            public Action ReapplyOrder;
+
+            /// <summary>Per-column click actions, built once, so a
+            /// re-describe never allocates a closure per column.</summary>
+            public Action SortByName;
+            public Action SortByAmount;
+
+            /// <summary>The band's hover/click cells, re-described whenever
+            /// the grid's column count or width changes.</summary>
+            public SortableHeaderCells Cells;
+
+            /// <summary>The cell split over those labels. Rebuilt only when
+            /// the column count or a header's width changes; Sync is what a
+            /// re-layout runs.</summary>
+            public HeaderCellPlan CellPlan;
+            public int PlanColumns;
+
+            /// <summary>Header text, and everything measured from it. Fixed
+            /// between sort clicks - the indicator is the only part that
+            /// moves - so a re-layout measures no string.</summary>
+            public string NameText;
+            public string AmountText;
+            public int NameWidth;
+            public int AmountWidth;
+
+            /// <summary>
+            /// Re-resolves both header labels against the sort state and
+            /// re-floors the Amount band on the new label width. The cell
+            /// plan caches those widths, so it is dropped, not patched.
+            /// </summary>
+            public void RefreshHeaders()
+            {
+                var font = TableHeaderStyle.Font;
+                NameText = SortableHeaderLabel.Decorate(
+                    NameTitle, Sort.IndicatorFor(SnapshotTableColumn.Name));
+                AmountText = SortableHeaderLabel.Decorate(
+                    AmountHeaderTitle, Sort.IndicatorFor(SnapshotTableColumn.Amount));
+                NameWidth = (int)Math.Ceiling(font.MeasureString(NameText).Width);
+                AmountWidth = (int)Math.Ceiling(font.MeasureString(AmountText).Width);
+                AmountBand = SnapshotItemGridLayout.CellAmountBandWidth(WidestAmount, AmountWidth);
+
+                for (int i = 0; i < NameHeaders.Count; i++)
+                {
+                    NameHeaders[i].Text = NameText;
+                    AmountHeaders[i].Text = AmountText;
+                }
+
+                CellPlan = null;
+                PlanColumns = 0;
+            }
+
+            public const string AmountHeaderTitle = "Amount";
+        }
+
+        /// <summary>
+        /// Builds one run's title band and its (empty) header band; the
+        /// per-column labels come from <see cref="LayoutSectionChrome"/>,
+        /// the only place that knows the resolved column count.
+        /// </summary>
+        private SectionChrome CreateSectionChrome(
+            string title, string nameTitle, TableSortState<SnapshotTableColumn> sort)
+        {
+            var chrome = new SectionChrome { NameTitle = nameTitle, Sort = sort };
+
+            chrome.TitlePanel = new Panel()
+            {
+                Size = new Point(0, SectionTitleBandHeight),
+                Parent = _resultGridPanel
+            };
+            new Label()
+            {
+                Font = UiFonts.SectionTitle,
+                Text = title,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, SectionTitleTextY),
+                Parent = chrome.TitlePanel
+            };
+            chrome.TitleDivider = new Panel()
+            {
+                Size = new Point(0, 2),
+                Location = new Point(0, SectionTitleBandHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = chrome.TitlePanel
+            };
+
+            chrome.HeaderPanel = new Panel()
+            {
+                Size = new Point(0, ColumnHeaderRowHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
+                Parent = _resultGridPanel
+            };
+
+            chrome.Cells = new SortableHeaderCells(chrome.HeaderPanel);
+            chrome.SortBy = column => SortSection(chrome, column);
+            chrome.SortByName = () => chrome.SortBy(SnapshotTableColumn.Name);
+            chrome.SortByAmount = () => chrome.SortBy(SnapshotTableColumn.Amount);
+            chrome.RefreshHeaders();
+
+            return chrome;
+        }
+
+        /// <summary>Applies a header click: the sort state cycles, the
+        /// headers re-resolve, the cells are RE-PLACED. Nothing is
+        /// re-queried or disposed, so the row count and grid height are
+        /// identical across it - which is why neither the scroll offset nor
+        /// the hover chain needs defending here.</summary>
+        private void SortSection(SectionChrome chrome, SnapshotTableColumn column)
+        {
+            // A chrome with no order to reapply was never handed its rows.
+            if (chrome?.ReapplyOrder == null) return;
+            if (_resultGridPanel == null || _resultGridPanel.Parent == null) return;
+
+            chrome.Sort.Cycle(column);
+
+            // The indicator changes the label's width, which floors the
+            // Amount band - the only reason a click re-ellipsizes.
+            int bandBefore = chrome.AmountBand;
+            chrome.RefreshHeaders();
+
+            chrome.ReapplyOrder();
+
+            LayoutResultGrid(refitText: chrome.AmountBand != bandBefore);
+        }
+
+        /// <summary>Places one run's chrome against the grid it labels.
+        /// Surplus labels from a wider window are hidden rather than
+        /// disposed, so a drag across the threshold churns nothing.</summary>
+        private void LayoutSectionChrome(
+            SectionChrome chrome, SnapshotResultLayout.Section section, int gridWidth)
+        {
+            if (chrome == null) return;
+
+            chrome.TitlePanel.Visible = section.Present;
+            chrome.HeaderPanel.Visible = section.Present;
+            if (!section.Present) return;
+
+            chrome.TitlePanel.Location = new Point(0, section.TitleY);
+            chrome.TitlePanel.Size = new Point(gridWidth, SectionTitleBandHeight);
+            chrome.TitleDivider.Size = new Point(gridWidth, 2);
+
+            chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
+            chrome.HeaderPanel.Size = new Point(gridWidth, ColumnHeaderRowHeight);
+
+            int columnCount = section.Grid.ColumnCount;
+            int columnWidth = section.Grid.ColumnWidth;
+
+            while (chrome.NameHeaders.Count < columnCount)
+            {
+                chrome.NameHeaders.Add(CreateHeaderLabel(chrome, chrome.NameText));
+                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome, chrome.AmountText));
+            }
+
+            for (int i = 0; i < chrome.NameHeaders.Count; i++)
+            {
+                bool used = i < columnCount;
+                chrome.NameHeaders[i].Visible = used;
+                chrome.AmountHeaders[i].Visible = used;
+                if (!used) continue;
+
+                int columnX = i * columnWidth;
+                int amountX =
+                    SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
+
+                chrome.NameHeaders[i].Location =
+                    new Point(columnX + SnapshotItemGridLayout.CellTextX, ColumnHeaderLabelY);
+                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, ColumnHeaderLabelY);
+            }
+
+            SyncHeaderCells(chrome, columnCount, columnWidth, gridWidth);
+        }
+
+        /// <summary>
+        /// Re-describes the header band's cells for the grid it now spans.
+        /// Position-and-width work only - the labels, widths and actions
+        /// live on the chrome's <see cref="HeaderCellPlan"/>. Each cell's
+        /// right edge is its own column's, not a midpoint between two
+        /// header words, and the last column absorbs the remainder.
+        /// </summary>
+        private static void SyncHeaderCells(
+            SectionChrome chrome, int columnCount, int columnWidth, int gridWidth)
+        {
+            if (columnCount <= 0) return;
+
+            if (chrome.CellPlan == null || chrome.PlanColumns != columnCount)
+            {
+                chrome.CellPlan = new HeaderCellPlan(columnCount * 2, chrome.Cells);
+                for (int i = 0; i < columnCount; i++)
+                {
+                    chrome.CellPlan.Set(i * 2, chrome.NameHeaders[i], chrome.NameWidth, chrome.SortByName);
+                    chrome.CellPlan.Set(
+                        (i * 2) + 1, chrome.AmountHeaders[i], chrome.AmountWidth, chrome.SortByAmount);
+                }
+
+                chrome.PlanColumns = columnCount;
+            }
+
+            int splitX = SnapshotItemGridLayout.CellHeaderSplitX(columnWidth, chrome.AmountBand);
+            for (int i = 0; i < columnCount; i++)
+            {
+                int columnX = i * columnWidth;
+                chrome.CellPlan.SetBoundary(i * 2, columnX + splitX);
+                chrome.CellPlan.SetBoundary(
+                    (i * 2) + 1, i == columnCount - 1 ? gridWidth : columnX + columnWidth);
+            }
+
+            chrome.CellPlan.Sync(gridWidth);
+        }
+
+        private static Label CreateHeaderLabel(SectionChrome chrome, string text)
+        {
+            var label = LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Font = TableHeaderStyle.Font,
+                Text = text,
+                TextColor = TableHeaderStyle.LabelColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Parent = chrome.HeaderPanel
+            });
+
+            // The hit area is the whole cell (SortableHeaderCells); the
+            // label carries only the note, which it would swallow.
+            SortableHeaderLabel.MarkSortable(label);
+            return label;
+        }
 
         /// <summary>
         /// One placed result cell: the row Panel the grid moves and sizes,
-        /// and the closure that re-ellipsizes its text lines (re-deciding
-        /// their tooltips) against a new column width.
+        /// and the closure that re-ellipsizes its text lines against a new
+        /// column width and re-pins its amount. Text and position only -
+        /// see RefitResultRows for the wallet row's one exception.
         /// </summary>
         private sealed class ResultCell
         {
@@ -1934,7 +2299,7 @@ namespace GW2CraftingHelper.Views
         /// Log tab's rows and the plan's tables use.
         /// </summary>
         private static Label CreateRowTextLabel(
-            Panel rowPanel, string text, int cellWidth, int y, Color? color, out bool shortened)
+            Panel rowPanel, string text, int maxWidth, int y, Color? color, out bool shortened)
         {
             var label = new Label()
             {
@@ -1949,7 +2314,7 @@ namespace GW2CraftingHelper.Views
                 label.TextColor = color.Value;
             }
 
-            shortened = FitRowTextLabel(label, text, cellWidth);
+            shortened = FitRowTextLabel(label, text, maxWidth);
 
             // Both lines of a snapshot row - the item name and the
             // "Character: ..." source caption - carry names nobody here
@@ -1961,33 +2326,22 @@ namespace GW2CraftingHelper.Views
 
         /// <summary>
         /// Ellipsizes one line to the width of the CELL it sits in - one
-        /// grid column, not the whole content panel - and re-decides its
-        /// tooltip, returning whether it had to shorten. The single rule, so
-        /// the build-time fit and the resize-time repack
-        /// (<see cref="RefitResultRows"/>) cannot drift.
-        /// <para>
-        /// The label is the deepest control under the cursor, and Blish
-        /// resolves a tooltip on that control alone - it does not bubble to
-        /// the row Panel (the swallowed-hover class recorded for
-        /// ShoppingListSectionRenderer and the tree row). The Panel gets one
-        /// too, from the caller, for the strip beside the text. A line that
-        /// now fits has its tooltip cleared rather than left stale.
-        /// </para>
+        /// grid column, not the whole content panel - so the build-time fit
+        /// and the repack cannot drift. Text only: the ROW owns its
+        /// tooltips, and a note written from this path would drop the rich
+        /// surface over the same label on every repack (a non-null
+        /// BasicTooltipText nulls Control._tooltip).
         /// </summary>
-        private static bool FitRowTextLabel(Label label, string text, int cellWidth)
+        private static bool FitRowTextLabel(Label label, string text, int maxWidth)
         {
-            var font = UiFonts.Body;
             string full = text ?? "";
-            string shown = LabelHelpers.EllipsizeToWidth(font, full, cellWidth - RowTextX - RowTextRightPad);
+            string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Body, full, maxWidth);
 
             label.Text = shown;
-
-            bool shortened = shown != full;
-            TooltipFacility.ApplyPlain(label, shortened ? full : null);
-            return shortened;
+            return shown != full;
         }
 
-        private void CreateItemRow(SnapshotSearchRow row, int columnWidth)
+        private void CreateItemRow(SnapshotSearchRow row, int columnWidth, SectionChrome chrome)
         {
             var rowPanel = new Panel()
             {
@@ -1995,89 +2349,141 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel
             };
 
-            // A missing IconUrl is a data gap (e.g. the API dropped it),
-            // never a genuine load failure - IconControls.CreateItemIcon
-            // degrades it to a neutral empty-slot square instead of
-            // Blish's alarming magenta missing-texture placeholder (audit
-            // row 56 PART B #1).
-            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, 2, 2);
+            // The module's one icon component, at the plan rows' 32px art
+            // in a 1px frame. Rarity comes from the session stat cache
+            // because an AccountSnapshot carries none; a miss is neutral.
+            string rarity = RarityFor(row.ItemId);
+            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, rarity, 2, 2);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
             //
-            // Quantity PREFIX ("30x Mystic Clover"), matching the recipe
-            // tree, the shopping list and Used Materials. This row used to
-            // suffix it ("Mystic Clover x30") and the wallet row below used
-            // a colon ("Spirit Shards: 50"), so one tab spelled the same
-            // fact three ways (audit batch J, M9). Two things are
-            // deliberately NOT swept into this: a tabular Amount column,
-            // whose header already labels its bare numbers, and the
-            // location breakdown below.
-            string nameText = $"{row.TotalCount}x {row.Name}";
-            var nameLabel = CreateRowTextLabel(rowPanel, nameText, columnWidth, 4, null, out bool nameShortened);
+            // The count is a COLUMN, not a prefix: a quantity a reader can
+            // sort by has to line up. The name takes a rarity colour only
+            // when one is KNOWN - the unknown entry is a 200-grey that would
+            // dim every name on a fresh session (see RarityFor).
+            string nameText = row.Name ?? "";
+            string amountText = AmountText(row.TotalCount);
+            var nameLabel = CreateRowTextLabel(
+                rowPanel, nameText,
+                SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
+                4, rarity == null ? (Color?)null : RarityColors.GetRarityNameColor(rarity),
+                out _);
 
-            // NOT the prefix notation the name line above uses, and the one
-            // deliberate exemption from M9's sweep beside the tabular Amount
-            // columns: these labels are LOCATIONS, not items
-            // (SnapshotSearchResultBuilder.FormatSourceLabel returns "Bank",
-            // "Material Storage", "Shared Inventory", "Character: <name>").
-            // "20x Bank" parses as twenty banks, and "10x Character:
-            // Maximus Test" collides the multiplier with the label's own
-            // colon. The count follows its location, as it did before.
+            // Measured here, not in the closure: the text is fixed and the
+            // repack walks every row on screen.
+            int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
+            var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 4);
+
+            // NOT the Amount column's prefix notation, and the one
+            // deliberate exemption from M9's sweep: these labels are
+            // LOCATIONS. "20x Bank" parses as twenty banks, and "10x
+            // Character: Maximus Test" collides with the label's own colon.
             string breakdown = row.Breakdown == null || row.Breakdown.Count == 0
                 ? ""
                 : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
 
-            var breakdownLabel =
-                CreateRowTextLabel(rowPanel, breakdown, columnWidth, 26, InfoTextColor, out bool breakdownShortened);
+            // Runs UNDER the Amount column: that is one short line.
+            var breakdownLabel = CreateRowTextLabel(
+                rowPanel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(columnWidth),
+                26, InfoTextColor, out _);
 
-            // The same rich item tooltip the plan's rows show, composed at
-            // hover time so a stat block fetched later in the session shows
-            // without re-rendering the grid. Both lines' own ellipsis
-            // tooltips are cleared: the stat block already opens with the
-            // item's full name, and a per-line plain tooltip on top of it
-            // would win the hover and show strictly less.
-            ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, icon, row, nameText, breakdown);
+            // The degrade path, stamped before the rich one takes the
+            // control over: Register captures this as the source's
+            // FallbackText, which is what a hover shows if the deferred
+            // builder throws (TooltipFacility.ResolveContent - the stat
+            // lookup runs inside Blish's mouse-moved handler). Width-
+            // independent, so the repack still owns no tooltip.
+            TooltipFacility.ApplyPlain(nameLabel, nameText);
+            TooltipFacility.ApplyPlain(breakdownLabel, breakdown);
 
-            // The cell's own Size is the grid's to write (LayoutGridSection),
+            // The plan's own rich item tooltip, composed at hover time so a
+            // stat block fetched later shows without a re-render. Stamped
+            // ONCE: it says the same at any width, so the repack leaves
+            // every tooltip on the row alone.
+            ApplyItemRowTooltip(
+                rowPanel, nameLabel, breakdownLabel, amountLabel, icon, row, nameText, breakdown);
+
+            // The cell's own Size is the grid's to write (LayoutResultGrid),
             // so this closure only re-fits what the new column width changed.
             _itemCells.Add(new ResultCell(rowPanel, w =>
             {
-                FitRowTextLabel(nameLabel, nameText, w);
-                FitRowTextLabel(breakdownLabel, breakdown, w);
-                ApplyItemRowTooltip(rowPanel, nameLabel, breakdownLabel, icon, row, nameText, breakdown);
+                FitRowTextLabel(
+                    nameLabel, nameText, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
+                FitRowTextLabel(breakdownLabel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(w));
+                PlaceAmountLabel(amountLabel, amountWidth, w, 4);
             }));
         }
 
         /// <summary>
-        /// One item row's tooltip, on the strip AND on both of its labels -
-        /// Blish resolves a tooltip on the deepest control under the cursor
-        /// and never bubbles, so an unstamped label is a hole in the row's
-        /// hover. Falls back to the shortened-line text when the session
-        /// has no stat block for this item, which is the tooltip these rows
-        /// always had.
+        /// The cell's Amount column: right-aligned on the edge every cell
+        /// pins to, so the numbers line up however long the names are.
+        /// </summary>
+        private static Label CreateAmountLabel(
+            Panel rowPanel, string text, int textWidth, int columnWidth, int y)
+        {
+            var label = LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Font = UiFonts.Body,
+                Text = text,
+                TextColor = AmountTextColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Parent = rowPanel
+            });
+            PlaceAmountLabel(label, textWidth, columnWidth, y);
+            return label;
+        }
+
+        /// <summary>Re-pins one amount to its column's right edge, on the
+        /// width the caller measured at build: the text never changes, and
+        /// this is a position-and-width-only path.</summary>
+        private static void PlaceAmountLabel(Label label, int textWidth, int columnWidth, int y)
+        {
+            label.Location = new Point(
+                SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - textWidth, y);
+        }
+
+        /// <summary>
+        /// One item row's tooltip, on the strip AND on every control over
+        /// it - Blish resolves a tooltip on the deepest control under the
+        /// cursor and never bubbles, so an unstamped label or icon is a
+        /// hole in the row's hover. Deferred, so a stat block fetched later
+        /// in the session shows without a re-render; the name and the whole
+        /// breakdown ride along either way, so this says the same thing at
+        /// every column width and is stamped once, at build.
         /// </summary>
         private void ApplyItemRowTooltip(
-            Panel rowPanel, Label nameLabel, Label breakdownLabel, Panel icon,
+            Panel rowPanel, Label nameLabel, Label breakdownLabel, Label amountLabel, Panel icon,
             SnapshotSearchRow row, string nameText, string breakdown)
         {
             Func<TooltipContent> build = () =>
             {
+                // ALWAYS, not only when the line was shortened: the hover
+                // is where a reader goes for the whole run of it.
                 var extras = new List<string>();
-                if (breakdownLabel.Text != breakdown)
+                if (!string.IsNullOrEmpty(breakdown))
                 {
                     extras.Add(breakdown);
                 }
+
+                // ...and so does the name: a stat block usually does not
+                // exist on this tab (see RarityFor), and a row answering
+                // nothing is the reported "no tooltips". With one, its own
+                // header wins instead.
+                const bool alwaysHeadWithTheName = true;
+
                 return ItemRowTooltipComposer.BuildRowContent(
                     _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
                     nameText,
-                    nameLabel.Text != nameText,
+                    alwaysHeadWithTheName,
                     extras);
             };
 
             TooltipFacility.ApplyRichDeferred(rowPanel, build);
             TooltipFacility.ApplyRichDeferred(nameLabel, build);
             TooltipFacility.ApplyRichDeferred(breakdownLabel, build);
+            TooltipFacility.ApplyRichDeferred(amountLabel, build);
 
             // Only when the row has a real item id: a non-item row's icon
             // names what it actually is, and an item builder has nothing
@@ -2090,7 +2496,20 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth)
+        /// <summary>The rarity this tab can know for an item, or null -
+        /// see CreateItemRow for why the session stat cache is the only
+        /// source here.</summary>
+        private string RarityFor(int itemId)
+        {
+            if (_getItemStatBlock == null || itemId <= 0)
+            {
+                return null;
+            }
+
+            return _getItemStatBlock(itemId)?.Rarity;
+        }
+
+        private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth, SectionChrome chrome)
         {
             var rowPanel = new Panel()
             {
@@ -2098,27 +2517,49 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel
             };
 
-            // See CreateItemRow's matching comment -
-            // same data-gap-vs-failure distinction applies to a wallet
-            // currency's icon (e.g. the reported Spirit Shards row).
-            IconControls.CreateItemIcon(rowPanel, entry.IconUrl, 2, 2);
+            // Same component as the item rows; no rarity, so neutral.
+            var icon = IconControls.CreateItemIcon(
+                rowPanel, entry.IconUrl, (string)null, 2, 2,
+                tooltipText: string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
-            // Never display raw currency IDs (repo invariant).
-            // Quantity prefix, matching CreateItemRow above and the plan's
-            // own tables - this row used to be the module's only
-            // "Name: value" colon form (audit batch J, M9). The thousands
+            // Never display raw currency IDs (repo invariant). Same two
+            // columns as the item run above, so one header pair shape
+            // labels both and a balance lines up under a count. The
+            // thousands
             // separator stays: wallet balances run to seven figures where
             // an item count does not.
             string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
-            string text = $"{entry.Value:N0}x {name}";
-            var label = CreateRowTextLabel(rowPanel, text, columnWidth, 6, null, out bool shortened);
-            TooltipFacility.ApplyPlain(rowPanel, shortened ? text : null);
+            string amountText = AmountText(entry.Value);
+            var label = CreateRowTextLabel(
+                rowPanel, name, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
+                6, null, out bool shortened);
+            int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
+            var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 6);
+
+            // Width-invariant, so stamped here and not from the repack.
+            // Re-stated over the component's resolution, which took the raw
+            // CurrencyName where this is the fallback.
+            IconControls.ApplyPlainToIconTree(icon, name);
+            StampWalletRowTooltip(rowPanel, label, name, shortened);
 
             _walletCells.Add(new ResultCell(rowPanel, w =>
             {
-                bool nowShortened = FitRowTextLabel(label, text, w);
-                TooltipFacility.ApplyPlain(rowPanel, nowShortened ? text : null);
+                bool nowShortened = FitRowTextLabel(
+                    label, name, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
+                PlaceAmountLabel(amountLabel, amountWidth, w, 6);
+                StampWalletRowTooltip(rowPanel, label, name, nowShortened);
             }));
+        }
+
+        /// <summary>A wallet row's hover: the full currency name wherever
+        /// the line shortened, on the panel AND the label (a tooltip
+        /// resolves on the deepest control and never bubbles). The icon is
+        /// stamped once at build.</summary>
+        private static void StampWalletRowTooltip(
+            Panel rowPanel, Label nameLabel, string name, bool shortened)
+        {
+            TooltipFacility.ApplyPlain(rowPanel, shortened ? name : null);
+            TooltipFacility.ApplyPlain(nameLabel, shortened ? name : null);
         }
 
         // This used to carry its own
@@ -2169,18 +2610,21 @@ namespace GW2CraftingHelper.Views
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
             var font = UiFonts.Body;
-            var captionFont = UiFonts.Caption;
+
+            // Body, not Caption: this was the one text on the tab both
+            // smaller AND greyer than what it labels. One channel of
+            // de-emphasis, and it lines up with the numbers it introduces.
             new Label()
             {
                 Text = CoinCaption,
-                Font = captionFont,
+                Font = font,
                 TextColor = CoinCaptionColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 4),
+                Location = new Point(0, 2),
                 Parent = _coinPanel
             };
-            int captionWidth = (int)Math.Ceiling(captionFont.MeasureString(CoinCaption).Width);
+            int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
             CoinCurrencyRenderer.AddSegmentSpec(segments, font, 156904, gold.ToString());

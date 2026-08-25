@@ -206,6 +206,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void StatusRow_HoldsTheStatusTierItIsDrawnIn()
+        {
+            // The Status tier's ink runs 2px deeper than Body's, and a band
+            // left at the old height clips a descender - so this asserts
+            // against the measured ink, not the old literal.
+            const int labelY = 2;
+
+            Assert.True(
+                SnapshotHeaderLayout.StatusRowHeight
+                    > TypeRampMetrics.InkBottom(TypeRampMetrics.StatusInk, labelY),
+                "the status row must clear its own tier's lowest ink");
+        }
+
+        [Fact]
         public void NoCellsYet_SharesTheSearchRow()
         {
             // The state before the first snapshot lands: nothing to flow, so

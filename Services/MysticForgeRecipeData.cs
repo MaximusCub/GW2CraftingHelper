@@ -34,6 +34,13 @@ namespace GW2CraftingHelper.Services
 
         public int RecipeCount => _byRecipeId.Count;
 
+        /// <summary>
+        /// Every loaded recipe, for callers that fold this whole data set
+        /// into another store rather than querying it one id at a time
+        /// (SeededRecipeCacheStore.MergeMysticForgeRecipes).
+        /// </summary>
+        public IEnumerable<RawRecipe> AllRecipes => _byRecipeId.Values;
+
         public IReadOnlyList<int> SearchByOutput(int itemId)
         {
             if (_byOutputItemId.TryGetValue(itemId, out var ids))

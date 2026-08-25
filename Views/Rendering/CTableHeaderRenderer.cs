@@ -2,7 +2,9 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
+using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
@@ -48,6 +50,10 @@ namespace GW2CraftingHelper.Views.Rendering
     // the right column - the full panel width for every caller whose
     // columns are pinned, i.e. all of them, and clamped to the panel for a
     // caller whose derived edge ever landed past it.
+    // leftColumnEndForWidth: where the flexing name column really ends,
+    // so its header cell reaches the band pinned to its right rather than
+    // stopping between two words (HeaderCellMath.LabelExtent). Omitted by
+    // the inert headers, whose cells answer nothing.
     // onLeftClick/onRightClick turn those two labels into sort controls
     // for the one caller that has a sortable table (Used Materials).
     // Omitted everywhere else, which leaves the label inert exactly as
@@ -60,7 +66,8 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static void CreateCTableHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
-            Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null)
+            Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
+            Func<int, int> leftColumnEndForWidth = null)
         {
             var rowPanel = new Panel()
             {
@@ -75,7 +82,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel
             });
-            SortableHeaderLabel.MakeClickable(leftLabelControl, onLeftClick);
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
@@ -94,7 +100,29 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? rightXForWidth(panelWidth)
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
                 TableHeaderStyle.LabelY);
-            SortableHeaderLabel.MakeClickable(rightLabelControl, onRightClick);
+
+            // The hit area is the whole cell (SortableHeaderCells); the
+            // labels only carry the note, which they would swallow.
+            if (onLeftClick != null) SortableHeaderLabel.MarkSortable(leftLabelControl);
+            if (onRightClick != null) SortableHeaderLabel.MarkSortable(rightLabelControl);
+
+            // Everything the split needs that does NOT move with the panel
+            // width, resolved once, so the closure below neither measures
+            // a string nor allocates.
+            var plan = new HeaderCellPlan(
+                middleLabelControl == null ? 2 : 3, new SortableHeaderCells(rowPanel));
+            plan.Set(0, leftLabelControl, Measure(font, leftLabel), onLeftClick);
+            if (middleLabelControl != null)
+            {
+                plan.Set(1, middleLabelControl, Measure(font, middleLabel), null);
+            }
+            plan.Set(plan.Count - 1, rightLabelControl, Measure(font, rightLabel), onRightClick);
+            if (leftColumnEndForWidth != null)
+            {
+                plan.SetBoundary(0, leftColumnEndForWidth(panelWidth));
+            }
+
+            plan.Sync(rowPanel.Width);
 
             sink.AddRelayout(w =>
             {
@@ -106,7 +134,23 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     middleLabelControl.Location = new Point(middleXForWidth(w), TableHeaderStyle.LabelY);
                 }
+
+                // A right-pinned column's edge moves with the panel.
+                if (leftColumnEndForWidth != null)
+                {
+                    plan.SetBoundary(0, leftColumnEndForWidth(w));
+                }
+
+                plan.Sync(rowPanel.Width);
             });
+        }
+
+        /// <summary>Measured from the string, not read off the control: a
+        /// Blish Label's Width is not settled until its next layout pass,
+        /// and these cells are described as the label is created.</summary>
+        private static int Measure(BitmapFont font, string text)
+        {
+            return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
         /// <summary>

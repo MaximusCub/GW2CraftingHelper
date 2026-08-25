@@ -13,9 +13,13 @@ namespace GW2CraftingHelper.Services
         public const int MinPercent = 0;
         public const int MaxPercent = 100;
 
-        // 1.875x the 0.4 ceiling Blish's game-derived click volume can ever
-        // reach, and 3.75x its 0.2 fixed-volume default, with headroom above.
-        public const int DefaultPercent = 75;
+        // The maintainer's field-tested number: 0.875x the 0.4 ceiling
+        // Blish's game-derived click volume can ever reach (-1.2 dB) and
+        // 1.75x its 0.2 fixed-volume default (+4.9 dB), which puts the
+        // asset's own 0.357 peak at -18.1 dBFS. Louder than the 0.2 fixed
+        // volume it replaces, and just under the 0.4 ceiling only a
+        // full-scale game peak ever reached.
+        public const int DefaultPercent = 35;
 
         // Load-bearing: SoundEffectInstance.Volume's setter throws outside
         // [0,1] rather than clamping, and SoundEffect.Play assigns straight

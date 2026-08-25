@@ -106,6 +106,11 @@ namespace GW2CraftingHelper.Views
         private const int InfoLineBottomPadding = 4;
         private const int SpacerHeight = 10;
         private const int HeaderRowHeight = 44;
+
+        // The ramp's section-title band, named once in PlanContentHeightMath
+        // and aliased here rather than re-derived.
+        private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
+        private const int SectionHeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
         private const int NameColumnX = 16;
         private const int NameColumnWidth = 150;
         private const int ValueColumnX = NameColumnX + NameColumnWidth;
@@ -201,13 +206,16 @@ namespace GW2CraftingHelper.Views
                 nameX = NameColumnX + IconSize + 10;
             }
 
+            // SectionTitle, y=8 not 10: the tier's line box is 29px against
+            // the 23px this row was built for, and re-centring keeps it
+            // level with the icon beside it.
             new Label()
             {
                 Text = $"{info.Name} v{info.Version}",
-                Font = UiFonts.Title,
+                Font = UiFonts.SectionTitle,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(nameX, 10),
+                Location = new Point(nameX, 8),
                 Parent = headerPanel
             };
         }
@@ -263,19 +271,22 @@ namespace GW2CraftingHelper.Views
         // values only, never wrapped).
         private void AddLabeledInfoSection(string label, string text, int panelWidth)
         {
+            // Section headings, not info lines: the SectionTitle tier and
+            // the band PlanContentHeightMath derives for it, rather than
+            // slightly-bolder prose above the prose they introduce.
             var labelPanel = new Panel()
             {
-                Size = new Point(panelWidth, InfoRowHeight),
+                Size = new Point(panelWidth, SectionHeaderRowHeight),
                 Parent = _rootPanel
             };
 
             new Label()
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.SectionTitle,
                 Text = label,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX, 2),
+                Location = new Point(NameColumnX, SectionHeaderTitleY),
                 Parent = labelPanel
             };
 
