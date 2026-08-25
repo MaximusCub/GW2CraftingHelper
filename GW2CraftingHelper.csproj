@@ -230,6 +230,7 @@
     <Compile Include="Services\SettingsSaveBarLayout.cs" />
     <Compile Include="Services\LogGutterLayout.cs" />
     <Compile Include="Services\LogToolbarLayout.cs" />
+    <Compile Include="Services\AboutLayoutMath.cs" />
     <Compile Include="Services\SnapshotItemGridLayout.cs" />
     <Compile Include="Services\HeaderCellMath.cs" />
     <Compile Include="Services\SnapshotResultLayout.cs" />

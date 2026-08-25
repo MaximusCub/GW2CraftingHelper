@@ -96,32 +96,85 @@ namespace GW2CraftingHelper.Views
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
 
-        private const int RightEdgePadding = 20;
+        // Every horizontal constant on this tab comes from AboutLayoutMath,
+        // which derives them from the plan tables' own pinned-right-edge
+        // rule and from the reading measure it declares.
+        private const int Inset = AboutLayoutMath.Inset;
         private const int RowHeight = 30;
-        // 22, not 20: AddLabeledInfoSection puts a heading at y=2 in a panel
-        // of exactly this height, and that heading's lowest Font16 ink is
-        // y=23. AddInfoLine's own rows already size themselves to their
-        // wrapped label and only use this as a floor.
-        private const int InfoRowHeight = 22;
-        private const int InfoLineBottomPadding = 4;
-        private const int SpacerHeight = 10;
+        private const int RowLabelY = 7;
+        private const int RowInputY = 3;
+        private const int InputHeight = 26;
+
+        // 22, not 20: a wrapped line sits at y=2 and its lowest Font16 ink
+        // is y=23.
+        private const int ProseLineHeight = 22;
+
+        /// <summary>Gap between one block on the board and the next.</summary>
+        private const int BlockGap = 20;
+
+        // The module name sits at the Display tier now, so the band holds a
+        // 36px line box: the title at y=2 puts its lowest ink at y=39, and
+        // the rule at HeaderRowHeight - 3 clears it by two.
         private const int HeaderRowHeight = 44;
+        private const int HeaderTitleY = 2;
 
         // The ramp's section-title band, named once in PlanContentHeightMath
         // and aliased here rather than re-derived.
         private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
         private const int SectionHeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
-        private const int NameColumnX = 16;
-        private const int NameColumnWidth = 150;
-        private const int ValueColumnX = NameColumnX + NameColumnWidth;
         private const int IconSize = 32;
-        private const int MinValueBoxWidth = 200;
+        private const int IconToNameGap = 10;
+        private const int NameToVersionGap = 8;
+
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         private readonly ModuleParameters _moduleParameters;
         private readonly string _dataDirectoryPath;
         private readonly Texture2D _moduleIconTexture;
 
         private FlowPanel _rootPanel;
+
+        // One absolutely-placed panel inside the scroller: two columns
+        // cannot be expressed by a top-to-bottom FlowPanel, and every block
+        // on it has to be re-placed when the width changes.
+        private Panel _documentPanel;
+
+        private Panel _headerPanel;
+        private Image _iconImage;
+        private Label _nameLabel;
+        private Label _versionLabel;
+        private Panel _headerRule;
+
+        /// <summary>One label/value row of the identity card.</summary>
+        private sealed class FactRow
+        {
+            public Panel Panel;
+            public Label LabelControl;
+            public string LabelText;
+            public Label ValueLabel;
+            public string ValueText;
+            public TextBox ValueBox;
+        }
+
+        /// <summary>A titled block of prose: the 38px band every other
+        /// SectionTitle in the module draws, its 2px rule, and one wrapped
+        /// paragraph.</summary>
+        private sealed class ProseBlock
+        {
+            public Panel Panel;
+            public Label TitleLabel;
+            public Panel Rule;
+            public Label Body;
+            public string BodyText;
+        }
+
+        private readonly List<FactRow> _factRows = new List<FactRow>();
+        private readonly List<ProseBlock> _proseBlocks = new List<ProseBlock>();
+        private ProseBlock _factsBlock;
+        private Label _descriptionLabel;
+        private string _descriptionText = "";
+
+        private int _panelWidth;
 
         public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
         {
@@ -134,7 +187,10 @@ namespace GW2CraftingHelper.Views
         {
             var info = LoadAboutInfo();
 
-            int panelWidth = container.ContentRegion.Width - RightEdgePadding;
+            _factRows.Clear();
+            _proseBlocks.Clear();
+            _descriptionLabel = null;
+            _factsBlock = null;
 
             _rootPanel = new FlowPanel()
             {
@@ -144,180 +200,196 @@ namespace GW2CraftingHelper.Views
                 Parent = container
             };
 
+            _documentPanel = new Panel()
+            {
+                Size = new Point(ContentWidth(container), 0),
+                Parent = _rootPanel
+            };
+
+            BuildHeader(info);
+
+            _descriptionText = info.Description ?? "";
+            if (!string.IsNullOrWhiteSpace(_descriptionText))
+            {
+                _descriptionLabel = CreateProseLabel(_documentPanel);
+            }
+
+            _factsBlock = CreateProseBlock("Module", null);
+
+            // Trailing colons dropped from all six: inside a two-column
+            // table with a rule, a colon on every label is punctuation doing
+            // a column's job.
+            AddFactRow("Source", string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, copyable: true);
+            AddFactRow("Author", info.AuthorDisplay ?? NotAvailableText);
+            AddFactRow("Built with", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}");
+
+            // "License" (this project's own license) and the Blish HUD
+            // credit are two separate, differently-sourced rows and are
+            // deliberately kept side by side rather than merged: "License"
+            // is this repo's own MIT license, while "Credits" is d1's
+            // already-verified Blish HUD MIT-license credit line, carried
+            // over unchanged. Do not collapse these into one row or drop
+            // either without updating this comment.
+            AddFactRow("License", "MIT (see LICENSE in the repo)");
+            AddFactRow("Credits", BlishHudCreditLine, copyable: true);
+            AddFactRow("Data directory", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, copyable: true);
+
+            CreateProseBlock("Disclaimer", ArenaNetDisclaimerText);
+            CreateProseBlock("gw2efficiency", Gw2EfficiencyCreditText);
+
+            Relayout(ContentWidth(container));
+
+            // The tab used to resize its root panel and nothing else, so a
+            // window widened after the tab was opened left the prose wrapped
+            // at whatever width it opened at, permanently. Both paths go
+            // through Relayout so they cannot drift.
             container.Resized += (_, __) =>
             {
                 _rootPanel.Size = new Point(
                     container.ContentRegion.Width,
                     container.ContentRegion.Height);
+                Relayout(ContentWidth(container));
             };
-
-            AddHeaderRow(info, panelWidth);
-
-            if (!string.IsNullOrWhiteSpace(info.Description))
-            {
-                AddInfoLine(info.Description, panelWidth);
-            }
-
-            AddSpacer(panelWidth);
-
-            AddValueRow("Source:", string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, panelWidth, copyable: true);
-            AddValueRow("Author:", info.AuthorDisplay ?? NotAvailableText, panelWidth);
-            AddValueRow("Built with:", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}", panelWidth);
-
-            // "License:" (this project's own license) and "Credits:" (the
-            // Blish HUD attribution d1 Feature 2 asked for) are two
-            // separate, differently-sourced rows and are deliberately kept
-            // side by side rather than merged: "License:" is this repo's
-            // own MIT license (not present in d1's original wireframe -
-            // added here so a reader always sees which license applies to
-            // this module's own code), while "Credits:" is d1's
-            // already-verified Blish HUD MIT-license credit line, carried
-            // over unchanged. Do not collapse these into one row or drop
-            // either without updating this comment.
-            AddValueRow("License:", "MIT (see LICENSE in the repo)", panelWidth);
-            AddValueRow("Credits:", BlishHudCreditLine, panelWidth, copyable: true);
-            AddValueRow("Data directory:", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, panelWidth, copyable: true);
-
-            AddSpacer(panelWidth);
-            AddLabeledInfoSection("Disclaimer:", ArenaNetDisclaimerText, panelWidth);
-
-            AddSpacer(panelWidth);
-            AddLabeledInfoSection("Credits: gw2efficiency", Gw2EfficiencyCreditText, panelWidth);
         }
 
-        private void AddHeaderRow(AboutInfo info, int panelWidth)
+        private static int ContentWidth(Container container)
         {
-            var headerPanel = new Panel()
+            int width = container.ContentRegion.Width - WindowSizing.ScrollbarAllowance;
+            return width > 0 ? width : 0;
+        }
+
+        /// <summary>
+        /// The plan header's own pair, reused verbatim: the module name at
+        /// Display 32 with its version at SmallHeading 20 regular beside it,
+        /// baseline-aligned. That pair is what SmallHeading exists for; the
+        /// tab's title was sitting one tier low at SectionTitle.
+        /// </summary>
+        private void BuildHeader(AboutInfo info)
+        {
+            _headerPanel = new Panel()
             {
-                Size = new Point(panelWidth, HeaderRowHeight),
-                Parent = _rootPanel
+                Size = new Point(AboutLayoutMath.FactsMinWidth, HeaderRowHeight),
+                Parent = _documentPanel
             };
 
-            int nameX = NameColumnX;
             if (_moduleIconTexture != null)
             {
-                new Image()
+                // Unframed on purpose: this is a logo, not an item, and the
+                // framed item-icon path is for items.
+                _iconImage = new Image()
                 {
                     Texture = new AsyncTexture2D(_moduleIconTexture),
                     Size = new Point(IconSize, IconSize),
-                    Location = new Point(NameColumnX, (HeaderRowHeight - IconSize) / 2),
-                    Parent = headerPanel
+                    Location = new Point(Inset, (HeaderRowHeight - IconSize) / 2),
+                    Parent = _headerPanel
                 };
-                nameX = NameColumnX + IconSize + 10;
             }
 
-            // SectionTitle, y=8 not 10: the tier's line box is 29px against
-            // the 23px this row was built for, and re-centring keeps it
-            // level with the icon beside it.
-            new Label()
+            _nameLabel = new Label()
             {
-                Text = $"{info.Name} v{info.Version}",
-                Font = UiFonts.SectionTitle,
+                Text = info.Name,
+                Font = UiFonts.Display,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(nameX, 8),
-                Parent = headerPanel
+                Location = new Point(Inset, HeaderTitleY),
+                Parent = _headerPanel
             };
-        }
 
-        // The manifest "description" can run well past a single ~800px-wide
-        // line at this tab's default font (unlike the short string this
-        // method was originally sized for), so it needs to wrap. The wrap
-        // is done ourselves via Blish HUD's own DrawUtil.WrapText (rather
-        // than the Label control's own WrapText property) because Label's
-        // wrap width is pinned from whatever Size the control already has
-        // at its very first internal layout pass - a pass that fires as
-        // soon as any AutoSize flag is applied in an object initializer,
-        // which happens before a later Width assignment in that same
-        // initializer would ever take effect. Pre-wrapping with embedded
-        // "\n"s and letting the Label AutoSizeWidth/AutoSizeHeight to the
-        // already-wrapped result sidesteps that ordering trap entirely.
-        // The row panel is then sized to the label's resulting (possibly
-        // multi-line) height so wrapped text is never clipped and later
-        // rows are pushed down instead of overlapping it.
-        private void AddInfoLine(string text, int panelWidth)
-        {
-            var font = UiFonts.Body;
-            int maxTextWidth = Math.Max(1, panelWidth - NameColumnX - RightEdgePadding);
-            string wrappedText = DrawUtil.WrapText(font, text, maxTextWidth);
-
-            var label = new Label()
+            _versionLabel = new Label()
             {
-                Text = wrappedText,
-                Font = font,
+                Text = "v" + info.Version,
+                Font = UiFonts.SmallHeading,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Location = new Point(NameColumnX, 2)
+                Location = new Point(Inset, HeaderTitleY),
+                Parent = _headerPanel
             };
 
-            int rowHeight = Math.Max(InfoRowHeight, label.Height + InfoLineBottomPadding);
-
-            var rowPanel = new Panel()
+            _headerRule = new Panel()
             {
-                Size = new Point(panelWidth, rowHeight),
-                Parent = _rootPanel
+                Size = new Point(AboutLayoutMath.FactsMinWidth, 2),
+                Location = new Point(0, HeaderRowHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = _headerPanel
             };
-
-            label.Parent = rowPanel;
         }
 
-        // A short row-name label (same Location/style as AddValueRow's
-        // name labels) followed immediately by an AddInfoLine wrapped
-        // paragraph, for multi-line body text that still needs a "Name:"
-        // heading - unlike the top-of-tab Description line (AddInfoLine
-        // called directly, no heading needed since it is self-evidently
-        // the module's own description) or AddValueRow's rows (single-line
-        // values only, never wrapped).
-        private void AddLabeledInfoSection(string label, string text, int panelWidth)
+        private ProseBlock CreateProseBlock(string title, string body)
         {
-            // Section headings, not info lines: the SectionTitle tier and
-            // the band PlanContentHeightMath derives for it, rather than
-            // slightly-bolder prose above the prose they introduce.
-            var labelPanel = new Panel()
+            var block = new ProseBlock
             {
-                Size = new Point(panelWidth, SectionHeaderRowHeight),
-                Parent = _rootPanel
+                BodyText = body,
+                Panel = new Panel()
+                {
+                    Size = new Point(AboutLayoutMath.FactsMinWidth, SectionHeaderRowHeight),
+                    Parent = _documentPanel
+                }
             };
 
-            new Label()
+            block.TitleLabel = new Label()
             {
+                Text = title,
                 Font = UiFonts.SectionTitle,
-                Text = label,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX, SectionHeaderTitleY),
-                Parent = labelPanel
+                Location = new Point(Inset, SectionHeaderTitleY),
+                Parent = block.Panel
             };
 
-            AddInfoLine(text, panelWidth);
+            // These two headings were the only SectionTitle bands in the
+            // module drawing no rule.
+            block.Rule = new Panel()
+            {
+                Size = new Point(AboutLayoutMath.FactsMinWidth, 2),
+                Location = new Point(0, SectionHeaderRowHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = block.Panel
+            };
+
+            if (body != null)
+            {
+                block.Body = CreateProseLabel(block.Panel);
+                _proseBlocks.Add(block);
+            }
+
+            return block;
         }
 
-        private void AddSpacer(int panelWidth)
+        private static Label CreateProseLabel(Panel parent)
         {
-            new Panel()
+            return new Label()
             {
-                Size = new Point(panelWidth, SpacerHeight),
-                Parent = _rootPanel
+                Font = UiFonts.Body,
+                Text = "",
+                AutoSizeWidth = false,
+                AutoSizeHeight = false,
+                TextColor = InfoTextColor,
+                Parent = parent
             };
         }
 
-        private void AddValueRow(string label, string value, int panelWidth, bool copyable = false)
+        private void AddFactRow(string label, string value, bool copyable = false)
         {
-            var rowPanel = new Panel()
+            var row = new FactRow
             {
-                Size = new Point(panelWidth, RowHeight),
-                Parent = _rootPanel
+                LabelText = label,
+                ValueText = value,
+                Panel = new Panel()
+                {
+                    Size = new Point(AboutLayoutMath.FactsMinWidth, RowHeight),
+                    Parent = _documentPanel
+                }
             };
 
-            new Label()
+            row.LabelControl = new Label()
             {
                 Font = UiFonts.Body,
                 Text = label,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(NameColumnX, 7),
-                Parent = rowPanel
+                Location = new Point(Inset, RowLabelY),
+                Parent = row.Panel
             };
 
             if (copyable)
@@ -331,28 +403,187 @@ namespace GW2CraftingHelper.Views
                 // control needed - the field is never read back or
                 // persisted, so a user editing it in-place is harmless and
                 // resets on the next tab visit anyway.
-                int width = Math.Max(MinValueBoxWidth, panelWidth - ValueColumnX - RightEdgePadding);
-                new TextBox()
+                row.ValueBox = new TextBox()
                 {
                     Text = value,
-                    Size = new Point(width, 26),
-                    Location = new Point(ValueColumnX, 3),
-                    Parent = rowPanel
+                    Size = new Point(AboutLayoutMath.ValueFloor, InputHeight),
+                    Location = new Point(Inset, RowInputY),
+                    Parent = row.Panel
                 }.ReleaseOnDispose().ReleaseOnEnter();
             }
             else
             {
-                new Label()
+                row.ValueLabel = new Label()
                 {
                     Font = UiFonts.Body,
                     Text = value,
-                    AutoSizeWidth = true,
+                    AutoSizeWidth = false,
                     AutoSizeHeight = true,
                     TextColor = InfoTextColor,
-                    Location = new Point(ValueColumnX, 7),
-                    Parent = rowPanel
+                    Location = new Point(Inset, RowLabelY),
+                    Parent = row.Panel
                 };
             }
+
+            _factRows.Add(row);
+        }
+
+        /// <summary>
+        /// Places every block at the current panel width: the header band
+        /// across the top, the identity card in the left column, the two
+        /// prose blocks in the right one - stacked into one column below
+        /// AboutLayoutMath.TwoColumnThreshold, with the text still capped at
+        /// the reading measure either way.
+        /// </summary>
+        private void Relayout(int panelWidth)
+        {
+            if (_documentPanel == null || panelWidth <= 0 || panelWidth == _panelWidth) return;
+
+            _panelWidth = panelWidth;
+            _documentPanel.Width = panelWidth;
+
+            int columnCount = AboutLayoutMath.ColumnCount(panelWidth);
+            int columnWidth = AboutLayoutMath.ColumnWidth(panelWidth);
+            int rightX = columnCount == 1 ? 0 : AboutLayoutMath.SecondColumnX(panelWidth);
+
+            int y = LayoutHeader(panelWidth);
+
+            int leftY = y;
+            int rightY = columnCount == 1 ? 0 : y;
+
+            if (_descriptionLabel != null)
+            {
+                leftY += LayoutProse(_descriptionLabel, _descriptionText, 0, leftY, columnWidth) + BlockGap;
+            }
+
+            leftY = LayoutFactsCard(0, leftY, columnWidth);
+
+            if (columnCount == 1)
+            {
+                rightY = leftY + BlockGap;
+            }
+
+            for (int i = 0; i < _proseBlocks.Count; i++)
+            {
+                if (i > 0) rightY += BlockGap;
+                rightY = LayoutProseBlock(_proseBlocks[i], rightX, rightY, columnWidth);
+            }
+
+            _documentPanel.Height = (leftY > rightY ? leftY : rightY) + BlockGap;
+        }
+
+        private int LayoutHeader(int panelWidth)
+        {
+            _headerPanel.Location = new Point(0, 0);
+            _headerPanel.Size = new Point(panelWidth, HeaderRowHeight);
+            _headerRule.Size = new Point(panelWidth, 2);
+
+            int nameX = _iconImage == null ? Inset : Inset + IconSize + IconToNameGap;
+            _nameLabel.Location = new Point(nameX, HeaderTitleY);
+
+            int nameWidth = (int)Math.Ceiling(UiFonts.Display.MeasureString(_nameLabel.Text ?? "").Width);
+
+            // Same baseline as the title beside it, not the same top: the
+            // two tiers have different line boxes.
+            int baseline = HeaderTitleY + TypeRampMetrics.Regular32.BaselineY;
+            _versionLabel.Location = new Point(
+                nameX + nameWidth + NameToVersionGap,
+                TypeRampMetrics.BaselineAlignedY(TypeRampMetrics.Regular20, baseline));
+
+            return HeaderRowHeight + BlockGap;
+        }
+
+        private int LayoutFactsCard(int x, int y, int columnWidth)
+        {
+            y = LayoutProseBlock(_factsBlock, x, y, columnWidth) + TitleToContentGap;
+
+            int labelBand = AboutLayoutMath.LabelFloor;
+            var font = UiFonts.Body;
+            foreach (var row in _factRows)
+            {
+                int width = (int)Math.Ceiling(font.MeasureString(row.LabelText).Width);
+                if (width > labelBand) labelBand = width;
+            }
+
+            int valueX = AboutLayoutMath.ValueX(labelBand);
+            foreach (var row in _factRows)
+            {
+                row.Panel.Location = new Point(x, y);
+                row.Panel.Size = new Point(columnWidth, RowHeight);
+
+                if (row.ValueBox != null)
+                {
+                    row.ValueBox.Location = new Point(valueX, RowInputY);
+                    row.ValueBox.Width = AboutLayoutMath.CopyBoxWidth(columnWidth, labelBand);
+                }
+                else
+                {
+                    int budget = AboutLayoutMath.ValueMaxWidth(columnWidth, labelBand);
+                    row.ValueLabel.Location = new Point(valueX, RowLabelY);
+                    row.ValueLabel.Width = budget;
+
+                    string shown = LabelHelpers.EllipsizeToWidth(font, row.ValueText, budget);
+                    if (!string.Equals(row.ValueLabel.Text, shown, StringComparison.Ordinal))
+                    {
+                        row.ValueLabel.Text = shown;
+                    }
+                    string full = string.Equals(shown, row.ValueText, StringComparison.Ordinal)
+                        ? null
+                        : row.ValueText;
+                    TooltipFacility.ApplyPlain(row.ValueLabel, full);
+                    TooltipFacility.ApplyPlain(row.Panel, full);
+                }
+
+                y += RowHeight;
+            }
+
+            return y;
+        }
+
+        private int LayoutProseBlock(ProseBlock block, int x, int y, int columnWidth)
+        {
+            block.Panel.Location = new Point(x, y);
+            block.Rule.Size = new Point(columnWidth, 2);
+
+            int height = SectionHeaderRowHeight;
+            if (block.Body != null)
+            {
+                height += TitleToContentGap
+                    + LayoutProse(block.Body, block.BodyText, 0, SectionHeaderRowHeight + TitleToContentGap, columnWidth);
+            }
+
+            block.Panel.Size = new Point(columnWidth, height);
+            return y + height;
+        }
+
+        // Gap between a section's title band and its first content row -
+        // the same 6 the Settings board uses, aliased so the two tabs'
+        // section rhythm cannot drift.
+        private const int TitleToContentGap = SettingsFormLayout.TitleToContentGap;
+
+
+        /// <summary>
+        /// Wraps one paragraph into an already-created label and returns the
+        /// height it took: one <see cref="ProseLineHeight"/> row per physical
+        /// line, capped at the reading measure however wide the column is.
+        /// </summary>
+        private static int LayoutProse(Label label, string text, int x, int y, int columnWidth)
+        {
+            int budget = AboutLayoutMath.TextBudget(columnWidth);
+            var wrapped = TextWrapMath.Wrap(
+                text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
+            string joined = string.Join("\n", wrapped.Lines);
+
+            if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+            {
+                label.Text = joined;
+            }
+            label.Location = new Point(x + Inset, y);
+            label.Size = new Point(budget, wrapped.Lines.Count * ProseLineHeight);
+
+            TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
+
+            return label.Height;
         }
 
         private class AboutInfo
