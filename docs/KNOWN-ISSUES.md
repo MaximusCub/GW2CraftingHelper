@@ -62,10 +62,20 @@ rather than oral.
    below. The stub MUST repeat, verbatim, every quoted name that `.cs`,
    test, or `ref/` files cite the section by, so those citations still
    resolve by grep in this file and land the reader one hop from the full
-   record. Un-gated or un-swept sections stay here in full.
+   record. Un-gated or un-swept sections stay here in full. (Exception of
+   record: the 2026-08-24 pass rotated six 2026-08-16 sections whose gate
+   line still reads `Gate: not yet run live` - the recipe-sheet/seasonal
+   opportunity notes, the three source-selection-simplification sections,
+   `shoplist-have-format`, and the festival-vendor auto-tagging follow-up.
+   Their gates are still owed; rule 5 says where the outcome lands.)
 5. **Never edit an archived record.** A correction to a rotated section is
    an entry in a new section, not a rewrite of the old one - the record is
-   evidence (see the high-evidence-zones policy below).
+   evidence (see the high-evidence-zones policy below). This includes a
+   gate that runs *after* its section was rotated: record the outcome by
+   (a) updating that record's one-line ledger stub below with the verdict
+   and date, and (b) appending a short new section here carrying the
+   verification transcript and naming the archive file it settles. The
+   archived record itself stays byte-frozen.
 6. **Tripwire:** whenever `wc -c docs/KNOWN-ISSUES.md` exceeds ~100KB, a
    rotation pass is due. Growth is ~11.5KB per merged branch, so that is
    roughly every eight branches. The 2026-08-24 rotation ran at 917KB;
