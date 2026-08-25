@@ -437,7 +437,7 @@ namespace GW2CraftingHelper
                 itemMetadataService,
                 _vendorOfferStore,
                 reducer: new InventoryReducer(),
-                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
+                accountRecipeClient: new CachingAccountRecipeClient(new Gw2AccountRecipeClient(Gw2ApiManager)),
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
                 acquisitionHints: acquisitionHints,
                 dailyCooldownItems: dailyCooldownItems,
