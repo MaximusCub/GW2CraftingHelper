@@ -1,3 +1,4 @@
+using System;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -78,6 +79,75 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(ShouldRefresh(
                 hasCachedSnapshot: true, apiReady: false,
                 alreadyAttempted: true, refreshInProgress: true, inFailureBackoff: true));
+        }
+
+        private static readonly TimeSpan Frame = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
+
+        [Fact]
+        public void ShouldCheckNow_HoldsUntilAFullIntervalHasAccumulated()
+        {
+            var interval = TimeSpan.FromSeconds(2);
+            var carried = TimeSpan.Zero;
+
+            Assert.False(FirstLoadSnapshotGate.ShouldCheckNow(carried, TimeSpan.FromSeconds(0.5), interval, out carried));
+            Assert.Equal(TimeSpan.FromSeconds(0.5), carried);
+
+            Assert.False(FirstLoadSnapshotGate.ShouldCheckNow(carried, TimeSpan.FromSeconds(1.4), interval, out carried));
+            Assert.Equal(TimeSpan.FromSeconds(1.9), carried);
+
+            Assert.True(FirstLoadSnapshotGate.ShouldCheckNow(carried, TimeSpan.FromSeconds(0.1), interval, out carried));
+            Assert.Equal(TimeSpan.Zero, carried);
+        }
+
+        [Fact]
+        public void ShouldCheckNow_KeepsANoApiKeySessionOffThePerFrameProbe()
+        {
+            // The regression this exists for: with no API key the shot is
+            // never spent, so nothing else stops Module.Update re-reading
+            // the gate's live inputs (a permission probe, a clock read) on
+            // every single frame for the whole session.
+            var interval = TimeSpan.FromSeconds(2);
+            var carried = interval;
+            int checks = 0;
+
+            // One minute at 60 fps.
+            for (int frame = 0; frame < 3600; frame++)
+            {
+                if (FirstLoadSnapshotGate.ShouldCheckNow(carried, Frame, interval, out carried))
+                {
+                    checks++;
+                    Assert.False(ShouldRefresh(apiReady: false));
+                }
+            }
+
+            // 3600 frames, one check per two seconds of them.
+            Assert.InRange(checks, 25, 35);
+        }
+
+        [Fact]
+        public void ShouldCheckNow_FiresOnTheFirstTickWhenSeededFull()
+        {
+            // How Module seeds the accumulator, and how Clear Cache resets
+            // it: a re-armed shot must not wait out an interval first.
+            var interval = TimeSpan.FromSeconds(2);
+            Assert.True(FirstLoadSnapshotGate.ShouldCheckNow(interval, Frame, interval, out TimeSpan carried));
+            Assert.Equal(TimeSpan.Zero, carried);
+        }
+
+        [Fact]
+        public void ShouldCheckNow_SurvivesAWildFrameDelta()
+        {
+            var interval = TimeSpan.FromSeconds(2);
+
+            // A resumed game can hand back an enormous delta - fire, do
+            // not overflow the accumulator.
+            Assert.True(FirstLoadSnapshotGate.ShouldCheckNow(TimeSpan.Zero, TimeSpan.MaxValue, interval, out TimeSpan carried));
+            Assert.Equal(TimeSpan.Zero, carried);
+
+            // A negative one must not walk the accumulator backwards into
+            // never firing again.
+            Assert.False(FirstLoadSnapshotGate.ShouldCheckNow(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(-5), interval, out carried));
+            Assert.Equal(TimeSpan.FromSeconds(1), carried);
         }
     }
 }

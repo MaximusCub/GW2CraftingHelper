@@ -1,3 +1,5 @@
+using System;
+
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
@@ -47,6 +49,38 @@ namespace GW2CraftingHelper.Services
             }
 
             return apiReady;
+        }
+
+        /// <summary>
+        /// Throttle for the gate above. Its inputs are live readings, not
+        /// cached flags (a permission probe, a clock read), and while the
+        /// shot is still armed nothing else stops the caller re-taking them
+        /// every frame - with no API key configured, for the whole session.
+        /// True on the tick that has accumulated a full interval; carried
+        /// is the caller's new accumulator either way.
+        /// </summary>
+        public static bool ShouldCheckNow(
+            TimeSpan sinceLastCheck,
+            TimeSpan elapsed,
+            TimeSpan interval,
+            out TimeSpan carried)
+        {
+            // Clamped, not trusted: a paused or resumed game can hand back
+            // a wild frame delta, and a negative one must not walk the
+            // accumulator backwards into never firing again.
+            if (elapsed < TimeSpan.Zero)
+            {
+                elapsed = TimeSpan.Zero;
+            }
+
+            if (interval <= TimeSpan.Zero || sinceLastCheck >= interval - elapsed)
+            {
+                carried = TimeSpan.Zero;
+                return true;
+            }
+
+            carried = sinceLastCheck + elapsed;
+            return false;
         }
     }
 }

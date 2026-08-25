@@ -15249,13 +15249,24 @@ Two follow-ups from review, both in that branch of `Update()`.
 inside the `SnapshotCommitGate.Clear` callback, alongside the other
 field resets): an in-session clear recreates exactly the nothing-cached
 state the shot exists for, and without the reset it left the tab with no
-automatic route to a snapshot until Blish restarted. And the spent flag
-is now checked at the CALL SITE, before
-`_snapshotService.HasRequiredPermissions()` is evaluated as an argument:
-that branch runs every frame for as long as nothing is cached (forever,
-with no API key configured), and `Gw2ApiManager.HasPermissions` takes an
-`IEnumerable`, so the old shape burned an enumerator allocation per
-frame on a decision the spent shot had already settled.
+automatic route to a snapshot until Blish restarted. And **that branch
+no longer probes the API manager per frame**. Both of the gate's inputs
+are live readings evaluated as arguments -
+`_snapshotService.HasRequiredPermissions()` (`Gw2ApiManager.HasPermissions`
+takes an `IEnumerable`, so an enumerator allocation) and
+`IsInRefreshFailureBackoff()` (a `UtcNow` read) - and the branch itself
+is reached every frame for as long as nothing is cached, which with no
+API key configured is the whole session. Checking the spent flag at the
+call site only silences it AFTER the shot is used, and the shot is never
+used in exactly that case, so the flag alone left the probe running at
+frame rate on the UI thread. `FirstLoadSnapshotGate.ShouldCheckNow` is
+the second guard: a Blish-free frame-delta accumulator that lets the
+gate be re-evaluated once every two seconds instead. It is seeded full
+(and reset the same way by Clear Cache) so an armed shot is still
+checked on the very next tick, and the coarse interval costs no first-
+load latency - a granted subtoken reaches the fetch through
+`OnSubtokenUpdated`; this poll is only the backstop for the grant that
+fired before the handler was attached.
 
 ### Desktop gate
 

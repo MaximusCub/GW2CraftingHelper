@@ -200,6 +200,18 @@ namespace GW2CraftingHelper
         // Main-thread only - Update() and the Clear Cache click handler.
         private bool _firstLoadRefreshAttempted;
 
+        // How often Update() may re-read the live inputs of that shot's
+        // gate (see FirstLoadSnapshotGate.ShouldCheckNow). Coarse on
+        // purpose: a granted subtoken already reaches the fetch through
+        // OnSubtokenUpdated, so this poll is the backstop for the case
+        // where that event fired before the handler was attached, and a
+        // second or two of extra latency on it is invisible.
+        private static readonly TimeSpan FirstLoadGateCheckInterval = TimeSpan.FromSeconds(2);
+
+        // Seeded full so the first Update() after load checks immediately,
+        // and reset the same way whenever the shot is re-armed.
+        private TimeSpan _sinceFirstLoadGateCheck = FirstLoadGateCheckInterval;
+
         // Whether the timer-driven auto-refresh is running right now.
         // Written from RefreshSnapshotInBackgroundAsync, which starts on the
         // main thread but whose finally may resume on a ThreadPool
@@ -1014,12 +1026,21 @@ namespace GW2CraftingHelper
             {
                 // Nothing cached at all: the staleness tick below has no
                 // snapshot to age, so this is the only automatic route to
-                // a first one - see FirstLoadSnapshotGate. The spent-shot
-                // flag is read here as well as passed in: this branch runs
-                // every frame for as long as nothing is cached (forever,
-                // with no API key configured), and HasRequiredPermissions
-                // allocates an enumerator per call.
+                // a first one - see FirstLoadSnapshotGate. This branch is
+                // reached every frame for as long as nothing is cached
+                // (forever, with no API key configured), so both guards
+                // ahead of the gate are load-bearing: the spent-shot flag
+                // silences it once the shot has been used, and the
+                // interval throttle silences it while the shot is still
+                // armed - without which the gate's arguments would take a
+                // live permission probe (an enumerator allocation) and a
+                // UtcNow read per frame, on the UI thread.
                 if (!_firstLoadRefreshAttempted
+                    && FirstLoadSnapshotGate.ShouldCheckNow(
+                        _sinceFirstLoadGateCheck,
+                        gameTime.ElapsedGameTime,
+                        FirstLoadGateCheckInterval,
+                        out _sinceFirstLoadGateCheck)
                     && FirstLoadSnapshotGate.ShouldRefreshNow(
                         hasCachedSnapshot: false,
                         apiReady: _snapshotService.HasRequiredPermissions(),
@@ -1331,6 +1352,7 @@ namespace GW2CraftingHelper
                 // it is re-armed here rather than leaving Clear Cache with
                 // no automatic route to a snapshot until Blish restarts.
                 _firstLoadRefreshAttempted = false;
+                _sinceFirstLoadGateCheck = FirstLoadGateCheckInterval;
             });
         }
 
