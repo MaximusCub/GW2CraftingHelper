@@ -799,8 +799,10 @@ namespace GW2CraftingHelper.Tests.Services
                 System.IO.Path.GetTempPath(), "gw2ch-test-" + System.Guid.NewGuid());
             try
             {
+                const int buildId = 205780;
                 var cacheStore = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
                 cacheStore.Load(currentGw2BuildId: null);
+                cacheStore.SetCurrentBuildId(buildId);
 
                 var api = new InMemoryRecipeApiClient();
                 // Item 1 has two candidate recipes: 10 (healthy) and 11
@@ -835,7 +837,7 @@ namespace GW2CraftingHelper.Tests.Services
                 cacheStore.Flush(force: true);
 
                 var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
-                reloaded.Load(currentGw2BuildId: null);
+                reloaded.Load(currentGw2BuildId: buildId);
                 var persistedRecipe = reloaded.TryGetRecipe(10);
                 Assert.NotNull(persistedRecipe);
                 Assert.Equal(1, persistedRecipe.OutputItemId);

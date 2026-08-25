@@ -417,6 +417,9 @@ namespace GW2CraftingHelper
                 }
                 catch (Exception ex)
                 {
+                    // Neither store is told a build, so the persisted recipe
+                    // overlay stays unread and untouched for the session -
+                    // see OverlayRecipeCacheStore._deferredDiskLoad.
                     Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
                     ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Could not fetch GW2 build ID for cache validation: {ex.Message}");
                 }

@@ -252,6 +252,81 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // Module.cs cannot pass a build id to Load - it learns the live build
+        // from an async /v2/build call that lands seconds later - so a plan
+        // generated in those seconds must not be built from recipes cached
+        // under a different build.
+        [Fact]
+        public void Overlay_WithheldFromReads_UntilTheBuildCheckResolves()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string tempDir = tmp.Path;
+
+                var session1 = new OverlayRecipeCacheStore(tempDir);
+                session1.Load(currentGw2BuildId: null);
+                session1.SetCurrentBuildId(buildId);
+                session1.PutSearch(100, new List<int> { 1 });
+                session1.PutRecipe(1, NewRecipe(1, 100));
+                session1.Flush(force: true);
+
+                var session2 = new OverlayRecipeCacheStore(tempDir);
+                session2.Load(currentGw2BuildId: null);
+
+                // Vintage still unproven - a miss, exactly as if the overlay
+                // were empty.
+                Assert.Null(session2.TryGetSearch(100));
+                Assert.Null(session2.TryGetRecipe(1));
+
+                // Whatever this session fetched itself is current-build by
+                // construction, so it is served throughout.
+                session2.PutSearch(200, new List<int> { 2 });
+                Assert.NotNull(session2.TryGetSearch(200));
+
+                session2.InvalidateIfStale(buildId);
+
+                Assert.NotNull(session2.TryGetSearch(100));
+                Assert.Equal(100, session2.TryGetRecipe(1).OutputItemId);
+                Assert.NotNull(session2.TryGetSearch(200));
+            }
+        }
+
+        // A /v2/build call that times out or throws leaves Module.cs's
+        // background task in its catch, so the overlay is never resolved at
+        // all. That session must neither serve the persisted overlay nor
+        // destroy it - re-stamping it with this session's fetches under the
+        // OLD build id would make cross-build recipes survive indefinitely.
+        [Fact]
+        public void Overlay_BuildCheckNeverResolves_LeavesPersistedOverlayUntouched()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string tempDir = tmp.Path;
+
+                var session1 = new OverlayRecipeCacheStore(tempDir);
+                session1.Load(currentGw2BuildId: null);
+                session1.SetCurrentBuildId(buildId);
+                session1.PutSearch(100, new List<int> { 1 });
+                session1.Flush(force: true);
+
+                var session2 = new OverlayRecipeCacheStore(tempDir);
+                session2.Load(currentGw2BuildId: null);
+                session2.PutSearch(300, new List<int> { 3 });
+                session2.Flush(force: true);
+
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tempDir));
+
+                // What is on disk is still session 1's overlay, unchanged and
+                // still stamped with the build it was cached from.
+                var session3 = new OverlayRecipeCacheStore(tempDir);
+                session3.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(session3.TryGetSearch(100));
+                Assert.Null(session3.TryGetSearch(300));
+            }
+        }
+
         // Load's own mismatch branch - the path the offline harness uses,
         // which passes the build id straight to Load instead of calling
         // InvalidateIfStale afterwards.
