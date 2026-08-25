@@ -182,7 +182,7 @@ So the 4-pill run fits today at normal padding, would need the tightened pass af
 
 ## 7. Other findings
 
-- **Repo assumption looks wrong**: `SettingsCurrencyGridLayoutTests.SettingsPanelWidthAtWindowMinimum = 864` ("884 content region - 20") skips the `ViewAdapter` chain (-32 outer, -8 border, -20 inner); the real panel at the 930 minimum is ~804. `docs/KNOWN-ISSUES.md` (~line 9190, "falls back to one column at the 930px minimum") agrees with 804 and contradicts 864. *(Confirmed and fixed on `min-width-1436`: the constant is now derived through the full chain, and the one-column result at the old minimum is asserted.)*
+- **Repo assumption looks wrong**: `SettingsCurrencyGridLayoutTests.SettingsPanelWidthAtWindowMinimum = 864` ("884 content region - 20") skips the `ViewAdapter` chain (-32 outer, -8 border, -20 inner); the real panel at the 930 minimum is ~804. The audit batch G record ("falls back to one column at the 930px minimum", since rotated to `docs/archive/known-issues/2026-08-22-audit-g-settings.md`) agrees with 804 and contradicts 864. *(Confirmed and fixed on `min-width-1436`: the constant is now derived through the full chain, and the one-column result at the old minimum is asserted.)*
 - **One extra level of headroom**: `CraftingTreeBuilder.BuildVendorCostComponentLeaves` can put synthesised leaves one level below the recipe graph. Add one `TreeIndentPer` (24 px) to cover it unconditionally -> 1436 / 1472.
 - **Today**: at panel 804 the block is pinned at `pillColX = 391`, so any row exceeding 383 px of `nameX+qty+name` ellipsizes (~depth 6 for a 150 px name); the deepest rows clamp to the 10 px name floor (bare ellipsis).
 
