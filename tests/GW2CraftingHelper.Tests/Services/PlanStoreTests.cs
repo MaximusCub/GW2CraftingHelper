@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -490,8 +491,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_WrongSchema_MissingResult_ReturnsNullAndLogsWarn()
+        public void LoadLatest_MissingResult_ReturnsNullAndLogsWarn()
         {
+            // Renamed from LoadLatest_WrongSchema_MissingResult_...: the
+            // version and structural verdicts are separate throws now, and
+            // this file takes the structural (corrupt) one - Result/Plan
+            // has existed since schema 1, so a document without it was
+            // never a valid plan at any version.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath, "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"UseOwnMaterials\": true }");
 
@@ -505,56 +511,120 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Regression: SchemaVersion is what makes the
-        // "old-schema file = fresh start with one Warn log line" tolerance
+        // "old-schema file = fresh start with one log line" tolerance
         // contract enforceable against a FUTURE member rename/removal, not
         // just a Result/Plan structurally missing entirely - see
-        // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment. ---
+        // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment.
+        //
+        // A file at an older SHIPPED version asserts the INFO channel, not
+        // the error one. Those asserted onError (wired to Warn in Module.cs)
+        // until the 2026-08-23 investigation: that mismatch is an expected,
+        // self-healing outcome, and logging it at the same severity and in
+        // the same words as real corruption is what made that incident
+        // unexplainable from the log alone. A version this build never
+        // shipped (0, or one from the future) is the opposite case and stays
+        // on the error channel - see the pair at the end of this block. ---
 
         [Fact]
-        public void LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn()
+        public void LoadLatest_ExplicitZeroSchemaVersion_ReturnsNullAndLogsWarn()
         {
             string filePath = Path.Combine(_tempDir, "plan.json");
             // Structurally valid (Result/Plan present, would have passed
-            // the old structural check) but stamped with an old/
-            // incompatible SchemaVersion.
+            // the old structural check) but stamped 0 - a version no build
+            // ever wrote, so it is the same verdict as the omitted-field
+            // case below rather than ordinary drift.
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            Exception capturedException = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains("no schema version", capturedException.Message);
+            // Not damage either - the file parsed. It must not borrow
+            // corruption's words any more than drift's channel.
+            Assert.DoesNotContain("corrupt", capturedException.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
-        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsWarn()
+        public void LoadLatest_FutureSchemaVersionFile_ReturnsNullAndLogsWarn()
+        {
+            // A plan written by a NEWER build, read after a downgrade. Not
+            // drift: this build cannot know what is in it, and reporting it
+            // at Info would present an unreadable file as routine. Both
+            // versions are named, so the log says which way round it is.
+            int future = PersistedPlan.CurrentSchemaVersion + 1;
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": " + future + ", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedError = null;
+            Exception capturedException = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains($"schema {future}", capturedException.Message);
+            Assert.Contains(PersistedPlan.CurrentSchemaVersion.ToString(), capturedException.Message);
+        }
+
+        [Fact]
+        public void LoadLatest_VomSchemaVersion1File_ReturnsNullAndLogsInfo()
         {
             // CurrentSchemaVersion bumped 1 -> 2
             // for the new PersistedPlan.ValueOwnMaterials field. A
             // genuinely realistic old file - SchemaVersion 1 (the actual
-            // previous CurrentSchemaVersion, not the synthetic "0" the
-            // pre-existing LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn
-            // test above uses) - must be rejected exactly the same way,
-            // degrading to Module's "no restored plan" fresh-start path,
-            // not silently defaulting ValueOwnMaterials to false.
+            // previous CurrentSchemaVersion, not the synthetic "0"
+            // LoadLatest_ExplicitZeroSchemaVersion_ReturnsNullAndLogsWarn
+            // above uses) - must be rejected the same way, degrading to
+            // Module's "no restored plan" fresh-start path, not silently
+            // defaulting ValueOwnMaterials to false. Unlike that 0, this is
+            // drift and belongs on the Info channel.
+            //
+            // This is the exact file the 2026-08-23 incident hit: a plan
+            // written at schema 1 on 2026-08-15, read 8 days later by a
+            // build at 3. Renamed from ...LogsWarn and re-pointed at the
+            // Info channel - the outcome is unchanged (null, fresh start),
+            // only the severity is now honest. The message must name both
+            // versions, which is what that investigation had to recover
+            // from commit timestamps instead.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
+            Assert.Contains("schema 1", capturedInfo);
+            Assert.Contains(PersistedPlan.CurrentSchemaVersion.ToString(), capturedInfo);
+            Assert.DoesNotContain("corrupt", capturedInfo, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
-        public void LoadLatest_QualityAuditSchemaVersion2File_ReturnsNullAndLogsWarn()
+        public void LoadLatest_QualityAuditSchemaVersion2File_ReturnsNullAndLogsInfo()
         {
             // Quality-audit fix (B1): CurrentSchemaVersion bumped 2 -> 3
             // because the persisted graph grew ~275 lines of new members
@@ -571,13 +641,68 @@ namespace GW2CraftingHelper.Tests.Services
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 2, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedError);
+            Assert.NotNull(capturedInfo);
+        }
+
+        [Fact]
+        public void LoadLatest_SchemaDriftAndCorruption_ReportDistinctMessagesAndSeverities()
+        {
+            // The 2026-08-23 blocker itself: both verdicts threw one
+            // InvalidDataException whose text said "corrupt or old-schema
+            // file", so the log could not tell an expected version
+            // rejection from real damage. This test fails if they are ever
+            // merged again - in EITHER direction (same words, or same
+            // channel). Severity is the channel: PlanStore takes no logger,
+            // and Module.cs wires onError -> Warn and onInfo -> Info (one
+            // site each, see Module.Initialize).
+            string filePath = Path.Combine(_tempDir, "plan.json");
+
+            // Drift: a recognizable plan, wrong version.
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": 1, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string driftError = null;
+            string driftInfo = null;
+            var driftStore = new PlanStore(
+                _tempDir, (message, ex) => driftError = message, message => driftInfo = message);
+            Assert.Null(driftStore.LoadLatest());
+
+            // Damage: current version, but no Result/Plan at all - a shape
+            // that was never a valid plan file at ANY schema version.
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": " + PersistedPlan.CurrentSchemaVersion + ", \"Result\": { } }");
+
+            string damageError = null;
+            string damageInfo = null;
+            Exception damageException = null;
+            var damageStore = new PlanStore(
+                _tempDir,
+                (message, ex) => { damageError = message; damageException = ex; },
+                message => damageInfo = message);
+            Assert.Null(damageStore.LoadLatest());
+
+            // Distinct severities: each verdict uses one channel and only
+            // one, so neither can borrow the other's level.
+            Assert.NotNull(driftInfo);
+            Assert.Null(driftError);
+            Assert.NotNull(damageError);
+            Assert.Null(damageInfo);
+
+            // Distinct messages: only damage says "corrupt", and only
+            // drift names the versions.
+            Assert.Contains("corrupt", damageException.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("corrupt", driftInfo, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("schema 1", driftInfo);
+            Assert.NotEqual(driftInfo, damageException.Message);
         }
 
         [Fact]
@@ -706,26 +831,37 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
         {
-            // The ONE class of old file that
-            // can actually exist (written before the SchemaVersion field
-            // existed, or by any code that forgets to set it) omits the
-            // member entirely, rather than writing an explicit 0 the way
-            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn above
-            // does. Newtonsoft only overwrites properties present in the
-            // JSON, so this is the exact case a `= CurrentSchemaVersion`
+            // A file with the member omitted entirely rather than stamped
+            // (written before the field existed, or by any code that forgets
+            // to set it). Newtonsoft only overwrites properties present in
+            // the JSON, so this is the exact case a `= CurrentSchemaVersion`
             // property initializer would have let sail through silently -
             // see PersistedPlan.SchemaVersion's own doc comment.
+            //
+            // The defect this guards is a PersistedPlan construction site
+            // that never stamps the version: every plan it saves is
+            // unrestorable, forever, and the only symptom is this log line.
+            // So it takes the error channel, not the Info one the older-
+            // shipped-version rejections use - the version it reads as (0)
+            // is one no build ever wrote.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath,
                 "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
-            string capturedMessage = null;
-            var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
+            string capturedError = null;
+            Exception capturedException = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.NotNull(capturedMessage);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains("no schema version", capturedException.Message);
         }
 
         [Fact]
@@ -1989,6 +2125,218 @@ namespace GW2CraftingHelper.Tests.Services
                 node = node.Children?.FirstOrDefault(c => !c.IsCostComponent);
             }
             Assert.True(walked >= depth, $"walked only {walked} levels of {depth}");
+        }
+
+        // --- The concurrency PlanStore._saveLock exists for. Two
+        // genuinely independent writers (Module.PersistAfterGenerateAsync's
+        // post-Generate persist and PersistResolvedPlanInBackground's
+        // pill-click persist - a decision pill on an OLD plan stays
+        // clickable while a NEW Generate is in flight) plus LoadLatest,
+        // which deliberately takes NO lock and relies on the atomic
+        // .tmp+Replace write instead.
+        //
+        // One test, two phases, because the claims need opposite setups:
+        // the never-torn one needs a reader racing the writers, and that
+        // same reader makes IOException a legitimate outcome, which is
+        // exactly what an unserialized writer collision looks like. The
+        // serialization claim therefore gets its own reader-free phase
+        // where zero failures is the only permitted result. ---
+
+        [Fact]
+        public async Task SaveAndLoad_ConcurrentWriters_SerializeAndNeverYieldATornPlan()
+        {
+            var shallowPipeline = BuildPipeline(out var shallowPrices);
+            shallowPrices.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
+            shallowPrices.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
+            var shallowResult = await shallowPipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            var deepPipeline = BuildDeepPipeline(out _);
+            var deepResult = await deepPipeline.GenerateStructuredAsync(
+                1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
+
+            // Header marker (RequestItems quantity) and payload (tree
+            // depth) are written by the same Save and must always be read
+            // back together - that pairing is what makes a torn read
+            // detectable at all, rather than merely "parsed, so probably
+            // fine".
+            var shallowPlan = Wrap(shallowResult, new DateTime(2026, 8, 25, 9, 0, 0, DateTimeKind.Local), quantity: 1);
+            var deepPlan = Wrap(deepResult, new DateTime(2026, 8, 25, 10, 0, 0, DateTimeKind.Local), quantity: 7);
+            int shallowDepth = TreeDepth(shallowPlan.Result.CraftingTree);
+            int deepDepth = TreeDepth(deepPlan.Result.CraftingTree);
+            Assert.NotEqual(shallowDepth, deepDepth);
+
+            // Seed the file so the race runs entirely against the
+            // File.Replace branch (the one a reader can actually collide
+            // with), not the one-shot File.Move branch.
+            var storeFailures = new ConcurrentQueue<Exception>();
+            var store = new PlanStore(_tempDir, (message, ex) => storeFailures.Enqueue(ex));
+            store.Save(shallowPlan);
+
+            const int writes = 60;
+            var escaped = new ConcurrentQueue<Exception>();
+            var samples = new ConcurrentQueue<PersistedPlan>();
+            int nullLoads = 0;
+            var start = new ManualResetEventSlim(false);
+
+            Action<PersistedPlan> writer = plan => Run(start, escaped, () =>
+            {
+                for (int i = 0; i < writes; i++)
+                {
+                    store.Save(plan);
+                }
+            });
+
+            var tasks = new[]
+            {
+                Task.Run(() => writer(shallowPlan)),
+                Task.Run(() => writer(deepPlan)),
+                Task.Run(() => Run(start, escaped, () =>
+                {
+                    for (int i = 0; i < writes * 2; i++)
+                    {
+                        // Paced deliberately. An unpaced reader keeps a
+                        // handle on plan.json almost continuously and
+                        // starves the race of anything to observe: measured
+                        // 111 of 120 loads returning null and 60 of 120
+                        // saves losing their File.Replace to the reader's
+                        // handle. With the pause it is 111 real samples,
+                        // 9 nulls and 8 lost writes - still genuinely
+                        // overlapping, but actually sampling the file.
+                        Thread.Sleep(1);
+                        var loaded = store.LoadLatest();
+                        if (loaded == null)
+                        {
+                            Interlocked.Increment(ref nullLoads);
+                        }
+                        else
+                        {
+                            samples.Enqueue(loaded);
+                        }
+                    }
+                }))
+            };
+
+            start.Set();
+            var all = Task.WhenAll(tasks);
+            Assert.Same(all, await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(60))));
+            await all;
+
+            // Nothing may escape the public surface: Save and LoadLatest
+            // both degrade IO failure to their callbacks, and a lost write
+            // under contention is tolerated - a thrown exception is not.
+            Assert.Empty(escaped);
+
+            // What contention IS allowed to cost: a lost write or a skipped
+            // read, both reported as OS access failures. A torn or
+            // half-written file would instead surface here as a DATA
+            // verdict - gzip's InvalidDataException, a JsonReaderException,
+            // or PlanStoreHelpers' own corrupt-file throw - so this is the
+            // assertion that actually pins "never partially written".
+            foreach (var failure in storeFailures)
+            {
+                Assert.True(
+                    failure is IOException || failure is UnauthorizedAccessException,
+                    $"contention must fail as IO, not data: {failure.GetType().Name} - {failure.Message}");
+            }
+
+            // Every load landed on exactly one of the two permitted
+            // outcomes - a whole plan, or null - and the reader ran to
+            // completion rather than dying part-way.
+            Assert.Equal(writes * 2, samples.Count + nullLoads);
+            Assert.True(samples.Count > 0, $"every one of the {writes * 2} loads returned null");
+            foreach (var sample in samples)
+            {
+                int quantity = sample.RequestItems.Single().Quantity;
+                Assert.Contains(quantity, new[] { 1, 7 });
+                Assert.Equal(
+                    quantity == 1 ? shallowDepth : deepDepth,
+                    TreeDepth(sample.Result.CraftingTree));
+            }
+
+            // Everything above is insensitive to _saveLock. Measured: with
+            // `lock (_saveLock)` deleted the phase above passes 4 runs out
+            // of 4, because a reader in the race makes IOException a
+            // permitted outcome and the writers' own collisions on the one
+            // shared .tmp path arrive as exactly that - roughly 85 of the
+            // 120 saves failing, every failure classified as tolerated
+            // contention. The torn-file assertions are real; the
+            // serialization claim needs its own phase.
+            //
+            // So: same two writers, no reader. The reader was the only
+            // legitimate source of failure, and two writers holding the
+            // lock cannot collide with anything, so a single failure here
+            // means Save is not serialized. A fresh store keeps its own
+            // failure queue, so the tolerated failures above cannot mask
+            // one; it shares the lock the writers need because they share
+            // the instance.
+            var serializedFailures = new ConcurrentQueue<Exception>();
+            var serializedStore = new PlanStore(_tempDir, (message, ex) => serializedFailures.Enqueue(ex));
+            var serializedStart = new ManualResetEventSlim(false);
+
+            Action<PersistedPlan> serializedWriter = plan => Run(serializedStart, escaped, () =>
+            {
+                for (int i = 0; i < writes; i++)
+                {
+                    serializedStore.Save(plan);
+                }
+            });
+
+            var writersOnly = Task.WhenAll(
+                Task.Run(() => serializedWriter(shallowPlan)),
+                Task.Run(() => serializedWriter(deepPlan)));
+            serializedStart.Set();
+            Assert.Same(writersOnly, await Task.WhenAny(writersOnly, Task.Delay(TimeSpan.FromSeconds(60))));
+            await writersOnly;
+
+            Assert.Empty(escaped);
+            Assert.True(
+                serializedFailures.IsEmpty,
+                $"Save must be serialized: {serializedFailures.Count} of {writes * 2} uncontended-by-a-reader "
+                + $"writes failed, first {serializedFailures.FirstOrDefault()?.GetType().Name} - "
+                + serializedFailures.FirstOrDefault()?.Message);
+
+            // The file survives both races intact, and the uncontended write
+            // that follows them consumes its own .tmp.
+            store.Save(deepPlan);
+            var final = store.LoadLatest();
+            Assert.NotNull(final);
+            Assert.Equal(7, final.RequestItems.Single().Quantity);
+            Assert.Equal(deepDepth, TreeDepth(final.Result.CraftingTree));
+            Assert.False(File.Exists(Path.Combine(_tempDir, "plan.json.tmp")));
+        }
+
+        private static void Run(ManualResetEventSlim start, ConcurrentQueue<Exception> escaped, Action body)
+        {
+            start.Wait();
+            try
+            {
+                body();
+            }
+            catch (Exception ex)
+            {
+                escaped.Enqueue(ex);
+            }
+        }
+
+        // Longest non-cost-component chain, root inclusive - cost-component
+        // children are currency leaves, not crafting steps.
+        private static int TreeDepth(CraftingTreeNode node)
+        {
+            if (node == null) return 0;
+
+            int deepestChild = 0;
+            if (node.Children != null)
+            {
+                foreach (var child in node.Children)
+                {
+                    if (child.IsCostComponent) continue;
+                    int depth = TreeDepth(child);
+                    if (depth > deepestChild) deepestChild = depth;
+                }
+            }
+
+            return deepestChild + 1;
         }
     }
 }
