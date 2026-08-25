@@ -1145,14 +1145,17 @@ namespace GW2CraftingHelper.Views
             // said an amount could be typed over the default at all.
             AddInfoLine("Type a whole number of copper in a currency's box and press Save to override its default.", panelWidth);
             // "Leave a currency unset..." and "Some currencies show a
-            // default estimate..." used to sit here. Both are stated
-            // VERBATIM on the hovers of the controls they describe (the
-            // amount box's own tooltip and the default tag's, in
-            // AddCurrencyRow), so on the panel they were a second copy of a
-            // sentence the reader already has where it applies. The
-            // price-basis pointer moved to this section's title hover: it
-            // points at another tab rather than instructing about a control
-            // here.
+            // default estimate..." used to sit here. Both are carried by the
+            // hovers of the controls they describe (the amount box's own
+            // tooltip and the default tag's, in AddCurrencyRow), reworded to
+            // suit the control rather than repeated verbatim - so on the
+            // panel they were a second copy of a sentence the reader already
+            // has where it applies. Note the amount box states the
+            // leave-it-blank clause on BOTH of its branches: the default
+            // tag, which is the other place that clause lives, does not
+            // exist on the rows with no default. The price-basis pointer
+            // moved to this section's title hover: it points at another tab
+            // rather than instructing about a control here.
             // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
             // for Astral Acclaim specifically - it is untradable and earned
             // via capped seasonal play, so unlike the other currencies
@@ -1838,9 +1841,15 @@ namespace GW2CraftingHelper.Views
             }.ReleaseOnDispose().ReleaseOnEnter();
             // Feature 1 spec: the estimate is labeled as such, with
             // attribution/editable/clearable spelled out on hover.
+            // The "leave it blank" clause is on BOTH branches deliberately.
+            // It used to be a panel info line; it is the only statement that
+            // unset is a supported state rather than an unfinished one, and
+            // the four currencies it matters most for (the ones with no
+            // default, so no default tag and no default-tag hover) would
+            // otherwise carry it nowhere at all.
             TooltipFacility.ApplyPlain(input, hasDefault
-                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it."
-                : "Coin value of one unit, in copper. Type an amount here and press Save.");
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it. Left blank and not ignored, it keeps the default."
+                : "Coin value of one unit, in copper. Type an amount here and press Save, or leave it blank to keep this currency out of price comparisons.");
 
             var defaultLabel = new Label()
             {

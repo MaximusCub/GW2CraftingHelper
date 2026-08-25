@@ -1929,13 +1929,25 @@ the floor's 1232 - nothing regresses at the minimum, and the two-column
 threshold still sits far below it.
 
 Six grey info lines above that section became two. Each dropped line was
-checked against the tooltips already on the controls it describes: "leave
-a currency unset" and "some currencies show a default estimate" are
-stated verbatim on the amount box's own hover and on the default tag's,
-and the price-basis pointer moved to the section title's hover. The two
-that remain are the one that says what the number means and the
-field-test line that says an amount can be typed over a default at all.
-This is copy, not layout - cheap for the maintainer to veto.
+checked against the tooltips already on the controls it describes:
+"some currencies show a default estimate" is carried by the default tag's
+own hover, "leave a currency unset" by the amount box's, and the
+price-basis pointer moved to the section title's hover. The two that
+remain are the one that says what the number means and the field-test
+line that says an amount can be typed over a default at all. This is
+copy, not layout - cheap for the maintainer to veto.
+
+CORRECTION, since the first draft of this section got it wrong and said
+so in a code comment as well: those hovers do not repeat the dropped
+lines verbatim, and one of them did not carry its line at all. The
+default tag exists only on rows that HAVE a default, so on the four
+curated currencies that have none (Astral Acclaim and the three Rift
+Essence tiers) nothing said that leaving the box blank is a supported
+state rather than an unfinished one - which is the exact confusion the
+field-test note says this section already had once. The amount box's own
+hover now states it on both of its branches. A comment asserting a false
+invariant is worse than no comment, so both it and this paragraph now
+say what is actually true.
 
 State that only a dialog could see is now on the surface that owns it:
 the save bar carries a dirty chip on the left (hidden entirely at zero,
@@ -2160,6 +2172,12 @@ SETTINGS
   box below reverts. That difference is what the tag is there to declare.
 - Filter the currency list to one match, then clear it: the tab does not
   jump to the top (the fixed grid height still holds).
+- Filter to "Astral", hover its empty amount box, and read the whole
+  hover: it must say that leaving the box blank keeps the currency out of
+  price comparisons. Repeat on a Rift Essence row. These four have no
+  default tag, so this hover is the only place that fact lives. Hover a
+  row that DOES have a default (Karma) and confirm its box says the
+  blank case keeps the default instead.
 
 LOG
 - 1378: the Tag column starts at one fixed x on every row; run the eye
