@@ -478,6 +478,17 @@ namespace GW2CraftingHelper.Views
         // superseded it.
         private int _scrollRestoreGeneration;
 
+        // Anchorable elements by stable key (section type, tree NodeId) -
+        // what lets a restore hold the row under the cursor still instead
+        // of merely holding the scroll OFFSET still, which slides the
+        // content whenever a re-solve changes a height ABOVE the viewport
+        // (Services/ScrollAnchorMath). Written by RegisterScrollAnchor
+        // during a render, keyed so a rebuild's new control replaces the
+        // old one under the same key; cleared with the content it
+        // describes in ResetContentPanelToEmpty.
+        private readonly Dictionary<string, Control> _scrollAnchors =
+            new Dictionary<string, Control>(StringComparer.Ordinal);
+
         #endregion // 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
 
         #region 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
@@ -704,7 +715,8 @@ namespace GW2CraftingHelper.Views
                     }
                 },
                 commands => _treeToolbarCommands = commands,
-                getItemStatBlock);
+                getItemStatBlock,
+                (nodeId, rowPanel) => RegisterScrollAnchor(TreeRowAnchorKey(nodeId), rowPanel));
         }
 
 
@@ -966,11 +978,194 @@ namespace GW2CraftingHelper.Views
             // stale-offset verify against the new content.
             _resizeScrollRestorePending = false;
 
-            mutate();
+            // Nothing to hold still at the very top of the content, and a
+            // restore is skipped there anyway.
+            ScrollAnchor anchor = default(ScrollAnchor);
+            bool anchored = false;
             if (saved > 0)
             {
-                ApplySavedScrollSynchronously(saved, capturedGeneration);
+                anchored = TryCaptureScrollAnchor(saved, out anchor);
             }
+
+            mutate();
+            if (saved <= 0)
+            {
+                return;
+            }
+
+            int restore = anchored ? ResolveAnchoredOffset(anchor, saved) : saved;
+            ApplySavedScrollSynchronously(restore, capturedGeneration);
+        }
+
+        /// <summary>
+        /// Registers one control as an anchor candidate under a stable
+        /// key. Re-registering a key replaces the control, which is how a
+        /// rebuild's new row takes over from the disposed one it stands
+        /// in for.
+        /// </summary>
+        private void RegisterScrollAnchor(string key, Control control)
+        {
+            if (string.IsNullOrEmpty(key) || control == null)
+            {
+                return;
+            }
+
+            _scrollAnchors[key] = control;
+        }
+
+        // Section anchor keys are per PlanSectionType (one section, one
+        // key); tree rows key off the solver NodeId the row draws - the
+        // same identity TreeSectionController's own in-place row pairing
+        // already treats as stable across a re-solve.
+        internal static string SectionAnchorKey(PlanSectionType sectionKey)
+        {
+            return "section:" + sectionKey;
+        }
+
+        internal const string TreeRowAnchorKeyPrefix = "node:";
+
+        internal static string TreeRowAnchorKey(int nodeId)
+        {
+            return TreeRowAnchorKeyPrefix + nodeId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Drops every anchor whose control the caller is about to
+        /// dispose, keeping only the preserved tree's: its own section
+        /// header and the node rows inside it survive a preserving
+        /// re-render, and nothing re-registers them afterwards.
+        /// </summary>
+        private void DropNonTreeScrollAnchors()
+        {
+            string treeSectionKey = SectionAnchorKey(PlanSectionType.RecipeTree);
+            var doomed = new List<string>();
+            foreach (var key in _scrollAnchors.Keys)
+            {
+                if (!key.StartsWith(TreeRowAnchorKeyPrefix, StringComparison.Ordinal) &&
+                    !string.Equals(key, treeSectionKey, StringComparison.Ordinal))
+                {
+                    doomed.Add(key);
+                }
+            }
+
+            foreach (var key in doomed)
+            {
+                _scrollAnchors.Remove(key);
+            }
+        }
+
+        /// <summary>
+        /// This render's anchor candidates in content space. A registered
+        /// control that no longer hangs under the content panel, or one
+        /// hidden inside a collapsed container, is skipped: its Top means
+        /// nothing (see ContentSpaceTop).
+        /// </summary>
+        private List<ScrollAnchorCandidate> CollectScrollAnchorCandidates()
+        {
+            var candidates = new List<ScrollAnchorCandidate>(_scrollAnchors.Count);
+            foreach (var entry in _scrollAnchors)
+            {
+                int? top = ContentSpaceTop(entry.Value);
+                if (top.HasValue)
+                {
+                    candidates.Add(new ScrollAnchorCandidate(entry.Key, top.Value, entry.Value.Height));
+                }
+            }
+            return candidates;
+        }
+
+        /// <summary>
+        /// A control's top in the content panel's own coordinate space -
+        /// its Top plus every intermediate container's - or null when the
+        /// walk never reaches the content panel (a disposed or detached
+        /// control) or passes through an invisible container (a collapsed
+        /// section holds its rows at their last laid-out positions, which
+        /// are not where anything is drawn).
+        /// </summary>
+        private int? ContentSpaceTop(Control control)
+        {
+            if (control == null || !control.Visible)
+            {
+                return null;
+            }
+
+            int top = 0;
+            var current = control;
+            while (current != null && current != _contentPanel)
+            {
+                if (!current.Visible)
+                {
+                    return null;
+                }
+
+                top += current.Top;
+                current = current.Parent;
+            }
+
+            return current == _contentPanel ? top : (int?)null;
+        }
+
+        private bool TryCaptureScrollAnchor(int savedOffset, out ScrollAnchor anchor)
+        {
+            anchor = default(ScrollAnchor);
+            if (_contentPanel == null || _scrollAnchors.Count == 0)
+            {
+                return false;
+            }
+
+            int anchorLine = ScrollAnchorMath.AnchorLine(
+                savedOffset, _contentPanel.Height, CursorYInContentViewport());
+
+            return ScrollAnchorMath.TryCapture(
+                CollectScrollAnchorCandidates(), anchorLine, out anchor);
+        }
+
+        /// <summary>
+        /// The mouse's y inside the content viewport, or null when the
+        /// cursor is somewhere else - a toolbar button, another window,
+        /// off-screen. AbsoluteBounds is the panel's on-screen rectangle,
+        /// so this is unaffected by how far the content is scrolled.
+        /// </summary>
+        private int? CursorYInContentViewport()
+        {
+            var mouse = GameService.Input?.Mouse;
+            if (mouse == null || _contentPanel == null)
+            {
+                return null;
+            }
+
+            var bounds = _contentPanel.AbsoluteBounds;
+            var position = mouse.Position;
+            if (!bounds.Contains(position))
+            {
+                return null;
+            }
+
+            return position.Y - bounds.Y;
+        }
+
+        /// <summary>
+        /// The offset that puts the anchored element back under the line
+        /// it was on. Falls back to the pre-mutate offset when the element
+        /// is gone from the rebuilt content - a jump to wherever a missing
+        /// row "would" be is worse than the reflow this fixes.
+        /// </summary>
+        private int ResolveAnchoredOffset(ScrollAnchor anchor, int savedOffset)
+        {
+            if (_contentPanel == null)
+            {
+                return savedOffset;
+            }
+
+            int? newTop = ScrollAnchorMath.FindTop(CollectScrollAnchorCandidates(), anchor);
+            if (!newTop.HasValue)
+            {
+                return savedOffset;
+            }
+
+            return ScrollAnchorMath.RestoredOffset(
+                savedOffset, anchor, newTop.Value,
+                MeasureContentHeight(_contentPanel), _contentPanel.Height);
         }
 
         #endregion // 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
@@ -3840,6 +4035,18 @@ namespace GW2CraftingHelper.Views
             _relayoutActions.Clear();
             _reellipsisActions.Clear();
 
+            // Anchor keys describe controls that are about to be disposed.
+            // A preserved tree keeps its rows (and their registrations);
+            // every other key is re-registered by the render that follows.
+            if (preserveTree)
+            {
+                DropNonTreeScrollAnchors();
+            }
+            else
+            {
+                _scrollAnchors.Clear();
+            }
+
             if (_contentPanel == null) return;
 
             // Detached, not disposed, and BEFORE the sweep: a preserved
@@ -4282,6 +4489,13 @@ namespace GW2CraftingHelper.Views
                 BackgroundColor = Color.Transparent,
                 Parent = _contentPanel
             };
+            // The section's scroll anchor is its header band: a coarse
+            // anchor that still absorbs every height change in the
+            // sections above it (the reported jar - Total Cost gaining or
+            // losing currency rows on a re-solve). Tree rows register
+            // their own finer anchors inside the tree's own section.
+            RegisterScrollAnchor(SectionAnchorKey(sectionKey), headerPanel);
+
             headerPanel.MouseEntered += (_, __) => headerPanel.BackgroundColor = Color.White * 0.05f;
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
             PressFeedback.Wire(headerPanel, suppressPress);

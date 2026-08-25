@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 
@@ -66,6 +67,32 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class DecisionPillPlanner
     {
+        // The module-owned source badge texts, shared with
+        // ShoppingSourceBadge (the other renderer of a seeded
+        // AcquisitionHint badge). A source badge means the item has a real
+        // source whose cost is in Plan.TotalCoinCost; a hint badge means
+        // the opposite (Decision == Unknown, contributes 0 and still
+        // counts as unpriced - see PlanViewModelBuilder.HasUnpricedNode),
+        // so a hint badge is never allowed to render one of these strings.
+        private const string CraftPillText = "CRAFT";
+        private const string TpPillText = "TP";
+        private const string VendorPillText = "VENDOR";
+        private const string CurrencyPillText = "CURRENCY";
+
+        /// <summary>
+        /// True when <paramref name="text"/> would render identically to a
+        /// module-owned source badge. Case-insensitive: nothing
+        /// upper-cases a badge on the way to the screen, so "Vendor"
+        /// collides just as badly.
+        /// </summary>
+        public static bool IsReservedSourceBadgeText(string text)
+        {
+            return string.Equals(text, CraftPillText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, TpPillText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, VendorPillText, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, CurrencyPillText, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// One pill per feasible acquisition source: 2-3 pills means a real
         /// choice, exactly 1 pill means the source is locked - the pill
@@ -118,7 +145,7 @@ namespace GW2CraftingHelper.Services
                     // ordinary currency leaf gets (see
                     // AppendCurrencyOwnershipPill); an item-type component
                     // keeps its OWN badge.
-                    specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                    specs.Add(new PillSpec(CurrencyPillText, null, PillKind.Locked));
                     AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
                 }
                 else if (node.ComponentOwnedQuantity > 0)
@@ -157,7 +184,7 @@ namespace GW2CraftingHelper.Services
             }
             if (node.Decision == CraftingDecision.Currency)
             {
-                specs.Add(new PillSpec("CURRENCY", null, PillKind.Locked));
+                specs.Add(new PillSpec(CurrencyPillText, null, PillKind.Locked));
                 // Every ordinary currency leaf gets the same plan-scope
                 // HAVE/TOTAL pill the cost-component branch above adds.
                 AppendCurrencyOwnershipPill(specs, node.ItemId, currencyPlanTotals, ownedCurrencyAmounts);
@@ -183,16 +210,23 @@ namespace GW2CraftingHelper.Services
             }
 
             var options = new List<(AcquisitionSource src, string text)>(3);
-            if (node.CanCraft) options.Add((AcquisitionSource.Craft, "CRAFT"));
-            if (node.CanBuyTp) options.Add((AcquisitionSource.BuyFromTp, "TP"));
-            if (node.CanBuyVendor) options.Add((AcquisitionSource.BuyFromVendor, "VENDOR"));
+            if (node.CanCraft) options.Add((AcquisitionSource.Craft, CraftPillText));
+            if (node.CanBuyTp) options.Add((AcquisitionSource.BuyFromTp, TpPillText));
+            if (node.CanBuyVendor) options.Add((AcquisitionSource.BuyFromVendor, VendorPillText));
 
             if (options.Count == 0)
             {
                 // Prefer the seeded wiki hint's badge (e.g. "SALVAGE",
                 // "EXPLORE") when one exists - "UNKNOWN" remains the
-                // fallback for no-source items with no seeded hint at all.
-                string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge)
+                // fallback for no-source items with no seeded hint at all,
+                // and for a badge that collides with a source pill text
+                // (see those consts): ref/acquisition_hints_seed.json is
+                // hand-maintained, and a badge reading VENDOR next to a
+                // real single-source VENDOR row is indistinguishable while
+                // meaning the opposite. The hint TEXT still reaches the
+                // row tooltip either way.
+                string badgeText = !string.IsNullOrEmpty(node.AcquisitionBadge) &&
+                        !IsReservedSourceBadgeText(node.AcquisitionBadge)
                     ? node.AcquisitionBadge
                     : "UNKNOWN";
                 specs.Add(new PillSpec(badgeText, null, PillKind.Locked));

@@ -88,6 +88,8 @@
     <Compile Include="Services\TreeRowIdentity.cs" />
     <Compile Include="Services\TypeRampMetrics.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
+    <Compile Include="Services\FirstLoadSnapshotGate.cs" />
+    <Compile Include="Services\ScrollAnchorMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />

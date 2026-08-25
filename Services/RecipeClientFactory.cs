@@ -19,6 +19,25 @@ namespace GW2CraftingHelper.Services
             IMysticForgeRecipeSource mfSource,
             ModuleLog moduleLog = null)
         {
+            return Create(primary, LoadData(mfSource, moduleLog));
+        }
+
+        /// <summary>
+        /// The same client over already-loaded data, for a caller that
+        /// needs the data itself as well - Module folds it into the recipe
+        /// seed (SeededRecipeCacheStore.MergeMysticForgeRecipes) so the
+        /// wiki recipes are served from cache instead of only rescuing an
+        /// API round trip.
+        /// </summary>
+        public static IRecipeApiClient Create(IRecipeApiClient primary, MysticForgeRecipeData mfData)
+        {
+            return new CompositeRecipeApiClient(primary, mfData ?? MysticForgeRecipeData.Empty);
+        }
+
+        public static MysticForgeRecipeData LoadData(
+            IMysticForgeRecipeSource mfSource,
+            ModuleLog moduleLog = null)
+        {
             var log = moduleLog ?? ModuleLog.Shared;
 
             MysticForgeRecipeData mfData;
@@ -41,7 +60,7 @@ namespace GW2CraftingHelper.Services
                     $"Mystic Forge recipes: loaded {mfData.RecipeCount}, {mfData.LoadWarnings.Count} warning(s) during load - see ref/mystic_forge_recipes.json");
             }
 
-            return new CompositeRecipeApiClient(primary, mfData);
+            return mfData;
         }
     }
 }

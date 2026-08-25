@@ -51,6 +51,27 @@
       "badge": "DAILY",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Charged_Quartz_Crystal",
       "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 106712,
+      "hint": "Purchased from Castaway Agnes in Hullgarden. Paid for in account-bound items, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
+      "badge": "MERCHANT",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Survivors",
+      "lastVerified": "2026-08-24"
+    },
+    {
+      "itemId": 105804,
+      "hint": "Purchased from Canach in Breezy Cay. Paid for in account-bound items, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
+      "badge": "MERCHANT",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_People",
+      "lastVerified": "2026-08-24"
+    },
+    {
+      "itemId": 106986,
+      "hint": "Awarded for completing the Radiance of the Sun God achievement; further copies from Palak in Hullgarden. That purchase is part barter, so this module cannot price it and counts it as 0. Not craftable; no recipe.",
+      "badge": "ACHIEVEMENT",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Hylek",
+      "lastVerified": "2026-08-24"
     }
   ]
 }

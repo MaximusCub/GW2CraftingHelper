@@ -174,6 +174,51 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void MultiItemRequest_UnpricedZero_NoMultiItemNoteRow()
+        {
+            // Same reasoning one step further: on an unpriced zero the
+            // sell/profit band is suppressed and a footnote says so, so a
+            // note scoping "sell value and profit" would describe rows
+            // that are not on the page.
+            var meta = MetaFor((1, "A", "a.png"), (2, "B", "b.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+            };
+            var result = MakeResult(totalCoinCost: 0, metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
+            result.MaterialOpportunityCost = 0;
+            result.NetSaleValue = 850;
+            result.CraftingProfit = 850;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 9,
+                        NodeId = 9,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var summaryRows = vm.Sections[0].Rows;
+
+            Assert.DoesNotContain(summaryRows, r => r.RowType == PlanRowType.MultiItemNote);
+            Assert.Contains(
+                summaryRows,
+                r => r.Label == PlanViewModelBuilder.ProfitSuppressedFootnoteText);
+        }
+
+        [Fact]
         public void SingleItemRequest_NoMultiItemNoteRow()
         {
             var result = MakeResult(totalCoinCost: 500);
