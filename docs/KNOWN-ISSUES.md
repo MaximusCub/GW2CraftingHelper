@@ -14999,3 +14999,205 @@ tooltips (pinned by the depth-19/20 boundary tests + the deferred
 full-name builders), item 15's dual-cost vendor leaves (row-identity
 gate is test-pinned; one expand on a live plan settles it), badge
 hover prose, and the longest-status-at-1378 measurement.
+
+## Zero-band retention, scroll anchoring, click default, MF recipes, first-load snapshot (field-fixes-3)
+
+Five independent maintainer reports from one live 0.2.3 session.
+
+### 1. The zero band keeps its cells even when a term is unmeasured
+
+"The Total Cost section can make it ONLY display the 'Actual Cost to
+Craft' section if everything in the recipe tree that requires
+ingredients or purchases ends up ignored. It should retain the other
+cells in the section and just show them with 0s rather than making them
+disappear."
+
+This overrides the v0.2.2 rule recorded in the
+`root-ignore-summary-zero` section above, which kept the collapsed lone
+tile whenever `PlanViewModelBuilder.HasUnpricedNode` was true. The
+argument for that (a zero nobody measured must not be dressed as a
+priced equation) was sound about the NUMBER and wrong about the
+MECHANISM: real plans routinely carry UNKNOWN nodes (Globs of Dark
+Matter, account-bound gifts), so the maintainer met the collapsed band
+constantly, and a section that drops cells reads as broken rather than
+as careful.
+
+The honesty moved into text that states it. On an unpriced zero the band
+renders all three tiles at 0 and:
+
+- every tile caption takes `PlanViewModelBuilder.UnpricedTileMarker`
+  (`*`),
+- every tile tooltip takes `UnpricedTooltipSuffix` ("... could not be
+  priced and count as 0, so this figure is a floor rather than a
+  measured total"),
+- the section grows a second `SummaryFootnote` row,
+  `UnpricedFootnoteText`, above the standing Trading Post line. The
+  renderer already drew every footnote row it was handed and
+  `SummarySectionLayoutMath.BodyHeight` already counted every one, so
+  neither needed a change.
+
+A measured zero therefore still reads differently from an unmeasured
+one - no marker, one footnote. `HasUnpricedNode` is now walked ONCE per
+section build, in `BuildSummarySection`, and still only from the
+zero-cost gate.
+
+Two things deliberately did NOT change. The **profit band** still
+suppresses entirely on an unpriced zero: its tiles would not be zeros at
+all - an unmeasured 0 materials value makes "Profit if Sold" the entire
+sale price, a large invented number no footnote makes safe. And **Free
+mode with owned materials consumed** still collapses to the lone tile
+(the middle term is absent, not zero - see the older section's
+known-vs-absent-zero paragraph).
+
+### 2. Scroll anchoring across a re-solve
+
+"When you toggle IGNORE on stuff in the recipe tree - it can adjust
+which currencies show up in the Total section at the top and cause the
+current location under you to 'move' as the view reflows."
+
+`CraftingPlanView.PreserveScrollAcross` preserved the scroll OFFSET,
+which holds the view still only while the content ABOVE the viewport
+keeps its height. A re-solve changes it - the Total Cost currency table
+gains or loses rows - so the same offset now points at different
+content.
+
+`Services/ScrollAnchorMath` (Blish-free) is the whole decision:
+`AnchorLine` (the cursor's content-space line when the cursor is over
+the panel, else the viewport top), `TryCapture` (the lowest-starting
+candidate at or above that line, ties to the shortest - so a tree row
+wins over the section containing it, with no nesting description
+needed), `FindTop`, and `RestoredOffset` (old offset plus how far the
+anchored element moved, clamped; the cursor cancels out of the
+arithmetic and only decides WHICH element is anchored).
+
+The view stays a thin shim: a `_scrollAnchors` key -> control registry
+(sections keyed by `PlanSectionType` in `CreateSectionHeader`, tree rows
+keyed by solver `NodeId` through a new optional
+`TreeSectionController` delegate - the same identity that class's own
+in-place row pairing already trusts across a re-solve), a parent walk to
+content space that skips anything invisible or no longer under the
+content panel, and `GameService.Input.Mouse` for the cursor. An anchor
+that no longer exists after the rebuild (its subtree was ignored away)
+falls back to the previous offset-only restore rather than jumping to
+where a missing row "would" be.
+
+### 3. Click sound default 75 -> 35
+
+The field test that the click-volume section above was waiting on
+returned: "I found 35% or so is a reasonable click default volume."
+`ClickSoundVolume.DefaultPercent` is now 35 - 1.75x Blish's 0.2 fixed
+volume (+4.9 dB), 0.875x its 0.4 absolute ceiling (-1.2 dB), putting the
+asset's own 0.357 peak at -18.1 dBFS. The setting is persisted, so a
+user who already moved the slider keeps their value; only the default
+changed. That section's dB derivation and the test that pinned "louder
+than the old ceiling" (true of 75, not of 35) were both restated.
+
+### 4. UNKNOWN Mystic Forge gifts - measured, and not the build bump
+
+Report: "Gift of Rays, Gift of the Survivors and Gift of the People and
+Gift of the Hylek all show UNKNOWN in the recipe tree", alongside the
+per-generation log line "Recipe seed built for build 205505; current
+build 205780; seed negative entries will fall back to API."
+
+**That log line is not about negative recipe ids.** "Negative entries"
+there means negative CACHE rows - `SeededRecipeCacheStore.TryGetSearch`
+invalidates an entry only when it is an EMPTY list AND the seed build
+differs. Synthetic Mystic Forge ids were never touched by it.
+`MysticForgeSeedStalenessTests` proves this three ways, including one
+test that plans item 107040 (Gift of Rays) through the REAL shipped
+`ref/` seed files with the seed build bumped and an API client that
+404s the MF id: it still crafts.
+
+Measured data state: `ref/recipe_search_seed.json` maps 107040 to
+-1587, `ref/recipes_seed.json` and `ref/mystic_forge_recipes.json` both
+carry -1587, and every one of the 1595 MF recipes is reachable through
+the search seed today. **Gift of the Survivors / of the People / of the
+Hylek appear in neither `ref/mystic_forge_recipes.json` nor
+`ref/item_name_seed.json`** - our wiki ingestion never captured them.
+Those three are a DATA GAP and need a wiki ingestion run; no code change
+can conjure a recipe nobody has.
+
+The reachable defect next door - the one this branch fixes - is the
+opposite direction. A seed row saying "the API knows no recipe for this
+item" is an EMPTY list served as a cache HIT, so nothing ever consults
+`MysticForgeRecipeData`. Any recipe added to the wiki-sourced forge file
+without re-running the seeder was therefore invisible; worse, because a
+stale seed turns that same empty row into an API call that
+`CompositeRecipeApiClient` rescues with MF data, whether a forge-only
+item resolved depended on the live game build id - nonsense for
+wiki-sourced data. `SeededRecipeCacheStore.MergeMysticForgeRecipes`
+folds the forge data into the seed at load (additive, API ids first,
+idempotent, tolerant of `MysticForgeRecipeData.Empty`), wired in
+`Module` via the new `RecipeClientFactory.LoadData`. Forge recipes are
+now ordinary cache content, no build id can affect them, and adding the
+three missing gifts to `ref/mystic_forge_recipes.json` alone will be
+enough to make them craft. Genuine API-sourced staleness still falls
+back exactly as before.
+
+### 5. First-load snapshot
+
+"When you load for the first time we should trigger a snapshot
+immediately to try to fetch your API inventory stuff otherwise
+everything is empty and requires either I assume waiting 10mins OR
+clicking manually to pull a snapshot."
+
+An install with nothing cached had no automatic route to its first
+snapshot at all - not a slow one. `Module.LoadAsync` fetches only when
+Blish has already granted the subtoken (usually it has not at that
+point), and the `SubtokenUpdated` handler that would cover the late
+grant is attached on the very next line, so an event that fired first is
+missed. `Update()`'s interval refresh then returns on
+`_currentSnapshot == null` every tick forever.
+
+`Update()` now runs a one-shot first-load fetch through the existing
+`RefreshSnapshotInBackgroundAsync` (spinner, status text and failure
+classification unchanged). `Services/FirstLoadSnapshotGate` holds the
+rule Blish-free: fire once, only with the API ready and no refresh or
+post-failure backoff in the way - and a blocked tick does NOT spend the
+one shot, so a module whose key arrives late still gets its fetch.
+`Module.IsInRefreshFailureBackoff` was extracted so the gate and the
+refresh itself read the same window. `Views/MainView.cs` is untouched.
+
+### Desktop gate
+
+1. **Zero band, unmeasured**: plan an item with no recipe and no
+   Trading Post price (root row reads UNKNOWN), or any plan carrying an
+   UNKNOWN node whose total comes to 0. The Total Cost band shows all
+   THREE tiles at 0 with the "-"/"=" operators and the result
+   highlight, each caption ending in `*`, a footnote line above the
+   Trading Post line explaining the `*`, and the `*` explanation again
+   in each tile's hover text. No profit band renders on such a plan.
+2. **Zero band, measured**: with "Use Own Materials" OFF, ignore every
+   child until the plan costs nothing. Same three tiles at 0, but NO
+   `*` on any caption and only the one Trading Post footnote - a
+   measured zero must still look different from an unmeasured one.
+3. **Scroll anchoring**: generate a deep plan (a legendary), scroll
+   into the middle of the recipe tree, put the cursor ON a row, and
+   click IGNORE on a row at or below it - the gesture that used to jar.
+   The row under the cursor stays under the cursor while the Total Cost
+   section above gains or loses currency rows. Repeat with the cursor
+   off the panel (click IGNORE via a row further down, then move the
+   mouse away first): the topmost visible row holds instead. Also
+   collapse/expand a section header and a tree caret - neither should
+   jump.
+4. **Click default**: on a profile that has never touched the slider
+   (or after Clear Cache / a fresh install), Settings shows **35%** and
+   the click is audible but unobtrusive. On a profile that HAS moved
+   the slider, the old value is still there - the default change must
+   not overwrite it.
+5. **Mystic Forge**: search for and plan **Gift of Rays** (the exact
+   item to search). Its row must NOT read UNKNOWN - it expands into
+   Gift of the Sun, Gift of the Beach, Gift of Infused Gems and
+   Purified Rift Essence. Expect Gift of the Survivors, Gift of the
+   People and Gift of the Hylek to STILL read UNKNOWN: they are a
+   recorded data gap, not a regression, until the wiki ingestion
+   captures them.
+6. **First-load snapshot**: with a valid API key set, clear the cached
+   snapshot (Clear Cache) and restart Blish. The Snapshot tab starts
+   fetching by itself within a few seconds - spinner visible, then real
+   inventory - with no click and no 10-minute wait. Then repeat with
+   the API key removed: the tab stays empty with its normal status, the
+   log shows no repeating fetch attempts, and adding the key mid-session
+   starts exactly one fetch.
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
