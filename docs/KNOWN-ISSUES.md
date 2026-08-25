@@ -857,7 +857,9 @@ above for when the next rotation is due.
   Cited as: "Font bump and decision-round polish", font-and-polish.
   `docs/archive/known-issues/2026-08-23-font-and-polish.md`
 - **Tooltip authenticity (tooltip-authenticity)** - gate PASS 2026-08-23.
-  Cited as: "Tooltip authenticity", tooltip-authenticity.
+  Cited as: "Tooltip authenticity", tooltip-authenticity; carries the
+  accepted divergence from the game's "Unused Infusion Slot" wording that
+  `Services/ItemStatTooltipComposer.cs` points here for.
   `docs/archive/known-issues/2026-08-23-tooltip-authenticity.md`
 - **Keyboard focus release (kb-focus-release)** - gate PASS 2026-08-23.
   `docs/archive/known-issues/2026-08-23-kb-focus-release.md`
