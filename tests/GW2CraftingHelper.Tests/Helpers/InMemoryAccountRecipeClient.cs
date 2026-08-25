@@ -25,9 +25,31 @@ namespace GW2CraftingHelper.Tests.Helpers
         /// </summary>
         public int GetCallCount { get; private set; }
 
+        /// <summary>
+        /// When set, every call awaits this task before returning - lets a
+        /// test hold a fetch in flight while it does something to the caller,
+        /// then release it. GetCallCount is bumped before the gate is
+        /// awaited, so an in-flight call is already observable. Mirrors
+        /// InMemoryPriceApiClient.Gate.
+        /// </summary>
+        public Task Gate { get; set; }
+
         public void AddLearnedRecipe(int recipeId)
         {
             _learnedRecipes.Add(recipeId);
+        }
+
+        /// <summary>
+        /// Replaces the learned set outright - a second account's ids, or a
+        /// recipe list that changed between calls.
+        /// </summary>
+        public void SetLearnedRecipes(params int[] recipeIds)
+        {
+            _learnedRecipes.Clear();
+            foreach (var recipeId in recipeIds)
+            {
+                _learnedRecipes.Add(recipeId);
+            }
         }
 
         public void SetHasPermission(bool hasPermission)
@@ -35,16 +57,21 @@ namespace GW2CraftingHelper.Tests.Helpers
             _hasPermission = hasPermission;
         }
 
-        public Task<ISet<int>> GetLearnedRecipeIdsAsync(CancellationToken ct)
+        public async Task<ISet<int>> GetLearnedRecipeIdsAsync(CancellationToken ct)
         {
             GetCallCount++;
+
+            if (Gate != null)
+            {
+                await Gate;
+            }
 
             if (ThrowOnGet)
             {
                 throw new InvalidOperationException("Simulated transient /v2/account/recipes failure.");
             }
 
-            return Task.FromResult<ISet<int>>(_learnedRecipes);
+            return new HashSet<int>(_learnedRecipes);
         }
 
         public bool HasRequiredPermission()

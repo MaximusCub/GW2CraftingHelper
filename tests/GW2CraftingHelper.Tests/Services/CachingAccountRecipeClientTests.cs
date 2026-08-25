@@ -100,6 +100,63 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain(99, second);
         }
 
+        // The TTL is a clock, and a clock cannot notice that the API key now
+        // addresses a different GW2 account. Module.OnSubtokenUpdated can,
+        // and says so here.
+        [Fact]
+        public async Task Invalidate_DropsTheCache_EvenWellInsideTheTtl()
+        {
+            var inner = new InMemoryAccountRecipeClient();
+            inner.SetLearnedRecipes(10); // account A
+            var clock = Start;
+            var svc = new CachingAccountRecipeClient(inner, TimeSpan.FromMinutes(5), () => clock);
+
+            var accountA = await svc.GetLearnedRecipeIdsAsync(CancellationToken.None);
+            Assert.Contains(10, accountA);
+
+            inner.SetLearnedRecipes(20); // the key now points at account B
+            svc.Invalidate();
+
+            clock = clock.AddSeconds(1);
+            var accountB = await svc.GetLearnedRecipeIdsAsync(CancellationToken.None);
+
+            Assert.Equal(2, inner.GetCallCount);
+            Assert.Contains(20, accountB);
+            Assert.DoesNotContain(10, accountB);
+        }
+
+        // A fetch already in flight when the key changed is carrying the old
+        // account's ids; letting it complete into the cache would silently
+        // undo the invalidation for a further TTL.
+        [Fact]
+        public async Task FetchInFlightWhenInvalidated_IsNotCached()
+        {
+            var inner = new InMemoryAccountRecipeClient();
+            inner.SetLearnedRecipes(10); // account A
+            var gate = new TaskCompletionSource<bool>();
+            inner.Gate = gate.Task;
+            var clock = Start;
+            var svc = new CachingAccountRecipeClient(inner, TimeSpan.FromMinutes(5), () => clock);
+
+            var inFlight = svc.GetLearnedRecipeIdsAsync(CancellationToken.None);
+            Assert.Equal(1, inner.GetCallCount); // entered, awaiting the gate
+
+            svc.Invalidate();
+
+            inner.Gate = null;
+            gate.SetResult(true);
+            var stillAccountA = await inFlight;
+            Assert.Contains(10, stillAccountA); // the caller that asked still gets an answer
+
+            inner.SetLearnedRecipes(20); // account B
+            clock = clock.AddSeconds(1);
+            var next = await svc.GetLearnedRecipeIdsAsync(CancellationToken.None);
+
+            Assert.Equal(2, inner.GetCallCount);
+            Assert.Contains(20, next);
+            Assert.DoesNotContain(10, next);
+        }
+
         [Fact]
         public void HasRequiredPermission_DelegatesToInner()
         {

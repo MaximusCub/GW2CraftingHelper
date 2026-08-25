@@ -45,6 +45,12 @@ namespace GW2CraftingHelper.Services
         private HashSet<int> _cached;
         private DateTime _fetchedUtc;
 
+        // Bumped by Invalidate. A fetch that was already in flight when the
+        // credential changed carries the OLD account's ids, so it must not
+        // be allowed to write them back into the cache the invalidation just
+        // cleared - it compares the epoch it started under before storing.
+        private int _epoch;
+
         /// <summary>
         /// ttl/utcNow are injectable so tests can cross the expiry
         /// boundary without waiting, matching TradingPostService's own
@@ -73,12 +79,16 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public async Task<ISet<int>> GetLearnedRecipeIdsAsync(CancellationToken ct)
         {
+            int startedUnderEpoch;
+
             lock (_cacheLock)
             {
                 if (_cached != null && _utcNow() - _fetchedUtc < _ttl)
                 {
                     return Copy(_cached);
                 }
+
+                startedUnderEpoch = _epoch;
             }
 
             // Deliberately outside the lock, and deliberately without an
@@ -90,9 +100,33 @@ namespace GW2CraftingHelper.Services
 
             lock (_cacheLock)
             {
-                _cached = fetched == null ? new HashSet<int>() : new HashSet<int>(fetched);
+                var ids = fetched == null ? new HashSet<int>() : new HashSet<int>(fetched);
+
+                // Answered for the caller that asked before the credential
+                // changed, but not stored: see _epoch.
+                if (_epoch != startedUnderEpoch)
+                {
+                    return Copy(ids);
+                }
+
+                _cached = ids;
                 _fetchedUtc = _utcNow();
                 return Copy(_cached);
+            }
+        }
+
+        /// <summary>
+        /// Drops the cached ids so the next call queries again. Called when
+        /// the API key changes (Module.OnSubtokenUpdated): the cached set
+        /// belongs to whichever account the previous subtoken addressed, and
+        /// no amount of wall-clock freshness makes it the new account's.
+        /// </summary>
+        public void Invalidate()
+        {
+            lock (_cacheLock)
+            {
+                _cached = null;
+                _epoch++;
             }
         }
 
