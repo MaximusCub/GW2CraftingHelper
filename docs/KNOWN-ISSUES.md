@@ -15049,6 +15049,16 @@ mode with owned materials consumed** still collapses to the lone tile
 (the middle term is absent, not zero - see the older section's
 known-vs-absent-zero paragraph).
 
+The profit band's own absence is nonetheless the same complaint one band
+lower - the maintainer's state ("only the Actual Cost to Craft section")
+is a Total Cost section with the cost band collapsed AND no Sell
+Value / Profit tiles - so it is now accounted for in text rather than
+left as two missing cells: a third `SummaryFootnote` row,
+`ProfitSuppressedFootnoteText`, added on exactly the condition
+`BuildProfitFormulaBand` returns on (`NetSaleValue.HasValue`), so it
+never claims a band was hidden on a plan that had no sell price to show
+one for.
+
 ### 2. Scroll anchoring across a re-solve
 
 "When you toggle IGNORE on stuff in the recipe tree - it can adjust
@@ -15092,7 +15102,7 @@ user who already moved the slider keeps their value; only the default
 changed. That section's dB derivation and the test that pinned "louder
 than the old ceiling" (true of 75, not of 35) were both restated.
 
-### 4. UNKNOWN Mystic Forge gifts - measured, and not the build bump
+### 4. UNKNOWN Mystic Forge gifts - measured: not the build bump, and mostly not a defect
 
 Report: "Gift of Rays, Gift of the Survivors and Gift of the People and
 Gift of the Hylek all show UNKNOWN in the recipe tree", alongside the
@@ -15103,36 +15113,57 @@ build 205780; seed negative entries will fall back to API."
 there means negative CACHE rows - `SeededRecipeCacheStore.TryGetSearch`
 invalidates an entry only when it is an EMPTY list AND the seed build
 differs. Synthetic Mystic Forge ids were never touched by it.
-`MysticForgeSeedStalenessTests` proves this three ways, including one
+`MysticForgeSeedStalenessTests` proves this several ways, including one
 test that plans item 107040 (Gift of Rays) through the REAL shipped
 `ref/` seed files with the seed build bumped and an API client that
 404s the MF id: it still crafts.
 
-Measured data state: `ref/recipe_search_seed.json` maps 107040 to
--1587, `ref/recipes_seed.json` and `ref/mystic_forge_recipes.json` both
-carry -1587, and every one of the 1595 MF recipes is reachable through
-the search seed today. **Gift of the Survivors / of the People / of the
-Hylek appear in neither `ref/mystic_forge_recipes.json` nor
-`ref/item_name_seed.json`** - our wiki ingestion never captured them.
-Those three are a DATA GAP and need a wiki ingestion run; no code change
-can conjure a recipe nobody has.
+Measured data state, audited directly against `ref/`: all **1591**
+recipes in `ref/mystic_forge_recipes.json` are already present in
+`ref/recipes_seed.json`, and every one of their output items already has
+a non-empty `ref/recipe_search_seed.json` row that already lists that MF
+id (0 missing on each count). 107040 -> `[-1587]` is one of them.
 
-The reachable defect next door - the one this branch fixes - is the
-opposite direction. A seed row saying "the API knows no recipe for this
-item" is an EMPTY list served as a cache HIT, so nothing ever consults
-`MysticForgeRecipeData`. Any recipe added to the wiki-sourced forge file
-without re-running the seeder was therefore invisible; worse, because a
-stale seed turns that same empty row into an API call that
-`CompositeRecipeApiClient` rescues with MF data, whether a forge-only
-item resolved depended on the live game build id - nonsense for
-wiki-sourced data. `SeededRecipeCacheStore.MergeMysticForgeRecipes`
-folds the forge data into the seed at load (additive, API ids first,
-idempotent, tolerant of `MysticForgeRecipeData.Empty`), wired in
-`Module` via the new `RecipeClientFactory.LoadData`. Forge recipes are
-now ordinary cache content, no build id can affect them, and adding the
-three missing gifts to `ref/mystic_forge_recipes.json` alone will be
-enough to make them craft. Genuine API-sourced staleness still falls
-back exactly as before.
+**The parent plan is Endless Summer (107022)**, named by the
+maintainer's own `module_log.jsonl` and `plan.json`, not Orrax: 107040
+is an ingredient of -1586, and the other three gifts are its siblings.
+`MysticForgeSeedStalenessTests.RealShippedSeed_EndlessSummerGifts_...`
+plans that exact parent through the REAL shipped seed under a build
+bump: **Gift of Rays resolves to Craft on recipe -1587**. The reported
+UNKNOWN for it was not reproduced by any route. The maintainer's own
+persisted `plan.json` from that session carries
+`IgnoredItemIds: [107040]` and renders the row `IsIgnored` - the IGNORE
+pill is offered on every non-root item row, so an ignored row is not
+evidence of an UNKNOWN one, and an ignored row reads IGNORED, not
+UNKNOWN.
+
+The other three are correct UNKNOWNs, not a recipe-lookup failure. Each
+has an EMPTY search row in the seed (the seeder's "the API knows no
+recipe for this item"), and the wiki confirms none exists: **Gift of the
+Survivors** (106712) is bought from Castaway Agnes in Hullgarden,
+**Gift of the People** (105804) from Canach in Breezy Cay, and **Gift of
+the Hylek** (106986) is awarded by the Radiance of the Sun God
+achievement. Their names come from the item API, so the fact that they
+are absent from `ref/item_name_seed.json` never mattered. The fix for
+them is therefore not a recipe but the pre-existing acquisition-hint
+mechanism: three wiki-verified entries in
+`ref/acquisition_hints_seed.json`, which turn the bare UNKNOWN pill into
+`VENDOR` / `ACHIEVEMENT` with the acquisition text in the row tooltip
+(`CraftingTreeBuilder.ApplyAcquisitionHint`, unchanged).
+
+`SeededRecipeCacheStore.MergeMysticForgeRecipes` is kept but is a
+**measured no-op on today's data** - every iteration hits
+`existing.Contains(recipe.Id)` and re-stores an equal recipe - and must
+not be read as the explanation for any of the four reports. What it buys
+is future-proofing in the direction the seed is weak: a seed row saying
+"the API knows no recipe" is an EMPTY list served as a cache HIT, so
+nothing consults `MysticForgeRecipeData`, and a recipe added to the
+wiki-sourced forge file without re-running the seeder would be invisible
+(and, via the stale-seed fallback that turns an empty row into an API
+call `CompositeRecipeApiClient` rescues, its visibility would depend on
+the live game build id - nonsense for wiki data). With the merge, adding
+a forge recipe to `ref/mystic_forge_recipes.json` alone is enough.
+Genuine API-sourced staleness still falls back exactly as before.
 
 ### 5. First-load snapshot
 
@@ -15158,6 +15189,19 @@ one shot, so a module whose key arrives late still gets its fetch.
 `Module.IsInRefreshFailureBackoff` was extracted so the gate and the
 refresh itself read the same window. `Views/MainView.cs` is untouched.
 
+Two follow-ups from review, both in that branch of `Update()`.
+**Clear Cache re-arms the shot** (`_firstLoadRefreshAttempted = false`
+inside the `SnapshotCommitGate.Clear` callback, alongside the other
+field resets): an in-session clear recreates exactly the nothing-cached
+state the shot exists for, and without the reset it left the tab with no
+automatic route to a snapshot until Blish restarted. And the spent flag
+is now checked at the CALL SITE, before
+`_snapshotService.HasRequiredPermissions()` is evaluated as an argument:
+that branch runs every frame for as long as nothing is cached (forever,
+with no API key configured), and `Gw2ApiManager.HasPermissions` takes an
+`IEnumerable`, so the old shape burned an enumerator allocation per
+frame on a decision the spent shot had already settled.
+
 ### Desktop gate
 
 1. **Zero band, unmeasured**: plan an item with no recipe and no
@@ -15166,7 +15210,10 @@ refresh itself read the same window. `Views/MainView.cs` is untouched.
    THREE tiles at 0 with the "-"/"=" operators and the result
    highlight, each caption ending in `*`, a footnote line above the
    Trading Post line explaining the `*`, and the `*` explanation again
-   in each tile's hover text. No profit band renders on such a plan.
+   in each tile's hover text. No profit band renders on such a plan -
+   and when the target itself has a Trading Post sell price, a SECOND
+   footnote line says so ("Sell Value and Profit if Sold are hidden
+   here ..."), so no cells go missing without an explanation on screen.
 2. **Zero band, measured**: with "Use Own Materials" OFF, ignore every
    child until the plan costs nothing. Same three tiles at 0, but NO
    `*` on any caption and only the one Trading Post footnote - a
@@ -15185,19 +15232,25 @@ refresh itself read the same window. `Views/MainView.cs` is untouched.
    the click is audible but unobtrusive. On a profile that HAS moved
    the slider, the old value is still there - the default change must
    not overwrite it.
-5. **Mystic Forge**: search for and plan **Gift of Rays** (the exact
-   item to search). Its row must NOT read UNKNOWN - it expands into
-   Gift of the Sun, Gift of the Beach, Gift of Infused Gems and
-   Purified Rift Essence. Expect Gift of the Survivors, Gift of the
-   People and Gift of the Hylek to STILL read UNKNOWN: they are a
-   recorded data gap, not a regression, until the wiki ingestion
-   captures them.
+5. **Mystic Forge**: search for and plan **Endless Summer** (the exact
+   item to search - it is the parent the report came from). First clear
+   the carried-over ignore: **Gift of Rays** will show the IGNORED pill
+   from the 0.2.3 session, so click it to un-ignore. Its row must then
+   read CRAFT, not UNKNOWN, and expand into Gift of the Sun, Gift of
+   the Beach, Gift of Infused Gems and Purified Rift Essence. Gift of
+   the Survivors, Gift of the People and Gift of the Hylek are NOT
+   craftable (vendor / achievement - verified on the wiki), so they
+   correctly stay uncraftable, but their pill must now read **VENDOR**,
+   **VENDOR** and **ACHIEVEMENT** instead of UNKNOWN, with the vendor
+   name and location in each row's hover text.
 6. **First-load snapshot**: with a valid API key set, clear the cached
    snapshot (Clear Cache) and restart Blish. The Snapshot tab starts
    fetching by itself within a few seconds - spinner visible, then real
-   inventory - with no click and no 10-minute wait. Then repeat with
-   the API key removed: the tab stays empty with its normal status, the
-   log shows no repeating fetch attempts, and adding the key mid-session
-   starts exactly one fetch.
+   inventory - with no click and no 10-minute wait. Then, WITHOUT
+   restarting, press Clear Cache again: a fresh fetch must start by
+   itself the same way (the one shot is re-armed by the clear). Then
+   repeat with the API key removed: the tab stays empty with its normal
+   status, the log shows no repeating fetch attempts, and adding the key
+   mid-session starts exactly one fetch.
 
 Gate: [PENDING - the orchestrator fills in PASS/FAIL]

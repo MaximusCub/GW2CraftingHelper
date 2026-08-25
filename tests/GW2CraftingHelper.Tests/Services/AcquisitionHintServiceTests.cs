@@ -146,7 +146,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Shipped seed file (pins the real file against silent drift) ---
 
         [Fact]
-        public void Load_ShippedSeedFile_ParsesSevenEntriesWithHintAndBadge()
+        public void Load_ShippedSeedFile_ParsesEveryEntryWithHintAndBadge()
         {
             string path = FindRepoFile(Path.Combine("ref", "acquisition_hints_seed.json"));
             Assert.False(
@@ -157,7 +157,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var hints = AcquisitionHintService.Load(stream);
 
-                Assert.Equal(7, hints.Count);
+                Assert.Equal(10, hints.Count);
                 foreach (var hint in hints.Values)
                 {
                     Assert.False(string.IsNullOrEmpty(hint.Hint));
@@ -179,6 +179,19 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.True(hints.ContainsKey(43772));
                 Assert.Equal("DAILY", hints[43772].Badge);
                 Assert.Contains("1 per day per account", hints[43772].Hint);
+
+                // The three Endless Summer gifts from the field report.
+                // Each has an EMPTY search row in the recipe seed - the
+                // API knows no recipe - and the wiki confirms none exists
+                // (vendor purchase / achievement reward), so the bare
+                // UNKNOWN pill the maintainer saw was correct but useless.
+                // These hints are what turns it into an answer.
+                Assert.Equal("VENDOR", hints[106712].Badge);
+                Assert.Contains("Castaway Agnes", hints[106712].Hint);
+                Assert.Equal("VENDOR", hints[105804].Badge);
+                Assert.Contains("Canach", hints[105804].Hint);
+                Assert.Equal("ACHIEVEMENT", hints[106986].Badge);
+                Assert.Contains("Radiance of the Sun God", hints[106986].Hint);
             }
         }
 

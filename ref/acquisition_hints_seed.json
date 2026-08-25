@@ -51,6 +51,27 @@
       "badge": "DAILY",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Charged_Quartz_Crystal",
       "lastVerified": "2026-08-16"
+    },
+    {
+      "itemId": 106712,
+      "hint": "Purchased from Castaway Agnes in Hullgarden, Shipwreck Strand for a Concentrated Chromatic Sap, a Gift of Shipwreck Strand Exploration, a Survivor's Enchanted Compass and 500 Aether-Rich Sap. Not craftable; no recipe.",
+      "badge": "VENDOR",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Survivors",
+      "lastVerified": "2026-08-24"
+    },
+    {
+      "itemId": 105804,
+      "hint": "Purchased from Canach in Breezy Cay, Shipwreck Strand for a Gift of Starlit Weald Exploration, a Patron of the Magical Arts Plaque, a Seer Wreath of Service and 500 Antiquated Ducats. Not craftable; no recipe.",
+      "badge": "VENDOR",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_People",
+      "lastVerified": "2026-08-24"
+    },
+    {
+      "itemId": 106986,
+      "hint": "Awarded for completing the Radiance of the Sun God achievement; further copies from Shaman Palak in Shipwreck Strand. Not craftable; no recipe.",
+      "badge": "ACHIEVEMENT",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Hylek",
+      "lastVerified": "2026-08-24"
     }
   ]
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,13 @@ namespace GW2CraftingHelper.Tests.Services
     /// -1587 (Gift of Rays, wiki-sourced). Every route through the cache is
     /// run against a game build that does NOT match the seed's, since that
     /// is the state the report was filed from.
+    /// <para>
+    /// Measured outcome (see docs/KNOWN-ISSUES.md, field-fixes-3 item 4):
+    /// no route reproduces the reported UNKNOWN for Gift of Rays - it
+    /// crafts from the shipped seed on every one of them, including as a
+    /// child of the real parent plan. What these tests pin is that the
+    /// build id cannot decide whether a wiki forge recipe resolves.
+    /// </para>
     /// </summary>
     public class MysticForgeSeedStalenessTests
     {
@@ -133,6 +141,97 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
                 Assert.Equal(4, result.CraftingTree.Children.Count);
             }
+        }
+
+        /// <summary>
+        /// The whole plan the field report came from - Endless Summer
+        /// (107022), the parent the maintainer's own module_log and
+        /// persisted plan.json name - run through the REAL shipped seed
+        /// against a build the seed does not match.
+        /// <para>
+        /// This is what the report's four items actually are: Gift of Rays
+        /// has a wiki Mystic Forge recipe in the seed and crafts; the other
+        /// three carry an EMPTY search row (the seeder's "the API knows no
+        /// recipe") and no forge recipe anywhere, because the wiki says
+        /// they are bought or awarded, never crafted. Their UNKNOWN is
+        /// correct, so the fix is the seeded acquisition hint that says
+        /// where they come from, asserted here through the real hint file
+        /// and the real CraftingTreeBuilder path.
+        /// </para>
+        /// </summary>
+        [Fact]
+        public async Task RealShippedSeed_EndlessSummerGifts_CraftOrCarryTheirAcquisitionHint()
+        {
+            const int EndlessSummer = 107022;
+            const int GiftOfTheSurvivors = 106712;
+            const int GiftOfThePeople = 105804;
+            const int GiftOfTheHylek = 106986;
+
+            var seed = LoadShippedSeed(out int seedBuildId);
+            seed.SetCurrentBuildId(seedBuildId + 275);
+            Assert.True(seed.SeedIsStale);
+
+            IReadOnlyDictionary<int, AcquisitionHint> hints;
+            using (var hintStream = File.OpenRead(
+                RepoFileLocator.FindRepoFile("ref/acquisition_hints_seed.json")))
+            {
+                hints = AcquisitionHintService.Load(hintStream);
+            }
+
+            using (var temp = new TempDirectory())
+            {
+                var overlay = new OverlayRecipeCacheStore(temp.Path);
+                overlay.Load(null);
+
+                var pipeline = new CraftingPlanPipeline(
+                    new RecipeService(new InMemoryRecipeApiClient(),
+                        cacheStore: new CompositeRecipeCacheStore(seed, overlay)),
+                    new TradingPostService(new InMemoryPriceApiClient()),
+                    new PlanSolver(),
+                    new ItemMetadataService(new InMemoryItemApiClient()),
+                    reducer: new InventoryReducer(),
+                    acquisitionHints: hints);
+
+                var result = await pipeline.GenerateStructuredAsync(
+                    EndlessSummer, 1, null, CancellationToken.None);
+
+                var children = result.CraftingTree.Children
+                    .ToDictionary(c => c.ItemId, c => c);
+
+                Assert.Equal(CraftingDecision.Craft, children[GiftOfRays].Decision);
+                Assert.Equal(GiftOfRaysRecipe, children[GiftOfRays].RecipeId);
+
+                foreach (int giftId in new[] { GiftOfTheSurvivors, GiftOfThePeople, GiftOfTheHylek })
+                {
+                    Assert.Equal(CraftingDecision.Unknown, children[giftId].Decision);
+                    Assert.False(string.IsNullOrEmpty(children[giftId].AcquisitionHint));
+                    Assert.False(string.IsNullOrEmpty(children[giftId].AcquisitionBadge));
+                }
+            }
+        }
+
+        private static SeededRecipeCacheStore LoadShippedSeed(out int seedBuildId)
+        {
+            string searchPath = RepoFileLocator.FindRepoFile("ref/recipe_search_seed.json");
+            string recipesPath = RepoFileLocator.FindRepoFile("ref/recipes_seed.json");
+            string manifestPath = RepoFileLocator.FindRepoFile("ref/recipe_seed_manifest.json");
+            Assert.NotNull(searchPath);
+            Assert.NotNull(recipesPath);
+            Assert.NotNull(manifestPath);
+
+            var seed = new SeededRecipeCacheStore();
+            using (var searchStream = File.OpenRead(searchPath))
+            using (var recipesStream = File.OpenRead(recipesPath))
+            {
+                seed.Load(searchStream, recipesStream);
+            }
+            using (var manifestStream = File.OpenRead(manifestPath))
+            {
+                seed.LoadManifest(manifestStream);
+            }
+
+            seedBuildId = seed.SeedBuildId.Value;
+            return seed;
         }
 
         [Fact]
