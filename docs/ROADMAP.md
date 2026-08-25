@@ -26,16 +26,19 @@
   plus a `TreeSectionController` (see
   [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) section 5), pipeline/solver
   structural splits, coverage gaps closed, and this documentation
-  restructure.
+  restructure. One deliverable from the wave's own plan was **not** built -
+  the `Services/` folder split - and is recorded in the DEFERRED list in
+  [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) with the reason.
 - **M39 - core tabs shipped.** Snapshot search/filter, the Log tab (with
   the JSONL log store and rotation), the Settings tab, and the About tab
   all landed and are in normal use - see the README's "Tabs" section for
   what each one does today.
 - **Current phase - field-test releases + the convergence-adoption wave.**
   Since 2026-08 the project ships stamped builds to a live Blish HUD
-  install: `v0.2.0` (2026-08-23) through `v0.2.3` (2026-08-24, the
-  plan-view redesign), each with a `CHANGELOG.md` entry and a matching git
-  tag - see [`CHANGELOG.md`](../CHANGELOG.md) and
+  install: `v0.2.0` (2026-08-23) through `v0.2.4` (2026-08-25, the
+  app-wide typography and layout pass), each with a `CHANGELOG.md` entry
+  and a matching git tag pushed to origin (measured 2026-08-25:
+  `git ls-remote --tags origin`) - see [`CHANGELOG.md`](../CHANGELOG.md) and
   [`docs/RELEASING.md`](RELEASING.md). Work arrives as one branch per
   milestone, each ending in a live desktop gate; the feedback loop is the
   maintainer field-testing the deployed build. The queue is driven by the
@@ -69,7 +72,10 @@
   navigation/visual-parity work, each with full scope/acceptance-criteria
   templates) are archived at
   [`docs/archive/plans/2026-02-15/`](archive/plans/2026-02-15/).
-- Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+- Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md);
+  designs proposed and deliberately not built:
+  [`docs/DECISIONS.md`](DECISIONS.md).
+- Everything else is indexed from [`docs/README.md`](README.md).
 
 ## Backlog
 

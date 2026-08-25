@@ -7,8 +7,8 @@ for GW2 Crafting Helper - not an aspirational process.
 a release is a CHANGELOG entry, a `manifest.json` version bump, and a
 matching `v<version>` git tag on the release commit, deployed by copying
 the built `.bhm` into a live Blish HUD install. `CHANGELOG.md` states the
-convention in its own header, and `v0.2.0` through `v0.2.3` exist and are
-pushed to origin (measured 2026-08-24: `git ls-remote --tags origin`).
+convention in its own header, and `v0.2.0` through `v0.2.4` exist and are
+pushed to origin (measured 2026-08-25: `git ls-remote --tags origin`).
 
 **What changed since:** `.github/workflows/release.yml` now builds
 Release/x64 on any pushed `v*` tag and publishes
@@ -38,19 +38,29 @@ labelled otherwise.
    user-facing voice the existing entries use, not commit-message voice.
    The release workflow uses this section verbatim as the release body and
    fails the build if it is missing.
-4. **If the plan view changed, refresh `docs/images/`.** The README's
+4. **Sweep the prose that names a version.** `manifest.json` is not the
+   only place a version number is written down, and the others drift
+   silently because nothing reads them: this file (the v0.2.x paragraph at
+   the top, the `manifest.json` fields section, the "what a real release
+   process would still need" list) and `docs/ROADMAP.md`'s current-phase
+   bullet all state which release is newest. `grep -rn "0\.2\." docs/
+   *.md` finds them; update each to the version being shipped, and stamp
+   any claim you re-checked with `(measured YYYY-MM-DD)` rather than "at
+   the time of writing". This step exists because ROADMAP.md and
+   RELEASING.md both still said v0.2.3 was newest after v0.2.4 shipped.
+5. **If the plan view changed, refresh `docs/images/`.** The README's
    screenshots are the only proof a visitor has that the product works.
    They went stale once already: the shots taken 2026-07-23 showed columns
    packed hard left with a wide empty band, which is the exact layout the
    0.2.3 entry in `CHANGELOG.md` describes as removed. Retake against the
    current build at full window width, cropped to whole rows.
-5. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+6. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-6. Tag the release commit `v<version>` and push the tag. That triggers
+7. Tag the release commit `v<version>` and push the tag. That triggers
    `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
    publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
    asset is attached.
-7. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+8. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
@@ -158,7 +168,7 @@ produced by the build above shows it contains, under `ref/`:
 
 - `name`, `version`, `namespace`, `package` - standard Blish HUD module
   identity fields. `version` is bumped per release under the CHANGELOG +
-  tag convention above (`0.2.3` at the time of writing). Nothing *enforces*
+  tag convention above (`0.2.4`, measured 2026-08-25). Nothing *enforces*
   the bump mechanically - no CI check, no analyzer - so it is a step in the
   protocol, not a guarantee.
 - `dependencies.bh.blishhud` - minimum Blish HUD host version
@@ -260,7 +270,7 @@ These are listed as concrete gaps, not committed-to future work:
   remaining friction in a non-developer install.
 - ~~A convention for bumping `manifest.json`'s `version` per release~~ -
   done: the CHANGELOG + `v<version>` tag protocol at the top of this file,
-  practiced across v0.2.0 through v0.2.3.
+  practiced across v0.2.0 through v0.2.4.
 - ~~A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
   packaging gap~~ - resolved as of M38/WP-29; see the addendum above.
 - The two stale `v1.0.0`/`v2.0.0` tags inherited from the original

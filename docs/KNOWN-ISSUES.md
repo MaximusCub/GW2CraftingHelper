@@ -669,6 +669,22 @@ genuinely open item, not just the ones originally filed under a
 - **(folded in from item 32)** StyleCop SA1413/SA1516/SA1503: left at
   default severity with a non-trivial pre-existing footprint (253/174/123
   warnings respectively); a future cleanup wave candidate.
+- **(M38 `Services/` foldering - recorded 2026-08-25, not executed)** The
+  target folder shape named in
+  `docs/dev-notes/m38-plan/m38-a1-architecture.md` section 5 -
+  `Services/Pricing/`, `Services/Planning/`, `Services/Persistence/`,
+  `Services/Vendor/`, `Services/Layout/`, `Services/Api/` - was never
+  built: none of the six directories exists, and `Services/` is 141 flat
+  files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
+  for unrelated reasons. Cut for the reason the plan itself flagged:
+  `GW2CraftingHelper.csproj` lists every file explicitly, so each move is
+  also a csproj path edit, and the plan's own sequencing note called out
+  high merge-conflict potential against the branches then in flight - which
+  kept arriving, so the quiet window never came. The payoff is
+  navigational rather than behavioral, and `docs/README.md`'s folder map
+  now delivers that part at zero merge cost. `docs/ROADMAP.md` declared M38
+  complete without recording this; noted here so "complete" keeps meaning
+  complete. Still available to a future wave - see `docs/DECISIONS.md`.
 
 Extracted from milestone records during the 2026-08-24 rotation - still
 open, so they live here rather than only in the archive:
