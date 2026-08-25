@@ -1586,8 +1586,9 @@ rebuilt only when the column count or a header's width changes.
 
 *Correction to how often those ran.* This was first recorded as a
 per-frame path on both counts, and it is not one. The Snapshot's
-re-layout is trailing-debounced: `ScheduleRowRefit` stamps a tick and
-returns, a ThreadPool wait loops until `ResizeSettleMs` of quiet and then
+re-layout is trailing-debounced: `ResizeSettleDebounce.Schedule` stamps a
+tick and returns, a ThreadPool wait loops until the settle window of quiet
+and then
 marshals `RefitResultRows` ONCE, so `LayoutResultGrid` runs once per drag
 and once per sort click, never per pixel. `HeaderCellPlan`'s OTHER
 callers - `CTableHeaderRenderer` and `ShoppingListSectionRenderer`, which
@@ -1852,6 +1853,46 @@ margin, reused rather than forked; the left inset is the section-title
 inset these tabs already used. A maintainer who wants 16/16 moves one
 constant.
 
+### The resize split, and a regression it caught
+
+Justifying a tab means its text now depends on the width, and the first
+draft paid for that on the wrong clock: Settings' resize handler re-ran
+every paragraph wrap and every name ellipsize on every resize EVENT, and
+About's did the same for three paragraphs and six fact values. That is
+hundreds of MeasureString calls plus fifty Label.Text writes inside a
+scrolling FlowPanel, synchronously, at drag-event frequency. Before this
+milestone neither handler measured a single string.
+
+The module already had the answer twice over and this milestone now uses
+it once: positions and widths track the drag live, and the half that
+MEASURES text runs at drag settle. Services/ResizeSettleDebounce is
+MainView's own ScheduleRowRefit/RunRowRefitAfterSettleAsync pair lifted
+out verbatim - one stamped clock, one in-flight waiter that re-arms
+against the stamp, no cancel-and-replace timer (which costs a
+CancellationTokenSource and a thrown cancellation per drag frame on the
+UI thread's own event path). MainView now goes through it too, so the
+module has one such debounce rather than a copy per view;
+CraftingPlanView's stays separate because it steps across frames off
+DoUpdate and cannot use Task.Delay. The class is Blish-free - the caller
+hands it the marshal - which is what makes its behaviour testable.
+
+The lever in the views is one bool, measureText, threaded through the
+layout functions so build and both halves of a resize stay one code path
+rather than three. The Label's own explicitly-written Height is the
+cache; at measureText false a paragraph keeps the wrap it has and only
+its box moves. VISIBLE COST, stated: for up to 150ms after a drag stops,
+a paragraph is wrapped to the previous width and a name that no longer
+fits still shows its "...". That is the same trade CraftingPlanView's
+re-ellipsis registry already makes.
+
+Deliberately NOT added: a per-label memo that skips a re-wrap when the
+budget is unchanged. Both tabs cap prose at a reading measure, so at
+every width above roughly a 620px column the budget IS unchanged and the
+memo would eliminate most of the settle pass's remaining work. It is
+half a dozen lines and reversible; it was left out because the settle
+window already bounds the work to once per drag, and the memo would put
+cache-invalidation state on the views for a pass that runs once.
+
 Services/ColumnBoardLayout packs variable-height blocks into N min-width
 columns, row-major, each board row as tall as its tallest block.
 Row-major rather than shortest-column masonry on purpose: masonry
@@ -2063,6 +2104,16 @@ Take each tab at 1378 (the enforced minimum), 1638, 1836 and 2406, and
 one very wide (2560+). At EVERY width, on every tab: no band of empty
 space to the right of the content, and no text running under a
 neighbouring column.
+
+EVERY TAB, THE DRAG ITSELF
+- Grab the window's resize grip on Settings, on About and on Snapshot in
+  turn and drag it fast from the minimum to the widest and back, several
+  times, WITHOUT letting go. The drag must stay smooth: boxes, buttons
+  and grid columns follow the edge frame by frame. Paragraph wrapping and
+  the "..." on shortened names deliberately lag - watch for them to catch
+  up within about a fifth of a second of releasing, once, not repeatedly.
+- Release the drag and immediately switch tabs. Nothing throws and
+  nothing appears in the Log tab at Debug+ about a re-fit wait.
 
 SETTINGS
 - 1378: two section columns; the four sections pack Sound|Homestead over

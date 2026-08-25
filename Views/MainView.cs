@@ -99,17 +99,6 @@ namespace GW2CraftingHelper.Views
         private const int SearchDebounceMs = 150;
         private CancellationTokenSource _searchDebounceCts;
 
-        // Width-driven repack of the rows already on screen - see
-        // ScheduleRowRefit. Deliberately NOT the search debounce above: that
-        // one is cancel-and-replace, so routing a resize drag through it
-        // allocated a CancellationTokenSource and threw a cancellation
-        // exception per drag FRAME, and its callback disposes and rebuilds
-        // every row (re-running the search, and putting the scroll position
-        // at risk) to change nothing but the cells' placement and the text
-        // that no longer fits. _lastRowLayoutWidth is the width the rows on
-        // screen were actually laid out at, so a drag that ends where it
-        // started repacks nothing.
-        private const int ResizeSettleMs = 150;
         private readonly List<ResultCell> _itemCells = new List<ResultCell>();
         private readonly List<ResultCell> _walletCells = new List<ResultCell>();
 
@@ -120,9 +109,19 @@ namespace GW2CraftingHelper.Views
         // Display position i shows cell [order[i]]; null is the identity.
         private IReadOnlyList<int> _itemOrder;
         private IReadOnlyList<int> _walletOrder;
+        // The width the rows on screen were actually laid out at, so a drag
+        // that ends where it started repacks nothing.
         private int _lastRowLayoutWidth = -1;
-        private bool _rowRefitPending;
-        private long _lastResizeEventTicks;
+
+        // Width-driven repack of the rows already on screen. Deliberately
+        // NOT the search debounce above: that one is cancel-and-replace, so
+        // routing a resize drag through it allocated a
+        // CancellationTokenSource and threw a cancellation exception per
+        // drag FRAME, and its callback disposes and rebuilds every row
+        // (re-running the search, and putting the scroll position at risk)
+        // to change nothing but the cells' placement and the text that no
+        // longer fits.
+        private readonly ResizeSettleDebounce _rowRefitSettle;
 
         // Layout constants
         private const int HeaderRowY = 5;
@@ -419,6 +418,12 @@ namespace GW2CraftingHelper.Views
             _saveStatus = saveStatus;
             _saveStatusThreadSafe = saveStatusThreadSafe;
             _getItemStatBlock = getItemStatBlock;
+
+            _rowRefitSettle = new ResizeSettleDebounce(
+                RefitResultRows,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "Snapshot row re-fit wait failed"));
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -849,7 +854,7 @@ namespace GW2CraftingHelper.Views
             // height-only drag re-ellipsizes nothing and arms nothing.
             if (widthChanged)
             {
-                ScheduleRowRefit();
+                _rowRefitSettle.Schedule();
             }
         }
 
@@ -1535,80 +1540,6 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Arms ONE trailing re-fit per resize drag, however many resize
-        /// events that drag produces. Each event only stamps
-        /// <see cref="_lastResizeEventTicks"/>; the pending waiter re-arms
-        /// itself against that stamp until the drag has been quiet for
-        /// <see cref="ResizeSettleMs"/>. Bounded to a single in-flight
-        /// waiter by <see cref="_rowRefitPending"/> - the same shape
-        /// CraftingPlanView's _resizeSettlePending ticker uses, for the same
-        /// reason: a cancel-and-replace timer per drag frame is allocation
-        /// and a thrown cancellation exception per frame, on the UI thread's
-        /// own event path.
-        /// <para>
-        /// Main thread only (the Resized handler), which is what makes the
-        /// flag a plain bool; the ticks stamp crosses to a ThreadPool thread
-        /// and so goes through <see cref="Interlocked"/>.
-        /// </para>
-        /// </summary>
-        private void ScheduleRowRefit()
-        {
-            Interlocked.Exchange(ref _lastResizeEventTicks, DateTime.UtcNow.Ticks);
-
-            if (_rowRefitPending)
-            {
-                return;
-            }
-
-            _rowRefitPending = true;
-            RunRowRefitAfterSettleAsync();
-        }
-
-        /// <summary>
-        /// Waits out the drag, then marshals <see cref="RefitResultRows"/>
-        /// back onto the main thread - Blish HUD's XNA host installs no
-        /// SynchronizationContext, so the continuation after
-        /// <see cref="Task.Delay"/> may resume on a ThreadPool thread (the
-        /// same reason RunSearchDebounceAsync marshals).
-        /// </summary>
-        private async void RunRowRefitAfterSettleAsync()
-        {
-            try
-            {
-                while (true)
-                {
-                    long elapsedMs =
-                        (DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastResizeEventTicks)) / TimeSpan.TicksPerMillisecond;
-                    if (elapsedMs >= ResizeSettleMs)
-                    {
-                        break;
-                    }
-
-                    // Clamped: a stamp landing between the two reads above
-                    // can make this negative, which Task.Delay rejects.
-                    int remaining = (int)(ResizeSettleMs - elapsedMs);
-                    await Task.Delay(remaining > 0 ? remaining : 1);
-                }
-
-                // A dropped queue attempt (overlay gone) would otherwise
-                // leave the pending flag set forever and starve every later
-                // drag of a re-fit. Cleared from this thread only in that
-                // case, when no main-thread work can be racing it.
-                if (!MainThreadMarshal.Run(RefitResultRows))
-                {
-                    _rowRefitPending = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                // async void: an escaping exception has no caller to reach
-                // and would take down the host rather than this one wait.
-                _rowRefitPending = false;
-                Logger.Warn(ex, "Snapshot row re-fit wait failed");
-            }
-        }
-
-        /// <summary>
         /// Repacks the rows already on screen against the content panel's
         /// current width, in place: the grid is recomputed (a wider window
         /// can gain a column, a narrower one drop back to the single-column
@@ -1636,8 +1567,6 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefitResultRows()
         {
-            _rowRefitPending = false;
-
             if (_contentPanel == null || _contentPanel.Parent == null)
             {
                 return;

@@ -75,6 +75,7 @@
     <Compile Include="Models\RecipeOption.cs" />
     <Compile Include="Services\IRecipeApiClient.cs" />
     <Compile Include="Services\RecipeService.cs" />
+    <Compile Include="Services\ResizeSettleDebounce.cs" />
     <Compile Include="Services\BoundedConcurrency.cs" />
     <Compile Include="Models\ItemPrice.cs" />
     <Compile Include="Models\PriceBasis.cs" />

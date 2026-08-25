@@ -179,11 +179,21 @@ namespace GW2CraftingHelper.Views
         // guarded Relayout - see Relayout.
         private int _panelWidth;
 
+        // Holds the wrap/ellipsize half of a resize until the drag stops -
+        // see Relayout.
+        private readonly ResizeSettleDebounce _resizeSettle;
+
         public AboutTabContent(ModuleParameters moduleParameters, string dataDirectoryPath, Texture2D moduleIconTexture)
         {
             _moduleParameters = moduleParameters ?? throw new ArgumentNullException(nameof(moduleParameters));
             _dataDirectoryPath = dataDirectoryPath ?? "";
             _moduleIconTexture = moduleIconTexture;
+
+            _resizeSettle = new ResizeSettleDebounce(
+                RefitTextAfterResizeSettle,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "About text re-fit wait failed"));
         }
 
         public void Build(Container container)
@@ -240,7 +250,7 @@ namespace GW2CraftingHelper.Views
             CreateProseBlock("Disclaimer", ArenaNetDisclaimerText);
             CreateProseBlock("gw2efficiency", Gw2EfficiencyCreditText);
 
-            ApplyLayout(ContentWidth(container));
+            ApplyLayout(ContentWidth(container), measureText: true);
 
             // The tab used to resize its root panel and nothing else, so a
             // window widened after the tab was opened left the prose wrapped
@@ -434,7 +444,9 @@ namespace GW2CraftingHelper.Views
         /// <summary>
         /// The RESIZE entry point: a no-op when the width has not actually
         /// moved (Resized fires on height-only changes too, and repeatedly
-        /// while the window is dragged).
+        /// while the window is dragged). Positions track the drag; the
+        /// wrapping and ellipsizing wait for it to stop, the module's
+        /// standing split for text measurement on a resize path.
         /// <para>
         /// Build must NOT come through here. Module reuses one
         /// AboutTabContent instance across every tab open and Blish re-runs
@@ -451,7 +463,13 @@ namespace GW2CraftingHelper.Views
         {
             if (panelWidth == _panelWidth) return;
 
-            ApplyLayout(panelWidth);
+            ApplyLayout(panelWidth, measureText: false);
+            _resizeSettle.Schedule();
+        }
+
+        private void RefitTextAfterResizeSettle()
+        {
+            ApplyLayout(_panelWidth, measureText: true);
         }
 
         /// <summary>
@@ -461,7 +479,7 @@ namespace GW2CraftingHelper.Views
         /// AboutLayoutMath.TwoColumnThreshold, with the text still capped at
         /// the reading measure either way.
         /// </summary>
-        private void ApplyLayout(int panelWidth)
+        private void ApplyLayout(int panelWidth, bool measureText)
         {
             if (_documentPanel == null || panelWidth <= 0) return;
 
@@ -479,10 +497,11 @@ namespace GW2CraftingHelper.Views
 
             if (_descriptionLabel != null)
             {
-                leftY += LayoutProse(_descriptionLabel, _descriptionText, 0, leftY, columnWidth) + BlockGap;
+                leftY += LayoutProse(
+                    _descriptionLabel, _descriptionText, 0, leftY, columnWidth, measureText) + BlockGap;
             }
 
-            leftY = LayoutFactsCard(0, leftY, columnWidth);
+            leftY = LayoutFactsCard(0, leftY, columnWidth, measureText);
 
             if (columnCount == 1)
             {
@@ -492,7 +511,7 @@ namespace GW2CraftingHelper.Views
             for (int i = 0; i < _proseBlocks.Count; i++)
             {
                 if (i > 0) rightY += BlockGap;
-                rightY = LayoutProseBlock(_proseBlocks[i], rightX, rightY, columnWidth);
+                rightY = LayoutProseBlock(_proseBlocks[i], rightX, rightY, columnWidth, measureText);
             }
 
             _documentPanel.Height = (leftY > rightY ? leftY : rightY) + BlockGap;
@@ -519,9 +538,9 @@ namespace GW2CraftingHelper.Views
             return HeaderRowHeight + BlockGap;
         }
 
-        private int LayoutFactsCard(int x, int y, int columnWidth)
+        private int LayoutFactsCard(int x, int y, int columnWidth, bool measureText)
         {
-            y = LayoutProseBlock(_factsBlock, x, y, columnWidth) + TitleToContentGap;
+            y = LayoutProseBlock(_factsBlock, x, y, columnWidth, measureText) + TitleToContentGap;
 
             int labelBand = AboutLayoutMath.LabelFloor;
             var font = UiFonts.Body;
@@ -547,6 +566,11 @@ namespace GW2CraftingHelper.Views
                     int budget = AboutLayoutMath.ValueMaxWidth(columnWidth, labelBand);
                     row.ValueLabel.Location = new Point(valueX, RowLabelY);
                     row.ValueLabel.Width = budget;
+                    if (!measureText)
+                    {
+                        y += RowHeight;
+                        continue;
+                    }
 
                     string shown = LabelHelpers.EllipsizeToWidth(font, row.ValueText, budget);
                     if (!string.Equals(row.ValueLabel.Text, shown, StringComparison.Ordinal))
@@ -566,7 +590,7 @@ namespace GW2CraftingHelper.Views
             return y;
         }
 
-        private int LayoutProseBlock(ProseBlock block, int x, int y, int columnWidth)
+        private int LayoutProseBlock(ProseBlock block, int x, int y, int columnWidth, bool measureText)
         {
             block.Panel.Location = new Point(x, y);
             block.Rule.Size = new Point(columnWidth, 2);
@@ -575,7 +599,9 @@ namespace GW2CraftingHelper.Views
             if (block.Body != null)
             {
                 height += TitleToContentGap
-                    + LayoutProse(block.Body, block.BodyText, 0, SectionHeaderRowHeight + TitleToContentGap, columnWidth);
+                    + LayoutProse(
+                        block.Body, block.BodyText, 0,
+                        SectionHeaderRowHeight + TitleToContentGap, columnWidth, measureText);
             }
 
             block.Panel.Size = new Point(columnWidth, height);
@@ -593,22 +619,34 @@ namespace GW2CraftingHelper.Views
         /// height it took: one <see cref="ProseLineHeight"/> row per physical
         /// line, capped at the reading measure however wide the column is.
         /// </summary>
-        private static int LayoutProse(Label label, string text, int x, int y, int columnWidth)
+        private static int LayoutProse(
+            Label label, string text, int x, int y, int columnWidth, bool measureText)
         {
             int budget = AboutLayoutMath.TextBudget(columnWidth);
-            var wrapped = TextWrapMath.Wrap(
-                text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
-            string joined = string.Join("\n", wrapped.Lines);
 
-            if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+            // At measureText false the paragraph keeps the wrap it already
+            // has and only its box moves; the label's own Height is the
+            // cache, written explicitly here and never auto-sized.
+            if (measureText)
             {
-                label.Text = joined;
+                var wrapped = TextWrapMath.Wrap(
+                    text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
+                string joined = string.Join("\n", wrapped.Lines);
+
+                if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+                {
+                    label.Text = joined;
+                }
+                label.Size = new Point(budget, wrapped.Lines.Count * ProseLineHeight);
+
+                TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
             }
+            else
+            {
+                label.Width = budget;
+            }
+
             label.Location = new Point(x + Inset, y);
-            label.Size = new Point(budget, wrapped.Lines.Count * ProseLineHeight);
-
-            TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
-
             return label.Height;
         }
 

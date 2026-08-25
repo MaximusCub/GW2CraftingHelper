@@ -296,6 +296,11 @@ namespace GW2CraftingHelper.Views
         // Width the content is currently laid out at (see ApplyPanelWidth).
         private int _panelWidth;
 
+        // Holds the wrap/ellipsize half of a resize until the drag stops -
+        // see ApplyPanelWidth. Lives as long as the view, so Teardown drops
+        // it rather than leaving a waiter pointed at a disposed tree.
+        private readonly ResizeSettleDebounce _resizeSettle;
+
         // The ONE "Diagnostics" checkbox + the two log-file
         // policy rows (max size / retention) - d2-log-system.md Section 5.
         // No separate
@@ -349,6 +354,12 @@ namespace GW2CraftingHelper.Views
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _modalDialog = modalDialog;
 
+            _resizeSettle = new ResizeSettleDebounce(
+                RefitTextAfterResizeSettle,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "Settings text re-fit wait failed"));
+
             // Lifetime subscription, dropped in Teardown.
             _settings.ClickSoundVolumePercent.SettingChanged += OnClickVolumeSettingChanged;
         }
@@ -377,6 +388,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public void Teardown()
         {
+            _resizeSettle.Cancel();
             _settings.ClickSoundVolumePercent.SettingChanged -= OnClickVolumeSettingChanged;
             DisposeClickVolumeSlider();
             _clickVolumeReadout = null;
@@ -515,7 +527,7 @@ namespace GW2CraftingHelper.Views
             BuildHomesteadRefinementSection();
             BuildLoggingSection();
             BuildSnapshotSection();
-            LayoutSectionBoard();
+            LayoutSectionBoard(measureText: true);
 
             BuildCurrencyValuationsSection(panelWidth);
 
@@ -639,44 +651,68 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Re-lays the whole scrolling content out at a new panel width.
-        /// Every row/header panel is built at the width the tab happened to
-        /// open at, and the currency grid additionally derives its column
-        /// count, column width and cell X positions from it - so without
-        /// this, narrowing the window leaves the second column of cells
-        /// beyond the panel's right edge, unreachable until the tab is
-        /// closed and re-opened.
+        /// The RESIZE entry point. Every row/header panel is built at the
+        /// width the tab happened to open at, and the currency grid
+        /// additionally derives its column count, column width and cell X
+        /// positions from it - so without this, narrowing the window leaves
+        /// the second column of cells beyond the panel's right edge,
+        /// unreachable until the tab is closed and re-opened.
+        /// <para>
+        /// Positions and widths track the drag; the work that MEASURES text
+        /// does not. Re-wrapping this tab's ten paragraphs and re-ellipsizing
+        /// its fifty-odd names is hundreds of MeasureString calls, and a
+        /// window drag delivers resize events at frame rate, so that half
+        /// runs once at drag settle instead - the module's standing split
+        /// (CraftingPlanView's re-ellipsis registry, MainView's row re-fit).
+        /// </para>
         /// </summary>
         private void ApplyPanelWidth(int panelWidth)
         {
-            // Resized fires on height-only changes too (and repeatedly while
-            // the window is dragged), and re-widening every row re-flows the
-            // scrolling FlowPanel once per row - so do nothing unless the
-            // width actually moved.
+            // Resized fires on height-only changes too, and re-widening
+            // every row re-flows the scrolling FlowPanel once per row - so
+            // do nothing unless the width actually moved.
             if (panelWidth <= 0 || panelWidth == _panelWidth) return;
 
             _panelWidth = panelWidth;
+            Relayout(measureText: false);
+            _resizeSettle.Schedule();
+        }
 
+        /// <summary>
+        /// The trailing half of a resize: the wraps and ellipses the live
+        /// pass left at the previous width, re-fitted once the drag has
+        /// stopped. Skipped while a rebuild is in flight, whose own Build
+        /// pass measures everything anyway.
+        /// </summary>
+        private void RefitTextAfterResizeSettle()
+        {
+            if (!_buildComplete) return;
+
+            Relayout(measureText: true);
+        }
+
+        private void Relayout(bool measureText)
+        {
             foreach (var panel in _fullWidthPanels)
             {
-                panel.Width = panelWidth;
+                panel.Width = _panelWidth;
             }
 
-            LayoutSectionBoard();
-            LayoutCurrencyProse();
+            LayoutSectionBoard(measureText);
+            LayoutCurrencyProse(measureText);
 
             if (_currencyGridPanel == null) return;
 
-            _currencyGridPanel.Width = panelWidth;
+            _currencyGridPanel.Width = _panelWidth;
             LayoutCurrencyFilterRow();
             LayoutCurrencyGridHeader();
 
-            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(panelWidth);
+            int columnWidth = SettingsCurrencyGridLayout.ComputeColumnWidth(_panelWidth);
             foreach (var row in _rows)
             {
                 row.Cell.Width = columnWidth;
                 row.Divider.Width = columnWidth;
-                LayoutCurrencyCell(row, columnWidth);
+                LayoutCurrencyCell(row, columnWidth, measureText);
             }
 
             SetCurrencyGridHeight();
@@ -795,30 +831,45 @@ namespace GW2CraftingHelper.Views
         /// returns the height it took: one
         /// <see cref="SettingsFormLayout.DescriptionLineHeight"/> row per
         /// physical line, which is NotesSectionLayoutMath's own precedent.
+        /// <para>
+        /// At <paramref name="measureText"/> false the paragraph keeps the
+        /// wrap it already has and only its box moves - see
+        /// <see cref="ApplyPanelWidth"/> for why. The label's own Height is
+        /// the cache: it is written explicitly here, never auto-sized.
+        /// </para>
         /// </summary>
-        private static int LayoutWrappedLabel(Label label, string text, int x, int y, int budget)
+        private static int LayoutWrappedLabel(
+            Label label, string text, int x, int y, int budget, bool measureText)
         {
             if (budget < 20) budget = 20;
 
-            var wrapped = TextWrapMath.Wrap(
-                text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
-            string joined = string.Join("\n", wrapped.Lines);
-
-            if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+            if (measureText)
             {
-                label.Text = joined;
+                var wrapped = TextWrapMath.Wrap(
+                    text, budget, budget, LabelHelpers.MeasureWith(UiFonts.Body));
+                string joined = string.Join("\n", wrapped.Lines);
+
+                if (!string.Equals(label.Text, joined, StringComparison.Ordinal))
+                {
+                    label.Text = joined;
+                }
+                label.Size = new Point(budget, wrapped.Lines.Count * InfoRowHeight);
+
+                // The wrap only drops text at the line cap, and then the
+                // full paragraph is the hover - the module's one overflow
+                // idiom.
+                TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
             }
+            else
+            {
+                label.Width = budget;
+            }
+
             label.Location = new Point(x, y);
-            label.Size = new Point(budget, wrapped.Lines.Count * InfoRowHeight);
-
-            // The wrap only drops text at the line cap, and then the full
-            // paragraph is the hover - the module's one overflow idiom.
-            TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
-
             return label.Height;
         }
 
-        private void LayoutSectionBoard()
+        private void LayoutSectionBoard(bool measureText)
         {
             if (_boardPanel == null || _sections.Count == 0) return;
 
@@ -830,7 +881,7 @@ namespace GW2CraftingHelper.Views
             var heights = new List<int>(_sections.Count);
             foreach (var section in _sections)
             {
-                heights.Add(LayoutSection(section, columnWidth));
+                heights.Add(LayoutSection(section, columnWidth, measureText));
             }
 
             var board = ColumnBoardLayout.Compute(
@@ -846,7 +897,7 @@ namespace GW2CraftingHelper.Views
             _boardPanel.Height = board.Height;
         }
 
-        private static int LayoutSection(SectionBlock section, int columnWidth)
+        private static int LayoutSection(SectionBlock section, int columnWidth, bool measureText)
         {
             section.Rule.Size = new Point(columnWidth, 2);
             if (section.Chip != null)
@@ -863,7 +914,7 @@ namespace GW2CraftingHelper.Views
             {
                 y += LayoutWrappedLabel(
                     section.ProseLabels[i], section.Prose[i], NameColumnX, y,
-                    SettingsFormLayout.SectionProseMaxWidth(columnWidth));
+                    SettingsFormLayout.SectionProseMaxWidth(columnWidth), measureText);
             }
             if (section.Prose.Count > 0) y += RowGap;
 
@@ -872,7 +923,7 @@ namespace GW2CraftingHelper.Views
                 var row = section.Rows[i];
                 row.Panel.Location = new Point(0, y);
                 row.Panel.Size = new Point(columnWidth, RowHeight);
-                LayoutFormRow(row, columnWidth);
+                LayoutFormRow(row, columnWidth, measureText);
                 y += RowHeight;
 
                 if (row.DescriptionLabel != null)
@@ -880,7 +931,8 @@ namespace GW2CraftingHelper.Views
                     // No gap: a description belongs to the row above it.
                     y += LayoutWrappedLabel(
                         row.DescriptionLabel, row.DescriptionText, NameColumnX, y,
-                        SettingsFormLayout.DescriptionMaxWidth(columnWidth, row.ClusterWidth));
+                        SettingsFormLayout.DescriptionMaxWidth(columnWidth, row.ClusterWidth),
+                        measureText);
                 }
 
                 if (i < section.Rows.Count - 1) y += RowGap;
@@ -889,7 +941,7 @@ namespace GW2CraftingHelper.Views
             return y;
         }
 
-        private static void LayoutFormRow(FormRow row, int columnWidth)
+        private static void LayoutFormRow(FormRow row, int columnWidth, bool measureText)
         {
             switch (row.Kind)
             {
@@ -914,8 +966,10 @@ namespace GW2CraftingHelper.Views
             if (row.NameLabel == null) return;
 
             int budget = SettingsFormLayout.NameMaxWidth(columnWidth, row.ClusterWidth);
-            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.NameText, budget);
             row.NameLabel.Width = budget;
+            if (!measureText) return;
+
+            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.NameText, budget);
             if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
             {
                 row.NameLabel.Text = shortName;
@@ -1513,22 +1567,22 @@ namespace GW2CraftingHelper.Views
             _currencyProseLabels.Add(CreateWrappedLabel(rowPanel));
             _currencyProse.Add(text);
 
-            LayoutCurrencyProseLine(_currencyProse.Count - 1, panelWidth);
+            LayoutCurrencyProseLine(_currencyProse.Count - 1, panelWidth, measureText: true);
         }
 
-        private void LayoutCurrencyProseLine(int index, int panelWidth)
+        private void LayoutCurrencyProseLine(int index, int panelWidth, bool measureText)
         {
             int height = LayoutWrappedLabel(
                 _currencyProseLabels[index], _currencyProse[index], NameColumnX, 2,
-                SettingsFormLayout.SectionProseMaxWidth(panelWidth));
+                SettingsFormLayout.SectionProseMaxWidth(panelWidth), measureText);
             _currencyProsePanels[index].Height = height + 2;
         }
 
-        private void LayoutCurrencyProse()
+        private void LayoutCurrencyProse(bool measureText)
         {
             for (int i = 0; i < _currencyProse.Count; i++)
             {
-                LayoutCurrencyProseLine(i, _panelWidth);
+                LayoutCurrencyProseLine(i, _panelWidth, measureText);
             }
         }
 
@@ -1809,7 +1863,7 @@ namespace GW2CraftingHelper.Views
 
             input.TextChanged += (_, __) => RefreshDirtyState();
 
-            LayoutCurrencyCell(row, columnWidth);
+            LayoutCurrencyCell(row, columnWidth, measureText: true);
             _rows.Add(row);
         }
 
@@ -1818,7 +1872,7 @@ namespace GW2CraftingHelper.Views
         /// right edge and re-fits the name to whatever is left. Called from
         /// the build and from ApplyPanelWidth, so the two cannot drift.
         /// </summary>
-        private static void LayoutCurrencyCell(CurrencyRow row, int columnWidth)
+        private static void LayoutCurrencyCell(CurrencyRow row, int columnWidth, bool measureText)
         {
             row.Input.Location = new Point(
                 SettingsCurrencyGridLayout.CellInputX(columnWidth), CellInputY);
@@ -1834,8 +1888,10 @@ namespace GW2CraftingHelper.Views
             }
 
             int budget = SettingsCurrencyGridLayout.CellNameMaxWidth(columnWidth);
-            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.Name, budget);
             row.NameLabel.Width = budget;
+            if (!measureText) return;
+
+            string shortName = LabelHelpers.EllipsizeToWidth(UiFonts.Body, row.Name, budget);
             if (!string.Equals(row.NameLabel.Text, shortName, StringComparison.Ordinal))
             {
                 row.NameLabel.Text = shortName;
