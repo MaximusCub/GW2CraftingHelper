@@ -1,4 +1,3 @@
-using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
@@ -201,13 +200,16 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = parent
             };
 
-            var icon = new Panel()
-            {
-                Size = new Point(iconSize, iconSize),
-                Location = new Point(x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset),
-                BackgroundTexture = AsyncTexture2D.FromAssetId(seg.AssetId),
-                Parent = parent
-            };
+            // Through the icon component, like the currency half of this
+            // file: a coin icon that answered no hover beside a spirit
+            // shard that named itself was the reported inconsistency.
+            // Unframed for the reason CreateUnframedIcon states - a frame's
+            // 2px is a term in the module's minimum-window-width
+            // derivation, and a denomination has no rarity.
+            var icon = IconControls.CreateAssetIcon(
+                parent, seg.AssetId,
+                x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset,
+                iconSize, CoinSegmentMath.DenominationName(seg.AssetId));
 
             return (label, icon);
         }

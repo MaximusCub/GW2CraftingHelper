@@ -1,4 +1,5 @@
 using Blish_HUD;
+using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
@@ -166,6 +167,35 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 TooltipFacility.ApplyPlain(placeholderMark, resolvedTooltip);
             }
+            return icon;
+        }
+
+        /// <summary>
+        /// The unframed path for art that ships with the game rather than
+        /// with an item: a coin denomination, addressed by asset id. Same
+        /// square, same hover wiring - the coin icons were the module's
+        /// most numerous icon draw and the one site that answered no hover
+        /// at all, while the currency icons beside them in the same run
+        /// named themselves.
+        /// <para>
+        /// No missing-art branch: an asset id is a compile-time constant
+        /// here, so there is no data gap to degrade (a texture that fails
+        /// to load is Blish's own affair, and the run's number is beside
+        /// it either way).
+        /// </para>
+        /// </summary>
+        internal static Panel CreateAssetIcon(
+            Panel parent, int assetId, int x, int y, int size, string tooltipText)
+        {
+            var icon = new Panel()
+            {
+                Size = new Point(size, size),
+                Location = new Point(x, y),
+                BackgroundTexture = AsyncTexture2D.FromAssetId(assetId),
+                Parent = parent
+            };
+
+            TooltipFacility.ApplyPlain(icon, tooltipText);
             return icon;
         }
 
