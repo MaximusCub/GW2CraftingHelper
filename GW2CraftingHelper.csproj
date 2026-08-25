@@ -22,6 +22,38 @@
          resolves to (M38 WP-02 / a6-csharp.md section 10). -->
     <LangVersion>7.3</LangVersion>
     <CodeAnalysisRuleSet>GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
+    <!-- The warning ratchet. Every warning is an error; the StyleCop rules
+         still outstanding are listed in NoWarn, so the build is green today and
+         a NEW warning of any kind - compiler or a StyleCop rule already cleaned
+         to zero - fails it.
+
+         Why this shape rather than gating the CS prefix alone: measured against
+         this project, csc honours WarningsAsErrors only for explicit codes.
+         <WarningsAsErrors>CS</WarningsAsErrors> was tried first, with a CS0108
+         deliberately reintroduced, and the build stayed green at 0 errors -
+         i.e. the prefix form would have installed a gate that gated nothing.
+         The same test with <WarningsAsErrors>CS0108</WarningsAsErrors> failed
+         the build, which is how the prefix was ruled out rather than assumed.
+
+         Before the ratchet, nine genuine compiler warnings had been sitting
+         unread inside 2,723: a CS0108 field hiding Control.BackgroundColor on a
+         Blish control subclass, and eight CS0649 on reflection-assigned DTO
+         fields. Both are fixed at the source; nothing here suppresses a CS code.
+
+         Each NoWarn entry is a bounded cleanup job, not a verdict. Removing one
+         is a self-contained commit: fix that rule's sites, delete the ID, and
+         the build proves the rule is clean and keeps it that way. The list only
+         ever shrinks. Counts as of this commit are in CONTRIBUTING.md.
+
+         SA1501 and SA1503 come out together or not at all. SA1501 (statement on
+         a single line) stays silent while SA1503 (braces omitted) is live and
+         takes over the same code the moment SA1503 is suppressed - measured
+         here: SA1503 live reports 395 and SA1501 zero, SA1503 in NoWarn reports
+         SA1501 394. Dropping SA1503 alone therefore turns 394 errors on, not
+         off. Bracing a statement satisfies both, so the fix that clears one
+         clears the other. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>SA1005;SA1009;SA1025;SA1111;SA1114;SA1116;SA1117;SA1118;SA1119;SA1120;SA1122;SA1127;SA1128;SA1201;SA1202;SA1203;SA1204;SA1208;SA1210;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1413;SA1500;SA1501;SA1502;SA1503;SA1505;SA1507;SA1508;SA1512;SA1513;SA1515;SA1516;SA1649</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>

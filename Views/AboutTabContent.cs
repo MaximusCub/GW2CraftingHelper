@@ -704,6 +704,10 @@ namespace GW2CraftingHelper.Views
             public string BlishVersionRange;
         }
 
+        // CS0649 (never assigned) is wrong about the two DTOs below: every field
+        // is written by reflection, by the JsonConvert.DeserializeObject call in
+        // ReadFromManifestJsonFallback, which the compiler cannot see.
+#pragma warning disable CS0649
         private class ManifestFallbackContributorDto
         {
             [JsonProperty("name")]
@@ -733,6 +737,7 @@ namespace GW2CraftingHelper.Views
             [JsonProperty("dependencies")]
             public Dictionary<string, string> Dependencies;
         }
+#pragma warning restore CS0649
 
         private AboutInfo LoadAboutInfo()
         {

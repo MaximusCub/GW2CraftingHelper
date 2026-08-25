@@ -54,7 +54,14 @@ namespace GW2CraftingHelper.Views.Rendering
         /// suppressed by <see cref="PaintBeforeChildren"/>.
         /// </para>
         /// </summary>
-        private static readonly Color BackgroundColor = new Color(0, 0, 0) * 0.82f;
+        /// <remarks>
+        /// Named for the surface rather than plainly <c>BackgroundColor</c>: at
+        /// that name the field hid the inherited <c>Control.BackgroundColor</c>
+        /// property (CS0108), so which member an unqualified mention bound to
+        /// depended on whether it sat in this class or in an initializer for
+        /// some other control.
+        /// </remarks>
+        private static readonly Color SurfaceBackgroundColor = new Color(0, 0, 0) * 0.82f;
 
         /// <summary>1px, near-black, all four edges - measured on column
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
@@ -154,7 +161,7 @@ namespace GW2CraftingHelper.Views.Rendering
         public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
         {
             var pixel = ContentService.Textures.Pixel;
-            spriteBatch.DrawOnCtrl(this, pixel, bounds, BackgroundColor);
+            spriteBatch.DrawOnCtrl(this, pixel, bounds, SurfaceBackgroundColor);
 
             DrawEdges(spriteBatch, pixel, bounds, BorderColor);
 
