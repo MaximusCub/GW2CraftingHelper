@@ -84,19 +84,24 @@ future work; they have no functional content yet.)
 
 ## Installing
 
-There is currently no published Blish HUD Repo listing or GitHub Release for
-this module (see [`docs/RELEASING.md`](docs/RELEASING.md) for the full state
-of packaging). Until one exists, running it means building from source:
+1. Download `GW2CraftingHelper.bhm` from the
+   [Releases page](https://github.com/MaximusCub/GW2CraftingHelper/releases).
+2. Drop it into your Blish HUD installation's `modules` folder
+   (`Documents\Guild Wars 2\addons\blishhud\modules` in a default install).
+3. Start or reload Blish HUD and enable the module, then authorize an API key
+   with the permissions listed below.
 
-1. Build in Release for `x64`:
-   `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
-2. Locate the produced `.bhm` (e.g. `bin\x64\Release\GW2CraftingHelper.bhm`).
-3. Copy it into your Blish HUD installation's `modules` directory and
-   (re)load Blish HUD.
+Releases are built and published automatically from a `v*` tag by
+[`.github/workflows/release.yml`](.github/workflows/release.yml), from the
+same Release/x64 build a developer would run locally. If the Releases page is
+empty, no tag has been pushed since that workflow landed - build it yourself in
+the meantime, following the build instructions in
+[`CONTRIBUTING.md`](CONTRIBUTING.md) and copying the resulting
+`bin\x64\Release\GW2CraftingHelper.bhm` as in step 2 above.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for prerequisites and
-[`docs/RELEASING.md`](docs/RELEASING.md) for what the `.bhm` packaging step
-does and does not currently cover.
+There is no Blish HUD module-repository listing yet, so the download is manual.
+[`docs/RELEASING.md`](docs/RELEASING.md) records exactly what the packaging
+step does and does not cover.
 
 ### GW2 API key permissions
 
@@ -118,6 +123,36 @@ structure, and pull request expectations.
 dotnet build GW2CraftingHelper.csproj -p:Platform=x64
 dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
 ```
+
+## How this was built
+
+This module is AI-assisted and human-reviewed, and it says so on purpose: the
+commit history carries `Co-Authored-By` trailers rather than hiding them.
+
+What that is worth depends entirely on the process around it, so here is the
+process, all of it checkable from this repository:
+
+- **Every push runs the suite.** 2,803 tests for the module plus separate
+  suites for the seeder tools, on
+  [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml).
+  The tests are Blish-free and run against real production code paths - no
+  contract mirrors, no fake I/O - which is enforced as a repo invariant in
+  [`CONTRIBUTING.md`](CONTRIBUTING.md), not just hoped for.
+- **Risky changes are characterized before they are made.** Where a rewrite
+  touches behavior the suite does not already pin, the pinning test is written
+  and committed against the *old* implementation first. The 14.8MB vendor
+  dataset, for instance, is pinned byte-for-byte against the writer that
+  produces it.
+- **UI changes are checked in the running game**, not asserted from a diff, and
+  what was actually observed is recorded.
+- **Every change is adversarially reviewed** against a written checklist in
+  [`CLAUDE.md`](CLAUDE.md) - null inputs, empty collections, cancellation, API
+  failure, race conditions, invariant violations - with findings classified and
+  the blocking ones fixed before the change lands.
+- **The docs record what was measured, not what was intended.**
+  [`docs/RELEASING.md`](docs/RELEASING.md) is explicit that it describes "the
+  current, actual state of packaging and release - not an aspirational process",
+  and [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) keeps the failures.
 
 ## License
 

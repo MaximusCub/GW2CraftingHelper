@@ -10,10 +10,17 @@ the built `.bhm` into a live Blish HUD install. `CHANGELOG.md` states the
 convention in its own header, and `v0.2.0` through `v0.2.3` exist and are
 pushed to origin (measured 2026-08-24: `git ls-remote --tags origin`).
 
-**What still does not exist:** a GitHub Releases flow. `gh release list`
-returns nothing (measured 2026-08-24), `.github/workflows/tests.yml` builds
-and tests but publishes no artifact, and there is no Blish HUD module-repo
-listing. So a non-developer still cannot install this module.
+**What changed since:** `.github/workflows/release.yml` now builds
+Release/x64 on any pushed `v*` tag and publishes
+`bin/x64/Release/GW2CraftingHelper.bhm` as a GitHub Release asset, with the
+matching `CHANGELOG.md` section as the body. It refuses to publish if the
+tag does not match `manifest.json`'s version, or if `CHANGELOG.md` has no
+section for it. Pushing a tag is therefore the whole release action.
+
+**What still does not exist:** a Blish HUD module-repository listing, so
+the download is still manual. And `gh release list` returned nothing as of
+2026-08-25 - the workflow has not yet been exercised by a pushed tag, so
+the first release will be the one that proves it end to end.
 
 Everything below reflects what a contributor can do today with the tools
 already in the repo, and is measured against the current build unless
@@ -22,13 +29,28 @@ labelled otherwise.
 ## The release protocol, step by step
 
 1. Land the work on `master`.
-2. Bump `manifest.json`'s `version` (the About tab reads it live).
+2. Bump `manifest.json`'s `version` (the About tab reads it live). Check
+   that `manifest.json`'s `description` still matches the GitHub repo
+   description - it is the sidebar text, the search-result snippet, and the
+   Open Graph card used every time the link is pasted into Discord or
+   Reddit, and it is the only sentence most people will ever read.
 3. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
    user-facing voice the existing entries use, not commit-message voice.
-4. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+   The release workflow uses this section verbatim as the release body and
+   fails the build if it is missing.
+4. **If the plan view changed, refresh `docs/images/`.** The README's
+   screenshots are the only proof a visitor has that the product works.
+   They went stale once already: the shots taken 2026-07-23 showed columns
+   packed hard left with a wide empty band, which is the exact layout the
+   0.2.3 entry in `CHANGELOG.md` describes as removed. Retake against the
+   current build at full window width, cropped to whole rows.
+5. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-5. Tag the release commit `v<version>` and push the tag.
-6. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+6. Tag the release commit `v<version>` and push the tag. That triggers
+   `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
+   publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
+   asset is attached.
+7. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
@@ -162,8 +184,12 @@ produced by the build above shows it contains, under `ref/`:
 
 ## Installing a built module today
 
-There is no GitHub Release and no in-app Blish HUD module-repository
-listing for this module (measured 2026-08-24). The only way to run it is:
+The supported path is the `.bhm` attached to a GitHub Release, dropped
+into Blish HUD's `modules` folder - that is what `README.md`'s "Installing"
+section documents, and the two should stay consistent. There is still no
+in-app Blish HUD module-repository listing, so the download is manual.
+
+Building it locally instead produces the identical artifact:
 
 1. Clear `bin/` and `obj/`, then build in Release, `x64`:
    `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
@@ -171,12 +197,9 @@ listing for this module (measured 2026-08-24). The only way to run it is:
 3. Copy it into your Blish HUD installation's `modules` directory and
    (re)load Blish HUD.
 
-This is also exactly what a release deploy does - the tag and CHANGELOG
-entry are what make a given copy of those three steps identifiable after
-the fact. There is still no documented, supported path for a
-non-developer to install this module without building it from source;
-`README.md`'s "Installing" section says the same thing and should stay
-consistent with this one.
+This is also exactly what the release workflow does on CI - the tag and
+CHANGELOG entry are what make a given copy of those three steps
+identifiable after the fact.
 
 ## Addendum: the ref/ cache-file packaging gap (fixed, M38/WP-29)
 
@@ -228,9 +251,13 @@ the `Exclude` list above.
 
 These are listed as concrete gaps, not committed-to future work:
 
-- A CI job that builds Release/x64 on a tag and attaches the resulting
-  `.bhm` as a GitHub Release asset. The tags exist; nothing consumes them.
-  This is the one gap that actually blocks a non-developer install.
+- ~~A CI job that builds Release/x64 on a tag and attaches the resulting
+  `.bhm` as a GitHub Release asset~~ - done:
+  `.github/workflows/release.yml`. Untested against a real tag push at the
+  time of writing; the first release exercises it.
+- A Blish HUD module-repository listing, so the module is installable from
+  inside Blish HUD rather than by downloading a file. This is now the only
+  remaining friction in a non-developer install.
 - ~~A convention for bumping `manifest.json`'s `version` per release~~ -
   done: the CHANGELOG + `v<version>` tag protocol at the top of this file,
   practiced across v0.2.0 through v0.2.3.

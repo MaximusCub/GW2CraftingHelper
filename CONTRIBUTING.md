@@ -30,13 +30,21 @@ A successful build also produces a `.bhm` file next to the built DLL (e.g.
 `bin\x64\Release\GW2CraftingHelper.bhm`) - see `docs/RELEASING.md` for how
 that packaging step works and what it currently does and does not cover.
 
+To **run** what you built rather than develop against it, build in Release
+for `x64` and copy `bin\x64\Release\GW2CraftingHelper.bhm` into your Blish
+HUD installation's `modules` folder, then reload Blish HUD. Players do not
+need any of this - `README.md`'s Installing section points them at the
+`.bhm` attached to a GitHub Release, which is the same artifact built by
+`.github/workflows/release.yml`.
+
 ## Testing
 
 ```
 dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
 ```
 
-At the time of writing this suite is 1,101 tests, all green. A few rules
+At the time of writing this suite is 2,803 tests, all green (measured
+2026-08-25). A few rules
 the test suite enforces and that any new test must follow:
 
 - **Tests exercise real production code paths.** No contract-mirror tests,
@@ -50,8 +58,11 @@ the test suite enforces and that any new test must follow:
   adding new logic.
 
 CI (`.github/workflows/tests.yml`) restores, builds the main module with
-`-p:Platform=x64`, and runs this same test project on every push and pull
-request.
+`-p:Platform=x64`, and runs this test project plus the two tool suites
+(`tests/GW2CraftingHelper.RecipeSeeder.Tests`,
+`tests/VendorOfferUpdater.Tests`) on every push and pull request.
+`.github/workflows/release.yml` builds and publishes the `.bhm` on a `v*`
+tag; see `docs/RELEASING.md`.
 
 ## Project/Solution Structure
 
@@ -123,6 +134,17 @@ If you're changing anything that touches pricing, recipes, or vendor data,
 check whether the relevant tool under `tools/` needs to be re-run rather
 than hand-editing a `ref/*.json` file.
 
+These files are marked `-diff -merge linguist-generated` in
+`.gitattributes`, so git and GitHub will not try to render a 14.8MB single
+line into your terminal or a pull request view. That also means a refresh's
+diff tells a reviewer nothing, so a pull request carrying a `data(vendor):`
+commit **must include the `--diff-summary` output in its body** -
+`tools/refresh-vendor-data.sh` prints it at the end of a refresh. See
+`docs/RELEASING.md`. The small hand-maintained files under `ref/`
+(`vendor_offer_exclusions.json`, `acquisition_hints_seed.json`,
+`daily_cooldown_items.json`, `recipe_sheet_items.json`) are deliberately
+left diffable, because those you do edit by hand and a reviewer must read.
+
 ## Pull Requests
 
 - A pull request template exists at `.github/PULL_REQUEST_TEMPLATE.md` -
@@ -132,6 +154,14 @@ than hand-editing a `ref/*.json` file.
 - Keep commits logically grouped (e.g. a refactor, a behavior change, and
   its tests as separate commits) rather than one large mixed commit, where
   practical.
+- **Commit trailers.** This project is AI-assisted and does not hide it:
+  where a change was co-authored by an AI agent, keep the `Co-Authored-By`
+  trailer. Do **not** add a session-URL trailer (the harness default
+  `Claude-Session:` line). Around 1,053 existing commits carry one, and they
+  resolve to a handful of private session IDs that 404 for every reader but
+  the maintainer - a constant paste with no provenance value. Attribution
+  stays; dead links do not.
+
 - If your change touches pricing, currency comparisons, or item/vendor IDs
   shown anywhere in the UI, note that this repo has a couple of
   non-negotiable invariants: IDs are internal-only and must never be
