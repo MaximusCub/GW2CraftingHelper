@@ -134,6 +134,19 @@ tag; see `docs/RELEASING.md`.
   over `.cs` files on every push.
 - No em-dashes in source, comments, or config - use a plain hyphen (`-`) or
   double-hyphen (`--`) instead.
+- **XML doc where it earns its place; never as an obligation.** A
+  `<summary>` belongs on a type or member whose contract is not already
+  obvious from its name, and on anything carrying a measurement or an
+  invariant a reader must not re-derive. It is the norm here rather than
+  the exception - 200 of the 248 production `.cs` files carry at least one,
+  1,247 blocks across 12,118 `///` lines (measured 2026-08-25) - but it is
+  **not** mandated, which is why `GW2CraftingHelper.ruleset` leaves SA1600
+  and SA1602 off. Do not add `<summary>Gets the item id.</summary>` to a
+  property called `ItemId`; a prose `//` at the decision point is worth
+  more than a doc comment that restates the signature.
+- Private fields are `_camelCase`; the naming convention is enforced by
+  `.editorconfig`, and `GW2CraftingHelper.ruleset` suppresses SA1309 so the
+  analyzer does not fight it.
 - Follow the patterns already established in neighboring files rather than
   introducing new structure for a small change.
 - Keep edits focused; avoid unrelated refactors or formatting churn in the
