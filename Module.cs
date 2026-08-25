@@ -944,6 +944,13 @@ namespace GW2CraftingHelper
         {
             bool statusApplied = false;
 
+            // Not folded into the _snapshotDirty drain below: Clear Cache
+            // drops the snapshot without setting that flag, and the plan
+            // tab must stop offering "Use Own Materials" the moment there
+            // is nothing to subtract. A reference read plus a bool compare
+            // per tick; the view early-returns when nothing changed.
+            _craftingContent?.SetAccountDataAvailable(_currentSnapshot != null);
+
             if (_snapshotDirty)
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
