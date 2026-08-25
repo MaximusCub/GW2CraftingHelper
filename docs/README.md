@@ -25,9 +25,10 @@ are in tells you whether a page is safe to edit.
 - [`ROADMAP.md`](ROADMAP.md) - where the project is and what is explicitly
   not being built.
 - [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) - the numbered issue catalog, the
-  DEFERRED list of genuinely-open items, and the ledger pointing into
-  `archive/known-issues/`. Production `.cs` files cite it by number
-  (`KNOWN-ISSUES #24`), so those citations resolve by grep.
+  DEFERRED list of genuinely-open items, and the ledger indexing the
+  milestone records under [`../dev/`](../dev/README.md). Production `.cs`
+  files cite it by number and only by number (`KNOWN-ISSUES #24`), which CI
+  checks resolves to a real heading.
 - [`RELEASING.md`](RELEASING.md) - what packaging and release actually do
   today, measured, including what still does not exist.
 - [`gw2e-parity-spec.md`](gw2e-parity-spec.md) - the normative
@@ -63,7 +64,7 @@ In short:
 
 - [`../dev/records/`](../dev/records/) - one milestone record per branch.
   Where new records land.
-- [`../dev/archive/known-issues/`](../dev/archive/known-issues/) - 68 older
+- [`../dev/archive/known-issues/`](../dev/archive/known-issues/) - 69 older
   records, rotated out of `KNOWN-ISSUES.md` verbatim in one 2026-08-24
   pass, before per-branch files existed.
 - [`../dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) - the pre-M38
