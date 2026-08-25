@@ -15281,11 +15281,12 @@ back to the 32px the rows drew before the frame arrived (the box grows
 to 34, which the 40px text column clears), so the visible delta on this
 tab is not "smaller icons, dimmer names".
 
-One consequence worth stating: sorting by Amount over a run already
-sorted by Name now breaks ties alphabetically rather than in the
-search's order, because the placement order composes over what is on
-screen. A rebuild (any search or filter change) re-derives it from the
-search's order, which is the canonical one.
+The order is always derived from the rows as the SEARCH produced them,
+never from what is currently on screen, so ties still break in the
+search's own order exactly as the rebuild path made them - a click is
+not a compounding sort. `SortItems`/`SortWallet` are gone with the
+rebuild that used them; the comparators they wrapped are what the order
+is built from, and what the tests drive.
 
 ### Out of scope, untouched
 
