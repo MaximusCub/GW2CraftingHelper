@@ -159,9 +159,12 @@ process, all of it checkable from this repository:
   plus 231 across the seeder and vendor-updater tools (measured 2026-08-25;
   the badge above is the live answer) - on
   [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml).
-  The tests are Blish-free and run against real production code paths - no
-  contract mirrors, no fake I/O - which is enforced as a repo invariant in
-  [`CONTRIBUTING.md`](CONTRIBUTING.md), not just hoped for.
+  The tests are Blish-free - CI fails the build on a Blish HUD or Gw2Sharp
+  reference under `tests/` - and they run against real production code paths,
+  no contract mirrors and no fake I/O. That second half no machine can check:
+  it is stated as an invariant in [`CONTRIBUTING.md`](CONTRIBUTING.md) and
+  checked by a human at review, on a checklist line every pull request has to
+  tick.
 - **Risky changes are characterized before they are made.** Where a rewrite
   touches behavior the suite does not already pin, the pinning test is written
   and committed against the *old* implementation first. The 14.8MB vendor
