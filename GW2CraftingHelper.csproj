@@ -282,7 +282,6 @@
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
     <Compile Include="Services\PlanPhaseEvent.cs" />
-    <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
     <Compile Include="Models\MaterialSourceAllocation.cs" />

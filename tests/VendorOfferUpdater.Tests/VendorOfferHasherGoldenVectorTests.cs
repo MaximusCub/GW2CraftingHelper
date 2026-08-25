@@ -8,25 +8,33 @@ using Xunit;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Cross-project parity net for VendorOfferHasher.
-    /// tools/VendorOfferUpdater/VendorOfferHasher.cs (this project,
-    /// net8.0) and Services/VendorOfferHasher.cs (net48) are two
-    /// independently-maintained copies with byte-for-byte identical
-    /// string-composition logic; only the digest-to-hex step differs
-    /// (SHA256.HashData+Convert.ToHexString here, SHA256.Create()+
-    /// byte-to-hex loop there), which is why they must still agree on
-    /// every input. VendorOfferHasherTests.cs (same directory) already
-    /// pins this copy's relative behavior (equal/not-equal on varied
-    /// inputs); this file instead asserts against the fixed hex digests in
-    /// tests/shared/vendor_offer_hasher_vectors.json, the exact same rows
-    /// GW2CraftingHelper.Tests/Services/VendorOfferHasherGoldenVectorTests.cs
-    /// asserts against. A future edit that changes either copy's
-    /// composition (cost-line ordering, null handling, or - the specific
-    /// footgun the "all_optional_fields_distinct_field_order_guard" row
-    /// exists for - reordering/mis-slotting the dailyCap/weeklyCap/
-    /// homesteadTier/seasonalCap trailing parameters) fails both suites
-    /// against the same golden hashes, instead of only self-consistency
-    /// checks that a synchronized mistake in both files would still pass.
+    /// Absolute-value net for VendorOfferHasher: the only test that pins
+    /// what the digests actually ARE, rather than how they relate.
+    /// VendorOfferHasherTests.cs (same directory) covers relative behavior
+    /// (equal/not-equal across varied inputs), which a self-consistent
+    /// mistake - renaming a segment, reordering the composition - passes
+    /// unchanged while silently rekeying all 59,414 rows of
+    /// ref/vendor_offers.json. This file asserts against the fixed hex
+    /// digests in tests/shared/vendor_offer_hasher_vectors.json, so such a
+    /// change has to be made deliberately, by regenerating the fixture.
+    /// <para>
+    /// The fixture was originally a CROSS-PROJECT net: the module carried
+    /// its own copy of the hasher in Services/, and both suites replayed
+    /// these same rows so the two copies could not drift. That copy had no
+    /// callers anywhere in the module and has been deleted, leaving one
+    /// implementation - so the fixture's job is now regression pinning over
+    /// time rather than agreement between two files. It stays where it is
+    /// (tests/shared/, outside either project's Helpers/) because it is
+    /// still the right home for a hash contract that keys shipped data, and
+    /// because a second consumer may return.
+    /// </para>
+    /// <para>
+    /// The specific footgun the
+    /// "all_optional_fields_distinct_field_order_guard" row exists for is
+    /// reordering or mis-slotting the trailing dailyCap/weeklyCap/
+    /// homesteadTier/seasonalCap parameters, which every other row's
+    /// mostly-null optionals would not catch.
+    /// </para>
     /// </summary>
     public class VendorOfferHasherGoldenVectorTests
     {

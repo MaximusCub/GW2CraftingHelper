@@ -5,11 +5,17 @@ using System.Text.Json;
 namespace VendorOfferUpdater.Tests.Helpers
 {
     /// <summary>
-    /// Loads the cross-project golden-vector fixture at
-    /// tests/shared/vendor_offer_hasher_vectors.json. See GW2CraftingHelper.Tests/Helpers/VendorOfferHasherVectorFixture.cs
-    /// (this project's counterpart) for why the fixture lives outside both
-    /// test projects rather than under ref/ or either project's own
-    /// Helpers/.
+    /// Loads the golden-vector fixture at
+    /// tests/shared/vendor_offer_hasher_vectors.json, via a walk-up from
+    /// the running test assembly.
+    /// <para>
+    /// The fixture sits in tests/shared/ rather than this project's own
+    /// Helpers/ because it began life shared with a module-side suite (see
+    /// VendorOfferHasherGoldenVectorTests for what happened to that), and
+    /// deliberately not under ref/, which is shipped module seed data
+    /// loaded at runtime - this file is test-only and has no runtime
+    /// consumer.
+    /// </para>
     /// </summary>
     public static class VendorOfferHasherVectorFixture
     {
