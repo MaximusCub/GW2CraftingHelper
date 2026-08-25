@@ -2300,4 +2300,38 @@ SNAPSHOT
 - The header title sits at the 16px inset with its rule 1px clear beneath
   the buttons.
 
-Gate: [PENDING - the orchestrator fills in PASS/FAIL]
+Gate: PASS (2026-08-25 desktop session, branch build at the
+orchestrator's fix HEAD, captures preflight/gTB0-gTB5).
+
+SETTINGS - the tab that prompted the milestone. The left-packed run of
+rows is gone: a genuine two-column board (Sound | Homestead Refinement,
+Logging | Snapshot, then Currency Valuations) filling the panel, inputs
+aligned on their column's own edge with the unit hint after them, each
+description wrapped to a reading measure under the control it belongs
+to, "Applies immediately" chips right-anchored on their section rows,
+and Save right-anchored in the bar. The right half of the panel is doing
+work at last.
+LOG - a three-band Time / Tag / Message gutter with Message owning the
+remaining width, toolbar controls left and the three buttons pinned
+right.
+ABOUT - a two-column document: the Module facts card (label + value
+rows) left, Disclaimer and the gw2efficiency credit as prose right at a
+sane measure rather than one 1300px line.
+SNAPSHOT - the audit found and fixed the last left-packed strip: the
+result line now sits opposite a right-anchored coin block on one
+justified row, and the source-filter run starts at the same gutter as
+the search box above it (it began at x=0) and ends on the tab's shared
+chrome right edge.
+NARROW - at a 1024 client the board keeps two columns with no collision
+and no overlap; content runs under the screen edge exactly as the
+plan-view gate already recorded for a sub-minimum client, which is the
+window's effective-minimum behavior and not this milestone's doing.
+
+Two round-capped Must Fixes were applied by the orchestrator before this
+gate rather than shipped: About cleared its built flag only inside the
+off-thread Build, leaving a settle callback free to dereference the
+blocks Build was about to replace (now cleared on the main thread at the
+factory, mirroring Settings); and the Snapshot source-filter run - the
+one content-driven width on that tab - was still escaping the frame in
+both modes. The two tests that encoded the old filter-run geometry moved
+to the new contract.
