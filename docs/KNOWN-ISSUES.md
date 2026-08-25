@@ -50,7 +50,11 @@ rather than oral.
    `grep -c '^Gate: \[PENDING' docs/KNOWN-ISSUES.md` returns exactly 1 and
    that the hit is this section's own, at the true EOF. Use the anchored
    pattern: the marker also appears indented inside this section and inside
-   archived records that narrate the same check.
+   archived records that narrate the same check. Exception: a rule-5
+   late-gate section reports a gate that has already run, so it ends with
+   the finished `Gate: PASS/FAIL/...` line and carries no PENDING marker.
+   On a branch whose only new section is that one, the count is 0, and 0
+   is the correct answer - do not invent a PENDING line to reach 1.
 3. **The orchestrator edits that line in place** after the live desktop
    session, turning it into a `Gate: PASS/FAIL/PARTIAL PASS ...` record
    with the verification transcript. By then the section may no longer be
