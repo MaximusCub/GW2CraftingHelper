@@ -15057,7 +15057,10 @@ left as two missing cells: a third `SummaryFootnote` row,
 `ProfitSuppressedFootnoteText`, added on exactly the condition
 `BuildProfitFormulaBand` returns on (`NetSaleValue.HasValue`), so it
 never claims a band was hidden on a plan that had no sell price to show
-one for.
+one for. The multi-item `MultiItemNote` row ("sell value and profit are
+the sum across every requested item ...") is gated on the same
+condition for the same reason - it used to scope two tiles that were not
+on the page.
 
 ### 2. Scroll anchoring across a re-solve
 

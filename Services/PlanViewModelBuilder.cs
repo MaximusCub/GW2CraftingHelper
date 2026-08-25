@@ -202,13 +202,14 @@ namespace GW2CraftingHelper.Services
             BuildProfitFormulaBand(section, result, isMultiItem, unpricedZero);
             BuildCurrencyTableRows(section, result);
 
-            // Gated on the same NetSaleValue.HasValue condition as the
-            // Sell value/Profit rows so this note never references a
-            // profit figure not actually on the page. The wording is not
-            // gw2e's verbatim banner text: this module's rollup has no
-            // craft-vs-buy filter, so "crafted recipes" would be
-            // inaccurate.
-            if (isMultiItem && result.NetSaleValue.HasValue)
+            // Gated on the same conditions the Sell value/Profit rows
+            // themselves are, so this note never scopes a figure not
+            // actually on the page - including the unpriced zero, where
+            // the band is suppressed and its own footnote says so. The
+            // wording is not gw2e's verbatim banner text: this module's
+            // rollup has no craft-vs-buy filter, so "crafted recipes"
+            // would be inaccurate.
+            if (isMultiItem && result.NetSaleValue.HasValue && !unpricedZero)
             {
                 section.Rows.Add(new PlanRowViewModel
                 {
