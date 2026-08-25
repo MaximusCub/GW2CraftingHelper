@@ -42,12 +42,27 @@ namespace GW2CraftingHelper.Tests.Services
                 SettleMs,
                 null);
 
-            while (clock.ElapsedMilliseconds < SettleMs * 3)
+            // Re-arm a few times, then QUIESCE before measuring. Two
+            // races had to go, both seen on GitHub runners 2026-08-25:
+            // scheduling and stamping in the same loop iteration let a
+            // stalled Task.Delay record an event AFTER the callback had
+            // already run, and simply waiting for "runAtMs >= 0" returned
+            // a value written during the burst rather than the one this
+            // test is about. So the burst is allowed to finish, its
+            // result is discarded, and only then is a single event timed.
+            for (int i = 0; i < 4; i++)
             {
                 debounce.Schedule();
-                lastEventMs = clock.ElapsedMilliseconds;
-                await Task.Delay(5);
+                await Task.Delay(SettleMs / 4);
             }
+
+            await Task.Delay(SettleMs * 4);
+            Volatile.Write(ref runAtMs, -1);
+
+            // Stamped BEFORE the final Schedule, so scheduling jitter can
+            // only ever lengthen the measured trail, never shorten it.
+            lastEventMs = clock.ElapsedMilliseconds;
+            debounce.Schedule();
 
             Assert.True(await WaitForAsync(() => Volatile.Read(ref runAtMs) >= 0, WaitMs));
 
