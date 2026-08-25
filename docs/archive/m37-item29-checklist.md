@@ -6,7 +6,7 @@ in the repo working tree was modified.
 
 ## 1. Where the file goes
 
-Copy the sibling file `m37-item29-snapshot.json` over:
+Copy the fixture `docs/dev-notes/m38-plan/m37-item29-snapshot.json` over:
 
 ```
 C:\Dev\Blish\blish-preflight-settings\data\snapshot.json
@@ -231,6 +231,7 @@ raw offer JSON, so 1 needed Bloodstone Shard = 200 Spirit Shards total.
 
 ## 7. Files
 
-- Snapshot to copy: `m37-item29-snapshot.json` (this scratchpad directory)
+- Snapshot to copy: `docs/dev-notes/m38-plan/m37-item29-snapshot.json`
+  (left in place by the 2026-08-24 docs rotation; only this checklist moved)
   -> `C:\Dev\Blish\blish-preflight-settings\data\snapshot.json`
-- This checklist: `m37-item29-checklist.md` (this scratchpad directory)
+- This checklist: `docs/archive/m37-item29-checklist.md`
