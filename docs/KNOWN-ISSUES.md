@@ -14981,3 +14981,282 @@ tooltips (pinned by the depth-19/20 boundary tests + the deferred
 full-name builders), item 15's dual-cost vendor leaves (row-identity
 gate is test-pinned; one expand on a live plan settles it), badge
 hover prose, and the longest-status-at-1378 measurement.
+
+## App-wide UI consistency wave (app-typography)
+
+Branched from v0.2.3, which redesigned the Crafting Plan tab alone. This
+wave carries that work to the REST of the module, on five maintainer
+directives. It deliberately reuses the 0.2.3 seams rather than growing
+new ones: `Services/TypeRampMetrics` for the tier seats,
+`Views/Rendering/UiFonts` for the fonts, `PlanContentHeightMath` for the
+band heights those tiers need, `PlanRelayoutMath`'s pinned-right-edge
+model for every column, and `IconControls` / `TooltipFacility` for icons
+and hovers.
+
+### A - the ramp is the whole app's, not the plan tab's
+
+`UiFonts.Title` (18 regular) is **deleted**. It was accepted divergence
+5 of the plan-view redesign, kept alive only because restyling Settings
+and About was "a second redesign"; this is that redesign. Nothing in the
+module resolves 18-regular any more, so the measured defect behind its
+retirement - the space glyph advances 4px against 7 at 16-regular and 9
+at 18-bold, so multi-word text renders with collapsed word gaps - can no
+longer reach the screen through a tier seat. Every promoted role is bold
+for that reason, not for a stylistic one.
+
+Placed, each at the band height its tier's measured ink needs:
+
+| Surface | Was | Now |
+|---|---|---|
+| "Account Snapshot", Settings' five section headers, About's title and its two labelled sections | Title 18 regular / Body 16 | **SectionTitle 24 bold**, 38px band, 2px rule |
+| Settings' currency grid header, the Log tab's rows (previously unlabelled), the Snapshot tab's two runs | Body 16 / nothing | **ColumnHeader 20 bold** on `TableHeaderStyle.BandColor`, 32px band |
+| Snapshot, Log and Settings status lines | Body 16 | **Status 18 bold** |
+
+Two rows grow because of it: `SnapshotHeaderLayout.StatusRowHeight` and
+the Log tab's own, 24 -> 26 (the Status tier's lowest ink is 23 against
+Body's 21, drawn at y=2 with the 1px clearance the row has always kept).
+A test asserts the clearance against the measured ink rather than
+against the literal, so a future tier swap is told which number to write.
+
+**The no-small-grey rule reached one offender outside the plan**: the
+Snapshot coin caption was Caption 14 in #828282, smaller AND greyer than
+the figure it labels. It keeps the grey and joins the coin run's own size
+and y - one channel of de-emphasis, the same fix the plan's Disciplines
+line got.
+
+The Log tab's new header names its prefix column **"Time"**. Judgment
+call: the column actually holds level, timestamp and tag, and "Time" is
+what a reader scans it for; "Level / Time / Tag" is honest and reads as
+a legend rather than a header.
+
+### B - one item-icon component
+
+Reported: *"item icon displays are not using a standardized code path
+everywhere.. some places give the tooltips, others do not, some places
+give colored borders, other places just use the icon image with no
+border"*. The inventory, taken at v0.2.3:
+
+| Site | Frame | Hover |
+|---|---|---|
+| Recipe Tree, Used Materials, Shopping List, Crafting Steps, Required Recipes, plan header, rich tooltip header | rarity | tree/materials/shopping: yes. **Crafting Steps, Required Recipes: none** |
+| Snapshot item rows, Snapshot wallet rows, item-search dropdown, Total Cost currency table | **none** | items: rich. **wallet, dropdown: none** |
+| Inline coin/currency runs (`CoinCurrencyRenderer`) | none | currency name |
+
+`IconControls.CreateItemIcon` IS the framed builder now (it was
+`CreateRarityFramedIcon`), it takes the icon's hover text, and it stamps
+that text on the frame as well as on the square and the missing-art
+placeholder inside it - Blish resolves a tooltip on the deepest control
+under the cursor and never bubbles, so each was its own hole.
+`CreateUnframedIcon` is the one remaining unframed path, named so it
+cannot be picked by accident.
+
+Every site above is routed through it except two, both deliberate and
+both stated here rather than left to be re-discovered:
+
+- **the inline coin/currency runs.** A frame adds 2px to every segment's
+  advance, and that advance is a term in the module's own
+  minimum-window-width derivation; it would also draw a rarity border
+  around a denomination that has no rarity.
+- **the About tab's module icon.** It is the module's logo, not an item.
+
+Each converted site passes its art size INSET by the border rather than
+growing its box, so no layout arithmetic moved anywhere. Crafting Steps
+and Required Recipes gained `ApplyPlainToIconTree`, so their row note now
+covers the biggest target on the row.
+
+**Snapshot rarity comes from the session stat cache**, which is the only
+source that tab has: `AccountSnapshot` carries no rarity and is
+schema-guarded against gaining fields (see `ItemStatBlock`'s own note on
+why stats are a session side channel). A row whose block has not been
+fetched frames NEUTRAL rather than guessing, and picks up its colour on
+the next rebuild. Consequence, stated plainly: on a fresh session most
+Snapshot frames are the unknown-rarity grey, and the uniform treatment -
+not the colour - is what this directive buys there.
+
+### C - the Snapshot tab's layout
+
+Reported: *"the snapshot tab for sure needs the layout overhaul because
+it has no tooltips and the same icon issue"*.
+
+The results were a grid of unlabelled two-line cards. They are two
+sortable tables now, each with a SectionTitle band and rule ("Items",
+"Currencies") and a ColumnHeader band under it. Both bands span the full
+grid and track the panel; a run with no rows is ABSENT, not an empty
+heading over nothing.
+
+- **The header band carries one label pair per grid column**, on the same
+  x's as the cells beneath it. The Settings currency grid already labels
+  a multi-column grid this way; the alternative labels columns two and
+  three with nothing.
+- **The count is a column, not a prefix.** "30x Mystic Clover" became
+  `Mystic Clover ... 30x` with the amount right-pinned, because a
+  quantity a reader can SORT by has to line up down the column rather
+  than move with each name's length. The name is the only part of a cell
+  that flexes, its budget stops at the Amount band, and the band is
+  `max(widest amount, its own header label)` - the header-floored rule
+  the plan tables needed once headers went to 20 bold.
+- **`MinColumnWidth` is re-derived term by term** for the new cell:
+  40 icon column + 45 chars x 9px + 12 gap + 79 amount floor + 8 pad =
+  **544** (was 516 for a 52-char name-plus-prefix run). Two columns still
+  fit the 1252px grid the 1378px window minimum leaves; a third now needs
+  a 1758px window rather than 1674.
+- **Sorting** goes through the existing `TableSortState` cycle
+  (asc -> desc -> back to the search's own order), one state per run,
+  session-sticky across a tab switch, in a Blish-free
+  `SnapshotTableSorter` shaped like `PlanTableSorter`.
+- **Hovers.** Wallet rows had none at all and now carry the currency name
+  on the panel, the name label and the icon. Item rows had the deferred
+  rich path already but showed NOTHING for the common case - see the
+  "Follow-up: snapshot rows without plan-cached stats" note above - and
+  now always head with the item's name and always carry the full source
+  breakdown. **The on-hover metadata fetch that note offers as the other
+  candidate fix was NOT taken**: it is a network call on a hover path,
+  and snapshot fetch triggering belongs to a sibling branch.
+
+Blish-free and tested: `SnapshotResultLayout` stacks the two sections
+(the view writes every y itself rather than betting on a FlowPanel
+re-flowing a later sibling - the reason the two runs already shared one
+panel), `SnapshotTableSorter` holds the comparators, and
+`SnapshotItemGridLayout` grew the cell's own column edges.
+
+### D - sortable headers are cells, not text
+
+Reported: *"the header rows of columns that you can click to sort should
+highlight lightly when you mouse over them to show that an action can be
+triggered from them. also the tooltip should probably and click action
+should probably trigger for mouseover of the entire column header cell,
+not just the text"*.
+
+`Views/Rendering/SortableHeaderCells` owns both halves for every sortable
+table in the module. The mechanism is measured against decompiled Blish
+HUD 1.3.0 rather than assumed, and it is the same finding
+`PressFeedback` already records: `Container.TriggerMouseInput` raises the
+CONTAINER's own mouse events first and only then walks its children, and
+`Control.CheckMouseLeft` clears `MouseOver` only when the cursor leaves
+that control's own bounds. The header row panel therefore sees every
+move, press and click inside the band INCLUDING those over its labels,
+and the cell under the cursor follows from `RelativeMousePosition`. The
+wash panels are passive scenery; every handler lives on the row.
+
+Two things do not follow from that:
+
+- the "click to sort" note is stamped on the label AND on the cell's
+  wash, because a tooltip resolves on the deepest control under the
+  cursor and never bubbles - whichever of the two the cursor is over is
+  the only one that can answer;
+- the label's own `Click` handler is GONE (`MakeClickable` is now
+  `MarkSortable`). A second handler on the label would fire alongside
+  the row's for one press and cycle the sort TWICE - the exact bug the
+  container-first dispatch order creates, and the reason it is called out
+  here rather than left as a comment.
+
+The washes carry `ZIndex = -1`, because Blish draws children in ZIndex
+order and a wash created after its label would otherwise paint over the
+text.
+
+`Services/HeaderCellMath` does the split, Blish-free and tested: a
+PARTITION rather than padded boxes, so no click lands in a dead strip
+between two columns, with each boundary midway between one label's right
+edge and the next label's left edge. Its degenerate cases - labels that
+touch, a right-aligned label that has slid left of its neighbour in a
+narrow window - collapse rather than inverting. On the Snapshot tab the
+partition is taken per GRID COLUMN, not across the band: a cell running
+past its column's edge would answer clicks aimed at the next column's
+Item header, and the last column absorbs the remainder integer division
+leaves.
+
+### E - tooltip translucency
+
+From the maintainer's own in-game inventory capture. A real GW2 tooltip's
+interior is NOT flat: background medians shift about 20 levels per
+channel across one box - (34,38,40) at one end to (43,55,55) at the
+other - because the scene behind shows through, which puts the game's
+alpha nearer 0.75-0.85. `RichTooltipSurface` painted a flat
+`Color(0,0,0) * 0.92f`, which reads as an opaque card beside it.
+
+Two changes, and nothing else. **The alpha constant goes 0.92 -> 0.82**,
+the UPPER end of the measured band deliberately: audit finding H6 is that
+content behind a tooltip must never bleed through LEGIBLY, and 0.82
+leaves 18% of the scene where the bottom of the band would leave 25%.
+And **a 1px light bevel immediately inside the dark border**, which the
+capture shows as a pair rather than a single edge - the chrome grey this
+file already carries for the header icon's frame, at 0.22 alpha, a
+highlight on the canvas rather than a second border. Both are cheaply
+reversible: one constant and one call.
+
+### Judgment calls, all cheap to reverse
+
+1. **Log column header reads "Time"** over a level+timestamp+tag prefix.
+2. **Snapshot sections read "Items" / "Currencies"**, matching the empty
+   state's own wording rather than the filter dropdown's "Wallet".
+3. **Snapshot item names take their rarity colour**, which is the
+   unknown-rarity grey (200,200,200) for most rows until something
+   fetches their stats - slightly dimmer than the white they had.
+4. **Snapshot icons draw 30px of art in the 32px box** the unframed icon
+   occupied, rather than growing the box to fit 32px of art plus a frame
+   and moving the text column with it.
+5. **The wash is white at 0.07 (0.14 held)** and the label keeps its
+   amber hover tint, because an unsorted column shows no sort indicator
+   and the wash alone is deliberately faint.
+6. **Theme B ships no new tests.** Its whole surface is Views-layer
+   control construction, which this repo's Blish-free rule puts out of
+   reach; the gate below is its evidence.
+
+### Out of scope, untouched
+
+The sibling `field-fixes-3` branch owns the Total Cost zero-band
+retention rule, scroll anchoring across re-solves, the click-sound
+default, the UNKNOWN Mystic-Forge recipe fallback and first-load snapshot
+triggering. None is touched here. `Services/PlanViewModelBuilder.cs` and
+`Views/CraftingPlanView.cs` are untouched apart from one mechanical
+rename of the icon component in the latter.
+
+### Desktop gate
+
+1. **The ramp, on each of the four tabs.** Snapshot: "Account Snapshot"
+   at 24 bold over a full-width rule, the status line at 18 bold,
+   "Items"/"Currencies" at 24 bold, "Item"/"Currency"/"Amount" at 20 bold
+   on the dark band. Settings: five section headings at 24 bold, the
+   currency grid's "Currency"/"Copper per unit" on a banded 20-bold
+   header, the save-bar status at 18 bold. Log: status at 18 bold,
+   "Time"/"Message" on a banded 20-bold header. About: the module title
+   and both "Disclaimer:"/"Credits:" headings at 24 bold. Nothing
+   anywhere renders multi-word text at 18 REGULAR (the collapsed-word-gap
+   defect); nothing renders a name at Caption grey.
+2. **One icon treatment everywhere.** Three formerly-inconsistent sites,
+   side by side with a plan row's icon: (a) a Snapshot item row, (b) a
+   Snapshot wallet row, (c) the item-search dropdown under the Crafting
+   Plan tab's search box. All three must show the same 1px frame at the
+   same box size, and all three must answer a hover. Then hover a
+   Crafting Steps icon and a Required Recipes icon - both must now show
+   the row's own note, which they never did.
+3. **Snapshot full-width tracking, at several widths.** At the 1378
+   floor, at ~1600, and maximised: both section rules and both header
+   bands must run the full width of the result panel at every width, the
+   Amount column must stay pinned the same distance from each cell's
+   right edge, and the header pair over EVERY grid column must sit on the
+   x's of the cells beneath it (check the rightmost column especially -
+   it absorbs the division remainder). Drag slowly across the 2 -> 3
+   column threshold (~1758px window) and confirm the third column's
+   header pair appears with it.
+4. **Snapshot item tooltips.** Hover an item row for something never
+   planned this session: a rich tooltip must appear, headed with the
+   item's name and carrying the full source breakdown. Hover a wallet
+   row: the currency's name. Hover a wallet row's ICON: the same. Then
+   generate a plan containing one of those items, return, and hover it
+   again - the full stat block must now head the box instead.
+5. **Sortable-header hover wash and whole-cell click, on a plan table AND
+   the snapshot.** On Used Materials: move the cursor into the header
+   band well AWAY from the word "Item" - the whole left cell must wash
+   and show the "click to sort" note, and a click there must sort. Same
+   for "Amount" on the right. Confirm ONE click cycles the sort ONE step
+   (a double cycle is the regression this design has to avoid). Repeat on
+   the Snapshot items header. Confirm the Recipe Tree's inert "Source"
+   header does NOT wash.
+6. **Tooltip translucency against the capture.** Open the maintainer's
+   own inventory screenshot beside a module tooltip over the same kind of
+   bright scene: the interior must no longer read as an opaque card, the
+   dark border must have a light line immediately inside it, and NO text
+   behind the tooltip may be legible through it (audit H6).
+
+Gate: [PENDING - the orchestrator fills in PASS/FAIL]
