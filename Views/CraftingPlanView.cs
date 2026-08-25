@@ -3222,15 +3222,15 @@ namespace GW2CraftingHelper.Views
 
             if (_currentPlan != null)
             {
-                // Show modal confirmation before regenerating
+                // Show modal confirmation before regenerating. The gate
+                // carries the optimistic intent onto the Value Own
+                // Materials checkbox (its own Checked value is preserved
+                // either way, only whether it can be clicked follows Use
+                // Own Materials); the box itself is then armed shut so it
+                // cannot be clicked again until the dialog answers.
                 _useOwnMaterials = newValue;
+                ApplyOwnMaterialsGate();
                 _ownMaterialsCheckbox.Enabled = false;
-                // Keep the Value Own Materials
-                // checkbox's Enabled state in lockstep with the optimistic
-                // _useOwnMaterials value at every point it changes here -
-                // its own Checked value is preserved either way, only
-                // whether it can be clicked follows Use Own Materials.
-                _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
 
                 // Undoes the optimistic arm above. Used for both the dialog's
                 // Cancel (which its X/Escape path also runs) and a refused
@@ -3252,7 +3252,11 @@ namespace GW2CraftingHelper.Views
                         : "Regenerate the plan with own materials excluded? Manual decisions and ignore marks are cleared.",
                     () =>
                     {
-                        _ownMaterialsCheckbox.Enabled = true;
+                        // Disarms through the gate, not straight to
+                        // Enabled = true: a Clear Cache landing while this
+                        // dialog was open must not hand back a live,
+                        // ticked box with no snapshot behind it.
+                        ApplyOwnMaterialsGate();
                         _ = TriggerGenerate();
                     },
                     revert,
