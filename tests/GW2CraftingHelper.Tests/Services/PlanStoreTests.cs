@@ -516,33 +516,72 @@ namespace GW2CraftingHelper.Tests.Services
         // just a Result/Plan structurally missing entirely - see
         // Models/PersistedPlan.cs's CurrentSchemaVersion doc comment.
         //
-        // All three of these assert the INFO channel, not the error one.
-        // They asserted onError (wired to Warn in Module.cs) until the
-        // 2026-08-23 investigation: a schema mismatch is an expected,
+        // A file at an older SHIPPED version asserts the INFO channel, not
+        // the error one. Those asserted onError (wired to Warn in Module.cs)
+        // until the 2026-08-23 investigation: that mismatch is an expected,
         // self-healing outcome, and logging it at the same severity and in
         // the same words as real corruption is what made that incident
-        // unexplainable from the log alone. ---
+        // unexplainable from the log alone. A version this build never
+        // shipped (0, or one from the future) is the opposite case and stays
+        // on the error channel - see the pair at the end of this block. ---
 
         [Fact]
-        public void LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsInfo()
+        public void LoadLatest_ExplicitZeroSchemaVersion_ReturnsNullAndLogsWarn()
         {
             string filePath = Path.Combine(_tempDir, "plan.json");
             // Structurally valid (Result/Plan present, would have passed
-            // the old structural check) but stamped with an old/
-            // incompatible SchemaVersion.
+            // the old structural check) but stamped 0 - a version no build
+            // ever wrote, so it is the same verdict as the omitted-field
+            // case below rather than ordinary drift.
             File.WriteAllText(filePath,
                 "{ \"SchemaVersion\": 0, \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
             string capturedError = null;
+            Exception capturedException = null;
             string capturedInfo = null;
             var store = new PlanStore(
-                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.Null(capturedError);
-            Assert.NotNull(capturedInfo);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains("no schema version", capturedException.Message);
+            // Not damage either - the file parsed. It must not borrow
+            // corruption's words any more than drift's channel.
+            Assert.DoesNotContain("corrupt", capturedException.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void LoadLatest_FutureSchemaVersionFile_ReturnsNullAndLogsWarn()
+        {
+            // A plan written by a NEWER build, read after a downgrade. Not
+            // drift: this build cannot know what is in it, and reporting it
+            // at Info would present an unreadable file as routine. Both
+            // versions are named, so the log says which way round it is.
+            int future = PersistedPlan.CurrentSchemaVersion + 1;
+            string filePath = Path.Combine(_tempDir, "plan.json");
+            File.WriteAllText(filePath,
+                "{ \"SchemaVersion\": " + future + ", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
+
+            string capturedError = null;
+            Exception capturedException = null;
+            string capturedInfo = null;
+            var store = new PlanStore(
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
+
+            var loaded = store.LoadLatest();
+
+            Assert.Null(loaded);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains($"schema {future}", capturedException.Message);
+            Assert.Contains(PersistedPlan.CurrentSchemaVersion.ToString(), capturedException.Message);
         }
 
         [Fact]
@@ -551,11 +590,12 @@ namespace GW2CraftingHelper.Tests.Services
             // CurrentSchemaVersion bumped 1 -> 2
             // for the new PersistedPlan.ValueOwnMaterials field. A
             // genuinely realistic old file - SchemaVersion 1 (the actual
-            // previous CurrentSchemaVersion, not the synthetic "0" the
-            // pre-existing LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsWarn
-            // test above uses) - must be rejected exactly the same way,
-            // degrading to Module's "no restored plan" fresh-start path,
-            // not silently defaulting ValueOwnMaterials to false.
+            // previous CurrentSchemaVersion, not the synthetic "0"
+            // LoadLatest_ExplicitZeroSchemaVersion_ReturnsNullAndLogsWarn
+            // above uses) - must be rejected the same way, degrading to
+            // Module's "no restored plan" fresh-start path, not silently
+            // defaulting ValueOwnMaterials to false. Unlike that 0, this is
+            // drift and belongs on the Info channel.
             //
             // This is the exact file the 2026-08-23 incident hit: a plan
             // written at schema 1 on 2026-08-15, read 8 days later by a
@@ -789,34 +829,39 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsInfo()
+        public void LoadLatest_MissingSchemaVersionField_ReturnsNullAndLogsWarn()
         {
-            // The ONE class of old file that
-            // can actually exist (written before the SchemaVersion field
-            // existed, or by any code that forgets to set it) omits the
-            // member entirely, rather than writing an explicit 0 the way
-            // LoadLatest_SchemaVersionMismatch_ReturnsNullAndLogsInfo above
-            // does. Newtonsoft only overwrites properties present in the
-            // JSON, so this is the exact case a `= CurrentSchemaVersion`
+            // A file with the member omitted entirely rather than stamped
+            // (written before the field existed, or by any code that forgets
+            // to set it). Newtonsoft only overwrites properties present in
+            // the JSON, so this is the exact case a `= CurrentSchemaVersion`
             // property initializer would have let sail through silently -
-            // see PersistedPlan.SchemaVersion's own doc comment. Reported
-            // on the Info channel with the rest of the version rejections
-            // (see the block comment above them) - an absent field is drift
-            // (it reads as version 0), not damage.
+            // see PersistedPlan.SchemaVersion's own doc comment.
+            //
+            // The defect this guards is a PersistedPlan construction site
+            // that never stamps the version: every plan it saves is
+            // unrestorable, forever, and the only symptom is this log line.
+            // So it takes the error channel, not the Info one the older-
+            // shipped-version rejections use - the version it reads as (0)
+            // is one no build ever wrote.
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath,
                 "{ \"GeneratedAt\": \"2026-08-09T00:00:00\", \"Result\": { \"Plan\": { \"TargetItemId\": 1 } } }");
 
             string capturedError = null;
+            Exception capturedException = null;
             string capturedInfo = null;
             var store = new PlanStore(
-                _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
+                _tempDir,
+                (message, ex) => { capturedError = message; capturedException = ex; },
+                message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
 
             Assert.Null(loaded);
-            Assert.Null(capturedError);
-            Assert.NotNull(capturedInfo);
+            Assert.Null(capturedInfo);
+            Assert.NotNull(capturedError);
+            Assert.Contains("no schema version", capturedException.Message);
         }
 
         [Fact]

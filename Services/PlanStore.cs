@@ -20,9 +20,10 @@ namespace GW2CraftingHelper.Services
     /// Two unreadable-file verdicts, two severities, because merging them
     /// once cost a full forensic investigation (2026-08-23): a corrupt or
     /// otherwise unparseable file goes to onError (Warn, same as every I/O
-    /// failure below), while a schema-version mismatch - expected, benign,
-    /// and repaired by the next Generate - goes to onInfo (Info). Any
-    /// caller wiring one and not the other silently drops half the story.
+    /// failure below), while a file written at an older SHIPPED schema
+    /// version - expected, benign, and repaired by the next Generate - goes
+    /// to onInfo (Info). Any caller wiring one and not the other silently
+    /// drops half the story.
     /// </para>
     /// <para>
     /// Unlike SnapshotStore/StatusStore (whose callers are already
