@@ -15040,7 +15040,7 @@ border"*. The inventory, taken at v0.2.3:
 |---|---|---|
 | Recipe Tree, Used Materials, Shopping List, Crafting Steps, Required Recipes, plan header, rich tooltip header | rarity | tree/materials/shopping: yes. **Crafting Steps, Required Recipes: none** |
 | Snapshot item rows, Snapshot wallet rows, item-search dropdown, Total Cost currency table | **none** | items: rich. **wallet, dropdown: none** |
-| Inline coin/currency runs (`CoinCurrencyRenderer`) | none | currency name |
+| Inline coin/currency runs (`CoinCurrencyRenderer`) | none | currency: name. **coin: none** |
 
 `IconControls.CreateItemIcon` IS the framed builder now (it was
 `CreateRarityFramedIcon`), it takes the icon's hover text, and it stamps
@@ -15053,8 +15053,9 @@ cannot be picked by accident.
 Every site above is routed through it except two, both deliberate and
 both stated here rather than left to be re-discovered:
 
-- **the inline coin/currency runs.** A frame adds 2px to every segment's
-  advance, and that advance is a term in the module's own
+- **the inline coin/currency runs stay UNFRAMED** (they still go through
+  the component - see the review fixes below). A frame adds 2px to every
+  segment's advance, and that advance is a term in the module's own
   minimum-window-width derivation; it would also draw a rarity border
   around a denomination that has no rarity.
 - **the About tab's module icon.** It is the module's logo, not an item.
@@ -15103,7 +15104,9 @@ heading over nothing.
 - **Sorting** goes through the existing `TableSortState` cycle
   (asc -> desc -> back to the search's own order), one state per run,
   session-sticky across a tab switch, in a Blish-free
-  `SnapshotTableSorter` shaped like `PlanTableSorter`.
+  `SnapshotTableSorter` shaped like `PlanTableSorter`. A click re-PLACES
+  the rows it already has rather than rebuilding them - see the review
+  fixes below.
 - **Hovers.** Wallet rows had none at all and now carry the currency name
   on the panel, the name label and the icon. Item rows had the deferred
   rich path already but showed NOTHING for the common case - see the
@@ -15156,14 +15159,15 @@ text.
 
 `Services/HeaderCellMath` does the split, Blish-free and tested: a
 PARTITION rather than padded boxes, so no click lands in a dead strip
-between two columns, with each boundary midway between one label's right
-edge and the next label's left edge. Its degenerate cases - labels that
-touch, a right-aligned label that has slid left of its neighbour in a
-narrow window - collapse rather than inverting. On the Snapshot tab the
-partition is taken per GRID COLUMN, not across the band: a cell running
-past its column's edge would answer clicks aimed at the next column's
-Item header, and the last column absorbs the remainder integer division
-leaves.
+between two columns. Each boundary is the caller's own COLUMN edge where
+it has one, and the midpoint between two labels only where it does not -
+see the review fixes below, where the label midpoint turned out to be
+the wrong rule for the columns that matter. Its degenerate cases -
+labels that touch, a right-aligned label that has slid left of its
+neighbour in a narrow window, a supplied boundary outside the band -
+collapse rather than inverting. On the Snapshot tab every cell ends at
+its own grid column's edge, and the last column absorbs the remainder
+integer division leaves.
 
 ### E - tooltip translucency
 
@@ -15189,18 +15193,99 @@ reversible: one constant and one call.
 1. **Log column header reads "Time"** over a level+timestamp+tag prefix.
 2. **Snapshot sections read "Items" / "Currencies"**, matching the empty
    state's own wording rather than the filter dropdown's "Wallet".
-3. **Snapshot item names take their rarity colour**, which is the
-   unknown-rarity grey (200,200,200) for most rows until something
-   fetches their stats - slightly dimmer than the white they had.
-4. **Snapshot icons draw 30px of art in the 32px box** the unframed icon
-   occupied, rather than growing the box to fit 32px of art plus a frame
-   and moving the text column with it.
+3. **Snapshot item names take their rarity colour only when there IS
+   one**, and keep white otherwise (revised - see the review fixes).
+4. **Snapshot icons draw the plan's own 32px art in a 34px frame**
+   (revised); the item-search dropdown and the Total Cost currency table
+   still inset their art by the border, because on those two rows the
+   box size is itself a layout term.
 5. **The wash is white at 0.07 (0.14 held)** and the label keeps its
    amber hover tint, because an unsorted column shows no sort indicator
    and the wash alone is deliberately faint.
-6. **Theme B ships no new tests.** Its whole surface is Views-layer
-   control construction, which this repo's Blish-free rule puts out of
-   reach; the gate below is its evidence.
+6. **Theme B's tests reach only as far as the Blish-free rule allows.**
+   Its surface is Views-layer control construction; what could be pinned
+   was pinned (the coin denominations' hover text), and the gate below
+   is the evidence for the rest.
+
+### Review fixes
+
+An adversarial pass over the five themes above found six things worth
+fixing. All six are in this branch; each is stated here with what it was
+and why the new behaviour is the right one.
+
+**The Snapshot's sort click re-ran the account search.** `SortBy` called
+`RebuildContent`, which re-ran `SnapshotSearchResultBuilder.BuildItemRows`
+over the whole account index and then disposed and recreated every
+control - on a full snapshot, thousands of rows of synchronous
+main-thread work to change nothing but the order. It also dropped the
+scroll position (Blish's `Scrollbar` zeroes itself when the content
+height changes) and replaced the header panel under a stationary cursor,
+which leaves `MouseOver` false until the mouse moves - the exact
+stale-hover class `HoverChainResync` exists for, made easier to hit by
+theme D's whole-cell target. The plan view had already been fixed for
+this class (`RerenderForSortChange`).
+
+The fix is not to copy the plan's scroll-preserve machinery but to
+remove the need for it: the cells are held in the SEARCH's order and a
+click derives a placement ORDER over them
+(`SnapshotTableSorter.ItemOrder` / `WalletOrder`, the same comparators
+`SortItems` applies). Nothing is re-queried, nothing is disposed, the
+row count and grid height are identical across a click - so the scroll
+offset and the hover chain are untouched by construction and no resync
+call is needed. Cycling back to None restores the search's own order
+without the view keeping a second copy of it.
+
+**Two per-tick paths still measured strings.** Commit 6201777 set the
+contract for the plan's headers (position-and-width work per tick,
+measuring at build and settle only) and the Snapshot had not been held
+to it: `PlaceAmountLabel` measured a FIXED string per cell per resize
+tick, and `LayoutSectionChrome` allocated a column list, two arrays and
+two closures per grid column and measured both header labels on every
+tick. The amount width is captured at build, and the chrome now owns a
+`HeaderCellPlan` rebuilt only when the column count or a header's width
+changes.
+
+**Coin icons answered no hover.** `CoinCurrencyRenderer` built its coin
+icon as a raw `Panel` with a `BackgroundTexture`, entirely outside
+`IconControls` - so in a Total Cost row the spirit-shard icon named
+itself and the gold coin beside it said nothing. That is the module's
+most numerous icon draw and the site directive B's report literally
+describes. `IconControls.CreateAssetIcon` is the asset-id twin of the
+unframed path (no missing-art branch: an asset id is a constant, so
+there is no data gap to degrade), and `CoinSegmentMath.DenominationName`
+names the three denominations beside the ids it already owns. The
+inventory table above understated this and is corrected.
+
+**Header cells stopped at the midpoint between two WORDS.** The split
+took `gapStart + (gapEnd - gapStart) / 2` over the label extents, and a
+header's text is a fraction of the column it names: on the Shopping List
+the boundary landed roughly halfway between "Item" and "Source", so a
+click above the right-hand end of the item NAMES sorted by Source.
+`HeaderCellMath.LabelExtent` now carries an optional explicit boundary
+(the midpoint remains the fallback), `ShoppingColumnMath` derives its
+four from the same pre-scan its columns come from,
+`SnapshotItemGridLayout.CellHeaderSplitX` does the same for a grid cell,
+and Used Materials hands `CTableHeaderRenderer` the three terms its name
+column already budgets against. The inert headers keep the fallback -
+their cells answer no click and paint no wash, so a boundary between
+them decides nothing.
+
+**Snapshot names got dimmer for the common case.** The rows took
+`GetRarityNameColor(RarityFor(...))` unconditionally, and `RarityFor`
+answers null for any item no plan has fetched - so on a fresh session
+every name dropped from white to the palette's 200-grey unknown entry,
+while the frame that colour was paying for stayed neutral anyway.
+Directive A's own no-small-grey rule argues the other way: the rarity
+colour is taken when there IS one, white otherwise. The art also goes
+back to the 32px the rows drew before the frame arrived (the box grows
+to 34, which the 40px text column clears), so the visible delta on this
+tab is not "smaller icons, dimmer names".
+
+One consequence worth stating: sorting by Amount over a run already
+sorted by Name now breaks ties alphabetically rather than in the
+search's order, because the placement order composes over what is on
+screen. A rebuild (any search or filter change) re-derives it from the
+search's order, which is the canonical one.
 
 ### Out of scope, untouched
 
@@ -15226,10 +15311,13 @@ rename of the icon component in the latter.
 2. **One icon treatment everywhere.** Three formerly-inconsistent sites,
    side by side with a plan row's icon: (a) a Snapshot item row, (b) a
    Snapshot wallet row, (c) the item-search dropdown under the Crafting
-   Plan tab's search box. All three must show the same 1px frame at the
-   same box size, and all three must answer a hover. Then hover a
-   Crafting Steps icon and a Required Recipes icon - both must now show
-   the row's own note, which they never did.
+   Plan tab's search box. All three must show the same 1px frame, and all
+   three must answer a hover. Then hover a Crafting Steps icon and a
+   Required Recipes icon - both must now show the row's own note, which
+   they never did. Finally hover the GOLD COIN icon in a Total Cost row
+   and then the spirit-shard icon beside it: the coin must name its
+   denomination where it used to say nothing. Snapshot item names must
+   read WHITE on a fresh session (no plan generated), not grey.
 3. **Snapshot full-width tracking, at several widths.** At the 1378
    floor, at ~1600, and maximised: both section rules and both header
    bands must run the full width of the result panel at every width, the
@@ -15253,7 +15341,19 @@ rename of the icon component in the latter.
    (a double cycle is the regression this design has to avoid). Repeat on
    the Snapshot items header. Confirm the Recipe Tree's inert "Source"
    header does NOT wash.
-6. **Tooltip translucency against the capture.** Open the maintainer's
+   **Then the column boundary specifically**, on the Shopping List: hover
+   the header directly above the right-hand end of the longest item NAME.
+   The Item cell must be the one that washes and the one that answers the
+   click - it used to be Source from about halfway across the names.
+6. **The Snapshot sort click keeps its place.** Take a full snapshot,
+   filter All, empty search, and scroll down to the Currencies run. Click
+   its Amount header: the run must re-order with no perceptible stall,
+   the list must NOT jump to the top, and the header under the
+   still-stationary cursor must stay washed (no mouse jiggle needed).
+   Click twice more - descending, then back to the search's own order.
+   Do the same on the Items header with the list scrolled deep, and
+   confirm the Currencies run's order is untouched by it.
+7. **Tooltip translucency against the capture.** Open the maintainer's
    own inventory screenshot beside a module tooltip over the same kind of
    bright scene: the interior must no longer read as an opaque card, the
    dark border must have a light line immediately inside it, and NO text
