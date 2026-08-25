@@ -42,21 +42,25 @@ namespace GW2CraftingHelper.Tests.Services
                 SettleMs,
                 null);
 
-            // Re-arm a few times, then STOP scheduling before measuring.
-            // The original loop scheduled and measured in the same
-            // iteration, so a CI runner that stalled inside Task.Delay
-            // could let the callback fire and then record a LATER
-            // lastEventMs on the next pass - reporting a 0ms trail for a
-            // debounce that had behaved correctly. Observed failing on a
-            // GitHub runner 2026-08-25.
+            // Re-arm a few times, then QUIESCE before measuring. Two
+            // races had to go, both seen on GitHub runners 2026-08-25:
+            // scheduling and stamping in the same loop iteration let a
+            // stalled Task.Delay record an event AFTER the callback had
+            // already run, and simply waiting for "runAtMs >= 0" returned
+            // a value written during the burst rather than the one this
+            // test is about. So the burst is allowed to finish, its
+            // result is discarded, and only then is a single event timed.
             for (int i = 0; i < 4; i++)
             {
                 debounce.Schedule();
                 await Task.Delay(SettleMs / 4);
             }
 
+            await Task.Delay(SettleMs * 4);
+            Volatile.Write(ref runAtMs, -1);
+
             // Stamped BEFORE the final Schedule, so scheduling jitter can
-            // only ever make the measured trail longer, never shorter.
+            // only ever lengthen the measured trail, never shorten it.
             lastEventMs = clock.ElapsedMilliseconds;
             debounce.Schedule();
 
