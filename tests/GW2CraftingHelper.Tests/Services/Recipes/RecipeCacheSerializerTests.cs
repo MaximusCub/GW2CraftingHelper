@@ -186,8 +186,12 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 // KNOWN-ISSUES recipe-ingestion bug class: was
                 // 15774 before this fix - see the matching count-drift
                 // comment in LoadRecipeSeed_ShippedSeedFile_... above for
-                // the full breakdown.
-                Assert.Equal(16022, searches.Count);
+                // the full breakdown. 16022 -> 16024 on the 2026-08-24
+                // reseed at build 205780: the four hand-authored
+                // negative-id rows (-1592..-1595) now get search entries
+                // like every other recipe, because the seeder preserves
+                // them explicitly instead of losing them (Step 5a).
+                Assert.Equal(16024, searches.Count);
 
                 // Amalgamated Rift Essence's search entry (item 100930):
                 // previously a STALE NEGATIVE entry ("100930": []) - the
