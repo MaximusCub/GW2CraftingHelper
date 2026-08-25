@@ -273,7 +273,8 @@ namespace GW2CraftingHelper
             _httpClient = new HttpClient();
             var rawRecipeApi = new Gw2RecipeApiClient(_httpClient);
             var mfSource = new ContentsManagerRecipeSource(ContentsManager);
-            var recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfSource);
+            var mfData = RecipeClientFactory.LoadData(mfSource);
+            var recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfData);
             var priceApi = new Gw2PriceApiClient(_httpClient);
             var itemApi = new Gw2ItemApiClient(_httpClient);
 
@@ -311,6 +312,13 @@ namespace GW2CraftingHelper
                 // change") - now visible in the Log tab at Warn.
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed load failed, starting with an empty seed cache: {ex.GetType().Name} - {ex.Message}");
             }
+
+            // Wiki-sourced Mystic Forge recipes are seed content, not an
+            // API fallback: folding them in here means a seed row saying
+            // "the API knows no recipe for this item" can never shadow one,
+            // and no game build id can affect whether they are found - see
+            // SeededRecipeCacheStore.MergeMysticForgeRecipes.
+            recipeSeed.MergeMysticForgeRecipes(mfData);
 
             try
             {
