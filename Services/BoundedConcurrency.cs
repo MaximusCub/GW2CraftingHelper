@@ -14,6 +14,15 @@ namespace GW2CraftingHelper.Services
             Func<T, Task> action,
             CancellationToken ct)
         {
+            // A zero or negative bound builds a semaphore no Release can
+            // open: every task parks on WaitAsync and Task.WhenAll never
+            // completes. In the overlay that is a plan generation that spins
+            // behind a progress bar forever, so it fails loudly here.
+            if (maxConcurrency < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxConcurrency));
+            }
+
             var materialized = items.ToList();
             if (materialized.Count == 0)
             {

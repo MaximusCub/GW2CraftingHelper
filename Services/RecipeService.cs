@@ -26,6 +26,11 @@ namespace GW2CraftingHelper.Services
             int maxConcurrency = DefaultMaxConcurrency,
             IRecipeCacheStore cacheStore = null)
         {
+            if (maxConcurrency < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxConcurrency));
+            }
+
             _api = api;
             _maxConcurrency = maxConcurrency;
             _cacheStore = cacheStore ?? new InMemoryRecipeCacheStore();
