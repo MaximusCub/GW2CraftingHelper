@@ -2416,15 +2416,28 @@ namespace GW2CraftingHelper.Views
         {
             Func<TooltipContent> build = () =>
             {
+                // The breakdown ALWAYS rides along, not only when its line
+                // was shortened: the cell shows one run of source counts at
+                // whatever width it has, and the hover is where a reader
+                // goes for the whole of it.
                 var extras = new List<string>();
-                if (breakdownLabel.Text != breakdown)
+                if (!string.IsNullOrEmpty(breakdown))
                 {
                     extras.Add(breakdown);
                 }
+
+                // ...and so does the name, whether or not it fits. On this
+                // tab a row's stat block usually does not exist (nothing
+                // has fetched it - see this file's RarityFor), and a
+                // pointed-at row answering with nothing at all is the
+                // reported "the snapshot tab has no tooltips". With a stat
+                // block the block's own header wins and this is unused.
+                const bool alwaysHeadWithTheName = true;
+
                 return ItemRowTooltipComposer.BuildRowContent(
                     _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
                     nameText,
-                    nameLabel.Text != nameText,
+                    alwaysHeadWithTheName,
                     extras);
             };
 
