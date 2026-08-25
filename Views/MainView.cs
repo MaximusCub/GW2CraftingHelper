@@ -184,7 +184,7 @@ namespace GW2CraftingHelper.Views
             + (SourceFilterMaxRows * SourceFilterCellHeight)
             + ((SourceFilterMaxRows - 1) * SourceFilterRowGapY)
             + SourceFilterBottomPad;
-        private const int SourceFilterScrollbarAllowance = 20;
+        private const int SourceFilterScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int MinContentHeight = 120;
 
         // Checkbox width beyond its measured label: the box glyph plus its

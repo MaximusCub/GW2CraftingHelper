@@ -96,12 +96,28 @@ namespace GW2CraftingHelper.Services
         public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + RightEdgePadding;
 
         /// <summary>
-        /// Trailing padding a tab's content keeps clear of the scrollbar -
-        /// the last term of <see cref="WindowToTabPanelChrome"/>, named here
-        /// because the toolbar row's right-anchored cluster stands off the
-        /// row's right edge by the same amount and the two must not drift.
+        /// Width the vertical scrollbar of a scrolling content panel
+        /// occupies, and therefore the width every tab subtracts from its
+        /// container before placing anything: content laid out inside the
+        /// full container runs under the scrollbar strip.
+        /// <para>
+        /// Named ONCE, here, beside
+        /// <see cref="WindowToTabPanelChrome"/>'s own accounting of the same
+        /// 20px. Three private copies of this number existed - in
+        /// LogTabContent, SnapshotItemGridLayout and MainView's
+        /// source-filter flow - and a fourth would have arrived with every
+        /// tab that gained a right edge.
+        /// </para>
         /// </summary>
-        public const int RightEdgePadding = 20;
+        public const int ScrollbarAllowance = 20;
+
+        /// <summary>
+        /// The same number seen from the padding side, kept because
+        /// <see cref="WindowToTabPanelChrome"/>'s derivation and the plan
+        /// tab's own chrome are written in these terms. One definition, two
+        /// names for the two things it is doing.
+        /// </summary>
+        public const int RightEdgePadding = ScrollbarAllowance;
 
         /// <summary>Panel width a tab's content gets inside a window of this width.</summary>
         public static int TabPanelWidthFor(int windowWidth)

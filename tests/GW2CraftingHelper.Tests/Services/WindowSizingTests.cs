@@ -44,5 +44,33 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(WindowSizing.MinWindowWidth, WindowSizing.EffectiveMinWindowWidth(screenWidth));
         }
+
+        // Historical literal, deliberately not read from production: this is
+        // the number the three private copies (LogTabContent's, MainView's
+        // source-filter one, SnapshotItemGridLayout's) each carried before
+        // the consolidation, and the fence that says the consolidation moved
+        // no layout.
+        private const int ScrollbarAllowanceBeforeConsolidation = 20;
+
+        [Fact]
+        public void ScrollbarAllowance_IsTheNumberTheThreePrivateCopiesUsed()
+        {
+            Assert.Equal(ScrollbarAllowanceBeforeConsolidation, WindowSizing.ScrollbarAllowance);
+            Assert.Equal(WindowSizing.ScrollbarAllowance, SnapshotItemGridLayout.ScrollbarAllowance);
+        }
+
+        [Fact]
+        public void RightEdgePadding_IsTheSameNumberSeenFromThePaddingSide()
+        {
+            Assert.Equal(WindowSizing.ScrollbarAllowance, WindowSizing.RightEdgePadding);
+        }
+
+        [Fact]
+        public void WindowToTabPanelChrome_StillAccountsForOneScrollbarAllowance()
+        {
+            Assert.Equal(
+                46 + 32 + 8 + 20 + WindowSizing.ScrollbarAllowance,
+                WindowSizing.WindowToTabPanelChrome);
+        }
     }
 }

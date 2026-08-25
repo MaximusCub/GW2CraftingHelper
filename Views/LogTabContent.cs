@@ -56,9 +56,8 @@ namespace GW2CraftingHelper.Views
         private const int TopChromeHeight = ToolbarHeight + StatusRowHeight + ColumnHeaderRowHeight;
 
         // The FlowPanel scrolls, so a row sized to the panel's full width
-        // would run under the scrollbar strip. Same allowance MainView's
-        // own scrolling source-filter flow uses.
-        private const int ScrollbarAllowance = 20;
+        // would run under the scrollbar strip.
+        private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
 
         // Prefix column allowance for the "[tag]" part, counted in 'w'
         // glyphs and sized off the longest tag written anywhere in the tree:
