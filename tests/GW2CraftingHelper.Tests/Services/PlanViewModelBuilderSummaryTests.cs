@@ -483,6 +483,79 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ProfitBand_UnpricedZeroWithSellPrice_AbsentAndAccountedForInText()
+        {
+            // The cost band keeps its cells at 0 here; the profit band
+            // cannot (its tiles would not be zeros), so the section has to
+            // say why those cells are gone rather than just drop them.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.NetSaleValue = 340;
+            result.CraftingProfit = 340;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.DoesNotContain(rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
+
+            var footnotes = rows.Where(r => r.RowType == PlanRowType.SummaryFootnote).ToList();
+            Assert.Equal(3, footnotes.Count);
+            Assert.Equal(PlanViewModelBuilder.UnpricedFootnoteText, footnotes[0].Label);
+            Assert.Equal(PlanViewModelBuilder.ProfitSuppressedFootnoteText, footnotes[1].Label);
+            Assert.Equal(PlanViewModelBuilder.FootnoteText, footnotes[2].Label);
+        }
+
+        [Fact]
+        public void ProfitBand_UnpricedZeroWithoutSellPrice_CarriesNoSuppressionNote()
+        {
+            // Nothing was suppressed - the band was never going to render
+            // without a sell price - so the note must not appear and claim
+            // otherwise.
+            var result = MakeResult(totalCoinCost: 0);
+            result.MaterialOpportunityCost = 0;
+            result.CraftingTree = new CraftingTreeNode
+            {
+                ItemId = 1,
+                NodeId = 1,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                Children = new List<CraftingTreeNode>
+                {
+                    new CraftingTreeNode
+                    {
+                        ItemId = 2,
+                        NodeId = 2,
+                        Quantity = 1,
+                        Decision = CraftingDecision.Unknown
+                    }
+                }
+            };
+
+            var vm = _builder.Build(result);
+
+            Assert.DoesNotContain(
+                vm.Sections[0].Rows,
+                r => r.Label == PlanViewModelBuilder.ProfitSuppressedFootnoteText);
+        }
+
+        [Fact]
         public void ProfitBand_SellPricePresent_ThreeTilesWithIdentityArithmetic()
         {
             var result = MakeResult(totalCoinCost: 300);

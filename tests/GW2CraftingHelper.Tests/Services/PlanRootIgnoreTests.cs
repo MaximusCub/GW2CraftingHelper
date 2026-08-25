@@ -294,9 +294,14 @@ namespace GW2CraftingHelper.Tests.Services
             // target HAS a sell price here, so its tiles would not be
             // zeros at all - "Sell Value - Total Materials Value 0 =
             // Profit if Sold" claims the craft consumes nothing and
-            // profits its entire sale price.
+            // profits its entire sale price. Its absence is accounted for
+            // in text rather than left as two missing cells.
             Assert.DoesNotContain(
                 summary.Rows, r => r.RowType == PlanRowType.ProfitFormulaTile);
+            Assert.Contains(
+                summary.Rows,
+                r => r.RowType == PlanRowType.SummaryFootnote
+                    && r.Label == PlanViewModelBuilder.ProfitSuppressedFootnoteText);
         }
 
         /// <summary>

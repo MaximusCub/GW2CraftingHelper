@@ -171,6 +171,14 @@ namespace GW2CraftingHelper.Services
         internal const string UnpricedTooltipSuffix =
             "\nSome items in this plan could not be priced and count as 0, so this figure is a floor rather than a measured total.";
 
+        // The profit band is the one part of this section that still
+        // disappears on an unpriced zero (see BuildProfitFormulaBand for
+        // why its tiles cannot honestly render at 0). Missing cells with
+        // nothing accounting for them are the complaint the marker above
+        // exists to answer, so the absence gets its own sentence.
+        internal const string ProfitSuppressedFootnoteText =
+            "Sell Value and Profit if Sold are hidden here - with materials at 0, the profit shown would be the whole sale price.";
+
         // Distinct caption for Band 2's middle tile in a multi-item batch
         // (see BuildProfitFormulaBand): two identically-captioned tiles
         // showing different numbers reads as a bug, not a scoping nuance.
@@ -216,6 +224,18 @@ namespace GW2CraftingHelper.Services
                     RowType = PlanRowType.SummaryFootnote,
                     Label = UnpricedFootnoteText
                 });
+
+                // Same condition BuildProfitFormulaBand returns on, so the
+                // note appears exactly when a band the plan would otherwise
+                // have shown is missing.
+                if (result.NetSaleValue.HasValue)
+                {
+                    section.Rows.Add(new PlanRowViewModel
+                    {
+                        RowType = PlanRowType.SummaryFootnote,
+                        Label = ProfitSuppressedFootnoteText
+                    });
+                }
             }
 
             // A single subdued footnote, always present, at the very
@@ -411,9 +431,11 @@ namespace GW2CraftingHelper.Services
             // its tiles would not be zeros. An unmeasured 0 materials
             // value here produces "Profit if Sold" equal to the ENTIRE
             // sale price - a large, confident, invented number, which no
-            // footnote makes safe. Plans with a real nonzero cost keep the
-            // band even when some node is unpriced (the pre-existing
-            // partial-pricing behavior, out of this round's scope).
+            // footnote makes safe. The absence is stated instead, by
+            // ProfitSuppressedFootnoteText. Plans with a real nonzero cost
+            // keep the band even when some node is unpriced (the
+            // pre-existing partial-pricing behavior, out of this round's
+            // scope).
             if (unpricedZero)
             {
                 return;
