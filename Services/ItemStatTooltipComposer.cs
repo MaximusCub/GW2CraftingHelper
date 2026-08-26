@@ -260,13 +260,11 @@ namespace GW2CraftingHelper.Services
 
         private static void AppendNourishment(TooltipContentBuilder builder, ItemStatBlock stats)
         {
-            // WHITE, not the upgrade-bonus blue: steak.png's two
-            // nourishment bands measure (252,254,253) and (252,255,255),
-            // the same white as "Food" and "Required Level: 10" on that
-            // capture. It is details.description - the very field this
-            // renders - so the measurement is of this line, not of a
-            // neighbour. The blue is measured on RUNE and SIGIL bonuses
-            // only (Rune_effects_*.jpg).
+            // The first line is WHITE, the trailing effect lines GREY
+            // (~162): measured on the allspice capture (fidelity-audit F7,
+            // one modern JPEG, but the 162-vs-240 gap is unambiguous). Not
+            // the upgrade-bonus blue in any case - that is measured on
+            // rune and sigil bonuses only.
             //
             // Ascended food returns details:{type:Food} and nothing else
             // (measured on 91805). Silence, not a "no effect data" marker:
@@ -274,7 +272,19 @@ namespace GW2CraftingHelper.Services
             // would be the one thing this module never does.
             if (!string.IsNullOrEmpty(stats.NourishmentDescription))
             {
-                builder.Text(stats.NourishmentDescription).EndLine();
+                string description = stats.NourishmentDescription
+                    .Replace("\r\n", "\n").Replace('\r', '\n');
+                int firstBreak = description.IndexOf('\n');
+                if (firstBreak < 0)
+                {
+                    builder.Text(description).EndLine();
+                }
+                else
+                {
+                    builder.Text(description.Substring(0, firstBreak)).EndLine();
+                    builder.Styled(
+                        description.Substring(firstBreak + 1), TooltipSpanRole.Muted).EndLine();
+                }
             }
 
             if (stats.NourishmentDurationMs.HasValue && stats.NourishmentDurationMs.Value > 0)
