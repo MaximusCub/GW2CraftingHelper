@@ -302,7 +302,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                             153
 Views/SettingsTabContent.cs                                                                2611
 Views/SuggestionPanel.cs                                                                   489
-Views/ViewAdapter.cs                                                                       90
+Views/ViewAdapter.cs                                                                       133
 tests/GW2CraftingHelper.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                        122
 tests/GW2CraftingHelper.Tests/Helpers/CapturingProgress.cs                                 22
 tests/GW2CraftingHelper.Tests/Helpers/CraftingPlanResultBuilders.cs                        94
