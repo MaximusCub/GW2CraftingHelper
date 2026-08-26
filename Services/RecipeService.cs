@@ -419,6 +419,19 @@ namespace GW2CraftingHelper.Services
             return node;
         }
 
+        /// <summary>
+        /// Drops one item's session-cached search row, so a corpus repair
+        /// landing mid-session (RecipeCorpusVerifier) is visible to later
+        /// builds instead of shadowed by the L0 memo for the whole session.
+        /// </summary>
+        public void InvalidateSearch(int outputItemId)
+        {
+            lock (_cacheGate)
+            {
+                _searchCache.Remove(outputItemId);
+            }
+        }
+
         private async Task<IReadOnlyList<int>> SearchByOutputCachedAsync(int itemId, CancellationToken ct)
         {
             lock (_cacheGate)

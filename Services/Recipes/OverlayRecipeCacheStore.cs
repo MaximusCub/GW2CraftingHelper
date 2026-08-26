@@ -279,6 +279,18 @@ namespace GW2CraftingHelper.Services.Recipes
             }
         }
 
+        /// <summary>
+        /// A snapshot of the recipe ids the overlay holds, for the corpus
+        /// diff; copied under the lock because the overlay mutates.
+        /// </summary>
+        public List<int> GetRecipeIds()
+        {
+            lock (_gate)
+            {
+                return new List<int>(_recipes.Keys);
+            }
+        }
+
         public IReadOnlyList<int> TryGetSearch(int outputItemId)
         {
             lock (_gate)

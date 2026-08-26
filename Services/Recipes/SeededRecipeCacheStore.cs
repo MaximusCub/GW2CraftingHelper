@@ -30,6 +30,12 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public int SearchRowCount => _searches.Count;
 
+        /// <summary>
+        /// Read-only after load (the seed maps never mutate once startup
+        /// finishes), so handing out the key collection is safe.
+        /// </summary>
+        public IEnumerable<int> RecipeIds => _recipes.Keys;
+
         public int? SeedBuildId => _seedBuildId;
 
         public int? CurrentBuildId

@@ -183,9 +183,20 @@ namespace GW2CraftingHelper
         // comment for the race that shape allowed.
         private readonly SnapshotRefreshSlot _refreshSlot = new SnapshotRefreshSlot();
 
-        // Cancels the background /v2/build lookup, which retries across
-        // several seconds and holds _httpClient - Unload disposes that.
+        // Cancels the background /v2/build lookup and the corpus probe
+        // behind it - both retry/run across several seconds and hold
+        // _httpClient, which Unload disposes.
         private readonly CancellationTokenSource _buildIdCts = new CancellationTokenSource();
+
+        // The corpus probe (RecipeCorpusVerifier): one id-list request per
+        // game build, run in the background and retried at the start of a
+        // generation when an earlier attempt failed. _corpusProbeRunning
+        // keeps at most one in flight; _liveGw2BuildId is 0 until the
+        // /v2/build fetch lands (no probe can run without it).
+        private CompositeRecipeCacheStore _recipeCacheStore;
+        private RecipeCorpusVerifier _recipeCorpusVerifier;
+        private int _liveGw2BuildId;
+        private int _corpusProbeRunning;
 
         // Bumped only by ClearCache; a
         // fetch that captured an older epoch before starting must discard
@@ -483,9 +494,18 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Info, "startup", $"Recipe overlay migration: dropped {recipeOverlay.DroppedLearnedNegatives} learned negative row(s); learned positives kept.");
             }
 
-            // Async build ID fetch: stamps provenance and (once known)
-            // licenses the corpus verification - never a wipe. The overlay
-            // is already loaded and serving above.
+            // Composite + service built before the build-id task below so
+            // the probe it kicks can repair the store and invalidate the
+            // service's session memo.
+            var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
+            _recipeCacheStore = recipeCacheStore;
+            var recipeService = new RecipeService(recipeApi, cacheStore: recipeCacheStore);
+            _recipeCorpusVerifier = new RecipeCorpusVerifier(
+                _httpClient, recipeCacheStore, recipeService.InvalidateSearch);
+
+            // Async build ID fetch: stamps provenance and licenses the
+            // corpus probe - never a wipe. The overlay is already loaded
+            // and serving above.
             var buildApi = new Gw2BuildApiClient(_httpClient);
             Task.Run(async () =>
             {
@@ -508,6 +528,9 @@ namespace GW2CraftingHelper
 
                     recipeOverlay.SetCurrentBuildId(build.BuildId.Value);
                     recipeSeed.SetCurrentBuildId(build.BuildId.Value);
+
+                    Volatile.Write(ref _liveGw2BuildId, build.BuildId.Value);
+                    KickCorpusVerification();
                 }
                 catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
                 {
@@ -515,8 +538,6 @@ namespace GW2CraftingHelper
                     // _httpClient disposed before this task can finish.
                 }
             });
-
-            var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
 
             // Hoisted out of the pipeline's argument list so the plan view
             // can read its session item-stat cache for tooltips - the same
@@ -528,7 +549,7 @@ namespace GW2CraftingHelper
                 new Gw2AccountRecipeClient(Gw2ApiManager));
 
             _craftingPipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi, cacheStore: recipeCacheStore),
+                recipeService,
                 new TradingPostService(priceApi),
                 new PlanSolver(),
                 itemMetadataService,
@@ -542,6 +563,68 @@ namespace GW2CraftingHelper
                 activeFestivalNames: ReadActiveFestivalNames);
 
             return itemMetadataService;
+        }
+
+        /// <summary>
+        /// Runs the corpus probe in the background: one /v2/recipes id-list
+        /// request per game build, the license for serving derived
+        /// negatives as exact (see RecipeCorpusVerifier). Never awaited by
+        /// plan generation. A no-op while the live build is unknown, while
+        /// a probe is already in flight, or - via the verifier's own
+        /// manifest cheap-out - when this build and corpus are already
+        /// verified (0 requests on a same-patch relaunch).
+        /// </summary>
+        private void KickCorpusVerification()
+        {
+            int buildId = Volatile.Read(ref _liveGw2BuildId);
+            var store = _recipeCacheStore;
+            var verifier = _recipeCorpusVerifier;
+            if (buildId == 0 || store == null || verifier == null)
+            {
+                return;
+            }
+
+            if (store.NegativesVerifiedBuildId == buildId)
+            {
+                // Cheapest exit for the by-far-common case; the verifier
+                // re-checks with the corpus count for the seed-swap case.
+                if (store.VerifiedKnownRecipeCount == store.GetKnownPositiveRecipeIds().Count)
+                {
+                    return;
+                }
+            }
+
+            if (Interlocked.CompareExchange(ref _corpusProbeRunning, 1, 0) != 0)
+            {
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var result = await verifier.VerifyAsync(
+                        buildId, store.GetKnownPositiveRecipeIds(), _buildIdCts.Token);
+                    switch (result.Status)
+                    {
+                        case CorpusVerificationStatus.Verified:
+                            ModuleLog.Shared.Write(ModuleLogLevel.Info, "startup", $"Recipe corpus verified at build {buildId}: {result.AddedRecipeIds.Count} recipe(s) added, {result.RemovedRecipeIds.Count} removed.");
+                            break;
+                        case CorpusVerificationStatus.Failed:
+                            ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe corpus verification failed ({result.Error?.GetType().Name} - {result.Error?.Message}); recipes added since build {store.NegativesVerifiedBuildId} may show as UNKNOWN. Retrying at the next plan generation.");
+                            break;
+                    }
+                }
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
+                {
+                    // Unloaded mid-probe: _buildIdCts is cancelled and
+                    // _httpClient disposed before this task can finish.
+                }
+                finally
+                {
+                    Volatile.Write(ref _corpusProbeRunning, 0);
+                }
+            });
         }
 
         /// <summary>
@@ -844,6 +927,11 @@ namespace GW2CraftingHelper
             string requestLabel,
             CancellationToken lifetimeToken)
         {
+            // The corpus probe retries here when its startup run failed
+            // (offline launch): fire-and-forget, a no-op when already
+            // verified, never awaited by the generation itself.
+            KickCorpusVerification();
+
             string activeChar = null;
             try
             {

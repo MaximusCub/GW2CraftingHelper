@@ -74,7 +74,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                               35
 Models/VendorOffer.cs                                                                      57
 Models/VendorOfferDataset.cs                                                               15
-Module.cs                                                                                  1908
+Module.cs                                                                                  1995
 Properties/AssemblyInfo.cs                                                                 12
 Services/AboutLayoutMath.cs                                                                163
 Services/AccountCurrencyIndex.cs                                                           44
@@ -106,7 +106,7 @@ Services/Gw2AccountRecipeClient.cs                                              
 Services/Gw2AccountSnapshotService.cs                                                      461
 Services/Gw2ItemApiClient.cs                                                               199
 Services/Gw2PriceApiClient.cs                                                              66
-Services/Gw2RecipeApiClient.cs                                                             152
+Services/Gw2RecipeApiClient.cs                                                             203
 Services/HeaderCellMath.cs                                                                 135
 Services/IAccountRecipeClient.cs                                                           13
 Services/IItemApiClient.cs                                                                 126
@@ -157,16 +157,17 @@ Services/PlanViewModelBuilder.cs                                                
 Services/ReceiptCaptionHelper.cs                                                           106
 Services/RecipeClientFactory.cs                                                            66
 Services/RecipeNodeIds.cs                                                                  45
-Services/RecipeService.cs                                                                  543
+Services/RecipeService.cs                                                                  556
 Services/RecipeSheetItemSeedService.cs                                                     78
 Services/RecipeSheetSavingsCalculator.cs                                                   321
-Services/Recipes/CompositeRecipeCacheStore.cs                                              121
+Services/Recipes/CompositeRecipeCacheStore.cs                                              192
 Services/Recipes/IRecipeCacheStore.cs                                                      44
 Services/Recipes/InMemoryRecipeCacheStore.cs                                               56
 Services/Recipes/ItemNameSeedData.cs                                                       56
-Services/Recipes/OverlayRecipeCacheStore.cs                                                449
+Services/Recipes/OverlayRecipeCacheStore.cs                                                461
 Services/Recipes/RecipeCacheSerializer.cs                                                  233
-Services/Recipes/SeededRecipeCacheStore.cs                                                 209
+Services/Recipes/RecipeCorpusVerifier.cs                                                   257
+Services/Recipes/SeededRecipeCacheStore.cs                                                 215
 Services/RecipesColumnMath.cs                                                              79
 Services/RequestLabelFormatter.cs                                                          63
 Services/RequiredRecipesVisibility.cs                                                      99
@@ -424,7 +425,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs 
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSublabelTests.cs                264
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSummaryTests.cs                 1181
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                        124
-tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            921
+tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            950
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                         143
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceConcurrencyTests.cs                    226
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               947
@@ -432,6 +433,7 @@ tests/GW2CraftingHelper.Tests/Services/RecipeSheetItemSeedServiceTests.cs       
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetSavingsCalculatorTests.cs                606
 tests/GW2CraftingHelper.Tests/Services/Recipes/ItemNameSeedDataTests.cs                    102
 tests/GW2CraftingHelper.Tests/Services/Recipes/RecipeCacheSerializerTests.cs               227
+tests/GW2CraftingHelper.Tests/Services/Recipes/RecipeCorpusVerifierTests.cs                362
 tests/GW2CraftingHelper.Tests/Services/Recipes/SeedFinalizeIndexTests.cs                   108
 tests/GW2CraftingHelper.Tests/Services/RecipesColumnMathTests.cs                           84
 tests/GW2CraftingHelper.Tests/Services/RequestLabelFormatterTests.cs                       76

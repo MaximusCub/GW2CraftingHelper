@@ -18,8 +18,12 @@ namespace GW2CraftingHelper.Services
         // rather than "v=latest" so an upstream schema bump can never
         // silently change the ingredient JSON shape for this client;
         // re-pin only alongside a verified review of the new schema's
-        // ingredient shape.
-        private const string SchemaVersion = "2026-08-15";
+        // ingredient shape. Internal so RecipeCorpusVerifier's id-list
+        // request pins the same version instead of duplicating the literal.
+        internal const string SchemaVersion = "2026-08-15";
+
+        // /v2 page cap, the same batch idiom as ItemMetadataService.
+        private const int BatchSize = 200;
 
         private readonly HttpClient _http;
 
@@ -61,6 +65,50 @@ namespace GW2CraftingHelper.Services
             return ParseRecipe(json);
         }
 
+        /// <summary>
+        /// Batched detail fetch via ?ids= for the corpus repair path
+        /// (RecipeCorpusVerifier) - 200 recipes per round trip, versus one
+        /// per round trip on the search path. Ids the API does not know
+        /// are simply absent from the result (a whole-batch 404 means none
+        /// of them exist).
+        /// </summary>
+        public async Task<List<RawRecipe>> GetRecipesAsync(
+            IReadOnlyList<int> recipeIds, CancellationToken ct)
+        {
+            var result = new List<RawRecipe>(recipeIds.Count);
+            for (int offset = 0; offset < recipeIds.Count; offset += BatchSize)
+            {
+                int count = System.Math.Min(BatchSize, recipeIds.Count - offset);
+                var batch = new System.Text.StringBuilder();
+                for (int i = 0; i < count; i++)
+                {
+                    if (i > 0)
+                    {
+                        batch.Append(',');
+                    }
+
+                    batch.Append(recipeIds[offset + i]);
+                }
+
+                var url = $"{BaseUrl}/recipes?ids={batch}&v={SchemaVersion}";
+                string json = await GetJsonAsync(url, ct);
+                if (json == null)
+                {
+                    continue;
+                }
+
+                foreach (var token in JArray.Parse(json))
+                {
+                    if (token is JObject obj)
+                    {
+                        result.Add(ParseRecipe(obj));
+                    }
+                }
+            }
+
+            return result;
+        }
+
         // GetAsync(url, ct) rather than GetStringAsync: net472's
         // GetStringAsync has no CancellationToken overload, which made ct
         // a silent no-op here.
@@ -85,8 +133,11 @@ namespace GW2CraftingHelper.Services
 
         internal static RawRecipe ParseRecipe(string json)
         {
-            var obj = JObject.Parse(json);
+            return ParseRecipe(JObject.Parse(json));
+        }
 
+        internal static RawRecipe ParseRecipe(JObject obj)
+        {
             var recipe = new RawRecipe
             {
                 Id = obj.Value<int>("id"),

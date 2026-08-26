@@ -408,6 +408,35 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // Spec 2.6: the session search memo has no invalidation of its
+        // own, so a corpus repair landing mid-session would stay invisible
+        // for item ids already resolved this session. InvalidateSearch is
+        // the repair path's hook to close that for the repaired items.
+        [Fact]
+        public async Task RecipeService_InvalidateSearch_MakesARepairVisibleMidSession()
+        {
+            var store = new InMemoryRecipeCacheStore();
+            var api = new CountingRecipeApiClient();
+            var service = new RecipeService(api, cacheStore: store);
+
+            var before = await service.BuildTreeAsync(100, 1, CancellationToken.None);
+            Assert.Empty(before.Recipes);
+
+            // The repair: a recipe for item 100 lands in the store.
+            store.PutSearch(100, new List<int> { 1 });
+            store.PutRecipe(1, NewRecipe(1, 100));
+
+            // Without invalidation, the session memo still answers "no
+            // recipe".
+            var shadowed = await service.BuildTreeAsync(100, 1, CancellationToken.None);
+            Assert.Empty(shadowed.Recipes);
+
+            service.InvalidateSearch(100);
+            var repaired = await service.BuildTreeAsync(100, 1, CancellationToken.None);
+            Assert.Single(repaired.Recipes);
+            Assert.Equal(1, repaired.Recipes[0].RecipeId);
+        }
+
         // Seed corpus: recipe 1 makes item 100 from 2x item 200.
         private static SeededRecipeCacheStore NewSeedWithOneRecipe()
         {
