@@ -260,8 +260,8 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                          2795
 Views/ModalBackdrop.cs                                                                     132
 Views/ModalDialog.cs                                                                       398
-Views/PlanHistoryTabContent.cs                                                             1205
-Views/RankerTabContent.cs                                                                  1777
+Views/PlanHistoryTabContent.cs                                                             1215
+Views/RankerTabContent.cs                                                                  1796
 Views/Rendering/ClickSound.cs                                                              197
 Views/Rendering/CoinCurrencyRenderer.cs                                                    564
 Views/Rendering/ColumnHeaderRowRenderer.cs                                                 184
@@ -302,7 +302,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                             153
 Views/SettingsTabContent.cs                                                                2611
 Views/SuggestionPanel.cs                                                                   489
-Views/ViewAdapter.cs                                                                       90
+Views/ViewAdapter.cs                                                                       133
 tests/GW2CraftingHelper.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                        122
 tests/GW2CraftingHelper.Tests/Helpers/CapturingProgress.cs                                 22
 tests/GW2CraftingHelper.Tests/Helpers/CraftingPlanResultBuilders.cs                        94
@@ -545,7 +545,7 @@ tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs            
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                   365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                                 100
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                       610
-tools/GW2CraftingHelper.Harness/Program.cs                                                 726
+tools/GW2CraftingHelper.Harness/Program.cs                                                 861
 tools/GW2CraftingHelper.RecipeSeeder/Program.cs                                            697
 tools/MysticForgeSeeder/Program.cs                                                         521
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                                526

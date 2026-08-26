@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
@@ -382,7 +383,16 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _contentPanel.ClearChildren();
+            // Dispose, not ClearChildren: ClearChildren only detaches
+            // (docs/ARCHITECTURE.md), so every rebuild - which fires on
+            // every tab switch and after every capture - would orphan up
+            // to PlanHistoryMaxEntries row trees to the GC undisposed.
+            // Same idiom as RichTooltipSurface.DisposeContent.
+            foreach (var child in _contentPanel.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
             _rows.Clear();
 
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
