@@ -31,6 +31,14 @@ namespace GW2CraftingHelper.Services.Recipes
 
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
+        private int _negativesVerifiedBuildId;
+        private int _verifiedKnownRecipeCount;
+        private int _droppedLearnedNegatives;
+
+        // The overlay manifest's schema. 1 stored learned negatives (empty
+        // search rows); 2 stores positives only and carries the
+        // corpus-verification stamp.
+        private const int SchemaVersion = 2;
 
         // See StatusStore's
         // matching field comment.
@@ -39,6 +47,48 @@ namespace GW2CraftingHelper.Services.Recipes
         private static readonly TimeSpan FlushDebounce = TimeSpan.FromSeconds(2);
 
         public RecipeCacheStats Stats => _stats;
+
+        /// <summary>
+        /// The game build the corpus was last verified against, off the
+        /// manifest; 0 = never. See RecipeOverlayManifest.
+        /// </summary>
+        public int NegativesVerifiedBuildId
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _negativesVerifiedBuildId;
+                }
+            }
+        }
+
+        public int VerifiedKnownRecipeCount
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _verifiedKnownRecipeCount;
+                }
+            }
+        }
+
+        /// <summary>
+        /// How many v1 learned-negative (empty) rows the last
+        /// <see cref="Load"/> dropped - exposed so Module.cs can log the
+        /// one-time migration once at Info.
+        /// </summary>
+        public int DroppedLearnedNegatives
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _droppedLearnedNegatives;
+                }
+            }
+        }
 
         private bool IsDirty => _searchesDirty || _recipesDirty || _stampDirty;
 
@@ -72,6 +122,9 @@ namespace GW2CraftingHelper.Services.Recipes
                 _searches = new Dictionary<int, IReadOnlyList<int>>();
                 _recipes = new Dictionary<int, RawRecipe>();
                 _storedBuildId = null;
+                _negativesVerifiedBuildId = 0;
+                _verifiedKnownRecipeCount = 0;
+                _droppedLearnedNegatives = 0;
 
                 if (!Directory.Exists(_cacheDir))
                 {
@@ -87,6 +140,8 @@ namespace GW2CraftingHelper.Services.Recipes
                             var manifest = RecipeCacheSerializer
                                 .LoadManifest<RecipeOverlayManifest>(fs);
                             _storedBuildId = manifest.Gw2BuildId;
+                            _negativesVerifiedBuildId = manifest.NegativesVerifiedBuildId;
+                            _verifiedKnownRecipeCount = manifest.VerifiedKnownRecipeCount;
                         }
                     }
                     catch (Exception ex)
@@ -96,6 +151,44 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 LoadOverlayFilesLocked();
+                FinalizeOverlayLocked();
+            }
+        }
+
+        // SeededRecipeCacheStore.FinalizeIndex's pass over the overlay's own
+        // contents, doubling as the v1 migration: learned positive rows and
+        // recipes carry over whatever build stamped them, v1 learned-negative
+        // (empty) rows are dropped unconditionally - the one-time cleanup
+        // that removes any already-poisoned negative from disk - and any
+        // change is marked dirty so the next flush rewrites the file, at
+        // which point PersistLocked stamps the manifest at schema 2.
+        private void FinalizeOverlayLocked()
+        {
+            bool changed = false;
+            foreach (var recipe in _recipes.Values)
+            {
+                changed |= SeededRecipeCacheStore.AddRecipeIdToRow(
+                    _searches, recipe.OutputItemId, recipe.Id);
+            }
+
+            var emptyRows = new List<int>();
+            foreach (var entry in _searches)
+            {
+                if (entry.Value.Count == 0)
+                {
+                    emptyRows.Add(entry.Key);
+                }
+            }
+
+            foreach (int key in emptyRows)
+            {
+                _searches.Remove(key);
+            }
+
+            _droppedLearnedNegatives = emptyRows.Count;
+            if (changed || emptyRows.Count > 0)
+            {
+                _searchesDirty = true;
             }
         }
 
@@ -160,6 +253,28 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 _storedBuildId = buildId;
+                _stampDirty = true;
+            }
+        }
+
+        /// <summary>
+        /// Records a successful corpus verification: the manifest written
+        /// by the next flush says derived negatives are exact at this build
+        /// for this corpus size. A no-op when both values already match, so
+        /// a relaunch inside the same patch stays write-free.
+        /// </summary>
+        public void SetCorpusVerified(int buildId, int knownRecipeCount)
+        {
+            lock (_gate)
+            {
+                if (_negativesVerifiedBuildId == buildId
+                    && _verifiedKnownRecipeCount == knownRecipeCount)
+                {
+                    return;
+                }
+
+                _negativesVerifiedBuildId = buildId;
+                _verifiedKnownRecipeCount = knownRecipeCount;
                 _stampDirty = true;
             }
         }
@@ -261,7 +376,10 @@ namespace GW2CraftingHelper.Services.Recipes
                 // line in the Log tab is poorer for it.
                 var manifest = new RecipeOverlayManifest
                 {
+                    SchemaVersion = SchemaVersion,
                     Gw2BuildId = _storedBuildId ?? 0,
+                    NegativesVerifiedBuildId = _negativesVerifiedBuildId,
+                    VerifiedKnownRecipeCount = _verifiedKnownRecipeCount,
                     UpdatedUtc = DateTime.UtcNow.ToString("o"),
                 };
                 string manifestJson = RecipeCacheSerializer.SerializeManifest(manifest);

@@ -504,13 +504,18 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(leafSearch);
         }
 
-        // An item the search endpoint genuinely has no recipe for is worth
-        // remembering across sessions: without a persisted negative row every
-        // raw material in a plan costs a live search on every launch. This
-        // pins that optimization so a later change to what gets persisted
-        // cannot quietly drop it.
+        // POLICY CHANGE: evolved from
+        // RecipeService_ProvenEmptySearch_IsServedFromDisk_NextSession,
+        // which pinned the learned-negative optimization - an API-answered
+        // empty search persisted to the overlay and served across sessions.
+        // The live search endpoint demonstrably lies (15 real craftable
+        // items return an empty search while their recipe is fetchable by
+        // id), so a persisted empty row is a poisoned fact; the migration
+        // pass drops every one at the next load. Cross-session "no recipe"
+        // answers now come from the corpus derivation in
+        // CompositeRecipeCacheStore instead of from disk.
         [Fact]
-        public async Task RecipeService_ProvenEmptySearch_IsServedFromDisk_NextSession()
+        public async Task RecipeService_ProvenEmptySearch_DoesNotSurviveAcrossSessions()
         {
             using (var tmp = new TempDirectory())
             {
@@ -535,12 +540,92 @@ namespace GW2CraftingHelper.Tests.Services
                 overlay2.Load();
                 overlay2.SetCurrentBuildId(buildId);
 
+                // The empty row did not carry over; a bare overlay (no seed
+                // corpus to derive from) asks the endpoint again.
+                Assert.Null(overlay2.TryGetSearch(100));
+
                 var api2 = new CountingRecipeApiClient();
                 var tree2 = await new RecipeService(api2, cacheStore: overlay2)
                     .BuildTreeAsync(100, 1, CancellationToken.None);
 
                 Assert.Empty(tree2.Recipes);
-                Assert.Equal(0, api2.SearchCallCount);
+                Assert.Equal(1, api2.SearchCallCount);
+            }
+        }
+
+        // The v1 -> v2 overlay migration, against files written byte-for-
+        // byte in the v1 shape (learned negatives included, manifest with
+        // the old two fields and the never-stamped gw2BuildId: 0 defect):
+        // positive search rows and recipes carry over whatever the stored
+        // build id, empty rows are dropped unconditionally, a recipe whose
+        // output lost its row is re-indexed, and the reflushed manifest
+        // reads back at schemaVersion 2 with the verification fields.
+        [Fact]
+        public void Overlay_V1Migration_KeepsPositives_DropsNegatives_RewritesManifestAtSchema2()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+                Directory.CreateDirectory(cacheDir);
+
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "search_overlay.json"),
+                    "{\"schemaVersion\":1,\"searches\":{" +
+                    "\"100\":[1],\"200\":[],\"300\":[2],\"400\":[]}}",
+                    Encoding.UTF8);
+
+                // Recipe 5 outputs item 500, which has NO search row - the
+                // fill half of the pass must repair that.
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "recipes_overlay.json"),
+                    "{\"schemaVersion\":1,\"recipes\":[" +
+                    "{\"id\":1,\"outputItemId\":100,\"outputItemCount\":1," +
+                    "\"minRating\":0,\"ingredients\":[],\"disciplines\":[],\"flags\":[]}," +
+                    "{\"id\":5,\"outputItemId\":500,\"outputItemCount\":1," +
+                    "\"minRating\":0,\"ingredients\":[],\"disciplines\":[],\"flags\":[]}]}",
+                    Encoding.UTF8);
+
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "overlay_manifest.json"),
+                    "{\"gw2BuildId\":0,\"updatedUtc\":\"2026-01-01T00:00:00Z\"}",
+                    Encoding.UTF8);
+
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load();
+
+                // Positives carried over; learned negatives are gone (null,
+                // not an empty list); the rowless output was re-indexed.
+                Assert.Equal(new[] { 1 }, overlay.TryGetSearch(100));
+                Assert.Equal(new[] { 2 }, overlay.TryGetSearch(300));
+                Assert.Null(overlay.TryGetSearch(200));
+                Assert.Null(overlay.TryGetSearch(400));
+                Assert.Equal(new[] { 5 }, overlay.TryGetSearch(500));
+                Assert.NotNull(overlay.TryGetRecipe(1));
+                Assert.NotNull(overlay.TryGetRecipe(5));
+                Assert.Equal(2, overlay.DroppedLearnedNegatives);
+
+                // The migration marked the store dirty, so the cleanup and
+                // the schema bump land on the next flush without any new
+                // learning happening first.
+                overlay.Flush(force: true);
+
+                RecipeOverlayManifest manifest;
+                using (var fs = File.OpenRead(Path.Combine(cacheDir, "overlay_manifest.json")))
+                {
+                    manifest = RecipeCacheSerializer.LoadManifest<RecipeOverlayManifest>(fs);
+                }
+
+                Assert.Equal(2, manifest.SchemaVersion);
+                Assert.Equal(0, manifest.Gw2BuildId);
+                Assert.Equal(0, manifest.NegativesVerifiedBuildId);
+                Assert.Equal(0, manifest.VerifiedKnownRecipeCount);
+
+                // A second load sees the migrated file: nothing left to drop.
+                var reloaded = new OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load();
+                Assert.Equal(0, reloaded.DroppedLearnedNegatives);
+                Assert.Equal(new[] { 1 }, reloaded.TryGetSearch(100));
+                Assert.Null(reloaded.TryGetSearch(200));
             }
         }
 

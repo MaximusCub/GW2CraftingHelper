@@ -476,6 +476,12 @@ namespace GW2CraftingHelper
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             _recipeOverlay = recipeOverlay;
             recipeOverlay.Load();
+            if (recipeOverlay.DroppedLearnedNegatives > 0)
+            {
+                // The one-time v1 migration, logged so a support report can
+                // show it happened.
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "startup", $"Recipe overlay migration: dropped {recipeOverlay.DroppedLearnedNegatives} learned negative row(s); learned positives kept.");
+            }
 
             // Async build ID fetch: stamps provenance and (once known)
             // licenses the corpus verification - never a wipe. The overlay

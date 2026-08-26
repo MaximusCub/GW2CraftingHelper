@@ -124,24 +124,27 @@ namespace GW2CraftingHelper.Services.Recipes
             }
         }
 
-        private static void AddRecipeIdToRow(
+        // Shared with OverlayRecipeCacheStore's own index pass rather than
+        // duplicated there.
+        internal static bool AddRecipeIdToRow(
             Dictionary<int, IReadOnlyList<int>> searches, int outputItemId, int recipeId)
         {
             if (!searches.TryGetValue(outputItemId, out var existing))
             {
                 searches[outputItemId] = new List<int> { recipeId };
-                return;
+                return true;
             }
 
             if (existing.Contains(recipeId))
             {
-                return;
+                return false;
             }
 
             var merged = new List<int>(existing.Count + 1);
             merged.AddRange(existing);
             merged.Add(recipeId);
             searches[outputItemId] = merged;
+            return true;
         }
 
         public void LoadManifest(Stream manifestStream)

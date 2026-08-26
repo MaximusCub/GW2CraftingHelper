@@ -164,9 +164,9 @@ Services/Recipes/CompositeRecipeCacheStore.cs                                   
 Services/Recipes/IRecipeCacheStore.cs                                                      44
 Services/Recipes/InMemoryRecipeCacheStore.cs                                               56
 Services/Recipes/ItemNameSeedData.cs                                                       56
-Services/Recipes/OverlayRecipeCacheStore.cs                                                424
-Services/Recipes/RecipeCacheSerializer.cs                                                  213
-Services/Recipes/SeededRecipeCacheStore.cs                                                 206
+Services/Recipes/OverlayRecipeCacheStore.cs                                                441
+Services/Recipes/RecipeCacheSerializer.cs                                                  233
+Services/Recipes/SeededRecipeCacheStore.cs                                                 209
 Services/RecipesColumnMath.cs                                                              79
 Services/RequestLabelFormatter.cs                                                          63
 Services/RequiredRecipesVisibility.cs                                                      99
@@ -424,7 +424,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs 
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSublabelTests.cs                264
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSummaryTests.cs                 1181
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                        124
-tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            782
+tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            797
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                         143
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceConcurrencyTests.cs                    226
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               947
