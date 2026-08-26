@@ -337,10 +337,13 @@ namespace GW2CraftingHelper.Services
                 identity.Text(SpaceCamelCase(type) + (isArmor ? " Armor" : "")).EndLine();
             }
 
+            // Grey, not white: "(Two-Handed)" measures (160,161,162) on
+            // live/eq-weapon-full.png (2026-08-25, lossless), same grey as
+            // the game's other parentheticals.
             string hand = WeaponHand(stats);
             if (hand != null)
             {
-                identity.Text(hand).EndLine();
+                identity.Styled(hand, TooltipSpanRole.Muted).EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.DamageType))

@@ -477,10 +477,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Reminder:
                     return new Color(175, 175, 175);
 
-                // Genuine secondary annotations only ("0/500 in Material
-                // Storage", measured #939496). The identity block is white.
+                // Secondary annotations and parentheticals. Lifted from
+                // 150 (the older #939496 "0/500 in Material Storage"
+                // measurement) to the 2026-08-25 live captures' grey:
+                // "(Two-Handed)" reads (160,161,162) and "(Cooldown: N
+                // Seconds)" (160,161,161) on eq-weapon-full, lossless.
                 case TooltipSpanRole.Muted:
-                    return new Color(150, 150, 150);
+                    return new Color(160, 160, 160);
 
                 default:
                     return Color.White;

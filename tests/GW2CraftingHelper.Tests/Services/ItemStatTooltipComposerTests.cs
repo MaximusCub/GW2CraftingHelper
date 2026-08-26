@@ -442,6 +442,21 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task TheHandLineIsMutedGreyNotWhite()
+        {
+            // "(Two-Handed)" measures (160,161,162) on
+            // live/eq-weapon-full.png (2026-08-25, lossless) - the game's
+            // parenthetical grey, not white.
+            var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.Bolt);
+            var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
+
+            var hand = content.Lines
+                .SelectMany(l => l.Spans)
+                .Single(s => s.Text == "(Main Hand)");
+            Assert.Equal(TooltipSpanRole.Muted, hand.Role);
+        }
+
+        [Fact]
         public void AnItemWithNoIconStillOpensWithAHeaderThatDrawsTheEmptySlotSquare()
         {
             var content = ItemStatTooltipComposer.BuildContent(
