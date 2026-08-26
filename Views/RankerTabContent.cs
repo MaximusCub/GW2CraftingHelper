@@ -568,7 +568,17 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _contentPanel.ClearChildren();
+            // Dispose, not ClearChildren: ClearChildren only detaches
+            // (docs/ARCHITECTURE.md - "a tab switch detaches, it does not
+            // dispose"), leaving every orphaned row tree to the GC and any
+            // control type that hooks a static event in its constructor
+            // (TrackBar does) rooted forever. Same idiom as
+            // RichTooltipSurface.DisposeContent.
+            foreach (var child in _contentPanel.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
             _rows.Clear();
             _bannerPanel = null;
             _bannerLabel = null;
@@ -743,7 +753,16 @@ namespace GW2CraftingHelper.Views
 
         private void RenderRowContent(RenderedRow row, RankerWatchlistEntry entry, int barWidth)
         {
-            row.Panel.ClearChildren();
+            // Dispose, not ClearChildren - see RebuildRows. This runs per
+            // row per band-width recompute (a Refresh over a full
+            // watchlist re-renders every row at least once, often twice),
+            // so a detach-only clear orphans hundreds of controls per
+            // click.
+            foreach (var child in row.Panel.Children.ToArray())
+            {
+                child.Dispose();
+            }
+
             row.GateNameLabels.Clear();
             row.GateValueLabels.Clear();
             row.CurrencyNameLabels.Clear();
