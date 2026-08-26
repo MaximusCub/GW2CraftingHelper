@@ -16,18 +16,6 @@ namespace GW2CraftingHelper.Tests.Services
         private static CraftingPlanPipeline BuildVendorCurrencyPipeline(
             out VendorOfferStore store, string tempDir)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            // No recipe for item 1, and (deliberately) no TP price either -
-            // a vendor-only purchase. The offer's karma cost line is never
-            // valued (no CurrencyValuation passed below), so it can only
-            // win via the "fallback" tier (PlanSolver's last-resort branch
-            // when nothing coin-priceable/craftable exists at all) - giving
-            // it a TP price here would make TP win outright instead.
-            var priceApi = new InMemoryPriceApiClient();
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Karma Item", "karma.png");
-
             var loader = new VendorOfferLoader();
             store = new VendorOfferStore(tempDir, loader);
             store.LoadBaseline(null);
@@ -47,13 +35,17 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             });
 
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                store,
-                reducer: new InventoryReducer());
+            // No recipe for item 1, and (deliberately) no TP price either -
+            // a vendor-only purchase. The offer's karma cost line is never
+            // valued (no CurrencyValuation passed below), so it can only
+            // win via the "fallback" tier (PlanSolver's last-resort branch
+            // when nothing coin-priceable/craftable exists at all) - giving
+            // it a TP price here would make TP win outright instead.
+            return PipelineBuilder.Create()
+                .WithItem(1, "Karma Item", "karma.png")
+                .WithVendorOfferStore(store)
+                .WithInventoryReducer()
+                .Build();
         }
 
         [Fact]

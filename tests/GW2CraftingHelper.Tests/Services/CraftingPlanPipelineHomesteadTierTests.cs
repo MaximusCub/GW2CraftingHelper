@@ -19,17 +19,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_NoHomesteadTiersArgument_ContextDefaultsToTierZero()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Item", "icon.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Item", "icon.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -46,12 +39,6 @@ namespace GW2CraftingHelper.Tests.Services
             using (var tmp = new TempDirectory())
             {
                 var tempDir = tmp.Path;
-                var recipeApi = new InMemoryRecipeApiClient();
-                var priceApi = new InMemoryPriceApiClient();
-                priceApi.AddPrice(102205, buyUnitPrice: 1000, sellUnitPrice: 1000);
-                var itemApi = new InMemoryItemApiClient();
-                itemApi.AddItem(102205, "Refined Homestead Metal", "icon.png");
-
                 var loader = new VendorOfferLoader();
                 var store = new VendorOfferStore(tempDir, loader);
                 store.LoadBaseline(null);
@@ -85,13 +72,12 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                var pipeline = PipelineBuilder.Create()
+                    .WithPrice(102205, buyUnitPrice: 1000, sellUnitPrice: 1000)
+                    .WithItem(102205, "Refined Homestead Metal", "icon.png")
+                    .WithVendorOfferStore(store)
+                    .WithInventoryReducer()
+                    .Build();
 
                 // Default (no homesteadTiers argument): tier-2 offer excluded,
                 // the far more expensive tier-0 offer is the only candidate.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
@@ -7,79 +8,223 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// <summary>
     /// One definition of what a default test pipeline looks like.
     ///
-    /// The CraftingPlanPipeline* test classes were split out of a single
-    /// 4,719-line file; these fixtures are the ones used from more than one
-    /// of the resulting files, so they live here rather than being copied
-    /// per file. Every method returns a FRESH object graph - nothing is
-    /// cached or shared between calls, so tests never contend.
+    /// The CraftingPlanPipeline* test classes used to be a single 4,719-line
+    /// file that spelled out the same four-service wiring at 58 separate
+    /// construction sites. That wiring lives here now, once: Build() is the
+    /// only place a CraftingPlanPipeline is constructed for those tests, so
+    /// changing what a default test pipeline means is a one-file edit.
+    ///
+    /// The builder wires REAL production objects - RecipeService,
+    /// TradingPostService, PlanSolver, ItemMetadataService over the suite's
+    /// in-memory API clients - never mocks, matching what the tests did
+    /// before the extraction.
+    ///
+    /// Every builder owns its own client graph and every static fixture
+    /// returns a fresh one; nothing is cached or shared between calls, so
+    /// the split test classes never contend when xUnit runs them in
+    /// parallel.
     /// </summary>
-    public static class PipelineBuilder
+    public sealed class PipelineBuilder
     {
+        /// <summary>
+        /// The in-memory clients this builder wires in. Exposed because a
+        /// good number of tests drive them past what the fluent With*
+        /// methods cover - fault injection (ThrowAlways, ThrowOnCallNumber,
+        /// Return404For, DropOnce), the request-batching assertions that
+        /// read Calls, and the gated-response cancellation tests.
+        /// </summary>
+        public InMemoryRecipeApiClient RecipeApi { get; } = new InMemoryRecipeApiClient();
+
+        public InMemoryPriceApiClient PriceApi { get; } = new InMemoryPriceApiClient();
+
+        public InMemoryItemApiClient ItemApi { get; } = new InMemoryItemApiClient();
+
+        private VendorOfferStore _vendorOfferStore;
+        private InventoryReducer _reducer;
+        private IAccountRecipeClient _accountRecipeClient;
+        private CurrencyMetadataService _currencyMetadataService;
+        private IReadOnlyDictionary<int, AcquisitionHint> _acquisitionHints;
+        private ModuleLog _moduleLog;
+        private IReadOnlyDictionary<int, DailyCooldownItem> _dailyCooldownItems;
+        private IReadOnlyDictionary<int, int> _recipeSheetItemIdByRecipeId;
+        private Func<IReadOnlyList<string>> _activeFestivalNames;
+
+        public static PipelineBuilder Create()
+        {
+            return new PipelineBuilder();
+        }
+
+        public PipelineBuilder WithSearchResult(int itemId, params int[] recipeIds)
+        {
+            RecipeApi.AddSearchResult(itemId, recipeIds);
+            return this;
+        }
+
+        public PipelineBuilder WithRecipe(RawRecipe recipe)
+        {
+            RecipeApi.AddRecipe(recipe);
+            return this;
+        }
+
+        public PipelineBuilder WithPrice(int itemId, int buyUnitPrice, int sellUnitPrice)
+        {
+            PriceApi.AddPrice(itemId, buyUnitPrice, sellUnitPrice);
+            return this;
+        }
+
+        public PipelineBuilder WithItem(int id, string name, string icon, string rarity = null, List<string> flags = null)
+        {
+            ItemApi.AddItem(id, name, icon, rarity, flags);
+            return this;
+        }
+
+        public PipelineBuilder WithItem(RawItem item)
+        {
+            ItemApi.AddItem(item);
+            return this;
+        }
+
+        public PipelineBuilder WithVendorOfferStore(VendorOfferStore vendorOfferStore)
+        {
+            _vendorOfferStore = vendorOfferStore;
+            return this;
+        }
+
+        public PipelineBuilder WithReducer(InventoryReducer reducer)
+        {
+            _reducer = reducer;
+            return this;
+        }
+
+        /// <summary>Wires a real InventoryReducer - the owned-materials tests' default.</summary>
+        public PipelineBuilder WithInventoryReducer()
+        {
+            return WithReducer(new InventoryReducer());
+        }
+
+        public PipelineBuilder WithAccountRecipeClient(IAccountRecipeClient accountRecipeClient)
+        {
+            _accountRecipeClient = accountRecipeClient;
+            return this;
+        }
+
+        public PipelineBuilder WithCurrencyMetadataService(CurrencyMetadataService currencyMetadataService)
+        {
+            _currencyMetadataService = currencyMetadataService;
+            return this;
+        }
+
+        public PipelineBuilder WithAcquisitionHints(IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints)
+        {
+            _acquisitionHints = acquisitionHints;
+            return this;
+        }
+
+        public PipelineBuilder WithModuleLog(ModuleLog moduleLog)
+        {
+            _moduleLog = moduleLog;
+            return this;
+        }
+
+        public PipelineBuilder WithDailyCooldownItems(IReadOnlyDictionary<int, DailyCooldownItem> dailyCooldownItems)
+        {
+            _dailyCooldownItems = dailyCooldownItems;
+            return this;
+        }
+
+        public PipelineBuilder WithRecipeSheetItemIds(IReadOnlyDictionary<int, int> recipeSheetItemIdByRecipeId)
+        {
+            _recipeSheetItemIdByRecipeId = recipeSheetItemIdByRecipeId;
+            return this;
+        }
+
+        public PipelineBuilder WithActiveFestivalNames(Func<IReadOnlyList<string>> activeFestivalNames)
+        {
+            _activeFestivalNames = activeFestivalNames;
+            return this;
+        }
+
+        /// <summary>
+        /// The single construction site. Unset optionals are passed as the
+        /// nulls the constructor defaults them to, so a builder that had no
+        /// With* call beyond the clients produces exactly the four-argument
+        /// pipeline the tests used to write out by hand.
+        /// </summary>
+        public CraftingPlanPipeline Build()
+        {
+            return new CraftingPlanPipeline(
+                new RecipeService(RecipeApi),
+                new TradingPostService(PriceApi),
+                new PlanSolver(),
+                new ItemMetadataService(ItemApi),
+                _vendorOfferStore,
+                _reducer,
+                _accountRecipeClient,
+                _currencyMetadataService,
+                _acquisitionHints,
+                _moduleLog,
+                _dailyCooldownItems,
+                _recipeSheetItemIdByRecipeId,
+                _activeFestivalNames);
+        }
+
+        /// <summary>
+        /// The suite's canonical craft tree: item 1 &lt;- recipe 10 &lt;-
+        /// <paramref name="ingredientCount"/>x item 2, Weaponsmith 400,
+        /// AutoLearned. Deliberately priceless - each caller adds the prices
+        /// its own scenario turns on.
+        /// </summary>
+        public static PipelineBuilder SingleRecipeTree(int ingredientCount)
+        {
+            return Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Ingredient", "i.png");
+        }
+
+        /// <summary>
+        /// SingleRecipeTree with 3x the ingredient and no reducer - the
+        /// sell-side economics fixture, used from the economics, progress-
+        /// logging and advisory-annotation test classes.
+        /// </summary>
         public static CraftingPlanPipeline BuildEconomicsPipeline(
             out InMemoryPriceApiClient priceApi)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            priceApi = new InMemoryPriceApiClient();
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var builder = SingleRecipeTree(3);
+            priceApi = builder.PriceApi;
+            return builder.Build();
         }
 
+        /// <summary>
+        /// SingleRecipeTree with a real InventoryReducer - the owned-
+        /// materials fixture, used from the own-materials, ignore, force-buy
+        /// and cancellation test classes.
+        /// </summary>
         public static CraftingPlanPipeline BuildOwnMaterialsPipeline(
             out InMemoryPriceApiClient priceApi, int ingredientCount = 5)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            priceApi = new InMemoryPriceApiClient();
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
+            var builder = SingleRecipeTree(ingredientCount).WithInventoryReducer();
+            priceApi = builder.PriceApi;
+            return builder.Build();
         }
 
+        /// <summary>
+        /// A snapshot owning <paramref name="count"/> of SingleRecipeTree's
+        /// item 2, in material storage.
+        /// </summary>
         public static AccountSnapshot OwnIngredient(int count)
         {
             return new AccountSnapshot
