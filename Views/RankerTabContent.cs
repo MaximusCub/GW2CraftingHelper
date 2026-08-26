@@ -551,6 +551,7 @@ namespace GW2CraftingHelper.Views
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
             public readonly List<Label> CurrencyNameLabels = new List<Label>();
+            public readonly List<string> CurrencyNameFulls = new List<string>();
             public readonly List<Label> CurrencyValueLabels = new List<Label>();
             public readonly List<Label> NoteLabels = new List<Label>();
             public RankerRowMetrics Metrics;
@@ -738,6 +739,7 @@ namespace GW2CraftingHelper.Views
             row.GateNameLabels.Clear();
             row.GateValueLabels.Clear();
             row.CurrencyNameLabels.Clear();
+            row.CurrencyNameFulls.Clear();
             row.CurrencyValueLabels.Clear();
             row.NoteLabels.Clear();
             row.Chip = null;
@@ -802,8 +804,12 @@ namespace GW2CraftingHelper.Views
             };
             TooltipFacility.ApplyPlain(row.DaysLabel, DaysTooltip(metrics));
 
-            if (metrics == null)
+            if (metrics == null || metrics.RemainingCoinCost <= 0)
             {
+                // The coin renderer's own zero-value cell is the gw2e-style
+                // "not sold or crafted" em dash, which claims unpriceable.
+                // A refreshed row's zero is a measured zero, so it gets the
+                // module's plain dash and says why on hover instead.
                 row.RemainingDash = new Label
                 {
                     Font = UiFonts.Body,
@@ -814,7 +820,9 @@ namespace GW2CraftingHelper.Views
                     Location = new Point(0, 12),
                     Parent = row.Panel
                 };
-                TooltipFacility.ApplyPlain(row.RemainingDash, "Not yet calculated - press Refresh.");
+                TooltipFacility.ApplyPlain(row.RemainingDash, metrics == null
+                    ? "Not yet calculated - press Refresh."
+                    : "Nothing left to buy - the materials you hold cover this item's coin cost.");
             }
             else
             {
@@ -849,7 +857,7 @@ namespace GW2CraftingHelper.Views
         {
             string chipText = ChipText(row.Metrics);
             row.ChipWidth = chipText == null ? 0 : LabelHelpers.MeasureSmallTagWidth(chipText);
-            row.RemainingCellWidth = row.Metrics == null
+            row.RemainingCellWidth = row.Metrics == null || row.Metrics.RemainingCoinCost <= 0
                 ? MeasureDashWidth()
                 : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
         }
@@ -920,10 +928,11 @@ namespace GW2CraftingHelper.Views
                 int y = RankerRowLayout.RowHeight
                     + (line + i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.SubLineHeight;
 
+                row.CurrencyNameFulls.Add(CurrencyName(shortfall));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
-                    Text = CurrencyName(shortfall),
+                    Text = row.CurrencyNameFulls[row.CurrencyNameFulls.Count - 1],
                     TextColor = DimColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1017,14 +1026,32 @@ namespace GW2CraftingHelper.Views
 
             for (int i = 0; i < row.CurrencyNameLabels.Count; i++)
             {
-                int column = i % RankerRowLayout.CurrenciesPerLine;
-                int half = bands.SubLineWidth / RankerRowLayout.CurrenciesPerLine;
-                int cellX = bands.SubLineX + column * half;
-                row.CurrencyNameLabels[i].Location = new Point(cellX, row.CurrencyNameLabels[i].Location.Y);
+                // Same rails as the gate strip above, so every sub-line value
+                // in the row right-aligns at the same four x positions.
+                RankerRowLayout.GateCell(bands, i % RankerRowLayout.CurrenciesPerLine,
+                    out int cellX, out int cellWidth);
+
+                var name = row.CurrencyNameLabels[i];
                 var value = row.CurrencyValueLabels[i];
-                value.Location = new Point(
-                    Math.Max(cellX, cellX + half - value.Width - RankerRowLayout.CellGap),
-                    value.Location.Y);
+                int valueX = Math.Max(cellX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap);
+
+                name.Location = new Point(cellX, name.Location.Y);
+                value.Location = new Point(valueX, value.Location.Y);
+
+                if (measureText)
+                {
+                    // A long currency name must clear the value in its own
+                    // cell rather than running under it.
+                    string full = row.CurrencyNameFulls[i];
+                    string shown = LabelHelpers.EllipsizeToWidth(
+                        UiFonts.Caption, full, Math.Max(0, valueX - cellX - RankerRowLayout.IconGap));
+                    if (!string.Equals(name.Text, shown, StringComparison.Ordinal))
+                    {
+                        name.Text = shown;
+                    }
+                    TooltipFacility.ApplyPlain(name,
+                        string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+                }
             }
 
             foreach (var note in row.NoteLabels)

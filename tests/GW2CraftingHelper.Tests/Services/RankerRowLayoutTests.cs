@@ -122,24 +122,98 @@ namespace GW2CraftingHelper.Tests.Services
         [Theory]
         [InlineData(0, 0)]
         [InlineData(1, 1)]
-        [InlineData(2, 1)]
-        [InlineData(3, 2)]
-        [InlineData(4, 2)]
+        [InlineData(4, 1)]
+        [InlineData(5, 2)]
+        [InlineData(8, 2)]
         [InlineData(9, 2)]
         public void CurrencyLineCount_IsMonotonicAndCappedAtTwoLines(int currencies, int expected)
         {
             Assert.Equal(expected, RankerRowLayout.CurrencyLineCount(currencies));
         }
 
+        [Fact]
+        public void CurrenciesShareTheGateStripsGrid()
+        {
+            // One set of vertical rails for every sub-line value in a row -
+            // the live desktop gate showed that a second grid under the gate
+            // strip reads as each value finding its own x.
+            Assert.Equal(RankerRowLayout.GateCellCount, RankerRowLayout.CurrenciesPerLine);
+        }
+
         [Theory]
         [MemberData(nameof(RealWidths))]
-        public void AtEveryRealWidth_TwoCurrencyCellsFitOnOneSubLine(int rowWidth)
+        public void AtEveryRealWidth_ACurrencyNamePlusValueFitsOneGateCell(int rowWidth)
         {
             // The reason CurrencyLineCount is deliberately width-independent:
             // a width-dependent count would change a row's HEIGHT mid-drag.
             var bands = RankerRowLayout.Compute(rowWidth, 120, 96);
+            RankerRowLayout.GateCell(bands, 0, out _, out int cellWidth);
 
-            Assert.True(bands.SubLineWidth / RankerRowLayout.CurrenciesPerLine >= 300);
+            Assert.True(cellWidth >= 150);
+        }
+
+        // ---------------------------------------------------------------
+        // The header minimum-width floor - the live desktop gate's Fix 1.
+        // The header labels right-align at the same edges the cells do, so
+        // every band must stay at least as wide as its own header text even
+        // when the table is empty and no cell has been measured.
+        // ---------------------------------------------------------------
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(8)]   // a dash-only remaining cell, the empty-table case
+        [InlineData(99)]
+        public void TheRemainingBandNeverDropsBelowItsHeaderFloor(int measuredCellWidth)
+        {
+            var bands = RankerRowLayout.Compute(1200, measuredCellWidth, 0);
+
+            Assert.True(bands.RemainingRightEdge - bands.DaysRightEdge
+                >= RankerRowLayout.MinRemainingCellWidth + RankerRowLayout.CellGap);
+        }
+
+        [Fact]
+        public void AWiderMeasuredCellStillBeatsTheFloor()
+        {
+            var floored = RankerRowLayout.Compute(1200, 8, 0);
+            var wide = RankerRowLayout.Compute(1200, 180, 0);
+
+            Assert.Equal(RankerRowLayout.MinRemainingCellWidth + RankerRowLayout.CellGap,
+                floored.RemainingRightEdge - floored.DaysRightEdge);
+            Assert.Equal(180 + RankerRowLayout.CellGap,
+                wide.RemainingRightEdge - wide.DaysRightEdge);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AnEmptyTablesHeaderCellsDoNotOverlap(int rowWidth)
+        {
+            // Exactly the shape the desktop gate photographed as
+            // "ReadhyDaining": zero rows, so a dash-width coin band and no
+            // chip. Each right-aligned header must clear the cell to its
+            // left even then.
+            var bands = RankerRowLayout.Compute(rowWidth, 8, 0);
+
+            int readyCellLeft = bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth;
+            int daysCellLeft = bands.DaysRightEdge - RankerRowLayout.DaysCellWidth;
+            int remainingCellLeft = bands.RemainingRightEdge - RankerRowLayout.MinRemainingCellWidth;
+
+            Assert.True(bands.NameX + bands.NameWidth <= readyCellLeft);
+            Assert.True(bands.ReadyRightEdge <= daysCellLeft);
+            Assert.True(bands.DaysRightEdge <= remainingCellLeft);
+            Assert.True(bands.RemainingRightEdge < bands.UpX);
+        }
+
+        [Fact]
+        public void TheReadyCellIsActuallyReserved_NotJustDeclared()
+        {
+            // The gate's other header collision: ReadyCellWidth existed but
+            // nothing subtracted it, so the name band ran under the
+            // right-aligned "100%".
+            var bands = RankerRowLayout.Compute(1200, 120, 96);
+
+            Assert.Equal(bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth - RankerRowLayout.CellGap,
+                bands.NameX + bands.NameWidth);
         }
     }
 }

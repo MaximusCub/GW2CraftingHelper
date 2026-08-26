@@ -27,11 +27,26 @@ namespace GW2CraftingHelper.Services
         /// <summary>Room for "25." at UiFonts.Caption plus clearance.</summary>
         public const int RankWidth = 26;
 
-        /// <summary>Widest "100%" at UiFonts.Body plus clearance.</summary>
-        public const int ReadyCellWidth = 46;
+        // The three right-hand cells each reserve enough width for BOTH
+        // their widest cell text ("100%", "999d", a coin amount) and their
+        // own column-header label at TableHeaderStyle's bold ColumnHeader
+        // font. The header labels right-align at the same edges the cells
+        // do, so a band narrower than its header collides the headers into
+        // each other - the live desktop gate caught exactly that
+        // ("ReadhyDaining") when an empty table let the coin band collapse
+        // to the width of a dash.
 
-        /// <summary>Widest realistic "999d" at UiFonts.Body plus clearance.</summary>
-        public const int DaysCellWidth = 44;
+        /// <summary>Fits bold "Ready" (~50px) and body "100%".</summary>
+        public const int ReadyCellWidth = 58;
+
+        /// <summary>Fits bold "Days" (~46px) and body "999d".</summary>
+        public const int DaysCellWidth = 54;
+
+        /// <summary>
+        /// Floor for the coin cell band, applied inside Compute: fits bold
+        /// "Remaining" (~92px). Rows may measure wider; never narrower.
+        /// </summary>
+        public const int MinRemainingCellWidth = 100;
 
         /// <summary>The four gate cells of the breakdown sub-line.</summary>
         public const int GateCellCount = 4;
@@ -101,7 +116,7 @@ namespace GW2CraftingHelper.Services
         public static Bands Compute(int rowWidth, int remainingCellWidth, int chipWidth)
         {
             rowWidth = Math.Max(0, rowWidth);
-            remainingCellWidth = Math.Max(0, remainingCellWidth);
+            remainingCellWidth = Math.Max(MinRemainingCellWidth, remainingCellWidth);
             chipWidth = Math.Max(0, chipWidth);
 
             int rightEdge = Math.Max(0, rowWidth - Inset);
@@ -120,7 +135,12 @@ namespace GW2CraftingHelper.Services
             int rankX = Inset;
             int iconX = rankX + RankWidth;
             int nameX = iconX + IconTotal + IconGap;
-            int nameWidth = readyRightEdge - CellGap - nameX;
+
+            // The name band ends at the Ready CELL's left edge, not at the
+            // Ready text's right edge - the right-aligned "100%" extends
+            // ReadyCellWidth's worth of pixels left of readyRightEdge, and a
+            // name allowed to run under it would collide.
+            int nameWidth = readyRightEdge - ReadyCellWidth - CellGap - nameX;
 
             // A window narrow enough to squeeze the name out clamps rather
             // than emitting a negative width the view would hand to a
@@ -168,15 +188,20 @@ namespace GW2CraftingHelper.Services
             return RowHeight + Math.Max(0, subLineCount) * SubLineHeight;
         }
 
-        /// <summary>Two currencies share a sub-line, and a row shows at most two such lines.</summary>
-        public const int CurrenciesPerLine = 2;
+        /// <summary>
+        /// Currency shortfalls sit on the SAME four-column grid as the gate
+        /// breakdown strip (GateCell), one currency per cell, so every value
+        /// in a row's sub-lines shares one set of vertical rails - the live
+        /// desktop gate showed that a second, different grid under the gate
+        /// strip reads as each value finding its own x.
+        /// </summary>
+        public const int CurrenciesPerLine = GateCellCount;
         public const int MaxCurrencyLines = 2;
 
         /// <summary>
         /// How many currency shortfall sub-lines a row needs. Deliberately
-        /// independent of width: at WindowSizing.MinWindowWidth the sub-line
-        /// band still clears 1100px, so two currency cells always fit, and a
-        /// width-dependent count would change a row's HEIGHT mid-drag.
+        /// independent of width: a width-dependent count would change a
+        /// row's HEIGHT mid-drag.
         /// </summary>
         public static int CurrencyLineCount(int currencyCount)
         {
