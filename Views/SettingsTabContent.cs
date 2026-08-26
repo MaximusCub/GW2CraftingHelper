@@ -366,7 +366,12 @@ namespace GW2CraftingHelper.Views
                 RefitTextAfterResizeSettle,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "Settings text re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "Settings text re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "settings",
+                        $"Settings text re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
 
             // Lifetime subscription, dropped in Teardown.
             _settings.ClickSoundVolumePercent.SettingChanged += OnClickVolumeSettingChanged;

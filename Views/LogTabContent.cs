@@ -290,7 +290,12 @@ namespace GW2CraftingHelper.Views
                 RefitRowTextAfterResizeSettle,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "Log row re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "Log row re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "log",
+                        $"Log row re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void Build(Container container)

@@ -157,6 +157,47 @@ comment instead claims `Children` itself would have been corrupted is
 asserting something the decompiled source disproves - its own defect
 (KNOWN-ISSUES #36, fourth fix-loop round).
 
+### The logging-channel rule for these guards
+
+Every one of these primitives ends in a catch that swallows rather than
+propagates - `MainThreadMarshal.Run` (an unhandled exception in a queued
+callback would take down Blish HUD's update loop), `FrameTicker.DoUpdate`,
+`TooltipFacility.ResolveContent` (a deferred builder runs inside Blish's
+own mouse-moved handler), and `ResizeSettleDebounce`'s `_onError`. That
+makes the choice of log channel load-bearing, so it is a rule and not a
+preference:
+
+> **Anything a user could plausibly report goes to
+> `ModuleLog.Shared.Write`. Blish HUD's `Logger` is additive - never the
+> sole channel.**
+
+The module ships its own diagnostic surface (`Services/ModuleLog.cs`,
+`Views/LogTabContent.cs`) with a Copy-to-clipboard button, and that button
+is what a bug report will actually contain. A failure written only to
+Blish's own file log is invisible there, which is the worst possible place
+for exactly these symptoms to land: "the tooltip does nothing on that row",
+"the plan strip froze on a phase", "I clicked Generate and nothing
+happened". Before this rule was written down the split was 39 `Logger`
+calls to 37 `ModuleLog` calls with no stated convention, so every new catch
+block was a coin flip.
+
+Two riders:
+
+- **`Logger` stays.** It carries the full stack; `ModuleLog` entries are
+  one ring-buffer line each and keep only the exception's type and message.
+  A catch that discards recoverable state (`CraftingPlanView.
+  RollBackFailedPlanRender`) writes both, plus enough plan identity to
+  reproduce - never item ids, which stay internal-only, log tab included.
+- **The log system's own failures never route back into the log system.**
+  `ModuleLogStore`'s IO-failure callback goes straight to `Logger`
+  (Module.cs, `Initialize`), because writing into the sink whose write just
+  failed is unbounded recursion. `MainThreadMarshal` is the subtle case:
+  `LogTabContent` rebuilds its rows THROUGH `MainThreadMarshal.Run`, so a
+  rebuild that throws would write the entry that schedules the rebuild that
+  throws. It carries a `[ThreadStatic]` re-entrancy guard for the
+  synchronous half and suppresses consecutive duplicate signatures for the
+  asynchronous half; `Logger` still gets every occurrence.
+
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
 (`dev/dev-notes/HISTORY.md` after the WP-27 split).
 

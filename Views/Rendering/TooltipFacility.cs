@@ -272,6 +272,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 // the correct answer, and the log line names the builder
                 // that failed.
                 Logger.Warn(ex, "Rich tooltip content builder threw; falling back to the control's own text");
+
+                // "the tooltip does nothing on that row" is a user-reportable
+                // symptom, so it belongs in the module's own Log tab and not
+                // only in Blish's file log - the Copy button cannot collect
+                // the latter. Hover-paced, not per-frame: a builder runs when
+                // a box is about to be shown, so a broken row costs one line
+                // per hover rather than one per frame.
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "ui",
+                    $"Rich tooltip content builder threw, falling back to the control's own text: {ex.GetType().Name} - {ex.Message}");
                 return TooltipContent.OrText(null, source.FallbackText);
             }
         }

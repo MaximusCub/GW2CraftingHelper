@@ -425,7 +425,12 @@ namespace GW2CraftingHelper.Views
                 RefitResultRows,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "Snapshot row re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "Snapshot row re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot",
+                        $"Snapshot row re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)

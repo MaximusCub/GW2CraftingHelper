@@ -216,7 +216,12 @@ namespace GW2CraftingHelper.Views
                 RefitTextAfterResizeSettle,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "About text re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "About text re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "about",
+                        $"About text re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void Build(Container container)

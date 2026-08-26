@@ -935,11 +935,31 @@ namespace GW2CraftingHelper.Views
         /// superseding generation's status is never
         /// clobbered.</description></item>
         /// </list>
+        /// <para>
+        /// The catch that reaches here is deliberately still
+        /// <c>catch (Exception)</c> - the rollback is the load-bearing part,
+        /// and narrowing it would trade a vanished plan for a crash on every
+        /// later tab visit. What it must not also do is destroy the evidence:
+        /// the state that would identify the offending node is reset a few
+        /// lines below, so the stack goes to Blish's Logger and the plan's
+        /// identity into the ModuleLog line BEFORE any of that happens.
+        /// </para>
         /// </summary>
         private void RollBackFailedPlanRender(Exception ex, string context)
         {
+            // Both call sites have already committed the failing view model
+            // to _currentPlan (ApplyRestoredPlan assigns it before it
+            // renders; Build renders _currentPlan directly), so this reads
+            // the plan that actually failed, not the one that replaced it.
             ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
-                $"Failed to render restored plan {context}: {ex.GetType().Name} - {ex.Message}");
+                $"Failed to render restored plan {context} [{DescribePlanForDiagnostics(_currentPlan)}]: {ex.GetType().Name} - {ex.Message}");
+
+            // The full stack, which the ring-buffer line cannot carry. A
+            // NullReferenceException from an ordinary logic bug anywhere
+            // under RenderPlan lands here too, and without this the only
+            // symptom a maintainer gets is "the restored plan silently
+            // disappears on tab visit".
+            Logger.Warn(ex, "Failed to render restored plan {0}; rolling back to the no-plan state", context);
 
             _treeController.ResetForNewPlan(null);
             _sectionExpansion.Clear();
@@ -964,6 +984,44 @@ namespace GW2CraftingHelper.Views
             if (_statusBoard.ClearRestoredSeed())
             {
                 SetStatus("Ready");
+            }
+        }
+
+        /// <summary>
+        /// Enough of a plan's identity to reproduce the render that failed,
+        /// with no item ids in it - those stay internal, log tab included.
+        /// Fully guarded: this describes a view model that has just proven it
+        /// can throw while being walked, so it must never throw itself and
+        /// mask the failure it is reporting.
+        /// </summary>
+        private static string DescribePlanForDiagnostics(PlanViewModel plan)
+        {
+            if (plan == null)
+            {
+                return "no plan committed";
+            }
+
+            try
+            {
+                int rootCount = plan.MultiItemRoots != null
+                    ? plan.MultiItemRoots.Count
+                    : (plan.TreeRoot != null ? 1 : 0);
+                int sectionCount = plan.Sections != null ? plan.Sections.Count : 0;
+                int rowCount = 0;
+                if (plan.Sections != null)
+                {
+                    foreach (var section in plan.Sections)
+                    {
+                        rowCount += section?.Rows != null ? section.Rows.Count : 0;
+                    }
+                }
+
+                string target = string.IsNullOrEmpty(plan.TargetItemName) ? "unnamed" : plan.TargetItemName;
+                return $"target={target} x{plan.TargetQuantity}, roots={rootCount}, sections={sectionCount}, rows={rowCount}";
+            }
+            catch (Exception ex)
+            {
+                return $"plan identity unreadable: {ex.GetType().Name}";
             }
         }
 
@@ -1264,6 +1322,14 @@ namespace GW2CraftingHelper.Views
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, "FrameTicker step failed; stopping");
+
+                    // At most one line per ticker: the ticker cancels itself
+                    // below and never runs the failing step again. This is
+                    // the per-frame work behind the spinner, the scroll
+                    // verify and the resize settle, so a silent stop reads to
+                    // the user as "the plan strip froze on a phase".
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "ui",
+                        $"A per-frame ticker step failed and the ticker stopped: {ex.GetType().Name} - {ex.Message}");
                     keepGoing = false;
                 }
 
@@ -3889,6 +3955,8 @@ namespace GW2CraftingHelper.Views
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Plan generation failed");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
+                    $"Plan generation failed: {ex.GetType().Name} - {ex.Message}");
                 MainThreadMarshal.Run(() =>
                 {
                     // A superseded generation's failure must not clobber a
