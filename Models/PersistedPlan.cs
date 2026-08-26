@@ -72,10 +72,10 @@ namespace GW2CraftingHelper.Models
         /// generated for, in request order - mirrors
         /// CraftingPlanResult.RequestedItems' own shape, but populated for
         /// every plan (single- or multi-item), not only a genuine
-        /// multi-item batch. Not used to reconstruct the search box/
-        /// quantity inputs on restore (those stay at
-        /// their defaults); persisted for round-trip fidelity of the
-        /// original request only.
+        /// multi-item batch. On restore this reseeds the input strip's
+        /// rows (RestoredRequestInputs.BuildRowSeeds ->
+        /// ItemInputRowStrip.RestoreRows), so Generate Plan re-solves the
+        /// restored request without any retyping.
         /// </summary>
         public IReadOnlyList<PlanRequestItem> RequestItems { get; set; }
 

@@ -343,6 +343,71 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, loaded.RequestItems[0].Quantity);
         }
 
+        // --- Restore-inputs pinning (restore-inputs branch): the three
+        // persisted-but-previously-ignored request inputs must round-trip
+        // in their NON-default direction, because the live controls they
+        // reseed default the other way (Use Own Materials checkbox true,
+        // price basis BuyOrder) - a wiring slip that dropped the loaded
+        // value would be invisible to a default-direction assertion. ---
+
+        [Fact]
+        public void Save_Load_UseOwnMaterialsFalse_RoundTripsAsFalse()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.BuyOrder,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.False(loaded.UseOwnMaterials);
+        }
+
+        [Fact]
+        public void Save_Load_NonDefaultPriceBasis_RoundTrips()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
+                UseOwnMaterials = true,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(PriceBasis.InstantBuy, loaded.PriceBasis);
+        }
+
+        [Fact]
+        public void Save_Load_MultiItemRequestWithQuantities_RoundTripsInRequestOrder()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 5, Quantity = 3 },
+                    new PlanRequestItem { ItemId = 6, Quantity = 250 },
+                    new PlanRequestItem { ItemId = 7, Quantity = 1 }
+                },
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 3 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(new[] { 5, 6, 7 }, loaded.RequestItems.Select(r => r.ItemId));
+            Assert.Equal(new[] { 3, 250, 1 }, loaded.RequestItems.Select(r => r.Quantity));
+        }
+
         [Fact]
         public async Task Save_AfterOverride_RoundTripsOverriddenResultInPlace()
         {
