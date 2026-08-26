@@ -19,13 +19,23 @@ using System.Threading.Tasks;
 // only, not the shared ruleset. See docs/ARCHITECTURE.md sections 1, 3,
 // and 5 for the FrameTicker/scroll preserve-restore-verify rationale and
 // the section-renderer decomposition.
+//
+// The markers are NAMES, not an index. They used to be numbered 1-8 and a
+// number was reached three or four times over, eleven headers reading
+// "(continued)", so a reader who collapsed them saw "3. Scroll
+// preserve/restore/verify" four times with nothing to tell them apart.
+// Making the numbering true would mean reordering the scroll, wheel-wrap
+// and FrameTicker code, which docs/ARCHITECTURE.md section 5 records as
+// deliberately not worth its risk; so the numbers went instead. Each
+// marker now says what its own block holds and no two say the same thing.
+// Anything added here needs a name of its own, not a "(continued)".
 #pragma warning disable SA1124 // Do not use regions
 
 namespace GW2CraftingHelper.Views
 {
     internal class CraftingPlanView : ISectionRelayoutSink, ITreePlanHost
     {
-        #region General: shared layout constants, colors, top-region geometry & dependencies
+        #region Shared layout constants, colors, top-region geometry & dependencies
 
         // Not one of the architecture report's 11 responsibilities - shared
         // substrate consumed by several regions below (see dev/dev-notes/m38-plan/m38-a1-architecture.md S3).
@@ -111,7 +121,7 @@ namespace GW2CraftingHelper.Views
         // last-chosen value is preserved while disabled.
         private bool _valueOwnMaterials = true;
 
-        #endregion // General: shared layout constants, colors, top-region geometry & dependencies
+        #endregion // Shared layout constants, colors, top-region geometry & dependencies
 
         #region Input rows: the multi-item request editor (gw2efficiency parity)
 
@@ -122,7 +132,7 @@ namespace GW2CraftingHelper.Views
 
         #endregion // Input rows: the multi-item request editor (gw2efficiency parity)
 
-        #region 2. Generate orchestration (state)
+        #region Generate orchestration: sequencing, request and status state
 
         // Bumped at the start of every TriggerGenerate call (Generate button
         // and OnOwnMaterialsToggled's modal-confirm path both funnel through
@@ -195,9 +205,9 @@ namespace GW2CraftingHelper.Views
         // this re-checked.
         private const int TypedNameSearchResults = 8;
 
-        #endregion // 2. Generate orchestration (state)
+        #endregion // Generate orchestration: sequencing, request and status state
 
-        #region 8. Tree rendering (state)
+        #region Tree rendering: the controller instance
 
         // The tree section renderer and its interactive override loop
         // (see TreeSectionController) - a single persistent instance,
@@ -206,9 +216,9 @@ namespace GW2CraftingHelper.Views
         // are freshly constructed per section.
         private readonly TreeSectionController _treeController;
 
-        #endregion // 8. Tree rendering (state)
+        #endregion // Tree rendering: the controller instance
 
-        #region 7. Section builders (state: section expand/collapse)
+        #region Plan render: section expand/collapse and table-sort state
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
             new Dictionary<PlanSectionType, bool>();
 
@@ -265,9 +275,9 @@ namespace GW2CraftingHelper.Views
             _shoppingListSort.Reset();
         }
 
-        #endregion // 7. Section builders (state: section expand/collapse)
+        #endregion // Plan render: section expand/collapse and table-sort state
 
-        #region 2. Generate orchestration (state, continued)
+        #region Generate orchestration: checkbox-revert suppression and the last debug log
 
         // Suppress flag for checkbox revert
         private bool _suppressToggle;
@@ -277,9 +287,9 @@ namespace GW2CraftingHelper.Views
 
         public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
 
-        #endregion // 2. Generate orchestration (state, continued)
+        #endregion // Generate orchestration: checkbox-revert suppression and the last debug log
 
-        #region General: Blish UI control fields (shared across all responsibilities)
+        #region Blish UI control fields (shared across all responsibilities)
 
         // UI controls (stored for resize handler)
 
@@ -319,9 +329,9 @@ namespace GW2CraftingHelper.Views
         private readonly List<(StandardButton Button, int Width, int GapToLeft)> _treeToolbarButtons =
             new List<(StandardButton, int, int)>(5);
 
-        #endregion // General: Blish UI control fields (shared across all responsibilities)
+        #endregion // Blish UI control fields (shared across all responsibilities)
 
-        #region 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
         // Resize tracking
         private int _lastRenderedWidth;
@@ -467,9 +477,9 @@ namespace GW2CraftingHelper.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
-        #endregion // 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
-        #region 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the anchor registry - KNOWN-ISSUES #12/#14/#19
 
         // Bumped by every PreserveScrollAcross call; an in-flight
         // StartScrollVerify loop compares its captured value against the
@@ -488,9 +498,9 @@ namespace GW2CraftingHelper.Views
         private readonly Dictionary<string, Control> _scrollAnchors =
             new Dictionary<string, Control>(StringComparer.Ordinal);
 
-        #endregion // 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the anchor registry - KNOWN-ISSUES #12/#14/#19
 
-        #region 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: drag-settle state - KNOWN-ISSUES #13/#19
 
         // Set by PreserveScrollAcrossResize whenever a height-changing
         // resize tick wrote a per-tick scroll-preserve; ResizeSettleStep
@@ -504,9 +514,9 @@ namespace GW2CraftingHelper.Views
         private bool _resizeScrollRestorePending;
         private int _resizeScrollSavedOffset;
 
-        #endregion // 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: drag-settle state - KNOWN-ISSUES #13/#19
 
-        #region 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: the ticker instance fields - KNOWN-ISSUES #12/#13
 
         // Live FrameTicker instances (null when idle). Tracked so Build()
         // can cancel a leftover ticker from the previous build cycle before
@@ -525,9 +535,9 @@ namespace GW2CraftingHelper.Views
         // reports a generation still in flight across a tab switch.
         private FrameTicker _spinnerTicker;
 
-        #endregion // 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: the ticker instance fields - KNOWN-ISSUES #12/#13
 
-        #region 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the pending-correction state - KNOWN-ISSUES #12 (reopened)
 
         // Defensive one-shot re-assert ticker for
         // ApplyWheelWrapCorrection (see StartWheelWrapVerify). Its own
@@ -541,9 +551,9 @@ namespace GW2CraftingHelper.Views
         // Matches StartScrollVerify's own stable-match tolerance.
         private const float WheelWrapVerifyEpsilon = 0.004f;
 
-        #endregion // 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the pending-correction state - KNOWN-ISSUES #12 (reopened)
 
-        #region 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the resize-restore state - KNOWN-ISSUES #12/#14/#19
 
         // With container heights finalized synchronously during build
         // (PlanContentHeightMath), the restore ratio is correct the
@@ -568,9 +578,9 @@ namespace GW2CraftingHelper.Views
         // a stale value cannot influence a new render.
         private DateTime? _lastWheelEventUtc;
 
-        #endregion // 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the resize-restore state - KNOWN-ISSUES #12/#14/#19
 
-        #region 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the wheel-event subscription state - KNOWN-ISSUES #12 (reopened)
 
         // Blish HUD's
         // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
@@ -585,9 +595,9 @@ namespace GW2CraftingHelper.Views
         // re-verify against the vendored source on any BlishHUD upgrade.
         private const int BlishScrollWheelStepPixels = 30;
 
-        #endregion // 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the wheel-event subscription state - KNOWN-ISSUES #12 (reopened)
 
-        #region Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
+        #region Diagnostics: scroll/wheel instrumentation (shared by the scroll and wheel-wrap blocks) - KNOWN-ISSUES #12
 
         // Instrumentation-only, gated on ScrollDiagnosticsEnabled; every
         // call site checks the setting before doing any work, so the
@@ -649,9 +659,9 @@ namespace GW2CraftingHelper.Views
             ModuleLog.Shared.Write(ModuleLogLevel.Debug, ScrollDiagLogTag, message);
         }
 
-        #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
+        #endregion // Diagnostics: scroll/wheel instrumentation (shared by the scroll and wheel-wrap blocks) - KNOWN-ISSUES #12
 
-        #region General: construction & status
+        #region Construction & status
         public CraftingPlanView(
             Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -1000,9 +1010,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // General: construction & status
+        #endregion // Construction & status
 
-        #region 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the reflection handle and PreserveScrollAcross - KNOWN-ISSUES #12/#14/#19
 
         // Blish HUD keeps a Panel's Scrollbar in a private field and resets
         // it to top whenever content height changes; the field is the only
@@ -1226,9 +1236,9 @@ namespace GW2CraftingHelper.Views
                 MeasureContentHeight(_contentPanel), _contentPanel.Height);
         }
 
-        #endregion // 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the reflection handle and PreserveScrollAcross - KNOWN-ISSUES #12/#14/#19
 
-        #region 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: the nested Control subclass - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Drives a per-real-frame step callback from Control.DoUpdate,
@@ -1341,9 +1351,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: the nested Control subclass - KNOWN-ISSUES #12/#13
 
-        #region 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: teardown - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
@@ -1371,9 +1381,9 @@ namespace GW2CraftingHelper.Views
             _lastWheelEventUtc = null;
         }
 
-        #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: teardown - KNOWN-ISSUES #12/#13
 
-        #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the anchor and resize-restore passes - KNOWN-ISSUES #12/#14/#19
 
         /// <summary>
         /// Writes the restore ratio to the scrollbar synchronously, using
@@ -1595,9 +1605,9 @@ namespace GW2CraftingHelper.Views
             _scrollVerifyTicker = new FrameTicker(VerifyTick);
         }
 
-        #endregion // 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the anchor and resize-restore passes - KNOWN-ISSUES #12/#14/#19
 
-        #region 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the wheel handlers and the correction itself - KNOWN-ISSUES #12 (reopened)
 
         /// <summary>
         /// Unconditional (not diagnostics-gated) tap on the same
@@ -1813,9 +1823,9 @@ namespace GW2CraftingHelper.Views
             LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
-        #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the wheel handlers and the correction itself - KNOWN-ISSUES #12 (reopened)
 
-        #region 1. Input rows (continued)
+        #region Input rows: the top-region reflow a row add/remove triggers
 
         /// <summary>
         /// The per-row suggestion popups outlive the host window (they are
@@ -1893,9 +1903,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // 1. Input rows (continued)
+        #endregion // Input rows: the top-region reflow a row add/remove triggers
 
-        #region General: view construction (Build) - wires every section/handler together
+        #region View construction (Build) - wires every section/handler together
 
         // Wires Input Rows (1), the wheel handlers (3/4), and the resize
         // handler (5) together onto the freshly built controls; not itself
@@ -2240,7 +2250,9 @@ namespace GW2CraftingHelper.Views
             PlaceTreeToolbarRow(w, rowY);
         }
 
-        #region 4b. Tree action confirms - a dialog only when the click would change something
+        #endregion // View construction (Build) - wires every section/handler together
+
+        #region Tree action confirms - a dialog only when the click would change something
 
         // The matrix, in one sentence: a dialog appears ONLY when the
         // click would actually change the plan; otherwise the click skips
@@ -2453,7 +2465,9 @@ namespace GW2CraftingHelper.Views
                 "Clear Ignored", commands.ClearIgnored);
         }
 
-        #endregion // 4b. Tree action confirms - a dialog only when the click would change something
+        #endregion // Tree action confirms - a dialog only when the click would change something
+
+        #region Tree toolbar: the state chips, the toolbar row's placement and its visibility
 
         // The two per-plan STATE chips, in the slot the grey "Recipe Tree:"
         // caption used to hold. Built once per Build() and shown/hidden by
@@ -2696,9 +2710,9 @@ namespace GW2CraftingHelper.Views
             ReflowTopRegion();
         }
 
-        #endregion // General: view construction (Build) - wires every section/handler together
+        #endregion // Tree toolbar: the state chips, the toolbar row's placement and its visibility
 
-        #region 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: the resize handler, the replay and the settle pass - KNOWN-ISSUES #13/#19
         private void OnPanelResized(object sender, ResizedEventArgs e)
         {
             var container = (Container)sender;
@@ -3145,9 +3159,9 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: the resize handler, the replay and the settle pass - KNOWN-ISSUES #13/#19
 
-        #region 2. Generate orchestration (continued)
+        #region Generate orchestration: the generate, resolve and restore paths
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
         {
             if (_suppressToggle)
@@ -4023,9 +4037,9 @@ namespace GW2CraftingHelper.Views
             RenderFromBoard(_statusBoard.Snapshot());
         }
 
-        #endregion // 2. Generate orchestration (continued)
+        #endregion // Generate orchestration: the generate, resolve and restore paths
 
-        #region General: current panel width helper
+        #region Current panel width helper
 
         /// <summary>
         /// The content panel's LIVE usable width (RightEdgePadding already
@@ -4044,9 +4058,9 @@ namespace GW2CraftingHelper.Views
             return _contentPanel != null ? _contentPanel.Width - RightEdgePadding : 0;
         }
 
-        #endregion // General: current panel width helper
+        #endregion // Current panel width helper
 
-        #region 7. Section builders
+        #region Plan render: RenderPlan and the shared section chrome
 
         /// <summary>
         /// Factored out of
@@ -4789,10 +4803,6 @@ namespace GW2CraftingHelper.Views
                     : PlanContentHeightMath.SectionBodyHeight(section.SectionType, visibleRows));
         }
 
-        #endregion // 7. Section builders
-
-        #region 7. Section builders (continued)
-
         // --- Used Materials section ---
         //
         // Row rendering moved to
@@ -4832,9 +4842,9 @@ namespace GW2CraftingHelper.Views
         // banner row, and the per-currency CreateCurrencyRow rows) moved to
         // Views/Rendering/SummarySectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
-        #endregion // 7. Section builders (continued)
+        #endregion // Plan render: RenderPlan and the shared section chrome
 
-        #region 8. Tree rendering (continued)
+        #region Tree rendering: what moved to TreeSectionController
 
         // The Recipe Tree
         // section renderer (TreeNodeState, CreateTreeSection,
@@ -4846,7 +4856,7 @@ namespace GW2CraftingHelper.Views
         // together) all moved onto Views/Rendering/TreeSectionController -
         // see that class's own doc comment for the full inventory and
         // every non-move edit.
-        #endregion // 8. Tree rendering (continued)
+        #endregion // Tree rendering: what moved to TreeSectionController
     }
 }
 
