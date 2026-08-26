@@ -1,6 +1,6 @@
 {
   "name": "GW2CraftingHelper",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "namespace": "GW2CraftingHelper",
   "package": "GW2CraftingHelper.dll",
   "manifest_version": 1,
