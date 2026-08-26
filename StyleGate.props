@@ -8,14 +8,14 @@
      project's <NoWarn>: an ID comes out of both lists in the same commit, per
      the shrink-only rule stated there and in CONTRIBUTING.md (Code Style).
 
-     No test- or tool-specific rule deltas exist: the six importing projects
+     No test- or tool-specific rule deltas exist: the seven importing projects
      build clean under the module's exact configuration, so none was needed. -->
 <Project>
 
   <PropertyGroup>
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);SA1005;SA1009;SA1111;SA1114;SA1116;SA1117;SA1118;SA1119;SA1120;SA1122;SA1127;SA1128;SA1201;SA1202;SA1203;SA1204;SA1208;SA1210;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
+    <NoWarn>$(NoWarn);SA1005;SA1009;SA1111;SA1116;SA1117;SA1118;SA1120;SA1122;SA1201;SA1202;SA1203;SA1204;SA1208;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
     <!-- NuGet audit advisories (NU1901-NU1904) stay visible as warnings but do
          not fail the build: they appear when a new advisory is published to
          nuget.org, not when this repo's code changes, so gating on them would

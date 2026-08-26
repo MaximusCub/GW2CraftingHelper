@@ -237,11 +237,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
-            Assert.Equal(
             // Coin spelling changed with the CoinSegmentMath.GameStyleText
             // consolidation: every composer now spells a coin amount the
             // way the icons beside it do (leading all-zero units omitted,
             // trailing units zero-padded).
+            Assert.Equal(
                 new[] { "Unit price: 5s 00c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
                 lines);
         }

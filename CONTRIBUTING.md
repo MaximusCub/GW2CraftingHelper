@@ -68,9 +68,10 @@ handed to someone new, and by the time it was removed the last quoted
 figure was off by roughly 940.
 
 Getting there meant admitting what the analyzer noise actually was. The
-rules still outstanding sit in that project's `<NoWarn>`: 26 StyleCop rule
-IDs covering 1,192 diagnostics, down from 38 rules and 2,723 (measured
-2026-08-25). Each ID is a bounded piece of work, not a judgement that the
+rules still outstanding sit in that project's `<NoWarn>`: 21 StyleCop rule
+IDs covering 1,385 module diagnostics (2,754 across the solution), down
+from 38 rules and 2,723 (measured
+2026-08-26). Each ID is a bounded piece of work, not a judgement that the
 rule is wrong. To take one on: delete the ID, fix what the build then
 reports, and commit the two together - the diff is confined to that one
 rule and the build proves it stays fixed. **The list only ever shrinks.**
@@ -83,8 +84,8 @@ comment in that file). Taking a rule on therefore means deleting its ID
 from both `GW2CraftingHelper.csproj` and `StyleGate.props` in the same
 commit, and fixing what every project then reports.
 
-The three largest remaining are `SA1117` (202, parameter layout), `SA1201`
-(173, member ordering) and `SA1401` (172, public fields). None has a
+The three largest remaining are `SA1117` (252, parameter layout), `SA1401`
+(210, public fields) and `SA1201` (190, member ordering). None has a
 mechanical fix that leaves the code better than it found it, which is why
 they are still here and the whitespace rules are not.
 

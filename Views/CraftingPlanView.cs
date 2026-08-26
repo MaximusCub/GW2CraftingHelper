@@ -1,6 +1,5 @@
 using Blish_HUD;
 using Blish_HUD.Content;
-using MonoGame.Extended.BitmapFonts;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Contracts;
@@ -8,6 +7,7 @@ using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1862,7 +1862,7 @@ namespace GW2CraftingHelper.Views
             int wheelValue = GameService.Input.Mouse.State.ScrollWheelValue;
             bool verifyLive = _scrollVerifyTicker != null && _scrollVerifyTicker.IsActive;
 
-            LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
+            LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={scrollbar?.ScrollDistance ?? -1f:0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
         #endregion // Wheel-wrap correction: the wheel handlers and the correction itself - KNOWN-ISSUES #12 (reopened)

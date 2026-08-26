@@ -233,6 +233,58 @@ jobs:
           fi
           echo "Every budgeted file is within its entry."
 
+      - name: Public surface stays within its pinned count
+        shell: bash
+        run: |
+          # A ratchet, not a metric. docs/public-surface.txt explains itself;
+          # this is the half that has teeth. Written after 10 public types
+          # landed in the weeks after the internal-flip, unnoticed because
+          # the convention was prose-only. Top-level means indented exactly
+          # one namespace level: the module has no file-scoped namespaces
+          # and no tab indentation, so 4 spaces is the committed shape, and
+          # a deeper indent is a nested type inside an internal owner, which
+          # the assembly does not export.
+          pinned=$(grep -v '^#' docs/public-surface.txt | grep -m1 .)
+          decls=$(git ls-files -z 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' \
+              'Contracts/*.cs' 'Properties/*.cs' 'Module.cs' \
+            | xargs -0 -r grep -nE '^    public (sealed |static |abstract |partial )*(class|struct|interface|enum|record|delegate) ' || true)
+          actual=$(printf '%s' "$decls" | grep -c . || true)
+          if [ "$actual" -gt "$pinned" ]; then
+            echo "The module declares $actual public top-level types; the pin is $pinned."
+            echo "The module's default is internal. Make the new type internal, or"
+            echo "raise the pin in docs/public-surface.txt in this same commit and"
+            echo "say in the message why the type earned a public seam."
+            echo "$decls"
+            exit 1
+          fi
+          if [ "$actual" -lt "$pinned" ]; then
+            echo "NOTE: $actual public top-level types, pin is $pinned - lower the pin"
+            echo "in docs/public-surface.txt to bank the reduction."
+          fi
+          echo "Public top-level types: $actual (pin: $pinned)."
+
+      - name: Module source cites no out-of-repo spec sections
+        shell: bash
+        run: |
+          # "spec section N.n" citations point at a document that is not in
+          # this repository and never was (KNOWN-ISSUES #42 records the
+          # sweep); the pattern regrew twice after being cleaned because
+          # nothing checked for it. Cite KNOWN-ISSUES or a docs/ file that
+          # actually carries the rationale, or inline the sentence. The
+          # digit keeps legitimate phrasing alive: "the spec", a repo doc's
+          # own "Section 4.3", and the CoinSegmentSpec/pill-spec objects
+          # never match "spec section <digit>".
+          hits=$(git ls-files -z 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' \
+              'Contracts/*.cs' 'Properties/*.cs' 'Module.cs' \
+            | xargs -0 -r grep -niE 'spec section [0-9]' || true)
+          if [ -n "$hits" ]; then
+            echo "Module source cites spec sections of a document this repo does not carry:"
+            echo "$hits"
+            echo "Cite docs/KNOWN-ISSUES.md or a docs/ file by repo path, or inline the fact."
+            exit 1
+          fi
+          echo "No out-of-repo spec-section citations in module source."
+
       - name: Relative links in tracked markdown resolve
         shell: bash
         run: |
@@ -335,9 +387,9 @@ jobs:
       #
       # No -warnaserror here on purpose. The warning gate lives in the project
       # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj and, through
-      # the StyleGate.props import, in every test and tool project except
-      # MysticForgeSeeder - so it applies to a developer's local build too, not
-      # just to CI, and this step inherits it for free. Adding the flag here would
+      # the StyleGate.props import, in every test and tool project - so it
+      # applies to a developer's local build too, not just to CI, and this
+      # step inherits it for free. Adding the flag here would
       # also widen the gate to every project in the solution, including CI-only
       # restore diagnostics that never appear locally. Note that -warnaserror:CS
       # specifically would do nothing at all: csc honours WarningsAsErrors only

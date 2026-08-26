@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
     /// colours only the marked runs (flavour teal, abilitytype pale yellow,
     /// warning red) and leaves unmarked description text white, which is
     /// the only way "A gift bag!" can be told apart from the quoted flavour
-    /// that follows it inside one description string (spec section 1.4,
+    /// that follows it inside one description string (KNOWN-ISSUES #42,
     /// gap G7).
     /// </para>
     ///

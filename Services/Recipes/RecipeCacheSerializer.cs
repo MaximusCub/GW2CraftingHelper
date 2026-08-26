@@ -161,7 +161,8 @@ namespace GW2CraftingHelper.Services.Recipes
             return result;
         }
 
-        public static T LoadManifest<T>(Stream stream) where T : class, new()
+        public static T LoadManifest<T>(Stream stream)
+            where T : class, new()
         {
             if (stream == null)
             {
