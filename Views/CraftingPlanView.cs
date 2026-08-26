@@ -3420,16 +3420,16 @@ namespace GW2CraftingHelper.Views
             // every further click would start another full generation -
             // _generateSequence makes the last result win, it does not stop
             // the redundant work.
-            SetGenerateEnabled(false);
+            SetGenerateInputsEnabled(false);
             SetStatus(ResolvingStatus);
 
             var matches = await FindTypedRowMatchesAsync(pending);
             bool queued = MainThreadMarshal.Run(() =>
             {
-                // Resolution is over either way, so hand the button back
-                // first; GenerateFromResolvedRows disables it again itself,
+                // Resolution is over either way, so hand the inputs back
+                // first; GenerateFromResolvedRows disables them again itself,
                 // synchronously, if a run actually starts.
-                SetGenerateEnabled(true);
+                SetGenerateInputsEnabled(true);
 
                 // Torn down while the search was in flight (tab
                 // switched away, module unloading) - nothing to
@@ -3447,18 +3447,49 @@ namespace GW2CraftingHelper.Views
             if (!queued)
             {
                 // Overlay is gone, so that callback will never drain and
-                // the button would stay disabled for the rest of this
+                // the inputs would stay disabled for the rest of this
                 // panel's life. The main-thread update loop this would
                 // otherwise race with is exactly what is missing.
-                SetGenerateEnabled(true);
+                SetGenerateInputsEnabled(true);
             }
         }
 
-        private void SetGenerateEnabled(bool enabled)
+        /// <summary>
+        /// Every control that can START a generation, switched together.
+        /// <para>
+        /// The Generate button used to be the only one disabled for the
+        /// length of a run, which left "Use Own Materials" clickable while a
+        /// plan was still generating - and its confirm callback starts
+        /// another generation. Two runs then shared one ItemMetadataService,
+        /// which is a data race, and _generateSequence does not help: it
+        /// makes the last result win, it does not stop the redundant work.
+        /// The service is now internally locked (ItemMetadataService's
+        /// _cacheLock), so this is no longer a crash guard - it is the
+        /// single-flight rule that stops the redundant run from starting at
+        /// all.
+        /// </para>
+        /// <para>
+        /// "Value Own Materials" is restored to <c>_useOwnMaterials</c>, not
+        /// to true: it is inert without a snapshot driving reduction and is
+        /// disabled whenever Use Own Materials is off (see its construction
+        /// site).
+        /// </para>
+        /// </summary>
+        private void SetGenerateInputsEnabled(bool enabled)
         {
             if (_generateButton != null)
             {
                 _generateButton.Enabled = enabled;
+            }
+
+            if (_ownMaterialsCheckbox != null)
+            {
+                _ownMaterialsCheckbox.Enabled = enabled;
+            }
+
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Enabled = enabled && _useOwnMaterials;
             }
         }
 
@@ -3703,7 +3734,9 @@ namespace GW2CraftingHelper.Views
             // PlanStripStatusBoard.Begin's own doc comment.
             _statusBoard.Begin(myGen);
 
-            _generateButton.Enabled = false;
+            // Not just the button: the own-materials toggles start a second
+            // generation of their own - see SetGenerateInputsEnabled.
+            SetGenerateInputsEnabled(false);
             _lastDebugLog = null;
 
             // The strip's standing notices now describe THIS run: the
@@ -3890,7 +3923,7 @@ namespace GW2CraftingHelper.Views
                         return;
                     }
 
-                    _generateButton.Enabled = true;
+                    SetGenerateInputsEnabled(true);
 
                     // The single restore point for the dim applied at the
                     // start of this generation - this finally runs on
