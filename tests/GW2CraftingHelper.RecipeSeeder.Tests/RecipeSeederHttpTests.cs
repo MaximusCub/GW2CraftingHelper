@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.RecipeSeeder.Tests
         [Fact]
         public async Task FetchRecipeBatchAsync_TypedIngredient_ParsesIdKeyWithoutThrowing()
         {
-            // KNOWN-ISSUES recipe-ingestion bug class: the
+            // KNOWN-ISSUES #48: the
             // versioned schema keys every ingredient's item id as "id" -
             // the seeder's own ParseRecipeBatch used to unconditionally
             // GetProperty("item_id"), which THROWS a JsonException on this

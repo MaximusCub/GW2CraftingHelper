@@ -27,6 +27,7 @@ namespace GW2CraftingHelper.Services
         private class PersistedModel
         {
             public Dictionary<int, long> Values { get; set; }
+
             public List<int> Cleared { get; set; }
         }
 
@@ -53,6 +54,7 @@ namespace GW2CraftingHelper.Services
             {
                 values[kvp.Key] = kvp.Value;
             }
+
             // ClearedCurrencyIds
             // is a HashSet<int>, whose enumeration order is not guaranteed
             // stable across otherwise-identical instances - sorted here so
@@ -64,7 +66,7 @@ namespace GW2CraftingHelper.Services
             var model = new PersistedModel
             {
                 Values = values,
-                Cleared = cleared
+                Cleared = cleared,
             };
             return JsonConvert.SerializeObject(model);
         }
@@ -138,6 +140,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     valid[kvp.Key] = kvp.Value;
                 }
             }
@@ -151,6 +154,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     validCleared.Add(currencyId);
                 }
             }

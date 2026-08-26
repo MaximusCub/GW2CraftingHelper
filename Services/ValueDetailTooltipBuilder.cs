@@ -22,56 +22,38 @@ namespace GW2CraftingHelper.Services
     /// this class formats is for a HOVER TOOLTIP only - it must never be
     /// copied into a displayed total anywhere else in the app.
     ///
-    /// this hover can never
-    /// fire for the "unpriceable component" trigger the brief lists
-    /// alongside valued currencies. PlanSolver.RecomputeComparisonValues
+    /// This hover can never fire for an unpriceable component, only for a
+    /// valued currency. PlanSolver.RecomputeComparisonValues
     /// sets ComparisonValue = TotalCost for every fallback-tier decision,
     /// and fallback tier propagates transitively up through every Craft
     /// ancestor, so an unvalued currency or GuildUpgrade ingredient
     /// anywhere in a chosen subtree forces delta = 0 for that node AND
-    /// every ancestor above it - TryBuild's delta &lt;= 0 guard below then
+    /// every ancestor above it - TryBuildContent's delta &lt;= 0 guard then
     /// suppresses the hover for the whole chain. Documented here, not
     /// fixed, so a future reader treats this as a known scope limit of the
     /// current solver rollup rather than rediscovering it as a bug.
     /// </summary>
-    public static class ValueDetailTooltipBuilder
+    internal static class ValueDetailTooltipBuilder
     {
         /// <summary>
         /// Attempts to build the value-detail tooltip for <paramref name="node"/>.
-        /// Returns false (and a null <paramref name="tooltipText"/>) when
-        /// this node's decision is not CRAFT/BuyFromVendor, either cost
-        /// figure is unavailable, or the two figures do not diverge - the
-        /// caller must show nothing in all of those cases, not an empty or
-        /// misleading tooltip.
-        /// </summary>
-        public static bool TryBuild(
-            CraftingTreeNode node,
-            IReadOnlyDictionary<int, TimegatedItem> vendorCapsByItemId,
-            out string tooltipText)
-        {
-            tooltipText = null;
-            if (!TryBuildContent(node, vendorCapsByItemId, out var content))
-            {
-                return false;
-            }
-
-            // Single wrap seam (see TooltipTextFormat): the opportunity-cost
-            // sentence is 76 characters, just past the budget, so the break
-            // lands where this module put it instead of wherever Blish's
-            // own 500px cap happens to fall. Applied HERE and not in
-            // TryBuildContent because the rich path wraps the same content
-            // against a real font at a real pixel width - one wrap policy
-            // per path, never both on one string.
-            tooltipText = TooltipTextFormat.Wrap(content.ToPlainText());
-            return true;
-        }
-
-        /// <summary>
-        /// The structured form <see cref="TryBuild"/> is a plain-text view
-        /// of. Each gold figure stays a coin span, which is what lets the
-        /// rich tooltip surface draw it with real coin icons instead of
-        /// spelling it "1g 23s 45c". Deliberately UNWRAPPED - see
-        /// <see cref="TryBuild"/>.
+        /// Returns false (and a null <paramref name="content"/>) when this
+        /// node's decision is not CRAFT/BuyFromVendor, either cost figure is
+        /// unavailable, or the two figures do not diverge - the caller must
+        /// show nothing in all of those cases, not an empty or misleading
+        /// tooltip.
+        /// <para>
+        /// Each gold figure stays a coin span, which is what lets the rich
+        /// tooltip surface draw it with real coin icons instead of spelling
+        /// it "1g 23s 45c".
+        /// </para>
+        /// <para>
+        /// Returned UNWRAPPED. The surface that renders this measures and
+        /// wraps against a real font at a real pixel width, so pre-breaking
+        /// the text here would only fight it. (There was once a second,
+        /// plain-string entry point that applied TooltipTextFormat's
+        /// character budget; nothing called it and it is gone.)
+        /// </para>
         /// </summary>
         public static bool TryBuildContent(
             CraftingTreeNode node,
@@ -84,10 +66,12 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             if (node.Decision != CraftingDecision.Craft && node.Decision != CraftingDecision.BuyFromVendor)
             {
                 return false;
             }
+
             // a currency-type
             // vendor cost-component leaf also has Decision == BuyFromVendor
             // and is kept out today only because BuildVendorCostComponentLeaves
@@ -101,6 +85,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             // a
             // merged vendor decision's VendorComponentCostsUnreliable is
             // already the documented signal (see that field's own doc
@@ -115,6 +100,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             if (!node.DecisionValue.HasValue || !node.SubtreeCost.HasValue)
             {
                 return false;
@@ -137,11 +123,11 @@ namespace GW2CraftingHelper.Services
             }
 
             var builder = new TooltipContentBuilder();
-            builder.Text("Crafting gold price: ").Coin(realGold, FormatCoin(realGold)).EndLine();
-            builder.Text("Currencies: ").Coin(delta, FormatCoin(delta)).EndLine();
+            builder.Text("Crafting gold price: ").Coin(realGold, CoinSegmentMath.GameStyleText(realGold)).EndLine();
+            builder.Text("Currencies: ").Coin(delta, CoinSegmentMath.GameStyleText(delta)).EndLine();
             builder.Text("This is an estimated opportunity cost for the used currencies in the recipe.").EndLine();
             builder.EndLine();
-            builder.Text("Optimization price: ").Coin(decisionTotal, FormatCoin(decisionTotal));
+            builder.Text("Optimization price: ").Coin(decisionTotal, CoinSegmentMath.GameStyleText(decisionTotal));
 
             // Maintainer-ratified #21 resolution: append the winning
             // vendor offer's purchase cap, when this node's item has one -
@@ -168,18 +154,6 @@ namespace GW2CraftingHelper.Services
                 case TimegatedCapType.Seasonal: return "season";
                 default: return "period";
             }
-        }
-
-        // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
-        // plain "Xg Ys Zc" FORMAT rather than referencing it - that class
-        // lives in Views.Rendering and is Blish-coupled, while this class
-        // must stay Blish-free to remain unit-testable (repo invariant).
-        // The split itself is shared via CoinSegmentMath.Split; only the
-        // trivial format string is kept in lockstep in spirit.
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
         }
     }
 }

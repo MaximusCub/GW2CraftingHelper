@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// shaping only; the caller still supplies already-formatted "name xN"
     /// entries in row order (see CraftingPlanView.TriggerGenerate).
     /// </summary>
-    public static class RequestLabelFormatter
+    internal static class RequestLabelFormatter
     {
         /// <summary>
         /// Entries beyond this count collapse into a single "+N more"
@@ -47,7 +47,11 @@ namespace GW2CraftingHelper.Services
             var sb = new StringBuilder();
             for (int i = 0; i < MaxVisibleEntries; i++)
             {
-                if (i > 0) sb.Append(", ");
+                if (i > 0)
+                {
+                    sb.Append(", ");
+                }
+
                 sb.Append(entries[i]);
             }
 

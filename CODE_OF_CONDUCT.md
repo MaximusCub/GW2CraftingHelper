@@ -58,9 +58,20 @@ representing the community in public spaces.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by opening an issue on this repository's issue tracker. All
-complaints will be reviewed and investigated promptly and fairly.
+Do **not** report through the issue tracker. Issues on this repository are
+public, which would contradict the privacy commitment immediately below.
+
+Instances of abusive, harassing, or otherwise unacceptable behavior should
+be reported privately, by either:
+
+- emailing the maintainer at the address `git log` shows as the author of
+  this repository's commits (not reprinted here, so this file does not
+  become one more page for address harvesters); or
+- using GitHub's own private reporting flow,
+  <https://github.com/contact/report-abuse>, which reaches GitHub Support
+  without publishing anything.
+
+All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of
 the reporter of any incident.

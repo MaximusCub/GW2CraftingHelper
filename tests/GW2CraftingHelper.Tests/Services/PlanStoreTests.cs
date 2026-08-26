@@ -144,7 +144,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ItemMetadataService(itemApi));
         }
 
-        // Mirrors CraftingPlanPipelineTests.BuildOwnMaterialsPipeline
+        // Mirrors PipelineBuilder.BuildOwnMaterialsPipeline
         // exactly (item 1 <- recipe 10 <- ingredientCount x item 2, with a
         // real InventoryReducer wired in) - reused here (rather than made
         // accessible cross-class) so this file's own fixtures stay
@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
                 reducer: new InventoryReducer());
         }
 
-        // Mirrors CraftingPlanPipelineTests.BuildForceBuyPipeline/
+        // Mirrors CraftingPlanPipelineForceBuyTests.BuildForceBuyPipeline/
         // OwnFourOfIngredient exactly: item 1's fresh (zero-owned) buy(100)
         // < craft(5x30=150)*0.85=127.5, so item 1's node is force-buy-
         // flagged under OwnMaterialsMode.Valued - the scenario that
@@ -341,6 +341,71 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(loaded.RequestItems);
             Assert.Equal(1, loaded.RequestItems[0].ItemId);
             Assert.Equal(3, loaded.RequestItems[0].Quantity);
+        }
+
+        // --- Restore-inputs pinning (restore-inputs branch): the three
+        // persisted-but-previously-ignored request inputs must round-trip
+        // in their NON-default direction, because the live controls they
+        // reseed default the other way (Use Own Materials checkbox true,
+        // price basis BuyOrder) - a wiring slip that dropped the loaded
+        // value would be invisible to a default-direction assertion. ---
+
+        [Fact]
+        public void Save_Load_UseOwnMaterialsFalse_RoundTripsAsFalse()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
+                UseOwnMaterials = false,
+                PriceBasis = PriceBasis.BuyOrder,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.False(loaded.UseOwnMaterials);
+        }
+
+        [Fact]
+        public void Save_Load_NonDefaultPriceBasis_RoundTrips()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
+                UseOwnMaterials = true,
+                PriceBasis = PriceBasis.InstantBuy,
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(PriceBasis.InstantBuy, loaded.PriceBasis);
+        }
+
+        [Fact]
+        public void Save_Load_MultiItemRequestWithQuantities_RoundTripsInRequestOrder()
+        {
+            _store.Save(new PersistedPlan
+            {
+                SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                GeneratedAt = DateTime.Now,
+                RequestItems = new List<PlanRequestItem>
+                {
+                    new PlanRequestItem { ItemId = 5, Quantity = 3 },
+                    new PlanRequestItem { ItemId = 6, Quantity = 250 },
+                    new PlanRequestItem { ItemId = 7, Quantity = 1 }
+                },
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 3 } }
+            });
+
+            var loaded = _store.LoadLatest();
+            Assert.NotNull(loaded);
+            Assert.Equal(new[] { 5, 6, 7 }, loaded.RequestItems.Select(r => r.ItemId));
+            Assert.Equal(new[] { 3, 250, 1 }, loaded.RequestItems.Select(r => r.Quantity));
         }
 
         [Fact]
@@ -950,13 +1015,13 @@ namespace GW2CraftingHelper.Tests.Services
         // full-featured pipelines (vendor offers, a learned-recipe account
         // client, a real snapshot, non-default CurrencyValuation/
         // HomesteadEfficiencyTiers, and a genuine multi-item batch) so the
-        // serialization-fidelity risk item 1 of the KNOWN-ISSUES entry
+        // serialization-fidelity risk item 1 of KNOWN-ISSUES #53
         // investigated is actually exercised, not just asserted. ---
 
         [Fact]
         public async Task Save_Load_ForceBuyOnlyNodeIds_RoundTripsAndManualOverrideStillWinsAfterReload()
         {
-            // Mirrors CraftingPlanPipelineTests'
+            // Mirrors CraftingPlanPipelineForceBuyTests'
             // ResolveWithOverrides_ForceBuyPrePass_ManualOverrideStillWins
             // exactly, adding a persist/reload round trip in the middle -
             // PlanSolveContext.ForceBuyOnlyNodeIds (an ISet<int> computed
@@ -1988,8 +2053,9 @@ namespace GW2CraftingHelper.Tests.Services
         /// Real pipeline, real VendorOfferStore-backed offer mixing a
         /// TP-valued Item cost line with a non-coin currency cost line (2
         /// kinds) - so CraftingTreeBuilder synthesizes component leaves
-        /// (see CraftingPlanPipelineTests.GenerateMixedVendorPlanAsync for
-        /// the sibling copy of this fixture shape). Mirrors this file's own
+        /// (see CraftingPlanPipelineVendorCostComponentTests.
+        /// GenerateMixedVendorPlanAsync for the sibling copy of this
+        /// fixture shape). Mirrors this file's own
         /// "build a REAL CraftingPlanResult, never hand-construct one"
         /// discipline (see this class's own header comment).
         /// </summary>

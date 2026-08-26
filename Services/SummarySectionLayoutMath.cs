@@ -14,25 +14,25 @@ namespace GW2CraftingHelper.Services
     /// otherwise the same kind of thing both already do for every other
     /// section: both are shared infrastructure several other sections'
     /// row builders depend on and are high-evidence zones (see
-    /// docs/KNOWN-ISSUES.md's policy note) - off-limits for the broader
+    /// docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - off-limits for the broader
     /// fold-back this class's own existence sidesteps.
     /// Views/CraftingPlanView.cs's one call site
     /// (CreateCollapsibleSection) special-cases PlanSectionType.Summary to
     /// call BodyHeight below instead of
     /// PlanContentHeightMath.SectionBodyHeight, the same way every other
     /// section type still routes through that method unchanged - see
-    /// docs/KNOWN-ISSUES.md's W4A entry for the original rationale.
+    /// KNOWN-ISSUES #46 for the original rationale.
     ///
     /// The row-height CONSTANTS themselves are not redefined here - every
     /// formula below reads PlanContentHeightMath's existing public
-    /// CostTileRowHeight/CTableHeaderRowHeight/CurrencyRowHeight/
+    /// CostTileRowHeight/ColumnHeaderRowHeight/CurrencyRowHeight/
     /// FallbackTextRowHeight constants directly, so this class can never
     /// drift from the fixed-row-height convention every other section
     /// already follows; only the Summary-specific COUNTING logic (how many
     /// of each fixed-height row this section's new formula-band/currency-
     /// table/footnote shape actually has) lives here.
     /// </summary>
-    public static class SummarySectionLayoutMath
+    internal static class SummarySectionLayoutMath
     {
         /// <summary>
         /// Total height of the redesigned Total Cost section's content
@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
         ///   - at most one CostTileRowHeight-tall row for the profit
         ///     formula band (present only when ProfitFormulaTile rows
         ///     exist - always exactly 3 when present);
-        ///   - one CTableHeaderRowHeight header plus one CurrencyRowHeight
+        ///   - one ColumnHeaderRowHeight header plus one CurrencyRowHeight
         ///     row per CurrencyCost row, only when at least one exists;
         ///   - one FallbackTextRowHeight row per MultiItemNote row;
         ///   - one FallbackTextRowHeight row for the SummaryFootnote row
@@ -91,13 +91,22 @@ namespace GW2CraftingHelper.Services
             }
 
             int height = 0;
-            if (hasCostBand) height += CostBandHeight(currencyRowCount > 0);
-            if (hasProfitBand) height += PlanContentHeightMath.CostTileRowHeight;
+            if (hasCostBand)
+            {
+                height += CostBandHeight(currencyRowCount > 0);
+            }
+
+            if (hasProfitBand)
+            {
+                height += PlanContentHeightMath.CostTileRowHeight;
+            }
+
             if (currencyRowCount > 0)
             {
-                height += PlanContentHeightMath.CTableHeaderRowHeight
+                height += PlanContentHeightMath.ColumnHeaderRowHeight
                     + currencyRowCount * PlanContentHeightMath.CurrencyRowHeight;
             }
+
             height += noteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             height += footnoteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
             return height;
@@ -246,7 +255,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string CurrencyRequirementNote(int currencyRowCount)
         {
-            if (currencyRowCount <= 0) return null;
+            if (currencyRowCount <= 0)
+            {
+                return null;
+            }
+
             // Deliberately short: it sits under a caption inside one tile
             // slice of a three-tile band, and the reason WHY it matters
             // lives in the hover text rather than widening this line past
@@ -264,14 +277,24 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string CurrencyRequirementNoteTooltip(IReadOnlyList<PlanRowViewModel> currencyRows)
         {
-            if (currencyRows == null || currencyRows.Count == 0) return null;
+            if (currencyRows == null || currencyRows.Count == 0)
+            {
+                return null;
+            }
 
             var names = new List<string>(currencyRows.Count);
             foreach (var row in currencyRows)
             {
-                if (!string.IsNullOrEmpty(row.Label)) names.Add(row.Label);
+                if (!string.IsNullOrEmpty(row.Label))
+                {
+                    names.Add(row.Label);
+                }
             }
-            if (names.Count == 0) return null;
+
+            if (names.Count == 0)
+            {
+                return null;
+            }
 
             return string.Join(", ", names)
                 + "\nThese are spent on top of the coin cost shown - see the Currency table below.";
@@ -372,6 +395,5 @@ namespace GW2CraftingHelper.Services
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
         }
-
     }
 }

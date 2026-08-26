@@ -6,10 +6,10 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>Columns the Snapshot tab's two runs expose - one enum,
     /// because they are the same two columns over different data.</summary>
-    public enum SnapshotTableColumn
+    internal enum SnapshotTableColumn
     {
         Name,
-        Amount
+        Amount,
     }
 
     /// <summary>
@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// same shape as <see cref="PlanTableSorter"/> (case-insensitive names
     /// included) except in what they return - see <see cref="ItemOrder"/>.
     /// </summary>
-    public static class SnapshotTableSorter
+    internal static class SnapshotTableSorter
     {
         /// <summary>
         /// The sort as a PERMUTATION of the caller's rows: <c>order[i]</c>
@@ -45,8 +45,15 @@ namespace GW2CraftingHelper.Services
             TableSortState<SnapshotTableColumn> state,
             Func<T, T, SnapshotTableColumn, int> compare)
         {
-            if (rows == null || rows.Count < 2) return null;
-            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue) return null;
+            if (rows == null || rows.Count < 2)
+            {
+                return null;
+            }
+
+            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue)
+            {
+                return null;
+            }
 
             SnapshotTableColumn column = state.Column.Value;
             int sign = state.Direction == TableSortDirection.Descending ? -1 : 1;

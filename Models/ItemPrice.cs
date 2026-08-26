@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class ItemPrice
+    internal class ItemPrice
     {
         public int ItemId { get; set; }
 

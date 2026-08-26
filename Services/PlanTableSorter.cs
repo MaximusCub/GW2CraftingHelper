@@ -8,13 +8,13 @@ namespace GW2CraftingHelper.Services
     /// Columns the Crafting Plan's two sortable tables expose. Used
     /// Materials has Item/Amount only; the Shopping List has all five.
     /// </summary>
-    public enum PlanTableColumn
+    internal enum PlanTableColumn
     {
         Item,
         Amount,
         Each,
         Total,
-        Source
+        Source,
     }
 
     /// <summary>
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// very same instance back, so the default path allocates nothing.
     /// </para>
     /// </summary>
-    public static class PlanTableSorter
+    internal static class PlanTableSorter
     {
         /// <summary>
         /// Rows in the order the given sort state asks for, or
@@ -38,8 +38,15 @@ namespace GW2CraftingHelper.Services
         public static IReadOnlyList<PlanRowViewModel> Sort(
             IReadOnlyList<PlanRowViewModel> rows, TableSortState<PlanTableColumn> state)
         {
-            if (rows == null || rows.Count < 2) return rows;
-            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue) return rows;
+            if (rows == null || rows.Count < 2)
+            {
+                return rows;
+            }
+
+            if (state == null || state.Direction == TableSortDirection.None || !state.Column.HasValue)
+            {
+                return rows;
+            }
 
             PlanTableColumn column = state.Column.Value;
             TableSortDirection direction = state.Direction;
@@ -61,6 +68,7 @@ namespace GW2CraftingHelper.Services
             {
                 sorted.Add(rows[order[i]]);
             }
+
             return sorted;
         }
 
@@ -150,7 +158,10 @@ namespace GW2CraftingHelper.Services
         {
             int aBlock = ValueBlock(aCoin, aCurrencies);
             int bBlock = ValueBlock(bCoin, bCurrencies);
-            if (aBlock != bBlock) return aBlock.CompareTo(bBlock);
+            if (aBlock != bBlock)
+            {
+                return aBlock.CompareTo(bBlock);
+            }
 
             if (aBlock == CoinBlock)
             {
@@ -163,7 +174,11 @@ namespace GW2CraftingHelper.Services
                 CurrencyAmountViewModel bKey = KeyCurrency(bCurrencies);
                 int byName = string.Compare(
                     aKey?.Name ?? string.Empty, bKey?.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-                if (byName != 0) return Flip(byName, direction);
+                if (byName != 0)
+                {
+                    return Flip(byName, direction);
+                }
+
                 return Flip(NumericKey(aKey).CompareTo(NumericKey(bKey)), direction);
             }
 
@@ -182,19 +197,30 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         private static int ValueBlock(long coin, IReadOnlyList<CurrencyAmountViewModel> currencies)
         {
-            if (coin > 0) return CoinBlock;
+            if (coin > 0)
+            {
+                return CoinBlock;
+            }
+
             return KeyCurrency(currencies) != null ? CurrencyBlock : UnpricedBlock;
         }
 
         private static CurrencyAmountViewModel KeyCurrency(IReadOnlyList<CurrencyAmountViewModel> currencies)
         {
-            if (currencies == null) return null;
+            if (currencies == null)
+            {
+                return null;
+            }
 
             CurrencyAmountViewModel key = null;
             for (int i = 0; i < currencies.Count; i++)
             {
                 var candidate = currencies[i];
-                if (candidate == null) continue;
+                if (candidate == null)
+                {
+                    continue;
+                }
+
                 if (key == null)
                 {
                     key = candidate;
@@ -208,6 +234,7 @@ namespace GW2CraftingHelper.Services
                     key = candidate;
                 }
             }
+
             return key;
         }
 
@@ -218,7 +245,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         private static double NumericKey(CurrencyAmountViewModel amount)
         {
-            if (amount == null) return 0;
+            if (amount == null)
+            {
+                return 0;
+            }
+
             return amount.UnitRate ?? amount.Amount;
         }
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services
 {
-    public enum TableSortDirection
+    internal enum TableSortDirection
     {
         /// <summary>
         /// The table renders in the order its data source produced -
@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         None,
         Ascending,
-        Descending
+        Descending,
     }
 
     /// <summary>
@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Services
     /// one - a table has exactly one active sort column.
     /// </para>
     /// </summary>
-    public sealed class TableSortState<TColumn>
+    internal sealed class TableSortState<TColumn>
         where TColumn : struct
     {
         /// <summary>ASCII sort markers - the tree's caret vocabulary.</summary>

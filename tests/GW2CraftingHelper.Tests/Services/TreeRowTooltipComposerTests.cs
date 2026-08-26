@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -39,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NullNode_ReturnsEmptyList()
         {
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(null, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(null, null, null).ToPlainLines();
 
             Assert.Empty(lines);
         }
@@ -49,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Have, name: null, quantity: 0);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Empty(lines);
         }
@@ -59,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.BuyFromTp, quantity: 5, unitCost: 12345);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("Unit price: 1g 23s 45c", lines);
         }
@@ -72,7 +73,7 @@ namespace GW2CraftingHelper.Tests.Services
             // price" tooltip line would be redundant.
             var node = Node(CraftingDecision.BuyFromTp, quantity: 1, unitCost: 12345);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.DoesNotContain(lines, l => l.StartsWith("Unit price:"));
         }
@@ -94,7 +95,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.DoesNotContain(lines, l => l.StartsWith("Unit price: 0g"));
             Assert.Contains("Unit price: 2 Karma", lines);
@@ -108,9 +109,13 @@ namespace GW2CraftingHelper.Tests.Services
             // must still render its real "0g 0s 0c" line, not go silent.
             var node = Node(CraftingDecision.BuyFromTp, quantity: 5, unitCost: 0);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
-            Assert.Contains("Unit price: 0g 0s 0c", lines);
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+            Assert.Contains("Unit price: 0c", lines);
         }
 
         [Fact]
@@ -122,7 +127,7 @@ namespace GW2CraftingHelper.Tests.Services
             // "false" and picking one side's wording as an unearned claim.
             var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("Other trading post price side shown", lines);
         }
@@ -133,7 +138,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
             var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.Contains("Buy-order price unavailable - instant-buy price shown", lines);
         }
@@ -144,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: true);
             var plan = new PlanViewModel { PriceBasis = PriceBasis.InstantBuy };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.Contains("Instant-buy price unavailable - buy-order price shown", lines);
         }
@@ -159,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
             // back" aggregate branch.
             var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true, isCostComponent: true);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("Other trading post price side shown", lines);
             Assert.DoesNotContain(lines, l => l.StartsWith("A vendor cost item's"));
@@ -170,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("A vendor cost item's other trading post price side shown", lines);
         }
@@ -181,15 +186,17 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
             var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
-            // 83 characters, so the composer's TooltipTextFormat seam splits
-            // it across list entries - the caller joins with newlines, so
-            // rejoining with a space must reproduce the sentence exactly.
-            Assert.StartsWith(
-                "A vendor cost item's buy-order price is unavailable - its instant-buy price is used",
-                string.Join(" ", lines));
-            Assert.All(lines, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars));
+            // 83 characters, and it stays ONE line: the rich surface wraps
+            // by measured pixel width, so the composer hands it over whole.
+            // (This used to assert the character-budget split applied by the
+            // deleted plain wrapper - TooltipTextFormatTests still covers
+            // that seam for the callers that still use it.)
+            Assert.Contains(
+                lines,
+                l => l.StartsWith(
+                    "A vendor cost item's buy-order price is unavailable - its instant-buy price is used"));
         }
 
         [Fact]
@@ -202,12 +209,12 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, priceSideFellBack: true);
             var plan = new PlanViewModel { PriceBasis = PriceBasis.InstantBuy };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
-            Assert.StartsWith(
-                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used",
-                string.Join(" ", lines));
-            Assert.All(lines, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars));
+            Assert.Contains(
+                lines,
+                l => l.StartsWith(
+                    "A vendor cost item's instant-buy price is unavailable - its buy-order price is used"));
         }
 
         [Fact]
@@ -228,10 +235,14 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.Equal(
-                new[] { "Unit price: 0g 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+                new[] { "Unit price: 5s 00c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
                 lines);
         }
 
@@ -240,7 +251,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // ResolveTreeNodeUnitAmounts falls back to a "N for M" bundle
             // label (Amount left at 0) whenever the total does not divide
-            // evenly by quantity - pin that BuildExtraTooltipLines renders
+            // evenly by quantity - pin that BuildExtraTooltipContent renders
             // that label rather than the numeric Amount.ToString() fork.
             var currencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 10 } };
             var node = Node(
@@ -252,7 +263,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, plan);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.Contains("Unit price: 10 for 3 Karma", lines);
         }
@@ -262,19 +273,20 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.BuyFromTp, priceSideFellBack: false);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.DoesNotContain(lines, l => l.Contains("trading post price side"));
         }
 
         [Theory]
-        [InlineData(CraftingDecision.Unknown)]
-        [InlineData(CraftingDecision.GuildUpgrade)]
-        public void AcquisitionHint_UnknownOrGuildUpgrade_IsIncluded(CraftingDecision decision)
+        [InlineData(nameof(CraftingDecision.Unknown))]
+        [InlineData(nameof(CraftingDecision.GuildUpgrade))]
+        public void AcquisitionHint_UnknownOrGuildUpgrade_IsIncluded(string decisionName)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, acquisitionHint: "Purchased from a Karma vendor.");
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("Purchased from a Karma vendor.", lines);
         }
@@ -287,7 +299,7 @@ namespace GW2CraftingHelper.Tests.Services
             // stray hint value must not surface it.
             var node = Node(CraftingDecision.Craft, acquisitionHint: "Purchased from a Karma vendor.");
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.DoesNotContain("Purchased from a Karma vendor.", lines);
         }
@@ -297,7 +309,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Unknown, name: null, acquisitionHint: null);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Empty(lines);
         }
@@ -307,7 +319,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Unknown, acquisitionHint: "No listed source.");
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "What if: crafted instead", null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, "What if: crafted instead", null).ToPlainLines();
 
             Assert.Equal("What if: crafted instead", lines[0]);
             Assert.Contains("No listed source.", lines);
@@ -318,7 +330,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Have, name: null);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "", null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, "", null).ToPlainLines();
 
             Assert.Empty(lines);
         }
@@ -328,7 +340,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Have, name: "Bolt of Damask");
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.Contains("Right-click: Open wiki page", lines);
         }
@@ -342,7 +354,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var node = Node(CraftingDecision.Have, name: name);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, null, null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
             Assert.DoesNotContain("Right-click: Open wiki page", lines);
         }
@@ -359,13 +371,13 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftingDecision.BuyFromTp, name: "Bolt of Damask", quantity: 3, unitCost: 100,
                 priceSideFellBack: true);
 
-            var lines = TreeRowTooltipComposer.BuildExtraTooltipLines(node, "Caption line", null);
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, "Caption line", null).ToPlainLines();
 
             Assert.Equal(
                 new[]
                 {
                     "Caption line",
-                    "Unit price: 0g 1s 0c",
+                    "Unit price: 1s 00c",
                     "Other trading post price side shown",
                     "Right-click: Open wiki page"
                 },

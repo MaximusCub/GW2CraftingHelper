@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services
     /// loaded. 22-BOLD is a genuine intermediate.
     /// </para>
     /// </summary>
-    public static class TypeRampMetrics
+    internal static class TypeRampMetrics
     {
         /// <summary>
         /// One font's measured vertical metrics, in the units every layout
@@ -90,7 +90,7 @@ namespace GW2CraftingHelper.Services
         // no test edits, every band height unchanged:
         //     ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk Bold20 -> Bold18
         //     SectionTitlePointSize 24 -> 22, SectionTitleInk Bold24 -> Bold22
-        //     PlanContentHeightMath.CTableHeaderLabelY   4 -> 5
+        //     PlanContentHeightMath.ColumnHeaderLabelY   4 -> 5
         //     PlanContentHeightMath.SectionHeaderCaretY 10 -> 9
         // The last two are not free-standing choices: a label y is one
         // half of a band's arithmetic and the shorter font's cap top and

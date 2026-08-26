@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Services
     /// same seam OwnedMaterialsForceBuyPrePass occupies conceptually,
     /// though this pass needs no NodeIds and no throwaway solve).
     /// </summary>
-    public static class AchievementBitDedupPrePass
+    internal static class AchievementBitDedupPrePass
     {
         public static void Apply(RecipeNode tree)
         {
@@ -181,6 +181,7 @@ namespace GW2CraftingHelper.Services
                     node.Recipes.Clear();
                     return;
                 }
+
                 seenBitItemIds.Add(node.Id);
             }
 

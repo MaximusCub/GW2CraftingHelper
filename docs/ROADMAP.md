@@ -20,22 +20,36 @@
   [`docs/gw2e-considerations.md`](gw2e-considerations.md)) then found a
   queue of genuine ADOPT gaps against the live calculator; those are what
   the current wave of branches is implementing.
-- **M38 - cleanup wave: complete.** Structural cleanup across the whole
-  codebase: test-infrastructure consolidation, analyzer/style hygiene, the
-  `CraftingPlanView` God-class decomposition into per-section renderers
-  plus a `TreeSectionController` (see
-  [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) section 5), pipeline/solver
-  structural splits, coverage gaps closed, and this documentation
-  restructure.
+- **M38 - cleanup wave: the work landed; one result did not hold.**
+  Structural cleanup across the whole codebase: test-infrastructure
+  consolidation, analyzer/style hygiene, the `CraftingPlanView` God-class
+  decomposition into per-section renderers plus a `TreeSectionController`
+  (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) section 5),
+  pipeline/solver structural splits, coverage gaps closed, and this
+  documentation restructure. One deliverable from the wave's own plan was
+  **not** built - the `Services/` folder split - and is recorded in the
+  DEFERRED list in [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) with the
+  reason.
+
+  The decomposition itself did not stay done. `CraftingPlanView` was
+  ~2,802 lines when the wave closed on 2026-07-23 and 5,281 lines by
+  2026-08-25 - past the ~4,802-line baseline the refactor started from -
+  because nothing in CI measured it and this document said the problem
+  was solved. That is fixed at the source rather than by editing the
+  claim: `docs/file-budgets.txt` plus the line-budget step in
+  `.github/workflows/tests.yml` now fail on growth in any tracked `.cs`
+  file. Read the measured figure in ARCHITECTURE.md section 5, not a
+  status word here.
 - **M39 - core tabs shipped.** Snapshot search/filter, the Log tab (with
   the JSONL log store and rotation), the Settings tab, and the About tab
   all landed and are in normal use - see the README's "Tabs" section for
   what each one does today.
 - **Current phase - field-test releases + the convergence-adoption wave.**
   Since 2026-08 the project ships stamped builds to a live Blish HUD
-  install: `v0.2.0` (2026-08-23) through `v0.2.3` (2026-08-24, the
-  plan-view redesign), each with a `CHANGELOG.md` entry and a matching git
-  tag - see [`CHANGELOG.md`](../CHANGELOG.md) and
+  install: `v0.2.0` (2026-08-23) through `v0.2.4` (2026-08-25, the
+  app-wide typography and layout pass), each with a `CHANGELOG.md` entry
+  and a matching git tag pushed to origin (measured 2026-08-25:
+  `git ls-remote --tags origin`) - see [`CHANGELOG.md`](../CHANGELOG.md) and
   [`docs/RELEASING.md`](RELEASING.md). Work arrives as one branch per
   milestone, each ending in a live desktop gate; the feedback loop is the
   maintainer field-testing the deployed build. The queue is driven by the
@@ -45,10 +59,12 @@
 ## What's not done
 
 - **Plan History** and **Crafting Ranker** exist only as placeholder tabs
-  (they render a "Coming Soon" stub, no functional content).
+  (they render a "Coming Soon" stub, no functional content). Their tab
+  registration is `#if DEBUG`, so they are not present in released builds -
+  remove the two directives in `Module.cs` when the features land.
 - Further tab feature proposals (deeper snapshot search, plan history,
   a crafting ranker, and similar ideas) live in-repo at
-  [`docs/dev-notes/m38-plan/proposals/`](dev-notes/m38-plan/proposals/).
+  [`dev/proposals/`](../dev/proposals/).
   Being written down does not make them committed roadmap items: `d1`
   (snapshot/about/settings) is partly implemented, while `d3`
   (plan history) and `d4` (crafting ranker) back the two placeholder tabs
@@ -63,13 +79,16 @@
   tiers: [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) is the current-state
   tracker (numbered catalog, the open list, and a ledger of every rotated
   milestone record); the full milestone records live one file each under
-  [`docs/archive/known-issues/`](archive/known-issues/); and the pre-M38
-  fix-pass diary is [`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md).
+  [`dev/archive/known-issues/`](../dev/archive/known-issues/); and the pre-M38
+  fix-pass diary is [`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md).
 - The original per-phase project plans (Phase A through the M14-M17
   navigation/visual-parity work, each with full scope/acceptance-criteria
   templates) are archived at
-  [`docs/archive/plans/2026-02-15/`](archive/plans/2026-02-15/).
-- Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+  [`dev/archive/plans/2026-02-15/`](../dev/archive/plans/2026-02-15/).
+- Durable architecture rationale: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md);
+  designs proposed and deliberately not built:
+  [`docs/DECISIONS.md`](DECISIONS.md).
+- Everything else is indexed from [`docs/README.md`](README.md).
 
 ## Backlog
 

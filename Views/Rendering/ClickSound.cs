@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// 1.3.0) - hence the reported inaudibility, and the only way past the
     /// cap is to play the effect ourselves. The asset is Blish's own
     /// button-click.wav from ref.dat, so only the volume changes; the
-    /// divergence from Blish's mute-with-game rule is in KNOWN-ISSUES.
+    /// divergence from Blish's mute-with-game rule is in KNOWN-ISSUES #52.
     /// </summary>
     internal static class ClickSound
     {
@@ -51,6 +51,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return _volumePercent;
             }
+
             set
             {
                 _volumePercent = ClickSoundVolume.Clamp(value);
@@ -64,13 +65,23 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static void Play()
         {
             int percent = _volumePercent;
-            if (ClickSoundVolume.IsSilent(percent)) return;
-            if (_playRemainingAttempts <= 0) return;
+            if (ClickSoundVolume.IsSilent(percent))
+            {
+                return;
+            }
+
+            if (_playRemainingAttempts <= 0)
+            {
+                return;
+            }
 
             try
             {
                 var effect = EnsureLoaded();
-                if (effect == null) return;
+                if (effect == null)
+                {
+                    return;
+                }
 
                 effect.Play(ClickSoundVolume.ToVolume(percent), 0f, 0f);
                 _playRemainingAttempts = MaxPlayAttempts;
@@ -97,7 +108,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 _loadFailed = false;
                 _playRemainingAttempts = MaxPlayAttempts;
 
-                if (effect == null) return;
+                if (effect == null)
+                {
+                    return;
+                }
 
                 try
                 {
@@ -118,12 +132,22 @@ namespace GW2CraftingHelper.Views.Rendering
         private static SoundEffect EnsureLoaded()
         {
             var loaded = _effect;
-            if (loaded != null) return loaded;
+            if (loaded != null)
+            {
+                return loaded;
+            }
 
             lock (LoadLock)
             {
-                if (_effect != null) return _effect;
-                if (_loadFailed) return null;
+                if (_effect != null)
+                {
+                    return _effect;
+                }
+
+                if (_loadFailed)
+                {
+                    return null;
+                }
 
                 // Set before the load, not in a catch: every exit below
                 // other than a successful decode is a permanent give-up.
@@ -139,11 +163,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     using (var reader = new ZipArchiveReader(refPath, AudioSubPath))
                     {
-                        if (!reader.FileExists(ClickSoundEntry)) return null;
+                        if (!reader.FileExists(ClickSoundEntry))
+                        {
+                            return null;
+                        }
 
                         using (var stream = reader.GetFileStream(ClickSoundEntry))
                         {
-                            if (stream == null) return null;
+                            if (stream == null)
+                            {
+                                return null;
+                            }
 
                             _effect = SoundEffect.FromStream(stream);
                         }

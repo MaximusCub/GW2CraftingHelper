@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// currency can never affect a decision or total (matching gw2e,
     /// whose quantity engine also excludes currency from decision math).
     /// </summary>
-    public class AccountCurrencyIndex
+    internal class AccountCurrencyIndex
     {
         private readonly Dictionary<int, int> _index;
 

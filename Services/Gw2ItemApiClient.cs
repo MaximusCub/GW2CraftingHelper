@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2ItemApiClient : IItemApiClient
+    internal class Gw2ItemApiClient : IItemApiClient
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 
@@ -49,10 +49,7 @@ namespace GW2CraftingHelper.Services
                 var results = new List<RawItem>();
                 foreach (var item in array)
                 {
-                    // design-plan-notes.md (Notes section, excess/reclaim
-                    // account-bound exclusion): the "flags" array (e.g.
-                    // "AccountBound") was previously parsed nowhere - see
-                    // RawItem.Flags' own doc comment. Missing/non-array
+                    // Missing/non-array
                     // "flags" yields an empty list, never null, mirroring
                     // the Name/Icon/Rarity "" fallback convention above.
                     var flags = new List<string>();
@@ -88,7 +85,7 @@ namespace GW2CraftingHelper.Services
                         VendorValue = item.Value<int>("vendor_value"),
                         Description = item.Value<string>("description"),
                         Restrictions = ReadStringArray(item["restrictions"] as JArray),
-                        Detail = ParseDetail(item["details"] as JObject)
+                        Detail = ParseDetail(item["details"] as JObject),
                     });
                 }
 
@@ -121,7 +118,7 @@ namespace GW2CraftingHelper.Services
                 StatChoiceIds = ReadIntArray(details["stat_choices"] as JArray),
                 NourishmentDurationMs = details.Value<int?>("duration_ms"),
                 NourishmentDescription = details.Value<string>("description"),
-                InfixAttributes = new List<RawItemAttribute>()
+                InfixAttributes = new List<RawItemAttribute>(),
             };
 
             var slots = details["infusion_slots"] as JArray;
@@ -144,10 +141,11 @@ namespace GW2CraftingHelper.Services
                         {
                             continue;
                         }
+
                         detail.InfixAttributes.Add(new RawItemAttribute
                         {
                             Attribute = name,
-                            Modifier = obj.Value<int?>("modifier") ?? 0
+                            Modifier = obj.Value<int?>("modifier") ?? 0,
                         });
                     }
                 }
@@ -165,6 +163,7 @@ namespace GW2CraftingHelper.Services
             {
                 return values;
             }
+
             foreach (var token in array)
             {
                 var value = token.Value<string>();
@@ -173,6 +172,7 @@ namespace GW2CraftingHelper.Services
                     values.Add(value);
                 }
             }
+
             return values;
         }
 
@@ -183,6 +183,7 @@ namespace GW2CraftingHelper.Services
             {
                 return values;
             }
+
             foreach (var token in array)
             {
                 var value = token.Value<int?>();
@@ -191,6 +192,7 @@ namespace GW2CraftingHelper.Services
                     values.Add(value.Value);
                 }
             }
+
             return values;
         }
     }

@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Models
     // for ModuleLogLevel. A future member reorder can no longer silently
     // remap an already-persisted plan's price basis to a different value.
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum PriceBasis
+    internal enum PriceBasis
     {
         /// <summary>
         /// Buy instantly from the lowest sell listing (sells.unit_price).
@@ -27,6 +27,6 @@ namespace GW2CraftingHelper.Models
         /// Place buy orders at the highest current buy order
         /// (buys.unit_price). Cheaper but not instant.
         /// </summary>
-        BuyOrder = 1
+        BuyOrder = 1,
     }
 }

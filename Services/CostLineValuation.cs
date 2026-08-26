@@ -74,12 +74,14 @@ namespace GW2CraftingHelper.Services
                         coinCost = 0;
                         return false;
                     }
+
                     int unitPrice = PlanSolver.GetUnitPrice(price, priceBasis);
                     if (unitPrice <= 0)
                     {
                         coinCost = 0;
                         return false;
                     }
+
                     coinCost += (long)line.Count * unitPrice;
                 }
                 else

@@ -65,15 +65,36 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void FormatCompactSummary_SingleItemDebugLog_BucketsIntoFivePhasesInOrder()
+        public void FormatCompactSummary_SingleItemDebugLog_BucketsIntoPhasesInOrder()
         {
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(BuildRealisticSingleItemDebugLog());
 
             // tree = 120 + 5 = 125; prices = 8400 + 2 = 8402;
-            // solve = 1 + 30 = 31; item details = 9200 + 50 + 100 = 9350;
-            // display = 250; total = 125+8402+31+9350+250 = 18158.
+            // solve = 1 + 30 = 31; item details = 9200 + 50 = 9250;
+            // learned recipes = 100; display = 250;
+            // total = 125+8402+31+9250+100+250 = 18158.
             Assert.Equal(
-                "tree 125ms, prices 8402ms (3 items), solve 31ms, item details 9350ms (3 items), display 250ms - total 18158ms",
+                "tree 125ms, prices 8402ms (3 items), solve 31ms, item details 9250ms (3 items), learned recipes 100ms, display 250ms - total 18158ms",
+                summary);
+        }
+
+        [Fact]
+        public void FormatCompactSummary_LearnedRecipes_DoesNotInflateTheItemDetailsBucket()
+        {
+            // The account round trip used to be added to "item details",
+            // which is annotated with the item-metadata count - so a 4.5s
+            // /v2/account/recipes call was reported as "item details
+            // (3 items)". The two must stay separately attributable.
+            var debugLog = new List<string>
+            {
+                "Fetch item metadata: 5ms (3 items)",
+                "Fetch learned recipes: 4557ms"
+            };
+
+            string summary = PlanPhaseTimingSummary.FormatCompactSummary(debugLog);
+
+            Assert.Equal(
+                "item details 5ms (3 items), learned recipes 4557ms - total 4562ms",
                 summary);
         }
 
@@ -91,7 +112,7 @@ namespace GW2CraftingHelper.Tests.Services
                 BuildRealisticSingleItemDebugLog(), wallClockMs: 19036);
 
             Assert.Equal(
-                "tree 125ms, prices 8402ms (3 items), solve 31ms, item details 9350ms (3 items), display 250ms - total 19036ms (phases 18158ms)",
+                "tree 125ms, prices 8402ms (3 items), solve 31ms, item details 9250ms (3 items), learned recipes 100ms, display 250ms - total 19036ms (phases 18158ms)",
                 summary);
         }
 
@@ -101,7 +122,7 @@ namespace GW2CraftingHelper.Tests.Services
             // The default (omitted) parameter must reproduce the exact
             // pre-existing wording - every current caller/test relies on
             // this (see FormatCompactSummary_SingleItemDebugLog_
-            // BucketsIntoFivePhasesInOrder above).
+            // BucketsIntoPhasesInOrder above).
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(
                 BuildRealisticSingleItemDebugLog(), wallClockMs: null);
 

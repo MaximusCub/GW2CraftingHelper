@@ -3,7 +3,7 @@ using System;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES 31a-F1 audit-of-the-fix: the original fix captured
+    /// KNOWN-ISSUES #31/31a-F1 audit-of-the-fix: the original fix captured
     /// <c>myEpoch</c> before a snapshot fetch's await and re-checked it
     /// against a bare <c>volatile int _snapshotEpoch</c> afterwards via
     /// <see cref="SnapshotEpochGuard"/>, with the field commit that follows
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// completed by the time TryCommit is called, and ClearCache's own work
     /// is all synchronous field/file writes).
     /// </summary>
-    public sealed class SnapshotCommitGate
+    internal sealed class SnapshotCommitGate
     {
         private readonly object _lock = new object();
         private int _epoch;
@@ -60,7 +60,10 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public void Clear(Action clear)
         {
-            if (clear == null) throw new ArgumentNullException(nameof(clear));
+            if (clear == null)
+            {
+                throw new ArgumentNullException(nameof(clear));
+            }
 
             lock (_lock)
             {
@@ -79,11 +82,17 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public bool TryCommit(int myEpoch, Action commit)
         {
-            if (commit == null) throw new ArgumentNullException(nameof(commit));
+            if (commit == null)
+            {
+                throw new ArgumentNullException(nameof(commit));
+            }
 
             lock (_lock)
             {
-                if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _epoch)) return false;
+                if (!SnapshotEpochGuard.ShouldCommit(myEpoch, _epoch))
+                {
+                    return false;
+                }
 
                 commit();
                 return true;

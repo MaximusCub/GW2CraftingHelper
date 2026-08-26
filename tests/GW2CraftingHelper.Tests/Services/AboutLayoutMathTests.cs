@@ -1,3 +1,4 @@
+using System.Linq;
 using GW2CraftingHelper.Services;
 using Xunit;
 
@@ -13,31 +14,44 @@ namespace GW2CraftingHelper.Tests.Services
 
         private const int WidePanelWidth = 2540;
 
+        // These pin the RESOLVED numbers, not the sums that produce them: a
+        // test that restates the const expression is checked by the compiler
+        // and can never go red, so any term moving would be invisible. Here
+        // a term moving forces a human to look at the new value and at the
+        // boundary tests below, which are written in literal pixels and so
+        // have an oracle independent of the constants under test.
         [Fact]
-        public void TwoColumnThreshold_IsItsOwnThreeTerms()
+        public void FactsMinWidthAndTwoColumnThreshold_ResolveToTheirShippedPixels()
         {
-            Assert.Equal(
-                AboutLayoutMath.FactsMinWidth + AboutLayoutMath.ColumnGutter
-                    + AboutLayoutMath.ProseMeasure,
-                AboutLayoutMath.TwoColumnThreshold);
+            Assert.Equal(362, AboutLayoutMath.FactsMinWidth);
+            Assert.Equal(954, AboutLayoutMath.TwoColumnThreshold);
         }
 
         [Fact]
-        public void FactsMinWidth_IsItsOwnFiveTerms()
+        public void ColumnCount_TurnsOverBetween953And954Pixels()
         {
-            Assert.Equal(
-                AboutLayoutMath.Inset
-                    + (AboutLayoutMath.LabelRunChars * SnapshotItemGridLayout.MaxCharWidthPx)
-                    + AboutLayoutMath.LabelToValueGap
-                    + AboutLayoutMath.ValueFloor
-                    + PlanRelayoutMath.TableRightMargin,
-                AboutLayoutMath.FactsMinWidth);
+            Assert.Equal(1, AboutLayoutMath.ColumnCount(953));
+            Assert.Equal(2, AboutLayoutMath.ColumnCount(954));
         }
 
         [Fact]
-        public void LabelFloor_HoldsTheWidestFactLabelTheTabShips()
+        public void LabelFloor_HoldsEveryFactLabelTheTabShips()
         {
-            Assert.True("Data directory".Length <= AboutLayoutMath.LabelRunChars);
+            Assert.Equal(6, AboutLayoutMath.FactLabels.Count);
+
+            foreach (string label in AboutLayoutMath.FactLabels)
+            {
+                Assert.True(
+                    label.Length <= AboutLayoutMath.LabelRunChars,
+                    label + " is wider than the label band's floor");
+            }
+
+            // The floor is not merely sufficient, it is sized to the widest
+            // label the tab ships: shipping a wider one reds this.
+            Assert.Equal(
+                AboutLayoutMath.LabelRunChars,
+                AboutLayoutMath.FactLabels.Max(label => label.Length));
+            Assert.Equal(126, AboutLayoutMath.LabelFloor);
         }
 
         [Fact]
@@ -51,10 +65,8 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ColumnCount_IsOneBelowTheThresholdAndTwoAtOrAboveIt()
+        public void ColumnCount_IsTwoAtEveryPanelWidthTheWindowActuallyReaches()
         {
-            Assert.Equal(1, AboutLayoutMath.ColumnCount(AboutLayoutMath.TwoColumnThreshold - 1));
-            Assert.Equal(2, AboutLayoutMath.ColumnCount(AboutLayoutMath.TwoColumnThreshold));
             Assert.Equal(2, AboutLayoutMath.ColumnCount(WidePanelWidth));
             Assert.Equal(2, AboutLayoutMath.ColumnCount(FloorPanelWidth));
         }
@@ -118,7 +130,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int NarrowColumn = 400;
 
             Assert.Equal(
-                PlanRelayoutMath.PinnedRightEdge(NarrowColumn) - AboutLayoutMath.Inset,
+                PlanRelayoutMath.PinnedRightEdge(NarrowColumn) - AboutLayoutMath.AboutInset,
                 AboutLayoutMath.TextBudget(NarrowColumn));
         }
 
@@ -136,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int MeasuredBand = 150;
 
             Assert.Equal(
-                AboutLayoutMath.Inset + MeasuredBand + AboutLayoutMath.LabelToValueGap,
+                AboutLayoutMath.AboutInset + MeasuredBand + AboutLayoutMath.LabelToValueGap,
                 AboutLayoutMath.ValueX(MeasuredBand));
         }
 

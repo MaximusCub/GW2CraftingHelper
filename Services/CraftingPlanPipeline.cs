@@ -9,7 +9,7 @@ using GW2CraftingHelper.Services.Diagnostics;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CraftingPlanPipeline
+    internal class CraftingPlanPipeline
     {
         private readonly RecipeService _recipeService;
         private readonly TradingPostService _tradingPostService;
@@ -106,11 +106,11 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
-            // Step 1: Build recipe tree
+            // Build recipe tree
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = $"Building recipe tree ({FirstRunTreeHint})..."
+                Message = $"Building recipe tree ({FirstRunTreeHint})...",
             });
             // These RecipeService diagnostics explain a slow first run and a
             // stale recipe seed; RecipeService bounds each to one Info line
@@ -130,6 +130,7 @@ namespace GW2CraftingHelper.Services
             {
                 _recipeService.OnStatusUpdate = null;
             }
+
             sw.Stop();
             timingLog.Add($"Build recipe tree: {sw.ElapsedMilliseconds}ms");
 
@@ -140,8 +141,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Steps 2 through result build, shared by the single-item and
-        /// multi-item paths. Callers run Step 1 (tree build) themselves so
+        /// Everything from price lookup through the result build, shared by
+        /// the single-item and multi-item paths. Callers build the tree
+        /// themselves so
         /// PlanPhaseTimingSummary keeps its per-path phase labels. items is
         /// null on the single-item path; when set, tree is the synthetic
         /// multi-item wrapper and targetItemId/quantity carry the wrapper
@@ -170,7 +172,7 @@ namespace GW2CraftingHelper.Services
             // force-buy pre-pass - see AchievementBitDedupPrePass.
             AchievementBitDedupPrePass.Apply(tree);
 
-            // Step 2: Collect all item IDs from the tree for price lookup
+            // Collect all item IDs from the tree for price lookup
             progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
             sw.Restart();
             var allItemIds = new HashSet<int>();
@@ -178,19 +180,19 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 3: Fetch TP prices
+            // Fetch TP prices
             phaseTracker.Start(PlanPhase.FetchingPrices, "Fetching prices", allItemIds.Count);
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching prices ({allItemIds.Count} items)...",
-                Total = allItemIds.Count
+                Total = allItemIds.Count,
             });
             sw.Restart();
             var prices = await _tradingPostService.GetPricesAsync(allItemIds, ct);
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Query vendor offers, then price any vendor-only cost items
+            // Query vendor offers, then price any vendor-only cost items
             var vendorContext = await FetchPricedVendorContextAsync(
                 allItemIds, prices, progress, sw, timingLog, ct);
             var vendorOffers = vendorContext.VendorOffers;
@@ -210,7 +212,8 @@ namespace GW2CraftingHelper.Services
             if (useForceBuyPrePass)
             {
                 // Pre-assign stable NodeIds to the unreduced tree before
-                // Step 6 clones it: CloneNode preserves NodeIds, so the
+                // the inventory reduction clones it: CloneNode preserves
+                // NodeIds, so the
                 // pre-pass's forceBuyOnlyNodeIds keys match the ids the
                 // real solve uses.
                 RecipeNodeIds.Assign(tree);
@@ -256,15 +259,15 @@ namespace GW2CraftingHelper.Services
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
-            // Step 6: Inventory reduction
+            // Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
             sw.Restart();
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
-            // VOM finding #1 fix: captured here (rather than scoped inside
-            // the `if` below) so it can also feed PlanSolveContext.
+            // Captured here rather than scoped inside the `if` below so it
+            // can also feed PlanSolveContext.
             // AccountItems further down - see that field's own doc comment.
             AccountItemIndex accountIndex = null;
 
@@ -276,10 +279,11 @@ namespace GW2CraftingHelper.Services
                 usedMaterials = reduced.UsedMaterials;
                 ownedQuantityUsedByNode = reduced.OwnedQuantityUsedByNode;
             }
+
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7: Solve. assignNodeIds:false only when the pre-pass
+            // Solve. assignNodeIds:false only when the pre-pass
             // pre-assigned ids, so forceBuyOnlyNodeIds' keys still match.
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
@@ -297,12 +301,12 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7b: convert the reference-keyed owned-usage side channel
+            // Convert the reference-keyed owned-usage side channel
             // into a NodeId-keyed lookup now that Solve() assigned NodeIds.
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
                 BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
 
-            // Step 8: Fetch item metadata for all step items + target + used materials + tree items
+            // Fetch item metadata for all step items + target + used materials + tree items
             // Fetch metadata for EVERY tree item (not just chosen-path ones):
             // local override re-solves can surface any node's item in steps,
             // and the cached SolveContext metadata must cover them all.
@@ -319,6 +323,7 @@ namespace GW2CraftingHelper.Services
             {
                 metadataIds.Add(targetItemId);
             }
+
             if (usedMaterials != null)
             {
                 foreach (var um in usedMaterials)
@@ -326,6 +331,7 @@ namespace GW2CraftingHelper.Services
                     metadataIds.Add(um.ItemId);
                 }
             }
+
             // Vendor cost-component item leaves are never tree ingredients,
             // so allItemIds never collects them; add them before the bulk
             // metadata fetch (see AddVendorItemComponentIds).
@@ -337,7 +343,7 @@ namespace GW2CraftingHelper.Services
             progress?.Report(new PlanStatus
             {
                 Message = $"Fetching item details ({metadataIds.Count} items)...",
-                Total = metadataIds.Count
+                Total = metadataIds.Count,
             });
             sw.Restart();
 
@@ -351,15 +357,15 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Step 9: Await the currency metadata fetch started above
+            // Await the currency metadata fetch started above
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
                 await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available)
+            // Fetch learned recipe IDs (if permission available)
             ISet<int> learnedRecipeIds =
-                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
+                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, phaseTracker, ct);
 
-            // Step 11: Build structured result
+            // Build structured result
             phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
@@ -441,7 +447,7 @@ namespace GW2CraftingHelper.Services
                 // PlanSolveContext.UnreducedTree.
                 UnreducedTree = useForceBuyPrePass ? tree : null,
                 AccountItems = useForceBuyPrePass ? ProjectAccountItemsForSolveContext(snapshot.Items) : null,
-                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null
+                ActiveCharacterName = useForceBuyPrePass ? activeCharacterName : null,
             };
             sw.Stop();
             timingLog.Add($"Build result: {sw.ElapsedMilliseconds}ms");
@@ -561,12 +567,12 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
-            // Step 1: Build each item's own tree, then wrap them under the
+            // Build each item's own tree, then wrap them under the
             // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
-                Message = $"Building recipe trees ({FirstRunTreeHint})..."
+                Message = $"Building recipe trees ({FirstRunTreeHint})...",
             });
             _recipeService.OnStatusUpdate = msg =>
             {
@@ -583,6 +589,7 @@ namespace GW2CraftingHelper.Services
             {
                 _recipeService.OnStatusUpdate = null;
             }
+
             sw.Stop();
             timingLog.Add($"Build recipe trees: {sw.ElapsedMilliseconds}ms ({items.Count} items)");
 
@@ -725,6 +732,7 @@ namespace GW2CraftingHelper.Services
             {
                 result.DebugLog = new List<string>();
             }
+
             result.DebugLog.Insert(0,
                 "Local re-solve with " + StatusText.Count(overrides?.Count ?? 0, "override") +
                 ", " + StatusText.Count(ignoredItemIds?.Count ?? 0, "ignored item"));
@@ -768,6 +776,7 @@ namespace GW2CraftingHelper.Services
             {
                 vendorOffers = _vendorOfferStore.GetOffersForItems(allItemIds);
             }
+
             sw.Stop();
             timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
@@ -805,6 +814,7 @@ namespace GW2CraftingHelper.Services
                     currencyMetadata = null;
                 }
             }
+
             sw.Stop();
             timingLog.Add($"Fetch currency metadata: {sw.ElapsedMilliseconds}ms");
             return currencyMetadata;
@@ -812,7 +822,7 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Fetches learned recipe ids if the account client is wired up and
-        /// permitted. KNOWN-ISSUES api-degradation F4: any non-cancellation
+        /// permitted. KNOWN-ISSUES #31/api-degradation F4: any non-cancellation
         /// failure degrades to null, a state PlanResultBuilder already treats
         /// as supported rather than discarding an otherwise-priced plan.
         /// </summary>
@@ -820,8 +830,10 @@ namespace GW2CraftingHelper.Services
             IProgress<PlanStatus> progress,
             Stopwatch sw,
             List<string> timingLog,
+            PhaseTracker phaseTracker,
             CancellationToken ct)
         {
+            phaseTracker.Start(PlanPhase.CheckingLearnedRecipes, "Checking learned recipes", null);
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;
@@ -840,6 +852,7 @@ namespace GW2CraftingHelper.Services
                     learnedRecipeIds = null;
                 }
             }
+
             sw.Stop();
             timingLog.Add($"Fetch learned recipes: {sw.ElapsedMilliseconds}ms");
             return learnedRecipeIds;
@@ -855,6 +868,7 @@ namespace GW2CraftingHelper.Services
             {
                 result.DebugLog = new List<string>();
             }
+
             result.DebugLog.InsertRange(0, timingLog);
             var summary = PlanTimingAnalyzer.Summarize(timingLog);
             result.DebugLog.InsertRange(timingLog.Count, summary);
@@ -880,7 +894,11 @@ namespace GW2CraftingHelper.Services
             {
                 foreach (var offer in offerList)
                 {
-                    if (offer.CostLines == null) continue;
+                    if (offer.CostLines == null)
+                    {
+                        continue;
+                    }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Item", StringComparison.Ordinal) &&
@@ -899,8 +917,16 @@ namespace GW2CraftingHelper.Services
 
             var costPrices = await _tradingPostService.GetPricesAsync(costItemIds, ct);
             var merged = new Dictionary<int, ItemPrice>(prices.Count + costPrices.Count);
-            foreach (var kvp in prices) merged[kvp.Key] = kvp.Value;
-            foreach (var kvp in costPrices) merged[kvp.Key] = kvp.Value;
+            foreach (var kvp in prices)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
+            foreach (var kvp in costPrices)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
             return merged;
         }
 
@@ -940,6 +966,7 @@ namespace GW2CraftingHelper.Services
                                context.Prices.TryGetValue(node.Id, out var price) &&
                                PlanSolver.GetUnitPrice(price, context.PriceBasis) > 0;
                 }
+
                 if (feasible)
                 {
                     overrides[node.NodeId] = source;
@@ -990,6 +1017,7 @@ namespace GW2CraftingHelper.Services
                             currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
                     }
                 }
+
                 result.CraftingTree = null;
                 result.MultiItemRoots = roots;
             }
@@ -1016,10 +1044,12 @@ namespace GW2CraftingHelper.Services
             {
                 return result;
             }
+
             foreach (var kvp in ownedQuantityUsedByNode)
             {
                 result[kvp.Key.NodeId] = kvp.Value;
             }
+
             return result;
         }
 
@@ -1035,6 +1065,7 @@ namespace GW2CraftingHelper.Services
                 _cachedAccountIndex = new AccountItemIndex(context.AccountItems);
                 _cachedAccountIndexContext = context;
             }
+
             return _cachedAccountIndex;
         }
 
@@ -1052,6 +1083,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             var projected = new List<SnapshotItemEntry>(items.Count);
             foreach (var entry in items)
             {
@@ -1059,9 +1091,10 @@ namespace GW2CraftingHelper.Services
                 {
                     ItemId = entry.ItemId,
                     Count = entry.Count,
-                    Source = entry.Source
+                    Source = entry.Source,
                 });
             }
+
             return projected;
         }
 
@@ -1092,6 +1125,7 @@ namespace GW2CraftingHelper.Services
                     currencyIds.Add(cc.CurrencyId);
                 }
             }
+
             AddAllVendorOfferCurrencyComponentIds(vendorOffers, currencyIds);
             if (currencyIds.Count == 0)
             {
@@ -1104,6 +1138,7 @@ namespace GW2CraftingHelper.Services
             {
                 result[currencyId] = currencyIndex.GetQuantity(currencyId);
             }
+
             return result;
         }
 
@@ -1120,18 +1155,21 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var offers in vendorOffers.Values)
             {
                 if (offers == null)
                 {
                     continue;
                 }
+
                 foreach (var offer in offers)
                 {
                     if (offer?.CostLines == null)
                     {
                         continue;
                     }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal)
@@ -1157,12 +1195,14 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var decision in decisions.Values)
             {
                 if (decision.VendorItemCosts == null)
                 {
                     continue;
                 }
+
                 foreach (var line in decision.VendorItemCosts)
                 {
                     metadataIds.Add(line.ItemId);
@@ -1185,18 +1225,21 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             foreach (var offers in vendorOffers.Values)
             {
                 if (offers == null)
                 {
                     continue;
                 }
+
                 foreach (var offer in offers)
                 {
                     if (offer?.CostLines == null)
                     {
                         continue;
                     }
+
                     foreach (var cost in offer.CostLines)
                     {
                         if (string.Equals(cost.Type, "Item", StringComparison.Ordinal))
@@ -1242,8 +1285,10 @@ namespace GW2CraftingHelper.Services
                 {
                     total += itemIndex.GetQuantity(itemId, source);
                 }
+
                 result[itemId] = total;
             }
+
             return result;
         }
 
@@ -1324,7 +1369,7 @@ namespace GW2CraftingHelper.Services
                     Phase = phase,
                     DisplayName = displayName,
                     Total = total,
-                    Detail = detail
+                    Detail = detail,
                 });
             }
 

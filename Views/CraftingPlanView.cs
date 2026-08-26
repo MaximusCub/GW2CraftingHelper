@@ -19,40 +19,34 @@ using System.Threading.Tasks;
 // only, not the shared ruleset. See docs/ARCHITECTURE.md sections 1, 3,
 // and 5 for the FrameTicker/scroll preserve-restore-verify rationale and
 // the section-renderer decomposition.
+//
+// The markers are NAMES, not an index. They used to be numbered 1-8 and a
+// number was reached three or four times over, eleven headers reading
+// "(continued)", so a reader who collapsed them saw "3. Scroll
+// preserve/restore/verify" four times with nothing to tell them apart.
+// Making the numbering true would mean reordering the scroll, wheel-wrap
+// and FrameTicker code, which docs/ARCHITECTURE.md section 5 records as
+// deliberately not worth its risk; so the numbers went instead. Each
+// marker now says what its own block holds and no two say the same thing.
+// Anything added here needs a name of its own, not a "(continued)".
 #pragma warning disable SA1124 // Do not use regions
 
 namespace GW2CraftingHelper.Views
 {
-    public class CraftingPlanView : ISectionRelayoutSink
+    internal class CraftingPlanView : ISectionRelayoutSink, ITreePlanHost
     {
-        #region General: shared layout constants, colors, top-region geometry & dependencies
+        #region Shared layout constants, colors, top-region geometry & dependencies
 
         // Not one of the architecture report's 11 responsibilities - shared
-        // substrate consumed by several regions below (see m38-a1-architecture.md S3).
+        // substrate consumed by several regions below (see dev/dev-notes/m38-plan/m38-a1-architecture.md S3).
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
         // Layout constants. The top strip's own Y arithmetic lives in the
         // Blish-free Services/TopRegionLayoutMath (three call sites lay the
         // strip out from it); these two are aliases so the row builders in
         // this file keep reading naturally.
-        private const int RowHeight = TopRegionLayoutMath.RowHeight;
+        private const int RowHeight = TopRegionLayoutMath.TopRegionRowHeight;
         private const int InputRowY = TopRegionLayoutMath.InputRowY;
-
-        // Item-row geometry, left to right: search box, "Qty:" label,
-        // quantity field, then the add/remove buttons. The buttons keep a
-        // clear gap from the quantity field so "+" does not read as its
-        // stepper.
-        private const int QtyInputX = 240;
-        private const int QtyInputWidth = 50;
-        private const int RowButtonsX = 320;
-
-        // The row's +/- pair: square, and the same height as every other
-        // button in the module - which is also the height of the search and
-        // quantity boxes they sit beside, so the run now shares one baseline
-        // instead of mixing 28px inputs with 24px buttons.
-        private const int RowButtonSize = UiMetrics.ButtonHeight;
-        private const int RowButtonGap = 8;
-        private const int RowButtonY = 3;
 
         private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
@@ -78,7 +72,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private TopRegionLayout ComputeTopRegionLayout()
         {
-            return TopRegionLayoutMath.Compute(_itemRows.Count, _treeToolbarVisible);
+            return TopRegionLayoutMath.Compute(_inputRows.Rows.Count, _treeToolbarVisible);
         }
 
         // phaseProgress carries live coarse-phase events for the status
@@ -97,6 +91,13 @@ namespace GW2CraftingHelper.Views
         // the background. Never on the hover path - see
         // ItemMetadataService.GetCachedStatBlock.
         private readonly Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
+
+        // Supplier rather than a stored CancellationToken so this view takes
+        // no dependency on when the module's source is created - the view is
+        // constructed inside Initialize, alongside it. Null in any caller
+        // that does not supply one (the tests), where the token is None -
+        // exactly the pre-existing behaviour.
+        private readonly Func<CancellationToken> _moduleLifetimeToken;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -104,10 +105,16 @@ namespace GW2CraftingHelper.Views
         private PlanViewModel _currentPlan;
 
         private DateTime _planGeneratedAt;
-        // Defaults to true - a deliberate divergence from gw2efficiency,
-        // whose default is unchecked. Purely in-memory session state,
-        // reset on every module reload.
+        // The user's INTENT, not what the next plan will do - read through
+        // OwnMaterialsGate, never directly, wherever the answer reaches the
+        // checkbox or the solver. Defaults to true, a deliberate divergence
+        // from gw2efficiency, whose default is unchecked. Purely in-memory
+        // session state, reset on every module reload.
         private bool _useOwnMaterials = true;
+        // Whether an account snapshot exists to subtract from; pushed by
+        // the host every tick (Module.Update) so a key added mid-session,
+        // or a Clear Cache, moves the gate without a restart.
+        private bool _accountDataAvailable;
         // gw2efficiency's own default is "buy price" (buy orders); echoed
         // here so a fresh plan matches gw2e's view rather than
         // systematically overpricing every material.
@@ -120,45 +127,18 @@ namespace GW2CraftingHelper.Views
         // last-chosen value is preserved while disabled.
         private bool _valueOwnMaterials = true;
 
-        #endregion // General: shared layout constants, colors, top-region geometry & dependencies
+        #endregion // Shared layout constants, colors, top-region geometry & dependencies
 
-        #region 1. Input rows (state) - multi-item plans (gw2efficiency parity)
+        #region Input rows: the multi-item request editor (gw2efficiency parity)
 
-        /// <summary>
-        /// One row of the multi-item input strip (gw2efficiency
-        /// parity): the plain session-persistent selection fields survive
-        /// across Build() calls (tab switches) exactly like _nodeOverrides/
-        /// _ignoredItemIds below - the live Blish controls do not (they are
-        /// disposed and recreated by every Build()/RebuildInputRows() call,
-        /// same lifecycle as _searchBox/_qtyInput used to have).
-        /// </summary>
-        private sealed class ItemRowState
-        {
-            public int? ItemId;
-            public string ItemName;
+        // The strip owns the row list and every row control; this view owns
+        // the panel it draws into and the top-region reflow a row
+        // add/remove triggers - see Views/ItemInputRowStrip.cs.
+        private readonly ItemInputRowStrip _inputRows;
 
-            // What the search box last read, kept whether or not it
-            // resolved to an item. ItemName alone cannot carry this: it is
-            // dropped the moment the text stops describing the picked item,
-            // so seeding a rebuilt row from it would wipe half-typed text
-            // on every row add/remove.
-            public string TypedText;
-            public string QuantityText = "1";
+        #endregion // Input rows: the multi-item request editor (gw2efficiency parity)
 
-            public Panel RowPanel;
-            public AutocompleteTextBox SearchBox;
-            public SuggestionPanel SuggestionPanel;
-            public TextBox QtyInput;
-        }
-
-        // Session-persistent row list, mirroring gw2e's `e.recipes`
-        // array. Populated with one empty row on the first Build();
-        // survives every later Build() (tab switch). No file persistence.
-        private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
-
-        #endregion // 1. Input rows (state) - multi-item plans (gw2efficiency parity)
-
-        #region 2. Generate orchestration (state)
+        #region Generate orchestration: sequencing, request and status state
 
         // Bumped at the start of every TriggerGenerate call (Generate button
         // and OnOwnMaterialsToggled's modal-confirm path both funnel through
@@ -231,9 +211,9 @@ namespace GW2CraftingHelper.Views
         // this re-checked.
         private const int TypedNameSearchResults = 8;
 
-        #endregion // 2. Generate orchestration (state)
+        #endregion // Generate orchestration: sequencing, request and status state
 
-        #region 8. Tree rendering (state)
+        #region Tree rendering: the controller instance
 
         // The tree section renderer and its interactive override loop
         // (see TreeSectionController) - a single persistent instance,
@@ -242,9 +222,9 @@ namespace GW2CraftingHelper.Views
         // are freshly constructed per section.
         private readonly TreeSectionController _treeController;
 
-        #endregion // 8. Tree rendering (state)
+        #endregion // Tree rendering: the controller instance
 
-        #region 7. Section builders (state: section expand/collapse)
+        #region Plan render: section expand/collapse and table-sort state
         private readonly Dictionary<PlanSectionType, bool> _sectionExpansion =
             new Dictionary<PlanSectionType, bool>();
 
@@ -275,6 +255,7 @@ namespace GW2CraftingHelper.Views
         // and the comparators; these fields are only the live state.
         private readonly TableSortState<PlanTableColumn> _usedMaterialsSort =
             new TableSortState<PlanTableColumn>();
+
         private readonly TableSortState<PlanTableColumn> _shoppingListSort =
             new TableSortState<PlanTableColumn>();
 
@@ -300,20 +281,25 @@ namespace GW2CraftingHelper.Views
             _shoppingListSort.Reset();
         }
 
-        #endregion // 7. Section builders (state: section expand/collapse)
+        #endregion // Plan render: section expand/collapse and table-sort state
 
-        #region 2. Generate orchestration (state, continued)
+        #region Generate orchestration: checkbox-revert suppression and the last debug log
 
-        // Suppress flag for checkbox revert
+        // Suppresses the settings controls' change handlers during a
+        // programmatic write: the own-materials gate/revert writes, and
+        // ApplyRestoredPlan reseeding the checkboxes/dropdown - a restored
+        // plan already reflects those settings, so its writes must neither
+        // open the regenerate confirm nor flag "Settings changed".
         private bool _suppressToggle;
 
         // Debug log from last plan generation
         private IReadOnlyList<string> _lastDebugLog;
+
         public IReadOnlyList<string> LastDebugLog => _lastDebugLog;
 
-        #endregion // 2. Generate orchestration (state, continued)
+        #endregion // Generate orchestration: checkbox-revert suppression and the last debug log
 
-        #region General: Blish UI control fields (shared across all responsibilities)
+        #region Blish UI control fields (shared across all responsibilities)
 
         // UI controls (stored for resize handler)
 
@@ -326,6 +312,7 @@ namespace GW2CraftingHelper.Views
         private Panel _controlsPanel;
         private Checkbox _ownMaterialsCheckbox;
         private Checkbox _valueOwnMaterialsCheckbox;
+        private Dropdown _priceBasisDropdown;
         private StandardButton _generateButton;
         private Label _statusLabel;
 
@@ -336,11 +323,11 @@ namespace GW2CraftingHelper.Views
         private Panel _separator;
         private FlowPanel _contentPanel;
 
-        // Recipe Tree toolbar row. The five buttons used to live in the
-        // tree's section header inside the scroll flow, which meant a long
-        // plan scrolled Collapse All away at exactly the moment it became
-        // useful. They sit in the non-scrolling strip now; the state they
-        // act on stays with TreeSectionController and reaches them through
+        // Recipe Tree toolbar row. The five buttons sit in the
+        // non-scrolling strip, not in the tree's section header inside the
+        // scroll flow, so a long plan cannot scroll Collapse All away at the
+        // moment it becomes useful. The state they act on stays with
+        // TreeSectionController and reaches them through
         // _treeToolbarCommands, republished by every tree render and
         // withdrawn (null) by every render that produces no tree.
         //
@@ -353,9 +340,9 @@ namespace GW2CraftingHelper.Views
         private readonly List<(StandardButton Button, int Width, int GapToLeft)> _treeToolbarButtons =
             new List<(StandardButton, int, int)>(5);
 
-        #endregion // General: Blish UI control fields (shared across all responsibilities)
+        #endregion // Blish UI control fields (shared across all responsibilities)
 
-        #region 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
         // Resize tracking
         private int _lastRenderedWidth;
@@ -411,6 +398,45 @@ namespace GW2CraftingHelper.Views
 
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
 
+        // ITreePlanHost implementation - explicit-interface for the same
+        // reason as ISectionRelayoutSink above: TreeSectionController gets
+        // named, compiler-checked access to exactly these members and to
+        // nothing else, and none of them becomes part of this class's own
+        // callable surface. Every one forwards to the private member that
+        // used to be handed over as a constructor delegate.
+        void ITreePlanHost.PreserveScrollAcross(Action mutate) => PreserveScrollAcross(mutate);
+
+        void ITreePlanHost.SetStatus(string status) => SetStatus(status);
+
+        void ITreePlanHost.RenderPlanAfterResolve(PlanViewModel vm) => RenderPlanAfterResolve(vm);
+
+        PlanViewModel ITreePlanHost.CurrentPlan
+        {
+            get => _currentPlan;
+            set => _currentPlan = value;
+        }
+
+        int ITreePlanHost.PanelWidth => GetCurrentPanelWidth();
+
+        void ITreePlanHost.SetLastDebugLog(IReadOnlyList<string> log) => _lastDebugLog = log;
+
+        void ITreePlanHost.SetTreeToolbar(TreeToolbarCommands commands) => _treeToolbarCommands = commands;
+
+        (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow) ITreePlanHost.CreateTreeSectionHeader(
+            string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
+            Func<bool> suppressToggle)
+        {
+            // routeChromeToTreeRegistry: the chrome this call registers
+            // must join the tree's registry, not the one a preserving
+            // re-render clears. Unpacks the private SectionHeaderHandle
+            // into a ValueTuple so the nested type never becomes visible
+            // outside this class.
+            var header = CreateSectionHeader(
+                title, sectionKey, panelWidth, defaultExpanded, suppressToggle,
+                routeChromeToTreeRegistry: true);
+            return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+        }
+
         /// <summary>
         /// The sink TreeSectionController registers through - the same
         /// contract as the view's own, routed to the tree-scoped registries
@@ -437,12 +463,6 @@ namespace GW2CraftingHelper.Views
             public int RelayoutCount => _view._treeRelayoutActions.Count;
         }
 
-        // Set only for the duration of the tree's own CreateSectionHeader
-        // call, so the shared section chrome that call registers joins the
-        // tree's registry rather than the one a preserving re-render
-        // clears. Every other section's header is unaffected.
-        private bool _routeSectionChromeToTree;
-
         // Set by a re-ellipsis closure that cannot honour the registry's
         // no-height-change contract at the settled width (today only the
         // Notes section, whose row COUNT is width-dependent - see
@@ -468,9 +488,9 @@ namespace GW2CraftingHelper.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
-        #endregion // 5. Resize relayout (state) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
-        #region 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the anchor registry - KNOWN-ISSUES #12/#14/#19
 
         // Bumped by every PreserveScrollAcross call; an in-flight
         // StartScrollVerify loop compares its captured value against the
@@ -489,9 +509,9 @@ namespace GW2CraftingHelper.Views
         private readonly Dictionary<string, Control> _scrollAnchors =
             new Dictionary<string, Control>(StringComparer.Ordinal);
 
-        #endregion // 3. Scroll preserve/restore/verify (state) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the anchor registry - KNOWN-ISSUES #12/#14/#19
 
-        #region 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: drag-settle state - KNOWN-ISSUES #13/#19
 
         // Set by PreserveScrollAcrossResize whenever a height-changing
         // resize tick wrote a per-tick scroll-preserve; ResizeSettleStep
@@ -505,9 +525,9 @@ namespace GW2CraftingHelper.Views
         private bool _resizeScrollRestorePending;
         private int _resizeScrollSavedOffset;
 
-        #endregion // 5. Resize relayout (state, continued) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: drag-settle state - KNOWN-ISSUES #13/#19
 
-        #region 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: the ticker instance fields - KNOWN-ISSUES #12/#13
 
         // Live FrameTicker instances (null when idle). Tracked so Build()
         // can cancel a leftover ticker from the previous build cycle before
@@ -526,9 +546,9 @@ namespace GW2CraftingHelper.Views
         // reports a generation still in flight across a tab switch.
         private FrameTicker _spinnerTicker;
 
-        #endregion // 6. The FrameTicker control (ticker instance fields) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: the ticker instance fields - KNOWN-ISSUES #12/#13
 
-        #region 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the pending-correction state - KNOWN-ISSUES #12 (reopened)
 
         // Defensive one-shot re-assert ticker for
         // ApplyWheelWrapCorrection (see StartWheelWrapVerify). Its own
@@ -542,9 +562,9 @@ namespace GW2CraftingHelper.Views
         // Matches StartScrollVerify's own stable-match tolerance.
         private const float WheelWrapVerifyEpsilon = 0.004f;
 
-        #endregion // 4. Wheel-wrap correction (state) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the pending-correction state - KNOWN-ISSUES #12 (reopened)
 
-        #region 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the resize-restore state - KNOWN-ISSUES #12/#14/#19
 
         // With container heights finalized synchronously during build
         // (PlanContentHeightMath), the restore ratio is correct the
@@ -569,9 +589,9 @@ namespace GW2CraftingHelper.Views
         // a stale value cannot influence a new render.
         private DateTime? _lastWheelEventUtc;
 
-        #endregion // 3. Scroll preserve/restore/verify (state, continued) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the resize-restore state - KNOWN-ISSUES #12/#14/#19
 
-        #region 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the wheel-event subscription state - KNOWN-ISSUES #12 (reopened)
 
         // Blish HUD's
         // Scrollbar.SCROLL_WHEEL private const (vendored Controls/
@@ -586,9 +606,9 @@ namespace GW2CraftingHelper.Views
         // re-verify against the vendored source on any BlishHUD upgrade.
         private const int BlishScrollWheelStepPixels = 30;
 
-        #endregion // 4. Wheel-wrap correction (state, continued) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the wheel-event subscription state - KNOWN-ISSUES #12 (reopened)
 
-        #region Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
+        #region Diagnostics: scroll/wheel instrumentation (shared by the scroll and wheel-wrap blocks) - KNOWN-ISSUES #12
 
         // Instrumentation-only, gated on ScrollDiagnosticsEnabled; every
         // call site checks the setting before doing any work, so the
@@ -597,12 +617,11 @@ namespace GW2CraftingHelper.Views
         // Two spellings of one tag, for two sinks with different shapes:
         // ModuleLogEntry carries the tag as a FIELD (the Log tab renders it
         // as "[scrolldiag]" in its own prefix column), while Blish's Logger
-        // has no tag column and needs it inside the message. Every call
-        // site used to prepend the bracketed form to the message text AND
-        // hand it to ModuleLog under the same tag, so every Log tab line
-        // read "[scrolldiag] [scrolldiag] wheel frame=..." - fixed here, in
-        // the one place that writes to both sinks, rather than at fourteen
-        // call sites.
+        // has no tag column and needs it inside the message. Both spellings
+        // are applied HERE, the one place that writes to both sinks: a call
+        // site that prepends the bracketed form itself and also passes the
+        // tag to ModuleLog produces "[scrolldiag] [scrolldiag] wheel
+        // frame=..." in the Log tab.
         private const string ScrollDiagLogTag = "scrolldiag";
         private const string ScrollDiagTag = "[" + ScrollDiagLogTag + "]";
 
@@ -627,6 +646,7 @@ namespace GW2CraftingHelper.Views
                 _scrollDiagFrameCounter++;
                 _scrollDiagLastFrameTime = current.Value;
             }
+
             return _scrollDiagFrameCounter;
         }
 
@@ -650,9 +670,9 @@ namespace GW2CraftingHelper.Views
             ModuleLog.Shared.Write(ModuleLogLevel.Debug, ScrollDiagLogTag, message);
         }
 
-        #endregion // Diagnostics: scroll/wheel instrumentation (shared by #3 and #4) - KNOWN-ISSUES #12
+        #endregion // Diagnostics: scroll/wheel instrumentation (shared by the scroll and wheel-wrap blocks) - KNOWN-ISSUES #12
 
-        #region General: construction & status
+        #region Construction & status
         public CraftingPlanView(
             Func<IReadOnlyList<PlanRequestItem>, bool, bool, PriceBasis, CancellationToken, IProgress<PlanStatus>, IProgress<PlanPhaseEvent>, string, Task<CraftingPlanResult>> generateAsync,
             ModalDialog modalDialog,
@@ -665,7 +685,15 @@ namespace GW2CraftingHelper.Views
             // see StartRestoredStatWarmup. Optional; without it a restored
             // plan simply has no stat blocks until the user regenerates,
             // which is the pre-existing behaviour.
-            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null,
+            // Module.Unload cancels this before it disposes the HttpClient
+            // every API client in the pipeline was built over. The two long
+            // awaits this view starts - plan generation and the typed-name
+            // search - run under it, so disabling the module mid-generation
+            // ends them instead of leaving them running against disposed
+            // objects. Optional; without it both use CancellationToken.None,
+            // which is what they did before.
+            Func<CancellationToken> moduleLifetimeToken = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -675,6 +703,13 @@ namespace GW2CraftingHelper.Views
             _resolveOverridesSync = resolveOverridesSync;
             _getItemStatBlock = getItemStatBlock;
             _warmItemStatsAsync = warmItemStatsAsync;
+            _moduleLifetimeToken = moduleLifetimeToken;
+
+            // Before anything that could read the row count:
+            // ComputeTopRegionLayout asks the strip how many rows there
+            // are, and an unbuilt view is still allowed to be asked.
+            _inputRows = new ItemInputRowStrip(
+                itemSearchProvider, () => ReflowTopRegion(rebuildItemRows: true));
 
             // Seed the per-plan default from the persisted setting so a
             // user who turned "Value own materials" off is not silently
@@ -685,40 +720,19 @@ namespace GW2CraftingHelper.Views
                 _valueOwnMaterials = settings.ValueOwnMaterials.Value;
             }
 
-            // Wires TreeSectionController's collaborator delegates: four
-            // plain method groups, plus three small adapters over state
-            // with no method to bind (including unpacking the private
-            // SectionHeaderHandle into a ValueTuple so the nested type
-            // never becomes visible outside this class).
+            // The tree's two seams onto this view are both interfaces
+            // implemented above: TreeRelayoutSink for relayout
+            // registration, this view itself for the rest (ITreePlanHost).
+            // The two trailing hooks stay delegates because null is a
+            // meaningful value for them - see the controller's own fields.
             _treeController = new TreeSectionController(
                 new TreeRelayoutSink(this),
-                _resolveOverridesSync,
+                this,
                 _vmBuilder,
-                PreserveScrollAcross,
-                SetStatus,
-                RenderPlanAfterResolve,
-                GetCurrentPanelWidth,
-                () => _currentPlan,
-                vm => _currentPlan = vm,
-                log => _lastDebugLog = log,
-                (title, sectionKey, panelWidth, defaultExpanded, suppressToggle) =>
-                {
-                    _routeSectionChromeToTree = true;
-                    try
-                    {
-                        var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
-                        return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
-                    }
-                    finally
-                    {
-                        _routeSectionChromeToTree = false;
-                    }
-                },
-                commands => _treeToolbarCommands = commands,
+                _resolveOverridesSync,
                 getItemStatBlock,
                 (nodeId, rowPanel) => RegisterScrollAnchor(TreeRowAnchorKey(nodeId), rowPanel));
         }
-
 
         public void SetStatus(string status)
         {
@@ -744,9 +758,10 @@ namespace GW2CraftingHelper.Views
         /// Generate. Mirrors TriggerGenerate's success-path shape: adopts
         /// <paramref name="result"/> as the override loop's baseline,
         /// restores the user's prior decision-pill overrides
-        /// (RestoreOverrides - required, not optional), resets section
-        /// expansion, rebuilds the view model, and seeds the status board
-        /// with the staleness banner text.
+        /// (RestoreOverrides - required, not optional), reseeds the
+        /// request inputs (rows, checkboxes, price basis) that produced
+        /// the plan, resets section expansion, rebuilds the view model,
+        /// and seeds the status board with the staleness banner text.
         /// <para>
         /// The tab has usually not been Build() yet, in which case only
         /// the state fields are set and Build()'s render tail renders on
@@ -771,14 +786,21 @@ namespace GW2CraftingHelper.Views
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
             IReadOnlyList<int> ignoredItemIds,
-            // "Value Own Materials" checkbox state at the generation
-            // time this plan was persisted - restoring it into the live
-            // checkbox is the whole reason PersistedPlan.ValueOwnMaterials
-            // exists. UseOwnMaterials/PriceBasis have the same gap (their
-            // live controls are not restored) - see docs/KNOWN-ISSUES.md.
-            bool valueOwnMaterials)
+            // The settings and request this plan was generated with, all
+            // restored into their live controls below so Generate Plan
+            // re-solves the restored request with zero retyping - before
+            // requestItems was restored, the input strip stayed at its
+            // defaults and Generate answered "Add at least one item" to a
+            // plan already on screen.
+            bool valueOwnMaterials,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis)
         {
-            if (result == null) return;
+            if (result == null)
+            {
+                return;
+            }
 
             PlanViewModel vm;
             try
@@ -800,14 +822,40 @@ namespace GW2CraftingHelper.Views
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
-            // Restore the checkbox's
-            // backing field AND its displayed Checked state - see this
-            // method's valueOwnMaterials parameter doc comment.
+            // Restore the inputs that produced the plan, not just the
+            // plan: the request rows, both checkboxes and the price-basis
+            // dropdown - backing fields AND displayed control state. The
+            // usual restore runs before Build() (every control still null,
+            // the fields render on first visit); a live tab takes the
+            // guarded writes. The control writes are suppressed
+            // (_suppressToggle, here and inside ApplyOwnMaterialsGate):
+            // these are not user decisions, so they must neither open the
+            // regenerate confirm nor flag "Settings changed" against the
+            // very plan that carries them.
+            _inputRows.RestoreRows(
+                RestoredRequestInputs.BuildRowSeeds(requestItems, result.ItemMetadata));
+
+            // The INTENT field; the gate write below re-resolves it against
+            // _accountDataAvailable, exactly as a user toggle would (a
+            // persisted true with no snapshot yet still shows unchecked
+            // until SetAccountDataAvailable re-applies the gate).
+            _useOwnMaterials = useOwnMaterials;
+            ApplyOwnMaterialsGate();
+
+            _priceBasis = priceBasis;
             _valueOwnMaterials = valueOwnMaterials;
+            _suppressToggle = true;
+            if (_priceBasisDropdown != null)
+            {
+                _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(priceBasis);
+            }
+
             if (_valueOwnMaterialsCheckbox != null)
             {
                 _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
             }
+
+            _suppressToggle = false;
 
             // The stamped half goes through StatusText.Stamp, which owns
             // the module's one timestamp format and its InvariantCulture
@@ -827,7 +875,10 @@ namespace GW2CraftingHelper.Views
             // not at render time, so there is nothing to wait for.
             StartRestoredStatWarmup(result);
 
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             _lastRenderedWidth = _contentPanel.Width;
             try
@@ -911,11 +962,31 @@ namespace GW2CraftingHelper.Views
         /// superseding generation's status is never
         /// clobbered.</description></item>
         /// </list>
+        /// <para>
+        /// The catch that reaches here is deliberately still
+        /// <c>catch (Exception)</c> - the rollback is the load-bearing part,
+        /// and narrowing it would trade a vanished plan for a crash on every
+        /// later tab visit. What it must not also do is destroy the evidence:
+        /// the state that would identify the offending node is reset a few
+        /// lines below, so the stack goes to Blish's Logger and the plan's
+        /// identity into the ModuleLog line BEFORE any of that happens.
+        /// </para>
         /// </summary>
         private void RollBackFailedPlanRender(Exception ex, string context)
         {
+            // Both call sites have already committed the failing view model
+            // to _currentPlan (ApplyRestoredPlan assigns it before it
+            // renders; Build renders _currentPlan directly), so this reads
+            // the plan that actually failed, not the one that replaced it.
             ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
-                $"Failed to render restored plan {context}: {ex.GetType().Name} - {ex.Message}");
+                $"Failed to render restored plan {context} [{DescribePlanForDiagnostics(_currentPlan)}]: {ex.GetType().Name} - {ex.Message}");
+
+            // The full stack, which the ring-buffer line cannot carry. A
+            // NullReferenceException from an ordinary logic bug anywhere
+            // under RenderPlan lands here too, and without this the only
+            // symptom a maintainer gets is "the restored plan silently
+            // disappears on tab visit".
+            Logger.Warn(ex, "Failed to render restored plan {0}; rolling back to the no-plan state", context);
 
             _treeController.ResetForNewPlan(null);
             _sectionExpansion.Clear();
@@ -943,9 +1014,47 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // General: construction & status
+        /// <summary>
+        /// Enough of a plan's identity to reproduce the render that failed,
+        /// with no item ids in it - those stay internal, log tab included.
+        /// Fully guarded: this describes a view model that has just proven it
+        /// can throw while being walked, so it must never throw itself and
+        /// mask the failure it is reporting.
+        /// </summary>
+        private static string DescribePlanForDiagnostics(PlanViewModel plan)
+        {
+            if (plan == null)
+            {
+                return "no plan committed";
+            }
 
-        #region 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
+            try
+            {
+                int rootCount = plan.MultiItemRoots != null
+                    ? plan.MultiItemRoots.Count
+                    : (plan.TreeRoot != null ? 1 : 0);
+                int sectionCount = plan.Sections != null ? plan.Sections.Count : 0;
+                int rowCount = 0;
+                if (plan.Sections != null)
+                {
+                    foreach (var section in plan.Sections)
+                    {
+                        rowCount += section?.Rows != null ? section.Rows.Count : 0;
+                    }
+                }
+
+                string target = string.IsNullOrEmpty(plan.TargetItemName) ? "unnamed" : plan.TargetItemName;
+                return $"target={target} x{plan.TargetQuantity}, roots={rootCount}, sections={sectionCount}, rows={rowCount}";
+            }
+            catch (Exception ex)
+            {
+                return $"plan identity unreadable: {ex.GetType().Name}";
+            }
+        }
+
+        #endregion // Construction & status
+
+        #region Scroll preserve/restore/verify: the reflection handle and PreserveScrollAcross - KNOWN-ISSUES #12/#14/#19
 
         // Blish HUD keeps a Panel's Scrollbar in a private field and resets
         // it to top whenever content height changes; the field is the only
@@ -1071,6 +1180,7 @@ namespace GW2CraftingHelper.Views
                     candidates.Add(new ScrollAnchorCandidate(entry.Key, top.Value, entry.Value.Height));
                 }
             }
+
             return candidates;
         }
 
@@ -1168,9 +1278,9 @@ namespace GW2CraftingHelper.Views
                 MeasureContentHeight(_contentPanel), _contentPanel.Height);
         }
 
-        #endregion // 3. Scroll preserve/restore/verify (reflection handle + PreserveScrollAcross) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the reflection handle and PreserveScrollAcross - KNOWN-ISSUES #12/#14/#19
 
-        #region 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: the nested Control subclass - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Drives a per-real-frame step callback from Control.DoUpdate,
@@ -1228,6 +1338,7 @@ namespace GW2CraftingHelper.Views
                 {
                     return;
                 }
+
                 _lastFrameTime = current;
 
                 bool keepGoing;
@@ -1238,6 +1349,14 @@ namespace GW2CraftingHelper.Views
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, "FrameTicker step failed; stopping");
+
+                    // At most one line per ticker: the ticker cancels itself
+                    // below and never runs the failing step again. This is
+                    // the per-frame work behind the spinner, the scroll
+                    // verify and the resize settle, so a silent stop reads to
+                    // the user as "the plan strip froze on a phase".
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "ui",
+                        $"A per-frame ticker step failed and the ticker stopped: {ex.GetType().Name} - {ex.Message}");
                     keepGoing = false;
                 }
 
@@ -1264,15 +1383,19 @@ namespace GW2CraftingHelper.Views
 
             public void Cancel()
             {
-                if (_canceled) return;
+                if (_canceled)
+                {
+                    return;
+                }
+
                 _canceled = true;
                 Dispose();
             }
         }
 
-        #endregion // 6. The FrameTicker control (nested Control subclass) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: the nested Control subclass - KNOWN-ISSUES #12/#13
 
-        #region 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
+        #region FrameTicker: teardown - KNOWN-ISSUES #12/#13
 
         /// <summary>
         /// Cancels every live FrameTicker (scroll-verify, resize-debounce,
@@ -1300,9 +1423,9 @@ namespace GW2CraftingHelper.Views
             _lastWheelEventUtc = null;
         }
 
-        #endregion // 6. The FrameTicker control (teardown) - KNOWN-ISSUES #12/#13
+        #endregion // FrameTicker: teardown - KNOWN-ISSUES #12/#13
 
-        #region 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
+        #region Scroll preserve/restore/verify: the anchor and resize-restore passes - KNOWN-ISSUES #12/#14/#19
 
         /// <summary>
         /// Writes the restore ratio to the scrollbar synchronously, using
@@ -1363,6 +1486,7 @@ namespace GW2CraftingHelper.Views
                     contentHeight = child.Bottom;
                 }
             }
+
             return contentHeight;
         }
 
@@ -1410,6 +1534,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=stale-generation frame={ScrollDiagFrame()} realFrame={frame} generation={capturedGeneration} liveGeneration={_scrollRestoreGeneration}");
                     }
+
                     return false;
                 }
 
@@ -1427,6 +1552,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"verify exit reason=wheel-observed frame={ScrollDiagFrame()} realFrame={frame}");
                         }
+
                         return false;
                     }
 
@@ -1459,6 +1585,7 @@ namespace GW2CraftingHelper.Views
                             {
                                 LogScrollDiag($"verify exit reason=zero-reassert-cap-exceeded frame={ScrollDiagFrame()} realFrame={frame} bounceCount={zeroReassert}");
                             }
+
                             return false;
                         }
                     }
@@ -1472,6 +1599,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"verify exit reason=user-scroll-detected frame={ScrollDiagFrame()} realFrame={frame} observed={current:0.0000} target={target:0.0000} contentHeight={contentHeight}");
                         }
+
                         return false;
                     }
                     else
@@ -1479,13 +1607,13 @@ namespace GW2CraftingHelper.Views
                         // Matches target within tolerance: the write is
                         // holding. Exit on this first confirmed-stable
                         // frame rather than requiring a multi-frame streak -
-                        // height is not still drifting (directive A), so one
-                        // clean frame is sufficient evidence nothing is
-                        // fighting the restore.
+                        // one clean frame is sufficient evidence that
+                        // nothing is fighting the restore.
                         if (diagEnabled)
                         {
                             LogScrollDiag($"verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                         }
+
                         return false;
                     }
 
@@ -1498,6 +1626,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=max-frames frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
                     }
+
                     return false;
                 }
                 catch (Exception ex)
@@ -1509,6 +1638,7 @@ namespace GW2CraftingHelper.Views
                     {
                         LogScrollDiag($"verify exit reason=disposed-exception frame={ScrollDiagFrame()} realFrame={frame} error={ex.GetType().Name}");
                     }
+
                     return false;
                 }
             }
@@ -1517,9 +1647,9 @@ namespace GW2CraftingHelper.Views
             _scrollVerifyTicker = new FrameTicker(VerifyTick);
         }
 
-        #endregion // 3. Scroll preserve/restore/verify (continued) - KNOWN-ISSUES #12/#14/#19
+        #endregion // Scroll preserve/restore/verify: the anchor and resize-restore passes - KNOWN-ISSUES #12/#14/#19
 
-        #region 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
+        #region Wheel-wrap correction: the wheel handlers and the correction itself - KNOWN-ISSUES #12 (reopened)
 
         /// <summary>
         /// Unconditional (not diagnostics-gated) tap on the same
@@ -1691,6 +1821,7 @@ namespace GW2CraftingHelper.Views
                         {
                             LogScrollDiag($"write writer=WheelWrapFix/reassert frame={ScrollDiagFrame()} before={current:0.0000} after={target:0.0000}");
                         }
+
                         return false;
                     }
 
@@ -1734,205 +1865,19 @@ namespace GW2CraftingHelper.Views
             LogScrollDiag($"wheel frame={ScrollDiagFrame()} sign={System.Math.Sign(wheelValue)} raw={wheelValue} scrollDistance={(scrollbar?.ScrollDistance ?? -1f):0.0000} contentHeight={contentHeight} verifyLive={verifyLive}");
         }
 
-        #endregion // 4. Wheel-wrap correction (continued) - KNOWN-ISSUES #12 (reopened)
+        #endregion // Wheel-wrap correction: the wheel handlers and the correction itself - KNOWN-ISSUES #12 (reopened)
 
-        #region 1. Input rows (continued)
-
-        /// <summary>
-        /// Disposes every current item row's live controls and rebuilds
-        /// them from _itemRows.
-        /// Called by Build() (initial construction) and by
-        /// AddItemRow/RemoveItemRow via ReflowTopRegion (row-count
-        /// changes) - a full rebuild rather than a patch, matching this
-        /// file's existing dispose+recreate pattern (e.g. RenderPlan
-        /// disposes all of _contentPanel's children on every render rather
-        /// than diffing). N is always small (a handful of rows at most), so
-        /// this is not a hot path.
-        /// </summary>
-        private void RebuildItemRowControls(int w)
-        {
-            foreach (var row in _itemRows)
-            {
-                // SuggestionPanel is SpriteScreen-parented (never a child of
-                // _inputPanel/buildPanel), so it always needs an explicit
-                // Dispose() regardless of which cycle this is - same
-                // reasoning the old single-_suggestionPanel field's Build()
-                // cleanup always had. SuggestionPanel.Dispose() itself is
-                // idempotent (`if (_disposed) return;`), so this is safe to
-                // call even on a row whose SuggestionPanel was already
-                // disposed by a previous rebuild this same Build() cycle.
-                row.SuggestionPanel?.Dispose();
-
-                // RowPanel, by contrast, IS a child of _inputPanel/buildPanel
-                // - across a tab-switch Build() cycle it (and its own
-                // children) were already torn down by ViewAdapter's own
-                // "clear existing children before rebuilding" cascade before
-                // this method ever runs again, which nulls a disposed
-                // control's Parent (see TriggerGenerate's own "a disposed
-                // control's Parent is nulled on disposal" comment). Disposing
-                // it again here would be a double-Dispose on an
-                // already-torn-down control; only a genuine same-cycle
-                // Add/Remove reflow (ReflowTopRegion, _inputPanel still
-                // live) leaves RowPanel.Parent non-null, meaning THIS row
-                // genuinely still needs disposing before its replacement is
-                // built.
-                if (row.RowPanel != null && row.RowPanel.Parent != null)
-                {
-                    row.RowPanel.Dispose();
-                }
-
-                row.SuggestionPanel = null;
-                row.RowPanel = null;
-                row.SearchBox = null;
-                row.QtyInput = null;
-            }
-
-            for (int i = 0; i < _itemRows.Count; i++)
-            {
-                CreateItemRowControls(_itemRows[i], i, w);
-            }
-        }
+        #region Input rows: the top-region reflow a row add/remove triggers
 
         /// <summary>
-        /// One input row's controls: search box + qty, a Remove button
-        /// (gw2e's own 2+-rows gate), and on the last row only an Add
-        /// button - attached to the last row rather than its own strip
-        /// row so the single-row case keeps the exact original layout.
-        /// </summary>
-        private void CreateItemRowControls(ItemRowState row, int index, int w)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(w, RowHeight),
-                Location = new Point(0, index * RowHeight),
-                Parent = _inputPanel
-            };
-            row.RowPanel = rowPanel;
-
-            var searchBox = new AutocompleteTextBox()
-            {
-                PlaceholderText = "Search items...",
-                Text = row.TypedText ?? row.ItemName ?? "",
-                Size = new Point(200, 28),
-                Location = new Point(0, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-            row.SearchBox = searchBox;
-
-            // The list drops straight under this box (see
-            // SuggestionPanel.PositionPanel).
-            var suggestionPanel = new SuggestionPanel(searchBox, _itemSearchProvider);
-            suggestionPanel.ItemSelected += (_, args) =>
-            {
-                row.ItemId = args.ItemId;
-                row.ItemName = args.Name;
-            };
-            row.SuggestionPanel = suggestionPanel;
-
-            // A pick is the only thing that resolves a row, so editing the
-            // box afterwards has to drop that resolution - otherwise the
-            // box reads one item while Generate still plans the previously
-            // picked one. Subscribed after SuggestionPanel so a pick's own
-            // Text write clears here first and is re-resolved by the
-            // ItemSelected handler above, in that order.
-            searchBox.TextChanged += (_, __) =>
-            {
-                row.TypedText = searchBox.Text;
-
-                if (!ItemRowSelection.SelectionIsStale(row.ItemId, row.ItemName, searchBox.Text))
-                {
-                    return;
-                }
-
-                row.ItemId = null;
-                row.ItemName = null;
-            };
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Qty:",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(210, 7),
-                Parent = rowPanel
-            };
-
-            var qtyInput = new TextBox()
-            {
-                Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
-                Size = new Point(QtyInputWidth, 28),
-                Location = new Point(QtyInputX, 3),
-                Parent = rowPanel
-            }.ReleaseOnDispose().ReleaseOnEnter();
-            qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
-            row.QtyInput = qtyInput;
-
-            int nextX = RowButtonsX;
-            if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
-            {
-                var removeButton = new FeedbackButton()
-                {
-                    Text = "-",
-                    Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
-                    Parent = rowPanel,
-                    BasicTooltipText = "Remove this item from the plan"
-                };
-                removeButton.Click += (_, __) => RemoveItemRow(row);
-                nextX += RowButtonSize + RowButtonGap;
-            }
-
-            if (index == _itemRows.Count - 1)
-            {
-                var addButton = new FeedbackButton()
-                {
-                    Text = "+",
-                    Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
-                    Parent = rowPanel,
-                    // Sitting next to the quantity field, a bare "+" reads
-                    // as a stepper. Say what it actually adds.
-                    BasicTooltipText = "Add another item to this plan"
-                };
-                addButton.Click += (_, __) => AddItemRow();
-            }
-        }
-
-        private void AddItemRow()
-        {
-            _itemRows.Add(new ItemRowState());
-            ReflowTopRegion(rebuildItemRows: true);
-        }
-
-        /// <summary>
-        /// The per-row suggestion popups are SpriteScreen-parented, like the
-        /// tickers, so disposing the host window does not reach them and
-        /// nothing else tears them down on unload - and each one holds a
-        /// global mouse subscription for its whole life. Called by
-        /// Module.Unload; every in-session teardown routes through
-        /// RebuildItemRowControls instead.
+        /// The per-row suggestion popups outlive the host window (they are
+        /// SpriteScreen-parented), so Module.Unload asks for them by name.
+        /// Every in-session teardown routes through
+        /// ItemInputRowStrip.Rebuild instead.
         /// </summary>
         public void DisposeSuggestionPanels()
         {
-            foreach (var row in _itemRows)
-            {
-                row.SuggestionPanel?.Dispose();
-                row.SuggestionPanel = null;
-            }
-        }
-
-        private void RemoveItemRow(ItemRowState row)
-        {
-            if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count)) return;
-
-            int index = _itemRows.IndexOf(row);
-            if (index < 0) return;
-
-            row.SuggestionPanel?.Dispose();
-            row.RowPanel?.Dispose();
-            _itemRows.RemoveAt(index);
-            ReflowTopRegion(rebuildItemRows: true);
+            _inputRows.DisposeSuggestionPanels();
         }
 
         /// <summary>
@@ -1953,7 +1898,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReflowTopRegion(bool rebuildItemRows = false)
         {
-            if (_buildPanel == null || _inputPanel == null) return;
+            if (_buildPanel == null || _inputPanel == null)
+            {
+                return;
+            }
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
@@ -1965,7 +1913,7 @@ namespace GW2CraftingHelper.Views
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             if (rebuildItemRows)
             {
-                RebuildItemRowControls(w);
+                _inputRows.Rebuild(_inputPanel, w);
             }
 
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
@@ -1997,17 +1945,17 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        #endregion // 1. Input rows (continued)
+        #endregion // Input rows: the top-region reflow a row add/remove triggers
 
-        #region General: view construction (Build) - wires every section/handler together
+        #region View construction (Build) - wires every section/handler together
 
         // Wires Input Rows (1), the wheel handlers (3/4), and the resize
         // handler (5) together onto the freshly built controls; not itself
-        // one of the 11 - see m38-a1-architecture.md S3.
+        // one of the 11 - see dev/dev-notes/m38-plan/m38-a1-architecture.md S3.
         public void Build(Container buildPanel)
         {
             // Screen-parented popups from the previous build cycle (one
-            // per item row) are cleaned up by RebuildItemRowControls below, which
+            // per item row) are cleaned up by the strip rebuild below, which
             // every row already routes through - no separate loop needed
             // here.
 
@@ -2019,14 +1967,7 @@ namespace GW2CraftingHelper.Views
             _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
 
-            // Gw2e's own initial state is one empty row
-            // (`e.recipes = [{id: null, amount: 1}]`) - see _itemRows' own
-            // doc comment. Only ever seeded once; every later Build() call
-            // (tab switch) reuses whatever the session already has.
-            if (_itemRows.Count == 0)
-            {
-                _itemRows.Add(new ItemRowState());
-            }
+            _inputRows.SeedFirstRow();
 
             // Settled BEFORE the layout is computed, from the plan this
             // Build is about to render (a tab switch re-renders whatever
@@ -2055,25 +1996,28 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, layout.InputPanelHeight),
                 Location = new Point(0, InputRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
-            RebuildItemRowControls(w);
+            _inputRows.Rebuild(_inputPanel, w);
 
             // Controls row: checkbox + generate button
             _controlsPanel = new Panel()
             {
                 Size = new Point(w, RowHeight),
                 Location = new Point(0, layout.ControlsRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
+            var ownMaterialsState = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
             _ownMaterialsCheckbox = new Checkbox()
             {
                 Text = "Use Own Materials",
-                Checked = _useOwnMaterials,
+                Checked = ownMaterialsState.Checked,
+                Enabled = ownMaterialsState.Enabled,
                 Location = new Point(0, 7),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
+            TooltipFacility.ApplyPlain(_ownMaterialsCheckbox, ownMaterialsState.Tooltip);
             // CheckedChanged is wired further down, AFTER
             // _valueOwnMaterialsCheckbox is constructed - the handler
             // dereferences that field unconditionally, and wiring it
@@ -2088,22 +2032,25 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(170, 7),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
-            var priceBasisDropdown = new Dropdown()
+            _priceBasisDropdown = new Dropdown()
             {
                 Size = new Point(110, 28),
                 Location = new Point(218, 3),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
-            priceBasisDropdown.Items.Add("Instant Buy");
-            priceBasisDropdown.Items.Add("Buy Orders");
-            priceBasisDropdown.SelectedItem = _priceBasis == PriceBasis.BuyOrder
-                ? "Buy Orders"
-                : "Instant Buy";
-            priceBasisDropdown.ValueChanged += (_, e) =>
+            _priceBasisDropdown.Items.Add(PriceBasisDropdownItem(PriceBasis.InstantBuy));
+            _priceBasisDropdown.Items.Add(PriceBasisDropdownItem(PriceBasis.BuyOrder));
+            _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(_priceBasis);
+            _priceBasisDropdown.ValueChanged += (_, e) =>
             {
-                _priceBasis = e.CurrentValue == "Buy Orders"
+                if (_suppressToggle)
+                {
+                    return;
+                }
+
+                _priceBasis = e.CurrentValue == PriceBasisDropdownItem(PriceBasis.BuyOrder)
                     ? PriceBasis.BuyOrder
                     : PriceBasis.InstantBuy;
                 MarkSettingsChanged();
@@ -2118,7 +2065,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Value Own Materials",
                 Checked = _valueOwnMaterials,
-                Enabled = _useOwnMaterials,
+                Enabled = ownMaterialsState.Checked,
                 Location = new Point(350, 7),
                 Parent = _controlsPanel,
                 // With this ON, owned materials are priced at market rate
@@ -2133,6 +2080,11 @@ namespace GW2CraftingHelper.Views
                 "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free.");
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
+                if (_suppressToggle)
+                {
+                    return;
+                }
+
                 _valueOwnMaterials = e.Checked;
                 MarkSettingsChanged();
             };
@@ -2146,7 +2098,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Generate Plan",
                 Size = new Point(120, UiMetrics.ButtonHeight),
                 Location = new Point(w - 120 - RightEdgePadding, 3),
-                Parent = _controlsPanel
+                Parent = _controlsPanel,
             };
             _generateButton.Click += async (_, __) => await TriggerGenerate();
 
@@ -2172,7 +2124,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, layout.StatusRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
@@ -2184,7 +2136,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(w - RightEdgePadding, 2),
                 Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
@@ -2195,7 +2147,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, layout.ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Unconditional wheel-recency tracking StartScrollVerify
@@ -2303,7 +2255,7 @@ namespace GW2CraftingHelper.Views
             // one writer of them.
             _treeToolbarPanel = new Panel()
             {
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             CreateTreeStateChips();
@@ -2318,7 +2270,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Text = text,
                     Size = new Point(slot.Width, TreeToolbarButtonHeight),
-                    Parent = _treeToolbarPanel
+                    Parent = _treeToolbarPanel,
                 };
                 TooltipFacility.ApplyPlain(button, tooltipText);
                 button.Click += (_, __) => onClick();
@@ -2351,7 +2303,9 @@ namespace GW2CraftingHelper.Views
             PlaceTreeToolbarRow(w, rowY);
         }
 
-        #region 4b. Tree action confirms - a dialog only when the click would change something
+        #endregion // View construction (Build) - wires every section/handler together
+
+        #region Tree action confirms - a dialog only when the click would change something
 
         // The matrix, in one sentence: a dialog appears ONLY when the
         // click would actually change the plan; otherwise the click skips
@@ -2368,11 +2322,14 @@ namespace GW2CraftingHelper.Views
         // Every predicate is read at CLICK time from the live tree state
         // (TreeToolbarCommands), never cached per render: two of them
         // build a preset to compare against.
-
         private void InvokeTreeCommand(Func<TreeToolbarCommands, Action> pick)
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
+            if (commands == null)
+            {
+                return;
+            }
+
             pick(commands)?.Invoke();
         }
 
@@ -2385,7 +2342,11 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ShowTreeConfirm(string message, string confirmText, Action onConfirm)
         {
-            if (onConfirm == null) return;
+            if (onConfirm == null)
+            {
+                return;
+            }
+
             _modalDialog?.Show(message, onConfirm, null, confirmText);
         }
 
@@ -2398,7 +2359,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool TreeCommandUnavailable(TreeToolbarCommands commands)
         {
-            if (commands.CanReSolve?.Invoke() != false) return false;
+            if (commands.CanReSolve?.Invoke() != false)
+            {
+                return false;
+            }
 
             SetStatus(WithStandingNotices(StatusText.ReSolveUnavailable));
             return true;
@@ -2407,8 +2371,15 @@ namespace GW2CraftingHelper.Views
         private void ConfirmBestPath()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2426,8 +2397,15 @@ namespace GW2CraftingHelper.Views
         private void ConfirmClearOverrides()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             int overrides = commands.GetOverrideCount?.Invoke() ?? 0;
             if (overrides == 0)
@@ -2481,8 +2459,15 @@ namespace GW2CraftingHelper.Views
             string noOpStatus, string question, string confirmText)
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             bool? wouldChange = pickPredicate(commands)?.Invoke();
             if (wouldChange == null)
@@ -2508,14 +2493,24 @@ namespace GW2CraftingHelper.Views
         private void ConfirmClearIgnored()
         {
             var commands = _treeToolbarCommands;
-            if (commands == null) return;
-            if (TreeCommandUnavailable(commands)) return;
+            if (commands == null)
+            {
+                return;
+            }
+
+            if (TreeCommandUnavailable(commands))
+            {
+                return;
+            }
 
             // The control is hidden at zero, so the predicate is always
             // true when it is clickable - the guard is what makes that a
             // fact rather than an assumption.
             int ignored = commands.GetIgnoredCount?.Invoke() ?? 0;
-            if (ignored == 0) return;
+            if (ignored == 0)
+            {
+                return;
+            }
 
             ShowTreeConfirm(
                 "Stop ignoring " + StatusText.Count(ignored, "item") +
@@ -2523,7 +2518,9 @@ namespace GW2CraftingHelper.Views
                 "Clear Ignored", commands.ClearIgnored);
         }
 
-        #endregion // 4b. Tree action confirms - a dialog only when the click would change something
+        #endregion // Tree action confirms - a dialog only when the click would change something
+
+        #region Tree toolbar: the state chips, the toolbar row's placement and its visibility
 
         // The two per-plan STATE chips, in the slot the grey "Recipe Tree:"
         // caption used to hold. Built once per Build() and shown/hidden by
@@ -2587,7 +2584,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Visible = false,
                 Location = new Point(0, TreeToolbarButtonY + 3),
-                Parent = _treeToolbarPanel
+                Parent = _treeToolbarPanel,
             };
         }
 
@@ -2598,7 +2595,7 @@ namespace GW2CraftingHelper.Views
                 Text = text,
                 Size = new Point(width, TreeToolbarButtonHeight),
                 Visible = false,
-                Parent = _treeToolbarPanel
+                Parent = _treeToolbarPanel,
             };
             TooltipFacility.ApplyPlain(button, tooltipText);
             button.Click += (_, __) => onClick();
@@ -2621,7 +2618,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefreshTreeStateChips()
         {
-            if (_overridesChipLabel == null) return;
+            if (_overridesChipLabel == null)
+            {
+                return;
+            }
 
             var commands = _treeToolbarCommands;
             int overrides = commands?.GetOverrideCount?.Invoke() ?? 0;
@@ -2641,6 +2641,7 @@ namespace GW2CraftingHelper.Views
             {
                 overridesWidth = SetChipText(_overridesChipLabel, StatusText.ForOverridesChip(overrides));
             }
+
             if (showIgnored)
             {
                 ignoredWidth = SetChipText(_ignoredChipLabel, StatusText.ForIgnoredChip(ignored));
@@ -2714,7 +2715,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
         {
-            if (_treeToolbarPanel == null) return;
+            if (_treeToolbarPanel == null)
+            {
+                return;
+            }
 
             _treeToolbarPanel.Visible = _treeToolbarVisible;
             _treeToolbarPanel.Size = new Point(
@@ -2750,15 +2754,18 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyTreeToolbarVisibility(bool visible)
         {
-            if (_treeToolbarVisible == visible) return;
+            if (_treeToolbarVisible == visible)
+            {
+                return;
+            }
 
             _treeToolbarVisible = visible;
             ReflowTopRegion();
         }
 
-        #endregion // General: view construction (Build) - wires every section/handler together
+        #endregion // Tree toolbar: the state chips, the toolbar row's placement and its visibility
 
-        #region 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
+        #region Resize relayout: the resize handler, the replay and the settle pass - KNOWN-ISSUES #13/#19
         private void OnPanelResized(object sender, ResizedEventArgs e)
         {
             var container = (Container)sender;
@@ -2776,19 +2783,14 @@ namespace GW2CraftingHelper.Views
             // pre-existing direct updates - these were
             // never part of the dispose+rebuild problem the relayout
             // registry below replaces. The input strip is N rows
-            // (_itemRows.Count) rather than a fixed one, so its own and
+            // (the strip's row count) rather than a fixed one, so its own and
             // every row panel's width need updating too, and the Y offsets
             // below it come from the same ComputeTopRegionLayout formula
             // Build()/ReflowTopRegion use rather than fixed constants.
             var layout = ComputeTopRegionLayout();
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
-            foreach (var row in _itemRows)
-            {
-                if (row.RowPanel != null)
-                {
-                    row.RowPanel.Size = new Point(w, RowHeight);
-                }
-            }
+            _inputRows.ResizeRows(w);
+
             _controlsPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
             _generateButton.Location = new Point(w - 120 - RightEdgePadding, 3);
@@ -2900,16 +2902,15 @@ namespace GW2CraftingHelper.Views
         /// reason).
         ///
         /// A write here keeps the visible position correct for the
-        /// remainder of THIS tick (no flash mid-drag, matching directive
-        /// B's zero-flash goal); OnPanelResized separately arms a bounded
+        /// remainder of THIS tick, so the drag never flashes;
+        /// OnPanelResized separately arms a bounded
         /// verify window at drag SETTLE (ResizeSettleStep), not per tick,
         /// to contest that trailing later-frame reset once the drag stops
         /// producing new ticks - see StartResizeScrollVerify. A per-tick
-        /// verify window was deliberately not used: it would spawn (or
+        /// verify window is not used: it would spawn (or
         /// cancel-and-replace) a FrameTicker on every single drag frame,
-        /// which is the "spam" the task explicitly ruled out, and the
-        /// per-tick synchronous write already keeps each tick visually
-        /// correct without one.
+        /// and the per-tick synchronous write already keeps each tick
+        /// visually correct without one.
         /// </summary>
         private void PreserveScrollAcrossResize(int savedOffsetPx, int newContentPanelHeight)
         {
@@ -3033,8 +3034,15 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
-            if (_contentPanel == null) return;
-            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
+
+            if (_relayoutActions.Count == 0 && _treeRelayoutActions.Count == 0)
+            {
+                return;
+            }
 
 #if DEBUG
             // Invariant (KNOWN-ISSUES #13): a pure width/text
@@ -3055,6 +3063,7 @@ namespace GW2CraftingHelper.Views
                 {
                     relayout(panelWidth);
                 }
+
                 foreach (var relayout in _treeRelayoutActions)
                 {
                     relayout(panelWidth);
@@ -3082,7 +3091,7 @@ namespace GW2CraftingHelper.Views
             if (debugScrollbar != null && debugScrollbar.ScrollDistance != debugScrollBefore)
             {
                 Logger.Warn(
-                    "M33 C2b invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
+                    "Invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
                     debugScrollBefore, debugScrollbar.ScrollDistance);
             }
 #endif
@@ -3196,32 +3205,36 @@ namespace GW2CraftingHelper.Views
             {
                 reellipsis(panelWidth);
             }
+
             foreach (var reellipsis in _treeReellipsisActions)
             {
                 reellipsis(panelWidth);
             }
         }
 
-        #endregion // 5. Resize relayout (continued) - KNOWN-ISSUES #13/#19
+        #endregion // Resize relayout: the resize handler, the replay and the settle pass - KNOWN-ISSUES #13/#19
 
-        #region 2. Generate orchestration (continued)
+        #region Generate orchestration: the generate, resolve and restore paths
         private void OnOwnMaterialsToggled(object sender, CheckChangedEvent e)
         {
-            if (_suppressToggle) return;
+            if (_suppressToggle)
+            {
+                return;
+            }
 
             bool newValue = e.Checked;
 
             if (_currentPlan != null)
             {
-                // Show modal confirmation before regenerating
+                // Show modal confirmation before regenerating. The gate
+                // carries the optimistic intent onto the Value Own
+                // Materials checkbox (its own Checked value is preserved
+                // either way, only whether it can be clicked follows Use
+                // Own Materials); the box itself is then armed shut so it
+                // cannot be clicked again until the dialog answers.
                 _useOwnMaterials = newValue;
+                ApplyOwnMaterialsGate();
                 _ownMaterialsCheckbox.Enabled = false;
-                // Keep the Value Own Materials
-                // checkbox's Enabled state in lockstep with the optimistic
-                // _useOwnMaterials value at every point it changes here -
-                // its own Checked value is preserved either way, only
-                // whether it can be clicked follows Use Own Materials.
-                _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
 
                 // Undoes the optimistic arm above. Used for both the dialog's
                 // Cancel (which its X/Escape path also runs) and a refused
@@ -3231,11 +3244,7 @@ namespace GW2CraftingHelper.Views
                 Action revert = () =>
                 {
                     _useOwnMaterials = !_useOwnMaterials;
-                    _suppressToggle = true;
-                    _ownMaterialsCheckbox.Checked = _useOwnMaterials;
-                    _suppressToggle = false;
-                    _ownMaterialsCheckbox.Enabled = true;
-                    _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+                    ApplyOwnMaterialsGate();
                 };
 
                 // Aligned to the tree's confirm matrix: state the outcome
@@ -3247,7 +3256,11 @@ namespace GW2CraftingHelper.Views
                         : "Regenerate the plan with own materials excluded? Manual decisions and ignore marks are cleared.",
                     () =>
                     {
-                        _ownMaterialsCheckbox.Enabled = true;
+                        // Disarms through the gate, not straight to
+                        // Enabled = true: a Clear Cache landing while this
+                        // dialog was open must not hand back a live,
+                        // ticked box with no snapshot behind it.
+                        ApplyOwnMaterialsGate();
                         _ = TriggerGenerate();
                     },
                     revert,
@@ -3262,13 +3275,77 @@ namespace GW2CraftingHelper.Views
             }
 
             _useOwnMaterials = newValue;
-            _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+            ApplyOwnMaterialsGate();
 
             // Only reached with no plan on screen (the branch above
             // regenerates behind a confirm), so nothing is being made
             // stale here - but the toggle still only takes effect on the
             // next Generate, and saying so beats leaving "Ready" up.
             MarkSettingsChanged();
+        }
+
+        /// <summary>
+        /// Tells the tab whether an account snapshot exists to subtract
+        /// from. Called by the host on every tick, so a key granted
+        /// mid-session or a Clear Cache moves the "Use Own Materials" gate
+        /// with no restart; unchanged values cost a bool compare.
+        /// </summary>
+        public void SetAccountDataAvailable(bool available)
+        {
+            if (_accountDataAvailable == available)
+            {
+                return;
+            }
+
+            _accountDataAvailable = available;
+            ApplyOwnMaterialsGate();
+        }
+
+        // The one mapping between PriceBasis values and the dropdown's item
+        // strings - Build's initial selection, its ValueChanged reverse map
+        // and ApplyRestoredPlan's restored selection must never drift.
+        private static string PriceBasisDropdownItem(PriceBasis basis)
+        {
+            return basis == PriceBasis.BuyOrder ? "Buy Orders" : "Instant Buy";
+        }
+
+        /// <summary>
+        /// Writes <see cref="OwnMaterialsGate"/>'s answer onto the two
+        /// checkboxes it governs. The gate's answer is written here and in
+        /// Build() and nowhere else, so the box's Checked can never drift
+        /// from the value Generate solves with. (The confirm path below
+        /// separately disables the box while its dialog is up; that arm is
+        /// undone by its own revert, which lands back here.)
+        /// <para>
+        /// Null-guarded rather than main-thread-only for the same reason
+        /// <see cref="ApplyRestoredPlan"/> is: Build() publishes these
+        /// fields from whatever thread Blish ran it on, so a host tick can
+        /// arrive before the controls exist.
+        /// </para>
+        /// </summary>
+        private void ApplyOwnMaterialsGate()
+        {
+            if (_ownMaterialsCheckbox == null)
+            {
+                return;
+            }
+
+            var state = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
+
+            // A programmatic Checked write raises CheckedChanged exactly
+            // like a click, and this is not a user decision - unsuppressed
+            // it would open the regenerate confirm on its own.
+            _suppressToggle = true;
+            _ownMaterialsCheckbox.Checked = state.Checked;
+            _suppressToggle = false;
+
+            _ownMaterialsCheckbox.Enabled = state.Enabled;
+            TooltipFacility.ApplyPlain(_ownMaterialsCheckbox, state.Tooltip);
+
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Enabled = state.Checked;
+            }
         }
 
         /// <summary>
@@ -3324,22 +3401,25 @@ namespace GW2CraftingHelper.Views
             // every further click would start another full generation -
             // _generateSequence makes the last result win, it does not stop
             // the redundant work.
-            SetGenerateEnabled(false);
+            SetGenerateInputsEnabled(false);
             SetStatus(ResolvingStatus);
 
             var matches = await FindTypedRowMatchesAsync(pending);
             bool queued = MainThreadMarshal.Run(() =>
             {
-                // Resolution is over either way, so hand the button back
-                // first; GenerateFromResolvedRows disables it again itself,
+                // Resolution is over either way, so hand the inputs back
+                // first; GenerateFromResolvedRows disables them again itself,
                 // synchronously, if a run actually starts.
-                SetGenerateEnabled(true);
+                SetGenerateInputsEnabled(true);
 
                 // Torn down while the search was in flight (tab
                 // switched away, module unloading) - nothing to
                 // generate into, same bail every other deferred
                 // callback in this file takes.
-                if (_contentPanel == null || _contentPanel.Parent == null) return;
+                if (_contentPanel == null || _contentPanel.Parent == null)
+                {
+                    return;
+                }
 
                 bool anyAmbiguous = AdoptTypedRowMatches(matches);
                 _ = GenerateFromResolvedRows(anyAmbiguous);
@@ -3348,18 +3428,58 @@ namespace GW2CraftingHelper.Views
             if (!queued)
             {
                 // Overlay is gone, so that callback will never drain and
-                // the button would stay disabled for the rest of this
+                // the inputs would stay disabled for the rest of this
                 // panel's life. The main-thread update loop this would
                 // otherwise race with is exactly what is missing.
-                SetGenerateEnabled(true);
+                SetGenerateInputsEnabled(true);
             }
         }
 
-        private void SetGenerateEnabled(bool enabled)
+        /// <summary>
+        /// Every control that can START a generation, switched together.
+        /// <para>
+        /// The Generate button used to be the only one disabled for the
+        /// length of a run, which left "Use Own Materials" clickable while a
+        /// plan was still generating - and its confirm callback starts
+        /// another generation. Two runs then shared one ItemMetadataService,
+        /// which is a data race, and _generateSequence does not help: it
+        /// makes the last result win, it does not stop the redundant work.
+        /// The service is now internally locked (ItemMetadataService's
+        /// _cacheLock), so this is no longer a crash guard - it is the
+        /// single-flight rule that stops the redundant run from starting at
+        /// all.
+        /// </para>
+        /// <para>
+        /// "Value Own Materials" is restored to <c>_useOwnMaterials</c>, not
+        /// to true: it is inert without a snapshot driving reduction and is
+        /// disabled whenever Use Own Materials is off (see its construction
+        /// site).
+        /// </para>
+        /// </summary>
+        /// <summary>
+        /// The module's lifetime token, or None when this view was built
+        /// without one. Read per call, never cached - see the field comment.
+        /// </summary>
+        private CancellationToken ModuleLifetimeToken()
+        {
+            return _moduleLifetimeToken == null ? CancellationToken.None : _moduleLifetimeToken();
+        }
+
+        private void SetGenerateInputsEnabled(bool enabled)
         {
             if (_generateButton != null)
             {
                 _generateButton.Enabled = enabled;
+            }
+
+            if (_ownMaterialsCheckbox != null)
+            {
+                _ownMaterialsCheckbox.Enabled = enabled;
+            }
+
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Enabled = enabled && _useOwnMaterials;
             }
         }
 
@@ -3376,7 +3496,7 @@ namespace GW2CraftingHelper.Views
                 return pending;
             }
 
-            foreach (var row in _itemRows)
+            foreach (var row in _inputRows.Rows)
             {
                 if (row.ItemId.HasValue)
                 {
@@ -3422,7 +3542,7 @@ namespace GW2CraftingHelper.Views
                 try
                 {
                     results = await _itemSearchProvider.SearchAsync(
-                        entry.Text, TypedNameSearchResults, CancellationToken.None);
+                        entry.Text, TypedNameSearchResults, ModuleLifetimeToken());
                 }
                 catch (Exception ex)
                 {
@@ -3448,7 +3568,7 @@ namespace GW2CraftingHelper.Views
         /// text - that is the same stale-selection bug the search box's own
         /// TextChanged handler exists to prevent. Rows removed while the
         /// search was in flight are skipped outright: their state belongs to
-        /// nothing once _itemRows no longer holds them, and their search box
+        /// nothing once the strip no longer holds them, and their search box
         /// has been disposed with the row panel.
         /// <para>
         /// Returns true when some row's name turned out to belong to more
@@ -3460,7 +3580,7 @@ namespace GW2CraftingHelper.Views
             bool anyAmbiguous = false;
             foreach (var entry in matches)
             {
-                if (entry.Row.ItemId.HasValue || !_itemRows.Contains(entry.Row))
+                if (entry.Row.ItemId.HasValue || !_inputRows.Rows.Contains(entry.Row))
                 {
                     continue;
                 }
@@ -3492,7 +3612,7 @@ namespace GW2CraftingHelper.Views
         private int CountUnresolvedTypedRows()
         {
             int count = 0;
-            foreach (var row in _itemRows)
+            foreach (var row in _inputRows.Rows)
             {
                 if (!row.ItemId.HasValue && !string.IsNullOrWhiteSpace(row.SearchBox?.Text))
                 {
@@ -3509,25 +3629,30 @@ namespace GW2CraftingHelper.Views
             // row's selection + quantity into the request list the
             // pipeline needs. Per-row quantity validation mirrors the
             // old single-quantity-box behavior exactly (invalid/blank/
-            // &lt;1 silently corrected to 1, with a user-visible notice) -
+            // <1 silently corrected to 1, with a user-visible notice) -
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
-            var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
+            var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_inputRows.Rows.Count);
             // Folded together with the label-part collection
-            // below (previously a separate foreach over the same _itemRows)
+            // below (previously a separate foreach over the same row list)
             // now that both need nothing from each other but this loop's own
             // per-row qty correction - see RequestLabelFormatter's own doc
             // comment for why the label itself is capped.
-            var labelParts = new List<string>(_itemRows.Count);
-            foreach (var row in _itemRows)
+            var labelParts = new List<string>(_inputRows.Rows.Count);
+            foreach (var row in _inputRows.Rows)
             {
                 bool qtyInvalid = !int.TryParse(row.QtyInput?.Text, out int qty) || qty < 1;
                 if (qtyInvalid)
                 {
                     qty = 1;
-                    if (row.QtyInput != null) row.QtyInput.Text = "1";
+                    if (row.QtyInput != null)
+                    {
+                        row.QtyInput.Text = "1";
+                    }
+
                     anyQtyInvalid = true;
                 }
+
                 row.QuantityText = qty.ToString();
                 rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
 
@@ -3540,7 +3665,11 @@ namespace GW2CraftingHelper.Views
                 // same order/count as requestItems, using the name the
                 // row's own search selection already resolved (no extra
                 // network round trip).
-                if (!row.ItemId.HasValue) continue;
+                if (!row.ItemId.HasValue)
+                {
+                    continue;
+                }
+
                 string name = string.IsNullOrEmpty(row.ItemName) ? "Unknown Item" : row.ItemName;
                 labelParts.Add($"{name} x{row.QuantityText}");
             }
@@ -3595,7 +3724,9 @@ namespace GW2CraftingHelper.Views
             // PlanStripStatusBoard.Begin's own doc comment.
             _statusBoard.Begin(myGen);
 
-            _generateButton.Enabled = false;
+            // Not just the button: the own-materials toggles start a second
+            // generation of their own - see SetGenerateInputsEnabled.
+            SetGenerateInputsEnabled(false);
             _lastDebugLog = null;
 
             // The strip's standing notices now describe THIS run: the
@@ -3646,15 +3777,26 @@ namespace GW2CraftingHelper.Views
             // its own lock to reject exactly that.
             var phaseProgress = new Progress<PlanPhaseEvent>(pe =>
             {
-                if (pe == null) return;
+                if (pe == null)
+                {
+                    return;
+                }
+
                 _statusBoard.UpdatePhase(myGen, (int)pe.Phase, PlanStripTickDecision.FormatPhaseText(pe));
             });
+
+            // The gated value, not the raw intent: what the checkbox shows
+            // is what the plan is solved with, and what gets persisted with
+            // it (see OwnMaterialsGate).
+            bool useOwnMaterials = OwnMaterialsGate
+                .Resolve(_useOwnMaterials, _accountDataAvailable)
+                .Checked;
 
             try
             {
                 var result = await _generateAsync(
-                    requestItems, _useOwnMaterials, _valueOwnMaterials, _priceBasis,
-                    CancellationToken.None, null, phaseProgress, requestLabel);
+                    requestItems, useOwnMaterials, _valueOwnMaterials, _priceBasis,
+                    ModuleLifetimeToken(), null, phaseProgress, requestLabel);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this
                 // continuation may resume on a ThreadPool thread. vm-building
@@ -3672,7 +3814,10 @@ namespace GW2CraftingHelper.Views
                 var vm = _vmBuilder.Build(result);
                 MainThreadMarshal.Run(() =>
                 {
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
 
                     // Plain-state writes happen before any control mutation
                     // so a disposed-control bail below can never strand this
@@ -3704,7 +3849,10 @@ namespace GW2CraftingHelper.Views
                     // disabled) while generation was in flight - a disposed
                     // control's Parent is nulled on disposal (see
                     // ResizeDebounceStep) - nothing left to render into.
-                    if (_contentPanel == null || _contentPanel.Parent == null) return;
+                    if (_contentPanel == null || _contentPanel.Parent == null)
+                    {
+                        return;
+                    }
 
                     _lastRenderedWidth = _contentPanel.Width;
                     RenderPlan(vm);
@@ -3713,12 +3861,17 @@ namespace GW2CraftingHelper.Views
             catch (Exception ex)
             {
                 Logger.Warn(ex, "Plan generation failed");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "plan",
+                    $"Plan generation failed: {ex.GetType().Name} - {ex.Message}");
                 MainThreadMarshal.Run(() =>
                 {
                     // A superseded generation's failure must not clobber a
                     // newer generation's (possibly successful) state or
                     // status - same reasoning as the success path above.
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
 
                     _lastDebugLog = new[] { $"Generation failed: {ex.Message}" };
 
@@ -3744,7 +3897,11 @@ namespace GW2CraftingHelper.Views
                 // actually runs is allowed to re-enable.
                 MainThreadMarshal.Run(() =>
                 {
-                    if (myGen != _generateSequence) return;
+                    if (myGen != _generateSequence)
+                    {
+                        return;
+                    }
+
                     // This callback runs back-to-back with the
                     // success/catch callback in the same main-thread
                     // drain - no engine frame can land between them. A
@@ -3760,8 +3917,12 @@ namespace GW2CraftingHelper.Views
                     RenderFromBoard(_statusBoard.Snapshot());
                     _spinnerTicker?.Cancel();
                     _spinnerTicker = null;
-                    if (_contentPanel == null || _contentPanel.Parent == null) return;
-                    _generateButton.Enabled = true;
+                    if (_contentPanel == null || _contentPanel.Parent == null)
+                    {
+                        return;
+                    }
+
+                    SetGenerateInputsEnabled(true);
 
                     // The single restore point for the dim applied at the
                     // start of this generation - this finally runs on
@@ -3794,7 +3955,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void SetContentDimmed(bool dimmed)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             float opacity = dimmed ? StalePlanOpacity : 1f;
             _contentPanel.Opacity = opacity;
@@ -3803,6 +3967,7 @@ namespace GW2CraftingHelper.Views
             {
                 _treeToolbarPanel.Opacity = opacity;
             }
+
             foreach (var entry in _treeToolbarButtons)
             {
                 entry.Button.Enabled = !dimmed;
@@ -3812,8 +3977,15 @@ namespace GW2CraftingHelper.Views
             // so they go dead with the five beside them. The count labels
             // dim with the panel and keep reading, which is right: the
             // counts are still true of what is still on screen.
-            if (_clearOverridesButton != null) _clearOverridesButton.Enabled = !dimmed;
-            if (_clearIgnoredButton != null) _clearIgnoredButton.Enabled = !dimmed;
+            if (_clearOverridesButton != null)
+            {
+                _clearOverridesButton.Enabled = !dimmed;
+            }
+
+            if (_clearIgnoredButton != null)
+            {
+                _clearIgnoredButton.Enabled = !dimmed;
+            }
         }
 
         /// <summary>
@@ -3838,7 +4010,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RenderFromBoard(PlanStripStatusSnapshot snapshot)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return;
+            }
 
             // The spinner is shown on exactly the condition the old ASCII
             // glyph was appended on, and every branch below re-anchors it
@@ -3935,7 +4110,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool SpinnerTick(int myGen, GameTime gameTime)
         {
-            if (_contentPanel == null || _contentPanel.Parent == null) return false;
+            if (_contentPanel == null || _contentPanel.Parent == null)
+            {
+                return false;
+            }
 
             var snapshot = _statusBoard.Snapshot();
             switch (PlanStripTickDecision.Decide(snapshot, myGen))
@@ -3951,6 +4129,7 @@ namespace GW2CraftingHelper.Views
                         _lastSpinnerTickUtc = now;
                         RenderFromBoard(snapshot);
                     }
+
                     return true;
 
                 default: // Stop (or any future action - fail safe by stopping, never spin forever)
@@ -3982,9 +4161,9 @@ namespace GW2CraftingHelper.Views
             RenderFromBoard(_statusBoard.Snapshot());
         }
 
-        #endregion // 2. Generate orchestration (continued)
+        #endregion // Generate orchestration: the generate, resolve and restore paths
 
-        #region General: current panel width helper
+        #region Current panel width helper
 
         /// <summary>
         /// The content panel's LIVE usable width (RightEdgePadding already
@@ -4003,9 +4182,9 @@ namespace GW2CraftingHelper.Views
             return _contentPanel != null ? _contentPanel.Width - RightEdgePadding : 0;
         }
 
-        #endregion // General: current panel width helper
+        #endregion // Current panel width helper
 
-        #region 7. Section builders
+        #region Plan render: RenderPlan and the shared section chrome
 
         /// <summary>
         /// Factored out of
@@ -4047,7 +4226,10 @@ namespace GW2CraftingHelper.Views
                 _scrollAnchors.Clear();
             }
 
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             // Detached, not disposed, and BEFORE the sweep: a preserved
             // tree's controls are children of the very panel being emptied.
@@ -4067,72 +4249,38 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        // What the tab says when it holds no plan. The default state was
-        // blank parchment plus a small "Ready" on the status strip, which
-        // names no next action - the Log tab already answers the same
-        // question with a dim label in its own empty content panel, and
-        // this is that pattern.
-        private const string EmptyPlanText =
-            "No plan yet. Search for an item above, then click Generate Plan.";
-        private const int EmptyPlanTopGap = 48;
-        private static readonly Color EmptyPlanTextColor = new Color(150, 150, 150);
-
         /// <summary>
-        /// Parents the empty-state label into the (already emptied) content
-        /// panel. Nothing disposes it explicitly: it is a child of
-        /// _contentPanel like every rendered section, so
-        /// ResetContentPanelToEmpty sweeps it on the first render of a real
-        /// plan - which is the "disposed on first render" the finding asks
-        /// for, through the path that already exists rather than a second
-        /// one that could drift from it.
+        /// Empties the content panel and hands it to
+        /// EmptyPlanStateRenderer.
         /// <para>
-        /// The gap is a spacer Panel, not a Location: _contentPanel is a
-        /// SingleTopToBottom FlowPanel and positions its own children, the
-        /// same reason CreateSectionHeader emits a topGap panel.
+        /// The reset is here, not in the renderer: it starts from the same
+        /// "nothing rendered yet" point RenderPlan does, and for the same
+        /// reason - the empty state registers a relayout closure, and
+        /// _relayoutActions is cleared ONLY here. Without it, a tab visit
+        /// with no plan would leave the previous visit's closures in the
+        /// registry, each one writing Size into a control that visit
+        /// already disposed. Idempotent - both call sites reach it with the
+        /// panel already empty (the rollback path calls it explicitly
+        /// first, deliberately, and both the tree-state reset and the
+        /// registry clears are repeat-safe).
         /// </para>
         /// </summary>
         private void ShowEmptyPlanState()
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
-            // Starts from the same "nothing rendered yet" point RenderPlan
-            // does, and for the same reason: this method registers a
-            // relayout closure, and _relayoutActions is cleared ONLY here.
-            // Without it, a tab visit with no plan would leave the previous
-            // visit's closures in the registry, each one writing Size into
-            // a control that visit already disposed. Idempotent - both call
-            // sites reach it with the panel already empty (the rollback
-            // path calls it explicitly first, deliberately, and both the
-            // tree-state reset and the registry clears are repeat-safe).
             ResetContentPanelToEmpty();
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
-            if (panelWidth < 0) panelWidth = 0;
-
-            var topGap = new Panel()
+            if (panelWidth < 0)
             {
-                Size = new Point(panelWidth, EmptyPlanTopGap),
-                Parent = _contentPanel
-            };
+                panelWidth = 0;
+            }
 
-            var label = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = EmptyPlanText,
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = panelWidth,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextColor = EmptyPlanTextColor,
-                Parent = _contentPanel
-            };
-
-            _relayoutActions.Add(w =>
-            {
-                int width = w > 0 ? w : 0;
-                topGap.Size = new Point(width, EmptyPlanTopGap);
-                label.Width = width;
-            });
+            new EmptyPlanStateRenderer(this).Render(_contentPanel, panelWidth);
         }
 
         /// <summary>
@@ -4146,7 +4294,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RenderPlanAfterResolve(PlanViewModel vm)
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             var treeRoots = ResolveTreeRoots(vm);
             if (treeRoots != null && _treeSectionControls != null &&
@@ -4161,20 +4312,23 @@ namespace GW2CraftingHelper.Views
 
         private void RenderPlan(PlanViewModel vm, bool preserveTree = false)
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             ResetContentPanelToEmpty(preserveTree);
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
-            CreatePlanHeader(vm, panelWidth);
+            new PlanHeaderRenderer(this, _getItemStatBlock).Render(vm, _contentPanel, panelWidth);
 
             // Separator under header
             var headerSeparator = new Panel()
             {
                 Size = new Point(panelWidth, 2),
                 BackgroundColor = new Color(180, 180, 180),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
             _relayoutActions.Add(w => headerSeparator.Size = new Point(w, 2));
 
@@ -4194,6 +4348,7 @@ namespace GW2CraftingHelper.Views
                     break;
                 }
             }
+
             if (summarySection != null)
             {
                 CreateCollapsibleSection(summarySection, panelWidth);
@@ -4228,6 +4383,7 @@ namespace GW2CraftingHelper.Views
                 {
                     control.Dispose();
                 }
+
                 _treeSectionControls = null;
                 _treeController.ResetTreeRenderState();
                 _treeRelayoutActions.Clear();
@@ -4236,7 +4392,11 @@ namespace GW2CraftingHelper.Views
 
             foreach (var section in vm.Sections)
             {
-                if (section.SectionType == PlanSectionType.Summary) continue;
+                if (section.SectionType == PlanSectionType.Summary)
+                {
+                    continue;
+                }
+
                 CreateCollapsibleSection(section, panelWidth);
             }
 
@@ -4267,6 +4427,7 @@ namespace GW2CraftingHelper.Views
             {
                 captured.Add(_contentPanel.Children[i]);
             }
+
             return captured;
         }
 
@@ -4287,158 +4448,17 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static List<CraftingTreeNode> ResolveTreeRoots(PlanViewModel vm)
         {
-            if (vm == null) return null;
+            if (vm == null)
+            {
+                return null;
+            }
+
             if (vm.MultiItemRoots != null && vm.MultiItemRoots.Count > 0)
             {
                 return vm.MultiItemRoots;
             }
+
             return vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null;
-        }
-
-        /// <summary>
-        /// Plan header: rarity-framed item icon + the item's own name in
-        /// its rarity colour + a grey quantity, left-aligned at the
-        /// content gutter every section below it also starts at.
-        ///
-        /// Three separate things used to compete here. The block was
-        /// CENTRED while everything under it was left-aligned, so the plan
-        /// had no single left edge. It carried a right-aligned "Generated:
-        /// ..." panel duplicating - to the minute - the timestamp the
-        /// fixed status strip 70px above already shows, so a plan opened
-        /// with the same text twice. And its title shared DefaultFont18
-        /// with every collapsible section header, leaving the page with no
-        /// typographic top level at all.
-        ///
-        /// So: the in-scroll timestamp is gone (the strip keeps it, and it
-        /// never scrolls away); the title is left-aligned and rendered at
-        /// DefaultFont32, and CreateSectionHeader drops to DefaultFont16,
-        /// so Font18-and-up now belongs to the page title alone. The
-        /// "Crafting Plan for " prefix is gone with it - the tab is
-        /// already titled "Crafting Plan" and the strip already says "Plan
-        /// generated", so the prefix cost half the title's width to repeat
-        /// what two other elements say.
-        /// </summary>
-        private void CreatePlanHeader(PlanViewModel vm, int panelWidth)
-        {
-            const int headerHeight = 56;
-            const int iconSize = 40;
-            const int iconBorder = 2;
-            const int iconPad = 10;
-
-            // Same 8px content gutter the Summary section's tiles, the
-            // currency table's icon column and the footnote all start at.
-            const int headerX = 8;
-
-            int frameSize = iconSize + iconBorder * 2;
-
-            var titleFont = UiFonts.Display;
-
-            // Regular weight, one tier down from the title it annotates -
-            // and not the 18-regular it used to be, whose 4px space glyph
-            // rendered " x 42 needed" no wider than Body did.
-            var qtyFont = UiFonts.SmallHeading;
-
-            string nameText = vm.TargetItemName ?? "Unknown Item";
-
-            // "needed", not a bare count: the quantity here is what the
-            // plan still has to obtain after owned materials were
-            // subtracted, which is routinely smaller than the number in
-            // the Qty box the user typed (live capture ph13: box 77,
-            // header 42, 35 already owned). A bare "x 42" beside a box
-            // reading 77 reads as a bug. Deliberately not "to craft" -
-            // a root the solver decided to BUY is just as legitimate.
-            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity} needed" : "";
-
-            var nameMeasure = titleFont.MeasureString(nameText);
-            int nameWidth = (int)System.Math.Ceiling(nameMeasure.Width);
-            int textHeight = (int)System.Math.Ceiling(nameMeasure.Height);
-
-            int qtyHeight = 0;
-            if (qtyText.Length > 0)
-            {
-                qtyHeight = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Height);
-            }
-
-            int iconY = (headerHeight - frameSize) / 2;
-            int textY = iconY + (frameSize - textHeight) / 2;
-            // Bottom-aligned against the much taller name rather than
-            // top-aligned, with a small optical lift off the descender
-            // line, so the two sit on one reading line.
-            int qtyY = textY + textHeight - qtyHeight - 4;
-
-            var titlePanel = new Panel()
-            {
-                Size = new Point(panelWidth, headerHeight),
-                Parent = _contentPanel
-            };
-
-            var iconFrame = IconControls.CreateItemIcon(
-                titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
-                iconSize: iconSize, borderThickness: iconBorder);
-
-            int textX = headerX + frameSize + iconPad;
-            var nameLabel = new Label()
-            {
-                Text = nameText,
-                Font = titleFont,
-                TextColor = RarityColors.GetRarityNameColor(vm.TargetRarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(textX, textY),
-                Parent = titlePanel
-            };
-
-            // PlanViewModel carries no target item id of its own, so the
-            // tree root - the very item this header names - is the id. A
-            // multi-item batch has no single target and no single tooltip
-            // either (TreeRoot is null there by design).
-            //
-            // Composed at hover time, so a plan restored from disk shows
-            // its stats as soon as the background top-up lands (Q13).
-            // Stamped on the Label and the icon as well as the panel:
-            // anything lying over the panel wins the hover outright
-            // (Control.ActiveControl is the deepest capturing control),
-            // the same swallowed-hover class already fixed on tree rows.
-            // The 44px icon is the header's largest target and the most
-            // natural one to point at.
-            var treeRoot = vm.TreeRoot;
-            Func<TooltipContent> buildStatContent =
-                () => TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock);
-            TooltipFacility.ApplyRichDeferred(titlePanel, buildStatContent);
-            TooltipFacility.ApplyRichDeferred(nameLabel, buildStatContent);
-
-            // The icon only for a real item root: a multi-item batch has
-            // no single target (TreeRoot is null by design), and stamping
-            // an always-empty builder over the icon would replace its own
-            // "no icon available" note with silence.
-            if (TreeRowTooltipComposer.RowIdIsAnItemId(treeRoot))
-            {
-                IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
-            }
-
-            if (qtyText.Length > 0)
-            {
-                var qtyLabel = new Label()
-                {
-                    Text = qtyText,
-                    Font = qtyFont,
-                    TextColor = new Color(170, 170, 170),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(textX + nameWidth, qtyY),
-                    Parent = titlePanel
-                };
-                TooltipFacility.ApplyRichDeferred(qtyLabel, buildStatContent);
-            }
-
-            // Every x here is now a constant or a font-only measurement,
-            // so nothing in the title moves with the panel width - only
-            // the panel's own cosmetic width, same as TextRowRenderer's
-            // rows. The centring anchor (and the right-aligned timestamp
-            // that needed one) is gone.
-            _relayoutActions.Add(w => titlePanel.Size = new Point(w, headerHeight));
         }
 
         /// <summary>
@@ -4466,17 +4486,25 @@ namespace GW2CraftingHelper.Views
         /// it one press on the control dims the whole header and plays the
         /// click sound twice) - only Required Recipes' "Hide Unlocked"
         /// checkbox still needs either.
+        /// <para>
+        /// routeChromeToTreeRegistry sends this header's own relayout
+        /// closure to the tree-scoped registry instead of the view's, so
+        /// the tree's chrome survives a preserving re-render that clears
+        /// the view's. Only the Recipe Tree passes it - see
+        /// ITreePlanHost.CreateTreeSectionHeader.
+        /// </para>
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
-            Func<bool> suppressToggle = null, Func<bool> suppressPress = null)
+            Func<bool> suppressToggle = null, Func<bool> suppressPress = null,
+            bool routeChromeToTreeRegistry = false)
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
             var topGap = new Panel()
             {
                 Size = new Point(panelWidth, SectionSpacing),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             bool expanded = _sectionExpansion.TryGetValue(sectionKey, out bool userExpanded)
@@ -4487,7 +4515,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(panelWidth, SectionHeaderRowHeight),
                 BackgroundColor = Color.Transparent,
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
             // The section's scroll anchor is its header band: a coarse
             // anchor that still absorbs every height change in the
@@ -4513,7 +4541,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(4, PlanContentHeightMath.SectionHeaderCaretY),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // The top of the ramp below the plan title: a section header
@@ -4528,7 +4556,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(22, PlanContentHeightMath.SectionHeaderTitleY),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // Divider under the header - identical chrome for every section.
@@ -4554,7 +4582,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = headerPanel
+                Parent = headerPanel,
             };
 
             // Standard (explicit) height, not
@@ -4572,7 +4600,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(panelWidth, 0),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 Visible = expanded,
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             headerPanel.Click += (_, __) =>
@@ -4581,6 +4609,7 @@ namespace GW2CraftingHelper.Views
                 {
                     return;
                 }
+
                 PreserveScrollAcross(() =>
                 {
                     contentFlow.Visible = !contentFlow.Visible;
@@ -4595,7 +4624,7 @@ namespace GW2CraftingHelper.Views
             // exactly (whatever it was most recently finalized to by
             // PlanContentHeightMath) so this can never disturb scroll
             // state.
-            (_routeSectionChromeToTree ? _treeRelayoutActions : _relayoutActions).Add(w =>
+            (routeChromeToTreeRegistry ? _treeRelayoutActions : _relayoutActions).Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, SectionHeaderRowHeight);
@@ -4607,7 +4636,7 @@ namespace GW2CraftingHelper.Views
             {
                 HeaderPanel = headerPanel,
                 ArrowLabel = headerArrow,
-                ContentFlow = contentFlow
+                ContentFlow = contentFlow,
             };
         }
 
@@ -4630,7 +4659,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RerenderForSortChange()
         {
-            if (_currentPlan == null) return;
+            if (_currentPlan == null)
+            {
+                return;
+            }
 
             // The tree is a pure function of the plan, and a sort click
             // does not change the plan - only the row ORDER of one flat
@@ -4718,13 +4750,12 @@ namespace GW2CraftingHelper.Views
                 case PlanSectionType.RequiredDisciplines:
                     // Row rendering lives in
                     // Views/Rendering/DisciplinesSectionRenderer, which
-                    // also owns its own c-table header call (see
+                    // also owns its own column header row call (see
                     // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.Notes:
-                    // design-plan-notes.md (Notes section, Option 1): row
-                    // rendering lives in Views/Rendering/NotesSectionRenderer -
+                    // Row rendering lives in Views/Rendering/NotesSectionRenderer -
                     // needs its own case rather than the default fallback
                     // below, since CreateTextRow never draws a coin value
                     // and this section's excess/reclaim lines carry one.
@@ -4745,6 +4776,7 @@ namespace GW2CraftingHelper.Views
                     {
                         TextRowRenderer.CreateTextRow(row.Label, contentFlow, panelWidth, this);
                     }
+
                     break;
             }
 
@@ -4752,7 +4784,7 @@ namespace GW2CraftingHelper.Views
             if (section.Rows.Count > 0 && _relayoutActions.Count == relayoutCountBeforeBody)
             {
                 Logger.Warn(
-                    "M33 C2b: section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
+                    "Section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
                     section.SectionType, section.Rows.Count);
             }
 #endif
@@ -4834,7 +4866,7 @@ namespace GW2CraftingHelper.Views
                 Checked = _hideUnlockedRecipes,
                 Size = new Point(checkboxWidth, 24),
                 Location = new Point(panelWidth - checkboxWidth, 3),
-                Parent = headerPanel
+                Parent = headerPanel,
             };
             TooltipFacility.ApplyPlain(
                 hideUnlockedCheckbox,
@@ -4862,7 +4894,7 @@ namespace GW2CraftingHelper.Views
             if (visibleRows.Count == 0)
             {
                 // Every recipe is unlocked and the filter is hiding them all -
-                // a friendly single line instead of a c-table header sitting
+                // a friendly single line instead of a column header row sitting
                 // over an empty body.
                 TextRowRenderer.CreateTextRow(
                     RequiredRecipesVisibility.AllUnlockedMessage(section.Rows.Count), contentFlow, panelWidth, this);
@@ -4874,7 +4906,7 @@ namespace GW2CraftingHelper.Views
                     SectionType = section.SectionType,
                     Title = headerTitle,
                     Rows = visibleRows,
-                    IsDefaultExpanded = section.IsDefaultExpanded
+                    IsDefaultExpanded = section.IsDefaultExpanded,
                 };
                 new RecipesSectionRenderer(this).Render(filteredSection, contentFlow, panelWidth);
             }
@@ -4883,7 +4915,7 @@ namespace GW2CraftingHelper.Views
             if (_relayoutActions.Count == relayoutCountBeforeBody)
             {
                 Logger.Warn(
-                    "M33 C2b: section {0} rendered but its body registered no relayout closures - it will not track live window resize. See CreateRequiredRecipesSection.",
+                    "Section {0} rendered but its body registered no relayout closures - it will not track live window resize. See CreateRequiredRecipesSection.",
                     section.SectionType);
             }
 #endif
@@ -4894,10 +4926,6 @@ namespace GW2CraftingHelper.Views
                     ? PlanContentHeightMath.FallbackTextRowHeight
                     : PlanContentHeightMath.SectionBodyHeight(section.SectionType, visibleRows));
         }
-
-        #endregion // 7. Section builders
-
-        #region 7. Section builders (continued)
 
         // --- Used Materials section ---
         //
@@ -4921,14 +4949,15 @@ namespace GW2CraftingHelper.Views
         // Views/Rendering/CraftStepsSectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
-        // --- Required Disciplines / Required Recipes sections (c-table) ---
+        // --- Required Disciplines / Required Recipes sections
+        // (column-header tables) ---
         //
         // Required Disciplines' row rendering lives in
         // Views/Rendering/DisciplinesSectionRenderer; Required
         // Recipes' row rendering (both row heights) in
         // Views/Rendering/RecipesSectionRenderer; the shared
-        // c-table header (CreateCTableHeaderRow) in
-        // Views/Rendering/CTableHeaderRenderer - see that class's doc comment.
+        // column header row (CreateColumnHeaderRow) in
+        // Views/Rendering/ColumnHeaderRowRenderer - see that class's doc comment.
 
         // --- Summary / Total Cost section ---
         //
@@ -4937,10 +4966,9 @@ namespace GW2CraftingHelper.Views
         // banner row, and the per-currency CreateCurrencyRow rows) moved to
         // Views/Rendering/SummarySectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
+        #endregion // Plan render: RenderPlan and the shared section chrome
 
-        #endregion // 7. Section builders (continued)
-
-        #region 8. Tree rendering (continued)
+        #region Tree rendering: what moved to TreeSectionController
 
         // The Recipe Tree
         // section renderer (TreeNodeState, CreateTreeSection,
@@ -4952,8 +4980,7 @@ namespace GW2CraftingHelper.Views
         // together) all moved onto Views/Rendering/TreeSectionController -
         // see that class's own doc comment for the full inventory and
         // every non-move edit.
-
-        #endregion // 8. Tree rendering (continued)
+        #endregion // Tree rendering: what moved to TreeSectionController
     }
 }
 

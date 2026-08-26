@@ -1,7 +1,7 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// The five coarse, user-facing phases of one
+    /// The six coarse, user-facing phases of one
     /// CraftingPlanPipeline.GenerateStructuredAsync
     /// run. Deliberately coarser than the pipeline's own internal timingLog
     /// (~10 detailed steps - see CraftingPlanPipeline.FinishTimingLog),
@@ -10,13 +10,22 @@ namespace GW2CraftingHelper.Services
     /// does not need to parse free-form text to know what stage generation
     /// is in.
     /// </summary>
-    public enum PlanPhase
+    internal enum PlanPhase
     {
         BuildingTree,
         FetchingPrices,
         SolvingDecisions,
         FetchingItemDetails,
-        BuildingDisplay
+
+        // Its own phase, not part of FetchingItemDetails: this is a single
+        // /v2/account/recipes round trip, measured at 327-4557ms, and
+        // folding it into the item-details phase made the status strip
+        // claim "Fetching item details (N items)" while it was blocked on
+        // an account endpoint. PhaseOrdinalGuard depends on this position
+        // matching the pipeline's actual emission order.
+        CheckingLearnedRecipes,
+
+        BuildingDisplay,
     }
 
     /// <summary>
@@ -32,7 +41,7 @@ namespace GW2CraftingHelper.Services
     /// behavior change, matching every other optional progress parameter
     /// this pipeline already has.
     /// </summary>
-    public class PlanPhaseEvent
+    internal class PlanPhaseEvent
     {
         public PlanPhase Phase { get; set; }
 

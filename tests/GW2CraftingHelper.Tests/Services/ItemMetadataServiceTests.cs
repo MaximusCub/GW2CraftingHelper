@@ -174,7 +174,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(50, api.Calls[1].Count);
         }
 
-        // KNOWN-ISSUES api-degradation F3: a hard-failing FIRST-WAVE batch
+        // KNOWN-ISSUES #31/api-degradation F3: a hard-failing FIRST-WAVE batch
         // must not abort the whole call - it degrades (here, healed by the
         // existing retry wave) instead of discarding an earlier batch's
         // already-fetched data.
@@ -205,7 +205,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, api.Calls.Count);
         }
 
-        // KNOWN-ISSUES api-degradation F3: a genuine total first-wave
+        // KNOWN-ISSUES #31/api-degradation F3: a genuine total first-wave
         // outage (every batch fails) must still surface as an error,
         // matching the pre-existing single-batch behavior - it must not be
         // silently swallowed into an all-Unknown-Item result.

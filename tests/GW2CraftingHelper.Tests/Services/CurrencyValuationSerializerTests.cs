@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void SerializeThenDeserialize_RoundTripsEntries()
         {
-            // Currency 63 (Astral Acclaim) - addendum-astral-acclaim.md P1:
+            // Currency 63 (Astral Acclaim) - dev/proposals/addendum-astral-acclaim.md P1:
             // added to SettingsTabContent.CuratedCurrencyIds alongside
             // Karma/Spirit Shards, so its valuation must round-trip through
             // this same serializer exactly like any other curated currency.

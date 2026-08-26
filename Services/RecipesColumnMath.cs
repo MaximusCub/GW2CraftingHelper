@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// the recipe name absorbs everything the two of them leave.
     /// </para>
     /// </summary>
-    public static class RecipesColumnMath
+    internal static class RecipesColumnMath
     {
         /// <summary>
         /// Gap between the Discipline and Status bands. Shared with the

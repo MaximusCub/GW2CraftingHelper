@@ -162,6 +162,43 @@ namespace VendorOfferUpdater.Tests
             Assert.NotEqual(hashDailyCap, hashWeeklyCap);
         }
 
+        // Ported from the deleted module-side duplicate of this suite, which
+        // covered the merchant field in the "different input, different
+        // hash" direction while this suite only covered null-vs-empty.
+        [Fact]
+        public void DifferentMerchant_ProducesDifferentHash()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+            };
+
+            string hash1 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant A", new List<string>(), null, null);
+            string hash2 = VendorOfferHasher.ComputeOfferId(
+                19685, 1, costs, "Merchant B", new List<string>(), null, null);
+
+            Assert.NotEqual(hash1, hash2);
+        }
+
+        // Ported from the deleted module-side duplicate: this suite had the
+        // "different tiers differ" direction but not the stability one.
+        [Fact]
+        public void SameHomesteadTier_ProducesSameHash()
+        {
+            var costs = new List<CostLine>
+            {
+                new CostLine { Type = "Item", Id = 19697, Count = 8 }
+            };
+
+            string hash1 = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 1);
+            string hash2 = VendorOfferHasher.ComputeOfferId(
+                102205, 1, costs, "Homestead Refinement\u2014Metal Forge", new List<string>(), null, null, 1);
+
+            Assert.Equal(hash1, hash2);
+        }
+
         [Fact]
         public void SameCapValues_ProduceSameHash()
         {

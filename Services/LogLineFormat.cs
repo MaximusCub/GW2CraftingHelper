@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     /// reason <see cref="LogViewFloor"/> lives here rather than beside
     /// LogTabContent.
     /// </summary>
-    public static class LogLineFormat
+    internal static class LogLineFormat
     {
         // Timestamp culture policy (applies to every user-facing timestamp
         // in this module, not just the line below): formatted with

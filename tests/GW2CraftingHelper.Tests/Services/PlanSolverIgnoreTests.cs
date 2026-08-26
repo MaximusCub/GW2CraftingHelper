@@ -128,7 +128,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(500, result.Plan.TotalCoinCost);
         }
 
-        // KNOWN-ISSUES 20.4 "Conservative reading":
+        // KNOWN-ISSUES #20.4 "Conservative reading":
         // the Ignore x owned-materials interaction is NOT pinned at this
         // layer. RecipeNode (the type Solve consumes) has no ownership
         // field at all - only Id/NodeId/Quantity/achievement fields - so
@@ -139,8 +139,8 @@ namespace GW2CraftingHelper.Tests.Services
         // nothing extra about the interaction. Ownership only exists on the
         // downstream CraftingTreeNode built after Solve returns, so the
         // real pin lives one and two layers up:
-        // CraftingPlanPipelineTests (GenerateStructuredAsync Ignore x owned-
-        // materials coverage) and DecisionPillPlannerTests
+        // CraftingPlanPipelineIgnoreTests (GenerateStructuredAsync Ignore x
+        // owned-materials coverage) and DecisionPillPlannerTests
         // (Have_IgnoredAndPartiallyOwned_ShowsIgnoredNotOwnedInfo).
     }
 }

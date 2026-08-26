@@ -65,10 +65,29 @@ namespace VendorOfferUpdater
             int delayMs = 250;
             bool tagSeasonalFestivals = false;
             int maxSeasonalPages = 500;
+            string? diffSummaryBefore = null;
+            string? diffSummaryAfter = null;
 
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--query" && i + 1 < args.Length)
+                // Matched on the flag alone, then arity-checked below, rather
+                // than on "flag plus two operands". Every other flag here falls
+                // through to the positional branch when short an operand, which
+                // for this one would mean silently discarding a read-only
+                // request and starting a 15-minute scrape that WRITES.
+                if (args[i] == "--diff-summary")
+                {
+                    if (i + 2 >= args.Length)
+                    {
+                        Console.Error.WriteLine(
+                            "ERROR: --diff-summary needs two paths: --diff-summary <old> <new>.");
+                        return 1;
+                    }
+
+                    diffSummaryBefore = args[++i];
+                    diffSummaryAfter = args[++i];
+                }
+                else if (args[i] == "--query" && i + 1 < args.Length)
                 {
                     queryCondition = args[++i];
                 }
@@ -130,6 +149,13 @@ namespace VendorOfferUpdater
                 Console.Error.WriteLine(
                     $"ERROR: --max-seasonal-pages must be a positive integer, got {maxSeasonalPages}.");
                 return 1;
+            }
+
+            // --diff-summary is a read-only report over two dataset files, so
+            // it short-circuits before any wiki/API setup and never writes.
+            if (diffSummaryBefore != null && diffSummaryAfter != null)
+            {
+                return await RunDiffSummaryAsync(diffSummaryBefore, diffSummaryAfter);
             }
 
             var queryOptions = new QueryOptions
@@ -497,36 +523,11 @@ namespace VendorOfferUpdater
                 var dataset = new VendorOfferDataset
                 {
                     SchemaVersion = 1,
-                    GeneratedAt = DateTime.UtcNow.ToString("o"),
                     Source = "gw2wiki-smw",
                     Offers = finalOffers
                 };
 
-                // System.Text.Json's DEFAULT
-                // encoder conservatively HTML-escapes '\'', '&', '<', '>'
-                // (as ' etc.) even for pure JSON output with no HTML
-                // context - but the already-checked-in ref/vendor_offers.json
-                // never does this (confirmed: 222 literal '&' characters, 0
-                // & escapes; "Hearth's Glow" stored with a literal
-                // apostrophe). UnsafeRelaxedJsonEscaping skips that extra
-                // HTML-safety escaping (while still escaping the JSON-
-                // mandatory '"'/'\\'/control characters) but ALSO stops
-                // escaping non-ASCII text, which the existing file DOES do
-                // (e.g. "Homestead Refinement-Farm"). EscapeNonAscii
-                // below restores exactly that: non-ASCII escaped, everything
-                // else literal - matching the existing file's convention so
-                // a scoped --merge-into run's diff stays confined to the
-                // offers actually changed, not every apostrophe/ampersand
-                // in the whole 53k-row dataset.
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = false,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                };
-
-                string json = EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
+                string json = SerializeDataset(dataset);
 
                 string? dir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -537,6 +538,23 @@ namespace VendorOfferUpdater
                 await File.WriteAllTextAsync(outputPath, json);
                 Console.WriteLine($"Written {finalOffers.Count} offers to {outputPath}");
                 Console.WriteLine($"File size: {new FileInfo(outputPath).Length:N0} bytes");
+
+                // The run's timestamp goes in the sibling manifest, never in
+                // the data file - see VendorOfferDataset's own note. A refresh
+                // that changes nothing must leave the 14.8MB blob byte-for-byte
+                // untouched, so `git status` after it is the no-op signal.
+                string manifestPath = ManifestPathFor(outputPath);
+                var manifest = new VendorOfferManifest
+                {
+                    ManifestVersion = 1,
+                    SchemaVersion = dataset.SchemaVersion,
+                    Source = dataset.Source,
+                    OfferCount = finalOffers.Count,
+                    Sha256 = HashFile(outputPath),
+                    GeneratedAt = DateTime.UtcNow.ToString("o")
+                };
+                await File.WriteAllTextAsync(manifestPath, SerializeManifest(manifest));
+                Console.WriteLine($"Written provenance manifest to {manifestPath}");
 
                 return 0;
             }
@@ -619,7 +637,7 @@ namespace VendorOfferUpdater
                 existingKeys.Add(key);
             }
 
-            // Quality-audit B4 (docs/KNOWN-ISSUES.md): counted against
+            // Quality-audit B4 (KNOWN-ISSUES #53): counted against
             // existingKeys, not merged.ContainsKey - merged mutates during
             // this same loop, so a duplicate PageName within one fresh
             // batch was double-counted as Refreshed. addedKeys/
@@ -1534,6 +1552,137 @@ namespace VendorOfferUpdater
             string json = JsonSerializer.Serialize(sorted, options);
             File.WriteAllText(path, json);
             Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+        }
+
+        /// <summary>
+        /// --diff-summary: reports what changed between two vendor datasets.
+        /// Read-only - it exists so a `data(vendor):` pull request can carry a
+        /// reviewable summary of a change whose own diff is one 14.8MB line.
+        /// See <see cref="VendorOfferDiff"/> for what "changed" means here.
+        /// </summary>
+        private static async Task<int> RunDiffSummaryAsync(string beforePath, string afterPath)
+        {
+            foreach (string path in new[] { beforePath, afterPath })
+            {
+                if (!File.Exists(path))
+                {
+                    Console.Error.WriteLine($"ERROR: --diff-summary input not found: {path}");
+                    return 1;
+                }
+            }
+
+            var readOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var before = JsonSerializer.Deserialize<VendorOfferDataset>(
+                await File.ReadAllTextAsync(beforePath), readOptions);
+            var after = JsonSerializer.Deserialize<VendorOfferDataset>(
+                await File.ReadAllTextAsync(afterPath), readOptions);
+
+            if (before == null || after == null)
+            {
+                Console.Error.WriteLine(
+                    "ERROR: --diff-summary input deserialized to null (empty or malformed JSON).");
+                return 1;
+            }
+
+            var result = VendorOfferDiff.Compute(before.Offers, after.Offers);
+            Console.Write(VendorOfferDiff.Format(
+                result, Path.GetFileName(beforePath), Path.GetFileName(afterPath)));
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Serializes a dataset into exactly the byte form
+        /// ref/vendor_offers.json is checked in as.
+        /// <para>
+        /// System.Text.Json's DEFAULT encoder conservatively HTML-escapes
+        /// '\'', '&amp;', '&lt;', '&gt;' (as <c>&amp;#x27;</c> etc.) even for pure JSON
+        /// output with no HTML context - but the already-checked-in
+        /// ref/vendor_offers.json never does this (confirmed: 222 literal
+        /// '&amp;' characters, 0 <c>&amp;#x26;</c> escapes; "Hearth's Glow" stored with a
+        /// literal apostrophe). UnsafeRelaxedJsonEscaping skips that extra
+        /// HTML-safety escaping (while still escaping the JSON-mandatory
+        /// '"'/'\\'/control characters) but ALSO stops escaping non-ASCII
+        /// text, which the existing file DOES do (e.g. "Homestead
+        /// Refinement-Farm"). <see cref="EscapeNonAscii"/> restores exactly
+        /// that: non-ASCII escaped, everything else literal - matching the
+        /// existing file's convention so a scoped --merge-into run's diff
+        /// stays confined to the offers actually changed, not every
+        /// apostrophe/ampersand in the whole 53k-row dataset.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string SerializeDataset(VendorOfferDataset dataset)
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+
+            return EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
+        }
+
+        /// <summary>
+        /// Lowercase hex SHA-256 of a file's bytes. Same definition the
+        /// module side uses (RecipeCacheSerializer.HashFile) - this project
+        /// does not reference the module, so the four lines are repeated
+        /// rather than shared, and both are pinned by the seed tests that
+        /// compare a manifest digest against the file it describes.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string HashFile(string path)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Sibling manifest path for a dataset path: ref/vendor_offers.json
+        /// becomes ref/vendor_offers_manifest.json. Derived from the dataset
+        /// path rather than hardcoded so a --merge-into run against a scratch
+        /// copy writes its manifest next to that copy, not over the shipped one.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string ManifestPathFor(string datasetPath)
+        {
+            string? dir = Path.GetDirectoryName(datasetPath);
+            string name = Path.GetFileNameWithoutExtension(datasetPath) + "_manifest.json";
+            return string.IsNullOrEmpty(dir) ? name : Path.Combine(dir, name);
+        }
+
+        /// <summary>
+        /// Indented, newline-terminated, camelCase - the manifest is meant to
+        /// be read in a diff, unlike the dataset it describes.
+        /// <para>
+        /// The line endings are forced to LF. System.Text.Json's WriteIndented
+        /// emits Environment.NewLine, so the same manifest content would be
+        /// written as CRLF on Windows and LF elsewhere - a determinism bug in
+        /// the file whose entire job is to make no-op refreshes provable.
+        /// (JsonSerializerOptions.NewLine only exists from .NET 9; this project
+        /// targets net8.0.) No manifest value can contain a newline, so the
+        /// replace cannot touch anything but the formatting.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static string SerializeManifest(VendorOfferManifest manifest)
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            };
+
+            string json = JsonSerializer.Serialize(manifest, jsonOptions);
+            return json.Replace("\r\n", "\n") + "\n";
         }
 
         /// <summary>

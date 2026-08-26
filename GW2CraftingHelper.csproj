@@ -22,6 +22,38 @@
          resolves to (M38 WP-02 / a6-csharp.md section 10). -->
     <LangVersion>7.3</LangVersion>
     <CodeAnalysisRuleSet>GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
+    <!-- The warning ratchet. Every warning is an error; the StyleCop rules
+         still outstanding are listed in NoWarn, so the build is green today and
+         a NEW warning of any kind - compiler or a StyleCop rule already cleaned
+         to zero - fails it.
+
+         Why this shape rather than gating the CS prefix alone: measured against
+         this project, csc honours WarningsAsErrors only for explicit codes.
+         <WarningsAsErrors>CS</WarningsAsErrors> was tried first, with a CS0108
+         deliberately reintroduced, and the build stayed green at 0 errors -
+         i.e. the prefix form would have installed a gate that gated nothing.
+         The same test with <WarningsAsErrors>CS0108</WarningsAsErrors> failed
+         the build, which is how the prefix was ruled out rather than assumed.
+
+         Before the ratchet, nine genuine compiler warnings had been sitting
+         unread inside 2,723: a CS0108 field hiding Control.BackgroundColor on a
+         Blish control subclass, and eight CS0649 on reflection-assigned DTO
+         fields. Both are fixed at the source; nothing here suppresses a CS code.
+
+         Each NoWarn entry is a bounded cleanup job, not a verdict. Removing one
+         is a self-contained commit: fix that rule's sites, delete the ID, and
+         the build proves the rule is clean and keeps it that way. The list only
+         ever shrinks. Counts as of this commit are in CONTRIBUTING.md.
+
+         SA1501 and SA1503 come out together or not at all. SA1501 (statement on
+         a single line) stays silent while SA1503 (braces omitted) is live and
+         takes over the same code the moment SA1503 is suppressed - measured
+         here: SA1503 live reports 395 and SA1501 zero, SA1503 in NoWarn reports
+         SA1501 394. Dropping SA1503 alone therefore turns 394 errors on, not
+         off. Bracing a statement satisfies both, so the fix that clears one
+         clears the other. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>SA1005;SA1009;SA1111;SA1114;SA1116;SA1117;SA1118;SA1119;SA1120;SA1122;SA1127;SA1128;SA1201;SA1202;SA1203;SA1204;SA1208;SA1210;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -88,6 +120,8 @@
     <Compile Include="Services\TreeToolbarRowLayout.cs" />
     <Compile Include="Services\TreeRowIdentity.cs" />
     <Compile Include="Services\TypeRampMetrics.cs" />
+    <Compile Include="Services\GridLayout.cs" />
+    <Compile Include="Services\UiSpacing.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\FirstLoadSnapshotGate.cs" />
     <Compile Include="Services\ScrollAnchorMath.cs" />
@@ -107,6 +141,7 @@
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
     <Compile Include="Services\ItemRowSelection.cs" />
+    <Compile Include="Services\RestoredRequestInputs.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Models\AcquisitionSource.cs" />
@@ -124,9 +159,11 @@
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
     <Compile Include="Services\PlanStripStatusBoard.cs" />
     <Compile Include="Services\PlanStripTickDecision.cs" />
+    <Compile Include="Services\OwnMaterialsGate.cs" />
     <Compile Include="Services\RequestLabelFormatter.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
+    <Compile Include="Services\SnapshotRefreshSlot.cs" />
     <Compile Include="Services\SnapshotFetchFailedException.cs" />
     <Compile Include="Services\SnapshotFailureKind.cs" />
     <Compile Include="Services\SnapshotFailureClassification.cs" />
@@ -157,11 +194,14 @@
     <Compile Include="Services\RecipeSheetItemSeedService.cs" />
     <Compile Include="Services\JsonSeedReader.cs" />
     <Compile Include="Services\SeasonalVendorTipCalculator.cs" />
+    <Compile Include="Services\CachingAccountRecipeClient.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
     <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />
+    <Compile Include="Services\TreeRowShapePlanner.cs" />
+    <Compile Include="Services\PillTooltipTextComposer.cs" />
     <Compile Include="Services\TooltipTextFormat.cs" />
     <Compile Include="Services\TooltipContent.cs" />
     <Compile Include="Services\TooltipLayoutMath.cs" />
@@ -175,10 +215,13 @@
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />
     <Compile Include="Services\Gw2ItemApiClient.cs" />
+    <Compile Include="Services\Gw2BuildApiClient.cs" />
     <Compile Include="Views\MainView.cs" />
     <Compile Include="Views\AutocompleteTextBox.cs" />
     <Compile Include="Views\SuggestionPanel.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
+    <Compile Include="Views\ItemInputRowStrip.cs" />
+    <Compile Include="Views\ItemRowState.cs" />
     <Compile Include="Views\Rendering\RarityColors.cs" />
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
@@ -187,8 +230,11 @@
     <Compile Include="Views\Rendering\RichTooltipSurface.cs" />
     <Compile Include="Views\Rendering\TooltipFacility.cs" />
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
+    <Compile Include="Views\Rendering\ITreePlanHost.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\EmptyPlanStateRenderer.cs" />
     <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\PlanHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
@@ -204,7 +250,7 @@
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
-    <Compile Include="Views\Rendering\CTableHeaderRenderer.cs" />
+    <Compile Include="Views\Rendering\ColumnHeaderRowRenderer.cs" />
     <Compile Include="Views\Rendering\CraftStepsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\RecipesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\SummarySectionRenderer.cs" />
@@ -262,7 +308,6 @@
     <Compile Include="Models\VendorOfferDataset.cs" />
     <Compile Include="Models\PlanStatus.cs" />
     <Compile Include="Services\PlanPhaseEvent.cs" />
-    <Compile Include="Services\VendorOfferHasher.cs" />
     <Compile Include="Services\VendorOfferLoader.cs" />
     <Compile Include="Services\VendorOfferStore.cs" />
     <Compile Include="Models\MaterialSourceAllocation.cs" />
@@ -290,7 +335,6 @@
     <Compile Include="Services\ReceiptCaptionHelper.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />
-    <Compile Include="Services\FileMysticForgeRecipeSource.cs" />
     <Compile Include="Services\MysticForgeRecipeData.cs" />
     <Compile Include="Services\CompositeRecipeApiClient.cs" />
     <Compile Include="Services\RecipeClientFactory.cs" />
@@ -413,43 +457,33 @@
       <Private>False</Private>
     </Reference>
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="ref\icon.png" />
-    <Content Include="ref\corner-icon.png" />
-    <Content Include="ref\emblem.png" />
-    <Content Include="ref\vendor_offers.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\mystic_forge_recipes.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\recipe_search_seed.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\recipes_seed.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\recipe_seed_manifest.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\item_name_seed.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\acquisition_hints_seed.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\daily_cooldown_items.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ref\recipe_sheet_items.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+  <!--
+    ref/ is packaged by exactly one thing: the BuildBlishHUDModule target near
+    the bottom of this file, which copies ref\** into $(OutDir)ref\ and zips it.
+
+    There used to be a second mechanism here - twelve <Content Include="ref\...">
+    items with CopyToOutputDirectory - and having two owners produced both of the
+    failures you would predict. Every listed file was copied twice per build,
+    including the 14.8MB vendor_offers.json. And the hand-maintained list drifted:
+    ref/vendor_offer_exclusions.json was never added to it, yet shipped in every
+    .bhm anyway, because the target's glob does not consult this list. Nothing
+    read the list to decide what ships, so nothing noticed it was wrong.
+
+    To add a file to the shipped module, put it in ref/. To keep one out, add it
+    to that target's Exclude. There is no third place to look.
+  -->
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+      <ErrorText>NuGet packages have not been restored: {0} is missing. Run this from the repository root, then build again: nuget restore GW2CraftingHelper.sln -- note that dotnet restore does NOT restore a packages.config project and will report Nothing to do instead. Get nuget.exe from https://www.nuget.org/downloads (see CONTRIBUTING.md, Prerequisites).</ErrorText>
     </PropertyGroup>
+    <!-- Checked before the restore errors below, because a version bump and a
+         missing restore look identical to an Exists() test on a version-pinned
+         path, and only one of them is fixed by running nuget restore. -->
+    <ItemGroup>
+      <RestoredBlishHudTargets Include="packages\BlishHUD.*\build\BlishHUD.targets" />
+    </ItemGroup>
+    <Error Condition="'@(RestoredBlishHudTargets)' != '' AND !Exists('packages\BlishHUD.1.3.0\build\BlishHUD.targets')" Text="This project carries a hand-maintained fork of BlishHUD 1.3.0's BuildBlishHUDModule target (see the comment above that target), but the restored package is '@(RestoredBlishHudTargets)'. The fork wins over whatever the new package imports, so the build would silently keep 1.3.0's packaging behaviour. Re-fork the target from the new version's BlishHUD.targets, re-apply the ref/ Exclude, then update the version in this check and in the Import below." />
     <Error Condition="!Exists('packages\BlishHUD.1.3.0\build\BlishHUD.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\BlishHUD.1.3.0\build\BlishHUD.targets'))" />
     <Error Condition="!Exists('packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\MonoGame.Framework.WindowsDX.3.8.0.1641\build\MonoGame.Framework.WindowsDX.targets'))" />
   </Target>
@@ -458,10 +492,25 @@
     Override of BuildBlishHUDModule from the imported BlishHUD.targets above.
     packages\ is NuGet-restored and gitignored, so it cannot carry a real fix;
     this redefinition (same name, declared after the import, so it wins) is
-    identical to the original except the RefFiles Include below gains an
-    Exclude for the three dev-only, git-untracked caches (two from
-    VendorOfferUpdater, one from MysticForgeSeeder) so they never end up in
-    the shipped .bhm. See docs/RELEASING.md.
+    a VERBATIM FORK of BlishHUD 1.3.0's target, character for character, except
+    that the RefFiles Include gains an Exclude. See docs/RELEASING.md.
+
+    Excluded, and why each earns it - all four are inputs to the offline tools
+    under tools/, none has a runtime consumer anywhere in Services/, Views/ or
+    Models/, so none of them belongs in a player's download:
+      wiki_vendor_cache.json, item_id_cache.json  VendorOfferUpdater caches
+      mf_item_id_cache.json                       MysticForgeSeeder cache
+      vendor_offer_exclusions.json                VendorOfferUpdater input
+    The first three are gitignored; the fourth is tracked, because it is
+    hand-verified data the refresh tool needs, not a regenerable cache. Tracked
+    or not makes no difference here - this Exclude is what decides what ships,
+    and .gitignore only decides what git stores.
+
+    BEING A FORK IS THE HAZARD. It is pinned to 1.3.0 by hand and cannot notice
+    an upstream change: bump the BlishHUD package and this file keeps packaging
+    the 1.3.0 way, winning over the target the new version imports, in silence.
+    The EnsureNuGetPackageBuildImports target above fails the build with that
+    exact explanation if a BlishHUD other than 1.3.0 is ever restored.
   -->
   <Target Name="BuildBlishHUDModule" AfterTargets="Build">
     <!-- Remove existing bhm file -->
@@ -472,7 +521,7 @@
 
     <!-- Copy ref files -->
     <ItemGroup>
-      <RefFiles Include="$(ProjectDir)ref\**" Exclude="$(ProjectDir)ref\wiki_vendor_cache.json;$(ProjectDir)ref\item_id_cache.json;$(ProjectDir)ref\mf_item_id_cache.json" />
+      <RefFiles Include="$(ProjectDir)ref\**" Exclude="$(ProjectDir)ref\wiki_vendor_cache.json;$(ProjectDir)ref\item_id_cache.json;$(ProjectDir)ref\mf_item_id_cache.json;$(ProjectDir)ref\vendor_offer_exclusions.json" />
     </ItemGroup>
     <Copy SourceFiles="@(RefFiles)" DestinationFolder="$(OutDir)ref\%(RecursiveDir)" />
 

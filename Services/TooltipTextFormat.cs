@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     ///
     /// Blish's basic tooltip already caps its own content width, at a fixed
     /// 500px - measured against BlishHUD 1.3.0, recorded in
-    /// docs/KNOWN-ISSUES.md under "Audit batches A+B+C tier 1" - so this
+    /// KNOWN-ISSUES #43 - so this
     /// seam is NOT what keeps a tooltip inside the module window (1378px
     /// clamped minimum, and 930px before that); 500px already does. What it adds is control over
     /// where the break lands and what happens to a token that cannot break:
@@ -21,10 +21,11 @@ namespace GW2CraftingHelper.Services
     /// add lines to a tooltip that Blish positions with no clamp on the
     /// bottom screen edge.
     ///
-    /// It is done here once rather than at each call site: every composer
-    /// routes its finished text through <see cref="Wrap"/> or
-    /// <see cref="WrapLines"/> at its return seam, so future callers inherit
-    /// the wrap without having to know it exists.
+    /// Its live callers are the two places a finished plain string is
+    /// handed to Blish: <c>TooltipFacility.ApplyPlain</c> and
+    /// <c>LogTabContent</c>. The tree tooltip composers do NOT route through
+    /// here - their output goes to the rich surface, which wraps against a
+    /// real font at real pixel widths.
     ///
     /// The budget is a CHARACTER count, not pixels: a tooltip string is
     /// composed in Services, far from any font, and the alternative -
@@ -32,7 +33,7 @@ namespace GW2CraftingHelper.Services
     /// Views/Rendering - would put a Blish dependency on the seam this class
     /// exists to keep Blish-free.
     /// </summary>
-    public static class TooltipTextFormat
+    internal static class TooltipTextFormat
     {
         /// <summary>
         /// Characters per wrapped line, derived from the one width Blish
@@ -97,27 +98,6 @@ namespace GW2CraftingHelper.Services
             return string.Join("\n", wrapped);
         }
 
-        /// <summary>
-        /// The list-shaped counterpart to <see cref="Wrap"/> for composers
-        /// that return one string per tooltip line. Returns a fresh,
-        /// never-null list; an over-budget input line becomes several output
-        /// lines, which is exactly what the caller's newline join renders.
-        /// </summary>
-        public static List<string> WrapLines(IEnumerable<string> lines)
-        {
-            var wrapped = new List<string>();
-            if (lines == null)
-            {
-                return wrapped;
-            }
-
-            foreach (string line in lines)
-            {
-                AppendWrapped(line, wrapped);
-            }
-            return wrapped;
-        }
-
         // Wrapped one source line at a time rather than by handing the whole
         // composed string to TextWrapMath.Wrap in one call: that method caps
         // a single wrap at MaxWrappedLines (24) and ellipsizes the tail past
@@ -149,6 +129,7 @@ namespace GW2CraftingHelper.Services
             {
                 return new[] { text };
             }
+
             return text.Replace("\r\n", "\n").Split('\n', '\r');
         }
     }

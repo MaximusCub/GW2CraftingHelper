@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RuleSet Name="GW2CraftingHelper style rules" Description="Custom StyleCop.Analyzers severity overrides. Suppresses only the rules that actively fight this codebase's documented, deliberate house style (see CLAUDE.md); everything else stays at StyleCop's default (warning) severity so drift gets caught for free. See M38 WP-02." ToolsVersion="16.0">
+<RuleSet Name="GW2CraftingHelper style rules" Description="Custom StyleCop.Analyzers severity overrides. Suppresses only the rules that actively fight this codebase's documented, deliberate house style (CONTRIBUTING.md, Code Style); everything else stays at StyleCop's default (warning) severity so drift gets caught for free. See M38 WP-02." ToolsVersion="16.0">
   <Rules AnalyzerId="StyleCop.Analyzers" RuleNamespace="StyleCop.Analyzers">
-    <!-- Doc-mandate rules: this codebase documents intent via prose "//" comments at
-         decision points, not <summary> on every member (CLAUDE.md style; a6-csharp.md
-         section 9). Forcing XML doc everywhere would produce thousands of new warnings
-         for zero value and encourage empty boilerplate doc comments. -->
+    <!-- Doc-mandate rules. An earlier version of this comment claimed the codebase
+         documents via prose "//" at decision points rather than <summary> on members.
+         Measured, that is false in the direction that matters: 200 of the 248
+         production .cs files carry at least one <summary>, 1,247 blocks across 12,118
+         "///" lines (2026-08-25). The actual rule is that XML doc is used where it
+         earns its place and is not mandated, so SA1600 on the remainder would only
+         produce boilerplate restating member names. The live statement of that rule
+         is CONTRIBUTING.md, Code Style; this file cites it rather than defining it.
+
+         Measured again, about this entry's own reach: with all three rules below
+         flipped to Warning and a forced rebuild of this exact codebase, SA1600 and
+         SA1602 emit ZERO diagnostics. The project sets no DocumentationFile, so
+         Roslyn leaves XML comment analysis switched off for the whole compilation,
+         which is precisely what SA0001 reports (once, project-wide). SA0001 is
+         therefore the only one of the three suppressing anything today; SA1600 and
+         SA1602 record the decision for the day a DocumentationFile is added. -->
     <Rule Id="SA1600" Action="None" /> <!-- ElementsMustBeDocumented -->
     <Rule Id="SA1602" Action="None" /> <!-- EnumerationItemsMustBeDocumented -->
-    <!-- Meta-warning that fires only because the doc-mandate rules above are off;
-         suppressing it is a direct consequence of the SA1600/SA1602 decision, not a
-         separate style choice. -->
     <Rule Id="SA0001" Action="None" /> <!-- XmlCommentAnalysisDisabled -->
 
     <!-- File-header rules assume a license banner on every file. This repo has never

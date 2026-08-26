@@ -2,11 +2,6 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "10./11. Coin/
-    // currency value rendering primitives" and "Generic control/format
-    // helpers" regions - private static -> internal static, no logic
-    // changes. Callers in CraftingPlanView now qualify as
-    // RarityColors.GetRarityBorderColor / RarityColors.GetRarityNameColor.
     internal static class RarityColors
     {
         /// <summary>

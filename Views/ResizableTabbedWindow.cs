@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Views
     /// any subclass override, which would otherwise run against a
     /// half-constructed instance.
     /// </remarks>
-    public sealed class ResizableTabbedWindow : TabbedWindow2
+    internal sealed class ResizableTabbedWindow : TabbedWindow2
     {
         private readonly Point _designMinSize;
 

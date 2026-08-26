@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Models
     /// never an unsaved change and listing it would make every toggle of
     /// it raise a save prompt for a value already on disk.
     /// </summary>
-    public sealed class SettingsFormState
+    internal sealed class SettingsFormState
     {
         // Ordinal, and sorted, so ChangedKeys is deterministic regardless
         // of the order the caller captured the controls in.

@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         internal static T Deserialize<T>(Stream stream)

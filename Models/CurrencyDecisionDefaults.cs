@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Models
     /// matching gw2e exactly - currencies with no entry must stay
     /// blank/unvalued rather than gain an invented rate.
     /// </summary>
-    public static class CurrencyDecisionDefaults
+    internal static class CurrencyDecisionDefaults
     {
         public static readonly IReadOnlyDictionary<int, long> DefaultCopperPerUnit = new Dictionary<int, long>
         {
@@ -95,7 +95,7 @@ namespace GW2CraftingHelper.Models
             { 65, 135 },     // Testimony of Jade Heroics
             { 67, 35 },      // Canach Coins
             { 68, 320 },     // Imperial Favor
-            { 69, 32 }       // Tales of Dungeon Delving
+            { 69, 32 },       // Tales of Dungeon Delving
         };
 
         /// <summary>

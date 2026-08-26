@@ -198,7 +198,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // ref/mystic_forge_recipes.json, so the notice pass (keyed
                 // strictly on AcquisitionSource.Craft steps) can never fire
                 // for it. Removed from the seed as dead data that read as
-                // covered when it was not - see docs/KNOWN-ISSUES.md's
+                // covered when it was not - see KNOWN-ISSUES #61's
                 // Craft-step-only limitation note.
                 Assert.False(
                     items.ContainsKey(43772),

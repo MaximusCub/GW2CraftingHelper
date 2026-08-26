@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// can opt in with a single `using` statement instead of a class-level
     /// IDisposable.
     /// </summary>
-    public sealed class TempDirectory : IDisposable
+    internal sealed class TempDirectory : IDisposable
     {
         /// <summary>Absolute path to the created scratch directory.</summary>
         public string Path { get; }

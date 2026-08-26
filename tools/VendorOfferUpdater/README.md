@@ -65,6 +65,7 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
 | `--dry-run` | off | Print query plan only, no HTTP calls to wiki |
 | `--tag-seasonal-festivals` | off | Fetch each distinct vendor page's wikitext and tag offers whose page carries a `{{Temporary\|...\|seasonal=}}`/`{{Temporary\|...\|event=}}` value matching one of the six known GW2 festivals. Opt-in: adds one extra HTTP request per distinct, not-yet-cached vendor page (see `--max-seasonal-pages`) |
+| `--diff-summary <old> <new>` | off | Read-only. Reports what changed between two vendor datasets and exits without touching the wiki, the API, or any file. See below |
 | `--max-seasonal-pages <n>` | 500 | Self-healing per-run budget on how many new (uncached) vendor pages `--tag-seasonal-festivals` will fetch in one run - if there are more uncached pages than the budget, it fetches up to the budget, saves the cache, and leaves the rest for a subsequent run (only a value `<= 0` is rejected outright) |
 
 ### Environment Overrides (wrapper script)
@@ -85,13 +86,52 @@ Example:
 DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 ```
 
+### `--diff-summary`: making a vendor refresh reviewable
+
+`git diff ref/vendor_offers.json` reports `1 insertion(+), 1 deletion(-)`. The
+payload is one 14.8MB line, so that single "changed line" is the entire dataset
+that prices every vendor in the game. A reviewer has no way to tell a three-row
+price correction from a scrape that dropped half the merchants.
+
+```bash
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
+    --diff-summary /path/to/old_vendor_offers.json ref/vendor_offers.json
+```
+
+```
+=== Vendor offer diff: old.json -> new.json ===
+  offers:   59,414 -> 59,414 (+0)
+  added:    1
+  removed:  1
+  repriced: 1
+  retagged: 1
+
+--- Repriced (1) ---
+  Quartermaster (Drizzlewood Coast) | item 93817 x1 | 1000x currency 58, 200x item 93371, daily cap 1 -> 1999x currency 58, ...
+```
+
+`refresh-vendor-data.sh` snapshots the baseline before it overwrites it and runs
+this automatically at the end of a refresh, so the summary is already printed by
+the time you go to write the PR body. `docs/RELEASING.md` requires it there for
+any `data(vendor):` commit.
+
+A note on how it classifies: `offerId` is a SHA-256 over the offer's whole
+content, so a price change does not modify a row - it deletes one hash and
+creates another. Reported literally that would turn every repricing into two
+unrelated hex strings. The report re-pairs them by (merchant, output item) and
+shows the old and new cost side by side; only rows with no counterpart are
+reported as genuine additions or removals. `seasonalFestival` is the one field
+outside the hash, so a change to it keeps the `offerId` and is reported as a
+retag. Counts in the header are always exact even when a listing is truncated.
+
 ## Data Files
 
 | File | Size | Role |
 |------|------|------|
-| `ref/vendor_offers.json` | ~13 MB | **Baseline vendor offers** - loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. |
-| `ref/wiki_vendor_cache.json` | ~16 MB | **Wiki query cache** - raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Committed to repo for developer convenience. |
-| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Committed to repo. |
+| `ref/vendor_offers.json` | ~14.8 MB | **Baseline vendor offers** - loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. Marked `-diff -merge linguist-generated` in `.gitattributes`. |
+| `ref/vendor_offers_manifest.json` | ~130 B | **Provenance record** for the file above - schema version, source, offer count, and the run's `generatedAt`. Everything run-scoped lives here so the payload stays byte-stable across a no-op refresh. Committed to repo. |
+| `ref/wiki_vendor_cache.json` | ~19.6 MB | **Wiki query cache** - raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Gitignored (dev-local) since PR #92, and excluded from the packed `.bhm` since M38/WP-29 - see `docs/RELEASING.md`. |
+| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Gitignored (dev-local), same as the wiki cache above. |
 | `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** - maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
 
 ## What It Queries
@@ -120,7 +160,6 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 ```jsonc
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-02-13T12:34:56.0000000Z",
   "source": "gw2wiki-smw",
   "offers": [
     {
@@ -138,6 +177,24 @@ DELAY_PASS1=500 MAX_RUNTIME=30 ./tools/refresh-vendor-data.sh
 ```
 
 Offers are deduplicated by `offerId` and sorted alphabetically. Null fields are omitted from the output.
+
+The payload carries **nothing that varies per run**. The run's timestamp and a
+provenance summary go in a sibling `ref/vendor_offers_manifest.json` instead:
+
+```jsonc
+{
+  "manifestVersion": 1,
+  "schemaVersion": 1,
+  "source": "gw2wiki-smw",
+  "offerCount": 59414,
+  "generatedAt": "2026-08-25T14:09:11.2810521Z"
+}
+```
+
+This is what makes a no-op refresh visible: re-scrape unchanged wiki data and
+`ref/vendor_offers.json` is byte-for-byte unchanged, so `git status` shows only
+the manifest. An embedded `generatedAt` used to guarantee a fresh 14.8MB blob on
+every run whether or not a single price had moved.
 
 ## Exit Codes
 

@@ -45,14 +45,16 @@ namespace GW2CraftingHelper
         // Bounds the whole multi-step account-snapshot fetch (wallet, bank,
         // shared inventory, materials, one call per character) so a full
         // network outage fails fast instead of stacking several ~100s HTTP
-        // timeouts sequentially (KNOWN-ISSUES 31b/api-degradation F6) -
+        // timeouts sequentially (KNOWN-ISSUES #31/api-degradation F6) -
         // mirrors CurrencyMetadataService's own internal-timeout pattern,
         // just with a larger budget since this fetch does far more work on
         // a genuine success than a single /v2/currencies call.
         private static readonly TimeSpan SnapshotFetchTimeout = TimeSpan.FromSeconds(60);
 
         internal ContentsManager ContentsManager => this.ModuleParameters.ContentsManager;
+
         internal DirectoriesManager DirectoriesManager => this.ModuleParameters.DirectoriesManager;
+
         internal Gw2ApiManager Gw2ApiManager => this.ModuleParameters.Gw2ApiManager;
 
         private CornerIcon _cornerIcon;
@@ -141,6 +143,11 @@ namespace GW2CraftingHelper
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
+
+        // Held apart from the pipeline that owns it purely so
+        // OnSubtokenUpdated can drop the cached ids: they belong to the
+        // account the old subtoken addressed.
+        private CachingAccountRecipeClient _accountRecipeClient;
         private PlanStore _planStore;
 
         // Lives here rather than on CraftingPlanView so it survives a
@@ -149,18 +156,38 @@ namespace GW2CraftingHelper
         // Module constructs exactly once.
         private readonly PlanStripStatusBoard _planStripStatusBoard = new PlanStripStatusBoard();
         private VendorOfferStore _vendorOfferStore;
+        private OverlayRecipeCacheStore _recipeOverlay;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
         private Texture2D _cornerIconTexture;
         private Texture2D _emblemTexture;
 
-        private CancellationTokenSource _refreshCts;
+        // Cancelled FIRST in Unload, before anything this module owns is
+        // disposed. Everything that outlives a single frame runs under it:
+        // plan generation, the typed-name search, the restored-plan stat
+        // top-up and the startup build-id fetch. Without it, disabling the
+        // module mid-generation left a continuation chain running against
+        // the HttpClient Unload had just disposed, finishing by writing the
+        // dead instance's plan.json - which the next enable would restore.
+        //
+        // Deliberately never disposed: the token is captured by in-flight
+        // work and by CreateLinkedTokenSource callers, and disposing the
+        // source while they still hold it buys nothing (a cancelled source
+        // with no live registrations holds no unmanaged state) at the cost
+        // of turning an orderly cancel into an ObjectDisposedException.
+        private CancellationTokenSource _lifetimeCts;
 
-        // Written in the finally of the refresh methods, which may resume
-        // on a ThreadPool continuation, and read from Update() on the
-        // main thread as a mutual-exclusion gate - volatile for
-        // cross-thread visibility.
-        private volatile bool _refreshInProgress;
+        // The single-fetch slot: the claim that decides which caller gets
+        // to refresh, and the CancellationTokenSource that refresh runs
+        // under. Both used to be bare fields here (a volatile bool checked
+        // then set, and a source cancelled/disposed/reassigned in three
+        // unsynchronized statements) - see SnapshotRefreshSlot's own doc
+        // comment for the race that shape allowed.
+        private readonly SnapshotRefreshSlot _refreshSlot = new SnapshotRefreshSlot();
+
+        // Cancels the background /v2/build lookup, which retries across
+        // several seconds and holds _httpClient - Unload disposes that.
+        private readonly CancellationTokenSource _buildIdCts = new CancellationTokenSource();
 
         // Bumped only by ClearCache; a
         // fetch that captured an older epoch before starting must discard
@@ -182,8 +209,8 @@ namespace GW2CraftingHelper
         // gate on every single Update() tick instead of waiting out
         // RefreshFailureBackoff - see RefreshSnapshotInBackgroundAsync.
         // long, not DateTime, because C# disallows `volatile` on 64-bit
-        // primitives; Interlocked.Read/Exchange give the same cross-thread
-        // visibility guarantee _refreshInProgress gets from volatile
+        // primitives; Interlocked.Read/Exchange give it the same cross-thread
+        // visibility _refreshSlot gets from its own Interlocked claim
         // (_snapshotCommitGate below gets it from its own internal lock
         // instead), without needing a lock of its own here.
         private long _lastFailedRefreshAttemptTicks;
@@ -222,8 +249,8 @@ namespace GW2CraftingHelper
         // rather than written to a control here, the same shape
         // SaveStatusThreadSafe already uses for status text.
         //
-        // NOT the same flag as _refreshInProgress: that one gates whether a
-        // refresh may START (and covers the clicked path too), while this
+        // NOT the same flag as _refreshSlot's claim: that one gates whether
+        // a refresh may START (and covers the clicked path too), while this
         // one is only ever about the SPINNER for the automatic path. Keeping
         // them apart is what lets the clicked path own its own spinner
         // without either path switching the other's off.
@@ -237,19 +264,49 @@ namespace GW2CraftingHelper
         private bool _backgroundRefreshSpinnerApplied;
 
         [ImportingConstructor]
-        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters) { }
+        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters)
+        {
+        }
 
         protected override void DefineSettings(SettingCollection settings)
         {
             _settings = new ModuleSettings(settings);
         }
 
+        /// <summary>
+        /// Composition root, split by lifecycle: configure logging, build
+        /// the service graph, load textures, build the views, build the
+        /// window, add its tabs, wire the events. The order below is the
+        /// order those steps depend on each other in - see each step's own
+        /// remarks for what it must come after.
+        /// </summary>
         protected override void Initialize()
         {
+            // First line of Initialize, so every construction below can hand
+            // its token to work that must not outlive this module instance.
+            _lifetimeCts = new CancellationTokenSource();
+            var lifetimeToken = _lifetimeCts.Token;
+
             string dataDir = DirectoriesManager.GetFullDirectoryPath("data");
 
+            ConfigureLogging(dataDir);
+            var itemMetadataService = BuildServices(dataDir, lifetimeToken);
+            LoadTextures();
+            BuildViews(dataDir, lifetimeToken, itemMetadataService);
+            BuildWindow();
+            BuildTabs();
+            WireEvents();
+        }
+
+        /// <summary>
+        /// Attaches the log store and the settings subscriptions that feed
+        /// it. Runs before every other step so their onError callbacks can
+        /// reach the Log tab no matter which one fails first.
+        /// </summary>
+        private void ConfigureLogging(string dataDir)
+        {
             // Configured before any other store so their
-            // onError callbacks (below) can always reach ModuleLog.Shared
+            // onError callbacks (BuildServices) can always reach ModuleLog.Shared
             // regardless of construction order - Write() is always safe to
             // call even before Configure() attaches the file store (writes
             // just stay ring-only until then). The log store's OWN IO
@@ -278,7 +335,16 @@ namespace GW2CraftingHelper
             // ModuleLog.SeedFromStore's own doc comment.
             ModuleLog.Shared.PruneOlderThan(_settings.GetClampedLogRetentionDays());
             ModuleLog.Shared.SeedFromStore();
+        }
 
+        /// <summary>
+        /// Builds the stores, API clients, seeds and the crafting pipeline.
+        /// Returns the <see cref="ItemMetadataService"/> because the views
+        /// read its session stat cache for tooltips - the same instance the
+        /// pipeline fills, so a hover shows what the plan already fetched.
+        /// </summary>
+        private ItemMetadataService BuildServices(string dataDir, CancellationToken lifetimeToken)
+        {
             // Every store's IO-failure callback routes to ModuleLog so a
             // store failure is visible in the Log tab, not just in an
             // attached debugger.
@@ -322,6 +388,7 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Vendor baseline load failed, starting with an empty baseline: {ex.GetType().Name} - {ex.Message}");
                 _vendorOfferStore.LoadBaseline(null);
             }
+
             _vendorOfferStore.LoadOverlay();
 
             // Recipe cache: seed + overlay
@@ -337,7 +404,7 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 // No seed files yet - graceful degradation. Previously a
-                // fully silent bare catch (d2-log-system.md Section 8: "a
+                // fully silent bare catch (dev/proposals/d2-log-system.md Section 8: "a
                 // real gap the migration closes, not just a routing
                 // change") - now visible in the Log tab at Warn.
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed load failed, starting with an empty seed cache: {ex.GetType().Name} - {ex.Message}");
@@ -391,7 +458,7 @@ namespace GW2CraftingHelper
             // here and passed straight to the pipeline (simpler than
             // CurrencyMetadataService, which hits a live API).
             // Acquisition hints: wiki-derived guidance for items with no
-            // priceable source (docs/KNOWN-ISSUES.md item 8).
+            // priceable source (docs/KNOWN-ISSUES #8).
             IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = LoadSeedOrNull(
                 "acquisition_hints_seed.json", "Acquisition hints unavailable",
                 AcquisitionHintService.Load);
@@ -409,21 +476,47 @@ namespace GW2CraftingHelper
                 RecipeSheetItemSeedService.Load);
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
+            _recipeOverlay = recipeOverlay;
             recipeOverlay.Load(currentGw2BuildId: null);
 
             // Async build ID fetch for overlay invalidation + seed staleness
+            var buildApi = new Gw2BuildApiClient(_httpClient);
             Task.Run(async () =>
             {
                 try
                 {
-                    int buildId = await FetchGw2BuildIdAsync();
-                    recipeOverlay.InvalidateIfStale(buildId);
-                    recipeSeed.SetCurrentBuildId(buildId);
+                    var build = await buildApi.TryGetBuildIdAsync(_buildIdCts.Token);
+
+                    if (!build.BuildId.HasValue)
+                    {
+                        // Neither store is told a build, so the persisted
+                        // recipe overlay stays unread AND unwritten for the
+                        // whole session (see
+                        // OverlayRecipeCacheStore._deferredDiskLoad): every
+                        // plan re-fetches its recipes live and the session
+                        // discards what it learned. Warn, not Debug - a user
+                        // whose /v2/build is blocked or slow has no other
+                        // signal that their recipe cache is switched off.
+                        string reason = build.LastError == null
+                            ? "no response"
+                            : $"[{build.LastError.GetType().Name}] {build.LastError.Message}";
+                        Logger.Warn("GW2 build ID unavailable after {0} attempts - the persisted recipe cache is neither read nor written this session: {1}", build.Attempts, reason);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"GW2 build ID unavailable after {build.Attempts} attempts - the persisted recipe cache is neither read nor written this session: {reason}");
+                        return;
+                    }
+
+                    // Stamp only after the staleness check: InvalidateIfStale
+                    // clears the overlay's stored build when it wipes, so the
+                    // reverse order would leave the manifest recording 0 and
+                    // the overlay would be deleted again on the next launch.
+                    recipeOverlay.InvalidateIfStale(build.BuildId.Value);
+                    recipeOverlay.SetCurrentBuildId(build.BuildId.Value);
+                    recipeSeed.SetCurrentBuildId(build.BuildId.Value);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
                 {
-                    Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
-                    ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Could not fetch GW2 build ID for cache validation: {ex.Message}");
+                    // Unloaded mid-fetch: _buildIdCts is cancelled and
+                    // _httpClient disposed before this task can finish.
                 }
             });
 
@@ -435,6 +528,9 @@ namespace GW2CraftingHelper
             // a hover reads. Never a fetch (GetCachedStatBlock).
             var itemMetadataService = new ItemMetadataService(itemApi, itemNameSeed);
 
+            _accountRecipeClient = new CachingAccountRecipeClient(
+                new Gw2AccountRecipeClient(Gw2ApiManager));
+
             _craftingPipeline = new CraftingPlanPipeline(
                 new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
@@ -442,13 +538,22 @@ namespace GW2CraftingHelper
                 itemMetadataService,
                 _vendorOfferStore,
                 reducer: new InventoryReducer(),
-                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
+                accountRecipeClient: _accountRecipeClient,
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
                 acquisitionHints: acquisitionHints,
                 dailyCooldownItems: dailyCooldownItems,
                 recipeSheetItemIdByRecipeId: recipeSheetItemIdByRecipeId,
                 activeFestivalNames: ReadActiveFestivalNames);
 
+            return itemMetadataService;
+        }
+
+        /// <summary>
+        /// Loads the three module textures, each falling back rather than
+        /// failing the load.
+        /// </summary>
+        private void LoadTextures()
+        {
             try
             {
                 _moduleIconTexture = ContentsManager.GetTexture("icon.png");
@@ -483,10 +588,18 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Emblem texture load failed, reusing the module icon: {ex.GetType().Name} - {ex.Message}");
                 _emblemTexture = _moduleIconTexture;
             }
+        }
 
-            // The module window is built further down this method, so the
-            // blocked surface is handed over as a lambda rather than a
-            // reference - see ModalBackdrop for what it does with it.
+        /// <summary>
+        /// Builds the dialogs and the five tab views. Runs after
+        /// <see cref="LoadTextures"/> (the About view takes the module
+        /// icon) and before <see cref="BuildWindow"/>, which parents them.
+        /// </summary>
+        private void BuildViews(string dataDir, CancellationToken lifetimeToken, ItemMetadataService itemMetadataService)
+        {
+            // BuildWindow runs after this, so the blocked surface is handed
+            // over as a lambda rather than a reference - see ModalBackdrop
+            // for what it does with it.
             _modalDialog = new ModalDialog(_settings, () => _mainWindow);
             _apiAccessDialog = new ApiAccessDialog();
 
@@ -509,52 +622,9 @@ namespace GW2CraftingHelper
                 // method inside the pipeline, so this lambda needs no
                 // single-vs-multi branch of its own.
                 (items, useOwn, valueOwnMaterials, priceBasis, ct, progress, phaseProgress, requestLabel) =>
-                {
-                    string activeChar = TryGetActiveCharacterName();
-
-                    // The EFFECTIVE
-                    // valuation (user overrides + CurrencyDecisionDefaults'
-                    // curated defaults, minus anything explicitly cleared -
-                    // see ModuleSettings.GetEffectiveCurrencyValuation's own
-                    // doc comment) - not the raw GetCurrencyValuation the
-                    // Settings tab itself reads, which must stay default-
-                    // free so it can tell a real user override apart from
-                    // an applied default.
-                    var currencyValuation = _settings.GetEffectiveCurrencyValuation();
-                    // The per-plan valueOwnMaterials parameter drives this
-                    // directly, matching how priceBasis/useOwn are also
-                    // per-plan rather than read from ModuleSettings.
-                    var ownMaterialsMode = valueOwnMaterials
-                        ? OwnMaterialsMode.Valued
-                        : OwnMaterialsMode.Free;
-                    var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
-
-                    // characterDisciplines is passed explicitly so the
-                    // useOwn:false branch (snapshot: null, disabling
-                    // reduction) still feeds the discipline tiebreak the
-                    // same list useOwn:true does - the reported discipline
-                    // must not change with the toggle.
-                    // PersistAfterGenerateAsync awaits the pipeline call
-                    // and saves on success only; a cancelled/failed
-                    // generation propagates unchanged. myPersistGen is
-                    // stamped here, synchronously, before generateTask is
-                    // created - in lockstep with the view's myGen bump.
-                    int myPersistGen = ++_persistGenerateSequence;
-
-                    Task<CraftingPlanResult> generateTask = useOwn
-                        ? _craftingPipeline.GenerateStructuredAsync(
-                            items, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel,
-                            characterDisciplines: _currentSnapshot?.CharacterDisciplines)
-                        : _craftingPipeline.GenerateStructuredAsync(
-                            items, null, ct, progress,
-                            null, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel,
-                            characterDisciplines: _currentSnapshot?.CharacterDisciplines);
-
-                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen);
-                },
+                    StartGenerateAsync(
+                        items, useOwn, valueOwnMaterials, priceBasis, ct,
+                        progress, phaseProgress, requestLabel, lifetimeToken),
                 _modalDialog,
                 _itemSearchProvider,
                 _settings,
@@ -575,19 +645,26 @@ namespace GW2CraftingHelper
                 // all. Fills only the session stat side table - see
                 // ItemMetadataService.WarmStatBlocksAsync for why it is
                 // not GetMetadataAsync.
-                ids => itemMetadataService.WarmStatBlocksAsync(ids, CancellationToken.None)
+                ids => itemMetadataService.WarmStatBlocksAsync(ids, lifetimeToken),
+                () => lifetimeToken
             );
 
             _settingsContent = new SettingsTabContent(_settings, _modalDialog);
 
-            // DataDir and
-            // _moduleIconTexture are both already in scope at this point in
-            // Initialize() (dataDir computed at the top of this method,
-            // _moduleIconTexture loaded a few lines above) - trivial
+            // dataDir is threaded in as a parameter and _moduleIconTexture
+            // is already loaded (LoadTextures runs first) - trivial
             // plumbing, no new fields needed on Module itself beyond the
             // view instance.
             _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
+        }
 
+        /// <summary>
+        /// Constructs the module window itself. Sizing rationale is in
+        /// WindowSizing; the texture-space regions below are explained
+        /// inline.
+        /// </summary>
+        private void BuildWindow()
+        {
             // SpriteScreen is the GW2 CLIENT area, not the monitor, so a
             // windowed player can legitimately be narrower than the minimum.
             // Enforcing the full minimum there would put the window's right
@@ -633,18 +710,32 @@ namespace GW2CraftingHelper
                 Location = new Point(
                     Math.Max(0, (GameService.Graphics.SpriteScreen.Width - minWindowWidth) / 2),
                     Math.Max(0, (GameService.Graphics.SpriteScreen.Height - WindowSizing.MinWindowHeight) / 2)),
-                SavesPosition = true
+                SavesPosition = true,
             };
+        }
+
+        /// <summary>
+        /// Adds the window's tabs in strip order. Tab order is the user-
+        /// visible contract; the DEBUG-gated pair is dev-only.
+        /// </summary>
+        private void BuildTabs()
+        {
+            // Crafting Plan first, and Blish opens on the first tab. It is
+            // the one tab that works with no API key at all - recipes,
+            // prices and vendor offers are public data - whereas Snapshot
+            // can only say "No snapshot available. Click Refresh Now.",
+            // which is not an instruction a key-less user can carry out.
+            // Nothing reads a tab by index; the two tabs held as fields
+            // (_logTab, _settingsTab) are compared by reference.
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156711),
+                () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
+                "Crafting Plan"));
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
                 () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
                 "Snapshot"));
-
-            _mainWindow.Tabs.Add(new Tab(
-                AsyncTexture2D.FromAssetId(156711),
-                () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
-                "Crafting Plan"));
 
             _logTab = new Tab(
                 AsyncTexture2D.FromAssetId(156701),
@@ -660,6 +751,12 @@ namespace GW2CraftingHelper
                 "Log");
             _mainWindow.Tabs.Add(_logTab);
 
+#if DEBUG
+            // Dev builds only. Both views are BuildPlaceholder - a single
+            // "Coming Soon" label - and a released overlay should not
+            // advertise unfinished work in its own tab strip. Delete the
+            // two directives (not the tabs) when the features land; see
+            // docs/ROADMAP.md.
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156691),
                 () => new ViewAdapter("Plan History", BuildPlaceholder),
@@ -681,6 +778,7 @@ namespace GW2CraftingHelper
                     return new ViewAdapter("Crafting Ranker", c => _rankerContent.Build(c));
                 },
                 "Crafting Ranker"));
+#endif
 
             _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
@@ -703,7 +801,14 @@ namespace GW2CraftingHelper
                     return new ViewAdapter("About", c => _aboutContent.Build(c));
                 },
                 "About"));
+        }
 
+        /// <summary>
+        /// Wires the window's tab-change handler and the corner icon.
+        /// Last, so every object these handlers touch already exists.
+        /// </summary>
+        private void WireEvents()
+        {
             // Refresh log content when switching to the Log tab
             _mainWindow.TabChanged += (s, e) =>
             {
@@ -728,13 +833,110 @@ namespace GW2CraftingHelper
                 IconName = "GW2 Crafting Helper",
                 Icon = new AsyncTexture2D(_cornerIconTexture),
                 Priority = 1245846523,
-                Parent = GameService.Graphics.SpriteScreen
+                Parent = GameService.Graphics.SpriteScreen,
             };
 
             _cornerIcon.Click += (s, e) =>
             {
                 _mainWindow.ToggleWindow();
             };
+        }
+
+        /// <summary>
+        /// One Generate click: reads the active character and the effective
+        /// settings, starts the pipeline, and hands the task to
+        /// <see cref="PersistAfterGenerateAsync"/>.
+        /// </summary>
+        /// <param name="lifetimeToken">
+        /// Passed in rather than read from <c>_lifetimeCts</c> so the token
+        /// is the one captured when the view was built - a later Initialize
+        /// installs a different source, and Unload disposes this one.
+        /// </param>
+        private Task<CraftingPlanResult> StartGenerateAsync(
+            IReadOnlyList<PlanRequestItem> items,
+            bool useOwn,
+            bool valueOwnMaterials,
+            PriceBasis priceBasis,
+            CancellationToken ct,
+            IProgress<PlanStatus> progress,
+            IProgress<PlanPhaseEvent> phaseProgress,
+            string requestLabel,
+            CancellationToken lifetimeToken)
+        {
+            string activeChar = null;
+            try
+            {
+                var mumble = GameService.Gw2Mumble;
+                if (mumble != null &&
+                    mumble.PlayerCharacter != null &&
+                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                {
+                    activeChar = mumble.PlayerCharacter.Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Gw2Mumble unavailable - graceful fallback. Debug,
+                // not Warn: this runs once per Generate click (a
+                // human-paced action, not a hot loop), but a user
+                // running Blish without Mumble wired up would hit
+                // it every single click - Debug (ring-always,
+                // file-only-when-diagnostics-on) keeps that from
+                // becoming routine file noise for a purely
+                // cosmetic fallback (active-character is only used
+                // for account-bound recipe checks).
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            // The EFFECTIVE
+            // valuation (user overrides + CurrencyDecisionDefaults'
+            // curated defaults, minus anything explicitly cleared -
+            // see ModuleSettings.GetEffectiveCurrencyValuation's own
+            // doc comment) - not the raw GetCurrencyValuation the
+            // Settings tab itself reads, which must stay default-
+            // free so it can tell a real user override apart from
+            // an applied default.
+            var currencyValuation = _settings.GetEffectiveCurrencyValuation();
+            // The per-plan valueOwnMaterials parameter drives this
+            // directly, matching how priceBasis/useOwn are also
+            // per-plan rather than read from ModuleSettings.
+            var ownMaterialsMode = valueOwnMaterials
+                ? OwnMaterialsMode.Valued
+                : OwnMaterialsMode.Free;
+            var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
+
+            // characterDisciplines is passed explicitly so the
+            // useOwn:false branch (snapshot: null, disabling
+            // reduction) still feeds the discipline tiebreak the
+            // same list useOwn:true does - the reported discipline
+            // must not change with the toggle.
+            // PersistAfterGenerateAsync awaits the pipeline call
+            // and saves on success only; a cancelled/failed
+            // generation propagates unchanged. myPersistGen is
+            // stamped here, synchronously, before generateTask is
+            // created - in lockstep with the view's myGen bump.
+            int myPersistGen = ++_persistGenerateSequence;
+
+            // The view already passes the lifetime token, but the
+            // parameter is public surface: linking here means a
+            // future caller cannot start an untethered generation by
+            // passing None, and costs one source per Generate click.
+            var generateCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetimeToken);
+            ct = generateCts.Token;
+
+            Task<CraftingPlanResult> generateTask = useOwn
+                ? _craftingPipeline.GenerateStructuredAsync(
+                    items, _currentSnapshot, ct, progress,
+                    activeChar, priceBasis, currencyValuation, ownMaterialsMode,
+                    homesteadTiers, phaseProgress, requestLabel,
+                    characterDisciplines: _currentSnapshot?.CharacterDisciplines)
+                : _craftingPipeline.GenerateStructuredAsync(
+                    items, null, ct, progress,
+                    null, priceBasis, currencyValuation, ownMaterialsMode,
+                    homesteadTiers, phaseProgress, requestLabel,
+                    characterDisciplines: _currentSnapshot?.CharacterDisciplines);
+
+            return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen, ct, generateCts);
         }
 
         /// <summary>
@@ -751,9 +953,8 @@ namespace GW2CraftingHelper
         /// handler can set to veto, and the one virtual member in the chain
         /// already runs after the assignment - so by the time any module
         /// code is reached, the tab has changed and cannot be changed back
-        /// without triggering a second switch. See KNOWN-ISSUES "Settings
-        /// dirty prompt" for the alternatives that were measured and
-        /// rejected.
+        /// without triggering a second switch. See KNOWN-ISSUES #51 for
+        /// the alternatives that were measured and rejected.
         /// </para>
         ///
         /// <para>
@@ -805,10 +1006,16 @@ namespace GW2CraftingHelper
 
         private void PromptForUnsavedSettings()
         {
-            if (_settingsContent == null || _modalDialog == null) return;
+            if (_settingsContent == null || _modalDialog == null)
+            {
+                return;
+            }
 
             int unsaved = _settingsContent.UnsavedChangeCount();
-            if (unsaved <= 0) return;
+            if (unsaved <= 0)
+            {
+                return;
+            }
 
             string changeWord = unsaved == 1 ? "change" : "changes";
             _modalDialog.Show(
@@ -829,7 +1036,10 @@ namespace GW2CraftingHelper
         // this message lands in the window that is already on screen.
         private void ReportSaveOutcome(SettingsTabContent.SaveOutcome outcome)
         {
-            if (outcome.AllSaved) return;
+            if (outcome.AllSaved)
+            {
+                return;
+            }
 
             string message;
             if (outcome.WriteFailed)
@@ -968,6 +1178,13 @@ namespace GW2CraftingHelper
         {
             bool statusApplied = false;
 
+            // Not folded into the _snapshotDirty drain below: Clear Cache
+            // drops the snapshot without setting that flag, and the plan
+            // tab must stop offering "Use Own Materials" the moment there
+            // is nothing to subtract. A reference read plus a bool compare
+            // per tick; the view early-returns when nothing changed.
+            _craftingContent?.SetAccountDataAvailable(_currentSnapshot != null);
+
             if (_snapshotDirty)
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
@@ -1037,14 +1254,17 @@ namespace GW2CraftingHelper
                             _pendingPlanRestore.GeneratedAt,
                             _pendingPlanRestore.NodeOverrides,
                             _pendingPlanRestore.IgnoredItemIds,
-                            _pendingPlanRestore.ValueOwnMaterials);
+                            _pendingPlanRestore.ValueOwnMaterials,
+                            _pendingPlanRestore.RequestItems,
+                            _pendingPlanRestore.UseOwnMaterials,
+                            _pendingPlanRestore.PriceBasis);
                     }
                 }
             }
 
             // The auto-refresh spinner, drained on change. Above the
-            // early return below on purpose: _refreshInProgress is true for
-            // the whole of the refresh whose spinner this is, so a drain
+            // early return below on purpose: the refresh slot is claimed
+            // for the whole of the refresh whose spinner this is, so a drain
             // underneath it would only ever get to switch the spinner ON
             // once the refresh had already finished.
             bool backgroundRefreshing = _backgroundRefreshInFlight;
@@ -1054,7 +1274,10 @@ namespace GW2CraftingHelper
                 _snapshotContent.SetBackgroundRefreshInFlight(backgroundRefreshing);
             }
 
-            if (_refreshInProgress) return;
+            if (_refreshSlot.IsClaimed)
+            {
+                return;
+            }
 
             if (_currentSnapshot == null)
             {
@@ -1085,6 +1308,7 @@ namespace GW2CraftingHelper
                     _firstLoadRefreshAttempted = true;
                     _ = RefreshSnapshotInBackgroundAsync();
                 }
+
                 return;
             }
 
@@ -1094,14 +1318,26 @@ namespace GW2CraftingHelper
             // than caching it, so a Settings tab save takes effect on the
             // very next Update() without any separate live-push plumbing.
             var staleThreshold = TimeSpan.FromMinutes(_settings.GetClampedSnapshotRefreshIntervalMinutes());
-            if (!StatusText.IsStale(DateTime.UtcNow - _currentSnapshot.CapturedAt, staleThreshold)) return;
-            if (!_snapshotService.HasRequiredPermissions()) return;
+            if (!StatusText.IsStale(DateTime.UtcNow - _currentSnapshot.CapturedAt, staleThreshold))
+            {
+                return;
+            }
+
+            if (!_snapshotService.HasRequiredPermissions())
+            {
+                return;
+            }
 
             _ = RefreshSnapshotInBackgroundAsync();
         }
 
         protected override void Unload()
         {
+            // FIRST, before any disposal below: every in-flight await this
+            // module owns is running against objects the next few lines are
+            // about to destroy - the HttpClient most of all.
+            _lifetimeCts?.Cancel();
+
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
 
             // The SettingEntry objects outlive this module instance
@@ -1111,8 +1347,15 @@ namespace GW2CraftingHelper
             _settings.LogMaxSizeBytes.SettingChanged -= OnLogMaxSizeBytesChanged;
             _settings.ClickSoundVolumePercent.SettingChanged -= OnClickSoundVolumeChanged;
 
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
+            _refreshSlot.CancelCurrent();
+
+            _buildIdCts.Cancel();
+            _buildIdCts.Dispose();
+
+            // RecipeService persists off the plan path, so the last plan's
+            // discoveries can still be in memory when the module goes away.
+            // A no-op unless something is actually unwritten.
+            _recipeOverlay?.Flush(force: true);
 
             // The scroll-verify/resize-debounce/wheel-wrap-verify tickers
             // are parented to the SpriteScreen, not this view's control
@@ -1143,7 +1386,7 @@ namespace GW2CraftingHelper
             _settingsContent?.Teardown();
             _aboutContent?.Teardown();
 
-            // Module-level log system (d2-log-system.md Section 7): the
+            // Module-level log system (dev/proposals/d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush
             // queue, never on the calling thread (see ModuleLog's own class
             // doc comment) - give any writes already queued (e.g. from a
@@ -1180,6 +1423,10 @@ namespace GW2CraftingHelper
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
         {
+            // The key may now address a different account, which no TTL can
+            // detect - see CachingAccountRecipeClient.Invalidate.
+            _accountRecipeClient?.Invalidate();
+
             if (_snapshotService.HasRequiredPermissions())
             {
                 _ = RefreshSnapshotInBackgroundAsync();
@@ -1194,7 +1441,7 @@ namespace GW2CraftingHelper
             // Captured before the fetch starts (main thread - see the
             // field's own comment) so the post-await commit below can
             // detect a Clear Cache that ran while this fetch was still in
-            // flight (KNOWN-ISSUES 31a-F1).
+            // flight (KNOWN-ISSUES #31/31a-F1).
             int myEpoch = _snapshotCommitGate.Epoch;
 
             AccountSnapshot snapshot;
@@ -1209,7 +1456,7 @@ namespace GW2CraftingHelper
                 {
                     // The internal timeout fired, not the caller's own
                     // token - a genuine fetch failure (KNOWN-ISSUES
-                    // api-degradation F6), not a cancellation. Re-thrown as
+                    // #31/api-degradation F6), not a cancellation. Re-thrown as
                     // a plain Exception so callers' "cancelled" catch
                     // (which must stay silent) does not swallow it.
                     throw new TimeoutException(
@@ -1219,7 +1466,7 @@ namespace GW2CraftingHelper
 
             // Re-check and commit run inside SnapshotCommitGate's lock -
             // the same lock ClearCache's own bump+clear runs under below -
-            // so the two can never interleave (KNOWN-ISSUES 31a-F1
+            // so the two can never interleave (KNOWN-ISSUES #31/31a-F1
             // audit-of-fix; see SnapshotCommitGate's doc comment).
             bool committed = _snapshotCommitGate.TryCommit(myEpoch, () =>
             {
@@ -1234,7 +1481,7 @@ namespace GW2CraftingHelper
             {
                 // Clear Cache ran (fully, atomically) either before or
                 // during this check; committing now would resurrect data
-                // the user explicitly cleared (KNOWN-ISSUES 31a-F1). Drop
+                // the user explicitly cleared (KNOWN-ISSUES #31/31a-F1). Drop
                 // the result - _currentSnapshot, _pendingSnapshot,
                 // _snapshotDirty, and the on-disk file are all left
                 // untouched by this call.
@@ -1273,7 +1520,13 @@ namespace GW2CraftingHelper
 
         private async Task RefreshSnapshotInBackgroundAsync()
         {
-            if (_refreshInProgress) return;
+            if (_refreshSlot.IsClaimed)
+            {
+                // Advisory pre-check, kept ahead of the backoff test so a
+                // call that loses to a running refresh still does not log the
+                // backoff line. TryClaim below is the real gate.
+                return;
+            }
 
             // Refuse to auto-retrigger again so
             // soon after a failed attempt - see _lastFailedRefreshAttemptTicks'
@@ -1287,28 +1540,28 @@ namespace GW2CraftingHelper
                 return;
             }
 
-            _refreshInProgress = true;
+            if (!_refreshSlot.TryClaim())
+            {
+                return;
+            }
 
             // Set only past both early returns above, so a tick that
             // declines to refresh (already running, or inside the failure
             // backoff) never spins a spinner over nothing.
             _backgroundRefreshInFlight = true;
 
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = new CancellationTokenSource();
-
             try
             {
-                var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                var snapshot = await FetchAndSaveSnapshotAsync(_refreshSlot.BeginFetch());
                 Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, 0);
                 if (snapshot != null)
                 {
                     var status = $"Updated \u2014 {snapshot.CapturedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture)}";
                     SaveStatusThreadSafe(status);
                 }
+
                 // else: superseded by Clear Cache while this fetch was in
-                // flight (KNOWN-ISSUES 31a-F1, see SnapshotEpochGuard) -
+                // flight (KNOWN-ISSUES #31/31a-F1, see SnapshotEpochGuard) -
                 // Clear Cache already wrote its own status; nothing further
                 // to report here.
             }
@@ -1340,41 +1593,43 @@ namespace GW2CraftingHelper
             finally
             {
                 _backgroundRefreshInFlight = false;
-                _refreshInProgress = false;
+                _refreshSlot.Release();
             }
         }
 
         private async Task<AccountSnapshot> UserRefreshAsync()
         {
-            if (_refreshInProgress) return null;
-            _refreshInProgress = true;
-
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = new CancellationTokenSource();
+            if (!_refreshSlot.TryClaim())
+            {
+                return null;
+            }
 
             try
             {
-                return await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                // BeginFetch is inside the try, unlike the old inline
+                // cancel/dispose/assign: a throw out of it (a registered
+                // cancellation callback rethrowing out of Cancel(), say) used
+                // to leave the claim set forever, and with it every later
+                // refresh - automatic and clicked - silently declined for the
+                // rest of the session.
+                return await FetchAndSaveSnapshotAsync(_refreshSlot.BeginFetch());
             }
             finally
             {
-                _refreshInProgress = false;
+                _refreshSlot.Release();
             }
         }
 
         private void ClearCache()
         {
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = null;
+            _refreshSlot.CancelCurrent();
 
             // Epoch bump + on-disk delete + field resets all run inside
             // SnapshotCommitGate's lock so a snapshot fetch already in
             // flight (which captured an epoch before this call ran) either
             // commits fully before this runs, or has its post-fetch commit
             // check fail atomically against this bump - no interleaving,
-            // no torn field state (KNOWN-ISSUES 31a-F1 audit-of-fix; see
+            // no torn field state (KNOWN-ISSUES #31/31a-F1 audit-of-fix; see
             // SnapshotCommitGate's own doc comment).
             _snapshotCommitGate.Clear(() =>
             {
@@ -1433,9 +1688,13 @@ namespace GW2CraftingHelper
         private sealed class PersistedPlanMetadata
         {
             public DateTime GeneratedAt { get; }
+
             public IReadOnlyList<PlanRequestItem> RequestItems { get; }
+
             public bool UseOwnMaterials { get; }
+
             public PriceBasis PriceBasis { get; }
+
             public bool ValueOwnMaterials { get; }
 
             public PersistedPlanMetadata(
@@ -1473,7 +1732,31 @@ namespace GW2CraftingHelper
             bool useOwnMaterials,
             PriceBasis priceBasis,
             bool valueOwnMaterials,
-            int myPersistGen)
+            int myPersistGen,
+            CancellationToken ct,
+            CancellationTokenSource generateCts)
+        {
+            try
+            {
+                return await PersistOrSkipAsync(
+                    generateTask, requestItems, useOwnMaterials, priceBasis, valueOwnMaterials, myPersistGen, ct);
+            }
+            finally
+            {
+                // The linked source created per Generate click, owned by this
+                // continuation because it is the last thing still using it.
+                generateCts?.Dispose();
+            }
+        }
+
+        private async Task<CraftingPlanResult> PersistOrSkipAsync(
+            Task<CraftingPlanResult> generateTask,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis,
+            bool valueOwnMaterials,
+            int myPersistGen,
+            CancellationToken ct)
         {
             var result = await generateTask;
 
@@ -1485,7 +1768,18 @@ namespace GW2CraftingHelper
                 _generateCompletedThisSession = true;
             }
 
-            if (myPersistGen != _persistGenerateSequence) return result;
+            if (myPersistGen != _persistGenerateSequence)
+            {
+                return result;
+            }
+
+            // A generation that completed as the module was being unloaded
+            // must not write plan.json: the module is gone, and the next
+            // enable would restore a plan the user never saw finish.
+            if (ct.IsCancellationRequested)
+            {
+                return result;
+            }
 
             var generatedAt = DateTime.Now;
             var metadata = new PersistedPlanMetadata(
@@ -1512,7 +1806,7 @@ namespace GW2CraftingHelper
                 ValueOwnMaterials = valueOwnMaterials,
                 Result = result,
                 NodeOverrides = new Dictionary<int, AcquisitionSource>(),
-                IgnoredItemIds = new List<int>()
+                IgnoredItemIds = new List<int>(),
             });
 
             return result;
@@ -1553,7 +1847,10 @@ namespace GW2CraftingHelper
             ISet<int> ignoredItemIds)
         {
             var metadata = _lastPersistedPlanMetadata;
-            if (metadata == null) return;
+            if (metadata == null)
+            {
+                return;
+            }
 
             // Copied via an explicit loop, not the Dictionary(IDictionary<>)
             // constructor - overrides is IReadOnlyDictionary<>, which does
@@ -1590,13 +1887,17 @@ namespace GW2CraftingHelper
                 ValueOwnMaterials = metadata.ValueOwnMaterials,
                 Result = result,
                 NodeOverrides = overridesSnapshot,
-                IgnoredItemIds = ignoredSnapshot
+                IgnoredItemIds = ignoredSnapshot,
             };
 
             lock (_pendingPlanSaveLock)
             {
                 _pendingPlanSave = persisted;
-                if (_planSaveWorkerRunning) return;
+                if (_planSaveWorkerRunning)
+                {
+                    return;
+                }
+
                 _planSaveWorkerRunning = true;
             }
 
@@ -1631,6 +1932,9 @@ namespace GW2CraftingHelper
             }
         }
 
+#if DEBUG
+        // Compiled only where its two callers are - see the tab
+        // registration in BuildMainWindow.
         private static void BuildPlaceholder(Container container)
         {
             new Label()
@@ -1641,23 +1945,9 @@ namespace GW2CraftingHelper
                 AutoSizeHeight = true,
                 Location = new Point(20, 20),
                 TextColor = new Color(150, 150, 150),
-                Parent = container
+                Parent = container,
             };
         }
-
-        private async Task<int> FetchGw2BuildIdAsync()
-        {
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
-            {
-                var response = await _httpClient.GetAsync(
-                    "https://api.guildwars2.com/v2/build", cts.Token);
-                response.EnsureSuccessStatusCode();
-                string json = await response.Content.ReadAsStringAsync();
-                using (var doc = System.Text.Json.JsonDocument.Parse(json))
-                {
-                    return doc.RootElement.GetProperty("id").GetInt32();
-                }
-            }
-        }
+#endif
     }
 }

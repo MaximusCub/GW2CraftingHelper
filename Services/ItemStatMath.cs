@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// only.
     /// </para>
     /// </summary>
-    public static class ItemStatMath
+    internal static class ItemStatMath
     {
         public static int AttributeValue(double multiplier, double attributeAdjustment)
         {

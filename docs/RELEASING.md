@@ -7,13 +7,20 @@ for GW2 Crafting Helper - not an aspirational process.
 a release is a CHANGELOG entry, a `manifest.json` version bump, and a
 matching `v<version>` git tag on the release commit, deployed by copying
 the built `.bhm` into a live Blish HUD install. `CHANGELOG.md` states the
-convention in its own header, and `v0.2.0` through `v0.2.3` exist and are
-pushed to origin (measured 2026-08-24: `git ls-remote --tags origin`).
+convention in its own header, and `v0.2.0` through `v0.2.4` exist and are
+pushed to origin (measured 2026-08-25: `git ls-remote --tags origin`).
 
-**What still does not exist:** a GitHub Releases flow. `gh release list`
-returns nothing (measured 2026-08-24), `.github/workflows/tests.yml` builds
-and tests but publishes no artifact, and there is no Blish HUD module-repo
-listing. So a non-developer still cannot install this module.
+**What changed since:** `.github/workflows/release.yml` now builds
+Release/x64 on any pushed `v*` tag and publishes
+`bin/x64/Release/GW2CraftingHelper.bhm` as a GitHub Release asset, with the
+matching `CHANGELOG.md` section as the body. It refuses to publish if the
+tag does not match `manifest.json`'s version, or if `CHANGELOG.md` has no
+section for it. Pushing a tag is therefore the whole release action.
+
+**What still does not exist:** a Blish HUD module-repository listing, so
+the download is still manual. And `gh release list` returned nothing as of
+2026-08-25 - the workflow has not yet been exercised by a pushed tag, so
+the first release will be the one that proves it end to end.
 
 Everything below reflects what a contributor can do today with the tools
 already in the repo, and is measured against the current build unless
@@ -22,17 +29,83 @@ labelled otherwise.
 ## The release protocol, step by step
 
 1. Land the work on `master`.
-2. Bump `manifest.json`'s `version` (the About tab reads it live).
-3. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
+2. Re-run the recipe seeder from the repo root and commit the refreshed
+   `ref/` seeds:
+
+   ```
+   dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+   ```
+
+   Roughly 1-2 minutes against the live API (measured 2026-08-25: 1m53s
+   cold, 59s on an immediate re-run). `--output-dir ref` is not optional:
+   the tool's own default writes into its `bin/` folder, not the repo's.
+   Why it is a release step: the seed pins the GW2 build id it was built
+   against, and once that id no longer matches the live build every
+   negative row in the seed stops counting as a cache hit, putting every
+   user on the slow live-API path for their first plan of each session.
+3. Bump `manifest.json`'s `version` (the About tab reads it live). Check
+   that `manifest.json`'s `description` still matches the GitHub repo
+   description - it is the sidebar text, the search-result snippet, and the
+   Open Graph card used every time the link is pasted into Discord or
+   Reddit, and it is the only sentence most people will ever read.
+4. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
    user-facing voice the existing entries use, not commit-message voice.
-4. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+   The release workflow uses this section verbatim as the release body and
+   fails the build if it is missing.
+5. **Sweep the prose that names a version.** `manifest.json` is not the
+   only place a version number is written down, and the others drift
+   silently because nothing reads them: this file (the v0.2.x paragraph at
+   the top, the `manifest.json` fields section, the "what a real release
+   process would still need" list) and `docs/ROADMAP.md`'s current-phase
+   bullet all state which release is newest. `grep -rn "0\.2\." docs/
+   *.md` finds them; update each to the version being shipped, and stamp
+   any claim you re-checked with `(measured YYYY-MM-DD)` rather than "at
+   the time of writing". This step exists because ROADMAP.md and
+   RELEASING.md both still said v0.2.3 was newest after v0.2.4 shipped.
+6. **If the plan view changed, refresh `docs/images/`.** The README's
+   screenshots are the only proof a visitor has that the product works.
+   They went stale once already: the shots taken 2026-07-23 showed columns
+   packed hard left with a wide empty band, which is the exact layout the
+   0.2.3 entry in `CHANGELOG.md` describes as removed. Retake against the
+   current build at full window width, cropped to whole rows.
+7. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-5. Tag the release commit `v<version>` and push the tag.
-6. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+8. Tag the release commit `v<version>` and push the tag. That triggers
+   `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
+   publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
+   asset is attached.
+9. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
 compared with `git diff v0.2.0..v0.2.1`.
+
+## Required: an offer diff on every `data(vendor):` pull request
+
+`ref/vendor_offers.json` is 14.8MB on a single line, so `git diff` on a
+vendor refresh reports `1 insertion(+), 1 deletion(-)` - the whole file
+that prices every vendor in the game, replaced as one indivisible hunk.
+A reviewer facing that has two options: rubber-stamp it, or hand-write a
+JSON differ. This repo already has the scar tissue from the first option
+(`ref/vendor_offer_exclusions.json` exists because a stale row shipped).
+
+**A pull request containing a `data(vendor):` commit must carry the
+`--diff-summary` output in its body.** `tools/refresh-vendor-data.sh`
+snapshots the baseline before overwriting it and prints the summary at the
+end of the run, so it is already on screen when the PR is written. To
+produce it by hand from any two dataset copies:
+
+```
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
+    --diff-summary <old vendor_offers.json> <new vendor_offers.json>
+```
+
+It reports offers added, removed, repriced and retagged, keyed by merchant
+and item rather than by the content hash - see
+`tools/VendorOfferUpdater/README.md` for why the raw `offerId` set is not
+usable for this. A refresh that changed nothing prints "No offer changed",
+and `ref/vendor_offers.json` will be byte-for-byte unmodified: only
+`ref/vendor_offers_manifest.json` moves. That is the intended no-op signal.
 
 ## How a `.bhm` is actually produced
 
@@ -49,7 +122,7 @@ restored) defines an `AfterTargets="Build"` target named
 `BuildBlishHUDModule` that runs automatically **on every build**. As of
 M38/WP-29, `GW2CraftingHelper.csproj` redeclares that same-named target
 after the import (the one and only hand-written pack/zip logic in this
-repo's own csproj) so its own version wins, purely to add a three-file
+repo's own csproj) so its own version wins, purely to add a four-file
 `Exclude` - see the addendum below. Otherwise it does exactly this,
 unconditionally:
 
@@ -78,11 +151,24 @@ which `ref/*.json` files are wired into `GW2CraftingHelper.csproj` via
 `<Content Include>`/`CopyToOutputDirectory`. Inspecting the actual `.bhm`
 produced by the build above shows it contains, under `ref/`:
 
-- `acquisition_hints_seed.json`, `emblem.png`, `icon.png`,
-  `item_name_seed.json`, `mystic_forge_recipes.json`, `recipes_seed.json`,
+- The thirteen files the module actually ships, measured from the zip's own
+  entry list on a clean Debug rebuild (2026-08-25):
+  `acquisition_hints_seed.json`, `corner-icon.png`,
+  `daily_cooldown_items.json`, `emblem.png`, `icon.png`,
+  `item_name_seed.json`, `mystic_forge_recipes.json`,
   `recipe_search_seed.json`, `recipe_seed_manifest.json`,
-  `vendor_offers.json` - these are the files also wired into the csproj as
-  `<Content Include>`, so their presence is expected.
+  `recipe_sheet_items.json`, `recipes_seed.json`, `vendor_offers.json`,
+  `vendor_offers_manifest.json`.
+
+  This list used to be written as "the files also wired into the csproj as
+  `<Content Include>`", and it named nine. That framing was the bug: the
+  `<Content Include>` list never determined what shipped, so the doc
+  inherited its omissions - `corner-icon.png`, `daily_cooldown_items.json`,
+  `recipe_sheet_items.json`, `vendor_offers_manifest.json` and
+  `vendor_offer_exclusions.json` were all in the `.bhm` and absent here.
+  The `<Content Include>` entries have since been deleted outright and the
+  packing target is the only owner, so the way to answer "what ships?" is
+  `ref/` minus that target's `Exclude`, or simply to list the zip.
 - **`item_id_cache.json` and `wiki_vendor_cache.json`** - these are *not*
   wired into the csproj as `<Content Include>` items (they exist purely as
   developer-side inputs to `tools/VendorOfferUpdater`), but because the
@@ -109,7 +195,7 @@ produced by the build above shows it contains, under `ref/`:
 
 - `name`, `version`, `namespace`, `package` - standard Blish HUD module
   identity fields. `version` is bumped per release under the CHANGELOG +
-  tag convention above (`0.2.3` at the time of writing). Nothing *enforces*
+  tag convention above (`0.2.4`, measured 2026-08-25). Nothing *enforces*
   the bump mechanically - no CI check, no analyzer - so it is a step in the
   protocol, not a guarantee.
 - `dependencies.bh.blishhud` - minimum Blish HUD host version
@@ -135,8 +221,12 @@ produced by the build above shows it contains, under `ref/`:
 
 ## Installing a built module today
 
-There is no GitHub Release and no in-app Blish HUD module-repository
-listing for this module (measured 2026-08-24). The only way to run it is:
+The supported path is the `.bhm` attached to a GitHub Release, dropped
+into Blish HUD's `modules` folder - that is what `README.md`'s "Installing"
+section documents, and the two should stay consistent. There is still no
+in-app Blish HUD module-repository listing, so the download is manual.
+
+Building it locally instead produces the identical artifact:
 
 1. Clear `bin/` and `obj/`, then build in Release, `x64`:
    `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
@@ -144,12 +234,9 @@ listing for this module (measured 2026-08-24). The only way to run it is:
 3. Copy it into your Blish HUD installation's `modules` directory and
    (re)load Blish HUD.
 
-This is also exactly what a release deploy does - the tag and CHANGELOG
-entry are what make a given copy of those three steps identifiable after
-the fact. There is still no documented, supported path for a
-non-developer to install this module without building it from source;
-`README.md`'s "Installing" section says the same thing and should stay
-consistent with this one.
+This is also exactly what the release workflow does on CI - the tag and
+CHANGELOG entry are what make a given copy of those three steps
+identifiable after the fact.
 
 ## Addendum: the ref/ cache-file packaging gap (fixed, M38/WP-29)
 
@@ -169,7 +256,7 @@ only controls what `git` tracks, not what MSBuild's `CopyToOutputDirectory`
 -equivalent packaging step reads off disk.
 
 This was directly measured on the M38 WP-25 branch (recorded in
-`docs/dev-notes/HISTORY.md` under the WP-25 entry, 2026-07-23): a worktree
+`dev/dev-notes/HISTORY.md` under the WP-25 entry, 2026-07-23): a worktree
 created **after** PR #92 (so never had the caches materialize at all)
 produced a `.bhm` of 6.0 MB, versus 7.2 MB from an equivalent build on a
 working copy that still had them - and the smaller, cache-free build
@@ -184,7 +271,19 @@ above has landed. `GW2CraftingHelper.csproj` now redeclares the imported
 import, so it wins) with an `Exclude` added to the `ref/**` copy for
 `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` - and, since
 `MysticForgeSeeder` landed, `ref/mf_item_id_cache.json`, making it three
-files. None of them is
+files.
+
+**Four, as of the repo-hygiene branch:** `ref/vendor_offer_exclusions.json`
+joined them. It is the odd one out in being *tracked* - it is hand-verified
+data, not a regenerable cache - but it is still a build-time input read only
+by `tools/VendorOfferUpdater` (`Program.cs`, `ApplyExclusions`), with no
+reader anywhere in `Services/`, `Views/` or `Models/`, so it has no business
+in a player's download. It had been shipping in every `.bhm` since it was
+created, because it appeared in no `<Content Include>` entry and the packing
+glob never consulted that list anyway. Those `<Content Include>` entries are
+now gone entirely and this target is the sole owner of what ships.
+
+None of the four is
 copied into `$(OutDir)ref` or zipped into the `.bhm` any more, regardless of
 whether a developer's working copy has them sitting on disk from running
 `tools/VendorOfferUpdater`. Building from an active `VendorOfferUpdater`
@@ -201,12 +300,16 @@ the `Exclude` list above.
 
 These are listed as concrete gaps, not committed-to future work:
 
-- A CI job that builds Release/x64 on a tag and attaches the resulting
-  `.bhm` as a GitHub Release asset. The tags exist; nothing consumes them.
-  This is the one gap that actually blocks a non-developer install.
+- ~~A CI job that builds Release/x64 on a tag and attaches the resulting
+  `.bhm` as a GitHub Release asset~~ - done:
+  `.github/workflows/release.yml`. Untested against a real tag push at the
+  time of writing; the first release exercises it.
+- A Blish HUD module-repository listing, so the module is installable from
+  inside Blish HUD rather than by downloading a file. This is now the only
+  remaining friction in a non-developer install.
 - ~~A convention for bumping `manifest.json`'s `version` per release~~ -
   done: the CHANGELOG + `v<version>` tag protocol at the top of this file,
-  practiced across v0.2.0 through v0.2.3.
+  practiced across v0.2.0 through v0.2.4.
 - ~~A decision on the `ref/wiki_vendor_cache.json` / `ref/item_id_cache.json`
   packaging gap~~ - resolved as of M38/WP-29; see the addendum above.
 - The two stale `v1.0.0`/`v2.0.0` tags inherited from the original

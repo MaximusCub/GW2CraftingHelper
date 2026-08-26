@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(size, size),
                 Visible = false,
-                Parent = parent
+                Parent = parent,
             };
         }
 
@@ -52,7 +52,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static void PlaceAfter(LoadingSpinner spinner, Label label, int gap)
         {
-            if (spinner == null || label == null) return;
+            if (spinner == null || label == null)
+            {
+                return;
+            }
 
             var placement = InlineSpinnerLayout.Place(
                 label.Location.X, label.Location.Y, label.Width, label.Height, spinner.Width, gap);

@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services
     /// try/catch below.
     /// </para>
     /// </summary>
-    public class PlanStore
+    internal class PlanStore
     {
         // Gzip's own magic number (RFC 1952 SS2.3.1) - the first two bytes
         // of every gzip member, regardless of what is inside it.
@@ -94,7 +94,11 @@ namespace GW2CraftingHelper.Services
         {
             try
             {
-                if (!File.Exists(_filePath)) return null;
+                if (!File.Exists(_filePath))
+                {
+                    return null;
+                }
+
                 byte[] bytes = File.ReadAllBytes(_filePath);
                 string json = IsGzip(bytes) ? DecompressToJson(bytes) : Encoding.UTF8.GetString(bytes);
                 return Deserialize(json);
@@ -125,7 +129,11 @@ namespace GW2CraftingHelper.Services
                 lock (_saveLock)
                 {
                     string dir = Path.GetDirectoryName(_filePath);
-                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    if (!Directory.Exists(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                    }
+
                     string json = Serialize(plan);
                     byte[] compressed = Compress(json);
                     string tmpPath = _filePath + ".tmp";
@@ -174,6 +182,7 @@ namespace GW2CraftingHelper.Services
                 {
                     gzip.Write(jsonBytes, 0, jsonBytes.Length);
                 }
+
                 return output.ToArray();
             }
         }

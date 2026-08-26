@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// surface's Blish-coupled shell stays thin enough to be uninteresting.
     ///
     /// The placement half is the fix Blish itself does not have. Measured
-    /// against BlishHUD 1.3.0 (see docs/KNOWN-ISSUES.md, "Tooltip facility"):
+    /// against BlishHUD 1.3.0 (see KNOWN-ISSUES #41):
     /// <c>Tooltip.UpdateTooltipPosition</c> flips above/below the cursor to
     /// protect the TOP edge and shifts left to protect the RIGHT edge, and
     /// clamps neither result - a tall tooltip placed below the cursor runs
@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     /// negative X. <see cref="Place"/> keeps Blish's above-when-it-fits
     /// preference and its 36px cursor gap, then clamps all four edges.
     /// </summary>
-    public static class TooltipLayoutMath
+    internal static class TooltipLayoutMath
     {
         /// <summary>
         /// Blish's own <c>Tooltip.MOUSE_VERTICAL_MARGIN</c> (measured).
@@ -54,8 +54,9 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
         /// every existing caller reads the same as every plain tooltip; a
         /// caller with a measured cap of its own - the item tooltip, whose
-        /// in-game boxes are 300-332px wide (gap G24) - passes it and does
-        /// not move the shared constant out from under the rest.
+        /// wrap maximum is derived from live captures (gap G24,
+        /// fidelity-audit section 1.5) - passes it and does not move the
+        /// shared constant out from under the rest.
         /// </summary>
         public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {
@@ -65,6 +66,7 @@ namespace GW2CraftingHelper.Services
             {
                 return preferred;
             }
+
             return Math.Max(MinContentWidth, usable);
         }
 
@@ -79,7 +81,9 @@ namespace GW2CraftingHelper.Services
             }
 
             public TooltipSpan Span { get; }
+
             public int X { get; }
+
             public int Width { get; }
         }
 
@@ -96,6 +100,7 @@ namespace GW2CraftingHelper.Services
             }
 
             public IReadOnlyList<PlacedSpan> Spans { get; }
+
             public int Width { get; }
 
             /// <summary>Top of this row inside the content, in pixels.</summary>
@@ -126,7 +131,9 @@ namespace GW2CraftingHelper.Services
             }
 
             public IReadOnlyList<LaidOutRow> Rows { get; }
+
             public int Width { get; }
+
             public int Height { get; }
         }
 
@@ -156,8 +163,15 @@ namespace GW2CraftingHelper.Services
             int headerRowHeight = 0,
             int headerIndent = 0)
         {
-            if (measureText == null) throw new ArgumentNullException(nameof(measureText));
-            if (measureCoin == null) throw new ArgumentNullException(nameof(measureCoin));
+            if (measureText == null)
+            {
+                throw new ArgumentNullException(nameof(measureText));
+            }
+
+            if (measureCoin == null)
+            {
+                throw new ArgumentNullException(nameof(measureCoin));
+            }
 
             var rows = new List<LaidOutRow>();
             if (content == null || content.IsEmpty)
@@ -208,6 +222,7 @@ namespace GW2CraftingHelper.Services
                         {
                             BreakRow();
                         }
+
                         // A coin run makes the row it actually lands on -
                         // never the one it was pushed off - the taller
                         // coin kind.
@@ -243,11 +258,13 @@ namespace GW2CraftingHelper.Services
                         {
                             BreakRow();
                         }
+
                         string piece = wrapped[i];
                         if (piece.Length == 0)
                         {
                             continue;
                         }
+
                         int pieceWidth = Math.Max(0, measureText(piece));
                         // WithText, not FromText: a wrapped piece keeps the
                         // original span's role, so a long rarity-coloured
@@ -278,6 +295,7 @@ namespace GW2CraftingHelper.Services
                     width = row.Width;
                 }
             }
+
             return new Layout(rows, width, Math.Max(0, y));
         }
 
@@ -306,6 +324,7 @@ namespace GW2CraftingHelper.Services
             {
                 x = mouseX - width;
             }
+
             x = ClampAxis(x, width, screenWidth);
 
             int above = mouseY - CursorGap - height;
@@ -315,6 +334,7 @@ namespace GW2CraftingHelper.Services
                 y = above;
                 return;
             }
+
             if (below + height <= screenHeight - ScreenEdgeMargin)
             {
                 y = below;
@@ -341,6 +361,7 @@ namespace GW2CraftingHelper.Services
             {
                 return min;
             }
+
             return desired < min ? min : (desired > max ? max : desired);
         }
     }

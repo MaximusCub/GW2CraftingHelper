@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// x's alone are not a placement.
     /// </para>
     /// </summary>
-    public static class TreeChipStripLayout
+    internal static class TreeChipStripLayout
     {
         /// <summary>Gap between a count label and its own clear button.</summary>
         public const int LabelToButtonGap = 8;
@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Services
             CountsOnly,
 
             /// <summary>Neither: not even the counts clear the buttons.</summary>
-            Hidden
+            Hidden,
         }
 
         /// <summary>

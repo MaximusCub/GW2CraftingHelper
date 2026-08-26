@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Models
     /// effective value is usable for comparison; everything else stays
     /// unvalued and fallback-tier only.
     /// </summary>
-    public class CurrencyValuation
+    internal class CurrencyValuation
     {
         /// <summary>
         /// No user-provided valuations or clears. "None" describes zero
@@ -54,6 +54,7 @@ namespace GW2CraftingHelper.Models
                             "Currency valuation cannot be keyed on the coin currency id.",
                             nameof(copperPerUnit));
                     }
+
                     if (kvp.Value <= 0)
                     {
                         throw new ArgumentOutOfRangeException(
@@ -61,9 +62,11 @@ namespace GW2CraftingHelper.Models
                             kvp.Value,
                             $"Currency {kvp.Key} must have a positive copper-per-unit valuation.");
                     }
+
                     validated[kvp.Key] = kvp.Value;
                 }
             }
+
             _copperPerUnit = validated;
 
             var validatedCleared = new HashSet<int>();
@@ -89,15 +92,18 @@ namespace GW2CraftingHelper.Models
                             "Currency valuation cannot clear the coin currency id.",
                             nameof(clearedCurrencyIds));
                     }
+
                     if (validated.ContainsKey(currencyId))
                     {
                         throw new ArgumentException(
                             $"Currency {currencyId} cannot be both explicitly valued and cleared.",
                             nameof(clearedCurrencyIds));
                     }
+
                     validatedCleared.Add(currencyId);
                 }
             }
+
             _clearedCurrencyIds = validatedCleared;
         }
 
@@ -149,11 +155,13 @@ namespace GW2CraftingHelper.Models
             {
                 return true;
             }
+
             if (_clearedCurrencyIds.Contains(currencyId))
             {
                 copperPerUnit = 0;
                 return false;
             }
+
             return CurrencyDecisionDefaults.TryGetDefault(currencyId, out copperPerUnit);
         }
 

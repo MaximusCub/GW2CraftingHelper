@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -10,23 +9,17 @@ namespace GW2CraftingHelper.Services
     /// Resolves ids to names via the shared resolvers and never surfaces
     /// a raw id (repo invariant).
     /// </summary>
-    public static class PillSubduingTooltipBuilder
+    internal static class PillSubduingTooltipBuilder
     {
-        public static string Build(
-            PillSubduingResult result,
-            IReadOnlyDictionary<int, ItemMetadata> itemMetadata,
-            IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
-        {
-            return BuildContent(result, itemMetadata, currencyMetadata)?.ToPlainText();
-        }
-
         /// <summary>
-        /// The structured form <see cref="Build"/> is a plain-text view of.
-        /// The gold margin stays a coin span so the rich tooltip surface
-        /// can draw it with real coin icons; every other part is prose.
-        /// Unwrapped - the caller's path decides its own wrap (the plain
-        /// path through <c>TooltipTextFormat</c>, the rich path against a
-        /// real font at a real pixel width).
+        /// The tooltip for a subdued pill, or null when there is no reason
+        /// to show one. The gold margin stays a coin span so the rich
+        /// tooltip surface can draw it with real coin icons; every other
+        /// part is prose.
+        /// <para>
+        /// Unwrapped: the surface that renders this wraps against a real
+        /// font at a real pixel width.
+        /// </para>
         /// </summary>
         public static TooltipContent BuildContent(
             PillSubduingResult result,
@@ -52,6 +45,7 @@ namespace GW2CraftingHelper.Services
                 {
                     AppendCoin(builder.Text(" ("), result.ValueMarginCopper.Value).Text(" more)");
                 }
+
                 return builder.Build();
             }
 
@@ -90,6 +84,7 @@ namespace GW2CraftingHelper.Services
             {
                 builder.Text("always more expensive");
             }
+
             return builder.Build();
         }
 
@@ -100,36 +95,7 @@ namespace GW2CraftingHelper.Services
 
         private static TooltipContentBuilder AppendCoin(TooltipContentBuilder builder, long copper)
         {
-            return builder.Coin(copper, FormatCoin(copper));
-        }
-
-        // Shares CoinSegmentMath.Split with every other coin display site,
-        // but a different output format than ValueDetailTooltipBuilder's
-        // FormatCoin (leading zero units omitted here, always three units
-        // there) - the formats stay deliberately independent.
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-
-            var sb = new StringBuilder();
-            if (gold > 0)
-            {
-                sb.Append(gold).Append('g');
-            }
-            if (silver > 0 || gold > 0)
-            {
-                if (sb.Length > 0)
-                {
-                    sb.Append(' ');
-                }
-                sb.Append(silver).Append('s');
-            }
-            if (sb.Length > 0)
-            {
-                sb.Append(' ');
-            }
-            sb.Append(cop).Append('c');
-            return sb.ToString();
+            return builder.Coin(copper, CoinSegmentMath.GameStyleText(copper));
         }
     }
 }

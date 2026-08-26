@@ -62,7 +62,10 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 extraRelayout?.Invoke(w);
-                if (divider != null) divider.Size = new Point(w, 2);
+                if (divider != null)
+                {
+                    divider.Size = new Point(w, 2);
+                }
             });
         }
     }

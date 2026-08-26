@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// module's UI click, kept apart from the Blish-coupled player
     /// (Views/Rendering/ClickSound) so it is covered by Blish-free tests.
     /// </summary>
-    public static class ClickSoundVolume
+    internal static class ClickSoundVolume
     {
         public const int MinPercent = 0;
         public const int MaxPercent = 100;
@@ -27,8 +27,16 @@ namespace GW2CraftingHelper.Services
         // settings file must never reach Play unclamped.
         public static int Clamp(int percent)
         {
-            if (percent < MinPercent) return MinPercent;
-            if (percent > MaxPercent) return MaxPercent;
+            if (percent < MinPercent)
+            {
+                return MinPercent;
+            }
+
+            if (percent > MaxPercent)
+            {
+                return MaxPercent;
+            }
+
             return percent;
         }
 
@@ -58,10 +66,17 @@ namespace GW2CraftingHelper.Services
         {
             percent = MinPercent;
 
-            if (float.IsNaN(sliderValue)) return false;
+            if (float.IsNaN(sliderValue))
+            {
+                return false;
+            }
 
             // Bound the infinities before the rounding cast can overflow.
-            if (sliderValue <= MinPercent) return true;
+            if (sliderValue <= MinPercent)
+            {
+                return true;
+            }
+
             if (sliderValue >= MaxPercent)
             {
                 percent = MaxPercent;

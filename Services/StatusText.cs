@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace GW2CraftingHelper.Services
 {
-    public static class StatusText
+    internal static class StatusText
     {
         public static string Normalize(string status) => status ?? "";
 

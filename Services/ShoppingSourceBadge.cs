@@ -16,11 +16,15 @@ namespace GW2CraftingHelper.Services
     /// Shopping List does not emit.
     /// </para>
     /// </summary>
-    public static class ShoppingSourceBadge
+    internal static class ShoppingSourceBadge
     {
         public static string ForRow(PlanRowViewModel row)
         {
-            if (row == null) return null;
+            if (row == null)
+            {
+                return null;
+            }
+
             switch (row.RowType)
             {
                 case PlanRowType.ShoppingBuy: return "TP";
@@ -59,7 +63,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string TooltipForRow(PlanRowViewModel row)
         {
-            if (row == null) return null;
+            if (row == null)
+            {
+                return null;
+            }
+
             switch (row.RowType)
             {
                 case PlanRowType.ShoppingBuy:

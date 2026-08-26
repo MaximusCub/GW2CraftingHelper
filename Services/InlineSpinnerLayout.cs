@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// live bounds - which is the whole of what the view has to get right.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class InlineSpinnerLayout
+    internal static class InlineSpinnerLayout
     {
         /// <summary>
         /// Spinner edge for the plan tab's status row. That row is
@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Services
         }
     }
 
-    public readonly struct SpinnerPlacement
+    internal readonly struct SpinnerPlacement
     {
         public readonly int X;
         public readonly int Y;

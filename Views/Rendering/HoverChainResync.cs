@@ -64,7 +64,10 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static void AfterRebuild()
         {
             var screen = GameService.Graphics?.SpriteScreen;
-            if (screen == null) return;
+            if (screen == null)
+            {
+                return;
+            }
 
             screen.TriggerMouseInput(MouseEventType.MouseMoved, GameService.Input.Mouse.State);
         }

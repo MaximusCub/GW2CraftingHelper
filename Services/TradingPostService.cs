@@ -7,7 +7,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class TradingPostService
+    internal class TradingPostService
     {
         private const int BatchSize = 200;
 
@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)> _cache =
             new Dictionary<int, (ItemPrice Price, DateTime FetchedUtc)>();
 
-        // KNOWN-ISSUES 31c-1: per-id in-flight tracking so a second
+        // KNOWN-ISSUES #31/31c-1: per-id in-flight tracking so a second
         // overlapping GetPricesAsync call that needs an id this call is
         // already fetching awaits THIS call's fetch instead of starting a
         // duplicate one. Every not-yet-cached id a given call decides to
@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
         // _cacheLock, and never while the lock is held across an await -
         // every access below is a plain synchronous dictionary op.
         //
-        // KNOWN-ISSUES 31c-audit: a shared FetchOwnBatchesAsync Task here
+        // KNOWN-ISSUES #31/31c-audit: a shared FetchOwnBatchesAsync Task here
         // is never tied to any single caller's CancellationToken (it
         // always runs with CancellationToken.None internally - see that
         // method) precisely because it is shared - a joiner's or the
@@ -41,6 +41,19 @@ namespace GW2CraftingHelper.Services
         // while awaiting via AwaitRespectingOwnCancellationAsync below, so
         // cancellation stays strictly per-caller in both directions.
         private readonly Dictionary<int, Task> _inFlight = new Dictionary<int, Task>();
+
+        // Ids an answered batch REQUESTED but the response did not
+        // contain: /v2/commerce/prices omits untradeable items entirely,
+        // so an account-bound id (gifts, clovers, a legendary target
+        // itself) never reaches _cache above and would otherwise be
+        // re-requested on every call forever. Mirrors
+        // ItemMetadataService._knownMissing, but TTL'd on the same
+        // CacheTtl clock as the positive cache rather than kept for the
+        // session: an item that becomes tradeable in a patch is then
+        // exactly as stale as an already-cached price is, no worse.
+        // Growth is bounded by the same thing _cache's is - how many
+        // distinct ids one session looks up.
+        private readonly Dictionary<int, DateTime> _knownMissing = new Dictionary<int, DateTime>();
 
         public TradingPostService(IPriceApiClient api, Func<DateTime> utcNow = null)
         {
@@ -56,7 +69,7 @@ namespace GW2CraftingHelper.Services
 
             // joinTasks: another overlapping call's own in-flight fetch
             // that already covers one or more of our ids - we wait on it
-            // instead of re-fetching (KNOWN-ISSUES 31c-1). ownTask: this
+            // instead of re-fetching (KNOWN-ISSUES #31/31c-1). ownTask: this
             // call's own fetch for whatever ids are neither cache-fresh nor
             // already in flight elsewhere, or null if nothing needs
             // fetching.
@@ -85,6 +98,11 @@ namespace GW2CraftingHelper.Services
                         continue;
                     }
 
+                    if (_knownMissing.TryGetValue(id, out var missedUtc) && now - missedUtc < CacheTtl)
+                    {
+                        continue;
+                    }
+
                     if (_inFlight.TryGetValue(id, out var existingFetch))
                     {
                         joinTasks.Add(existingFetch);
@@ -99,7 +117,7 @@ namespace GW2CraftingHelper.Services
                 {
                     // Deliberately NOT this caller's ct - see
                     // FetchOwnBatchesAsync's own doc comment and the
-                    // KNOWN-ISSUES 31c-audit note on _inFlight above.
+                    // KNOWN-ISSUES #31/31c-audit note on _inFlight above.
                     ownTask = FetchOwnBatchesAsync(freshIds, now);
                     foreach (var id in freshIds)
                     {
@@ -113,7 +131,7 @@ namespace GW2CraftingHelper.Services
             // another overlapping caller's in-flight fetch we are joining -
             // counts toward the total-failure tally below.
             // FetchOwnBatchesAsync already degrades a single failing batch
-            // to holes internally (KNOWN-ISSUES api-degradation F2) and
+            // to holes internally (KNOWN-ISSUES #31/api-degradation F2) and
             // only faults if ALL of its own batches failed; a caller whose
             // entire request is satisfied purely via joined fetches must
             // still see a thrown error if every one of those also failed,
@@ -131,7 +149,7 @@ namespace GW2CraftingHelper.Services
                 {
                     // Respects THIS call's own ct even though ownTask
                     // itself runs with CancellationToken.None internally
-                    // (KNOWN-ISSUES 31c-audit) - see
+                    // (KNOWN-ISSUES #31/31c-audit) - see
                     // AwaitRespectingOwnCancellationAsync's doc comment.
                     await AwaitRespectingOwnCancellationAsync(ownTask, ct);
                     succeeded++;
@@ -151,7 +169,7 @@ namespace GW2CraftingHelper.Services
                     // that owns it; joining must still respect THIS
                     // caller's own ct rather than inheriting whatever
                     // that other caller's cancellation state is
-                    // (KNOWN-ISSUES 31c-audit).
+                    // (KNOWN-ISSUES #31/31c-audit).
                     await AwaitRespectingOwnCancellationAsync(task, ct);
                     succeeded++;
                 }
@@ -187,10 +205,10 @@ namespace GW2CraftingHelper.Services
         // Fetches every batch of `ids` this call itself owns, strictly one
         // batch at a time in order - identical sequencing to this method's
         // old inline for-loop, so a single caller's own batch
-        // count/order/timing is unaffected by the KNOWN-ISSUES 31c-1
+        // count/order/timing is unaffected by the KNOWN-ISSUES #31/31c-1
         // coalescing added around it.
         //
-        // KNOWN-ISSUES 31c-audit: deliberately takes no CancellationToken.
+        // KNOWN-ISSUES #31/31c-audit: deliberately takes no CancellationToken.
         // The returned Task is registered into _inFlight and may be
         // awaited by other overlapping GetPricesAsync callers besides the
         // one that decided to run it (a "joiner"); threading any single
@@ -219,7 +237,7 @@ namespace GW2CraftingHelper.Services
 
             try
             {
-                // KNOWN-ISSUES api-degradation F2: a single failing batch
+                // KNOWN-ISSUES #31/api-degradation F2: a single failing batch
                 // degrades to missing ids (unpriceable holes downstream, an
                 // already-supported state) instead of aborting the whole
                 // fetch - mirroring ItemMetadataService's retry-wave catch.
@@ -241,21 +259,50 @@ namespace GW2CraftingHelper.Services
                     {
                         // CancellationToken.None, not any caller's ct -
                         // see this method's own doc comment.
-                        var entries = await _api.GetPricesAsync(batch, CancellationToken.None);
+                        var response = await _api.GetPricesAsync(batch, CancellationToken.None);
 
                         lock (_cacheLock)
                         {
-                            foreach (var entry in entries)
+                            var returned = new HashSet<int>();
+                            foreach (var entry in response.Entries)
                             {
                                 var price = new ItemPrice
                                 {
                                     ItemId = entry.Id,
                                     BuyInstant = entry.SellUnitPrice,
-                                    SellInstant = entry.BuyUnitPrice
+                                    SellInstant = entry.BuyUnitPrice,
                                 };
                                 _cache[entry.Id] = (price, fetchedUtc);
+                                returned.Add(entry.Id);
+
+                                // Newly tradeable: drop the stale negative
+                                // entry rather than leaving two records of
+                                // the same id disagreeing.
+                                _knownMissing.Remove(entry.Id);
+                            }
+
+                            // Only a batch the endpoint actually answered
+                            // proves an id is absent: a thrown batch
+                            // (below) tells us nothing, and neither does a
+                            // 404, which the endpoint returns for an
+                            // outage as readily as for "every id here is
+                            // untradeable" (see
+                            // PriceBatchResult.AbsenceProven). Negative-
+                            // caching either would blank every price in
+                            // the plan for a full CacheTtl without so much
+                            // as another request to recover from.
+                            if (response.AbsenceProven)
+                            {
+                                foreach (var id in batch)
+                                {
+                                    if (!returned.Contains(id))
+                                    {
+                                        _knownMissing[id] = fetchedUtc;
+                                    }
+                                }
                             }
                         }
+
                         succeededBatches++;
                     }
                     catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -281,7 +328,7 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        // KNOWN-ISSUES 31c-audit: awaits a shared fetch Task (owned or
+        // KNOWN-ISSUES #31/31c-audit: awaits a shared fetch Task (owned or
         // joined) while respecting only THIS caller's own `ct`, never the
         // cancellation state of whichever caller happens to own `task`.
         // If `ct` fires first, throws a fresh OperationCanceledException

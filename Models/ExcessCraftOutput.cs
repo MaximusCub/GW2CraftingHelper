@@ -1,7 +1,7 @@
 namespace GW2CraftingHelper.Models
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, excess/reclaim): one item's
+    /// One item's
     /// aggregated crafting surplus across every Decision == Craft
     /// occurrence in the display tree - see
     /// Services/ExcessCraftOutputCalculator.Apply, which is the sole
@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Models
     /// CraftingPlanResult.MaterialOpportunityCost - see that field's own
     /// doc comment).
     /// </summary>
-    public class ExcessCraftOutput
+    internal class ExcessCraftOutput
     {
         public int ItemId { get; set; }
 

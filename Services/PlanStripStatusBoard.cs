@@ -3,7 +3,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Pull-based, thread-safe, module-level state for the Crafting Plan
     /// tab's status strip ("tab-switch strip freeze/lost completion
-    /// status" - docs/KNOWN-ISSUES.md's W3B section).
+    /// status" - KNOWN-ISSUES #45).
     ///
     /// <para>
     /// CraftingPlanView's status-strip fields and its _statusLabel control
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
     /// write side instead of being re-checked by every caller.
     /// </para>
     /// </summary>
-    public sealed class PlanStripStatusBoard
+    internal sealed class PlanStripStatusBoard
     {
         private readonly object _lock = new object();
 
@@ -106,8 +106,15 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)) return;
-                if (!PhaseOrdinalGuard.ShouldApply(phaseOrdinal, _phaseOrdinal)) return;
+                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight))
+                {
+                    return;
+                }
+
+                if (!PhaseOrdinalGuard.ShouldApply(phaseOrdinal, _phaseOrdinal))
+                {
+                    return;
+                }
 
                 _phaseOrdinal = phaseOrdinal;
                 _phaseText = phaseText;
@@ -141,7 +148,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight)) return;
+                if (!StatusUpdateGuard.ShouldApply(sequence, _sequence, !_inFlight))
+                {
+                    return;
+                }
 
                 _inFlight = false;
                 _finalStatusText = finalStatusText;
@@ -193,7 +203,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (_sequence != 0 || _inFlight) return;
+                if (_sequence != 0 || _inFlight)
+                {
+                    return;
+                }
 
                 _sequence = 0;
                 _inFlight = false;
@@ -231,7 +244,10 @@ namespace GW2CraftingHelper.Services
         {
             lock (_lock)
             {
-                if (_sequence != 0 || _inFlight) return false;
+                if (_sequence != 0 || _inFlight)
+                {
+                    return false;
+                }
 
                 _finalStatusText = null;
                 return true;
@@ -257,7 +273,7 @@ namespace GW2CraftingHelper.Services
     /// One consistent read of <see cref="PlanStripStatusBoard"/>'s state -
     /// see <see cref="PlanStripStatusBoard.Snapshot"/>.
     /// </summary>
-    public sealed class PlanStripStatusSnapshot
+    internal sealed class PlanStripStatusSnapshot
     {
         /// <summary>The generation this snapshot describes.</summary>
         public int Sequence { get; }

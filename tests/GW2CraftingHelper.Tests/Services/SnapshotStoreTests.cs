@@ -95,7 +95,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- One-store convention: atomic .tmp+Replace, matching
         // StatusStore/VendorOfferStore - previously a plain, non-atomic
-        // File.WriteAllText (tab-roadmap-proposal.md Section 2.2's
+        // File.WriteAllText (dev/proposals/tab-roadmap-proposal.md Section 2.2's
         // correction). ---
 
         [Fact]

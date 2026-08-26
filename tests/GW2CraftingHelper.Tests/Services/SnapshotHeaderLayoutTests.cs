@@ -108,7 +108,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Was x=0 spanning the raw panel - sixteen pixels left of the
             // search box directly above it, and past the shared right edge.
-            Assert.Equal(SnapshotHeaderLayout.Inset, placement.X);
+            Assert.Equal(SnapshotHeaderLayout.SnapshotHeaderInset, placement.X);
             Assert.Equal(
                 SnapshotHeaderLayout.ChromeRightEdge(884),
                 placement.X + placement.Width);
@@ -315,14 +315,14 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(
                 SnapshotHeaderLayout.CoinBlockX(ContainerAtWindowMinimum, BlockWidth)
-                    - SnapshotHeaderLayout.ResultLineToCoinGap - SnapshotHeaderLayout.Inset,
+                    - SnapshotHeaderLayout.ResultLineToCoinGap - SnapshotHeaderLayout.SnapshotHeaderInset,
                 budget);
             Assert.Equal(
                 PlanRelayoutMath.NameMaxWidthBeforeColumn(
                     SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum),
                     BlockWidth,
                     SnapshotHeaderLayout.ResultLineToCoinGap,
-                    SnapshotHeaderLayout.Inset),
+                    SnapshotHeaderLayout.SnapshotHeaderInset),
                 budget);
         }
 
@@ -352,7 +352,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(
                 SnapshotHeaderLayout.ChromeRightEdge(ContainerAtWindowMinimum)
-                    - SnapshotHeaderLayout.Inset - reserve,
+                    - SnapshotHeaderLayout.SnapshotHeaderInset - reserve,
                 SnapshotHeaderLayout.StatusMaxWidth(ContainerAtWindowMinimum, reserve));
         }
 
@@ -399,7 +399,7 @@ namespace GW2CraftingHelper.Tests.Services
                 containerWidth, startX: 200, searchRowHeight: SearchRowHeight,
                 rowGap: 6, sharesSearchRow: false);
 
-            Assert.Equal(SnapshotHeaderLayout.Inset, ownRow.X);
+            Assert.Equal(SnapshotHeaderLayout.SnapshotHeaderInset, ownRow.X);
             Assert.Equal(chromeRight, ownRow.X + ownRow.Width);
 
             var shared = SnapshotHeaderLayout.PlaceSourceFilterRun(

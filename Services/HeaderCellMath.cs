@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// boxes: every pixel belongs to exactly one cell, so no click lands
     /// in a dead strip between two columns.
     /// </summary>
-    public static class HeaderCellMath
+    internal static class HeaderCellMath
     {
         /// <summary>
         /// Where one header label sits inside its band, and - when the
@@ -112,9 +112,20 @@ namespace GW2CraftingHelper.Services
                     end = gapEnd > gapStart ? gapStart + ((gapEnd - gapStart) / 2) : gapEnd;
                 }
 
-                if (end < start) end = start;
-                if (end > band) end = band;
-                if (start > band) start = band;
+                if (end < start)
+                {
+                    end = start;
+                }
+
+                if (end > band)
+                {
+                    end = band;
+                }
+
+                if (start > band)
+                {
+                    start = band;
+                }
 
                 into[i] = new CellRange(start, end - start);
                 start = end;

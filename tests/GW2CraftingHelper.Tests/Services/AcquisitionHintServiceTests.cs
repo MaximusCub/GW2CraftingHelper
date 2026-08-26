@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Tests.Services
     {
         // In-file fixture with 6 of the now-10 real ref/acquisition_hints_
         // seed.json entries (the five wiki-verified entries from docs/
-        // KNOWN-ISSUES.md item 8, plus the Gift of Battle
+        // KNOWN-ISSUES #8, plus the Gift of Battle
         // entry) - exercises AcquisitionHintService.Load's parsing shape
         // in isolation. The separate Load_ShippedSeedFile_* test below
         // reads the actual shipped file and pins its real entry count,
@@ -157,6 +157,13 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var hints = AcquisitionHintService.Load(stream);
 
+                // Deliberately still an exact literal, unlike the four
+                // machine-generated corpora that moved to manifest digests:
+                // acquisition_hints_seed.json is 3KB of HAND-curated rows
+                // with no seeder behind it, so there is no regeneration
+                // churn to absorb and no manifest a tool could write. Ten
+                // rows means the ten below, and adding an eleventh is
+                // exactly the edit that should stop and read this test.
                 Assert.Equal(10, hints.Count);
                 foreach (var hint in hints.Values)
                 {

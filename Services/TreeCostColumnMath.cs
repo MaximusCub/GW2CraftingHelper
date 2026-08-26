@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Services
     /// stability argument, same single pass.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class TreeCostColumnMath
+    internal static class TreeCostColumnMath
     {
         /// <summary>
         /// The widest text each denomination's sub-column has to hold this
@@ -150,7 +150,10 @@ namespace GW2CraftingHelper.Services
         public static CostSubColumnEdges ComputeRowEdges(
             int costRightEdge, CostColumnWidths widths, bool rowDrawsCurrency)
         {
-            if (rowDrawsCurrency) return ComputeEdges(costRightEdge, widths);
+            if (rowDrawsCurrency)
+            {
+                return ComputeEdges(costRightEdge, widths);
+            }
 
             var collapsed = ComputeEdges(
                 costRightEdge,
@@ -185,7 +188,11 @@ namespace GW2CraftingHelper.Services
 
         private static int AddBand(int total, int bandWidth)
         {
-            if (bandWidth <= 0) return total;
+            if (bandWidth <= 0)
+            {
+                return total;
+            }
+
             return total > 0 ? total + CoinSegmentMath.CoinSegmentGap + bandWidth : bandWidth;
         }
 
@@ -200,7 +207,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static bool ShowsCurrencySegments(CraftingTreeNode node)
         {
-            if (node?.VendorCurrencyCosts == null || node.VendorCurrencyCosts.Count == 0) return false;
+            if (node?.VendorCurrencyCosts == null || node.VendorCurrencyCosts.Count == 0)
+            {
+                return false;
+            }
+
             var children = node.Children;
             return !(children != null && children.Count > 0 && children[0].IsCostComponent);
         }
@@ -219,7 +230,7 @@ namespace GW2CraftingHelper.Services
             /// which is exactly the number of rows the section renders once
             /// Expand All is pressed, and so the count the section header
             /// shows in parentheses like every other countable section
-            /// (audit batch J, L2). It rides this walk rather than a second
+            /// It rides this walk rather than a second
             /// one for the same reason the widths do.
             /// </summary>
             public readonly int NodeCount;
@@ -269,9 +280,20 @@ namespace GW2CraftingHelper.Services
             Func<string, int> measureText,
             Func<CraftingTreeNode, int> measureCurrencyRunWidth)
         {
-            if (roots == null || roots.Count == 0) return TreeColumnScan.Empty;
-            if (measureText == null) throw new ArgumentNullException(nameof(measureText));
-            if (measureCurrencyRunWidth == null) throw new ArgumentNullException(nameof(measureCurrencyRunWidth));
+            if (roots == null || roots.Count == 0)
+            {
+                return TreeColumnScan.Empty;
+            }
+
+            if (measureText == null)
+            {
+                throw new ArgumentNullException(nameof(measureText));
+            }
+
+            if (measureCurrencyRunWidth == null)
+            {
+                throw new ArgumentNullException(nameof(measureCurrencyRunWidth));
+            }
 
             int gold = 0, silver = 0, copper = 0, currency = 0, nodeCount = 0;
             foreach (var root in roots)
@@ -280,6 +302,7 @@ namespace GW2CraftingHelper.Services
                     root, measureText, measureCurrencyRunWidth,
                     ref gold, ref silver, ref copper, ref currency, ref nodeCount);
             }
+
             return new TreeColumnScan(
                 new CostColumnWidths(gold, silver, copper, currency), nodeCount);
         }
@@ -293,14 +316,20 @@ namespace GW2CraftingHelper.Services
             ref int gold, ref int silver, ref int copper, ref int currency,
             ref int nodeCount)
         {
-            if (root == null) return;
+            if (root == null)
+            {
+                return;
+            }
 
             var pending = new Stack<CraftingTreeNode>();
             pending.Push(root);
             while (pending.Count > 0)
             {
                 var node = pending.Pop();
-                if (node == null) continue;
+                if (node == null)
+                {
+                    continue;
+                }
 
                 nodeCount++;
 
@@ -310,9 +339,20 @@ namespace GW2CraftingHelper.Services
                 if (node.SubtreeCost.HasValue && node.SubtreeCost.Value > 0)
                 {
                     var (goldText, silverText, copperText) = CoinSegmentMath.FormatSegmentTexts(node.SubtreeCost.Value);
-                    if (goldText != null) gold = Max(gold, measureText(goldText));
-                    if (silverText != null) silver = Max(silver, measureText(silverText));
-                    if (copperText != null) copper = Max(copper, measureText(copperText));
+                    if (goldText != null)
+                    {
+                        gold = Max(gold, measureText(goldText));
+                    }
+
+                    if (silverText != null)
+                    {
+                        silver = Max(silver, measureText(silverText));
+                    }
+
+                    if (copperText != null)
+                    {
+                        copper = Max(copper, measureText(copperText));
+                    }
                 }
 
                 if (node.SubtreeCost.HasValue && ShowsCurrencySegments(node))
@@ -321,7 +361,11 @@ namespace GW2CraftingHelper.Services
                 }
 
                 var children = node.Children;
-                if (children == null) continue;
+                if (children == null)
+                {
+                    continue;
+                }
+
                 for (int i = 0; i < children.Count; i++)
                 {
                     pending.Push(children[i]);

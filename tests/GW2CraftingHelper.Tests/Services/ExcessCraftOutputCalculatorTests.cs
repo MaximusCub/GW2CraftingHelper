@@ -6,7 +6,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, excess/reclaim) - direct unit
+    /// Direct unit
     /// tests on ExcessCraftOutputCalculator's pure tree-walk aggregation,
     /// using plain CraftingTreeNode fixtures (no Blish reference, no
     /// solver/pipeline round-trip needed).

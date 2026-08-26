@@ -10,7 +10,7 @@ using Gw2Sharp.WebApi.V2.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2AccountSnapshotService
+    internal class Gw2AccountSnapshotService
     {
         private static readonly Logger Logger = Logger.GetLogger<Gw2AccountSnapshotService>();
 
@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
             TokenPermission.Account,
             TokenPermission.Characters,
             TokenPermission.Inventories,
-            TokenPermission.Wallet
+            TokenPermission.Wallet,
         };
 
         private const int ItemBulkLimit = 200;
@@ -69,9 +69,9 @@ namespace GW2CraftingHelper.Services
                     {
                         snapshot.Wallet.Add(new SnapshotWalletEntry
                         {
-                            CurrencyId   = entry.Id,
+                            CurrencyId = entry.Id,
                             CurrencyName = "",
-                            Value        = entry.Value
+                            Value = entry.Value,
                         });
                     }
                 }
@@ -92,12 +92,16 @@ namespace GW2CraftingHelper.Services
                 var bank = await _apiManager.Gw2ApiClient.V2.Account.Bank.GetAsync(ct);
                 foreach (var item in bank)
                 {
-                    if (item == null) continue;
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
                     snapshot.Items.Add(new SnapshotItemEntry
                     {
                         ItemId = item.Id,
-                        Count  = item.Count,
-                        Source = "Bank"
+                        Count = item.Count,
+                        Source = "Bank",
                     });
                 }
             }
@@ -117,12 +121,16 @@ namespace GW2CraftingHelper.Services
                 var shared = await _apiManager.Gw2ApiClient.V2.Account.Inventory.GetAsync(ct);
                 foreach (var item in shared)
                 {
-                    if (item == null) continue;
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
                     snapshot.Items.Add(new SnapshotItemEntry
                     {
                         ItemId = item.Id,
-                        Count  = item.Count,
-                        Source = "SharedInventory"
+                        Count = item.Count,
+                        Source = "SharedInventory",
                     });
                 }
             }
@@ -142,12 +150,16 @@ namespace GW2CraftingHelper.Services
                 var materials = await _apiManager.Gw2ApiClient.V2.Account.Materials.GetAsync(ct);
                 foreach (var mat in materials)
                 {
-                    if (mat.Count <= 0) continue;
+                    if (mat.Count <= 0)
+                    {
+                        continue;
+                    }
+
                     snapshot.Items.Add(new SnapshotItemEntry
                     {
                         ItemId = mat.Id,
-                        Count  = mat.Count,
-                        Source = "MaterialStorage"
+                        Count = mat.Count,
+                        Source = "MaterialStorage",
                     });
                 }
             }
@@ -263,15 +275,23 @@ namespace GW2CraftingHelper.Services
                 {
                     foreach (var bag in inventory.Bags)
                     {
-                        if (bag?.Inventory == null) continue;
+                        if (bag?.Inventory == null)
+                        {
+                            continue;
+                        }
+
                         foreach (var item in bag.Inventory)
                         {
-                            if (item == null) continue;
+                            if (item == null)
+                            {
+                                continue;
+                            }
+
                             items.Add(new SnapshotItemEntry
                             {
                                 ItemId = item.Id,
-                                Count  = item.Count,
-                                Source = AccountItemIndex.CharacterSourcePrefix + characterName
+                                Count = item.Count,
+                                Source = AccountItemIndex.CharacterSourcePrefix + characterName,
                             });
                         }
                     }
@@ -282,6 +302,7 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to fetch inventory for character {CharacterName}", characterName);
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch inventory for character {characterName}: {ex.GetType().Name} - {ex.Message}");
             }
+
             return items;
         }
 
@@ -304,12 +325,17 @@ namespace GW2CraftingHelper.Services
                         {
                             continue;
                         }
+
                         return (true, disciplines);
                     }
 
                     foreach (var cd in crafting.Crafting)
                     {
-                        if (cd == null) continue;
+                        if (cd == null)
+                        {
+                            continue;
+                        }
+
                         disciplines.Add(new SnapshotCharacterDiscipline
                         {
                             CharacterName = characterName,
@@ -319,9 +345,10 @@ namespace GW2CraftingHelper.Services
                             // shape RequiredDiscipline.Discipline uses.
                             Discipline = cd.Discipline?.RawValue ?? "",
                             Rating = cd.Rating,
-                            Active = cd.Active
+                            Active = cd.Active,
                         });
                     }
+
                     return (false, disciplines);
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -330,11 +357,13 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     Logger.Warn(ex, "Failed to fetch crafting disciplines for character {CharacterName}", characterName);
                     ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch crafting disciplines for character {characterName}: {ex.GetType().Name} - {ex.Message}");
                     return (true, disciplines);
                 }
             }
+
             return (true, disciplines);
         }
 

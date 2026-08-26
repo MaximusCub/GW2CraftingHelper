@@ -13,7 +13,6 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-
     /// <summary>
     /// The Snapshot tab: a search-as-you-type account-inventory browser
     /// over
@@ -29,9 +28,8 @@ namespace GW2CraftingHelper.Views
     /// bounds how often it runs while the search box is being typed into,
     /// which is where the cancellation/marshal ceremony below comes from.
     /// </summary>
-    public class MainView
+    internal class MainView
     {
-
         private static readonly Logger Logger = Logger.GetLogger<MainView>();
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
@@ -137,7 +135,7 @@ namespace GW2CraftingHelper.Views
         private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
 
         /// <summary>Left gutter every element on this tab starts at.</summary>
-        private const int Inset = SnapshotHeaderLayout.Inset;
+        private const int Inset = SnapshotHeaderLayout.SnapshotHeaderInset;
 
         private const int HeaderButtonWidth = 100;
 
@@ -196,6 +194,7 @@ namespace GW2CraftingHelper.Views
             + (SourceFilterMaxRows * SourceFilterCellHeight)
             + ((SourceFilterMaxRows - 1) * SourceFilterRowGapY)
             + SourceFilterBottomPad;
+
         private const int SourceFilterScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int MinContentHeight = 120;
 
@@ -235,7 +234,9 @@ namespace GW2CraftingHelper.Views
             SnapshotHeaderLayout.SearchBandHeight(SearchRowHeight, _sourceFilterHeight, CurrentPlacement);
 
         private int CoinRowY => SearchRowY + SearchBandHeight + SectionGapY;
+
         private int ContentY => CoinRowY + CoinHeight + SectionGapY;
+
         private int TopRegionHeight => ContentY;
 
         // Fixed distance from the search band's bottom edge to the content
@@ -284,8 +285,6 @@ namespace GW2CraftingHelper.Views
         // PlanContentHeightMath's own heights, not re-derived here.
         private const int SectionTitleBandHeight = PlanContentHeightMath.SectionHeaderRowHeight;
         private const int SectionTitleTextY = PlanContentHeightMath.SectionHeaderTitleY;
-        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
 
         // The treatment the plan tables give a quantity column.
         private static readonly Color AmountTextColor = new Color(200, 200, 200);
@@ -329,6 +328,7 @@ namespace GW2CraftingHelper.Views
         // the items must not disturb the currencies beneath them.
         private readonly TableSortState<SnapshotTableColumn> _itemSortState =
             new TableSortState<SnapshotTableColumn>();
+
         private readonly TableSortState<SnapshotTableColumn> _walletSortState =
             new TableSortState<SnapshotTableColumn>();
 
@@ -379,7 +379,7 @@ namespace GW2CraftingHelper.Views
         // gate) and runs its finally straight away, so a single flag would
         // let that no-op click switch the running auto-refresh's spinner
         // off. The spinner shows the OR of the two - see
-        // <see cref="ApplySpinnerVisibility"/>.
+        // ApplySpinnerVisibility.
         private bool _backgroundRefreshInFlight;
         private Color _defaultStatusColor;
 
@@ -397,7 +397,7 @@ namespace GW2CraftingHelper.Views
             // for the Snapshot result rows' item tooltips. Optional, and a
             // pure cache read - a snapshot row whose item no plan has
             // fetched this session degrades to the ellipsis tooltip it
-            // always had. See docs/KNOWN-ISSUES.md, "Tooltip authenticity".
+            // always had. See KNOWN-ISSUES #42.
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _snapshot = snapshot;
@@ -423,7 +423,12 @@ namespace GW2CraftingHelper.Views
                 RefitResultRows,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "Snapshot row re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "Snapshot row re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot",
+                        $"Snapshot row re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void SetSnapshot(AccountSnapshot snapshot)
@@ -475,7 +480,6 @@ namespace GW2CraftingHelper.Views
             // RebuildContent()/ScheduleSearchRebuild() touch this same
             // _searchDebounceCts field on the main thread, so cancelling it
             // here would race them.
-
             int w = buildPanel.ContentRegion.Width;
             _containerWidth = w;
             _containerHeight = buildPanel.ContentRegion.Height;
@@ -485,7 +489,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, HeaderHeight),
                 Location = new Point(0, HeaderRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             new Label()
@@ -495,7 +499,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, HeaderTitleY),
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
 
             // Bottom-anchored with 1px clearance, like every other section
@@ -507,7 +511,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(SnapshotHeaderLayout.ChromeRightEdge(w), 2),
                 Location = new Point(0, HeaderHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
 
             _clearButton = new FeedbackButton()
@@ -516,7 +520,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(Inset, HeaderButtonY),
                 Parent = _headerPanel,
-                Enabled = _clearCache != null
+                Enabled = _clearCache != null,
             };
             TooltipFacility.ApplyPlain(
                 _clearButton,
@@ -528,7 +532,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(Inset, HeaderButtonY),
                 Parent = _headerPanel,
-                Enabled = _refreshAsync != null
+                Enabled = _refreshAsync != null,
             };
             LayoutHeaderRow(w);
 
@@ -547,7 +551,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, StatusRowHeight),
                 Location = new Point(0, StatusRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Explicit width, not AutoSizeWidth: a long failure string ran
@@ -561,7 +565,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, 2),
-                Parent = _statusPanel
+                Parent = _statusPanel,
             };
             _statusBudget = SnapshotHeaderLayout.StatusMaxWidth(w, StatusSpinnerReserve);
 
@@ -593,7 +597,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(FilterPanelWidth(w), SearchRowHeight),
                 Location = new Point(0, SearchRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             _searchBox = new TextBox()
@@ -603,7 +607,7 @@ namespace GW2CraftingHelper.Views
                     Inset, PlanRelayoutMath.CenterX(SearchRowHeight, SearchBoxHeight)),
                 PlaceholderText = "Search items, currencies, characters...",
                 Text = _lastSearchText ?? "",
-                Parent = _filterPanel
+                Parent = _filterPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             _searchBox.TextChanged += (_, __) =>
             {
@@ -617,7 +621,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(
                     FilterDropdownX,
                     PlanRelayoutMath.CenterX(SearchRowHeight, FilterDropdownHeight)),
-                Parent = _filterPanel
+                Parent = _filterPanel,
             };
             _filterDropdown.Items.Add("All");
             _filterDropdown.Items.Add("Items");
@@ -673,7 +677,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(placement.Width, _sourceFilterHeight),
                 Location = new Point(placement.X, SearchRowY + placement.OffsetY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Coin display panel - see UpdateCoinDisplay's doc comment for
@@ -685,7 +689,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, CoinHeight),
                 Location = new Point(0, CoinRowY),
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // The coin row was a caption and ~150px of coin run left-packed
@@ -700,7 +704,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
                 Location = new Point(Inset, 2),
-                Parent = _coinPanel
+                Parent = _coinPanel,
             };
 
             // Its own child panel so UpdateCoinDisplay's dispose-and-rebuild
@@ -709,7 +713,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(0, CoinHeight),
                 Location = new Point(0, 0),
-                Parent = _coinPanel
+                Parent = _coinPanel,
             };
 
             // Scrollable content
@@ -719,83 +723,37 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, ContentY),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = buildPanel
+                Parent = buildPanel,
             };
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            // Same hazard family as the LogTabContent field crash
-            // (docs/KNOWN-ISSUES.md): Blish HUD runs a tab's Build() via
-            // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
-            // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
-            // LogTabContent, this instance is never recreated per tab visit
-            // (Module.cs creates ONE MainView in Initialize() and keeps
-            // reusing it), and Module.Update() calls SetSnapshot()/
-            // SetStatus() on it every tick a background refresh completes -
-            // regardless of which tab is currently selected, so it is not
-            // even limited to "user is on the Snapshot tab right now". Both
-            // paths end up calling UpdateCoinDisplay/ApplyStatusDisplay/
-            // RebuildContent, which dispose-then-add into _coinPanel.
-            // Children/_contentPanel.Children.
-            // <para>
-            // NOT the hazard, despite resembling one: Blish's own
-            // Container.Children (ControlCollection&lt;T&gt;) is itself
-            // ReaderWriterLockSlim-guarded on every operation - Add, Remove,
-            // AddRange, and the indexer all EnterWriteLock; Count and the
-            // indexer getter EnterReadLock; GetEnumerator EnterReadLocks and
-            // releases it from its ControlEnumerator's Dispose() -
-            // independently confirmed by decompiling
-            // packages/BlishHUD.1.3.0's Blish HUD.exe with ilspycmd. Unlike
-            // LogTabContent's plain unsynchronized Queue&lt;(long,Label)&gt;,
-            // concurrent Children access cannot corrupt the collection's own
-            // internals.
-            // </para>
-            // <para>
-            // The two hazards marshaling this tail actually closes: (a)
-            // dispose-then-add is a non-atomic COMPOUND sequence - Children's
-            // own lock protects each individual Add/Remove call, but nothing
-            // holds a lock across the whole "dispose every old child, then
-            // add every new one" sequence, so two interleaved
-            // UpdateCoinDisplay/RebuildContent calls can each finish
-            // disposing the OLD children before either adds the NEW ones,
-            // and both survive - duplicated content, the same shape as the
-            // doubled "No log entries yet." placeholders LogTabContent
-            // hit live (see LogTabContent.cs's _buildComplete doc
-            // comment); and (b) the top-of-Build
-            // _searchDebounceCts?.Cancel();?.Dispose(); sequence this branch
-            // moved into this tail used to run directly in Build()'s
-            // ThreadPool-thread body, racing ScheduleSearchRebuild()/
-            // RebuildContent(), which write the same field on the main
-            // thread - CancellationTokenSource.Cancel() calls
-            // ThrowIfDisposed(), so whichever call landed second on the
-            // shared reference could throw ObjectDisposedException.
-            // Marshaling this tail onto the main thread serializes it
-            // against every Update()-driven SetSnapshot/SetStatus call and
-            // every main-thread handler touching the same fields, so
-            // neither hazard can occur - impossible BY CONSTRUCTION, matching
-            // LogTabContent's fix (which closes the DIFFERENT hazard of an
-            // actually-unsynchronized Queue&lt;T&gt;, not a Children race).
-            // </para>
-            // UpdateCoinDisplay is called here (rather than earlier, right
-            // after _coinPanel is created) so all three calls land in the
-            // same queued callback as the _searchDebounceCts cleanup above.
-            // <para>
-            // This does NOT make every MainView mutation path main-thread-
-            // only - unlike the state above, the panel/control fields
-            // themselves (_headerPanel, _contentPanel, _coinPanel,
-            // _searchBox, the checkboxes, etc.) are still first published
-            // by the REST of Build()'s body on this same ThreadPool thread,
-            // same as LogTabContent's eight control fields. This file's own
-            // Clear Cache/Refresh Now/checkbox/dropdown click handlers are
-            // wired up mid-body and become clickable the instant each
-            // control is parented, so they can run on the main thread while
-            // Build() is still constructing later controls; that is only
-            // survivable because every one of those handlers' downstream
-            // calls (UpdateCoinDisplay, ApplyStatusDisplay, RebuildContent)
-            // already null-guards the field it touches. Pre-existing
-            // pattern, not changed by this fix.
-            // </para>
+            // Build() runs on a ThreadPool thread (docs/ARCHITECTURE.md
+            // section 1), and this instance is never recreated: Module.cs
+            // creates ONE MainView and Module.Update() calls SetSnapshot()/
+            // SetStatus() on it on the main thread every tick a background
+            // refresh completes, whatever tab is selected. Both paths reach
+            // UpdateCoinDisplay/ApplyStatusDisplay/RebuildContent, which
+            // dispose-then-add into _coinPanel/_contentPanel Children - a
+            // compound sequence Blish's own per-call Children lock does not
+            // cover, so two interleaved rebuilds can each finish disposing
+            // before either adds, and both survive (KNOWN-ISSUES #36, and
+            // docs/ARCHITECTURE.md section 1 for the decompiled evidence).
+            // The same tail also cancels+disposes _searchDebounceCts, which
+            // ScheduleSearchRebuild/RebuildContent write from the main
+            // thread; whichever Cancel() landed second on a disposed source
+            // would throw ObjectDisposedException. Marshaling the whole tail
+            // serializes it against both.
+            //
+            // This does NOT make MainView main-thread-only: the control
+            // fields are still published by the rest of Build()'s body on
+            // the ThreadPool thread, and the click handlers wired mid-body
+            // become live before Build() finishes - which is survivable only
+            // because every downstream call null-guards the field it
+            // touches. UpdateCoinDisplay is called here, rather than right
+            // after _coinPanel is created, so all three calls land in the
+            // same queued callback as the _searchDebounceCts cleanup.
             MainThreadMarshal.Run(() =>
             {
                 // Supersedes any debounce armed by a previous visit to this
@@ -818,7 +776,10 @@ namespace GW2CraftingHelper.Views
                 // and UpdateCoinDisplay/ApplyStatusDisplay/RebuildContent
                 // below still run, just into a real header panel the user
                 // can no longer see. Wasted work, not a hazard.
-                if (_headerPanel == null || _headerPanel.Parent == null) return;
+                if (_headerPanel == null || _headerPanel.Parent == null)
+                {
+                    return;
+                }
 
                 RebuildSourceFilterRow();
                 UpdateCoinDisplay(_snapshot?.CoinCopper ?? 0);
@@ -869,7 +830,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RebuildSourceFilterRow()
         {
-            if (_sourceFilterPanel == null) return;
+            if (_sourceFilterPanel == null)
+            {
+                return;
+            }
 
             foreach (var child in _sourceFilterPanel.Children.ToArray())
             {
@@ -910,13 +874,27 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private static bool RosterEquals(List<string> left, List<string> right)
         {
-            if (ReferenceEquals(left, right)) return true;
-            if (left == null || right == null) return false;
-            if (left.Count != right.Count) return false;
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
 
             for (int i = 0; i < left.Count; i++)
             {
-                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -936,12 +914,16 @@ namespace GW2CraftingHelper.Views
                 Checked = isChecked,
                 Size = new Point(MeasureCheckboxWidth(text), SourceFilterCellHeight),
                 Location = new Point(0, SourceFilterTopPad),
-                Parent = _sourceFilterPanel
+                Parent = _sourceFilterPanel,
             };
 
             checkbox.CheckedChanged += (_, __) =>
             {
-                if (_suppressSourceFilterEvents) return;
+                if (_suppressSourceFilterEvents)
+                {
+                    return;
+                }
+
                 onChanged(checkbox.Checked);
                 RebuildContent();
             };
@@ -965,7 +947,10 @@ namespace GW2CraftingHelper.Views
         {
             foreach (string name in _characterNames)
             {
-                if (_uncheckedCharacters.Contains(name)) return false;
+                if (_uncheckedCharacters.Contains(name))
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -1040,7 +1025,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private int FilterPanelWidth(int panelWidth)
         {
-            if (!_sharesSearchRow) return panelWidth;
+            if (!_sharesSearchRow)
+            {
+                return panelWidth;
+            }
 
             return panelWidth < SourceFilterX ? panelWidth : SourceFilterX;
         }
@@ -1284,7 +1272,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private async Task RefreshNowAsync()
         {
-            if (_refreshAsync == null) return;
+            if (_refreshAsync == null)
+            {
+                return;
+            }
 
             int generation = _clearGeneration;
 
@@ -1341,7 +1332,10 @@ namespace GW2CraftingHelper.Views
                     // covers module teardown only; a tab-switched-away
                     // user still gets SetSnapshot/SetStatus run into a
                     // real, just no-longer-visible, header panel.
-                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    {
+                        return;
+                    }
 
                     // Re-checked here, not just before the persist above:
                     // the clear runs on the main thread while this
@@ -1384,7 +1378,11 @@ namespace GW2CraftingHelper.Views
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
-                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    {
+                        return;
+                    }
+
                     SetStatus(status);
 
                     // Same guard as every other UI mutation in this tail -
@@ -1413,7 +1411,11 @@ namespace GW2CraftingHelper.Views
                     // clears a flag a later rebuild reads, and leaving it
                     // set would spin a spinner over a finished refresh.
                     SetRefreshSpinnerVisible(false);
-                    if (_headerPanel == null || _headerPanel.Parent == null) return;
+                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    {
+                        return;
+                    }
+
                     SetSnapshotActionsEnabled(true);
                 });
             }
@@ -1489,7 +1491,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyStatusDisplay()
         {
-            if (_statusLabel == null) return;
+            if (_statusLabel == null)
+            {
+                return;
+            }
 
             string text = _initialStatus ?? "";
 
@@ -1523,7 +1528,10 @@ namespace GW2CraftingHelper.Views
 
         private void ApplyStatusText()
         {
-            if (_statusLabel == null) return;
+            if (_statusLabel == null)
+            {
+                return;
+            }
 
             var font = UiFonts.Status;
             string shown = LabelHelpers.EllipsizeToWidth(font, _statusFullText, _statusBudget);
@@ -1531,6 +1539,7 @@ namespace GW2CraftingHelper.Views
             {
                 _statusLabel.Text = shown;
             }
+
             _statusLabel.Width = (int)Math.Ceiling(font.MeasureString(shown).Width);
             TooltipFacility.ApplyPlain(
                 _statusLabel,
@@ -1557,8 +1566,8 @@ namespace GW2CraftingHelper.Views
         /// - the grid panel's width moves, its height does not. A repack that
         /// changes the column count writes a new grid-panel height, and
         /// Blish's Scrollbar zeroes the scroll position a frame after any
-        /// content-height change (measured: docs/KNOWN-ISSUES.md, "The grid
-        /// panel holds its unfiltered height"), so the list snaps to top.
+        /// content-height change (measured: KNOWN-ISSUES #55, "The grid panel holds its
+        /// unfiltered height"), so the list snaps to top.
         /// Not defended against here: the tab has no scroll-restore
         /// machinery (CraftingPlanView.PreserveScrollAcross is the module's
         /// only one), and a column-count change re-flows every row anyway, so
@@ -1617,13 +1626,16 @@ namespace GW2CraftingHelper.Views
             // landed yet - the window in which a resize would otherwise
             // repack the PREVIOUS cycle's dead controls. RefitResultRows'
             // catch would survive that; this simply never enters it.
-            if (_contentPanel == null || _resultGridPanel == null || _resultGridPanel.Parent == null) return;
+            if (_contentPanel == null || _resultGridPanel == null || _resultGridPanel.Parent == null)
+            {
+                return;
+            }
 
             int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
 
             var layout = SnapshotResultLayout.Compute(
                 _itemCells.Count, _walletCells.Count, gridWidth, ItemRowHeight, WalletRowHeight,
-                SectionTitleBandHeight, ColumnHeaderRowHeight);
+                SectionTitleBandHeight, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             _resultGridPanel.Size = new Point(gridWidth, layout.TotalHeight);
 
@@ -1751,15 +1763,26 @@ namespace GW2CraftingHelper.Views
                 // keeps a non-null Parent in that case, so an uncancelled
                 // debounce would still render, just into a panel the user
                 // can no longer see.
-                if (token.IsCancellationRequested) return;
-                if (_contentPanel == null || _contentPanel.Parent == null) return;
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                if (_contentPanel == null || _contentPanel.Parent == null)
+                {
+                    return;
+                }
+
                 RebuildContent();
             });
         }
 
         private void RebuildContent()
         {
-            if (_contentPanel == null) return;
+            if (_contentPanel == null)
+            {
+                return;
+            }
 
             // Whatever triggered this rebuild (an explicit checkbox/
             // dropdown click, or the debounced search callback itself)
@@ -1799,7 +1822,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(8, 8),
-                    Parent = _contentPanel
+                    Parent = _contentPanel,
                 };
                 return;
             }
@@ -1826,7 +1849,7 @@ namespace GW2CraftingHelper.Views
                     Bank = _bankEnabled,
                     MaterialStorage = _materialStorageEnabled,
                     SharedInventory = _sharedInventoryEnabled,
-                    UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal)
+                    UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal),
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(
@@ -1898,7 +1921,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeHeight = true,
                     Location = new Point(8, 8),
                     TextColor = InfoTextColor,
-                    Parent = _contentPanel
+                    Parent = _contentPanel,
                 };
                 return;
             }
@@ -1914,7 +1937,7 @@ namespace GW2CraftingHelper.Views
             _resultGridPanel = new Panel()
             {
                 Size = new Point(gridWidth, 0),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             _itemChrome = anyItemRows ? CreateSectionChrome("Items", "Item", _itemSortState) : null;
@@ -1981,7 +2004,10 @@ namespace GW2CraftingHelper.Views
             for (int i = 0; i < rows.Count; i++)
             {
                 int width = (int)Math.Ceiling(font.MeasureString(amountOf(rows[i])).Width);
-                if (width > widest) widest = width;
+                if (width > widest)
+                {
+                    widest = width;
+                }
             }
 
             return widest;
@@ -2131,7 +2157,7 @@ namespace GW2CraftingHelper.Views
             chrome.TitlePanel = new Panel()
             {
                 Size = new Point(0, SectionTitleBandHeight),
-                Parent = _resultGridPanel
+                Parent = _resultGridPanel,
             };
             new Label()
             {
@@ -2140,21 +2166,21 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, SectionTitleTextY),
-                Parent = chrome.TitlePanel
+                Parent = chrome.TitlePanel,
             };
             chrome.TitleDivider = new Panel()
             {
                 Size = new Point(0, 2),
                 Location = new Point(0, SectionTitleBandHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = chrome.TitlePanel
+                Parent = chrome.TitlePanel,
             };
 
             chrome.HeaderPanel = new Panel()
             {
-                Size = new Point(0, ColumnHeaderRowHeight),
+                Size = new Point(0, PlanContentHeightMath.ColumnHeaderRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = _resultGridPanel
+                Parent = _resultGridPanel,
             };
 
             chrome.Cells = new SortableHeaderCells(chrome.HeaderPanel);
@@ -2174,8 +2200,15 @@ namespace GW2CraftingHelper.Views
         private void SortSection(SectionChrome chrome, SnapshotTableColumn column)
         {
             // A chrome with no order to reapply was never handed its rows.
-            if (chrome?.ReapplyOrder == null) return;
-            if (_resultGridPanel == null || _resultGridPanel.Parent == null) return;
+            if (chrome?.ReapplyOrder == null)
+            {
+                return;
+            }
+
+            if (_resultGridPanel == null || _resultGridPanel.Parent == null)
+            {
+                return;
+            }
 
             chrome.Sort.Cycle(column);
 
@@ -2195,18 +2228,24 @@ namespace GW2CraftingHelper.Views
         private void LayoutSectionChrome(
             SectionChrome chrome, SnapshotResultLayout.Section section, int gridWidth)
         {
-            if (chrome == null) return;
+            if (chrome == null)
+            {
+                return;
+            }
 
             chrome.TitlePanel.Visible = section.Present;
             chrome.HeaderPanel.Visible = section.Present;
-            if (!section.Present) return;
+            if (!section.Present)
+            {
+                return;
+            }
 
             chrome.TitlePanel.Location = new Point(0, section.TitleY);
             chrome.TitlePanel.Size = new Point(gridWidth, SectionTitleBandHeight);
             chrome.TitleDivider.Size = new Point(gridWidth, 2);
 
             chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
-            chrome.HeaderPanel.Size = new Point(gridWidth, ColumnHeaderRowHeight);
+            chrome.HeaderPanel.Size = new Point(gridWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             int columnCount = section.Grid.ColumnCount;
             int columnWidth = section.Grid.ColumnWidth;
@@ -2222,15 +2261,18 @@ namespace GW2CraftingHelper.Views
                 bool used = i < columnCount;
                 chrome.NameHeaders[i].Visible = used;
                 chrome.AmountHeaders[i].Visible = used;
-                if (!used) continue;
+                if (!used)
+                {
+                    continue;
+                }
 
                 int columnX = i * columnWidth;
                 int amountX =
                     SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
 
                 chrome.NameHeaders[i].Location =
-                    new Point(columnX + SnapshotItemGridLayout.CellTextX, ColumnHeaderLabelY);
-                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, ColumnHeaderLabelY);
+                    new Point(columnX + SnapshotItemGridLayout.CellTextX, PlanContentHeightMath.ColumnHeaderLabelY);
+                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
             SyncHeaderCells(chrome, columnCount, columnWidth, gridWidth);
@@ -2246,7 +2288,10 @@ namespace GW2CraftingHelper.Views
         private static void SyncHeaderCells(
             SectionChrome chrome, int columnCount, int columnWidth, int gridWidth)
         {
-            if (columnCount <= 0) return;
+            if (columnCount <= 0)
+            {
+                return;
+            }
 
             if (chrome.CellPlan == null || chrome.PlanColumns != columnCount)
             {
@@ -2282,7 +2327,7 @@ namespace GW2CraftingHelper.Views
                 TextColor = TableHeaderStyle.LabelColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Parent = chrome.HeaderPanel
+                Parent = chrome.HeaderPanel,
             });
 
             // The hit area is the whole cell (SortableHeaderCells); the
@@ -2327,7 +2372,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(RowTextX, y),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             if (color.HasValue)
             {
@@ -2366,7 +2411,7 @@ namespace GW2CraftingHelper.Views
             var rowPanel = new Panel()
             {
                 Size = new Point(columnWidth, ItemRowHeight),
-                Parent = _resultGridPanel
+                Parent = _resultGridPanel,
             };
 
             // The module's one icon component, at the plan rows' 32px art
@@ -2449,7 +2494,7 @@ namespace GW2CraftingHelper.Views
                 TextColor = AmountTextColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Parent = rowPanel
+                Parent = rowPanel,
             });
             PlaceAmountLabel(label, textWidth, columnWidth, y);
             return label;
@@ -2534,7 +2579,7 @@ namespace GW2CraftingHelper.Views
             var rowPanel = new Panel()
             {
                 Size = new Point(columnWidth, WalletRowHeight),
-                Parent = _resultGridPanel
+                Parent = _resultGridPanel,
             };
 
             // Same component as the item rows; no rarity, so neutral.
@@ -2582,20 +2627,12 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyPlain(nameLabel, shortened ? name : null);
         }
 
-        // This used to carry its own
-        // GetCoinColor/AddCoinSegment copies, byte-identical to the ones
-        // CraftingPlanView carried before its own coin/currency rendering
-        // was extracted into Views/Rendering/CoinCurrencyRenderer -
-        // the second independent encoding of the coin invariant. Both are
-        // deleted; this now builds its own CoinSegmentSpec list (still
-        // always exactly 3 segments - gold, silver, copper - via plain
-        // ToString(), no leading-zero-unit omission or zero-padding: that
-        // formatting choice is unchanged,
-        // deliberately) via the shared CoinCurrencyRenderer.AddSegmentSpec
-        // (bumped private -> internal for this reuse - a normal forward
-        // MainView -> Views/Rendering consumer dependency; see the note at
-        // CoinCurrencyRenderer.AddSegmentSpec for why this is not the same
-        // precedent as the reverted GetPillColors bump) and hands it to
+        // Builds its CoinSegmentSpec list through the shared
+        // CoinCurrencyRenderer.AddSegmentSpec, so the coin invariant has one
+        // encoding rather than a per-view copy. Always exactly 3 segments -
+        // gold, silver, copper - via plain ToString(), with no
+        // leading-zero-unit omission and no zero-padding: this tab shows the
+        // full wallet, unlike a plan's cost cells. Handed to
         // LayoutCoinSegments with
         // startX = 0 (left-anchored) instead of the right-anchored
         // RenderValueCellRightAligned/MeasureValueWidth entry points
@@ -2615,7 +2652,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void LayoutHeaderRow(int containerWidth)
         {
-            if (_refreshButton == null) return;
+            if (_refreshButton == null)
+            {
+                return;
+            }
 
             int rightEdge = SnapshotHeaderLayout.ChromeRightEdge(containerWidth);
             int refreshX = PlanRelayoutMath.RightAlignedX(rightEdge, HeaderButtonWidth);
@@ -2637,13 +2677,19 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void LayoutCoinRow(int containerWidth)
         {
-            if (_coinBlockPanel == null) return;
+            if (_coinBlockPanel == null)
+            {
+                return;
+            }
 
             _coinBlockPanel.Size = new Point(_coinBlockWidth, CoinHeight);
             _coinBlockPanel.Location = new Point(
                 SnapshotHeaderLayout.CoinBlockX(containerWidth, _coinBlockWidth), 0);
 
-            if (_resultLineLabel == null) return;
+            if (_resultLineLabel == null)
+            {
+                return;
+            }
 
             int budget = SnapshotHeaderLayout.ResultLineMaxWidth(containerWidth, _coinBlockWidth);
             _resultLineLabel.Width = budget;
@@ -2653,6 +2699,7 @@ namespace GW2CraftingHelper.Views
             {
                 _resultLineLabel.Text = shown;
             }
+
             string full = string.Equals(shown, _resultLineText, StringComparison.Ordinal)
                 ? null
                 : _resultLineText;
@@ -2674,6 +2721,7 @@ namespace GW2CraftingHelper.Views
                     ? StatusText.Count(totalItems, "item")
                     : $"{shownItems} of {totalItems} items");
             }
+
             if (totalWallet > 0)
             {
                 parts.Add(shownWallet == totalWallet
@@ -2698,7 +2746,10 @@ namespace GW2CraftingHelper.Views
         // would be destroyed by the first snapshot update.
         private void UpdateCoinDisplay(int copper)
         {
-            if (_coinBlockPanel == null) return;
+            if (_coinBlockPanel == null)
+            {
+                return;
+            }
 
             foreach (var child in _coinBlockPanel.Children.ToArray())
             {
@@ -2720,7 +2771,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 2),
-                Parent = _coinBlockPanel
+                Parent = _coinBlockPanel,
             };
             int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
 

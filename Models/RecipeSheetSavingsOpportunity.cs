@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Models
     /// doc comment) - PlanViewModelBuilder.BuildNotesSection is the only
     /// consumer.
     /// </summary>
-    public class RecipeSheetSavingsOpportunity
+    internal class RecipeSheetSavingsOpportunity
     {
         /// <summary>The bought item this opportunity applies to.</summary>
         public int ItemId { get; set; }

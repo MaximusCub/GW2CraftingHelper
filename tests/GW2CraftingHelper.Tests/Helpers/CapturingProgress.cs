@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// Unlike Progress{T}, this does not post through SynchronizationContext,
     /// making it reliable in unit test runners.
     /// </summary>
-    public class CapturingProgress<T> : IProgress<T>
+    internal class CapturingProgress<T> : IProgress<T>
     {
         private readonly List<T> _reports = new List<T>();
 

@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// LabelHelpers.EllipsizeToWidth is now a thin adapter over
     /// <see cref="Ellipsize"/> so the two paths cannot drift.
     /// </summary>
-    public static class TextWrapMath
+    internal static class TextWrapMath
     {
         public const string Ellipsis = "...";
 
@@ -58,10 +58,25 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static string Ellipsize(string text, int maxWidth, Func<string, int> measure)
         {
-            if (measure == null) throw new ArgumentNullException(nameof(measure));
-            if (string.IsNullOrEmpty(text)) return text ?? "";
-            if (maxWidth <= 0) return "";
-            if (measure(text) <= maxWidth) return text;
+            if (measure == null)
+            {
+                throw new ArgumentNullException(nameof(measure));
+            }
+
+            if (string.IsNullOrEmpty(text))
+            {
+                return text ?? "";
+            }
+
+            if (maxWidth <= 0)
+            {
+                return "";
+            }
+
+            if (measure(text) <= maxWidth)
+            {
+                return text;
+            }
 
             int ellipsisWidth = measure(Ellipsis);
             if (ellipsisWidth >= maxWidth)
@@ -77,8 +92,16 @@ namespace GW2CraftingHelper.Services
             {
                 int mid = (lo + hi + 1) / 2;
                 int width = measure(text.Substring(0, mid)) + ellipsisWidth;
-                if (width <= maxWidth) lo = mid; else hi = mid - 1;
+                if (width <= maxWidth)
+                {
+                    lo = mid;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
             }
+
             return lo <= 0 ? Ellipsis : text.Substring(0, lo) + Ellipsis;
         }
 
@@ -109,8 +132,15 @@ namespace GW2CraftingHelper.Services
         public static WrappedText Wrap(
             string text, int firstLineMaxWidth, int maxWidth, Func<string, int> measure, int maxLines)
         {
-            if (measure == null) throw new ArgumentNullException(nameof(measure));
-            if (maxLines < 1) maxLines = 1;
+            if (measure == null)
+            {
+                throw new ArgumentNullException(nameof(measure));
+            }
+
+            if (maxLines < 1)
+            {
+                maxLines = 1;
+            }
 
             var lines = new List<string>();
             foreach (string segment in SplitHardBreaks(text))
@@ -131,6 +161,7 @@ namespace GW2CraftingHelper.Services
                 {
                     tail.Append(' ').Append(lines[i]);
                 }
+
                 lines.RemoveRange(maxLines - 1, lines.Count - (maxLines - 1));
                 lines.Add(Ellipsize(tail.ToString(), BudgetFor(lines.Count, firstLineMaxWidth, maxWidth), measure));
                 truncated = true;
@@ -149,7 +180,11 @@ namespace GW2CraftingHelper.Services
             {
                 bool isSpace = segment[i] == ' ';
                 int j = i;
-                while (j < segment.Length && (segment[j] == ' ') == isSpace) j++;
+                while (j < segment.Length && (segment[j] == ' ') == isSpace)
+                {
+                    j++;
+                }
+
                 string token = segment.Substring(i, j - i);
                 i = j;
 
@@ -212,11 +247,21 @@ namespace GW2CraftingHelper.Services
             while (true)
             {
                 int budget = BudgetFor(lines.Count, firstLineMaxWidth, maxWidth);
-                if (budget <= 0 || measure(rest) <= budget) return rest;
+                if (budget <= 0 || measure(rest) <= budget)
+                {
+                    return rest;
+                }
 
                 int fit = LongestPrefixWithin(rest, budget, measure);
-                if (fit < 1) fit = 1;
-                if (fit >= rest.Length) return rest;
+                if (fit < 1)
+                {
+                    fit = 1;
+                }
+
+                if (fit >= rest.Length)
+                {
+                    return rest;
+                }
 
                 lines.Add(rest.Substring(0, fit));
                 rest = rest.Substring(fit);
@@ -229,8 +274,16 @@ namespace GW2CraftingHelper.Services
             while (lo < hi)
             {
                 int mid = (lo + hi + 1) / 2;
-                if (measure(text.Substring(0, mid)) <= maxWidth) lo = mid; else hi = mid - 1;
+                if (measure(text.Substring(0, mid)) <= maxWidth)
+                {
+                    lo = mid;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
             }
+
             return lo;
         }
 
@@ -251,12 +304,20 @@ namespace GW2CraftingHelper.Services
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c != '\n' && c != '\r') continue;
+                if (c != '\n' && c != '\r')
+                {
+                    continue;
+                }
 
                 yield return text.Substring(start, i - start);
-                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+                {
+                    i++;
+                }
+
                 start = i + 1;
             }
+
             yield return text.Substring(start);
         }
     }

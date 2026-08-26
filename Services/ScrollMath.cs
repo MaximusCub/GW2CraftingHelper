@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
     /// restoring the previous pixel offset requires converting it to the
     /// scrollbar's 0..1 travel ratio against the CURRENT content height.
     /// </summary>
-    public static class ScrollMath
+    internal static class ScrollMath
     {
         /// <summary>
         /// The scrollbar travel ratio (0..1) that puts the same content

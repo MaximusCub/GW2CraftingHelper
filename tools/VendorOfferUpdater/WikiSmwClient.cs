@@ -49,7 +49,7 @@ namespace VendorOfferUpdater
         // "Has total purchase cap" on the same per-offer subobjects, but the
         // module has no consuming model for either (the solver has no
         // account/character concept at all) - deliberately not scraped here.
-        // See KNOWN-ISSUES.md item 28.
+        // See KNOWN-ISSUES #28.
         //
         // "Has seasonal purchase cap" (Astral Acclaim package): IS scraped
         // below - live-confirmed exclusively on the "Wizard's Vault" /
@@ -59,7 +59,7 @@ namespace VendorOfferUpdater
         // no other vendor on the wiki uses this property). The parsed value
         // is threaded into VendorOffer.SeasonalCap and the hasher, and is now
         // also consumed by the runtime solver via
-        // TimegatedCapType.Seasonal (see KNOWN-ISSUES.md item 33 /
+        // TimegatedCapType.Seasonal (see KNOWN-ISSUES #33 /
         // VendorBatchSolver.FinalizeVendorBatches).
         //
         // "Has requirement" is populated by the

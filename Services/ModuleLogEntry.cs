@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// namespace and Newtonsoft.Json, already used elsewhere in Services)
     /// so ModuleLog/ModuleLogStore stay independently testable and the "no
     /// Blish HUD in tests" repo invariant is trivially satisfiable - see
-    /// d2-log-system.md Section 9.
+    /// dev/proposals/d2-log-system.md Section 9.
     /// <para>
     /// Property names on the wire are short (t/lvl/tag/msg) deliberately:
     /// this file is written far more often than snapshot.json/status.txt,
@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// look at the raw file is legible without a lookup table.
     /// </para>
     /// </summary>
-    public class ModuleLogEntry
+    internal class ModuleLogEntry
     {
         [JsonProperty("t")]
         public DateTime TimestampUtc { get; set; }

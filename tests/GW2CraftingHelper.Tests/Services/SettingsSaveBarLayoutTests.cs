@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Tests.Services
             var slots = SettingsSaveBarLayout.Compute(BarWidth, ChipWidth, DiscardWidth, SaveWidth);
 
             Assert.Equal(
-                slots.SaveX - SettingsSaveBarLayout.ButtonGap - DiscardWidth, slots.DiscardX);
+                slots.SaveX - SettingsSaveBarLayout.SettingsSaveBarButtonGap - DiscardWidth, slots.DiscardX);
         }
 
         [Fact]
@@ -48,8 +48,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             // A standing "0 unsaved changes" spends attention on the absence
             // of a thing; the status line simply starts at the inset.
-            Assert.Equal(SettingsSaveBarLayout.Inset, without.StatusX);
-            Assert.Equal(SettingsSaveBarLayout.Inset, without.ChipX);
+            Assert.Equal(SettingsSaveBarLayout.SettingsSaveBarInset, without.StatusX);
+            Assert.Equal(SettingsSaveBarLayout.SettingsSaveBarInset, without.ChipX);
         }
 
         [Fact]
@@ -59,7 +59,7 @@ namespace GW2CraftingHelper.Tests.Services
             var with = SettingsSaveBarLayout.Compute(BarWidth, ChipWidth, DiscardWidth, SaveWidth);
 
             Assert.Equal(
-                SettingsSaveBarLayout.Inset + ChipWidth + SettingsSaveBarLayout.ChipToStatusGap,
+                SettingsSaveBarLayout.SettingsSaveBarInset + ChipWidth + SettingsSaveBarLayout.ChipToStatusGap,
                 with.StatusX);
             Assert.Equal(
                 without.StatusMaxWidth - ChipWidth - SettingsSaveBarLayout.ChipToStatusGap,
@@ -93,7 +93,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var slots = SettingsSaveBarLayout.Compute(BarWidth, -10, -10, SaveWidth);
 
-            Assert.Equal(SettingsSaveBarLayout.Inset, slots.StatusX);
+            Assert.Equal(SettingsSaveBarLayout.SettingsSaveBarInset, slots.StatusX);
             Assert.Equal(slots.SaveX, slots.DiscardX);
         }
 

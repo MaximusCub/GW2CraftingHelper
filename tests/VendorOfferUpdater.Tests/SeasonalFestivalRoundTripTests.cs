@@ -41,7 +41,7 @@ namespace VendorOfferUpdater.Tests
     /// comment on the Astral Acclaim hash-format migration, so
     /// touching Candy Corn Vendor (Weekly) in that pass would have broken
     /// the "3 known offer IDs survive identically" requirement). See
-    /// docs/KNOWN-ISSUES.md for the full partial-coverage note (thousands
+    /// KNOWN-ISSUES #63 for the full partial-coverage note (thousands
     /// of non-festival vendor pages remain untagged - this pass only
     /// covered the known festival vendor list, not a full re-scrape).
     /// </summary>

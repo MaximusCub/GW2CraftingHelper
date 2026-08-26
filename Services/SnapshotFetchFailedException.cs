@@ -8,10 +8,10 @@ namespace GW2CraftingHelper.Services
     /// Thrown by Gw2AccountSnapshotService.FetchSnapshotAsync when one or
     /// more of the independent account-data sources (wallet, bank, shared
     /// inventory, material storage, character list) failed for this fetch
-    /// (KNOWN-ISSUES item 31/api-degradation F1).
+    /// (KNOWN-ISSUES #31/api-degradation F1).
     ///
     /// Conservative persistence rule (documented here and in
-    /// KNOWN-ISSUES.md): FetchSnapshotAsync only ever returns normally on a
+    /// KNOWN-ISSUES #31): FetchSnapshotAsync only ever returns normally on a
     /// FULL success of all data sources. ANY failure - partial or total -
     /// throws this instead of returning a snapshot with holes, so a caller
     /// can never silently persist/replace a good cached snapshot with one
@@ -26,9 +26,10 @@ namespace GW2CraftingHelper.Services
     /// a real cancellation still propagates as OperationCanceledException,
     /// never wrapped in this type.
     /// </summary>
-    public class SnapshotFetchFailedException : Exception
+    internal class SnapshotFetchFailedException : Exception
     {
         public int FailedSourceCount { get; }
+
         public int TotalSourceCount { get; }
 
         /// <summary>

@@ -52,8 +52,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Prefix matches first (Iron Ingot, Iron Ore), then substring (Mithril Iron Bar)
             Assert.Equal(3, results.Count);
-            Assert.True(results[0].Name.StartsWith("Iron", StringComparison.OrdinalIgnoreCase));
-            Assert.True(results[1].Name.StartsWith("Iron", StringComparison.OrdinalIgnoreCase));
+            Assert.StartsWith("Iron", results[0].Name, StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith("Iron", results[1].Name, StringComparison.OrdinalIgnoreCase);
             Assert.Equal("Mithril Iron Bar", results[2].Name);
         }
 

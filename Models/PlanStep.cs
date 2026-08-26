@@ -2,13 +2,18 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class PlanStep
+    internal class PlanStep
     {
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public AcquisitionSource Source { get; set; }
+
         public long UnitCost { get; set; }
+
         public long TotalCost { get; set; }
+
         public int RecipeId { get; set; }
 
         // Non-coin currency cost of this step (Source == BuyFromVendor
@@ -29,6 +34,7 @@ namespace GW2CraftingHelper.Models
         // a non-vendor step, or a vendor step whose occurrences resolved to
         // more than one distinct offer.
         public int VendorOfferOutputCount { get; set; }
+
         public List<CostLine> VendorOfferCurrencyCostLinesPerBatch { get; set; }
     }
 }

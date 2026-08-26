@@ -34,14 +34,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ColumnThresholds_ThroughTheChromeChain_AreTheDocumentedWindowWidths()
         {
-            // The window widths the table in docs/KNOWN-ISSUES.md ("Snapshot
-            // item grid") quotes, derived rather than copied: N columns need
-            // N * MinColumnWidth of grid, and the chrome between the window
+            // The window widths the table in KNOWN-ISSUES #50 quotes,
+            // derived rather than copied: N columns need N * MinColumnWidth
+            // of grid, and the chrome between the window
             // and the grid is WindowToTabPanelChrome (this tab spends on the
             // scrollbar the 20px the chain's last term spends on padding).
-            int windowForTwoColumns = 2 * SnapshotItemGridLayout.MinColumnWidth
+            int windowForTwoColumns = 2 * SnapshotItemGridLayout.SnapshotMinColumnWidth
                 + WindowSizing.WindowToTabPanelChrome;
-            int windowForThreeColumns = 3 * SnapshotItemGridLayout.MinColumnWidth
+            int windowForThreeColumns = 3 * SnapshotItemGridLayout.SnapshotMinColumnWidth
                 + WindowSizing.WindowToTabPanelChrome;
 
             Assert.Equal(1214, windowForTwoColumns);
@@ -63,8 +63,8 @@ namespace GW2CraftingHelper.Tests.Services
         public void MinColumnWidth_FitsTwoColumnsAtTheWindowMinimum()
         {
             Assert.Equal(2, SnapshotItemGridLayout.ComputeColumnCount(GridWidthAtWindowMinimum));
-            Assert.True(2 * SnapshotItemGridLayout.MinColumnWidth <= GridWidthAtWindowMinimum);
-            Assert.True(3 * SnapshotItemGridLayout.MinColumnWidth > GridWidthAtWindowMinimum);
+            Assert.True(2 * SnapshotItemGridLayout.SnapshotMinColumnWidth <= GridWidthAtWindowMinimum);
+            Assert.True(3 * SnapshotItemGridLayout.SnapshotMinColumnWidth > GridWidthAtWindowMinimum);
         }
 
         [Fact]
@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Tests.Services
                 columnWidth, SnapshotItemGridLayout.AmountColumnFloor);
 
             Assert.True(
-                SnapshotItemGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
+                SnapshotItemGridLayout.SnapshotNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
                 "a full-length name must not ellipsize in a column at the window minimum");
         }
 
@@ -168,7 +168,7 @@ namespace GW2CraftingHelper.Tests.Services
             int columns = SnapshotItemGridLayout.ComputeColumnCount(3800);
 
             Assert.True(columns >= 4);
-            Assert.True(SnapshotItemGridLayout.ComputeColumnWidth(3800) >= SnapshotItemGridLayout.MinColumnWidth);
+            Assert.True(SnapshotItemGridLayout.ComputeColumnWidth(3800) >= SnapshotItemGridLayout.SnapshotMinColumnWidth);
         }
 
         [Fact]

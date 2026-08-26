@@ -13,10 +13,12 @@ namespace GW2CraftingHelper.Models
     /// every other id in this module (never displayed - only the resolved
     /// name/icon reach the UI).
     /// </summary>
-    public class VendorItemCostLine
+    internal class VendorItemCostLine
     {
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public long GoldValue { get; set; }
 
         // true when this

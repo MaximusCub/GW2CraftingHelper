@@ -8,16 +8,24 @@ namespace GW2CraftingHelper.Models
     /// the originating generation. Enables instant per-node override
     /// recomputes in the UI.
     /// </summary>
-    public class PlanSolveContext
+    internal class PlanSolveContext
     {
         public int TargetItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public RecipeNode Tree { get; set; }
+
         public IReadOnlyDictionary<int, ItemPrice> Prices { get; set; }
+
         public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; set; }
+
         public IReadOnlyDictionary<int, ItemMetadata> Metadata { get; set; }
+
         public ISet<int> LearnedRecipeIds { get; set; }
+
         public List<UsedMaterial> UsedMaterials { get; set; }
+
         public PriceBasis PriceBasis { get; set; }
 
         /// <summary>
@@ -149,10 +157,10 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
 
         /// <summary>
-        /// VOM finding #1 fix: the ORIGINAL, unreduced tree from GENERATION
+        /// The ORIGINAL, unreduced tree from GENERATION
         /// time (the same `tree` OwnedMaterialsForceBuyPrePass and the
-        /// zero-owned decision pass ran against - see CraftingPlanPipeline's
-        /// Step 5.5/5.6), snapshotted here ONLY when the force-buy pre-pass
+        /// zero-owned decision pass ran against, in
+        /// CraftingPlanPipeline), snapshotted here ONLY when the force-buy pre-pass
         /// ran (ForceBuyOnlyNodeIds != null) so ResolveWithOverrides can
         /// re-run InventoryReducer.Reduce with an overrides-aware guide on
         /// every local re-solve, instead of permanently replaying overrides

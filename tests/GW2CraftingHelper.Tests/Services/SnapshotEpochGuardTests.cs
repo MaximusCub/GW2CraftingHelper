@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void EpochBumpedByClearCache_Discarded()
         {
-            // KNOWN-ISSUES 31a-F1: ClearCache bumped the shared epoch while
+            // KNOWN-ISSUES #31/31a-F1: ClearCache bumped the shared epoch while
             // this fetch was still in flight - its result must never
             // commit, regardless of how far ahead the current epoch is.
             Assert.False(SnapshotEpochGuard.ShouldCommit(myEpoch: 3, currentEpoch: 4));

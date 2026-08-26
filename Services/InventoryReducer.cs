@@ -5,16 +5,17 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class InventoryReducer
+    internal class InventoryReducer
     {
         public ReducedTreeResult Reduce(
             RecipeNode tree,
             AccountItemIndex index,
             string activeCharacterName,
-            // Value-Own-Materials (VOM) design, Candidate A: the Decisions
+            // The Decisions
             // dictionary from a throwaway zero-owned PlanSolver.Solve on the
             // SAME unreduced tree (with forceBuyOnlyNodeIds already applied)
-            // - see CraftingPlanPipeline's Step 5.5/5.6 doc comments. Keyed
+            // - see CraftingPlanPipeline.RunPipelineAsync's zero-owned solve.
+            // Keyed
             // by RecipeNode.NodeId, which must already be assigned on
             // `tree` (RecipeNodeIds.Assign) before this call, since it is
             // what CloneNode below preserves onto the clone this method
@@ -41,7 +42,7 @@ namespace GW2CraftingHelper.Services
                         .Select(sg => new MaterialSourceAllocation
                         {
                             Source = sg.Key,
-                            Quantity = sg.Sum(a => a.Quantity)
+                            Quantity = sg.Sum(a => a.Quantity),
                         })
                         .Where(a => a.Quantity > 0)
                         .OrderBy(a => a.Source, StringComparer.Ordinal)
@@ -51,7 +52,7 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = g.Key,
                         QuantityUsed = g.Sum(u => u.QuantityUsed),
-                        Sources = allSources
+                        Sources = allSources,
                     };
                 })
                 .Where(u => u.QuantityUsed > 0)
@@ -61,7 +62,7 @@ namespace GW2CraftingHelper.Services
             {
                 ReducedTree = clone,
                 UsedMaterials = aggregated,
-                OwnedQuantityUsedByNode = ownedUsageByNode
+                OwnedQuantityUsedByNode = ownedUsageByNode,
             };
         }
 
@@ -76,7 +77,7 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="zeroOwnedDecisions"/> below, which recipe
         /// option's descendants get to consume the pool:
         ///
-        /// - VOM design (Candidate A), decision-guided mode: when
+        /// - Decision-guided mode: when
         ///   <paramref name="zeroOwnedDecisions"/> is non-null and contains
         ///   this node's NodeId, the recipe option that decision's
         ///   Source == Craft &amp;&amp; RecipeId matches is the one whose
@@ -93,7 +94,7 @@ namespace GW2CraftingHelper.Services
         ///   (post-reduction) Solve() toward a DIFFERENT recipe option than
         ///   the guide chose for this node.
         ///
-        ///   KNOWN RESIDUAL (not guarded/tested - see docs/KNOWN-ISSUES.md):
+        ///   KNOWN RESIDUAL (not guarded/tested - see KNOWN-ISSUES #20):
         ///   this does NOT guarantee the guide's Source/Craft-vs-Buy
         ///   decision for THIS node itself still holds after reduction. The
         ///   guide is computed on the UNREDUCED tree, but this node's OWN
@@ -112,7 +113,7 @@ namespace GW2CraftingHelper.Services
         ///   greater than 1.
         /// - Legacy heuristic: used
         ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
-        ///   pre-VOM caller/test) OR does not contain this node's NodeId
+        ///   caller/test) OR does not contain this node's NodeId
         ///   (defensive fallback) - true only along the single
         ///   chosen-recipe-candidate chain, the root, then recursively only
         ///   each node's PRIMARY option (node.Recipes[0], the option
@@ -185,7 +186,7 @@ namespace GW2CraftingHelper.Services
                         allocations.Add(new MaterialSourceAllocation
                         {
                             Source = source,
-                            Quantity = consume
+                            Quantity = consume,
                         });
                         totalConsumed += consume;
                         remaining -= consume;
@@ -198,7 +199,7 @@ namespace GW2CraftingHelper.Services
                     {
                         ItemId = node.Id,
                         QuantityUsed = totalConsumed,
-                        Sources = allocations
+                        Sources = allocations,
                     });
                     ownedUsageByNode[node] = totalConsumed;
                     node.Quantity -= totalConsumed;
@@ -341,7 +342,7 @@ namespace GW2CraftingHelper.Services
                 // actually consume.
                 AchievementId = node.AchievementId,
                 AchievementBit = node.AchievementBit,
-                IsAchievementBitDeduped = node.IsAchievementBitDeduped
+                IsAchievementBitDeduped = node.IsAchievementBitDeduped,
             };
 
             foreach (var option in node.Recipes)
@@ -368,7 +369,7 @@ namespace GW2CraftingHelper.Services
                 ExpectedOutputCount = option.ExpectedOutputCount,
                 Disciplines = new List<string>(option.Disciplines),
                 MinRating = option.MinRating,
-                Flags = new List<string>(option.Flags)
+                Flags = new List<string>(option.Flags),
             };
 
             foreach (var ingredient in option.Ingredients)

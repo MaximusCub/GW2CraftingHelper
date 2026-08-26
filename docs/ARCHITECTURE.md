@@ -11,16 +11,20 @@ narrative (root-cause traces, live-verification transcripts, dated PASS
 records) - that history is preserved in
 [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (the current-state tracker: the
 numbered catalog, the open list, and a ledger pointing into
-[`docs/archive/known-issues/`](archive/known-issues/), where the full
+[`dev/archive/known-issues/`](../dev/archive/known-issues/), where the full
 milestone records live one file each) and
-[`docs/dev-notes/HISTORY.md`](dev-notes/HISTORY.md) (the pre-M38 fix-pass
+[`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) (the pre-M38 fix-pass
 diary this document distills). Each section below names the KNOWN-ISSUES
 item number(s) it is drawn from so you can go read the original
 investigation.
 
-This is a living map of *mechanisms*, not a tour of every file. See
-`docs/gw2e-parity-spec.md` for the normative behavior the solver targets,
-and `CONTRIBUTING.md` for build/test/style basics.
+This is a living map of *mechanisms*, not a tour of every file. For a map
+of *files* - which folder holds what, and the handful worth opening first -
+see [`docs/README.md`](README.md). Designs that were proposed and
+deliberately not built live in [`docs/DECISIONS.md`](DECISIONS.md), so this
+document can describe what exists rather than argue against what does not.
+See `docs/gw2e-parity-spec.md` for the normative behavior the solver
+targets, and `CONTRIBUTING.md` for build/test/style basics.
 
 ---
 
@@ -143,8 +147,12 @@ COMPOUND operation: `Children`'s own lock protects each individual
 "dispose-every-old-child, then add-every-new-one" sequence, so two
 interleaved rebuilds can each finish disposing before either starts adding,
 and both survive - duplicated content, e.g. the doubled "No log entries
-yet." placeholders `LogTabContent` hit live on 2026-07-23
-(`LogTabContent.cs`'s `_buildComplete` doc comment). Marshaling the whole
+yet." placeholders `LogTabContent` hit live on 2026-07-23, and - on the
+second path, where `Module.cs`'s `TabChanged` handler called `Refresh()`
+on the main thread while `Build()`'s own tail was still running on a
+ThreadPool thread - two threads enqueuing into `_renderedRows` at once,
+crashing with "Destination array was not long enough" inside
+`Queue<T>.SetCapacity`. Marshaling the whole
 tail onto the main thread still closes this correctly, just for the right
 reason: it prevents two rebuilds from interleaving AT ALL (a single thread
 cannot run two call stacks at the same instant), rather than relying on a
@@ -153,8 +161,49 @@ comment instead claims `Children` itself would have been corrupted is
 asserting something the decompiled source disproves - its own defect
 (KNOWN-ISSUES #36, fourth fix-loop round).
 
+### The logging-channel rule for these guards
+
+Every one of these primitives ends in a catch that swallows rather than
+propagates - `MainThreadMarshal.Run` (an unhandled exception in a queued
+callback would take down Blish HUD's update loop), `FrameTicker.DoUpdate`,
+`TooltipFacility.ResolveContent` (a deferred builder runs inside Blish's
+own mouse-moved handler), and `ResizeSettleDebounce`'s `_onError`. That
+makes the choice of log channel load-bearing, so it is a rule and not a
+preference:
+
+> **Anything a user could plausibly report goes to
+> `ModuleLog.Shared.Write`. Blish HUD's `Logger` is additive - never the
+> sole channel.**
+
+The module ships its own diagnostic surface (`Services/ModuleLog.cs`,
+`Views/LogTabContent.cs`) with a Copy-to-clipboard button, and that button
+is what a bug report will actually contain. A failure written only to
+Blish's own file log is invisible there, which is the worst possible place
+for exactly these symptoms to land: "the tooltip does nothing on that row",
+"the plan strip froze on a phase", "I clicked Generate and nothing
+happened". Before this rule was written down the split was 39 `Logger`
+calls to 37 `ModuleLog` calls with no stated convention, so every new catch
+block was a coin flip.
+
+Two riders:
+
+- **`Logger` stays.** It carries the full stack; `ModuleLog` entries are
+  one ring-buffer line each and keep only the exception's type and message.
+  A catch that discards recoverable state (`CraftingPlanView.
+  RollBackFailedPlanRender`) writes both, plus enough plan identity to
+  reproduce - never item ids, which stay internal-only, log tab included.
+- **The log system's own failures never route back into the log system.**
+  `ModuleLogStore`'s IO-failure callback goes straight to `Logger`
+  (Module.cs, `Initialize`), because writing into the sink whose write just
+  failed is unbounded recursion. `MainThreadMarshal` is the subtle case:
+  `LogTabContent` rebuilds its rows THROUGH `MainThreadMarshal.Run`, so a
+  rebuild that throws would write the entry that schedules the rebuild that
+  throws. It carries a `[ThreadStatic]` re-entrancy guard for the
+  synchronous half and suppresses consecutive duplicate signatures for the
+  asynchronous half; `Logger` still gets every occurrence.
+
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
-(`docs/dev-notes/HISTORY.md` after the WP-27 split).
+(`dev/dev-notes/HISTORY.md` after the WP-27 split).
 
 ---
 
@@ -180,6 +229,32 @@ HUD's mouse-hook backends feed the same buggy getter, so a real player
 fast-flicking the wheel upward hits it. The module cannot patch Blish
 HUD's own binary, so it classifies and corrects the value on the way in
 instead.
+
+The decompiled getter, verbatim:
+
+```csharp
+int num = Convert.ToInt32((MouseData & 0xFFFF0000u) >> 16);
+if (num > SystemInformation.MouseWheelScrollDelta) num -= 65536;
+return num;
+```
+
+**The `-60000` threshold, derived:** a wrapped-positive event's raw value
+is `N*120 - 65536` for an intended up-notch count `N >= 2`, i.e. the band
+`[-65416 .. -60016]` (`N=46`, an already-absurd flick), falling further for
+larger `N`. A genuine down-delta never comes near it: the largest measured
+is `-840` (7 coalesced down-notches), and an implausible 40-notch down-flick
+is only `-4800`. `-60000` sits between the two, so `raw <= -60000` selects
+exactly the corruption. A single up-notch (`N=1`, unsigned 120) sits *at*
+the threshold, not above it, so the vendored getter leaves it alone - which
+is why single notches in both directions are clean.
+
+**Why 120 is hardcoded** in the sanitizer and in
+`CraftingPlanView.ApplyWheelWrapCorrection`'s `intendedDelta / 120.0`
+notch arithmetic, while `MouseWheelScrollLines` is read live: 120 is Win32's
+`WHEEL_DELTA`, the fixed unit a low-level mouse hook reports for one notch.
+`SystemInformation.MouseWheelScrollDelta` is Microsoft's managed accessor
+for that same constant and is not user-configurable, unlike
+`MouseWheelScrollLines`, which is.
 
 **Where:** `Services/WheelDeltaSanitizer.cs` (pure, Blish-free,
 unit-tested); consumed by `CraftingPlanView.ApplyWheelWrapCorrection`.
@@ -324,41 +399,32 @@ WP-24, WP-25) extracted:
   (`CoinCurrencyRenderer`, `RarityColors`, `IconControls`, `LabelHelpers`)
   also moved to `Views/Rendering/`.
 
-**TreeSectionController state/render split: rejected by decision, not
-deferred by oversight.** A later proposal to bisect `TreeSectionController`
-into a stateful collaborator (owning `_nodeOverrides`/`_ignoredItemIds`/
-`_nodeExpansion`/`_treeNodeStates`) and a separate stateless renderer,
-mirroring the per-render section renderers above, was evaluated and
-rejected (quorum verdict D-2). The invariant this class exists to hold is
-one owner, one lifetime: the whole reason it is constructed once in
-`CraftingPlanView`'s own constructor (`Views/CraftingPlanView.cs` ~614)
-instead of freshly per render is that its override state must survive a
-local pill-click re-solve, and a two-class split would either duplicate
-that lifetime management across both halves or reintroduce a second
-implicit owner - the exact class of bug section 1's "one owner" primitives
-above exist to prevent, just at the object-graph level instead of the
-thread level. It is also already the most-coupled class in
-`Views/Rendering/` outside its own file - mentioned by name in 14
-production `.cs` files (`Module.cs` plus 9 `Services/` files and 4
-`Views/` files, not counting `Models/` shape-mirroring comments or test
-files), of which 13 are comment-only; the actual compile-time coupling is
-2 references, both in `Views/CraftingPlanView.cs` (the field declaration
-and the constructor call site) - plus, as measured pre-change at `ce64423`,
-3 doc mentions (this section's own bullet and "Where:" line, plus
-`docs/ROADMAP.md`; `docs/KNOWN-ISSUES.md` carried 42 more as historical
-narrative) - not 18, an earlier over-count that conflated this figure with
-something wider. That doc-mention count is a snapshot, not a live figure: every doc entry that names the class (including this one) adds mentions on landing, so no post-change total is stated here - reproduce the current count with `git grep -c TreeSectionController -- '*.md'`. A state/render split
-would not shrink that coupling, only relocate half of it across a new
-seam. The accepted alternative for future tree-row/pill features is not
-a class bisection: per
-the STANDING RULE (`CONTRIBUTING.md`), extract the pure text/decision
-computation for a given feature into a Blish-free, unit-tested composer
-under `Services/` first - `TreeRowTooltipComposer` (tree-tooltip-composer
-milestone) is the latest instance of the same pattern already behind
-`DecisionPillPlanner`, `ValueDetailTooltipBuilder`, `PillSubduingEvaluator`/
-`PillSubduingTooltipBuilder`, and `ReceiptCaptionHelper` - and keep wiring
-it into `TreeSectionController`'s existing single-owner shape rather than
-growing a second stateful class alongside it.
+**Dependencies point one way.** `CraftingPlanView` and `MainView` call into
+`Views/Rendering`; nothing in `Views/Rendering` references either. A
+renderer that needs a view-private helper extracts the helper into
+`Views/Rendering` rather than widening the view's surface, and what a
+renderer needs from the view arrives through a narrow interface the view
+implements explicitly - `ISectionRelayoutSink` for relayout registration,
+`ITreePlanHost` (`Views/Rendering/ITreePlanHost.cs`) for everything
+`TreeSectionController` needs beyond it - or, where null is itself a
+meaningful value, a constructor delegate. This was violated once - a `GetPillColors`
+`private -> internal` bump on `CraftingPlanView` - and reverted for this
+reason; the rule is stated here so the revert does not have to be
+re-litigated in each file. `MainView -> Views/Rendering` (e.g.
+`CoinCurrencyRenderer.AddSegmentSpec`) is a forward call and fine.
+
+`TreeSectionController` is constructed once, in `CraftingPlanView`'s own
+constructor (`Views/CraftingPlanView.cs` ~743), and lives as long as the
+view: one owner, one lifetime. That is what lets a pill click re-solve
+locally without resetting the user's overrides. The constructor takes the
+two sinks, the view-model builder, the solver callback and two optional
+hooks; it used to take fourteen positional arguments, ten of them bare
+delegates, two of which shared the type `Action<PlanViewModel>` with
+opposite meanings, so transposing them compiled. Splitting it into a
+stateful/stateless pair was proposed and rejected - see
+[`docs/DECISIONS.md`](DECISIONS.md). New tree-row and pill features grow
+the `Services/` side of the boundary instead, under `CONTRIBUTING.md`'s
+STANDING RULE.
 
 **What stayed, and why (WP-26 cut):** The scroll/resize/wheel controller
 move (bundling `PreserveScrollAcross`, the wheel-wrap correction, and the
@@ -374,20 +440,38 @@ plan-authoring baseline down to ~2,802 lines at the time WP-26 was cut -
 real progress, even though short of the plan's own 2,000-line target - so
 the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
 fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
-`Views/CraftingPlanView.cs` has since grown well past the post-WP-26
-figure above, which is expected, not a
-regression of the decomposition: every line added since (W3B status
-strip/spinner, currency-ux-package, gate-round fixes, the
-tree-tooltip-composer extraction itself, ...) is a legitimate feature/fix
-landing in the file the STANDING RULE (see the TreeSectionController
-state/render split entry above and `CONTRIBUTING.md`) still routes pure
-logic out of on the way in, not evidence the WP-21 through WP-25
-extractions eroded.
+
+The file then grew back past its own pre-decomposition baseline - 5,281
+lines on 2026-08-25, +2,156 in the 33 days after the decomposition
+landed - with nothing in CI to notice. It stands at **4,863 lines,
+measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`), against the
+~4,802 above. `Views/Rendering/` holds 8,932 lines across 36 files on the
+same date, so the split of plan-tab code is roughly 65% outside the view -
+a ratio that can move in either direction, unlike the one-off before/after
+figure. Both numbers, and the date, so a later reader can re-run the two
+commands rather than take a characterization on trust.
+
+Two things changed on that date so the regrowth cannot repeat quietly.
+`docs/file-budgets.txt` pins every tracked `.cs` file to its size that
+day and a CI step fails when a file exceeds its entry, so growth now
+costs a visible line in a checked-in file rather than nothing. And the
+view's `#region` markers, which had numbered eight responsibilities but
+shipped twenty-three disjoint blocks with eleven headers reading
+"(continued)", were renamed: each marker now names its own block and no
+two names repeat. The numbering went rather than the code, because making
+it true would mean reordering exactly the scroll/wheel/ticker machinery
+the WP-26 cut above is about.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
+`Views/Rendering/ITreePlanHost.cs`,
 `Views/Rendering/TreeSectionController.cs`, the seven
 `Views/Rendering/*SectionRenderer.cs` files (the six M38 ones plus
-`NotesSectionRenderer`), and the surviving
+`NotesSectionRenderer`), `Views/Rendering/PlanHeaderRenderer.cs` and
+`Views/Rendering/EmptyPlanStateRenderer.cs` (the plan title and the
+no-plan state, moved onto the same sink on 2026-08-25),
+`Views/ItemInputRowStrip.cs` (the multi-item request editor - in `Views/`
+rather than `Views/Rendering/`, because its controls are `Views` types
+and the dependency points one way), and the surviving
 `_relayoutActions`/`_reellipsisActions` registries plus scroll/resize/wheel
 machinery in `Views/CraftingPlanView.cs`.
 
@@ -508,8 +592,11 @@ inventing a new one. The load-bearing rules:
   (there is no buy cost to lose to), matching gw2efficiency's
   `isCheaperToCraft = craftPrice-defined && (!buyPrice || decisionPrice < buyPrice)`.
 
-**Where:** `Services/PlanSolver.cs` (`Evaluate`, `PickCheapest`); the
-normative spec these rules echo is `docs/gw2e-parity-spec.md`.
+**Where:** `Services/PlanSolver.cs` (`Evaluate`, `SelectBestRecipes`,
+`PickCheapest`); the normative spec these rules echo is
+`docs/gw2e-parity-spec.md`. Whole-result goldens for these decisions live
+in `tests/GW2CraftingHelper.Tests/Goldens/plan-solver/` - a difference
+there is a finding to investigate, never a file to re-baseline.
 
 **Full history:** KNOWN-ISSUES items 20, 21, 24, 25, 26 (the M33-M37
 parity waves); `docs/gw2e-parity-spec.md` for the researched gw2efficiency
@@ -547,7 +634,8 @@ committed (see `docs/RELEASING.md` for the packaging implication of a
 dev machine still having them on disk locally).
 
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
-`Services/RecipeCacheSerializer.cs`, `Services/ItemNameSeedData.cs`; wiki
+`Services/Recipes/RecipeCacheSerializer.cs`,
+`Services/Recipes/ItemNameSeedData.cs`; wiki
 scraper - `tools/VendorOfferUpdater/WikiSmwClient.cs`.
 
 **Full history:** KNOWN-ISSUES items 24, 28, 33; `CONTRIBUTING.md`'s
@@ -574,10 +662,10 @@ All four are wired at three producer call sites, by name -
 edit site, `PlanViewModelBuilder.BuildNotesSection`, which reads all four
 lists to render their Notes rows. A fifth pass means touching all four
 sites; there is deliberately no `ApplyAll` seam collapsing the three
-producer calls into one - rejected on review as premature (quorum verdict
-D-3): the four calculators do not share a signature (differing inputs -
-`learnedRecipeIds`, `vendorOffers`, `characterDisciplines`), so a shared
-seam would need its own parameter object with no caller needing it today.
+producer calls into one, because the four calculators do not share a
+signature (differing inputs - `learnedRecipeIds`, `vendorOffers`,
+`characterDisciplines`). Rejected as premature; see
+[`docs/DECISIONS.md`](DECISIONS.md).
 
 The call order at each producer site - `SellSideEconomics` first,
 `CompetencyOpportunityCalculator` last - is convention (kept identical
@@ -592,5 +680,55 @@ pass's output, so any order between them is byte-identical.
 `Services/CraftingPlanPipeline.cs`; consumer in
 `Services/PlanViewModelBuilder.cs` (`BuildNotesSection`).
 
-**Full history:** quorum verdict D-3 (annotation-detection mutation-testing
-gap); each calculator's own class doc comment for its individual rationale.
+**Full history:**
+[`dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md`](../dev/archive/known-issues/2026-08-17-annotation-detection-post-solve-advisory-list.md)
+(the mutation-testing gap that produced these four passes); each
+calculator's own class doc comment for its individual rationale.
+
+---
+
+## 11. Typography: the measured type ramp
+
+**What:** `Services/TypeRampMetrics.cs` holds the measured Menomonia glyph
+metrics behind every vertical constant in the plan view, and names which
+ramp tier each chrome role sits in (section title, column header, status,
+body, caption). It is pure and Blish-free; `Views/Rendering/UiFonts.cs`
+is the only place that resolves an actual `BitmapFont`.
+
+**Why:** the numbers are measured, not chosen, and two of them are
+measured *defects* that a later contributor would otherwise rediscover the
+expensive way, in a live desktop session:
+
+- **18-regular is unusable for prose.** Its space glyph advances 4px,
+  against 7 at 16-regular and 9 at 18-bold, so any multi-word string at
+  18-regular renders with collapsed word gaps. The status line is
+  therefore bold at 18, not regular.
+- **22-regular is metrically a 24** - same line height, cap height and
+  advances as 24-regular, different file bytes - so there is no
+  regular-weight step between 20 and 24, and 22-regular must never be
+  loaded. 22-bold is a genuine intermediate.
+  `TypeRampMetrics.HasUsableRegularFace` refuses exactly these two sizes,
+  and `UiFonts.Regular` refuses them again at the seam.
+- **Two pixels of clearance under a descender, never one.** Blish's
+  UI-scale transform is non-integer, so a single-pixel margin can be lost
+  in the rounding. Every band height and divider clearance is a statement
+  about `TypeRampMetrics.InkBottom`, derived from the lowest ink of any
+  printable ASCII glyph at that size.
+- **Some Blish controls are locked to Font14** (`Checkbox`,
+  `StandardButton`, `TextBox`, `Dropdown`). Measure them in the caption
+  tier; do not try to restyle them.
+
+The metrics come from parsing the installed
+`Content/fonts/menomonia/menomonia-{size}-{style}.xnb` files directly -
+uncompressed MonoGame XNB containers holding one BitmapFont asset - and
+they reproduce, glyph for glyph, the figures published in
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+The atlas covers 8-36 regular and 8-24 plus 36 bold, reached via
+`ContentService.GetFont`, not only the five Blish defaults.
+
+**Where:** `Services/TypeRampMetrics.cs` (metrics, tier seats, and the
+`InkBottom`/`BaselineAlignedY` arithmetic every constant is written in);
+`Views/Rendering/UiFonts.cs` (font resolution);
+`Services/PlanContentHeightMath.cs` (the band heights those metrics feed).
+[`.impeccable.md`](../.impeccable.md) at the repo root carries the
+tool-facing design summary and points back here.

@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Models
     /// cosmetic display data only, same "advisory" contract as
     /// RecipeSheetSavingsOpportunity's own doc comment.
     /// </summary>
-    public class SeasonalVendorTip
+    internal class SeasonalVendorTip
     {
         /// <summary>The plan item this tip applies to.</summary>
         public int ItemId { get; set; }
@@ -42,6 +42,7 @@ namespace GW2CraftingHelper.Models
         public long PlanUnitPrice { get; set; }
 
         public int? DailyCap { get; set; }
+
         public int? WeeklyCap { get; set; }
     }
 }

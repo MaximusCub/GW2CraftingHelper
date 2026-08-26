@@ -16,6 +16,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Tool-only implementation of the module's IMysticForgeRecipeSource -
+         see that file's own doc comment for why it is linked here instead
+         of compiled into the shipped module. -->
+    <Compile Include="..\Shared\FileMysticForgeRecipeSource.cs"
+             Link="FileMysticForgeRecipeSource.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.Net.Http" />
   </ItemGroup>
 

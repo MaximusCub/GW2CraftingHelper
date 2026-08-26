@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Services
     /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class PlanContentHeightMath
+    internal static class PlanContentHeightMath
     {
         // --- Section row-height constants (mirrored 1:1 by CraftingPlanView's
         // row builders - CreateUsedMaterialRow, CreateShoppingRow, etc. use
@@ -56,10 +56,10 @@ namespace GW2CraftingHelper.Services
 
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
-        // lowest ink is 26 rather than 21. CTableHeaderLabelY 4 reproduces
+        // lowest ink is 26 rather than 21. ColumnHeaderLabelY 4 reproduces
         // the band the 16pt header drew - cap top 8px down, ink bottom 2px
         // clear of the band's own bottom edge - at the taller font.
-        public const int CTableHeaderRowHeight = 32;
+        public const int ColumnHeaderRowHeight = 32;
 
         // Baseline y of every column-header label inside that band. Lives
         // here rather than with the chrome that draws it
@@ -67,7 +67,7 @@ namespace GW2CraftingHelper.Services
         // is half of the arithmetic above: a label y and a band height that
         // move independently are how a header's descenders end up on the
         // row under them.
-        public const int CTableHeaderLabelY = 4;
+        public const int ColumnHeaderLabelY = 4;
 
         // --- Section header band (drawn by CraftingPlanView.
         // CreateSectionHeader, which aliases all three). ---
@@ -146,22 +146,21 @@ namespace GW2CraftingHelper.Services
             rows = rows ?? Array.Empty<PlanRowViewModel>();
             switch (sectionType)
             {
-                // Both of these gained a CTableHeaderRowHeight band in
-                // audit batch J's chrome unification: Used Materials had no
-                // header at all, and the Shopping List's was its own 22px
-                // unbanded style. Counted unconditionally, exactly as the
-                // two c-tables below are, because all four renderers emit
+                // Both of these draw a ColumnHeaderRowHeight band, as the
+                // two column-header tables below do. Counted
+                // unconditionally, exactly as the two column-header tables
+                // below are, because all four renderers emit
                 // the header before looking at the row count.
                 case PlanSectionType.UsedMaterials:
-                    return CTableHeaderRowHeight + rows.Count * UsedMaterialRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * UsedMaterialRowHeight;
                 case PlanSectionType.ShoppingList:
-                    return CTableHeaderRowHeight + rows.Count * ShoppingRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * ShoppingRowHeight;
                 case PlanSectionType.CraftingSteps:
                     return CraftingStepsBodyHeight(rows);
                 case PlanSectionType.RequiredDisciplines:
-                    return CTableHeaderRowHeight + rows.Count * DisciplineRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * DisciplineRowHeight;
                 case PlanSectionType.RequiredRecipes:
-                    return CTableHeaderRowHeight + rows.Count * RecipeRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * RecipeRowHeight;
                 default:
                     // Defensive fallback mirrors CreateCollapsibleSection's own
                     // default branch (CreateTextRow, one fixed-height row per
@@ -188,6 +187,7 @@ namespace GW2CraftingHelper.Services
                     ? FallbackTextRowHeight
                     : CraftStepRowHeight;
             }
+
             return height;
         }
 
@@ -208,6 +208,7 @@ namespace GW2CraftingHelper.Services
             {
                 return overrideValue;
             }
+
             return !dimmed && depth < 2;
         }
 
@@ -220,7 +221,11 @@ namespace GW2CraftingHelper.Services
         public static int TreeNodeHeight(
             CraftingTreeNode node, int depth, bool dimmed, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (node == null) return 0;
+            if (node == null)
+            {
+                return 0;
+            }
+
             return TreeRowHeight + TreeChildFlowHeight(node, depth, dimmed, expansionOverrides);
         }
 
@@ -234,8 +239,15 @@ namespace GW2CraftingHelper.Services
         public static int TreeChildFlowHeight(
             CraftingTreeNode node, int depth, bool dimmed, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (node?.Children == null || node.Children.Count == 0) return 0;
-            if (!IsNodeExpanded(node.NodeId, depth, dimmed, expansionOverrides)) return 0;
+            if (node?.Children == null || node.Children.Count == 0)
+            {
+                return 0;
+            }
+
+            if (!IsNodeExpanded(node.NodeId, depth, dimmed, expansionOverrides))
+            {
+                return 0;
+            }
 
             bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
             return ChildrenHeight(node.Children, depth + 1, childDimmed, expansionOverrides);
@@ -254,12 +266,17 @@ namespace GW2CraftingHelper.Services
             IReadOnlyList<CraftingTreeNode> children, int childDepth, bool childDimmed,
             IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (children == null) return 0;
+            if (children == null)
+            {
+                return 0;
+            }
+
             int total = 0;
             foreach (var child in children)
             {
                 total += TreeNodeHeight(child, childDepth, childDimmed, expansionOverrides);
             }
+
             return total;
         }
 
@@ -288,11 +305,12 @@ namespace GW2CraftingHelper.Services
         /// TreeNodeHeight(roots[0], 0, false, ...) by exactly the column
         /// header below.
         /// <para>
-        /// One CTableHeaderRowHeight column header
+        /// One ColumnHeaderRowHeight column header
         /// (TreeSectionController.CreateTreeSection builds it into the
         /// same FlowPanel, above every root) precedes the roots whenever
         /// there is a tree at all - the tree's right-hand columns are
-        /// unlabelled otherwise, unlike every other c-table in the plan.
+        /// unlabelled otherwise, unlike every other column-header table
+        /// in the plan.
         /// An empty/absent roots list renders no tree and therefore no
         /// header either, and still measures 0.
         /// </para>
@@ -300,13 +318,22 @@ namespace GW2CraftingHelper.Services
         public static int MultiRootTreeFlowHeight(
             IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)
         {
-            if (roots == null || roots.Count == 0) return 0;
-            int total = CTableHeaderRowHeight;
+            if (roots == null || roots.Count == 0)
+            {
+                return 0;
+            }
+
+            int total = ColumnHeaderRowHeight;
             for (int i = 0; i < roots.Count; i++)
             {
-                if (i > 0) total += MultiRootDividerHeight;
+                if (i > 0)
+                {
+                    total += MultiRootDividerHeight;
+                }
+
                 total += TreeNodeHeight(roots[i], 0, false, expansionOverrides);
             }
+
             return total;
         }
     }

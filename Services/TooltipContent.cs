@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 
 namespace GW2CraftingHelper.Services
 {
@@ -12,12 +11,14 @@ namespace GW2CraftingHelper.Services
     /// gold/silver/copper icons (icons RIGHT of their numbers, repo
     /// invariant) by the rich tooltip surface.
     ///
-    /// Every span carries plain text too, so <see cref="ToPlainText"/>
-    /// reproduces byte-for-byte what the composers used to return. That is
-    /// what lets each composer keep ONE implementation while still serving
-    /// the plain <c>BasicTooltipText</c> path and its existing tests.
+    /// Every span carries its own plain text as well as its structure. The
+    /// rich surface draws that text; a coin span additionally keeps the
+    /// copper value, so the surface can replace "1g 23s 45c" with icons.
+    /// There is deliberately no plain-string projection on this type - the
+    /// composers have one output shape, and the tests that want to assert on
+    /// wording flatten it themselves (Tests/Helpers/TooltipContentPlainText).
     /// </summary>
-    public sealed class TooltipContent
+    internal sealed class TooltipContent
     {
         public static readonly TooltipContent Empty = new TooltipContent(new List<TooltipLine>());
 
@@ -62,6 +63,7 @@ namespace GW2CraftingHelper.Services
             {
                 return content;
             }
+
             return string.IsNullOrEmpty(fallbackText) ? Empty : FromText(fallbackText);
         }
 
@@ -84,7 +86,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// The icon+name row every in-game item tooltip opens with: a
         /// ~34x34 framed item icon with the name set to its right and
-        /// vertically centred on it (spec section 1.5, gap G11). A taller
+        /// vertically centred on it (KNOWN-ISSUES #42, gap G11). A taller
         /// row than a prose one, and the only line kind that carries an
         /// icon - which is why it is a KIND rather than another span role.
         /// <para>
@@ -107,57 +109,20 @@ namespace GW2CraftingHelper.Services
         {
             return new TooltipLine(spans ?? new TooltipSpan[0]);
         }
-
-        /// <summary>
-        /// The exact string the plain path assigns to
-        /// <c>BasicTooltipText</c>. Coin spans render their own plain text,
-        /// which is why the two composers' deliberately different coin
-        /// formats (always-three-units vs leading-units-omitted) survive
-        /// the round trip unchanged.
-        /// </summary>
-        public string ToPlainText()
-        {
-            var sb = new StringBuilder();
-            for (int i = 0; i < _lines.Count; i++)
-            {
-                if (i > 0)
-                {
-                    sb.Append('\n');
-                }
-                _lines[i].AppendPlainText(sb);
-            }
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// One plain string per line - the shape
-        /// <c>TreeRowTooltipComposer</c>'s callers already pass around.
-        /// </summary>
-        public List<string> ToPlainLines()
-        {
-            var lines = new List<string>(_lines.Count);
-            foreach (var line in _lines)
-            {
-                var sb = new StringBuilder();
-                line.AppendPlainText(sb);
-                lines.Add(sb.ToString());
-            }
-            return lines;
-        }
     }
 
     /// <summary>What a line IS, structurally. Prose unless stated.</summary>
-    public enum TooltipLineKind
+    internal enum TooltipLineKind
     {
         /// <summary>An ordinary prose row, one line height tall.</summary>
         Text,
 
         /// <summary>The icon+name header row - see
         /// <see cref="TooltipContent.HeaderLine"/>.</summary>
-        Header
+        Header,
     }
 
-    public sealed class TooltipLine
+    internal sealed class TooltipLine
     {
         private readonly IReadOnlyList<TooltipSpan> _spans;
 
@@ -186,14 +151,6 @@ namespace GW2CraftingHelper.Services
         /// prose row.
         /// </summary>
         public string IconUrl { get; }
-
-        internal void AppendPlainText(StringBuilder sb)
-        {
-            foreach (var span in _spans)
-            {
-                sb.Append(span.Text);
-            }
-        }
     }
 
     /// <summary>
@@ -204,7 +161,7 @@ namespace GW2CraftingHelper.Services
     /// <c>Views/Rendering/RarityColors</c> knows a
     /// <c>Microsoft.Xna.Framework.Color</c>.
     /// </summary>
-    public enum TooltipSpanRole
+    internal enum TooltipSpanRole
     {
         /// <summary>Ordinary tooltip prose.</summary>
         Default,
@@ -250,9 +207,9 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// A genuine secondary annotation - the game's own grey, e.g.
         /// "0/500 in Material Storage". NOT the identity block, which the
-        /// game renders white (spec section 1.4, gap G4).
+        /// game renders white (KNOWN-ISSUES #42, gap G4).
         /// </summary>
-        Muted
+        Muted,
     }
 
     /// <summary>
@@ -261,7 +218,7 @@ namespace GW2CraftingHelper.Services
     /// the caller's own plain rendering, used by the plain tooltip path and
     /// as the width fallback nowhere else.
     /// </summary>
-    public readonly struct TooltipSpan
+    internal readonly struct TooltipSpan
     {
         private TooltipSpan(string text, long coinCopper, bool isCoin, TooltipSpanRole role, string rarityKey)
         {
@@ -329,7 +286,7 @@ namespace GW2CraftingHelper.Services
     /// <see cref="Append"/> and <see cref="Separator"/> instead of the
     /// "\n\n" string concatenation the pill tooltip used to do.
     /// </summary>
-    public sealed class TooltipContentBuilder
+    internal sealed class TooltipContentBuilder
     {
         private readonly List<TooltipLine> _lines = new List<TooltipLine>();
         private List<TooltipSpan> _current;
@@ -369,6 +326,7 @@ namespace GW2CraftingHelper.Services
             {
                 EndLine();
             }
+
             _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
             return this;
         }
@@ -392,10 +350,12 @@ namespace GW2CraftingHelper.Services
                 {
                     Current().Add(template.WithText(piece));
                 }
+
                 if (brk < 0)
                 {
                     return this;
                 }
+
                 EndLine();
                 start = brk + 1;
             }
@@ -431,10 +391,12 @@ namespace GW2CraftingHelper.Services
             {
                 return this;
             }
+
             if (_current != null)
             {
                 EndLine();
             }
+
             _lines.Add(new TooltipLine(new List<TooltipSpan>()));
             return this;
         }
@@ -445,10 +407,12 @@ namespace GW2CraftingHelper.Services
             {
                 return this;
             }
+
             if (_current != null)
             {
                 EndLine();
             }
+
             _lines.AddRange(other.Lines);
             return this;
         }
@@ -459,6 +423,7 @@ namespace GW2CraftingHelper.Services
             {
                 EndLine();
             }
+
             return _lines.Count == 0 ? TooltipContent.Empty : new TooltipContent(_lines);
         }
 

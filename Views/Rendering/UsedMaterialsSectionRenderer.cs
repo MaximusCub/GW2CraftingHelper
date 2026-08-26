@@ -7,16 +7,7 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Used Materials row list only. Behavior is
-    // unchanged: same row geometry, same PlanContentHeightMath/
-    // PlanRelayoutMath calls, same LabelHelpers.CreateRowDivider usage
-    // (divider math and its 1px scissor clearance
-    // untouched). The only edit inside the moved bodies is
-    // _relayoutActions.Add -> the injected ISectionRelayoutSink.AddRelayout
-    // and _reellipsisActions.Add -> ISectionRelayoutSink.AddReellipsis, both
-    // semantics-preserving pass-throughs (see ISectionRelayoutSink's doc
-    // comment).
+    // The Used Materials row list.
     //
     // CreateUsedMaterialRow's
     // icon+ellipsized-name construction and its divider+relayout tail
@@ -49,14 +40,6 @@ namespace GW2CraftingHelper.Views.Rendering
             ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by DisciplinesSectionRenderer - the
-            // sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateUsedMaterialRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
@@ -70,9 +53,8 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int NameToQtyGap = 12;
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateUsedMaterialsBody,
-        /// then given the one-pass pre-scan every other plan table already
-        /// had: the widest rendered "Nx" string, which is the Amount
+        /// One-pass pre-scan, as every other plan table has: the widest
+        /// rendered "Nx" string, which is the Amount
         /// column's reserved band and therefore the Item column's ellipsis
         /// budget. Data-derived, so it is measured once here and reused by
         /// every row's relayout closure rather than re-measured per resize
@@ -100,18 +82,21 @@ namespace GW2CraftingHelper.Views.Rendering
             foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
-                if (qtyWidth > maxQtyWidth) maxQtyWidth = qtyWidth;
+                if (qtyWidth > maxQtyWidth)
+                {
+                    maxQtyWidth = qtyWidth;
+                }
             }
 
-            // Item/Amount column header. This was the one plan table with
-            // a right-hand column and no header naming it (audit batch J,
-            // L2) - the reader had to infer that a bare "12x" column was a
-            // quantity. Unconditional, like the Shopping List's and the two
-            // c-tables', so it can never disagree with
+            // Item/Amount column header. Without it this is the one plan
+            // table with a right-hand column nothing names, leaving the
+            // reader to infer that a bare "12x" column is a quantity.
+            // Unconditional, like the Shopping List's and the two
+            // column-header tables', so it can never disagree with
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
             // same way. No rightXForWidth: the Amount column is pinned to
-            // the panel edge, which is CTableHeaderRenderer's own default.
-            CTableHeaderRenderer.CreateCTableHeaderRow(
+            // the panel edge, which is ColumnHeaderRowRenderer's own default.
+            ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
                 SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
                 amountHeaderText, _sink,
@@ -136,9 +121,6 @@ namespace GW2CraftingHelper.Views.Rendering
             _onSortChanged();
         }
 
-        // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
-        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
-        // the class doc comment above) - same geometry, same constants.
         private void CreateUsedMaterialRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth,
             int maxQtyWidth, bool isLast)
@@ -192,7 +174,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(qtyRightEdge - qtyWidth, 9),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
 

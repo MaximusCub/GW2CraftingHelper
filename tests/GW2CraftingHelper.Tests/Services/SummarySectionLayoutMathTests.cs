@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
-                + PlanContentHeightMath.CTableHeaderRowHeight + 3 * PlanContentHeightMath.CurrencyRowHeight
+                + PlanContentHeightMath.ColumnHeaderRowHeight + 3 * PlanContentHeightMath.CurrencyRowHeight
                 + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
@@ -147,7 +147,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
                 + PlanContentHeightMath.CostTileRowHeight
-                + PlanContentHeightMath.CTableHeaderRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight
+                + PlanContentHeightMath.ColumnHeaderRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight
                 + 2 * PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
@@ -318,7 +318,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             int currencyTableHeight =
-                PlanContentHeightMath.CTableHeaderRowHeight + PlanContentHeightMath.CurrencyRowHeight;
+                PlanContentHeightMath.ColumnHeaderRowHeight + PlanContentHeightMath.CurrencyRowHeight;
 
             Assert.Equal(
                 SummarySectionLayoutMath.BodyHeight(withoutCurrency)

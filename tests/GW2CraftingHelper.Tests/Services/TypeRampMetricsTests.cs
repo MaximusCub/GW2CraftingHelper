@@ -5,8 +5,7 @@ namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
     /// The ramp's own invariants. These do not re-measure the font (the
-    /// XNB parse is recorded in TypeRampMetrics' doc comment and in
-    /// plan-redesign/typography.md); they pin the RELATIONSHIPS that make
+    /// XNB parse is recorded in TypeRampMetrics' doc comment); they pin the RELATIONSHIPS that make
     /// the ramp a hierarchy rather than four sizes in a row, so a future
     /// tier swap that breaks one fails here instead of on a screenshot.
     /// </summary>
@@ -20,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Services
             // over 16pt": that gate reads as an invariant while really
             // encoding one of the two tier seats the maintainer chose
             // between, and it fails by construction on the 18/22 retreat
-            // decisions.md ordered kept one commit away.
+            // that was kept one commit away.
             Assert.True(
                 TypeRampMetrics.SectionTitlePointSize > TypeRampMetrics.ColumnHeaderPointSize,
                 "section titles must outrank column headers");

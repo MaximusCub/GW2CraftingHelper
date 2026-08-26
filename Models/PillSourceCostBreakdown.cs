@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Models
     /// (Type, Id). Count can be 0 for a craft ingredient fully covered by
     /// owned stock - harmless for StrictDomination.
     /// </summary>
-    public class PillSourceCostBreakdown
+    internal class PillSourceCostBreakdown
     {
         /// <summary>
         /// False when this source is not feasible at all for this node

@@ -13,12 +13,12 @@ namespace GW2CraftingHelper.Services
     /// and will be replaced by a real craftable-item index backed by GW2 API
     /// data once Lane 2 implements the search provider.
     /// </summary>
-    public class StaticItemSearchProvider : IItemSearchProvider
+    internal class StaticItemSearchProvider : IItemSearchProvider
     {
         private static readonly IReadOnlyList<ItemSearchResult> AllItems = new List<ItemSearchResult>
         {
             new ItemSearchResult { ItemId = 46762, Name = "Zojja's Claymore", IconUrl = null, IsPlanTarget = true },
-            new ItemSearchResult { ItemId = 19684, Name = "Mithril Ingot", IconUrl = null, IsPlanTarget = true }
+            new ItemSearchResult { ItemId = 19684, Name = "Mithril Ingot", IconUrl = null, IsPlanTarget = true },
         };
 
         /// <inheritdoc />

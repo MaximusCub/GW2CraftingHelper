@@ -11,10 +11,10 @@ namespace GW2CraftingHelper.Services
     /// (SettingsTabContent.AddCurrencyRow / ApplyCurrencyFilter) only copies
     /// the results onto controls.
     /// </summary>
-    public static class SettingsCurrencyGridLayout
+    internal static class SettingsCurrencyGridLayout
     {
         // Horizontal layout of one currency cell. These live here rather
-        // than in the view so MinColumnWidth below is derived from the same
+        // than in the view so SettingsCurrencyMinColumnWidth below is derived from the same
         // numbers the controls are placed with and cannot drift from them,
         // and so the arithmetic is covered by Blish-free tests.
         //
@@ -67,9 +67,9 @@ namespace GW2CraftingHelper.Services
         /// old fixed 190px name column was itself sized from ("Pristine
         /// Fractal Relic").
         /// </summary>
-        public const int NameRunChars = 22;
+        public const int SettingsCurrencyNameRunChars = 22;
 
-        public const int CellNameFloor = NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
+        public const int CellNameFloor = SettingsCurrencyNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
 
         /// <summary>The pinned block: amount box, gap, Ignore checkbox, tag
         /// slot.</summary>
@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Services
         /// control block, and the table right margin. Below this the grid
         /// falls back to a single column rather than clipping.
         /// </summary>
-        public const int MinColumnWidth =
+        public const int SettingsCurrencyMinColumnWidth =
             CellNameX + CellNameFloor + NameToControlGap + CellControlBlockWidth
             + PlanRelayoutMath.TableRightMargin;
 
@@ -134,10 +134,15 @@ namespace GW2CraftingHelper.Services
         public sealed class Grid
         {
             public IReadOnlyList<CellPlacement> Cells { get; }
+
             public int ColumnCount { get; }
+
             public int ColumnWidth { get; }
+
             public int RowCount { get; }
+
             public int Height { get; }
+
             public int VisibleCount { get; }
 
             internal Grid(
@@ -153,22 +158,19 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        /// <summary>
-        /// As many whole <see cref="MinColumnWidth"/> columns as fit, never
-        /// fewer than one. Not capped at two: the module has ONE grid law,
-        /// stated on <see cref="SnapshotItemGridLayout.ComputeColumnCount"/>,
-        /// and this grid used to disagree with its sibling by holding 454px
-        /// of content in a 1210px column at a wide window.
-        /// </summary>
+        /// <summary>The shared grid law at this grid's own
+        /// <see cref="SettingsCurrencyMinColumnWidth"/> - see <see cref="GridLayout"/>.
+        /// This grid used to state the law itself and disagreed with its
+        /// sibling by holding 454px of content in a 1210px column at a wide
+        /// window; delegating is what makes that unrepeatable.</summary>
         public static int ComputeColumnCount(int panelWidth)
         {
-            int columns = panelWidth / MinColumnWidth;
-            return columns > 1 ? columns : 1;
+            return GridLayout.ColumnCount(panelWidth, SettingsCurrencyMinColumnWidth);
         }
 
         public static int ComputeColumnWidth(int panelWidth)
         {
-            return panelWidth > 0 ? panelWidth / ComputeColumnCount(panelWidth) : 0;
+            return GridLayout.ColumnWidth(panelWidth, ComputeColumnCount(panelWidth));
         }
 
         /// <summary>
@@ -181,9 +183,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int ComputeHeight(int count, int panelWidth, int rowHeight)
         {
-            int columnCount = ComputeColumnCount(panelWidth);
-            int safeCount = count > 0 ? count : 0;
-            int rowCount = (safeCount + columnCount - 1) / columnCount;
+            int rowCount = GridLayout.RowCount(count, ComputeColumnCount(panelWidth));
             return rowCount * (rowHeight > 0 ? rowHeight : 0);
         }
 
@@ -195,8 +195,16 @@ namespace GW2CraftingHelper.Services
         public static bool Matches(string name, string filter)
         {
             string trimmed = filter == null ? null : filter.Trim();
-            if (string.IsNullOrEmpty(trimmed)) return true;
-            if (string.IsNullOrEmpty(name)) return false;
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
             return name.IndexOf(trimmed, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
@@ -239,7 +247,7 @@ namespace GW2CraftingHelper.Services
                 visible++;
             }
 
-            int rowCount = (visible + columnCount - 1) / columnCount;
+            int rowCount = GridLayout.RowCount(visible, columnCount);
             return new Grid(cells, columnCount, columnWidth, rowCount, rowCount * safeRowHeight, visible);
         }
     }

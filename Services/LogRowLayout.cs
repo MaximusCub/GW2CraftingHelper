@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// zero-width message column, which would blank every row - is pinned by
     /// tests rather than only observable live.
     /// </summary>
-    public static class LogRowLayout
+    internal static class LogRowLayout
     {
         /// <summary>Gap between the prefix column and the message column.</summary>
         public const int MessageGap = 8;

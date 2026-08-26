@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// Placements are computed at each section's own offset, so
     /// <see cref="SnapshotItemGridLayout.Grid.Cells"/> are absolute.
     /// </summary>
-    public static class SnapshotResultLayout
+    internal static class SnapshotResultLayout
     {
         /// <summary>Gap above a section that follows another. The first
         /// starts flush, under the coin row's own gap.</summary>

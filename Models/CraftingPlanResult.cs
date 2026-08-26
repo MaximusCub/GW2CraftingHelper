@@ -2,12 +2,16 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class CraftingPlanResult
+    internal class CraftingPlanResult
     {
         public CraftingPlan Plan { get; set; }
+
         public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
+
         public List<UsedMaterial> UsedMaterials { get; set; }
+
         public List<RequiredDiscipline> RequiredDisciplines { get; set; }
+
         public List<RequiredRecipe> RequiredRecipes { get; set; }
 
         // Nodes where craft was excluded from the automatic pick because
@@ -17,7 +21,9 @@ namespace GW2CraftingHelper.Models
         // qualifies. Rendered as concrete "would save N" Plan Notes -
         // never fed back into any cost/comparison.
         public List<CompetencyOpportunity> CompetencyOpportunities { get; set; }
+
         public CraftingTreeNode CraftingTree { get; set; }
+
         public List<string> DebugLog { get; set; }
 
         /// <summary>Price basis used for material costs in this plan.</summary>
@@ -149,7 +155,7 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
 
         /// <summary>
-        /// design-plan-notes.md (Notes section, excess/reclaim): per-item
+        /// Source of the Plan Notes excess/reclaim lines: per-item
         /// crafting surplus, aggregated across every Decision == Craft
         /// occurrence in CraftingTree/MultiItemRoots - see
         /// Services/ExcessCraftOutputCalculator.Apply, the sole producer.
@@ -161,7 +167,7 @@ namespace GW2CraftingHelper.Models
         public List<ExcessCraftOutput> ExcessCraftOutputs { get; set; }
 
         /// <summary>
-        /// design-plan-notes.md (Notes section, gambling-forge scope):
+        /// Source of the Plan Notes gambling-forge scope caveat:
         /// output item ids of every chosen recipe that is a Mystic-Clover-
         /// style fractional-yield Mystic Forge combine (Disciplines
         /// contains "MysticForge" and ExpectedOutputCount &lt; OutputCount -
@@ -169,8 +175,8 @@ namespace GW2CraftingHelper.Models
         /// Populated by PlanResultBuilder.Build alongside RequiredRecipes,
         /// from the same recipeOptionIndex walk. Deliberately does NOT
         /// cover true multi-outcome gambles (precursor forging etc.) -
-        /// those never reach the solved tree at all (docs/gw2e-
-        /// considerations.md #17) so there is nothing here to detect for
+        /// those never reach the solved tree at all
+        /// (docs/gw2e-considerations.md #17) so there is nothing here to detect for
         /// them; PlanViewModelBuilder's note wording must not conflate the
         /// two. Empty list (not null) when no such recipe was chosen,
         /// matching RequiredDisciplines/RequiredRecipes' own convention.

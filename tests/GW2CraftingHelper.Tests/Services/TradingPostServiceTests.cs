@@ -163,6 +163,120 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
+        // /v2/commerce/prices omits untradeable items from its response
+        // entirely. An account-bound id (a gift, a clover, the legendary
+        // target itself) therefore never reaches the positive cache, and
+        // used to be re-requested on every single call however recently
+        // it was asked for; it is now negative-cached on the same clock.
+        [Fact]
+        public async Task UntradeableId_NegativeCachedWithinTtl_NotRefetched()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            // 99999 is never added: the fake omits it from the response,
+            // exactly as the real endpoint does for an account-bound item.
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 1, 99999 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(1); // well inside the 15 minute TTL
+            var result = await svc.GetPricesAsync(new[] { 1, 99999 }, CancellationToken.None);
+
+            Assert.Single(api.Calls); // no second round trip for either id
+            Assert.False(result.ContainsKey(99999)); // still absent, still an unpriceable hole
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        [Fact]
+        public async Task UntradeableId_RefetchedOnceTheNegativeEntryExpires()
+        {
+            var api = new InMemoryPriceApiClient();
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
+            clock = clock.AddMinutes(16); // past the 15 minute TTL
+            await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count);
+        }
+
+        [Fact]
+        public async Task ItemThatBecomesTradeable_IsPricedAfterTheNegativeEntryExpires()
+        {
+            var api = new InMemoryPriceApiClient();
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            var beforePatch = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+            Assert.False(beforePatch.ContainsKey(99999));
+
+            api.AddPrice(99999, buyUnitPrice: 100, sellUnitPrice: 200); // a patch makes it tradeable
+            clock = clock.AddMinutes(16);
+            var afterPatch = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+
+            Assert.Equal(200, afterPatch[99999].BuyInstant);
+
+            // The negative entry was dropped, not just outvoted: the now-
+            // cached price serves the next call with no further request.
+            clock = clock.AddMinutes(1);
+            var third = await svc.GetPricesAsync(new[] { 99999 }, CancellationToken.None);
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(200, third[99999].BuyInstant);
+        }
+
+        [Fact]
+        public async Task FailedBatch_DoesNotNegativeCacheItsIds()
+        {
+            // A batch that threw proves nothing about whether its ids are
+            // tradeable - only a response that came back and omitted them
+            // does. Negative-caching a transient failure would blank those
+            // prices for 15 minutes.
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            api.ThrowOnCallNumber = 1;
+            var svc = new TradingPostService(api);
+
+            await Assert.ThrowsAsync<HttpRequestException>(
+                () => svc.GetPricesAsync(new[] { 1 }, CancellationToken.None));
+
+            var result = await svc.GetPricesAsync(new[] { 1 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count);
+            Assert.Equal(200, result[1].BuyInstant);
+        }
+
+        // The other half of the same rule: /v2/commerce/prices answers 404
+        // for an endpoint-level outage as readily as for "every id in this
+        // batch is untradeable", and Gw2PriceApiClient turns that 404 into
+        // an empty batch WITHOUT throwing. Negative-caching those ids would
+        // latch a whole plan into "no price for anything" for a full 15
+        // minute TTL, and - because the freshness scan then skips them -
+        // without a single further request to recover on.
+        [Fact]
+        public async Task UnprovenEmptyBatch_DoesNotNegativeCacheItsIds()
+        {
+            var api = new InMemoryPriceApiClient();
+            api.AddPrice(1, buyUnitPrice: 100, sellUnitPrice: 200);
+            api.AddPrice(2, buyUnitPrice: 300, sellUnitPrice: 400);
+            api.UnprovenEmptyOnCallNumber = 1;
+            var clock = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var svc = new TradingPostService(api, () => clock);
+
+            // The outage itself still degrades to unpriceable holes.
+            var duringOutage = await svc.GetPricesAsync(new[] { 1, 2 }, CancellationToken.None);
+            Assert.Empty(duringOutage);
+
+            clock = clock.AddMinutes(1); // well inside the 15 minute TTL
+            var afterOutage = await svc.GetPricesAsync(new[] { 1, 2 }, CancellationToken.None);
+
+            Assert.Equal(2, api.Calls.Count); // the recovery request happened
+            Assert.Equal(200, afterOutage[1].BuyInstant);
+            Assert.Equal(400, afterOutage[2].BuyInstant);
+        }
+
         [Fact]
         public async Task Ttl_MixedFreshAndStaleBatchOnlyRefetchesStaleIds()
         {
@@ -203,7 +317,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, result[1].BuyInstant);
         }
 
-        // KNOWN-ISSUES 31c-1: two overlapping GetPricesAsync calls for the
+        // KNOWN-ISSUES #31/31c-1: two overlapping GetPricesAsync calls for the
         // same not-yet-cached id must coalesce into a single upstream
         // fetch instead of each starting its own. The Gate holds the fake
         // API's response until BOTH calls have been started, so joining
@@ -260,7 +374,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(3, result2.Count);
         }
 
-        // KNOWN-ISSUES 31c-audit: the owning caller's cancellation must
+        // KNOWN-ISSUES #31/31c-audit: the owning caller's cancellation must
         // never abandon the shared fetch a DIFFERENT, still-live caller is
         // joined onto. Caller A (owner) is cancelled while the upstream
         // fetch is still gated; caller B (joiner, never cancelled) must
@@ -289,7 +403,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(api.Calls); // still just one shared upstream fetch
         }
 
-        // KNOWN-ISSUES 31c-audit: a joining caller's own cancellation must
+        // KNOWN-ISSUES #31/31c-audit: a joining caller's own cancellation must
         // be observed - it must not silently ride along on whatever the
         // owning caller's fetch eventually does. Caller B (joiner) is
         // cancelled while the upstream fetch is still gated (unreleased);
@@ -322,7 +436,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(api.Calls); // still just one shared upstream fetch
         }
 
-        // KNOWN-ISSUES api-degradation F2: one bad batch amid otherwise-
+        // KNOWN-ISSUES #31/api-degradation F2: one bad batch amid otherwise-
         // healthy ones must degrade to missing ids (unpriceable holes
         // downstream) instead of aborting the whole call.
         [Fact]
@@ -348,7 +462,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.ContainsKey(201));
         }
 
-        // KNOWN-ISSUES api-degradation F2: a genuine total outage (every
+        // KNOWN-ISSUES #31/api-degradation F2: a genuine total outage (every
         // batch fails) must still surface as an error, not silently render
         // an all-unpriceable plan.
         [Fact]

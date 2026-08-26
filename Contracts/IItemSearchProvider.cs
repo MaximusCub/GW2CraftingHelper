@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Contracts
     /// valid plan target - an item for which <c>CraftingPlanPipeline</c> can generate
     /// a crafting plan (e.g. discipline recipes, Mystic Forge outputs).
     /// </summary>
-    public class ItemSearchResult
+    internal class ItemSearchResult
     {
         /// <summary>GW2 API item ID. Internal-only - never display to users.</summary>
         public int ItemId { get; set; }
@@ -43,7 +43,7 @@ namespace GW2CraftingHelper.Contracts
     /// user selection.
     /// </para>
     /// </summary>
-    public interface IItemSearchProvider
+    internal interface IItemSearchProvider
     {
         /// <summary>
         /// Searches for plan-valid items matching <paramref name="query"/>.

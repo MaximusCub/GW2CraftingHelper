@@ -6,13 +6,16 @@ at startup instead of fetching every recipe live.
 
 ## Quick Start
 
+From the repo root:
+
 ```
-dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj
+dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
 ```
 
-By default this writes into the repo's `ref/` directory. If seed files
-already exist there, the tool refuses to overwrite them unless you pass
-`--force`.
+Pass `--output-dir` explicitly: with no flag the tool writes into the
+`ref/` folder beside its own built executable (`bin/...`), not the repo's.
+If seed files already exist in the target directory, it refuses to
+overwrite them unless you pass `--force`.
 
 ## CLI Reference
 
@@ -49,6 +52,9 @@ already exist there, the tool refuses to overwrite them unless you pass
 
 ## When to Re-run
 
+- Before every release - it is step 2 of `docs/RELEASING.md`'s protocol,
+  because a seed stale against the live build puts every user on the slow
+  live-API path.
 - After a game update that adds, removes, or changes recipes.
 - After re-running `tools/MysticForgeSeeder` (its output is merged in at
   step 4 above - a stale `ref/mystic_forge_recipes.json` will seed stale

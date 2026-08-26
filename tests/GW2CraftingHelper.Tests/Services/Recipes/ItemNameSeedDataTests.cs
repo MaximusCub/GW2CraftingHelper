@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using GW2CraftingHelper.Services.Recipes;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
 
@@ -79,21 +80,13 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 var data = ItemNameSeedData.Load(stream);
 
-                // KNOWN-ISSUES recipe-ingestion bug class: was
-                // 14587 before that fix re-ran the full seeder chain
-                // (including this file - item_name_seed.json is generated
-                // from the same craftable-item-id set recipe_search_seed.json
-                // indexes) - now includes names for every output item of
-                // the ~230 newly-visible recipes, plus six months of
-                // ordinary game-content growth (see the matching
-                // RecipeCacheSerializerTests count-drift comment for the
-                // full breakdown).
-                // 14762 -> 14766 on the 2026-08-24 reseed at build
-                // 205780: the four preserved negative-id rows made their
-                // outputs craftable-visible, so the Infinite Trebuchet
-                // Blueprint chain now carries names and icons locally
-                // instead of resolving live.
-                Assert.Equal(14766, data.Items.Count);
+                // Row count and bytes against the seeder's own manifest -
+                // see ShippedSeedManifest for why the literal that used to
+                // sit here, under a changelog of every past reseed, was a
+                // tripwire a contributor could only silence by editing it.
+                ShippedSeedManifest.AssertRecipeSeedMatches(
+                    "item_name_seed.json", data.Items.Count);
+                Assert.InRange(data.Items.Count, 12000, 30000);
                 Assert.All(data.Items, item =>
                 {
                     Assert.True(item.Id > 0);

@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Models
     /// Carries a DISPLAY name, never an API attribute token and never an
     /// itemstats id (repo invariant: ids are internal-only).
     /// </summary>
-    public sealed class ItemAttributeLine
+    internal sealed class ItemAttributeLine
     {
         public ItemAttributeLine(string displayName, int value)
         {

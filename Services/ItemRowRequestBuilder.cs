@@ -9,9 +9,9 @@ namespace GW2CraftingHelper.Services
     /// semantics (`addRecipe`/`removeRecipe`, the Remove link's
     /// `recipes.length > 1` visibility gate - docs/gw2e-parity-spec.md)
     /// minus the reorder (`moveRecipe`) affordance - see
-    /// docs/KNOWN-ISSUES.md item 21 for that deliberate divergence.
+    /// docs/KNOWN-ISSUES #21 for that deliberate divergence.
     /// </summary>
-    public static class ItemRowRequestBuilder
+    internal static class ItemRowRequestBuilder
     {
         /// <summary>
         /// One input row's already-Blish-free state: the item id selected
