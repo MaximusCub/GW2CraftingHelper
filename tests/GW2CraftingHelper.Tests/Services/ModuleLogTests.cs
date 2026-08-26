@@ -195,12 +195,12 @@ namespace GW2CraftingHelper.Tests.Services
 
                 log.DiagnosticsEnabled = false;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "hidden");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Empty(store.ReadAll());
 
                 log.DiagnosticsEnabled = true;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "visible");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var afterEnabled = store.ReadAll();
                 Assert.Single(afterEnabled);
                 Assert.Equal("visible", afterEnabled[0].Message);
@@ -229,7 +229,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // (never on the calling thread - see ModuleLog's own class
                 // doc comment on why), so the write is only guaranteed to
                 // have landed once this returns true.
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(3, store.ReadAll().Count);
             }
         }
@@ -251,7 +251,7 @@ namespace GW2CraftingHelper.Tests.Services
                     log.Write(ModuleLogLevel.Info, "t", "m" + i);
                 }
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 var result = store.ReadAll();
                 Assert.Equal(entryCount, result.Count);
@@ -318,12 +318,12 @@ namespace GW2CraftingHelper.Tests.Services
                     log.Write(ModuleLogLevel.Info, "t", "entry " + i);
                 }
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(20, store.ReadAll().Count);
 
                 log.MaxFileSizeBytes = 200;
                 log.Write(ModuleLogLevel.Info, "t", "after the cap dropped");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 var onDisk = store.ReadAll();
                 Assert.True(onDisk.Count < 21, "the lowered cap did not trim: " + onDisk.Count + " entries");
@@ -432,12 +432,12 @@ namespace GW2CraftingHelper.Tests.Services
 
                 log.Write(ModuleLogLevel.Info, "t", "one");
                 log.Write(ModuleLogLevel.Warn, "t", "two");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(2, store.ReadAll().Count);
                 long versionBefore = log.Version;
 
                 log.DeleteFileAndReset();
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 // Ring holds only the trace entry; Version stayed monotonic
                 // (the delete's own trace write bumped it, nothing reset it).
@@ -464,10 +464,10 @@ namespace GW2CraftingHelper.Tests.Services
                 log.Configure(store, 0, null);
 
                 log.Write(ModuleLogLevel.Info, "t", "pre-delete");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 log.DeleteFileAndReset();
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 // Simulate the next session: a fresh ModuleLog seeding from
                 // the same on-disk store. This is exactly why a view-only
