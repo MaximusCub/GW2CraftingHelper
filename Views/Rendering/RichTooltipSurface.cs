@@ -42,8 +42,16 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
-        /// The game's own canvas: pure black, faintly translucent, over
-        /// the whole box.
+        /// The game's own canvas: near-black with a blue-green cast,
+        /// faintly translucent, over the whole box.
+        /// <para>
+        /// The tint (25,32,34) is Blish's game-derived tooltip texture's
+        /// median (decompiled 1.3.0, drawn at 0.98), and all three lossless
+        /// 2026-08-25 live captures show the same cast over their scenes -
+        /// interior medians (31,34,33), (31,40,45), (28,33,36): green ~+5
+        /// and blue ~+7 over red, where the previous pure black had none
+        /// and read colder and flatter than the game.
+        /// </para>
         /// <para>
         /// 0.82, retuned from 0.92 against the maintainer's in-game
         /// capture: a real tooltip's interior is not flat - medians shift
@@ -61,7 +69,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// depended on whether it sat in this class or in an initializer for
         /// some other control.
         /// </remarks>
-        private static readonly Color SurfaceBackgroundColor = new Color(0, 0, 0) * 0.82f;
+        private static readonly Color SurfaceBackgroundColor = new Color(25, 32, 34) * 0.82f;
 
         /// <summary>1px, near-black, all four edges - measured on column
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
