@@ -441,19 +441,37 @@ real progress, even though short of the plan's own 2,000-line target - so
 the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
 fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
 
-The file has since grown back past its own pre-decomposition baseline:
-**5,281 lines, measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`),
-against the ~4,802 above. `Views/Rendering/` holds 8,817 lines across 34
-files on the same date, so the split of plan-tab code is now roughly 63%
-outside the view - a ratio that can move in either direction, unlike the
-one-off before/after figure. Both numbers, and the date, so a later reader
-can re-run the two commands rather than take a characterization on trust.
+The file then grew back past its own pre-decomposition baseline - 5,281
+lines on 2026-08-25, +2,156 in the 33 days after the decomposition
+landed - with nothing in CI to notice. It stands at **4,863 lines,
+measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`), against the
+~4,802 above. `Views/Rendering/` holds 8,932 lines across 36 files on the
+same date, so the split of plan-tab code is roughly 65% outside the view -
+a ratio that can move in either direction, unlike the one-off before/after
+figure. Both numbers, and the date, so a later reader can re-run the two
+commands rather than take a characterization on trust.
+
+Two things changed on that date so the regrowth cannot repeat quietly.
+`docs/file-budgets.txt` pins every tracked `.cs` file to its size that
+day and a CI step fails when a file exceeds its entry, so growth now
+costs a visible line in a checked-in file rather than nothing. And the
+view's `#region` markers, which had numbered eight responsibilities but
+shipped twenty-three disjoint blocks with eleven headers reading
+"(continued)", were renamed: each marker now names its own block and no
+two names repeat. The numbering went rather than the code, because making
+it true would mean reordering exactly the scroll/wheel/ticker machinery
+the WP-26 cut above is about.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
 `Views/Rendering/ITreePlanHost.cs`,
 `Views/Rendering/TreeSectionController.cs`, the seven
 `Views/Rendering/*SectionRenderer.cs` files (the six M38 ones plus
-`NotesSectionRenderer`), and the surviving
+`NotesSectionRenderer`), `Views/Rendering/PlanHeaderRenderer.cs` and
+`Views/Rendering/EmptyPlanStateRenderer.cs` (the plan title and the
+no-plan state, moved onto the same sink on 2026-08-25),
+`Views/ItemInputRowStrip.cs` (the multi-item request editor - in `Views/`
+rather than `Views/Rendering/`, because its controls are `Views` types
+and the dependency points one way), and the surviving
 `_relayoutActions`/`_reellipsisActions` registries plus scroll/resize/wheel
 machinery in `Views/CraftingPlanView.cs`.
 

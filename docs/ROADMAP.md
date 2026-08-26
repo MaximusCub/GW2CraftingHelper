@@ -20,15 +20,26 @@
   [`docs/gw2e-considerations.md`](gw2e-considerations.md)) then found a
   queue of genuine ADOPT gaps against the live calculator; those are what
   the current wave of branches is implementing.
-- **M38 - cleanup wave: complete.** Structural cleanup across the whole
-  codebase: test-infrastructure consolidation, analyzer/style hygiene, the
-  `CraftingPlanView` God-class decomposition into per-section renderers
-  plus a `TreeSectionController` (see
-  [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) section 5), pipeline/solver
-  structural splits, coverage gaps closed, and this documentation
-  restructure. One deliverable from the wave's own plan was **not** built -
-  the `Services/` folder split - and is recorded in the DEFERRED list in
-  [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) with the reason.
+- **M38 - cleanup wave: the work landed; one result did not hold.**
+  Structural cleanup across the whole codebase: test-infrastructure
+  consolidation, analyzer/style hygiene, the `CraftingPlanView` God-class
+  decomposition into per-section renderers plus a `TreeSectionController`
+  (see [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) section 5),
+  pipeline/solver structural splits, coverage gaps closed, and this
+  documentation restructure. One deliverable from the wave's own plan was
+  **not** built - the `Services/` folder split - and is recorded in the
+  DEFERRED list in [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) with the
+  reason.
+
+  The decomposition itself did not stay done. `CraftingPlanView` was
+  ~2,802 lines when the wave closed on 2026-07-23 and 5,281 lines by
+  2026-08-25 - past the ~4,802-line baseline the refactor started from -
+  because nothing in CI measured it and this document said the problem
+  was solved. That is fixed at the source rather than by editing the
+  claim: `docs/file-budgets.txt` plus the line-budget step in
+  `.github/workflows/tests.yml` now fail on growth in any tracked `.cs`
+  file. Read the measured figure in ARCHITECTURE.md section 5, not a
+  status word here.
 - **M39 - core tabs shipped.** Snapshot search/filter, the Log tab (with
   the JSONL log store and rotation), the Settings tab, and the About tab
   all landed and are in normal use - see the README's "Tabs" section for
