@@ -465,10 +465,9 @@ namespace GW2CraftingHelper.Services
             // RecipeSearchResult.AbsenceProven), and what survives such a
             // response is at best incomplete - empty for an ordinary item,
             // or Mystic-Forge-only for one the composite client could fill
-            // in. Cached, that renders a craftable item as an uncraftable (or
-            // half-craftable) leaf and stops every later attempt short of the
-            // API that would correct it: for the session in _searchCache, and
-            // until the next game build in the persistent overlay.
+            // in. Held in _searchCache, that would render a craftable item
+            // as an uncraftable (or half-craftable) leaf for the rest of
+            // the session.
             if (!result.AbsenceProven)
             {
                 return result.RecipeIds;

@@ -24,6 +24,14 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public int? CurrentBuildId => _seed.CurrentBuildId;
 
+        /// <summary>
+        /// Spec 2.3's "corpus usable": the seed actually loaded recipes.
+        /// False disables derived negatives (TryGetSearch falls through to
+        /// the API) and makes the corpus probe pointless - without a seed
+        /// it would refetch the entire live corpus into the overlay.
+        /// </summary>
+        public bool CorpusUsable => _seed.RecipeCount > 0;
+
         public int NegativesVerifiedBuildId => _overlay.NegativesVerifiedBuildId;
 
         public int VerifiedKnownRecipeCount => _overlay.VerifiedKnownRecipeCount;
@@ -113,10 +121,10 @@ namespace GW2CraftingHelper.Services.Recipes
             // corpus (seed + forge + overlay) holds every recipe the live
             // id list does, so "no known recipe outputs this item" IS the
             // answer - the search endpoint would add nothing but its 15
-            // known false negatives. The RecipeCount guard matters:
+            // known false negatives. The CorpusUsable guard matters:
             // Module.cs's seed-load catch can leave an empty seed, and an
             // empty corpus must not answer "no recipe" for everything.
-            if (_seed.RecipeCount > 0)
+            if (CorpusUsable)
             {
                 _stats.IncrementSearchHit();
                 return Array.Empty<int>();

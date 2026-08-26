@@ -579,7 +579,7 @@ namespace GW2CraftingHelper
             int buildId = Volatile.Read(ref _liveGw2BuildId);
             var store = _recipeCacheStore;
             var verifier = _recipeCorpusVerifier;
-            if (buildId == 0 || store == null || verifier == null)
+            if (buildId == 0 || store == null || verifier == null || !store.CorpusUsable)
             {
                 return;
             }
@@ -611,7 +611,10 @@ namespace GW2CraftingHelper
                             ModuleLog.Shared.Write(ModuleLogLevel.Info, "startup", $"Recipe corpus verified at build {buildId}: {result.AddedRecipeIds.Count} recipe(s) added, {result.RemovedRecipeIds.Count} removed.");
                             break;
                         case CorpusVerificationStatus.Failed:
-                            ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe corpus verification failed ({result.Error?.GetType().Name} - {result.Error?.Message}); recipes added since build {store.NegativesVerifiedBuildId} may show as UNKNOWN. Retrying at the next plan generation.");
+                            string lastVerified = store.NegativesVerifiedBuildId > 0
+                                ? $"build {store.NegativesVerifiedBuildId}"
+                                : "the shipped seed";
+                            ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe corpus verification failed ({result.Error?.GetType().Name} - {result.Error?.Message}); recipes added since {lastVerified} may show as UNKNOWN. Retrying at the next plan generation.");
                             break;
                     }
                 }
