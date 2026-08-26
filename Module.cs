@@ -159,6 +159,10 @@ namespace GW2CraftingHelper
 
         private CancellationTokenSource _refreshCts;
 
+        // Cancels the background /v2/build lookup, which retries across
+        // several seconds and holds _httpClient - Unload disposes that.
+        private readonly CancellationTokenSource _buildIdCts = new CancellationTokenSource();
+
         // Written in the finally of the refresh methods, which may resume
         // on a ThreadPool continuation, and read from Update() on the
         // main thread as a mutual-exclusion gate - volatile for
@@ -406,27 +410,43 @@ namespace GW2CraftingHelper
             recipeOverlay.Load(currentGw2BuildId: null);
 
             // Async build ID fetch for overlay invalidation + seed staleness
+            var buildApi = new Gw2BuildApiClient(_httpClient);
             Task.Run(async () =>
             {
                 try
                 {
-                    int buildId = await FetchGw2BuildIdAsync();
+                    var build = await buildApi.TryGetBuildIdAsync(_buildIdCts.Token);
+
+                    if (!build.BuildId.HasValue)
+                    {
+                        // Neither store is told a build, so the persisted
+                        // recipe overlay stays unread AND unwritten for the
+                        // whole session (see
+                        // OverlayRecipeCacheStore._deferredDiskLoad): every
+                        // plan re-fetches its recipes live and the session
+                        // discards what it learned. Warn, not Debug - a user
+                        // whose /v2/build is blocked or slow has no other
+                        // signal that their recipe cache is switched off.
+                        string reason = build.LastError == null
+                            ? "no response"
+                            : $"[{build.LastError.GetType().Name}] {build.LastError.Message}";
+                        Logger.Warn("GW2 build ID unavailable after {0} attempts - the persisted recipe cache is neither read nor written this session: {1}", build.Attempts, reason);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"GW2 build ID unavailable after {build.Attempts} attempts - the persisted recipe cache is neither read nor written this session: {reason}");
+                        return;
+                    }
 
                     // Stamp only after the staleness check: InvalidateIfStale
                     // clears the overlay's stored build when it wipes, so the
                     // reverse order would leave the manifest recording 0 and
                     // the overlay would be deleted again on the next launch.
-                    recipeOverlay.InvalidateIfStale(buildId);
-                    recipeOverlay.SetCurrentBuildId(buildId);
-                    recipeSeed.SetCurrentBuildId(buildId);
+                    recipeOverlay.InvalidateIfStale(build.BuildId.Value);
+                    recipeOverlay.SetCurrentBuildId(build.BuildId.Value);
+                    recipeSeed.SetCurrentBuildId(build.BuildId.Value);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
                 {
-                    // Neither store is told a build, so the persisted recipe
-                    // overlay stays unread and untouched for the session -
-                    // see OverlayRecipeCacheStore._deferredDiskLoad.
-                    Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
-                    ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Could not fetch GW2 build ID for cache validation: {ex.Message}");
+                    // Unloaded mid-fetch: _buildIdCts is cancelled and
+                    // _httpClient disposed before this task can finish.
                 }
             });
 
@@ -1115,6 +1135,9 @@ namespace GW2CraftingHelper
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
 
+            _buildIdCts.Cancel();
+            _buildIdCts.Dispose();
+
             // The scroll-verify/resize-debounce/wheel-wrap-verify tickers
             // are parented to the SpriteScreen, not this view's control
             // tree, so nothing else tears them down on unload - this must
@@ -1649,19 +1672,5 @@ namespace GW2CraftingHelper
             };
         }
 
-        private async Task<int> FetchGw2BuildIdAsync()
-        {
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
-            {
-                var response = await _httpClient.GetAsync(
-                    "https://api.guildwars2.com/v2/build", cts.Token);
-                response.EnsureSuccessStatusCode();
-                string json = await response.Content.ReadAsStringAsync();
-                using (var doc = System.Text.Json.JsonDocument.Parse(json))
-                {
-                    return doc.RootElement.GetProperty("id").GetInt32();
-                }
-            }
-        }
     }
 }
