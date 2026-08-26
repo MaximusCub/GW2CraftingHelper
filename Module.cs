@@ -154,13 +154,13 @@ namespace GW2CraftingHelper
         private Texture2D _cornerIconTexture;
         private Texture2D _emblemTexture;
 
-        private CancellationTokenSource _refreshCts;
-
-        // Written in the finally of the refresh methods, which may resume
-        // on a ThreadPool continuation, and read from Update() on the
-        // main thread as a mutual-exclusion gate - volatile for
-        // cross-thread visibility.
-        private volatile bool _refreshInProgress;
+        // The single-fetch slot: the claim that decides which caller gets
+        // to refresh, and the CancellationTokenSource that refresh runs
+        // under. Both used to be bare fields here (a volatile bool checked
+        // then set, and a source cancelled/disposed/reassigned in three
+        // unsynchronized statements) - see SnapshotRefreshSlot's own doc
+        // comment for the race that shape allowed.
+        private readonly SnapshotRefreshSlot _refreshSlot = new SnapshotRefreshSlot();
 
         // Bumped only by ClearCache; a
         // fetch that captured an older epoch before starting must discard
@@ -182,8 +182,8 @@ namespace GW2CraftingHelper
         // gate on every single Update() tick instead of waiting out
         // RefreshFailureBackoff - see RefreshSnapshotInBackgroundAsync.
         // long, not DateTime, because C# disallows `volatile` on 64-bit
-        // primitives; Interlocked.Read/Exchange give the same cross-thread
-        // visibility guarantee _refreshInProgress gets from volatile
+        // primitives; Interlocked.Read/Exchange give it the same cross-thread
+        // visibility _refreshSlot gets from its own Interlocked claim
         // (_snapshotCommitGate below gets it from its own internal lock
         // instead), without needing a lock of its own here.
         private long _lastFailedRefreshAttemptTicks;
@@ -222,8 +222,8 @@ namespace GW2CraftingHelper
         // rather than written to a control here, the same shape
         // SaveStatusThreadSafe already uses for status text.
         //
-        // NOT the same flag as _refreshInProgress: that one gates whether a
-        // refresh may START (and covers the clicked path too), while this
+        // NOT the same flag as _refreshSlot's claim: that one gates whether
+        // a refresh may START (and covers the clicked path too), while this
         // one is only ever about the SPINNER for the automatic path. Keeping
         // them apart is what lets the clicked path own its own spinner
         // without either path switching the other's off.
@@ -1033,8 +1033,8 @@ namespace GW2CraftingHelper
             }
 
             // The auto-refresh spinner, drained on change. Above the
-            // early return below on purpose: _refreshInProgress is true for
-            // the whole of the refresh whose spinner this is, so a drain
+            // early return below on purpose: the refresh slot is claimed
+            // for the whole of the refresh whose spinner this is, so a drain
             // underneath it would only ever get to switch the spinner ON
             // once the refresh had already finished.
             bool backgroundRefreshing = _backgroundRefreshInFlight;
@@ -1044,7 +1044,7 @@ namespace GW2CraftingHelper
                 _snapshotContent.SetBackgroundRefreshInFlight(backgroundRefreshing);
             }
 
-            if (_refreshInProgress)
+            if (_refreshSlot.IsClaimed)
             {
                 return;
             }
@@ -1112,8 +1112,7 @@ namespace GW2CraftingHelper
             _settings.LogMaxSizeBytes.SettingChanged -= OnLogMaxSizeBytesChanged;
             _settings.ClickSoundVolumePercent.SettingChanged -= OnClickSoundVolumeChanged;
 
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
+            _refreshSlot.CancelCurrent();
 
             // The scroll-verify/resize-debounce/wheel-wrap-verify tickers
             // are parented to the SpriteScreen, not this view's control
@@ -1273,8 +1272,11 @@ namespace GW2CraftingHelper
 
         private async Task RefreshSnapshotInBackgroundAsync()
         {
-            if (_refreshInProgress)
+            if (_refreshSlot.IsClaimed)
             {
+                // Advisory pre-check, kept ahead of the backoff test so a
+                // call that loses to a running refresh still does not log the
+                // backoff line. TryClaim below is the real gate.
                 return;
             }
 
@@ -1290,20 +1292,19 @@ namespace GW2CraftingHelper
                 return;
             }
 
-            _refreshInProgress = true;
+            if (!_refreshSlot.TryClaim())
+            {
+                return;
+            }
 
             // Set only past both early returns above, so a tick that
             // declines to refresh (already running, or inside the failure
             // backoff) never spins a spinner over nothing.
             _backgroundRefreshInFlight = true;
 
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = new CancellationTokenSource();
-
             try
             {
-                var snapshot = await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                var snapshot = await FetchAndSaveSnapshotAsync(_refreshSlot.BeginFetch());
                 Interlocked.Exchange(ref _lastFailedRefreshAttemptTicks, 0);
                 if (snapshot != null)
                 {
@@ -1344,38 +1345,36 @@ namespace GW2CraftingHelper
             finally
             {
                 _backgroundRefreshInFlight = false;
-                _refreshInProgress = false;
+                _refreshSlot.Release();
             }
         }
 
         private async Task<AccountSnapshot> UserRefreshAsync()
         {
-            if (_refreshInProgress)
+            if (!_refreshSlot.TryClaim())
             {
                 return null;
             }
 
-            _refreshInProgress = true;
-
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = new CancellationTokenSource();
-
             try
             {
-                return await FetchAndSaveSnapshotAsync(_refreshCts.Token);
+                // BeginFetch is inside the try, unlike the old inline
+                // cancel/dispose/assign: a throw out of it (a registered
+                // cancellation callback rethrowing out of Cancel(), say) used
+                // to leave the claim set forever, and with it every later
+                // refresh - automatic and clicked - silently declined for the
+                // rest of the session.
+                return await FetchAndSaveSnapshotAsync(_refreshSlot.BeginFetch());
             }
             finally
             {
-                _refreshInProgress = false;
+                _refreshSlot.Release();
             }
         }
 
         private void ClearCache()
         {
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = null;
+            _refreshSlot.CancelCurrent();
 
             // Epoch bump + on-disk delete + field resets all run inside
             // SnapshotCommitGate's lock so a snapshot fetch already in

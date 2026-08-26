@@ -159,6 +159,7 @@
     <Compile Include="Services\RequestLabelFormatter.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
+    <Compile Include="Services\SnapshotRefreshSlot.cs" />
     <Compile Include="Services\SnapshotFetchFailedException.cs" />
     <Compile Include="Services\SnapshotFailureKind.cs" />
     <Compile Include="Services\SnapshotFailureClassification.cs" />
