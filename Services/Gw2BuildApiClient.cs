@@ -44,18 +44,21 @@ namespace GW2CraftingHelper.Services
         private const string BuildUrl = "https://api.guildwars2.com/v2/build";
         private const int MaxAttempts = 3;
 
-        private static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan DefaultAttemptTimeout = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
         private readonly HttpClient _http;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+        private readonly TimeSpan _attemptTimeout;
 
         public Gw2BuildApiClient(
             HttpClient http,
-            Func<TimeSpan, CancellationToken, Task> delay = null)
+            Func<TimeSpan, CancellationToken, Task> delay = null,
+            TimeSpan? attemptTimeout = null)
         {
             _http = http;
             _delay = delay ?? ((d, ct) => Task.Delay(d, ct));
+            _attemptTimeout = attemptTimeout ?? DefaultAttemptTimeout;
         }
 
         /// <summary>
@@ -65,7 +68,7 @@ namespace GW2CraftingHelper.Services
         {
             using (var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
             {
-                timeoutCts.CancelAfter(AttemptTimeout);
+                timeoutCts.CancelAfter(_attemptTimeout);
 
                 using (var response = await _http.GetAsync(BuildUrl, timeoutCts.Token))
                 {

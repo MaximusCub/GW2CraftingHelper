@@ -80,9 +80,11 @@ namespace GW2CraftingHelper.Tests.Services
             return () => throw new HttpRequestException("connection refused");
         }
 
-        private static Gw2BuildApiClient NoDelay(HttpClient http)
+        private static Gw2BuildApiClient NoDelay(
+            HttpClient http, TimeSpan? attemptTimeout = null)
         {
-            return new Gw2BuildApiClient(http, (d, ct) => Task.CompletedTask);
+            return new Gw2BuildApiClient(
+                http, (d, ct) => Task.CompletedTask, attemptTimeout);
         }
 
         [Fact]
@@ -141,7 +143,8 @@ namespace GW2CraftingHelper.Tests.Services
             using (var handler = new HangingHandler())
             using (var http = new HttpClient(handler))
             {
-                var result = await NoDelay(http).TryGetBuildIdAsync(CancellationToken.None);
+                var result = await NoDelay(http, TimeSpan.FromMilliseconds(50))
+                    .TryGetBuildIdAsync(CancellationToken.None);
 
                 // A response that never arrives must be given up on per attempt
                 // and retried, not waited out: the caller is told to degrade.
