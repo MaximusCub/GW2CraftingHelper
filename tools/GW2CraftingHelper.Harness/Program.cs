@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -80,6 +81,10 @@ namespace GW2CraftingHelper.Harness
             bool printCacheStats = false;
             bool clearOverlayCache = false;
             bool dumpTree = false;
+            bool alloc = false;
+            int drift = 0;
+            bool startupTiming = false;
+            List<int> itemOverrides = null;
             // -1 = not specified -> pipeline default
             // (HomesteadEfficiencyTiers.Default, tier 0 for every material).
             // Applies the SAME tier uniformly to Fiber/Metal/Wood - a single
@@ -120,6 +125,31 @@ namespace GW2CraftingHelper.Harness
                     case "--dump-tree":
                         dumpTree = true;
                         break;
+                    case "--alloc":
+                        alloc = true;
+                        break;
+                    case "--drift":
+                        if (i + 1 < args.Length)
+                        {
+                            drift = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        }
+
+                        break;
+                    case "--startup-timing":
+                        startupTiming = true;
+                        break;
+                    case "--items":
+                        if (i + 1 < args.Length)
+                        {
+                            itemOverrides = new List<int>();
+                            foreach (var part in args[++i].Split(','))
+                            {
+                                itemOverrides.Add(
+                                    int.Parse(part.Trim(), CultureInfo.InvariantCulture));
+                            }
+                        }
+
+                        break;
                     case "--homestead-tier":
                         if (i + 1 < args.Length)
                         {
@@ -145,18 +175,38 @@ namespace GW2CraftingHelper.Harness
                 }
             }
 
-            if (profile < 0)
+            if (profile < 0 && itemOverrides == null)
             {
                 Console.Error.WriteLine(
                     "Usage: GW2CraftingHelper.Harness --profile <n> " +
                     "[--iterations <n>] [--live] [--raw] " +
                     "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree] " +
-                    "[--homestead-tier <0|1|2>]");
+                    "[--homestead-tier <0|1|2>] " +
+                    "[--alloc] [--drift <n>] [--startup-timing] [--items <id,id,...>]");
                 return 1;
             }
 
             // Get profile items
-            var items = GetProfileItems(profile, live);
+            List<ProfileItem> items;
+            if (itemOverrides != null)
+            {
+                items = new List<ProfileItem>();
+                foreach (int id in itemOverrides)
+                {
+                    items.Add(new ProfileItem
+                    {
+                        Name = $"Item {id}",
+                        ItemId = id,
+                        Quantity = 1,
+                        RequiresLive = false,
+                    });
+                }
+            }
+            else
+            {
+                items = GetProfileItems(profile, live);
+            }
+
             if (items == null || items.Count == 0)
             {
                 Console.Error.WriteLine($"Unknown profile: {profile}");
@@ -169,6 +219,18 @@ namespace GW2CraftingHelper.Harness
 
             // Build pipeline
             HttpClient httpClient = null;
+            var stepSw = new Stopwatch();
+
+            void ReportStartup(string label)
+            {
+                if (startupTiming)
+                {
+                    Console.WriteLine(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "[startup] {0}: {1}ms", label, stepSw.ElapsedMilliseconds));
+                }
+            }
+
             try
             {
                 IRecipeApiClient recipeApi;
@@ -179,7 +241,9 @@ namespace GW2CraftingHelper.Harness
                 // and (below) merged into the recipe seed - mirroring
                 // Module.cs, so the corpus the derived negatives are built
                 // from includes the forge recipes here too.
+                stepSw.Restart();
                 var mfData = RecipeClientFactory.LoadData(new FileMysticForgeRecipeSource());
+                ReportStartup("Mystic Forge data load");
 
                 if (live)
                 {
@@ -204,6 +268,7 @@ namespace GW2CraftingHelper.Harness
                 var vendorLoader = new VendorOfferLoader();
                 var vendorStore = new VendorOfferStore(dataDir, vendorLoader);
                 string vendorBaseline = Path.Combine(baseDir, "ref", "vendor_offers.json");
+                stepSw.Restart();
                 if (File.Exists(vendorBaseline))
                 {
                     using (var stream = File.OpenRead(vendorBaseline))
@@ -216,10 +281,13 @@ namespace GW2CraftingHelper.Harness
                     vendorStore.LoadBaseline(null);
                 }
 
+                ReportStartup("Vendor offer baseline load");
+
                 // Recipe cache: seed + overlay
                 var recipeSeed = new SeededRecipeCacheStore();
                 string seedSearchPath = Path.Combine(baseDir, "ref", "recipe_search_seed.json");
                 string seedRecipesPath = Path.Combine(baseDir, "ref", "recipes_seed.json");
+                stepSw.Restart();
                 if (File.Exists(seedSearchPath) && File.Exists(seedRecipesPath))
                 {
                     using (var s1 = File.OpenRead(seedSearchPath))
@@ -229,8 +297,12 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
+                ReportStartup("Recipe seed load (search + recipes)");
+
+                stepSw.Restart();
                 recipeSeed.MergeMysticForgeRecipes(mfData);
                 recipeSeed.FinalizeIndex();
+                ReportStartup("Merge MF recipes + FinalizeIndex");
 
                 string seedManifestPath = Path.Combine(baseDir, "ref", "recipe_seed_manifest.json");
                 if (File.Exists(seedManifestPath))
@@ -281,6 +353,7 @@ namespace GW2CraftingHelper.Harness
                 // what the live module always has wired.
                 ItemNameSeedData itemNameSeed = null;
                 string itemNameSeedPath = Path.Combine(baseDir, "ref", "item_name_seed.json");
+                stepSw.Restart();
                 if (File.Exists(itemNameSeedPath))
                 {
                     using (var nameStream = File.OpenRead(itemNameSeedPath))
@@ -288,6 +361,8 @@ namespace GW2CraftingHelper.Harness
                         ItemSearchProviderFactory.Create(nameStream, out _, out itemNameSeed);
                     }
                 }
+
+                ReportStartup("Item name seed load");
 
                 // Acquisition hints seed (docs/KNOWN-ISSUES #8/#17),
                 // mirroring Module.cs so Unknown-decision nodes carry the
@@ -304,10 +379,11 @@ namespace GW2CraftingHelper.Harness
 
                 var recipeCacheStore = new CompositeRecipeCacheStore(recipeSeed, recipeOverlay);
 
+                var solver = new PlanSolver();
                 var pipeline = new CraftingPlanPipeline(
                     new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                     new TradingPostService(priceApi),
-                    new PlanSolver(),
+                    solver,
                     new ItemMetadataService(itemApi, itemNameSeed),
                     vendorStore,
                     reducer: new InventoryReducer(),
@@ -331,19 +407,30 @@ namespace GW2CraftingHelper.Harness
                     Console.WriteLine();
                 }
 
-                // Run each profile item
-                foreach (var item in items)
+                if (alloc)
                 {
-                    if (dumpTree)
+                    await AllocBench.RunAsync(pipeline, items[0], solver);
+                }
+                else if (drift > 0)
+                {
+                    await RunDrift(pipeline, items, drift, homesteadTiers);
+                }
+                else
+                {
+                    // Run each profile item
+                    foreach (var item in items)
                     {
-                        await DumpItemTree(pipeline, item, mode, homesteadTiers);
-                    }
-                    else
-                    {
-                        await RunItemProfile(pipeline, item, iterations, raw, mode, homesteadTiers);
-                    }
+                        if (dumpTree)
+                        {
+                            await DumpItemTree(pipeline, item, mode, homesteadTiers);
+                        }
+                        else
+                        {
+                            await RunItemProfile(pipeline, item, iterations, raw, mode, homesteadTiers);
+                        }
 
-                    Console.WriteLine();
+                        Console.WriteLine();
+                    }
                 }
 
                 if (printCacheStats)
@@ -689,6 +776,54 @@ namespace GW2CraftingHelper.Harness
                         "{0}: {1}ms ({2:F1}%)",
                         s.Name, (long)s.Med, s.Pct));
                 }
+            }
+        }
+
+        /// <summary>
+        /// Solves <paramref name="count"/> plans back to back in one
+        /// process, cycling the given items, and reports per-solve wall
+        /// time plus managed heap after a forced full collection. Flat
+        /// time and flat memory across solves = no per-solve accumulation;
+        /// growth = something retains per-solve state.
+        /// </summary>
+        private static async Task RunDrift(
+            CraftingPlanPipeline pipeline,
+            List<ProfileItem> items,
+            int count,
+            HomesteadEfficiencyTiers homesteadTiers)
+        {
+            Console.WriteLine($"=== Drift run: {count} back-to-back solves ===");
+            Console.WriteLine("| Solve | Item | ms | Managed heap after GC (bytes) | Log ring entries |");
+            Console.WriteLine("|---|---|---|---|---|");
+
+            var sw = new Stopwatch();
+            for (int i = 0; i < count; i++)
+            {
+                var item = items[i % items.Count];
+                sw.Restart();
+
+                // A non-positive id (--items 0) runs the loop without
+                // generating - a control that separates growth caused by a
+                // generation from growth caused by the measurement loop.
+                if (item.ItemId > 0)
+                {
+                    await pipeline.GenerateStructuredAsync(
+                        item.ItemId, item.Quantity, null, CancellationToken.None,
+                        homesteadTiers: homesteadTiers);
+                }
+
+                sw.Stop();
+
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                long heap = GC.GetTotalMemory(forceFullCollection: true);
+
+                Console.WriteLine(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "| {0} | {1} | {2} | {3:N0} | {4} |",
+                    i + 1, item.Name, sw.ElapsedMilliseconds, heap,
+                    ModuleLog.Shared.Version));
             }
         }
 

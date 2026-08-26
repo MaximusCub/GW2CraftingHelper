@@ -545,7 +545,7 @@ tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs            
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                   365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                                 100
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                       610
-tools/GW2CraftingHelper.Harness/Program.cs                                                 726
+tools/GW2CraftingHelper.Harness/Program.cs                                                 861
 tools/GW2CraftingHelper.RecipeSeeder/Program.cs                                            697
 tools/MysticForgeSeeder/Program.cs                                                         521
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                                526
