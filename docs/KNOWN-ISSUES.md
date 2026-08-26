@@ -772,9 +772,14 @@ Panel. Gate not yet run live. Full record:
 
 ### 58. W3D: plan persistence across module restarts
 
-What a persisted plan restores and what it does not: `ValueOwnMaterials` is
-restored into its live checkbox, `UseOwnMaterials` and `PriceBasis` are not.
-Full record:
+Originally, only `ValueOwnMaterials` was restored into its live control -
+`RequestItems`, `UseOwnMaterials` and `PriceBasis` were persisted on every
+save but ignored on restore, so a restored session's Generate Plan answered
+"Add at least one item" until the user retyped their own request (observed
+live 2026-08-26, twice). Fixed on the restore-inputs branch: all three now
+reseed the input rows, checkbox and dropdown
+(`RestoredRequestInputs.BuildRowSeeds` -> `ItemInputRowStrip.RestoreRows`),
+with no schema change. Full record:
 `dev/archive/known-issues/2026-08-09-w3d-plan-persistence-across-module-restarts.md`.
 
 ### 59. Best Path and Clear Overrides are one action
