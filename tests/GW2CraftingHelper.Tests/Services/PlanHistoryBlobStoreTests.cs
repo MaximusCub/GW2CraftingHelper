@@ -177,9 +177,9 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData("")]
         [InlineData("..")]
         [InlineData("../evil")]
-        [InlineData("0123456789abcdef0123456789abcde")]     // 31 chars
-        [InlineData("0123456789abcdef0123456789abcdef0")]   // 33 chars
-        [InlineData("0123456789ABCDEF0123456789ABCDEF")]    // uppercase
+        [InlineData("0123456789abcdef0123456789abcde")] // 31 chars
+        [InlineData("0123456789abcdef0123456789abcdef0")] // 33 chars
+        [InlineData("0123456789ABCDEF0123456789ABCDEF")] // uppercase
         [InlineData("0123456789abcdef0123456789abcde/")]
         [InlineData("0123456789abcdef0123456789abcde\\")]
         public async Task InvalidEntryIds_AreRejectedWithoutTouchingTheFilesystem(string entryId)
