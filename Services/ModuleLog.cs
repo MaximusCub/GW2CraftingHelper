@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Module-wide structured log sink (dev/proposals/
-    /// d2-log-system.md Section 4). Two
+    /// dev/proposals/d2-log-system.md Section 4). Two
     /// responsibilities:
     /// <list type="number">
     /// <item>A thread-safe, fixed-capacity in-memory ring buffer, always
@@ -474,7 +474,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The destructive "clear log file" action (d2-log-system.md
+        /// The destructive "clear log file" action (dev/proposals/d2-log-system.md
         /// Section 7, Open Question 4 - distinct from the Log tab's
         /// view-only Clear): deletes the on-disk file AND clears the
         /// in-memory ring, then writes one Info entry recording the

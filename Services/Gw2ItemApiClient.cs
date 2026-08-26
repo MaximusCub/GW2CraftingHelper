@@ -49,10 +49,7 @@ namespace GW2CraftingHelper.Services
                 var results = new List<RawItem>();
                 foreach (var item in array)
                 {
-                    // design-plan-notes.md (Notes section, excess/reclaim
-                    // account-bound exclusion): the "flags" array (e.g.
-                    // "AccountBound") was previously parsed nowhere - see
-                    // RawItem.Flags' own doc comment. Missing/non-array
+                    // Missing/non-array
                     // "flags" yields an empty list, never null, mirroring
                     // the Name/Icon/Rarity "" fallback convention above.
                     var flags = new List<string>();

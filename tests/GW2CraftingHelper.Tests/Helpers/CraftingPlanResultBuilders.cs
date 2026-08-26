@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // exercises the same "no data" path production code hits
                 // for every legacy/degraded snapshot.
                 CharacterDisciplines = characterDisciplines,
-                // design-plan-notes.md (Notes section): matches
+                // Matches
                 // RequiredDisciplines/RequiredRecipes' own "empty list, not
                 // null" default above - production (ExcessCraftOutputCalculator/
                 // PlanResultBuilder) never leaves either field null once run.

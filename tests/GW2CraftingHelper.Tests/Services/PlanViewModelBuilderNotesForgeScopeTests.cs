@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.CraftingPlanResultBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, gambling-forge scope) -
+    /// Plan Notes forge-scope line:
     /// PlanViewModelBuilder.BuildNotesSection's forge-scope line, driven by
     /// CraftingPlanResult.ProbabilisticForgeOutputItemIds (populated by
     /// PlanResultBuilder - see PlanResultBuilderTests'

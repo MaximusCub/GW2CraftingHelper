@@ -351,7 +351,7 @@ namespace GW2CraftingHelper
             catch (Exception ex)
             {
                 // No seed files yet - graceful degradation. Previously a
-                // fully silent bare catch (d2-log-system.md Section 8: "a
+                // fully silent bare catch (dev/proposals/d2-log-system.md Section 8: "a
                 // real gap the migration closes, not just a routing
                 // change") - now visible in the Log tab at Warn.
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe seed load failed, starting with an empty seed cache: {ex.GetType().Name} - {ex.Message}");
@@ -1187,7 +1187,7 @@ namespace GW2CraftingHelper
             _settingsContent?.Teardown();
             _aboutContent?.Teardown();
 
-            // Module-level log system (d2-log-system.md Section 7): the
+            // Module-level log system (dev/proposals/d2-log-system.md Section 7): the
             // file-sink append/trim now happens on a background flush
             // queue, never on the calling thread (see ModuleLog's own class
             // doc comment) - give any writes already queued (e.g. from a

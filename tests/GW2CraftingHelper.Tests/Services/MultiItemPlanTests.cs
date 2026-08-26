@@ -1003,7 +1003,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// have a live TP sell price. Item 1200 is crafted and also has a
         /// live sell price. Regression: the batch
         /// rollup has NO craft-vs-buy filter at all (docs/research/
-        /// m37-r2-batch-economics.md Section 4.1.1 explicitly recommends
+        /// docs/research/m37-r2-batch-economics.md Section 4.1.1 explicitly recommends
         /// against replicating gw2e's own craft===true filter) - a
         /// bought-but-tradable root still contributes its own
         /// NetSaleValue/CraftingProfit, exactly like the single-item path
@@ -1205,9 +1205,8 @@ namespace GW2CraftingHelper.Tests.Services
         /// ends up BOUGHT (see BuildBuyVsCraftPipeline's own doc comment -
         /// buy 50 beats craft 500 even zero-owned), folding a forgone-value
         /// deduction into MaterialOpportunityCost for a branch that was
-        /// never actually crafted - precisely the audited row-31 "phantom
-        /// UsedMaterials" bug this milestone fixes (see design-value-own-
-        /// materials.md Section 1).
+        /// never actually crafted - the "phantom UsedMaterials" bug the
+        /// decision-guided reduction fixes.
         ///
         /// Now: the guided reduction (InventoryReducer.Reduce's
         /// zeroOwnedDecisions parameter) sees that 1100's zero-owned

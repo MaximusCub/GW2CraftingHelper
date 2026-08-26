@@ -59,7 +59,7 @@ namespace GW2CraftingHelper.Services
         // ingredient-level RawIngredient.AchievementBit. Populated
         // for the achievement-recipe seed additions, so a future task
         // surfacing "this recipe is achievement-gated" does not need a
-        // second schema migration (m37-r3-achievement-dedup.md Section 6,
+        // second schema migration (docs/research/m37-r3-achievement-dedup.md Section 6,
         // open question 5).
         public int? AchievementId { get; set; }
     }

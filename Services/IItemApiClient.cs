@@ -14,8 +14,7 @@ namespace GW2CraftingHelper.Services
 
         public string Rarity { get; set; }
 
-        // design-plan-notes.md (Notes section, excess/reclaim account-bound
-        // exclusion): raw /v2/items "flags" strings (e.g. "AccountBound",
+        // Raw /v2/items "flags" strings (e.g. "AccountBound",
         // "SoulBindOnAcquire", "NoSell") - see Gw2ItemApiClient.GetItemsAsync.
         // Never null from that production parser (empty list when the API
         // response has no flags array); ItemMetadataService.

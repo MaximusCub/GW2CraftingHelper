@@ -170,6 +170,27 @@ tag; see `docs/RELEASING.md`.
   double-hyphen (`--`) instead. CI fails the build on one, in any tracked
   `.cs`, `.csproj`, `.yml`, `.json` or `.config` file outside `ref/` (which
   holds generated GW2 data, not authored text).
+- **A comment must carry something the code and `git log` cannot.** The
+  test: could a reader get this from the code in front of them plus one
+  `git log -S`? If yes, the comment is noise. What survives is the external
+  fact - vendor binary behaviour, a Windows constant, a GW2 API quirk, a
+  measurement, a derivation, an invariant a caller can violate. What does
+  not survive: refactor provenance ("moved verbatim out of X", "was private
+  static, now internal static", "no logic changes"), review rebuttals
+  ("this is deliberate, not an oversight"), bug-discovery narratives, and
+  session-local jargon ("per the brief", "directive B", milestone codes) -
+  those belong in the commit message, or in `docs/` when a future reader
+  needs them. Keep contiguous comment blocks to roughly 12 lines: past
+  that, the invariant a caller must not violate stays inline and the
+  narrative moves to `docs/ARCHITECTURE.md` under a section the comment
+  then points at. State a rule once, canonically, and point at it from the
+  other sites rather than restating it - a comment claiming to "mirror X
+  exactly" promises a synchronisation nothing enforces.
+- **Cite documents by repo-relative path.** A `.md` filename in a `.cs`
+  comment must resolve against the tree (`dev/proposals/d2-log-system.md`,
+  not `d2-log-system.md`); CI fails the build on a citation that resolves
+  nowhere, because a bare name sends a reader hunting for a file that may
+  never have been committed.
 - **XML doc where it earns its place; never as an obligation.** A
   `<summary>` belongs on a type or member whose contract is not already
   obvious from its name, and on anything carrying a measurement or an

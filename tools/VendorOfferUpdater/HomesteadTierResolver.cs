@@ -10,7 +10,7 @@ namespace VendorOfferUpdater
     /// Gw2ApiHelper/HttpClient fixture.
     ///
     /// Mirrors gw2efficiency's own cheapestTree.ts matching shape (docs/
-    /// research/m37-r1-homestead.md Section 1.2): a row only participates
+    /// docs/research/m37-r1-homestead.md Section 1.2): a row only participates
     /// in tier gating when its merchant name contains the literal substring
     /// "Homestead Refinement" (gw2e: tree.merchant.name.includes('Homestead
     /// Refinement')) - matching all three station pages ("...-Farm",

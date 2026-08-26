@@ -54,9 +54,8 @@ namespace GW2CraftingHelper.Models
 
         public int? RecipeId { get; set; }
 
-        // design-plan-notes.md (Notes section, excess/reclaim): batch shape
-        // of the chosen recipe at this exact tree occurrence (gw2e-
-        // considerations.md #4) - CraftsNeeded * RecipeOutputCount is what
+        // Batch shape of the chosen recipe at this exact tree occurrence
+        // (docs/gw2e-considerations.md #4) - CraftsNeeded * RecipeOutputCount is what
         // this craft actually produces, which can exceed Quantity (this
         // node's own real demand) when the batch doesn't divide evenly. Set
         // only for Decision == Craft nodes (CraftingTreeBuilder.BuildNode,

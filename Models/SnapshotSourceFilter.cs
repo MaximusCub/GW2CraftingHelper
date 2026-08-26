@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// Which account-inventory sources the Snapshot tab's search/filter row
-    /// should include (d1-snapshot-about-settings.md Feature 1). The three
+    /// should include (dev/proposals/d1-snapshot-about-settings.md Feature 1). The three
     /// storage locations default to true (show everything), matching the
     /// pre-search-box tab's implicit no-filter behavior.
     /// <para>

@@ -13,7 +13,7 @@ using MonoGame.Extended.BitmapFonts;
 namespace GW2CraftingHelper.Views
 {
     /// <summary>
-    /// The Log tab's search/view pane (d2-log-system.md Section 3):
+    /// The Log tab's search/view pane (dev/proposals/d2-log-system.md Section 3):
     /// level-filter dropdown, text search, follow-tail, copy-to-clipboard,
     /// clear-view, and the confirm-gated destructive delete-log-file
     /// action, backed directly by a ModuleLog's ring buffer.

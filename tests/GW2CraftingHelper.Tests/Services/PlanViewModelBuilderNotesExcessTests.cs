@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.CraftingPlanResultBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, excess/reclaim) -
+    /// Plan Notes excess/reclaim lines:
     /// PlanViewModelBuilder.BuildNotesSection's excess-line assembly, given
     /// an already-computed CraftingPlanResult.ExcessCraftOutputs list (the
     /// calculator's own aggregation arithmetic is covered separately by

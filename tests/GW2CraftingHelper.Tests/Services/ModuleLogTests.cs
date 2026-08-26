@@ -183,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(20, log.Snapshot().Count);
         }
 
-        // --- File-sink gating policy (d2-log-system.md Section 6): tested
+        // --- File-sink gating policy (dev/proposals/d2-log-system.md Section 6): tested
         // against a REAL ModuleLogStore/temp dir, not a fake. ---
 
         [Fact]

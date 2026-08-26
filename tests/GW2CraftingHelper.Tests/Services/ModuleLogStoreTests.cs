@@ -72,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
 
                 string line = File.ReadAllText(store.FilePath).TrimEnd('\n', '\r');
 
-                // Short property names deliberately (d2-log-system.md
+                // Short property names deliberately (dev/proposals/d2-log-system.md
                 // Section 4.1) - this file is written far more often than
                 // snapshot.json, so every byte compounds across the
                 // retention window.
@@ -114,7 +114,7 @@ namespace GW2CraftingHelper.Tests.Services
 
                 // Simulates a crash mid-append leaving a truncated last
                 // line - exactly the failure JSONL (vs. one big JSON array)
-                // is chosen to tolerate, per d2-log-system.md Section 4.1.
+                // is chosen to tolerate, per dev/proposals/d2-log-system.md Section 4.1.
                 File.AppendAllText(store.FilePath, "{\"t\":\"not valid json truncat");
 
                 var entries = store.ReadAll();

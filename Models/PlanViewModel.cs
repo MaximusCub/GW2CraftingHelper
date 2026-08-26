@@ -11,8 +11,8 @@ namespace GW2CraftingHelper.Models
         RequiredDisciplines,
         RequiredRecipes,
 
-        // Plan Notes (single flat advisory section, Option 1 of
-        // design-plan-notes.md): excess/reclaim, competency gaps, and the
+        // Plan Notes - ONE flat advisory section carrying every note kind,
+        // not a section per kind: excess/reclaim, competency gaps, and the
         // Mystic-Clover-yield forge-scope caveat, in that fixed order - see
         // PlanViewModelBuilder.BuildNotesSection. Always last (Build()'s
         // section 7) since every note kind is a caveat ABOUT facts shown in
@@ -97,7 +97,7 @@ namespace GW2CraftingHelper.Models
         // one (PlanViewModelBuilder.UnpricedFootnoteText).
         SummaryFootnote,
 
-        // design-plan-notes.md (Notes section, Option 1): the one shared
+        // The one shared
         // row shape for every line in PlanSectionType.Notes - excess/
         // reclaim, competency, and forge-scope lines all use this single
         // member rather than one row type per note kind. Label carries the

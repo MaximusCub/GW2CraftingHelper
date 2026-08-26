@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Services
     /// Logger level names 1:1 (Debug/Info/Warn/Error are the only levels
     /// used anywhere in this codebase's existing Logger.* call sites - no
     /// Fatal/Trace exist, so four levels covers current usage without
-    /// inventing unused ones - see d2-log-system.md Section 4.1). Ordinal
+    /// inventing unused ones - see dev/proposals/d2-log-system.md Section 4.1). Ordinal
     /// order doubles as severity order for the Log tab's "minimum severity"
     /// filter (Error+/Warn+/Info+/Debug+) and for ModuleLog's own file-sink
     /// floor check.

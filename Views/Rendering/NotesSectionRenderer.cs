@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // design-plan-notes.md (Notes section, Option 1): renders every row of
+    // Renders every row of
     // PlanSectionType.Notes - all PlanRowType.NoteLine - as WRAPPED text
     // with an optional right-aligned coin cell on its first line.
     // RenderValueCellRightAligned/RepositionValueCellRightAligned are the
@@ -19,8 +19,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // reclaim amount this section shows - so this section needs its own
     // case in that switch rather than falling through to the default).
     //
-    // Row-height discipline is still load-bearing (design-plan-notes.md
-    // section 4) and unchanged in kind: a note is greedily wrapped into k
+    // Row-height discipline is load-bearing: a note is greedily wrapped into k
     // lines by NotesSectionLayoutMath.WrapNote, and each LINE gets its own
     // PlanContentHeightMath.FallbackTextRowHeight-tall Panel. So every
     // panel this class builds is still exactly that height, the DEBUG

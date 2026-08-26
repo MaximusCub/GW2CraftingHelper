@@ -8,8 +8,8 @@ using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (m3-display-
-    /// decision-map.md's decision -> pill table) plus the HAVE/CURRENCY
+    /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (the
+    /// decision -> pill table) plus the HAVE/CURRENCY
     /// short-circuits, exercising the real DecisionPillPlanner.BuildPillSpecs
     /// production code - KNOWN-ISSUES #18. Also covers:
     /// the non-interactive "HAVE N/M NEEDED" annotation and the interactive

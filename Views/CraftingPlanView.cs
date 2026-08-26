@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
         #region General: shared layout constants, colors, top-region geometry & dependencies
 
         // Not one of the architecture report's 11 responsibilities - shared
-        // substrate consumed by several regions below (see m38-a1-architecture.md S3).
+        // substrate consumed by several regions below (see dev/dev-notes/m38-plan/m38-a1-architecture.md S3).
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
         // Layout constants. The top strip's own Y arithmetic lives in the
@@ -2117,7 +2117,7 @@ namespace GW2CraftingHelper.Views
 
         // Wires Input Rows (1), the wheel handlers (3/4), and the resize
         // handler (5) together onto the freshly built controls; not itself
-        // one of the 11 - see m38-a1-architecture.md S3.
+        // one of the 11 - see dev/dev-notes/m38-plan/m38-a1-architecture.md S3.
         public void Build(Container buildPanel)
         {
             // Screen-parented popups from the previous build cycle (one
@@ -5028,8 +5028,7 @@ namespace GW2CraftingHelper.Views
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.Notes:
-                    // design-plan-notes.md (Notes section, Option 1): row
-                    // rendering lives in Views/Rendering/NotesSectionRenderer -
+                    // Row rendering lives in Views/Rendering/NotesSectionRenderer -
                     // needs its own case rather than the default fallback
                     // below, since CreateTextRow never draws a coin value
                     // and this section's excess/reclaim lines carry one.

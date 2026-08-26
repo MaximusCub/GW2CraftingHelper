@@ -311,8 +311,7 @@ namespace GW2CraftingHelper.Services
                     Name = entry.Name,
                     IconUrl = entry.Icon,
                     Rarity = entry.Rarity,
-                    // design-plan-notes.md (Notes section, excess/reclaim
-                    // account-bound exclusion): null-tolerant even though
+                    // Null-tolerant even though
                     // the production Gw2ItemApiClient parser never returns
                     // a null Flags list - a test fixture or future client
                     // implementation might.

@@ -89,7 +89,7 @@ namespace GW2CraftingHelper.Services
         public SettingEntry<int> LogRetentionDays { get; private set; }
 
         // The ONE diagnostics toggle for the whole module
-        // (d2-log-system.md Section 5) -
+        // (dev/proposals/d2-log-system.md Section 5) -
         // subsumes ScrollDiagnosticsEnabled above and additionally gates
         // whether Debug-level ModuleLog entries reach the file sink (they
         // always still land in the in-memory ring regardless - see

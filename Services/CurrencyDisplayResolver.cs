@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Services
         /// offers, or a non-vendor row), in which case this returns null
         /// rather than reviving the old misleading average: gw2efficiency
         /// itself never shows a per-unit currency price at all (docs/
-        /// gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
+        /// docs/gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
         /// Each cell is the closer parity choice than guessing.
         ///
         /// When a line's per-batch count does not divide evenly by

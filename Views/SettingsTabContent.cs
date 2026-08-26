@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Views
         // - it is already directly comparable and CurrencyValuation rejects
         // coin-keyed entries outright.
         //
-        // Astral Acclaim (63) - addendum-astral-acclaim.md P1: added so a
+        // Astral Acclaim (63) - dev/proposals/addendum-astral-acclaim.md P1: added so a
         // user CAN value it if they choose to, but with no suggested rate
         // (see the info line in BuildCurrencyValuationsSection below) - a
         // single implied copper-per-AA
@@ -310,7 +310,7 @@ namespace GW2CraftingHelper.Views
         private readonly ResizeSettleDebounce _resizeSettle;
 
         // The ONE "Diagnostics" checkbox + the two log-file
-        // policy rows (max size / retention) - d2-log-system.md Section 5.
+        // policy rows (max size / retention) - dev/proposals/d2-log-system.md Section 5.
         // No separate
         // ScrollDiagnosticsEnabled checkbox is surfaced here - see
         // ModuleSettings' own doc comment on that setting's backward-compat
@@ -1207,7 +1207,7 @@ namespace GW2CraftingHelper.Views
             // exist on the rows with no default. The price-basis pointer
             // moved to this section's title hover: it points at another tab
             // rather than instructing about a control here.
-            // addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
+            // dev/proposals/addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
             // for Astral Acclaim specifically - it is untradable and earned
             // via capped seasonal play, so unlike the other currencies
             // below, there is no rate this settings row can honestly
@@ -1564,7 +1564,7 @@ namespace GW2CraftingHelper.Views
             {
                 // Retention is only enforced once per session at
                 // Module.Initialize (age-based pruning does not need
-                // per-write cost - d2-log-system.md Section 4.2), so a
+                // per-write cost - dev/proposals/d2-log-system.md Section 4.2), so a
                 // saved value here intentionally takes effect next session,
                 // not immediately - nothing holds a live copy of it to keep
                 // current, unlike the size cap above.
