@@ -1043,10 +1043,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // only the "is the name actually truncated" line needs to be
             // reconsidered when nameMaxWidth changes.
             //
-            // tree-tooltip-composer milestone: the actual line-building
-            // logic (unit price, AUDIT ROW 20/38 price-side-fallback
-            // caveat, acquisition hint, caption, wiki-link line) moved
-            // verbatim to the pure, unit-tested
+            // The line-building itself (unit price, price-side-fallback
+            // caveat, acquisition hint, caption, wiki-link line) lives in
+            // the pure, unit-tested
             // Services/TreeRowTooltipComposer.cs - see that class's own doc
             // comment and docs/ARCHITECTURE.md section 5's STANDING RULE.
             // Only the Blish-bound right-click event wiring below stays
@@ -1161,10 +1160,10 @@ namespace GW2CraftingHelper.Views.Rendering
             RenderCostCell(handle, node, edges.CostRightEdge, dimmed);
 
             // Child container. Children of a non-Craft decision are this
-            // module's own informational reference branch (audit row 56
-            // PART B #3: corrected provenance - gw2e has no equivalent
-            // ".not-crafted" concept; this dimmed "what it would cost to
-            // craft instead" branch is a module original) - dimmed, and the
+            // module's own informational reference branch (gw2e has no
+            // equivalent ".not-crafted" concept; this dimmed "what it would
+            // cost to craft instead" branch is a module original) - dimmed,
+            // and the
             // flag does not stack on already-dimmed branches.
             FlowPanel childFlow = null;
             if (hasChildren)

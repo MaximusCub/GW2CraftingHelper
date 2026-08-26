@@ -23,9 +23,8 @@ namespace GW2CraftingHelper.Views.Rendering
     /// <b>The choice, and why.</b> The band wins, on three grounds. It is
     /// what four of the five existing headers already do, so unifying the
     /// other way would have rewritten the majority to match the minority.
-    /// It is the more recent deliberate decision - batch D introduced the
-    /// band for the tree AFTER the Shopping List's lighter treatment
-    /// existed. And it is the one that survives this module's own row
+    /// It is the more recent decision - the tree's band was introduced
+    /// after the Shopping List's lighter treatment existed. And it is the one that survives this module's own row
     /// chrome: every table row already carries a 2px divider and, in most
     /// tables, an icon, so an unbanded header in a lighter grey reads as a
     /// faint first data row rather than as a header, which is exactly the

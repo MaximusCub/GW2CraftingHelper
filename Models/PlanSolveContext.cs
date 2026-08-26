@@ -157,7 +157,7 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<SnapshotCharacterDiscipline> CharacterDisciplines { get; set; }
 
         /// <summary>
-        /// VOM finding #1 fix: the ORIGINAL, unreduced tree from GENERATION
+        /// The ORIGINAL, unreduced tree from GENERATION
         /// time (the same `tree` OwnedMaterialsForceBuyPrePass and the
         /// zero-owned decision pass ran against, in
         /// CraftingPlanPipeline), snapshotted here ONLY when the force-buy pre-pass

@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
             RecipeNode tree,
             AccountItemIndex index,
             string activeCharacterName,
-            // Value-Own-Materials (VOM) design, Candidate A: the Decisions
+            // The Decisions
             // dictionary from a throwaway zero-owned PlanSolver.Solve on the
             // SAME unreduced tree (with forceBuyOnlyNodeIds already applied)
             // - see CraftingPlanPipeline.RunPipelineAsync's zero-owned solve.
@@ -77,7 +77,7 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="zeroOwnedDecisions"/> below, which recipe
         /// option's descendants get to consume the pool:
         ///
-        /// - VOM design (Candidate A), decision-guided mode: when
+        /// - Decision-guided mode: when
         ///   <paramref name="zeroOwnedDecisions"/> is non-null and contains
         ///   this node's NodeId, the recipe option that decision's
         ///   Source == Craft &amp;&amp; RecipeId matches is the one whose
@@ -113,7 +113,7 @@ namespace GW2CraftingHelper.Services
         ///   greater than 1.
         /// - Legacy heuristic: used
         ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
-        ///   pre-VOM caller/test) OR does not contain this node's NodeId
+        ///   caller/test) OR does not contain this node's NodeId
         ///   (defensive fallback) - true only along the single
         ///   chosen-recipe-candidate chain, the root, then recursively only
         ///   each node's PRIMARY option (node.Recipes[0], the option

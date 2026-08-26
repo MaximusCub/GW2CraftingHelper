@@ -266,8 +266,8 @@ namespace GW2CraftingHelper.Services
             RecipeNode treeUsedForSolve = tree;
             List<UsedMaterial> usedMaterials = null;
             Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null;
-            // VOM finding #1 fix: captured here (rather than scoped inside
-            // the `if` below) so it can also feed PlanSolveContext.
+            // Captured here rather than scoped inside the `if` below so it
+            // can also feed PlanSolveContext.
             // AccountItems further down - see that field's own doc comment.
             AccountItemIndex accountIndex = null;
 

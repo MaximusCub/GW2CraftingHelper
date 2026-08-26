@@ -19,10 +19,10 @@ namespace GW2CraftingHelper.Services
 
         // gw2efficiency-style "value own materials" (upgraded over time
         // from a display-only opportunity-cost tweak into a real
-        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
-        // the VOM design (Candidate A) further upgraded it into a full
-        // decision-invariant reduction - see InventoryReducer's
-        // zeroOwnedDecisions doc comment): when enabled, a node is
+        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass - and
+        // then into a full decision-invariant reduction, see
+        // InventoryReducer's zeroOwnedDecisions doc comment): when enabled,
+        // a node is
         // force-excluded from crafting whenever buying it outright costs
         // less than 85% of its own components' fresh buy cost
         // (gw2efficiency's getCheaperToBuyItemIds), owned stock only ever
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services
         // choose (never a never-chosen branch), and the plan's profit
         // figure is reduced by owned materials' sell opportunity cost.
         //
-        // SUPERSEDED (VOM design Section 5): this setting is kept defined
+        // SUPERSEDED: this setting is kept defined
         // ONLY for backward compatibility with an already-persisted
         // settings.json value (mirroring the ScrollDiagnosticsEnabled
         // precedent below) - it is no longer read on the live Module.cs

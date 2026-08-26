@@ -6,11 +6,10 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Builds a Recipe Tree row's extra tooltip lines (unit-price line(s),
-    /// the AUDIT ROW 20/38 TP price-side-fallback caveat, the Unknown/
+    /// the TP price-side-fallback caveat, the Unknown/
     /// GuildUpgrade acquisition hint, the receipt/what-if caption, and the
-    /// "Right-click: Open wiki page" affordance line) - moved verbatim out
-    /// of <c>TreeSectionController.RenderTreeNode</c> (tree-tooltip-composer
-    /// milestone; docs/ARCHITECTURE.md section 5's STANDING RULE). Pure,
+    /// "Right-click: Open wiki page" affordance line), for
+    /// <c>TreeSectionController.RenderTreeNode</c>. Pure,
     /// Blish-free string shaping so this row-tooltip logic is directly
     /// unit-testable without a live <c>Panel</c>/<c>BasicTooltipText</c>,
     /// matching this repo's established pattern for tree-rendering text
@@ -152,78 +151,32 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // AUDIT ROW 20/38 (gw2e price-side fallback parity, DISPLAY
-            // CAVEAT): this node's TP unit price came from the item's
-            // NON-preferred side because the preferred side had no
-            // listings (CraftingTreeBuilder.BuildNode/
-            // SolverDecision.PriceSideFellBack) - flag it so the number
-            // shown doesn't read as an ordinary preferred-side price.
-            // Deliberately outside the node.Quantity > 1 gate above: this
-            // caveat is about WHICH TP side priced the node, not about a
-            // qty=1 row already showing its own total as the unit price.
+            // Price-side fallback caveat: this node's TP unit price came
+            // from the item's NON-preferred side because the preferred side
+            // had no listings (CraftingTreeBuilder.BuildNode /
+            // SolverDecision.PriceSideFellBack), so the number shown must
+            // not read as an ordinary preferred-side price. Outside the
+            // node.Quantity > 1 gate above on purpose: the caveat is about
+            // WHICH TP side priced the node, not about a qty=1 row showing
+            // its total as the unit price.
             //
-            // also covers a BuyFromVendor
-            // cost-component leaf (node.IsCostComponent) whose own TP-
-            // valued barter price fell back the same way - see
-            // VendorItemCostLine.PriceSideFellBack and
-            // CraftingTreeBuilder.BuildVendorCostComponentLeaves.
+            // Three producers set the flag: a BuyFromTp node, a
+            // BuyFromVendor cost-component leaf whose TP-valued barter price
+            // fell back (VendorItemCostLine.PriceSideFellBack), and a
+            // BuyFromVendor PARENT, whose flag is an OR across its
+            // VendorItemCosts - folded up so the caveat is still reachable
+            // when the offending leaf renders collapsed
+            // (PlanContentHeightMath.IsNodeExpanded caps default expansion
+            // at depth < 2).
             //
-            // Also: also covers a plain
-            // BuyFromVendor node with no cost-component leaves at all (a
-            // pure item-barter offer, kindCount==1 - the common case - or
-            // any offer VendorComponentCostsUnreliable suppressed leaf
-            // synthesis for) - CraftingTreeBuilder.BuildNode sets that
-            // node's own PriceSideFellBack (OR across VendorItemCosts) in
-            // that case, so `node.Decision ==
-            // CraftingDecision.BuyFromVendor` on its own already covers
-            // both this case and the cost-component leaf above (a leaf's
-            // own Decision is always BuyFromVendor too - see
-            // BuildVendorCostComponentLeaves) - IsCostComponent is kept as
-            // an explicit disjunct anyway to document both producers by
-            // name rather than rely on that overlap implicitly.
-            //
-            // Also:
-            // BuildNode's parent-flag check widened further to also cover a
-            // BuyFromVendor node that DID get component leaves (2+ cost
-            // kinds) - its own coin total still includes the fallen-back
-            // item's value, and that parent node is exactly what renders
-            // collapsed by default a couple of levels deep
-            // (PlanContentHeightMath.IsNodeExpanded caps expansion at
-            // depth < 2), hiding the leaf-only caveat. `node.Decision ==
-            // CraftingDecision.BuyFromVendor` reads the widened parent flag
-            // with no further gate changes; the leaf below it (if any)
-            // keeps carrying its own flag too, so both rows can show a
-            // caveat with no double-render (they are separate tooltip
-            // lines on separate rows).
-            //
-            // (Misattributed caveat text on vendor
-            // rows): a BuyFromVendor PARENT's PriceSideFellBack is never
-            // about ITS OWN item's TP price - that node was not bought on
-            // the TP at all - it is an aggregate ("did any barter cost
-            // line fall back") folded up from VendorItemCosts so the
-            // caveat is reachable even when the offending leaf renders
-            // collapsed (see the BuildNode comments this mirrors). Reusing
-            // the BuyFromTp/cost-component-leaf sentence here asserted THIS
-            // row's item has no buy orders on the preferred side, which is
-            // false in general: the row's own item may have a perfectly
-            // healthy TP presence, or none at all - only one of its vendor
-            // cost items fell back. A BuyFromTp node and an IsCostComponent
-            // leaf both keep the original sentence unchanged - for those
-            // two, the flag genuinely describes the row's own price. A
-            // plain BuyFromVendor parent (not itself a cost-component leaf
-            // - a leaf's Decision is always BuyFromVendor too, so this is
-            // an explicit "not a leaf" carve-out, checked first) gets a
-            // distinct sentence naming the component instead of the row.
-            //
-            // currentPlan is a
-            // real nullable parameter here (moved verbatim from
-            // TreeSectionController's own hoisted _getCurrentPlan()
-            // local), so when it IS null neither ternary below can know
-            // the actual PriceBasis - reading that as false and picking
-            // the InstantBuy-unavailable wording would be an unearned
-            // claim about which side fell back. A null plan instead gets a
-            // basis-agnostic sentence that states only the fact this code
-            // does know (the node's price came from the other TP side).
+            // The parent therefore gets a DIFFERENT sentence: its own item
+            // was never bought on the TP, so the leaf wording would assert
+            // something false about a row whose item may have a healthy TP
+            // presence. BuyFromTp and cost-component leaves keep the
+            // original sentence, where the flag does describe the row's own
+            // price. With a null currentPlan neither ternary can know the
+            // PriceBasis, so that case gets a basis-agnostic sentence rather
+            // than an unearned claim about which side fell back.
             if (node.PriceSideFellBack &&
                 (node.Decision == CraftingDecision.BuyFromTp || node.IsCostComponent))
             {

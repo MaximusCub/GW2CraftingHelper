@@ -51,8 +51,8 @@ namespace GW2CraftingHelper.Services
 
             // Own-materials opportunity cost (gw2efficiency-style "value own
             // materials"): what selling the owned materials that inventory
-            // reduction consumed would have netted after TP fees. VOM design
-            // (Candidate A) UPDATE: in Valued mode, reduction is now
+            // reduction consumed would have netted after TP fees. In Valued
+            // mode, reduction is
             // decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
             // guide, built by CraftingPlanPipeline's zero-owned solve),
             // so owned mats are consumed first at zero acquisition cost ONLY
@@ -310,8 +310,8 @@ namespace GW2CraftingHelper.Services
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
         ///
-        /// Documented nuance (updated by the decision-guided reduction design -
-        /// Candidate A - decision-invariant reduction): MaterialOpportunityCost
+        /// Documented nuance, under the decision-guided reduction:
+        /// MaterialOpportunityCost
         /// is a SINGLE sum over the batch's whole merged UsedMaterials list
         /// (Reduce still runs on the entire wrapper tree before Solve ever
         /// picks Buy vs Craft per root - see GenerateStructuredMultiAsync's

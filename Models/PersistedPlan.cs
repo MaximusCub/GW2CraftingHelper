@@ -86,7 +86,7 @@ namespace GW2CraftingHelper.Models
         public PriceBasis PriceBasis { get; set; }
 
         /// <summary>
-        /// VOM design (Section 5.3): "Value Own Materials" checkbox state
+        /// "Value Own Materials" checkbox state
         /// at generation time - the per-plan session toggle in
         /// Views/CraftingPlanView.cs's controls panel (see its
         /// _valueOwnMaterials field's own doc comment), mirroring <see

@@ -2629,20 +2629,12 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyPlain(nameLabel, shortened ? name : null);
         }
 
-        // This used to carry its own
-        // GetCoinColor/AddCoinSegment copies, byte-identical to the ones
-        // CraftingPlanView carried before its own coin/currency rendering
-        // was extracted into Views/Rendering/CoinCurrencyRenderer -
-        // the second independent encoding of the coin invariant. Both are
-        // deleted; this now builds its own CoinSegmentSpec list (still
-        // always exactly 3 segments - gold, silver, copper - via plain
-        // ToString(), no leading-zero-unit omission or zero-padding: that
-        // formatting choice is unchanged,
-        // deliberately) via the shared CoinCurrencyRenderer.AddSegmentSpec
-        // (bumped private -> internal for this reuse - a normal forward
-        // MainView -> Views/Rendering consumer dependency; see the note at
-        // CoinCurrencyRenderer.AddSegmentSpec for why this is not the same
-        // precedent as the reverted GetPillColors bump) and hands it to
+        // Builds its CoinSegmentSpec list through the shared
+        // CoinCurrencyRenderer.AddSegmentSpec, so the coin invariant has one
+        // encoding rather than a per-view copy. Always exactly 3 segments -
+        // gold, silver, copper - via plain ToString(), with no
+        // leading-zero-unit omission and no zero-padding: this tab shows the
+        // full wallet, unlike a plan's cost cells. Handed to
         // LayoutCoinSegments with
         // startX = 0 (left-anchored) instead of the right-anchored
         // RenderValueCellRightAligned/MeasureValueWidth entry points

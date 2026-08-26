@@ -215,12 +215,12 @@ namespace GW2CraftingHelper.Views.Rendering
         /// the left). It gets the same band height as the three-tile case
         /// and simply starts where everything else in the section starts.
         ///
-        /// Every tile's amount renders at the SAME font. The cost band's
-        /// result tile used to be promoted to DefaultFont32; the
-        /// maintainer's field test replaced that with highlightResult - a
-        /// tinted, semi-transparent box around the result tile's
-        /// caption+note+amount, which draws the eye without breaking the
-        /// band's visual balance. The box is a real Panel and the result
+        /// Every tile's amount renders at the SAME font; the result tile is
+        /// picked out by highlightResult instead - a tinted,
+        /// semi-transparent box around its caption+note+amount, which draws
+        /// the eye without breaking the band's visual balance (a promoted
+        /// DefaultFont32 was tried and did break it). The box is a real Panel
+        /// and the result
         /// tile's controls are its CHILDREN, so the fill is painted behind
         /// them by the container's own paint order (no z-index games) and a
         /// resize moves one control instead of re-centring three runs.
@@ -242,11 +242,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// never steal hover) - without them, same-shaped tiles have no
         /// visible relationship. Never drawn for a collapsed 1-tile band.
         ///
-        /// The final boundary's symbol is no longer
-        /// an unconditional "=". It reads the rightmost tile's own
-        /// PlanRowViewModel.FormulaResultIsExact (see that field's doc
-        /// comment) and draws NeutralResultSeparator instead of "=" when
-        /// false - the profit band's loss case, where the rightmost tile
+        /// The final boundary's symbol is not an unconditional "=": it
+        /// reads the rightmost tile's PlanRowViewModel.FormulaResultIsExact
+        /// and draws NeutralResultSeparator when false - the profit band's
+        /// loss case, where the rightmost tile
         /// deliberately shows Math.Abs(profit) under a "Loss if Sold"
         /// caption, so "left - middle = <abs loss>" would be an
         /// arithmetically false equation as drawn. Every other boundary

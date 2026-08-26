@@ -136,8 +136,7 @@ namespace GW2CraftingHelper.Views
         /// parity): the plain session-persistent selection fields survive
         /// across Build() calls (tab switches) exactly like _nodeOverrides/
         /// _ignoredItemIds below - the live Blish controls do not (they are
-        /// disposed and recreated by every Build()/RebuildInputRows() call,
-        /// same lifecycle as _searchBox/_qtyInput used to have).
+        /// disposed and recreated by every Build()/RebuildInputRows() call).
         /// </summary>
         private sealed class ItemRowState
         {
@@ -606,12 +605,11 @@ namespace GW2CraftingHelper.Views
         // Two spellings of one tag, for two sinks with different shapes:
         // ModuleLogEntry carries the tag as a FIELD (the Log tab renders it
         // as "[scrolldiag]" in its own prefix column), while Blish's Logger
-        // has no tag column and needs it inside the message. Every call
-        // site used to prepend the bracketed form to the message text AND
-        // hand it to ModuleLog under the same tag, so every Log tab line
-        // read "[scrolldiag] [scrolldiag] wheel frame=..." - fixed here, in
-        // the one place that writes to both sinks, rather than at fourteen
-        // call sites.
+        // has no tag column and needs it inside the message. Both spellings
+        // are applied HERE, the one place that writes to both sinks: a call
+        // site that prepends the bracketed form itself and also passes the
+        // tag to ModuleLog produces "[scrolldiag] [scrolldiag] wheel
+        // frame=..." in the Log tab.
         private const string ScrollDiagLogTag = "scrolldiag";
         private const string ScrollDiagTag = "[" + ScrollDiagLogTag + "]";
 
