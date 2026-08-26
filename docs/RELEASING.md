@@ -19,8 +19,10 @@ section for it. Pushing a tag is therefore the whole release action.
 
 **What still does not exist:** a Blish HUD module-repository listing, so
 the download is still manual. And `gh release list` returned nothing as of
-2026-08-25 - the workflow has not yet been exercised by a pushed tag, so
-the first release will be the one that proves it end to end.
+2026-08-26 - the workflow has not yet been exercised by a pushed tag, so
+the first release will be the one that proves it end to end. See the
+v0.3.0 runbook below for what has been verified without a tag and what
+only a real tag can prove.
 
 Everything below reflects what a contributor can do today with the tools
 already in the repo, and is measured against the current build unless
@@ -79,6 +81,94 @@ labelled otherwise.
 
 Because every deployed build has a tag, any two shipped builds can be
 compared with `git diff v0.2.0..v0.2.1`.
+
+## v0.3.0 first-release runbook (staged 2026-08-26)
+
+The release-prep pass staged protocol steps 3-5 on this branch:
+`manifest.json` says `0.3.0`, `CHANGELOG.md` carries the `## 0.3.0`
+section the workflow publishes verbatim, and the version prose is swept.
+What remains after the field-test pass:
+
+```
+# 1. Refresh the recipe seeds (protocol step 2); commit if anything moved.
+dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+
+# 2. If release day differs from the staged CHANGELOG date, update the
+#    "## 0.3.0 - <date>" line and commit.
+
+# 3. Tag the release commit and push the tag. This is the whole release.
+git tag v0.3.0
+git push origin v0.3.0
+
+# 4. Watch the run and confirm the asset attached.
+gh run watch
+gh release view v0.3.0
+```
+
+Protocol step 6 also applies to this release: the plan view's tooltips
+changed and two new tabs shipped since the README screenshots were taken.
+
+### Verified without a tag (2026-08-26)
+
+- The release job's build steps were replicated locally in a clean
+  worktree of `master`: `dotnet build GW2CraftingHelper.csproj
+  -p:Platform=x64 -c Release` produced
+  `bin/x64/Release/GW2CraftingHelper.bhm` - exactly the path the
+  workflow asserts and uploads - and the file is a valid zip (38
+  entries) containing `manifest.json` with the matching version and
+  none of the four excluded `ref/` cache files (measured by listing the
+  zip's entries).
+- The workflow's CHANGELOG-extraction awk was run byte-for-byte locally
+  against `CHANGELOG.md`: it returns the correct section for `0.2.0`,
+  `0.2.4` and the new `0.3.0` heading, and returns nothing (a hard
+  failure in the workflow) for a version with no section.
+- The tag-vs-manifest gate is plain `bash` + `jq`; both are preinstalled
+  on `windows-latest` runners (inferred from the runner image manifest,
+  not proven by a run).
+- `tests.yml` declares `workflow_call`, so `release.yml`'s `uses:` test
+  gate resolves, and the same suite is green on `master` (run
+  33001423467, measured 2026-08-26). Its `changes` job special-cases tag
+  refs to always run the full suite.
+- `tests.yml` already builds Release/x64 and asserts the `.bhm` path on
+  every master push, so the artifact location is CI-proven - just not by
+  the release workflow itself.
+- `gh release list` still returns nothing (measured 2026-08-26): the
+  workflow has never run.
+
+### What only a real tag can prove
+
+- The `on: push: tags: v*` trigger firing and the job checking out the
+  tag ref.
+- The reusable-workflow test gate executing in a tag context end to end.
+- `softprops/action-gh-release` creating the release and uploading the
+  asset under the workflow-level `contents: write` permission.
+
+### PROPOSAL, not executed: rehearse the workflow with v0.3.0-rc.1
+
+The release workflow has never run, and the three items above are only
+provable by a pushed tag. The owner can choose to make the first pushed
+tag a rehearsal instead of the release:
+
+1. On a throwaway commit (not necessarily on `master`): set
+   `manifest.json` to `0.3.0-rc.1` and add a one-line
+   `## 0.3.0-rc.1 - <date>` section to `CHANGELOG.md` (both gates
+   require the exact match).
+2. `git tag v0.3.0-rc.1 <that commit> && git push origin v0.3.0-rc.1`.
+3. The workflow now marks any hyphenated tag as a GitHub prerelease
+   (added 2026-08-26), so the releases page keeps `v0.3.0` as its only
+   full release and "latest" never points at the rehearsal.
+4. After the run proves the pipeline, optionally remove the rehearsal:
+   `gh release delete v0.3.0-rc.1 --yes` and
+   `git push origin :refs/tags/v0.3.0-rc.1`.
+
+Caveats: Blish HUD parses the manifest version as SemVer and a
+prerelease suffix is valid SemVer, but a `0.3.0-rc.1` manifest has not
+been proven in a live Blish install (inferred); and the rehearsal tag
+is public while it exists. The alternative is to accept the real
+`v0.3.0` tag as the first proof, with every locally provable step
+already verified above and the known failure gates (tag/manifest
+mismatch, missing CHANGELOG section, missing `.bhm`) all failing closed
+before the publish step.
 
 ## Required: an offer diff on every `data(vendor):` pull request
 
@@ -195,9 +285,10 @@ produced by the build above shows it contains, under `ref/`:
 
 - `name`, `version`, `namespace`, `package` - standard Blish HUD module
   identity fields. `version` is bumped per release under the CHANGELOG +
-  tag convention above (`0.2.4`, measured 2026-08-25). Nothing *enforces*
-  the bump mechanically - no CI check, no analyzer - so it is a step in the
-  protocol, not a guarantee.
+  tag convention above (`0.3.0` staged, measured 2026-08-26; `0.2.4` is
+  the newest shipped). The release workflow enforces the tag side of the
+  bump - a `v*` tag that does not match this field fails before
+  publishing - but nothing forces the bump commit itself to exist.
 - `dependencies.bh.blishhud` - minimum Blish HUD host version
   (`>=1.3.0`).
 - `url`, `contributors` - metadata shown in Blish HUD's module browser and
