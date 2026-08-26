@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
         {
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(body)
+                Content = new StringContent(body),
             };
         }
 
@@ -67,13 +67,13 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
             {
                 { 100, new List<int> { 1 } },
                 { 200, new List<int> { 2 } },
-                { 300, new List<int> { -5 } }
+                { 300, new List<int> { -5 } },
             };
             var recipes = new Dictionary<int, RawRecipe>
             {
                 { 1, NewRecipe(1, 100) },
                 { 2, NewRecipe(2, 200) },
-                { -5, NewRecipe(-5, 300) }
+                { -5, NewRecipe(-5, 300) },
             };
 
             var seed = new SeededRecipeCacheStore();
@@ -99,7 +99,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 Ingredients = new List<RawIngredient>(),
                 Disciplines = new List<string>(),
                 MinRating = 0,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             };
         }
 
@@ -270,7 +270,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 handler.Responder = uri =>
                     new HttpResponseMessage(HttpStatusCode.InternalServerError)
                     {
-                        Content = new StringContent("")
+                        Content = new StringContent(""),
                     };
 
                 var store = NewComposite(tmp.Path, out var overlay);
@@ -301,7 +301,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                     uri.Query.Contains("ids=")
                         ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
                         {
-                            Content = new StringContent("")
+                            Content = new StringContent(""),
                         }
                         : Json("[1,2,901]");
 
