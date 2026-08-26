@@ -364,5 +364,38 @@ namespace GW2CraftingHelper.Services
 
             return desired < min ? min : (desired > max ? max : desired);
         }
+
+        /// <summary>
+        /// Where the game's tooltip canvas art starts inside Blish's
+        /// 942x942 "tooltip" texture. Blish's own draw (decompiled 1.3.0)
+        /// crops from (3,4) to skip the art's baked border, and the
+        /// 2026-08-26 live captures confirm the game itself composites
+        /// exactly this crop 1:1: the interior of live2/k-2 correlates with
+        /// the texture at r=0.983 when aligned to this origin
+        /// (fidelity-audit, 8.4 closure).
+        /// </summary>
+        public const int CanvasArtSourceX = 3;
+
+        public const int CanvasArtSourceY = 4;
+
+        /// <summary>
+        /// How much of one axis of the canvas art a box of
+        /// <paramref name="boxLength"/> can source starting at
+        /// <paramref name="offset"/>: the box length, clamped to what the
+        /// texture has left past the offset, never negative. The 942px
+        /// texture leaves 939x938 - a rich tooltip (max content width 392
+        /// plus chrome) never approaches it, so the clamp exists for the
+        /// pathological box, not the common one.
+        /// </summary>
+        public static int CanvasArtSourceLength(int boxLength, int textureLength, int offset)
+        {
+            int available = textureLength - offset;
+            if (available <= 0 || boxLength <= 0)
+            {
+                return 0;
+            }
+
+            return boxLength < available ? boxLength : available;
+        }
     }
 }

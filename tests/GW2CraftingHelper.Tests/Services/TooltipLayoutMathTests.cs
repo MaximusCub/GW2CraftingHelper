@@ -424,5 +424,41 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(1000 - TooltipLayoutMath.ScreenEdgeMargin - 100, TooltipLayoutMath.ClampAxis(5000, 100, 1000));
             Assert.Equal(300, TooltipLayoutMath.ClampAxis(300, 100, 1000));
         }
+
+        // The canvas art source is a 1:1 crop: any box the module can
+        // actually produce sources exactly its own size. 942 is the real
+        // "tooltip" texture's edge (decompiled Blish 1.3.0), and (3,4) is
+        // the crop origin the live client provably uses (fidelity-audit
+        // 8.4: live2/k-2 interior vs texture r=0.983 at that alignment).
+        [Fact]
+        public void CanvasArtSource_IsTheBoxSizeForEveryReachableBox()
+        {
+            Assert.Equal(412, TooltipLayoutMath.CanvasArtSourceLength(
+                412, 942, TooltipLayoutMath.CanvasArtSourceX));
+            Assert.Equal(600, TooltipLayoutMath.CanvasArtSourceLength(
+                600, 942, TooltipLayoutMath.CanvasArtSourceY));
+        }
+
+        [Fact]
+        public void CanvasArtSource_ClampsToWhatTheTextureHasPastTheOrigin()
+        {
+            Assert.Equal(939, TooltipLayoutMath.CanvasArtSourceLength(
+                1000, 942, TooltipLayoutMath.CanvasArtSourceX));
+            Assert.Equal(938, TooltipLayoutMath.CanvasArtSourceLength(
+                1000, 942, TooltipLayoutMath.CanvasArtSourceY));
+            // exact fit is not a clamp
+            Assert.Equal(939, TooltipLayoutMath.CanvasArtSourceLength(
+                939, 942, TooltipLayoutMath.CanvasArtSourceX));
+        }
+
+        [Fact]
+        public void CanvasArtSource_DegenerateBoxesAndTexturesSourceNothing()
+        {
+            Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(0, 942, 3));
+            Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(-5, 942, 3));
+            // texture no larger than the crop origin has nothing to give
+            Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(100, 3, 3));
+            Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(100, 0, 4));
+        }
     }
 }
