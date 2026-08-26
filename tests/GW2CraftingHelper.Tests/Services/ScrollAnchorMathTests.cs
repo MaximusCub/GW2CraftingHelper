@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new ScrollAnchorCandidate("section:RecipeTree", treeTop, 40),
                 new ScrollAnchorCandidate("node:1", treeTop + 40, 30),
                 new ScrollAnchorCandidate("node:2", treeTop + 70, 30),
-                new ScrollAnchorCandidate("node:3", treeTop + 100, 30)
+                new ScrollAnchorCandidate("node:3", treeTop + 100, 30),
             };
         }
 
@@ -36,8 +36,12 @@ namespace GW2CraftingHelper.Tests.Services
             int bottom = 0;
             foreach (var c in layout)
             {
-                if (c.Top + c.Height > bottom) bottom = c.Top + c.Height;
+                if (c.Top + c.Height > bottom)
+                {
+                    bottom = c.Top + c.Height;
+                }
             }
+
             return bottom + 2000; // plenty of rows below; never clamps
         }
 
@@ -138,7 +142,7 @@ namespace GW2CraftingHelper.Tests.Services
             var layout = new List<ScrollAnchorCandidate>
             {
                 new ScrollAnchorCandidate("section:RecipeTree", 100, 500),
-                new ScrollAnchorCandidate("node:9", 100, 30)
+                new ScrollAnchorCandidate("node:9", 100, 30),
             };
 
             Assert.True(ScrollAnchorMath.TryCapture(layout, 110, out var anchor));
@@ -160,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new ScrollAnchorCandidate("section:Summary", 0, 200),
                 new ScrollAnchorCandidate("section:RecipeTree", 200, 40),
-                new ScrollAnchorCandidate("node:1", 240, 30)
+                new ScrollAnchorCandidate("node:1", 240, 30),
             };
 
             Assert.Null(ScrollAnchorMath.FindTop(after, anchor));
@@ -171,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var layout = new List<ScrollAnchorCandidate>
             {
-                new ScrollAnchorCandidate("section:Summary", 50, 200)
+                new ScrollAnchorCandidate("section:Summary", 50, 200),
             };
 
             Assert.False(ScrollAnchorMath.TryCapture(layout, 20, out var anchor));
@@ -197,7 +201,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new ScrollAnchorCandidate("section:Summary", 0, 100),
                 new ScrollAnchorCandidate(null, 90, 10),
-                new ScrollAnchorCandidate("", 95, 10)
+                new ScrollAnchorCandidate("", 95, 10),
             };
 
             Assert.True(ScrollAnchorMath.TryCapture(layout, 99, out var anchor));

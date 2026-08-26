@@ -26,8 +26,8 @@ namespace GW2CraftingHelper.Tests.Models
         }
 
         [Theory]
-        [InlineData(2, 1)]     // Karma
-        [InlineData(3, 3500)]  // Laurel
+        [InlineData(2, 1)] // Karma
+        [InlineData(3, 3500)] // Laurel
         [InlineData(23, 3600)] // Spirit Shard
         public void TryGetDefault_KnownCurrency_ReturnsExpectedValue(int currencyId, long expected)
         {

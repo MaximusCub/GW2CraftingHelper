@@ -31,8 +31,10 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     return candidate;
                 }
+
                 dir = dir.Parent;
             }
+
             return null;
         }
     }

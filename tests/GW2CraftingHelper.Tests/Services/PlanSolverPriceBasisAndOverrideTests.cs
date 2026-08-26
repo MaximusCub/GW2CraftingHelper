@@ -11,13 +11,12 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanSolverPriceBasisAndOverrideTests
     {
         // --- Price basis tests ---
-
         [Fact]
         public void BuyOrderBasis_UsesBuyOrderPrice()
         {
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 60 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 60 } },
             };
             var solver = new PlanSolver();
 
@@ -42,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
             // as unpriceable. Previously this returned UnknownSource.
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
             };
             var solver = new PlanSolver();
 
@@ -61,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
             // invents a price from nothing.
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 0 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 0 } },
             };
             var solver = new PlanSolver();
 
@@ -86,7 +85,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 0, SellInstant = 20 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 0, SellInstant = 20 } },
             };
             var solver = new PlanSolver();
 
@@ -113,11 +112,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } },
             };
             var solver = new PlanSolver();
 
@@ -146,7 +145,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 0 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200, SellInstant = 200 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200, SellInstant = 200 } },
             };
             var solver = new PlanSolver();
 
@@ -165,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100, SellInstant = 90 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 60, SellInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 60, SellInstant = 30 } },
             };
             var solver = new PlanSolver();
 
@@ -193,19 +192,19 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                    new CostLine { Type = "Item", Id = 42, Count = 5 },
                 },
                 MerchantName = "Barter Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10, SellInstant = 4 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var solver = new PlanSolver();
 
@@ -234,19 +233,19 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Item", Id = 42, Count = 5 }
+                    new CostLine { Type = "Item", Id = 42, Count = 5 },
                 },
                 MerchantName = "Barter Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200, SellInstant = 100 } },
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 4, SellInstant = 0 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 4, SellInstant = 0 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var solver = new PlanSolver();
 
@@ -257,7 +256,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Per-node override tests ---
-
         [Fact]
         public void Override_ForcesBuyOverCheaperCraft()
         {
@@ -266,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
 
@@ -276,7 +274,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { rootNodeId, AcquisitionSource.BuyFromTp }
+                { rootNodeId, AcquisitionSource.BuyFromTp },
             };
             var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
 
@@ -293,13 +291,13 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 0, AcquisitionSource.Craft }
+                { 0, AcquisitionSource.Craft },
             };
             var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
 
@@ -314,13 +312,13 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 0, AcquisitionSource.Craft }
+                { 0, AcquisitionSource.Craft },
             };
             var plan = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides).Plan;
 
@@ -340,7 +338,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 90 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } },
             };
             var solver = new PlanSolver();
 
@@ -351,7 +349,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Child 2 is NodeId 1 (DFS: root=0, first child=1)
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 1, AcquisitionSource.BuyFromTp }
+                { 1, AcquisitionSource.BuyFromTp },
             };
             var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
 
@@ -375,7 +373,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -387,7 +385,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 0, AcquisitionSource.Craft }
+                { 0, AcquisitionSource.Craft },
             };
             var forced = solver.Solve(tree, prices, null, PriceBasis.InstantBuy, overrides);
 
@@ -400,12 +398,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 2, new List<VendorOffer> { CoinVendorOffer(2, 500) } }
+                { 2, new List<VendorOffer> { CoinVendorOffer(2, 500) } },
             };
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 

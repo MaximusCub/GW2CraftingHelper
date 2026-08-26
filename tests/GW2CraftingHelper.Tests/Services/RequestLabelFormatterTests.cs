@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Orrax Manifested x1",
                 "Bolt of Damask x5",
                 "Vial of Powerful Blood x250",
-                "Pile of Bloodstone Dust x10"
+                "Pile of Bloodstone Dust x10",
             };
 
             Assert.Equal(

@@ -80,7 +80,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Role-carrying spans (gap G7) ---
-
         [Fact]
         public void PlainAndFlavorRunsInOneDescriptionKeepSeparateRoles()
         {

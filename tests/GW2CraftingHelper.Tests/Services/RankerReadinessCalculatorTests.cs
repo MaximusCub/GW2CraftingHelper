@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return new List<PlanStep>
             {
-                new PlanStep { ItemId = itemId, Quantity = quantity, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = itemId, Quantity = quantity, Source = AcquisitionSource.Craft },
             };
         }
 
@@ -63,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Currency = currency ?? new Dictionary<int, int>(),
                 ClaimedGatedUnits = claimedGated ?? new Dictionary<int, int>(),
                 ClaimedItemIds = claimedItems ?? new HashSet<int>(),
-                ClaimedCurrencyIds = claimedCurrencies ?? new HashSet<int>()
+                ClaimedCurrencyIds = claimedCurrencies ?? new HashSet<int>(),
             };
         }
 
@@ -80,7 +80,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Null and degenerate inputs
         // ---------------------------------------------------------------
-
         [Fact]
         public void NullResults_AreNotMeasurableAndNeverThrow()
         {
@@ -90,7 +89,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RankerReadinessCalculator.Compute(null, real, Availability(), 0),
                 RankerReadinessCalculator.Compute(real, null, Availability(), 0),
-                RankerReadinessCalculator.Compute(null, null, Availability(), 0)
+                RankerReadinessCalculator.Compute(null, null, Availability(), 0),
             })
             {
                 Assert.Equal(RankerReadinessKind.NotMeasurable, metrics.Kind);
@@ -158,7 +157,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // The property that keeps the change honest
         // ---------------------------------------------------------------
-
         [Fact]
         public void AnItemWhoseOnlyBarrierIsMaterials_ScoresExactlyTheCoinOnlyFigure()
         {
@@ -196,7 +194,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Never claim done when it is not
         // ---------------------------------------------------------------
-
         [Fact]
         public void NinetyNinePointSixPercent_FloorsToNinetyNine()
         {
@@ -264,7 +261,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Currencies: never priced, only ever compared with themselves
         // ---------------------------------------------------------------
-
         [Fact]
         public void AnUnvaluedCurrencyDragsTheScoreDownRatherThanReadingAsCheap()
         {
@@ -307,7 +303,7 @@ namespace GW2CraftingHelper.Tests.Services
             var costs = new List<CurrencyCost>
             {
                 new CurrencyCost { CurrencyId = 2, Amount = 5000 },
-                new CurrencyCost { CurrencyId = 3, Amount = 10 }
+                new CurrencyCost { CurrencyId = 3, Amount = 10 },
             };
             var availability = Availability(currency: new Dictionary<int, int> { { 2, 5000 } });
 
@@ -323,7 +319,7 @@ namespace GW2CraftingHelper.Tests.Services
             var baseline = Result(coin: 1000);
             var owned = Result(coin: 900, currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 40 }
+                new CurrencyCost { CurrencyId = 29, Amount = 40 },
             });
 
             var metrics = RankerReadinessCalculator.Compute(baseline, owned, Availability(), 0);
@@ -339,7 +335,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Time gates
         // ---------------------------------------------------------------
-
         [Fact]
         public void DaysAcrossDifferentGatedItems_IsTheMaxNotTheSum()
         {
@@ -349,7 +344,7 @@ namespace GW2CraftingHelper.Tests.Services
             var steps = new List<PlanStep>
             {
                 new PlanStep { ItemId = MithrilliumId, Quantity = 20, Source = AcquisitionSource.Craft },
-                new PlanStep { ItemId = ResidueId, Quantity = 12, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = ResidueId, Quantity = 12, Source = AcquisitionSource.Craft },
             };
             var result = Result(steps: steps, cooldowns: cooldowns);
 
@@ -385,7 +380,7 @@ namespace GW2CraftingHelper.Tests.Services
             // incidental festival-vendor offer.
             var vendorCaps = new List<TimegatedItem>
             {
-                new TimegatedItem { ItemId = 19721, CapType = TimegatedCapType.Weekly, CapValue = 1, NeededCount = 86 }
+                new TimegatedItem { ItemId = 19721, CapType = TimegatedCapType.Weekly, CapValue = 1, NeededCount = 86 },
             };
             var baseline = Result(coin: 1000, vendorCaps: vendorCaps);
             var owned = Result(coin: 500, vendorCaps: vendorCaps);
@@ -418,7 +413,7 @@ namespace GW2CraftingHelper.Tests.Services
             var cooldowns = Cooldowns(MithrilliumId);
             var steps = new List<PlanStep>
             {
-                new PlanStep { ItemId = MithrilliumId, Quantity = 40, Source = AcquisitionSource.BuyFromTp }
+                new PlanStep { ItemId = MithrilliumId, Quantity = 40, Source = AcquisitionSource.BuyFromTp },
             };
             var result = Result(steps: steps, cooldowns: cooldowns);
 
@@ -430,7 +425,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Disciplines
         // ---------------------------------------------------------------
-
         [Fact]
         public void WithNoDisciplineDataCaptured_TheGateDoesNotApply()
         {
@@ -476,7 +470,7 @@ namespace GW2CraftingHelper.Tests.Services
                 characters: new List<SnapshotCharacterDiscipline>
                 {
                     new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 400, Active = false },
-                    new SnapshotCharacterDiscipline { CharacterName = "Tems", Discipline = "Huntsman", Rating = 275, Active = true }
+                    new SnapshotCharacterDiscipline { CharacterName = "Tems", Discipline = "Huntsman", Rating = 275, Active = true },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -497,7 +491,7 @@ namespace GW2CraftingHelper.Tests.Services
                 disciplines: new List<RequiredDiscipline> { new RequiredDiscipline { Discipline = "Armorsmith", MinRating = 400 } },
                 characters: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Armorsmith", Rating = 400, Active = false }
+                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Armorsmith", Rating = 400, Active = false },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -513,11 +507,11 @@ namespace GW2CraftingHelper.Tests.Services
                 disciplines: new List<RequiredDiscipline>
                 {
                     new RequiredDiscipline { Discipline = "Huntsman", MinRating = 500 },
-                    new RequiredDiscipline { Discipline = "Leatherworker", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Leatherworker", MinRating = 400 },
                 },
                 characters: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 }
+                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -531,7 +525,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Affordability and contention, both cascade-aware
         // ---------------------------------------------------------------
-
         [Fact]
         public void AffordabilityIsMeasuredAgainstCoinLeftAfterHigherPrioritySlots()
         {
@@ -553,12 +546,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var owned = Result(coin: 500, currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 100 }
+                new CurrencyCost { CurrencyId = 29, Amount = 100 },
             });
             owned.Plan.Steps = new List<PlanStep>
             {
                 new PlanStep { ItemId = 111, Quantity = 4, Source = AcquisitionSource.BuyFromTp },
-                new PlanStep { ItemId = 222, Quantity = 2, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = 222, Quantity = 2, Source = AcquisitionSource.Craft },
             };
 
             var availability = Availability(

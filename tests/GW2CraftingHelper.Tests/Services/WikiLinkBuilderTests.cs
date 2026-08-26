@@ -6,7 +6,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class WikiLinkBuilderTests
     {
         // --- BuildItemPageUrl ---
-
         [Fact]
         public void BuildItemPageUrl_SimpleSpaces_ReplacedWithUnderscores()
         {
@@ -53,7 +52,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BuildItemAcquisitionUrl ---
-
         [Fact]
         public void BuildItemAcquisitionUrl_AppendsAnchor()
         {
@@ -77,7 +75,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BuildRecipeSheetUrl ---
-
         [Fact]
         public void BuildRecipeSheetUrl_UsesLiteralNamespaceColon()
         {
@@ -101,7 +98,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BuildRequiredRecipeUrl (flag-based target) ---
-
         [Fact]
         public void BuildRequiredRecipeUrl_LearnedFromItem_LinksToRecipeSheet()
         {
@@ -132,7 +128,6 @@ namespace GW2CraftingHelper.Tests.Services
         // doc comment for each source) - none of them names a real wiki
         // page, so every BuildXxxUrl method must return null for all four
         // rather than construct a guaranteed-404 URL.
-
         [Theory]
         [InlineData("Unknown Item")]
         [InlineData("Guild upgrade (unresolved)")]
@@ -181,7 +176,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- HasWikiPage (cheap render-path pre-check) ---
-
         [Fact]
         public void HasWikiPage_RealName_ReturnsTrue()
         {

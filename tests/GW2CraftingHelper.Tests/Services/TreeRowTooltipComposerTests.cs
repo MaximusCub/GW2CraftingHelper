@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceSideFellBack = priceSideFellBack,
                 IsCostComponent = isCostComponent,
                 VendorCurrencyCosts = vendorCurrencyCosts,
-                AcquisitionHint = acquisitionHint
+                AcquisitionHint = acquisitionHint,
             };
         }
 
@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
@@ -231,7 +231,7 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
@@ -259,7 +259,7 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
@@ -379,7 +379,7 @@ namespace GW2CraftingHelper.Tests.Services
                     "Caption line",
                     "Unit price: 1s 00c",
                     "Other trading post price side shown",
-                    "Right-click: Open wiki page"
+                    "Right-click: Open wiki page",
                 },
                 lines);
         }
@@ -394,7 +394,6 @@ namespace GW2CraftingHelper.Tests.Services
         // EvenWhenIdCollides for the same real collision: id 24 is both a
         // vendor-offer outputItemId and the currency "Pristine Fractal
         // Relics".
-
         private const int CollidingId = 24;
 
         private static ItemStatBlock CollidingItemStats()
@@ -405,7 +404,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Unrelated Item",
                 Rarity = "Legendary",
                 ItemType = "Trophy",
-                VendorValue = 1000
+                VendorValue = 1000,
             };
         }
 
@@ -423,7 +422,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Decision = decision,
                 Quantity = 5,
                 IsCostComponent = isCostComponent,
-                SubtreeCost = subtreeCost
+                SubtreeCost = subtreeCost,
             };
         }
 

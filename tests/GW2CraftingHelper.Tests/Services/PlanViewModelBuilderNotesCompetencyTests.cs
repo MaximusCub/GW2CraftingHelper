@@ -25,11 +25,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Weaponsmith", Rating = 400 }
+                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Weaponsmith", Rating = 400 },
                 });
 
             var vm = _builder.Build(result);
@@ -48,11 +48,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Weaponsmith", Rating = 400 }
+                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Weaponsmith", Rating = 400 },
                 });
 
             var vm = _builder.Build(result);
@@ -66,7 +66,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 characterDisciplines: null);
 
@@ -82,11 +82,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Armorsmith", Rating = 400 }
+                    new SnapshotCharacterDiscipline { CharacterName = "Aria", Discipline = "Armorsmith", Rating = 400 },
                 });
 
             var vm = _builder.Build(result);

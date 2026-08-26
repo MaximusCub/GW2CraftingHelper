@@ -32,8 +32,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Entries = new List<RankerWatchlistEntry>
                 {
                     new RankerWatchlistEntry { ItemId = 30684, Quantity = 1, Name = "Twilight", IconUrl = "t.png", Rarity = "Legendary" },
-                    new RankerWatchlistEntry { ItemId = 30689, Quantity = 2, Name = "Sunrise", IconUrl = "s.png", Rarity = "Legendary" }
-                }
+                    new RankerWatchlistEntry { ItemId = 30689, Quantity = 2, Name = "Sunrise", IconUrl = "s.png", Rarity = "Legendary" },
+                },
             };
         }
 
@@ -145,8 +145,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     Entries = new List<RankerWatchlistEntry>
                     {
-                        new RankerWatchlistEntry { ItemId = 1000 + i, Quantity = 1, Name = "Item " + i }
-                    }
+                        new RankerWatchlistEntry { ItemId = 1000 + i, Quantity = 1, Name = "Item " + i },
+                    },
                 };
                 store.Save(watchlist);
             });
@@ -166,8 +166,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new RankerWatchlistEntry { ItemId = 0, Quantity = 1, Name = "Bogus" },
                     new RankerWatchlistEntry { ItemId = 42, Quantity = 0, Name = "Real" },
-                    new RankerWatchlistEntry { ItemId = 43, Quantity = -5, Name = "Also real" }
-                }
+                    new RankerWatchlistEntry { ItemId = 43, Quantity = -5, Name = "Also real" },
+                },
             };
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(payload));
 

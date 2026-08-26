@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return new CraftingPlanResult
             {
-                Plan = new CraftingPlan { Steps = new List<PlanStep>(steps) }
+                Plan = new CraftingPlan { Steps = new List<PlanStep>(steps) },
             };
         }
 
@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CostLines = new List<CostLine> { new CostLine { Type = "Item", Id = itemCostId, Count = itemCostCount } },
                 MerchantName = merchant,
                 SeasonalFestival = Gw2Constants.HalloweenFestivalName,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
             };
         }
 
@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Tests.Services
             var offer = HalloweenOffer(19721, 5, 999, 1, weeklyCap: 1);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 19721, new List<VendorOffer> { offer } }
+                { 19721, new List<VendorOffer> { offer } },
             };
             var prices = new Dictionary<int, ItemPrice> { { 999, new ItemPrice { SellInstant = 50 } } };
 
@@ -115,7 +115,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 OfferId = "regular", OutputItemId = 19721, OutputCount = 5,
                 CostLines = new List<CostLine> { new CostLine { Type = "Item", Id = 999, Count = 1 } },
-                MerchantName = "Regular Vendor", SeasonalFestival = null
+                MerchantName = "Regular Vendor", SeasonalFestival = null,
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>> { { 19721, new List<VendorOffer> { regularOffer } } };
             var prices = new Dictionary<int, ItemPrice> { { 999, new ItemPrice { SellInstant = 50 } } };
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             var step = new PlanStep
             {
                 ItemId = 19721, Quantity = 10, UnitCost = 100, Source = AcquisitionSource.BuyFromVendor,
-                VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 5 } }
+                VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 5 } },
             };
             var result = MakeResult(step);
             var offer = HalloweenOffer(19721, 5, 999, 1);
@@ -175,12 +175,12 @@ namespace GW2CraftingHelper.Tests.Services
             var expensive = HalloweenOffer(19721, 5, 222, 1); // 90/5 = 18/unit
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 19721, new List<VendorOffer> { expensive, cheap } }
+                { 19721, new List<VendorOffer> { expensive, cheap } },
             };
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 111, new ItemPrice { SellInstant = 30 } },
-                { 222, new ItemPrice { SellInstant = 90 } }
+                { 222, new ItemPrice { SellInstant = 90 } },
             };
 
             SeasonalVendorTipCalculator.Apply(

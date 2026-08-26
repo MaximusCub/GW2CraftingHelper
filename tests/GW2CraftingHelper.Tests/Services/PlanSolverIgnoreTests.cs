@@ -10,14 +10,13 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanSolverIgnoreTests
     {
         // --- "Ignore" pill (ignoredItemIds) ---
-
         [Fact]
         public void IgnoredItemIds_LeafBuyNode_ZeroCostNoStep()
         {
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -40,7 +39,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } }, // buying finished item is far pricier
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -67,7 +66,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },
             };
             var solver = new PlanSolver();
 
@@ -97,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 5 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 5 } },
             };
             var solver = new PlanSolver();
 
@@ -116,7 +115,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 

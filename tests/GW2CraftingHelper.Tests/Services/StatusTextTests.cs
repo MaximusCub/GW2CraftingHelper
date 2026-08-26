@@ -4,10 +4,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class StatusTextTests
     {
-
         [Fact]
         public void Normalize_NonNull_ReturnsSameString()
         {
@@ -30,7 +28,6 @@ namespace GW2CraftingHelper.Tests.Services
         // banned from user-facing text, and every count the plan view is
         // about to show (overrides, ignored items, copied lines) goes
         // through here.
-
         [Theory]
         [InlineData(0, "0 overrides")]
         [InlineData(1, "1 override")]
@@ -132,7 +129,7 @@ namespace GW2CraftingHelper.Tests.Services
                 StatusText.NoOverridesToClear,
                 StatusText.AlreadyCraftingEverything,
                 StatusText.AlreadyBuyingEverything,
-                StatusText.ReSolveUnavailable
+                StatusText.ReSolveUnavailable,
             })
             {
                 Assert.False(string.IsNullOrWhiteSpace(line));
@@ -162,7 +159,6 @@ namespace GW2CraftingHelper.Tests.Services
         // SnapshotRefreshIntervalMinutes - the threshold is a parameter
         // here precisely so the caller's setting value flows through
         // rather than being hardcoded on either side) ----
-
         [Fact]
         public void IsStale_AgeBelowThreshold_ReturnsFalse()
         {
@@ -195,7 +191,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- ForRefreshFailure (field-tested pain: the
         // Snapshot tab's Refresh Now used to show only bare
         // "Refresh Failed - {time}" regardless of cause) ----
-
         [Fact]
         public void ForRefreshFailure_ApiAccessNotReady_ReturnsAccessNotReadyText()
         {
@@ -233,7 +228,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- Stamp (audit batch J, M10): the ONE shape every timestamped
         // status line in the module uses. Four sites wrote it by hand with
         // two different separators before this. ----
-
         [Fact]
         public void Stamp_VerbAndTime_UsesTheSingleSeparatorAndFormat()
         {
@@ -266,7 +260,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---- ForSnapshotAgeSuffix (audit batch J, M10): the age suffix
         // names its subject, so a failure timestamp followed by a snapshot
         // age can no longer read as one moment. ----
-
         [Fact]
         public void ForSnapshotAgeSuffix_Days_NamesItsSubject()
         {
@@ -341,5 +334,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("just now", StatusText.ForAgeAgo(TimeSpan.FromSeconds(-5)));
         }
     }
-
 }

@@ -334,8 +334,9 @@ jobs:
       # have no test project, so a project-scoped build compiled neither.
       #
       # No -warnaserror here on purpose. The warning gate lives in the project
-      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj, WarningsAsErrors
-      # in the test project - so it applies to a developer's local build too, not
+      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj and, through
+      # the StyleGate.props import, in every test and tool project except
+      # MysticForgeSeeder - so it applies to a developer's local build too, not
       # just to CI, and this step inherits it for free. Adding the flag here would
       # also widen the gate to every project in the solution, including CI-only
       # restore diagnostics that never appear locally. Note that -warnaserror:CS

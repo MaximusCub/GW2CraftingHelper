@@ -9,7 +9,7 @@ namespace VendorOfferUpdater.Tests.Helpers
     /// </summary>
     public class WikiJsonBuilder
     {
-        private readonly List<object> _results = new();
+        private readonly List<object> _results = new List<object>();
         private int? _continueOffset;
 
         public WikiJsonBuilder AddResult(
@@ -35,7 +35,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 Locations = locations,
                 DailyCap = dailyCap,
                 WeeklyCap = weeklyCap,
-                SeasonalCap = seasonalCap
+                SeasonalCap = seasonalCap,
             });
             return this;
         }
@@ -67,6 +67,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     writer.WriteNumberValue(entry.GameId.Value);
                 }
+
                 writer.WriteEndArray();
 
                 // Sells item
@@ -77,6 +78,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                     writer.WriteString("fulltext", entry.ItemName);
                     writer.WriteEndObject();
                 }
+
                 writer.WriteEndArray();
 
                 // Has item quantity
@@ -85,6 +87,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     writer.WriteNumberValue(entry.Quantity.Value);
                 }
+
                 writer.WriteEndArray();
 
                 // Has item cost
@@ -110,6 +113,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                         writer.WriteEndObject();
                     }
                 }
+
                 writer.WriteEndArray();
 
                 // Has vendor
@@ -120,6 +124,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                     writer.WriteString("fulltext", entry.Vendor);
                     writer.WriteEndObject();
                 }
+
                 writer.WriteEndArray();
 
                 // Located in
@@ -133,6 +138,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                         writer.WriteEndObject();
                     }
                 }
+
                 writer.WriteEndArray();
 
                 // Has daily purchase cap - real SMW responses return an empty
@@ -142,6 +148,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     writer.WriteNumberValue(entry.DailyCap.Value);
                 }
+
                 writer.WriteEndArray();
 
                 // Has weekly purchase cap - same empty-array-means-uncapped shape.
@@ -150,6 +157,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     writer.WriteNumberValue(entry.WeeklyCap.Value);
                 }
+
                 writer.WriteEndArray();
 
                 // Has seasonal purchase cap - same empty-array-means-uncapped shape.
@@ -158,6 +166,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     writer.WriteNumberValue(entry.SeasonalCap.Value);
                 }
+
                 writer.WriteEndArray();
 
                 writer.WriteEndObject(); // printouts
@@ -189,14 +198,23 @@ namespace VendorOfferUpdater.Tests.Helpers
         private class ResultEntry
         {
             public string PageName { get; set; }
+
             public int? GameId { get; set; }
+
             public string ItemName { get; set; }
+
             public int? Quantity { get; set; }
+
             public List<(int value, string currency)> Costs { get; set; }
+
             public string Vendor { get; set; }
+
             public List<string> Locations { get; set; }
+
             public int? DailyCap { get; set; }
+
             public int? WeeklyCap { get; set; }
+
             public int? SeasonalCap { get; set; }
         }
     }

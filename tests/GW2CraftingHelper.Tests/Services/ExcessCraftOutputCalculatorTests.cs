@@ -37,7 +37,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftsNeeded = craftsNeeded,
                 RecipeOutputCount = outputCount,
                 RecipeExpectedOutputCount = expectedOutputCount,
-                Children = children
+                Children = children,
             };
         }
 
@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = quantity,
                 Decision = CraftingDecision.BuyFromTp,
                 IsReferenceBranch = isReferenceBranch,
-                Children = children
+                Children = children,
             };
         }
 
@@ -108,7 +108,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = 10,
                 Decision = CraftingDecision.BuyFromTp,
                 CraftsNeeded = 4,
-                RecipeOutputCount = 3
+                RecipeOutputCount = 3,
             };
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -143,7 +143,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rootB = WrapAsRoot(wrapperItemId: 2, children: new[] { childB });
             var result = new CraftingPlanResult
             {
-                MultiItemRoots = new List<CraftingTreeNode> { rootA, rootB }
+                MultiItemRoots = new List<CraftingTreeNode> { rootA, rootB },
             };
 
             ExcessCraftOutputCalculator.Apply(
@@ -174,7 +174,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice> { { 2, new ItemPrice { SellInstant = 100 } } };
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { 2, new ItemMetadata { ItemId = 2, IsAccountBound = true } }
+                { 2, new ItemMetadata { ItemId = 2, IsAccountBound = true } },
             };
             var result = new CraftingPlanResult { CraftingTree = root };
 
@@ -214,7 +214,6 @@ namespace GW2CraftingHelper.Tests.Services
         // floors to 0 excess against a demand of 77 - the plan produces
         // exactly 77 clovers in expectation, not the 172 the pre-fix
         // RecipeOutputCount-basis math fabricated. ---
-
         [Fact]
         public void FractionalYieldRecipe_UsesExpectedOutputBasis_NoFakeExcess()
         {
@@ -257,7 +256,6 @@ namespace GW2CraftingHelper.Tests.Services
         // Buy node that also has a recipe) carries real solver decisions
         // for hypothetical children - none of it was actually crafted, so
         // none of it may contribute excess. ---
-
         [Fact]
         public void ReferenceBranchChild_NeverContributes()
         {
@@ -297,7 +295,6 @@ namespace GW2CraftingHelper.Tests.Services
         // sellableQuantity) - advertising it again here double-counts the
         // same coins under a different label, so root item ids are
         // excluded from the Notes list entirely. ---
-
         [Fact]
         public void SingleItemPlan_RootsOwnExcess_ExcludedFromOutputs()
         {
@@ -333,7 +330,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rootB = CraftNode(itemId: 2, quantity: 1, craftsNeeded: 1, outputCount: 3); // would be 2 excess
             var result = new CraftingPlanResult
             {
-                MultiItemRoots = new List<CraftingTreeNode> { rootA, rootB }
+                MultiItemRoots = new List<CraftingTreeNode> { rootA, rootB },
             };
 
             ExcessCraftOutputCalculator.Apply(

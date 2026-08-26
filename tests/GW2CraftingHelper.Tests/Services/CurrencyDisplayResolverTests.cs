@@ -8,13 +8,12 @@ namespace GW2CraftingHelper.Tests.Services
     public class CurrencyDisplayResolverTests
     {
         // --- ResolveName ---
-
         [Fact]
         public void ResolveName_MetadataPresent_PrefersMetadataName()
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard (Live)", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard (Live)", IconUrl = "s.png" },
             };
 
             Assert.Equal("Spirit Shard (Live)", CurrencyDisplayResolver.ResolveName(23, metadata));
@@ -31,7 +30,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma" }
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma" },
             };
 
             Assert.Equal("Spirit Shards", CurrencyDisplayResolver.ResolveName(23, metadata));
@@ -42,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "" },
             };
 
             Assert.Equal("Spirit Shards", CurrencyDisplayResolver.ResolveName(23, metadata));
@@ -58,13 +57,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ResolveIconUrl ---
-
         [Fact]
         public void ResolveIconUrl_MetadataPresent_ReturnsIcon()
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "spirit_shard.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "spirit_shard.png" },
             };
 
             Assert.Equal("spirit_shard.png", CurrencyDisplayResolver.ResolveIconUrl(23, metadata));
@@ -81,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [2] = new CurrencyMetadata { CurrencyId = 2, IconUrl = "karma.png" }
+                [2] = new CurrencyMetadata { CurrencyId = 2, IconUrl = "karma.png" },
             };
 
             Assert.Null(CurrencyDisplayResolver.ResolveIconUrl(23, metadata));
@@ -92,14 +90,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, IconUrl = "" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, IconUrl = "" },
             };
 
             Assert.Null(CurrencyDisplayResolver.ResolveIconUrl(23, metadata));
         }
 
         // --- ResolveAmounts ---
-
         [Fact]
         public void ResolveAmounts_Null_ReturnsNull()
         {
@@ -117,7 +114,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" },
             };
             var costLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } };
 
@@ -138,12 +135,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" },
             };
             var costLines = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = 23, Count = 50 },
-                new CostLine { Type = "Currency", Id = 2, Count = 1000 }
+                new CostLine { Type = "Currency", Id = 2, Count = 1000 },
             };
 
             var result = CurrencyDisplayResolver.ResolveAmounts(costLines, metadata);
@@ -156,7 +153,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ResolveAmounts ownedCurrencyAmounts ---
-
         [Fact]
         public void ResolveAmounts_OwnedAmountsNull_OwnedQuantityStaysNull()
         {
@@ -217,7 +213,7 @@ namespace GW2CraftingHelper.Tests.Services
             var costLines = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = 23, Count = 500 },
-                new CostLine { Type = "Currency", Id = 2, Count = 1000 }
+                new CostLine { Type = "Currency", Id = 2, Count = 1000 },
             };
             var owned = new Dictionary<int, int> { { 23, 100 } }; // only the first line has wallet data
 
@@ -240,7 +236,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- ResolveUnitAmounts (winning-offer true per-unit
         // rate, not a truncated total/quantity average) ---
-
         [Fact]
         public void ResolveUnitAmounts_EvenDivision_ResolvesWholeNumberAmount_NoBundleLabel()
         {
@@ -324,7 +319,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- ResolveTreeNodeUnitAmounts (field-test finding B: recipe-tree
         // "Unit price:" tooltip for a pure/mixed-currency vendor node) ---
-
         [Fact]
         public void ResolveTreeNodeUnitAmounts_EvenDivision_ResolvesWholeNumberAmount_NoBundleLabel()
         {
@@ -357,7 +351,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" },
             };
             var total = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } };
 
@@ -401,7 +395,7 @@ namespace GW2CraftingHelper.Tests.Services
             var total = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = 23, Count = 100 },
-                new CostLine { Type = "Currency", Id = 2, Count = 7 }
+                new CostLine { Type = "Currency", Id = 2, Count = 7 },
             };
 
             var result = CurrencyDisplayResolver.ResolveTreeNodeUnitAmounts(total, 2, null);

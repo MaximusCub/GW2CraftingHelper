@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Tests.Services
                 TimestampUtc = timestampUtc ?? DateTime.UtcNow,
                 Level = level,
                 Tag = tag,
-                Message = message
+                Message = message,
             };
         }
 
@@ -258,7 +258,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- onError callback: real IO failures, not mocked. ---
-
         [Fact]
         public void AppendLine_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
         {

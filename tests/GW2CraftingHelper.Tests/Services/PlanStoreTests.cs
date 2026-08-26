@@ -42,7 +42,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         public void Dispose()
         {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(_tempDir, true);
+            }
+            catch
+            {
+            }
         }
 
         private static CraftingPlanPipeline BuildPipeline(out InMemoryPriceApiClient priceApi)
@@ -56,11 +62,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             priceApi = new InMemoryPriceApiClient();
@@ -108,11 +114,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             recipeApi.AddSearchResult(2, 20);
             recipeApi.AddRecipe(new RawRecipe
@@ -122,11 +128,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 100,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             priceApi = new InMemoryPriceApiClient();
@@ -162,11 +168,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
+                    new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             priceApi = new InMemoryPriceApiClient();
@@ -208,9 +214,9 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 2,
                         Count = 4,
-                        Source = AccountItemIndex.SourceMaterialStorage
-                    }
-                }
+                        Source = AccountItemIndex.SourceMaterialStorage,
+                    },
+                },
             };
         }
 
@@ -247,7 +253,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // way here keeps every pre-existing call to this helper
                 // exercising that same real shape instead of null.
                 NodeOverrides = nodeOverrides ?? new Dictionary<int, AcquisitionSource>(),
-                IgnoredItemIds = ignoredItemIds ?? new List<int>()
+                IgnoredItemIds = ignoredItemIds ?? new List<int>(),
             };
         }
 
@@ -300,7 +306,7 @@ namespace GW2CraftingHelper.Tests.Services
             // both must produce identical decisions.
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
 
             var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
@@ -349,7 +355,6 @@ namespace GW2CraftingHelper.Tests.Services
         // reseed default the other way (Use Own Materials checkbox true,
         // price basis BuyOrder) - a wiring slip that dropped the loaded
         // value would be invisible to a default-direction assertion. ---
-
         [Fact]
         public void Save_Load_UseOwnMaterialsFalse_RoundTripsAsFalse()
         {
@@ -360,7 +365,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
                 UseOwnMaterials = false,
                 PriceBasis = PriceBasis.BuyOrder,
-                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } },
             });
 
             var loaded = _store.LoadLatest();
@@ -378,7 +383,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 1 } },
                 UseOwnMaterials = true,
                 PriceBasis = PriceBasis.InstantBuy,
-                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } },
             });
 
             var loaded = _store.LoadLatest();
@@ -397,9 +402,9 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new PlanRequestItem { ItemId = 5, Quantity = 3 },
                     new PlanRequestItem { ItemId = 6, Quantity = 250 },
-                    new PlanRequestItem { ItemId = 7, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 7, Quantity = 1 },
                 },
-                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 3 } }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 3 } },
             });
 
             var loaded = _store.LoadLatest();
@@ -420,7 +425,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var overridden = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
             Assert.Equal(AcquisitionSource.BuyFromTp, overridden.Plan.Steps[0].Source);
@@ -446,7 +451,6 @@ namespace GW2CraftingHelper.Tests.Services
         // themselves must round-trip, not just the Result they produced -
         // see Models/PersistedPlan.cs's NodeOverrides/IgnoredItemIds doc
         // comments and TreeSectionController.RestoreOverrides. ---
-
         [Fact]
         public async Task Save_Load_NodeOverridesAndIgnoredItemIds_RoundTripAndDriveIdenticalReResolve()
         {
@@ -589,7 +593,6 @@ namespace GW2CraftingHelper.Tests.Services
         // unexplainable from the log alone. A version this build never
         // shipped (0, or one from the future) is the opposite case and stays
         // on the error channel - see the pair at the end of this block. ---
-
         [Fact]
         public void LoadLatest_ExplicitZeroSchemaVersion_ReturnsNullAndLogsWarn()
         {
@@ -606,7 +609,11 @@ namespace GW2CraftingHelper.Tests.Services
             string capturedInfo = null;
             var store = new PlanStore(
                 _tempDir,
-                (message, ex) => { capturedError = message; capturedException = ex; },
+                (message, ex) =>
+                {
+                    capturedError = message;
+                    capturedException = ex;
+                },
                 message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
@@ -637,7 +644,11 @@ namespace GW2CraftingHelper.Tests.Services
             string capturedInfo = null;
             var store = new PlanStore(
                 _tempDir,
-                (message, ex) => { capturedError = message; capturedException = ex; },
+                (message, ex) =>
+                {
+                    capturedError = message;
+                    capturedException = ex;
+                },
                 message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
@@ -751,7 +762,11 @@ namespace GW2CraftingHelper.Tests.Services
             Exception damageException = null;
             var damageStore = new PlanStore(
                 _tempDir,
-                (message, ex) => { damageError = message; damageException = ex; },
+                (message, ex) =>
+                {
+                    damageError = message;
+                    damageException = ex;
+                },
                 message => damageInfo = message);
             Assert.Null(damageStore.LoadLatest());
 
@@ -806,11 +821,11 @@ namespace GW2CraftingHelper.Tests.Services
                                 Quantity = 1,
                                 Decision = CraftingDecision.BuyFromTp,
                                 CanBuyTp = true,
-                                CanBuyVendor = true
-                            }
-                        }
-                    }
-                }
+                                CanBuyVendor = true,
+                            },
+                        },
+                    },
+                },
             };
 
             _store.Save(plan);
@@ -838,7 +853,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 5, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 6, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 6, Quantity = 1 },
                 },
                 Result = new CraftingPlanResult
                 {
@@ -848,15 +863,15 @@ namespace GW2CraftingHelper.Tests.Services
                         new CraftingTreeNode
                         {
                             ItemId = 5, NodeId = 1, Name = "A", Quantity = 1,
-                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true
+                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true,
                         },
                         new CraftingTreeNode
                         {
                             ItemId = 6, NodeId = 2, Name = "B", Quantity = 1,
-                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true
-                        }
-                    }
-                }
+                            Decision = CraftingDecision.BuyFromTp, CanBuyTp = true,
+                        },
+                    },
+                },
             };
 
             _store.Save(plan);
@@ -883,7 +898,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 5, Quantity = 2 } },
                 UseOwnMaterials = false,
                 PriceBasis = PriceBasis.InstantBuy,
-                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 } }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 } },
             };
 
             _store.Save(plan);
@@ -918,7 +933,11 @@ namespace GW2CraftingHelper.Tests.Services
             string capturedInfo = null;
             var store = new PlanStore(
                 _tempDir,
-                (message, ex) => { capturedError = message; capturedException = ex; },
+                (message, ex) =>
+                {
+                    capturedError = message;
+                    capturedException = ex;
+                },
                 message => capturedInfo = message);
 
             var loaded = store.LoadLatest();
@@ -950,8 +969,8 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceBasis = PriceBasis.InstantBuy,
                 Result = new CraftingPlanResult
                 {
-                    Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 }
-                }
+                    Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 2 },
+                },
             };
             _store.Save(plan);
 
@@ -971,7 +990,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } },
                 UseOwnMaterials = false,
                 PriceBasis = PriceBasis.InstantBuy,
-                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 1, TargetQuantity = 1 } }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 1, TargetQuantity = 1 } },
             };
             _store.Save(plan);
 
@@ -997,7 +1016,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SchemaVersion = PersistedPlan.CurrentSchemaVersion,
                 GeneratedAt = DateTime.Now,
-                Result = new CraftingPlanResult { Plan = new CraftingPlan() }
+                Result = new CraftingPlanResult { Plan = new CraftingPlan() },
             });
 
             Assert.NotNull(capturedMessage);
@@ -1017,7 +1036,6 @@ namespace GW2CraftingHelper.Tests.Services
         // HomesteadEfficiencyTiers, and a genuine multi-item batch) so the
         // serialization-fidelity risk item 1 of KNOWN-ISSUES #53
         // investigated is actually exercised, not just asserted. ---
-
         [Fact]
         public async Task Save_Load_ForceBuyOnlyNodeIds_RoundTripsAndManualOverrideStillWinsAfterReload()
         {
@@ -1058,7 +1076,7 @@ namespace GW2CraftingHelper.Tests.Services
             // the automatic pre-pass, same as the original.
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.Craft }
+                { initial.CraftingTree.NodeId, AcquisitionSource.Craft },
             };
             var manualOriginal = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
             var manualReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
@@ -1149,11 +1167,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 500,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 });
 
                 var priceApi = new InMemoryPriceApiClient();
@@ -1176,11 +1194,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = 2, Count = 10 }
+                            new CostLine { Type = "Currency", Id = 2, Count = 10 },
                         },
                         MerchantName = "Test Vendor",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var accountClient = new InMemoryAccountRecipeClient();
@@ -1198,23 +1216,23 @@ namespace GW2CraftingHelper.Tests.Services
                 var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
                 var tiers = new HomesteadEfficiencyTiers(new Dictionary<int, int>
                 {
-                    { Gw2Constants.RefinedHomesteadMetalItemId, 2 }
+                    { Gw2Constants.RefinedHomesteadMetalItemId, 2 },
                 });
 
                 var snapshot = new AccountSnapshot
                 {
                     Items = new List<SnapshotItemEntry>
                     {
-                        new SnapshotItemEntry { ItemId = 2, Count = 2, Source = AccountItemIndex.SourceMaterialStorage }
+                        new SnapshotItemEntry { ItemId = 2, Count = 2, Source = AccountItemIndex.SourceMaterialStorage },
                     },
                     Wallet = new List<SnapshotWalletEntry>
                     {
-                        new SnapshotWalletEntry { CurrencyId = 2, Value = 500 }
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 500 },
                     },
                     CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                     {
-                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
-                    }
+                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
+                    },
                 };
 
                 var result = await pipeline.GenerateStructuredAsync(
@@ -1277,7 +1295,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // once rather than a minimal two-item tree.
                 var overrides = new Dictionary<int, AcquisitionSource>
                 {
-                    { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                    { result.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
                 };
                 var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
                 var resolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
@@ -1307,11 +1325,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             recipeApi.AddSearchResult(2, 20);
             recipeApi.AddRecipe(new RawRecipe
@@ -1321,11 +1339,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 4, Count = 1 },
                 },
                 Disciplines = new List<string> { "Armorsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -1349,7 +1367,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 2 },
-                new PlanRequestItem { ItemId = 2, Quantity = 3 }
+                new PlanRequestItem { ItemId = 2, Quantity = 3 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None,
@@ -1369,7 +1387,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceBasis = PriceBasis.InstantBuy,
                 Result = result,
                 NodeOverrides = new Dictionary<int, AcquisitionSource>(),
-                IgnoredItemIds = new List<int>()
+                IgnoredItemIds = new List<int>(),
             };
             _store.Save(plan);
 
@@ -1393,7 +1411,7 @@ namespace GW2CraftingHelper.Tests.Services
             // original and reloaded contexts.
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { result.MultiItemRoots[0].NodeId, AcquisitionSource.BuyFromTp }
+                { result.MultiItemRoots[0].NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolvedOriginal = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
             var resolvedReloaded = pipeline.ResolveWithOverrides(loaded.Result.SolveContext, overrides);
@@ -1421,7 +1439,6 @@ namespace GW2CraftingHelper.Tests.Services
         // proving the validator rejects a file a naive parse/schema check
         // would have accepted, and does so with the required "one Warn log
         // line, return null" contract (never a partial accept). ---
-
         private static string SerializeAndCorrupt(PersistedPlan plan, Action<JObject> corrupt)
         {
             string json = PlanStoreHelpers.SerializePersistedPlan(plan);
@@ -1810,7 +1827,6 @@ namespace GW2CraftingHelper.Tests.Services
         // that empty array wholesale rather than one existing element,
         // since a fresh single-item fixture never triggers any of these
         // four calculators into producing a real entry. ---
-
         [Fact]
         public async Task LoadLatest_NullEntryInCompetencyOpportunities_ReturnsNullAndLogsWarnExactlyOnce()
         {
@@ -1935,6 +1951,7 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     gzip.Write(textBytes, 0, textBytes.Length);
                 }
+
                 return output.ToArray();
             }
         }
@@ -2012,7 +2029,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceBasis = PriceBasis.InstantBuy,
                 Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 1, TargetQuantity = 1 } },
                 NodeOverrides = new Dictionary<int, AcquisitionSource>(),
-                IgnoredItemIds = new List<int>()
+                IgnoredItemIds = new List<int>(),
             };
             _store.Save(plan);
 
@@ -2063,7 +2080,6 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - vendor-only.
-
             var priceApi = new InMemoryPriceApiClient();
             priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
 
@@ -2086,11 +2102,11 @@ namespace GW2CraftingHelper.Tests.Services
                         CostLines = new List<CostLine>
                         {
                             new CostLine { Type = "Item", Id = 42, Count = 5 },
-                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = new CraftingPlanPipeline(
@@ -2163,12 +2179,12 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             Type = "Item",
                             Id = level == 1 ? depth + 1 : level - 1,
-                            Count = 1
-                        }
+                            Count = 1,
+                        },
                     },
                     Disciplines = new List<string> { "Artificer" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 });
             }
 
@@ -2190,6 +2206,7 @@ namespace GW2CraftingHelper.Tests.Services
                 walked++;
                 node = node.Children?.FirstOrDefault(c => !c.IsCostComponent);
             }
+
             Assert.True(walked >= depth, $"walked only {walked} levels of {depth}");
         }
 
@@ -2207,7 +2224,6 @@ namespace GW2CraftingHelper.Tests.Services
         // exactly what an unserialized writer collision looks like. The
         // serialization claim therefore gets its own reader-free phase
         // where zero failures is the only permitted result. ---
-
         [Fact]
         public async Task SaveAndLoad_ConcurrentWriters_SerializeAndNeverYieldATornPlan()
         {
@@ -2280,7 +2296,7 @@ namespace GW2CraftingHelper.Tests.Services
                             samples.Enqueue(loaded);
                         }
                     }
-                }))
+                })),
             };
 
             start.Set();
@@ -2389,16 +2405,26 @@ namespace GW2CraftingHelper.Tests.Services
         // children are currency leaves, not crafting steps.
         private static int TreeDepth(CraftingTreeNode node)
         {
-            if (node == null) return 0;
+            if (node == null)
+            {
+                return 0;
+            }
 
             int deepestChild = 0;
             if (node.Children != null)
             {
                 foreach (var child in node.Children)
                 {
-                    if (child.IsCostComponent) continue;
+                    if (child.IsCostComponent)
+                    {
+                        continue;
+                    }
+
                     int depth = TreeDepth(child);
-                    if (depth > deepestChild) deepestChild = depth;
+                    if (depth > deepestChild)
+                    {
+                        deepestChild = depth;
+                    }
                 }
             }
 

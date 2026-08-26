@@ -35,8 +35,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 5,
                         OfferUnitCost = 10,
                         PlanUnitPrice = 100,
-                        WeeklyCap = 1
-                    }
+                        WeeklyCap = 1,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -90,8 +90,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         OfferUnitCost = 10,
                         PlanUnitPrice = 100,
-                        WeeklyCap = 1
-                    }
+                        WeeklyCap = 1,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -116,12 +116,12 @@ namespace GW2CraftingHelper.Tests.Services
                         MerchantName = "Some Vendor",
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 },
                         },
                         OutputCount = 1,
                         OfferUnitCost = 500,
-                        PlanUnitPrice = 1000
-                    }
+                        PlanUnitPrice = 1000,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -146,8 +146,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 5,
                         OfferUnitCost = 10,
                         PlanUnitPrice = 100,
-                        DailyCap = 3
-                    }
+                        DailyCap = 3,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -172,8 +172,8 @@ namespace GW2CraftingHelper.Tests.Services
                         CostLines = new List<CostLine> { new CostLine { Type = "Item", Id = 999, Count = 1 } },
                         OutputCount = 5,
                         OfferUnitCost = 10,
-                        PlanUnitPrice = 100
-                    }
+                        PlanUnitPrice = 100,
+                    },
                 });
 
             var vm = _builder.Build(result);

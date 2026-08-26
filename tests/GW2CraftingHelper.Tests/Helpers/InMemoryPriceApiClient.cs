@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             {
                 Id = itemId,
                 BuyUnitPrice = buyUnitPrice,
-                SellUnitPrice = sellUnitPrice
+                SellUnitPrice = sellUnitPrice,
             };
         }
 

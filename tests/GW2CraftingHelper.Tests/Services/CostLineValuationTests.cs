@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 }
+                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 },
             };
 
             bool ok = CostLineValuation.TryGetCoinCost(
@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = new List<CostLine>
             {
-                new CostLine { Type = "Item", Id = 10, Count = 3 }
+                new CostLine { Type = "Item", Id = 10, Count = 3 },
             };
             // PriceBasis.BuyOrder reads ItemPrice.SellInstant as its preferred
             // side - see PlanSolver.GetUnitPrice's own doc comment.
@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 50 },
-                new CostLine { Type = "Item", Id = 10, Count = 2 }
+                new CostLine { Type = "Item", Id = 10, Count = 2 },
             };
             var prices = new Dictionary<int, ItemPrice> { { 10, new ItemPrice { SellInstant = 25 } } };
 
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 2, Count = 100 } // Karma
+                new CostLine { Type = "Currency", Id = 2, Count = 100 }, // Karma
             };
 
             bool ok = CostLineValuation.TryGetCoinCost(
@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 500 },
-                new CostLine { Type = "Currency", Id = 2, Count = 10 } // Karma - fails
+                new CostLine { Type = "Currency", Id = 2, Count = 10 }, // Karma - fails
             };
 
             bool ok = CostLineValuation.TryGetCoinCost(

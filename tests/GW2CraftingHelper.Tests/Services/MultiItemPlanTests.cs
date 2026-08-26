@@ -32,10 +32,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
+                MinRating = 400,
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -123,10 +123,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
+                MinRating = 400,
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -200,8 +200,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 500, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 500, Count = 2 },
+                },
             });
             recipeApi.AddSearchResult(200, 210);
             recipeApi.AddRecipe(new RawRecipe
@@ -211,8 +211,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 500, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 500, Count = 2 },
+                },
             });
 
             // No TP price for 100, 200 (force-craft, they have a recipe) or
@@ -239,11 +239,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 5,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 20 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 20 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = new CraftingPlanPipeline(
@@ -264,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var items = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 100, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 200, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 200, Quantity = 1 },
                 };
 
                 var result = await pipeline.GenerateStructuredAsync(
@@ -310,8 +310,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 301, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 301, Count = 1 },
+                },
             });
             // Item 400 <- recipe 410 <- item 401 (priced ingredient)
             recipeApi.AddSearchResult(400, 410);
@@ -322,8 +322,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 401, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 401, Count = 1 },
+                },
             });
 
             priceApi = new InMemoryPriceApiClient();
@@ -360,7 +360,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 300, Quantity = 1 },
-                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+                new PlanRequestItem { ItemId = 400, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(
@@ -373,7 +373,7 @@ namespace GW2CraftingHelper.Tests.Services
             // (item 300) is untouched by this override.
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.MultiItemRoots[1].NodeId, AcquisitionSource.BuyFromTp }
+                { initial.MultiItemRoots[1].NodeId, AcquisitionSource.BuyFromTp },
             };
 
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
@@ -403,8 +403,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 301, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 301, Count = 2 },
+                },
             });
             recipeApi.AddSearchResult(400, 410);
             recipeApi.AddRecipe(new RawRecipe
@@ -414,8 +414,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 301, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 301, Count = 3 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -436,7 +436,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 300, Quantity = 1 },
-                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+                new PlanRequestItem { ItemId = 400, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(
@@ -481,8 +481,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 601, Count = 5 }
-                }
+                    new RawIngredient { Type = "Item", Id = 601, Count = 5 },
+                },
             });
             // Item 700: no TP price of its own - always force-crafts.
             recipeApi.AddSearchResult(700, 710);
@@ -493,8 +493,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 701, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 701, Count = 1 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -522,7 +522,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 600, Quantity = 1 },
-                new PlanRequestItem { ItemId = 700, Quantity = 1 }
+                new PlanRequestItem { ItemId = 700, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -566,8 +566,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 900, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 900, Count = 3 },
+                },
             });
             recipeApi.AddSearchResult(801, 811);
             recipeApi.AddRecipe(new RawRecipe
@@ -577,8 +577,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 900, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 900, Count = 3 },
+                },
             });
 
             // No TP price for 800/801 (force-craft, they have a recipe).
@@ -606,14 +606,14 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 900, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 900, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 800, Quantity = 1 },
-                new PlanRequestItem { ItemId = 801, Quantity = 1 }
+                new PlanRequestItem { ItemId = 801, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(
@@ -670,11 +670,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 901, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = 901, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             recipeApi.AddSearchResult(902, 920);
             recipeApi.AddRecipe(new RawRecipe
@@ -684,11 +684,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 903, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = 903, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             // Same InstantBuy pricing shape as BuildForceBuyPipeline: fresh
@@ -719,8 +719,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Items = new List<SnapshotItemEntry>
                 {
                     new SnapshotItemEntry { ItemId = 901, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
-                    new SnapshotItemEntry { ItemId = 903, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 903, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var standaloneA = await pipeline.GenerateStructuredAsync(
@@ -738,7 +738,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 900, Quantity = 1 },
-                new PlanRequestItem { ItemId = 902, Quantity = 1 }
+                new PlanRequestItem { ItemId = 902, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -784,8 +784,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 301, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 301, Count = 1 },
+                },
             });
             recipeApi.AddSearchResult(400, 410);
             recipeApi.AddRecipe(new RawRecipe
@@ -795,8 +795,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 401, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 401, Count = 1 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -806,7 +806,6 @@ namespace GW2CraftingHelper.Tests.Services
             // finished items are untradable (no TP listings at all), so
             // both force-craft (no buy price to compare against) AND both
             // leave NetSaleValue null.
-
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(300, "Item C (untradable)", "c.png");
             itemApi.AddItem(301, "Ingredient C", "ic.png");
@@ -850,7 +849,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 300, Quantity = 1 },
-                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+                new PlanRequestItem { ItemId = 400, Quantity = 1 },
             };
 
             // Default priceBasis is PriceBasis.BuyOrder (see
@@ -894,7 +893,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 300, Quantity = 1 },
-                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+                new PlanRequestItem { ItemId = 400, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -932,8 +931,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 501, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 501, Count = 2 },
+                },
             });
             recipeApi.AddSearchResult(600, 610);
             recipeApi.AddRecipe(new RawRecipe
@@ -943,8 +942,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 601, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 601, Count = 3 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -981,7 +980,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 500, Quantity = 1 },
-                new PlanRequestItem { ItemId = 600, Quantity = 1 }
+                new PlanRequestItem { ItemId = 600, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -1030,7 +1029,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1100, Quantity = 1 },
-                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -1069,7 +1068,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1100, Quantity = 1 },
-                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(
@@ -1079,7 +1078,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.MultiItemRoots[0].NodeId, AcquisitionSource.Craft }
+                { initial.MultiItemRoots[0].NodeId, AcquisitionSource.Craft },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -1115,7 +1114,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 300, Quantity = 1 },
-                new PlanRequestItem { ItemId = 400, Quantity = 1 }
+                new PlanRequestItem { ItemId = 400, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(
@@ -1157,8 +1156,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 1101, Count = 5 }
-                }
+                    new RawIngredient { Type = "Item", Id = 1101, Count = 5 },
+                },
             });
             recipeApi.AddSearchResult(1200, 1210);
             recipeApi.AddRecipe(new RawRecipe
@@ -1168,8 +1167,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 1201, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 1201, Count = 1 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -1230,8 +1229,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 1101, Count = 2, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 1101, Count = 2, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var standalone1100 = await pipeline.GenerateStructuredAsync(
@@ -1255,7 +1254,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1100, Quantity = 1 },
-                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -1322,8 +1321,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 1201, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 1201, Count = 1, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var standalone1200 = await pipeline.GenerateStructuredAsync(
@@ -1342,7 +1341,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1100, Quantity = 1 },
-                new PlanRequestItem { ItemId = 1200, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1200, Quantity = 1 },
             };
 
             var batch = await pipeline.GenerateStructuredAsync(
@@ -1403,8 +1402,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 500, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 500, Count = 2 },
+                },
             });
             recipeApi.AddSearchResult(200, 210);
             recipeApi.AddRecipe(new RawRecipe
@@ -1414,8 +1413,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 500, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 500, Count = 2 },
+                },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -1445,11 +1444,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 5,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 20 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 20 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = new CraftingPlanPipeline(
@@ -1462,7 +1461,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var items = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 100, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 200, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 200, Quantity = 1 },
                 };
 
                 var batch = await pipeline.GenerateStructuredAsync(
@@ -1496,7 +1495,6 @@ namespace GW2CraftingHelper.Tests.Services
         // the report's exact multi-item-request double-count scenario
         // (docs/research/m37-r3-achievement-dedup.md Section 4.6), using
         // the real, wiki/API-verified Infinite Trebuchet Blueprint ids. ---
-
         [Fact]
         public async Task GenerateStructuredAsync_BlueprintAchievementRecipe_PlusDirectBitItemRequest_DedupsSharedIngredient()
         {
@@ -1529,9 +1527,9 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = bit0PileOfRecycledTrebuchets, Count = 1, AchievementId = 8493, AchievementBit = 0 },
                     new RawIngredient { Type = "Item", Id = bit1TrebuchetMechanism, Count = 1, AchievementId = 8493, AchievementBit = 1 },
                     new RawIngredient { Type = "Item", Id = bit2ProofOfSiegeExpertise, Count = 1, AchievementId = 8493, AchievementBit = 2 },
-                    new RawIngredient { Type = "Item", Id = bit3BoxOfScavengedTrebuchetParts, Count = 1, AchievementId = 8493, AchievementBit = 3 }
+                    new RawIngredient { Type = "Item", Id = bit3BoxOfScavengedTrebuchetParts, Count = 1, AchievementId = 8493, AchievementBit = 3 },
                 },
-                Disciplines = new List<string> { "Achievement" }
+                Disciplines = new List<string> { "Achievement" },
             });
             // No recipe registered for any of the 4 bit items - each is
             // priced directly (a real acquisition path per gw2e's own
@@ -1553,7 +1551,6 @@ namespace GW2CraftingHelper.Tests.Services
             priceApi.AddPrice(bit3BoxOfScavengedTrebuchetParts, buyUnitPrice: 15, sellUnitPrice: 20);
             // No price for the Blueprint itself - forces Craft (its own
             // achievement "recipe" is the only path).
-
             var itemApi = new InMemoryItemApiClient();
             itemApi.AddItem(blueprintId, "Infinite Trebuchet Blueprint", "blueprint.png");
             itemApi.AddItem(bit0PileOfRecycledTrebuchets, "Pile of Recycled Trebuchets", "pile.png");
@@ -1571,7 +1568,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = blueprintId, Quantity = 1 },
-                new PlanRequestItem { ItemId = bit0PileOfRecycledTrebuchets, Quantity = 1 }
+                new PlanRequestItem { ItemId = bit0PileOfRecycledTrebuchets, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(

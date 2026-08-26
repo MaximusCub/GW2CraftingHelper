@@ -46,11 +46,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(100, 5)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } }
+                { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { ItemAndCurrencyVendorOffer(1, new[] { (100, 15) }, null) } }
+                { 1, new List<VendorOffer> { ItemAndCurrencyVendorOffer(1, new[] { (100, 15) }, null) } },
             };
 
             var root = SolveAndBuildRootNode(tree, prices, vendorOffers);
@@ -99,11 +99,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 77, 1000) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 77, 1000) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 77, 1 } });
 
@@ -139,7 +139,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 400 } },
-                { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } }
+                { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } },
             };
 
             var root = SolveAndBuildRootNode(tree, prices);
@@ -179,11 +179,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 77, 1000) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 77, 1000) } },
             };
 
             var root = SolveAndBuildRootNode(tree, prices, vendorOffers);

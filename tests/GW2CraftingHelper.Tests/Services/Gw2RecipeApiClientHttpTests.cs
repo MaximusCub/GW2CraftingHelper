@@ -41,14 +41,13 @@ namespace GW2CraftingHelper.Tests.Services
                 LastRequestUri = request.RequestUri;
                 var response = new HttpResponseMessage(_statusCode)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
                 return Task.FromResult(response);
             }
         }
 
         // --- SearchByOutputAsync ---
-
         [Fact]
         public async Task SearchByOutputAsync_200_ReturnsParsedIds()
         {
@@ -122,7 +121,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- GetRecipeAsync ---
-
         [Fact]
         public async Task GetRecipeAsync_200_ReturnsParsedRecipe()
         {

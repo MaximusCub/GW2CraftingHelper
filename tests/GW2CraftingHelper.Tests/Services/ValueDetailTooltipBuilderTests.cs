@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Services
                 NodeId = 1,
                 Decision = decision,
                 SubtreeCost = subtreeCost,
-                DecisionValue = decisionValue
+                DecisionValue = decisionValue,
             };
         }
 
@@ -130,7 +130,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 7, subtreeCost: 0, decisionValue: 250);
             var caps = new Dictionary<int, TimegatedItem>
             {
-                { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } }
+                { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } },
             };
 
             bool result = ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 3, subtreeCost: 0, decisionValue: 100);
             var caps = new Dictionary<int, TimegatedItem>
             {
-                { 3, new TimegatedItem { ItemId = 3, CapType = capType, CapValue = 2, NeededCount = 10 } }
+                { 3, new TimegatedItem { ItemId = 3, CapType = capType, CapValue = 2, NeededCount = 10 } },
             };
 
             ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
@@ -163,7 +163,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 7, subtreeCost: 0, decisionValue: 250);
             var caps = new Dictionary<int, TimegatedItem>
             {
-                { 999, new TimegatedItem { ItemId = 999, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 10 } }
+                { 999, new TimegatedItem { ItemId = 999, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 10 } },
             };
 
             ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);
@@ -180,7 +180,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = Node(CraftingDecision.Craft, itemId: 7, subtreeCost: 5000, decisionValue: 30000);
             var caps = new Dictionary<int, TimegatedItem>
             {
-                { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } }
+                { 7, new TimegatedItem { ItemId = 7, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 20 } },
             };
 
             ValueDetailTooltipBuilder.TryBuildContent(node, caps, out var content);

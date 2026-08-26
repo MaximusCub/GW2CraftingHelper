@@ -16,7 +16,9 @@ namespace GW2CraftingHelper.Tests.Helpers
         private int _searchCallCount;
 
         public int MaxObservedConcurrency => _maxObservedConcurrency;
+
         public int SearchCallCount => _searchCallCount;
+
         public int LatencyMs { get; set; }
 
         /// <summary>

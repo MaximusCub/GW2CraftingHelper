@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountCurrencyIndex(new List<SnapshotWalletEntry>
             {
-                Entry(2, 500)
+                Entry(2, 500),
             });
 
             Assert.Equal(500, index.GetQuantity(2));
@@ -44,7 +44,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountCurrencyIndex(new List<SnapshotWalletEntry>
             {
-                Entry(2, 500)
+                Entry(2, 500),
             });
 
             Assert.Equal(0, index.GetQuantity(3));
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountCurrencyIndex(new List<SnapshotWalletEntry>
             {
                 Entry(2, 500),
-                Entry(2, 250)
+                Entry(2, 250),
             });
 
             Assert.Equal(750, index.GetQuantity(2));
@@ -69,7 +69,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(2, 0),
                 Entry(3, -5),
-                Entry(4, 10)
+                Entry(4, 10),
             });
 
             Assert.Equal(0, index.GetQuantity(2));

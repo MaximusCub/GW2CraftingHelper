@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Tests.Services
             "Laurels",
             "Spirit Shards",
             "Fractal Relics",
-            "Pristine Fractal Relics"
+            "Pristine Fractal Relics",
         };
 
         // Two columns of the re-derived 490px cell. The old pair (907/908)

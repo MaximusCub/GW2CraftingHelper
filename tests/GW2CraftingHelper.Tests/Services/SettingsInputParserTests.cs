@@ -146,7 +146,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseLogMaxSizeMb (log system) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("2", 2)]
@@ -199,7 +198,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseRetentionDays (log system) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("14", 14)]
@@ -251,7 +249,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseRefreshIntervalMinutes (dev/proposals/d1-snapshot-about-settings.md Feature 3) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("10", 10)]

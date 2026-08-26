@@ -14,6 +14,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             private readonly HttpStatusCode _statusCode;
             private readonly string _body;
+
             public int CallCount { get; private set; }
 
             public StubHandler(HttpStatusCode statusCode, string body = "")
@@ -28,7 +29,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CallCount++;
                 var response = new HttpResponseMessage(_statusCode)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
                 return Task.FromResult(response);
             }
@@ -156,12 +157,13 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
                     {
-                        Content = new StringContent("")
+                        Content = new StringContent(""),
                     });
                 }
+
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(_successBody)
+                    Content = new StringContent(_successBody),
                 });
             }
         }
@@ -238,7 +240,7 @@ namespace GW2CraftingHelper.Tests.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 });
             }
         }
@@ -270,6 +272,7 @@ namespace GW2CraftingHelper.Tests.Services
         private class ConfigurableDelayHandler : HttpMessageHandler
         {
             private readonly string _body;
+
             public TimeSpan Delay { get; set; }
 
             public ConfigurableDelayHandler(string body)
@@ -284,9 +287,10 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     await Task.Delay(Delay, cancellationToken);
                 }
+
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
             }
         }

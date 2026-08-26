@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineOwnedCurrencyTests
     {
         // --- Owned currency (cosmetic only, never affects decisions) ---
-
         private static CraftingPlanPipeline BuildVendorCurrencyPipeline(
             out VendorOfferStore store, string tempDir)
         {
@@ -28,11 +27,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputCount = 1,
                     CostLines = new List<CostLine>
                     {
-                        new CostLine { Type = "Currency", Id = 2, Count = 500 }
+                        new CostLine { Type = "Currency", Id = 2, Count = 500 },
                     },
                     MerchantName = "Karma Vendor",
-                    Locations = new List<string>()
-                }
+                    Locations = new List<string>(),
+                },
             });
 
             // No recipe for item 1, and (deliberately) no TP price either -
@@ -67,8 +66,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     Wallet = new List<SnapshotWalletEntry>
                     {
-                        new SnapshotWalletEntry { CurrencyId = 2, Value = 100000 }
-                    }
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 100000 },
+                    },
                 };
                 var withWallet = await pipeline.GenerateStructuredAsync(
                     1, 1, snapshotWithWallet, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
@@ -103,8 +102,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     Wallet = new List<SnapshotWalletEntry>
                     {
-                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 }
-                    }
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 },
+                    },
                 };
                 var result = await pipeline.GenerateStructuredAsync(
                     1, 1, snapshot, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
@@ -145,8 +144,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     Wallet = new List<SnapshotWalletEntry>
                     {
-                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 }
-                    }
+                        new SnapshotWalletEntry { CurrencyId = 2, Value = 200 },
+                    },
                 };
                 var result = await pipeline.GenerateStructuredAsync(
                     1, 1, snapshot, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);

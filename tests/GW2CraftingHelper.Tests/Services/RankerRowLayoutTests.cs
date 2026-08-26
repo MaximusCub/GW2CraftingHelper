@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Tests.Services
             new object[] { WindowSizing.TabPanelWidthFor(1638) - WindowSizing.ScrollbarAllowance },
             new object[] { WindowSizing.TabPanelWidthFor(1836) - WindowSizing.ScrollbarAllowance },
             new object[] { WindowSizing.TabPanelWidthFor(2406) - WindowSizing.ScrollbarAllowance },
-            new object[] { WindowSizing.TabPanelWidthFor(2560) - WindowSizing.ScrollbarAllowance }
+            new object[] { WindowSizing.TabPanelWidthFor(2560) - WindowSizing.ScrollbarAllowance },
         };
 
         [Theory]
@@ -158,11 +158,10 @@ namespace GW2CraftingHelper.Tests.Services
         // every band must stay at least as wide as its own header text even
         // when the table is empty and no cell has been measured.
         // ---------------------------------------------------------------
-
         [Theory]
         [InlineData(0)]
         [InlineData(1)]
-        [InlineData(8)]   // a dash-only remaining cell, the empty-table case
+        [InlineData(8)] // a dash-only remaining cell, the empty-table case
         [InlineData(99)]
         public void TheRemainingBandNeverDropsBelowItsHeaderFloor(int measuredCellWidth)
         {

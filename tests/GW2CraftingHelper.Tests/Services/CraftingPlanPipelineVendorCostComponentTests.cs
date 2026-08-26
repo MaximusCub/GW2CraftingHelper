@@ -57,11 +57,11 @@ namespace GW2CraftingHelper.Tests.Services
                         CostLines = new List<CostLine>
                         {
                             new CostLine { Type = "Item", Id = 42, Count = 5 },
-                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 pipeline = builder.WithVendorOfferStore(store).Build();
@@ -69,6 +69,7 @@ namespace GW2CraftingHelper.Tests.Services
                 result = await pipeline.GenerateStructuredAsync(1, 2, snapshot, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
             }
+
             return (pipeline, result);
         }
 
@@ -118,12 +119,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 23, Value = 999 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 23, Value = 999 },
+                },
             };
 
             var (_, result) = await GenerateMixedVendorPlanAsync(snapshot);
@@ -232,8 +233,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 })
                 .WithPrice(2, buyUnitPrice: 1, sellUnitPrice: 1) // craft is cheap - the baseline winner
                 .WithPrice(42, buyUnitPrice: 10, sellUnitPrice: 20)
@@ -262,12 +263,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
+                    new SnapshotItemEntry { ItemId = 42, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 23, Value = 5 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 23, Value = 5 },
+                },
             };
 
             CraftingPlanPipeline pipeline;
@@ -287,11 +288,11 @@ namespace GW2CraftingHelper.Tests.Services
                         CostLines = new List<CostLine>
                         {
                             new CostLine { Type = "Item", Id = 42, Count = 5 },
-                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 pipeline = builder.WithVendorOfferStore(store).Build();
@@ -315,7 +316,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor }
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor },
             };
             var resolved = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
 
@@ -370,8 +371,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 })
                 .WithPrice(2, buyUnitPrice: 1, sellUnitPrice: 1) // craft is cheap - the baseline winner
                 .WithPrice(42, buyUnitPrice: 10, sellUnitPrice: 20)
@@ -397,11 +398,11 @@ namespace GW2CraftingHelper.Tests.Services
                         CostLines = new List<CostLine>
                         {
                             new CostLine { Type = "Item", Id = 42, Count = 5 },
-                            new CostLine { Type = "Currency", Id = 23, Count = 3 }
+                            new CostLine { Type = "Currency", Id = 23, Count = 3 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 pipeline = builder.WithVendorOfferStore(store).Build();
@@ -414,7 +415,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor }
+                { result.CraftingTree.NodeId, AcquisitionSource.BuyFromVendor },
             };
             var resolved = pipeline.ResolveWithOverrides(result.SolveContext, overrides);
 
@@ -491,10 +492,10 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
-                    MinRating = 400
+                    MinRating = 400,
                 })
                 .WithPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -508,8 +509,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 3, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 2, Count = 3, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var withoutSnapshot = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,

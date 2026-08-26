@@ -18,7 +18,6 @@ namespace GW2CraftingHelper.Tests.Services
         //     +-- Mid B (201) x1 -- Recipe 3
         //           +-- Leaf Y (301) x3  (shared with Mid A)
         //           +-- Leaf Z (302) x1
-
         private const int Root = 100;
         private const int MidA = 200;
         private const int MidB = 201;
@@ -42,11 +41,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = MidA, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = MidB, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = MidB, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             api.AddSearchResult(MidA, RecipeMidA);
@@ -58,11 +57,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = LeafX, Count = 2 },
-                    new RawIngredient { Type = "Item", Id = LeafY, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = LeafY, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 300,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             api.AddSearchResult(MidB, RecipeMidB);
@@ -74,15 +73,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = LeafY, Count = 3 },
-                    new RawIngredient { Type = "Item", Id = LeafZ, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = LeafZ, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 300,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             // Leaves have no recipes (SearchByOutput returns empty)
-
             return api;
         }
 
@@ -171,7 +169,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = ingredients,
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var service = new RecipeService(api, maxConcurrency: 3);
@@ -204,15 +202,15 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = nextItemId, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = nextItemId, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 });
             }
-            // Item 105 is a leaf (no search result)
 
+            // Item 105 is a leaf (no search result)
             using (var cts = new CancellationTokenSource())
             {
                 // Cancel after 150ms - enough for ~1 BFS level but not all 5

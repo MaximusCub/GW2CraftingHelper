@@ -23,13 +23,13 @@ namespace GW2CraftingHelper.Tests.Helpers
                 OutputCount = outputCount,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost }
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost },
                 },
                 MerchantName = "TestMerchant",
                 Locations = new List<string> { "TestLoc" },
                 DailyCap = dailyCap,
                 WeeklyCap = weeklyCap,
-                SeasonalCap = seasonalCap
+                SeasonalCap = seasonalCap,
             };
         }
 
@@ -44,9 +44,10 @@ namespace GW2CraftingHelper.Tests.Helpers
                 {
                     Type = "Currency",
                     Id = Gw2Constants.CoinCurrencyId,
-                    Count = coinCost
+                    Count = coinCost,
                 });
             }
+
             costLines.Add(new CostLine { Type = "Currency", Id = currencyId, Count = currencyCount });
 
             return new VendorOffer
@@ -59,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 Locations = new List<string>(),
                 DailyCap = dailyCap,
                 WeeklyCap = weeklyCap,
-                SeasonalCap = seasonalCap
+                SeasonalCap = seasonalCap,
             };
         }
 
@@ -88,9 +89,10 @@ namespace GW2CraftingHelper.Tests.Helpers
                 {
                     Type = "Currency",
                     Id = Gw2Constants.CoinCurrencyId,
-                    Count = coinCost
+                    Count = coinCost,
                 });
             }
+
             if (itemCostLines != null)
             {
                 foreach (var (itemId, count) in itemCostLines)
@@ -98,6 +100,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                     costLines.Add(new CostLine { Type = "Item", Id = itemId, Count = count });
                 }
             }
+
             if (currencyCostLines != null)
             {
                 foreach (var (currencyId, count) in currencyCostLines)
@@ -113,7 +116,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 OutputCount = outputCount,
                 CostLines = costLines,
                 MerchantName = "Barter Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
         }
     }

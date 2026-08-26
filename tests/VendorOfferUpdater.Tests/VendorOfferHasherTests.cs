@@ -12,7 +12,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
             var locations = new List<string> { "Lion's Arch" };
 
@@ -30,7 +30,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -46,7 +46,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -63,12 +63,12 @@ namespace VendorOfferUpdater.Tests
             var costs1 = new List<CostLine>
             {
                 new CostLine { Type = "Currency", Id = 1, Count = 100 },
-                new CostLine { Type = "Item", Id = 50, Count = 3 }
+                new CostLine { Type = "Item", Id = 50, Count = 3 },
             };
             var costs2 = new List<CostLine>
             {
                 new CostLine { Type = "Item", Id = 50, Count = 3 },
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -84,7 +84,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -115,7 +115,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -131,7 +131,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -147,7 +147,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hashNoCap = VendorOfferHasher.ComputeOfferId(
@@ -170,7 +170,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -188,7 +188,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Item", Id = 19697, Count = 8 }
+                new CostLine { Type = "Item", Id = 19697, Count = 8 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -204,7 +204,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash1 = VendorOfferHasher.ComputeOfferId(
@@ -220,7 +220,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             // Same "has a cap" shape (both non-null), different magnitude - the
@@ -243,7 +243,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hash = VendorOfferHasher.ComputeOfferId(
@@ -264,7 +264,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hashOmitted = VendorOfferHasher.ComputeOfferId(
@@ -280,7 +280,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Item", Id = 19697, Count = 8 }
+                new CostLine { Type = "Item", Id = 19697, Count = 8 },
             };
 
             string hashNoTier = VendorOfferHasher.ComputeOfferId(
@@ -303,13 +303,12 @@ namespace VendorOfferUpdater.Tests
         // every existing positional call above - including the ones that
         // already pass homesteadTier - keeps meaning exactly what it meant
         // before this parameter existed.
-
         [Fact]
         public void OmittedSeasonalCap_MatchesExplicitNull()
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             string hashOmitted = VendorOfferHasher.ComputeOfferId(
@@ -325,7 +324,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 63, Count = 60 }
+                new CostLine { Type = "Currency", Id = 63, Count = 60 },
             };
 
             string hashNoCap = VendorOfferHasher.ComputeOfferId(
@@ -345,7 +344,7 @@ namespace VendorOfferUpdater.Tests
         {
             var costs = new List<CostLine>
             {
-                new CostLine { Type = "Currency", Id = 1, Count = 100 }
+                new CostLine { Type = "Currency", Id = 1, Count = 100 },
             };
 
             // Same numeric value (5), but in different cap slots - must not

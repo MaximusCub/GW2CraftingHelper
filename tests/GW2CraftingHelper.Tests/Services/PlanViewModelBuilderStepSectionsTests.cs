@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Crafting Steps ---
-
         [Fact]
         public void CraftingSteps_OnlyCraftSource()
         {
@@ -20,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp },
                 new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.BuyFromVendor }
+                new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.BuyFromVendor },
             });
             var vm = _builder.Build(result);
 
@@ -38,7 +37,7 @@ namespace GW2CraftingHelper.Tests.Services
                 steps: new List<PlanStep>
                 {
                     new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
                 });
             var vm = _builder.Build(result);
 
@@ -53,7 +52,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp }
+                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp },
             });
             var vm = _builder.Build(result);
 
@@ -71,11 +70,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
                 },
                 timegatedItems: new List<TimegatedItem>
                 {
-                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 }
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 },
                 });
             var vm = _builder.Build(result);
 
@@ -98,11 +97,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 9, Quantity = 4, Source = AcquisitionSource.BuyFromVendor }
+                    new PlanStep { ItemId = 9, Quantity = 4, Source = AcquisitionSource.BuyFromVendor },
                 },
                 timegatedItems: new List<TimegatedItem>
                 {
-                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 4 }
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Weekly, CapValue = 3, NeededCount = 4 },
                 });
             var vm = _builder.Build(result);
 
@@ -123,11 +122,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 9, Quantity = 60, Source = AcquisitionSource.BuyFromVendor }
+                    new PlanStep { ItemId = 9, Quantity = 60, Source = AcquisitionSource.BuyFromVendor },
                 },
                 timegatedItems: new List<TimegatedItem>
                 {
-                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Seasonal, CapValue = 20, NeededCount = 60 }
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Seasonal, CapValue = 20, NeededCount = 60 },
                 });
             var vm = _builder.Build(result);
 
@@ -141,13 +140,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Required Disciplines ---
-
         [Fact]
         public void RequiredDisciplines_MapsCorrectly()
         {
             var result = MakeResult(requiredDisciplines: new List<RequiredDiscipline>
             {
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
             });
             var vm = _builder.Build(result);
 
@@ -169,19 +167,18 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Per-character discipline display (gw2efficiency
         // parity): character availability text on DisciplineRow rows. ---
-
         [Fact]
         public void RequiredDisciplines_AllCharactersSufficient_ListsEachWithRating()
         {
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
                     new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400, Active = true },
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
                 });
             var vm = _builder.Build(result);
 
@@ -197,11 +194,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 450 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 450 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400, Active = true }
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400, Active = true },
                 });
             var vm = _builder.Build(result);
 
@@ -215,11 +212,11 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 },
                 },
                 characterDisciplines: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = true }
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = true },
                 });
             var vm = _builder.Build(result);
 
@@ -236,7 +233,7 @@ namespace GW2CraftingHelper.Tests.Services
             // claim.
             var result = MakeResult(requiredDisciplines: new List<RequiredDiscipline>
             {
-                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 },
             });
             var vm = _builder.Build(result);
 
@@ -245,7 +242,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Required Recipes ---
-
         [Fact]
         public void RequiredRecipes_AutoLearned_StatusTag()
         {
@@ -258,8 +254,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = true,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = null
-                }
+                    IsMissing = null,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -279,8 +275,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = false,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = true
-                }
+                    IsMissing = true,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -300,8 +296,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = false,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = false
-                }
+                    IsMissing = false,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -321,8 +317,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = false,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = null
-                }
+                    IsMissing = null,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -331,7 +327,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- UI-bundle milestone, Feature A (wiki links) ---
-
         [Fact]
         public void RequiredRecipes_Missing_NotLearnedFromItem_WikiUrlLinksToAcquisitionAnchor()
         {
@@ -346,8 +341,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsLearnedFromItem = false,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = true
-                }
+                    IsMissing = true,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -371,8 +366,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsLearnedFromItem = true,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = true
-                }
+                    IsMissing = true,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -394,8 +389,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = false,
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    IsMissing = false
-                }
+                    IsMissing = false,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -419,8 +414,8 @@ namespace GW2CraftingHelper.Tests.Services
                     // (an AutoLearned recipe below the character rating is
                     // IsAutoLearned AND IsMissing) is the axis this test must
                     // pin; null passed vacuously under any gate.
-                    IsMissing = true
-                }
+                    IsMissing = true,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -442,8 +437,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 5,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "Weaponsmith" },
-                        MinRating = 400
-                    }
+                        MinRating = 400,
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -454,7 +449,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Wave-3 quick win #2: Mystic Forge rows excluded from the
         // Required Recipes SECTION (nothing to learn) ---
-
         [Fact]
         public void RequiredRecipes_MysticForgeOnly_SectionOmittedEntirely()
         {
@@ -470,8 +464,8 @@ namespace GW2CraftingHelper.Tests.Services
                     IsAutoLearned = true,
                     Disciplines = new List<string> { "MysticForge" },
                     MinRating = 0,
-                    IsMissing = false
-                }
+                    IsMissing = false,
+                },
             });
             var vm = _builder.Build(result);
 
@@ -497,7 +491,7 @@ namespace GW2CraftingHelper.Tests.Services
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "MysticForge" },
                         MinRating = 0,
-                        IsMissing = false
+                        IsMissing = false,
                     },
                     new RequiredRecipe
                     {
@@ -506,8 +500,8 @@ namespace GW2CraftingHelper.Tests.Services
                         IsAutoLearned = false,
                         Disciplines = new List<string> { "Weaponsmith" },
                         MinRating = 400,
-                        IsMissing = true
-                    }
+                        IsMissing = true,
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -536,8 +530,8 @@ namespace GW2CraftingHelper.Tests.Services
                         IsAutoLearned = false,
                         Disciplines = new List<string> { "MysticForge", "Weaponsmith" },
                         MinRating = 400,
-                        IsMissing = true
-                    }
+                        IsMissing = true,
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -548,7 +542,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Section order ---
-
         [Fact]
         public void SectionOrder_MatchesSpec()
         {
@@ -562,16 +555,16 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 10, QuantityUsed = 1 }
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 1 },
                 },
                 steps: new List<PlanStep>
                 {
                     new PlanStep { ItemId = 3, Quantity = 5, Source = AcquisitionSource.BuyFromTp, TotalCost = 500 },
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
                 },
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 requiredRecipes: new List<RequiredRecipe>
                 {
@@ -581,8 +574,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 2,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "Weaponsmith" },
-                        MinRating = 500
-                    }
+                        MinRating = 500,
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -594,12 +587,11 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanSectionType.ShoppingList,
                 PlanSectionType.RequiredDisciplines,
                 PlanSectionType.RequiredRecipes,
-                PlanSectionType.CraftingSteps
+                PlanSectionType.CraftingSteps,
             }, types);
         }
 
         // --- Mixed steps ---
-
         [Fact]
         public void MixedSteps_CorrectSectionAssignment()
         {
@@ -607,7 +599,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.BuyFromVendor, TotalCost = 200 }
+                new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.BuyFromVendor, TotalCost = 200 },
             });
             var vm = _builder.Build(result);
 
@@ -622,7 +614,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Target quantity ---
-
         [Fact]
         public void TargetQuantity_PassedThrough()
         {

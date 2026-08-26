@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 829, new ItemPrice { ItemId = 829, BuyInstant = 99999 } }
+                { 829, new ItemPrice { ItemId = 829, BuyInstant = 99999 } },
             };
             var solver = new PlanSolver();
 
@@ -96,11 +96,11 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "GuildUpgrade")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } }
+                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } },
             };
             var solver = new PlanSolver();
 
@@ -134,7 +134,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "GuildUpgrade")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 829, 5 } });
             var solver = new PlanSolver();
@@ -158,7 +158,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "GuildUpgrade")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -192,7 +192,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },
                 // Deliberately no price for item 2 - its only route is craft.
             };
             var solver = new PlanSolver();
@@ -242,7 +242,6 @@ namespace GW2CraftingHelper.Tests.Services
         // string ("MysteryIngredientType") that is neither "Item",
         // "Currency", nor "GuildUpgrade" to prove the general guard, not
         // just the one concrete instance the earlier tests above cover.
-
         [Fact]
         public void UnrecognizedIngredientType_NeverPricedAsItem_EvenWhenTpPriceExistsForSameId()
         {
@@ -257,7 +256,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 829, new ItemPrice { ItemId = 829, BuyInstant = 99999 } }
+                { 829, new ItemPrice { ItemId = 829, BuyInstant = 99999 } },
             };
             var solver = new PlanSolver();
 
@@ -294,11 +293,11 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "MysteryIngredientType")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } }
+                { 829, new List<VendorOffer> { CoinVendorOffer(829, 1, outputCount: 1) } },
             };
             var solver = new PlanSolver();
 
@@ -321,7 +320,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "MysteryIngredientType")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 829, 5 } });
             var solver = new PlanSolver();
@@ -344,7 +343,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(829, 5, "MysteryIngredientType")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 

@@ -72,8 +72,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new GW2CraftingHelper.Services.Recipes.ItemNameEntry
                     {
-                        Id = 2, Name = "Seed Name", Icon = "seed.png"
-                    }
+                        Id = 2, Name = "Seed Name", Icon = "seed.png",
+                    },
                 });
             var svc = new ItemMetadataService(api, seed);
 
@@ -164,6 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
                 api.AddItem(i, $"Item {i}", $"https://example.com/{i}.png");
                 ids.Add(i);
             }
+
             var svc = new ItemMetadataService(api);
 
             var result = await svc.GetMetadataAsync(ids, CancellationToken.None);
@@ -188,6 +189,7 @@ namespace GW2CraftingHelper.Tests.Services
                 api.AddItem(i, $"Item {i}", $"https://example.com/{i}.png");
                 ids.Add(i);
             }
+
             // First wave: batch 1 (ids 1-200) is call #1 and succeeds;
             // batch 2 (ids 201-250) is call #2 and hard-fails.
             api.ThrowOnCallNumber = 2;

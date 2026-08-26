@@ -39,10 +39,15 @@ namespace VendorOfferUpdater
         internal sealed class Result
         {
             public int OldCount { get; set; }
+
             public int NewCount { get; set; }
+
             public List<VendorOffer> Added { get; } = new List<VendorOffer>();
+
             public List<VendorOffer> Removed { get; } = new List<VendorOffer>();
+
             public List<OfferChange> Repriced { get; } = new List<OfferChange>();
+
             public List<OfferChange> Retagged { get; } = new List<OfferChange>();
 
             public bool IsEmpty =>
@@ -61,6 +66,7 @@ namespace VendorOfferUpdater
             }
 
             public VendorOffer Before { get; }
+
             public VendorOffer After { get; }
         }
 
@@ -73,6 +79,7 @@ namespace VendorOfferUpdater
             }
 
             public string Merchant { get; }
+
             public int OutputItemId { get; }
 
             public bool Equals(PairKey other) =>
@@ -95,7 +102,7 @@ namespace VendorOfferUpdater
             var result = new Result
             {
                 OldCount = before.Count,
-                NewCount = after.Count
+                NewCount = after.Count,
             };
 
             var beforeById = IndexById(before);
@@ -257,14 +264,17 @@ namespace VendorOfferUpdater
             {
                 parts.Add($"daily cap {offer.DailyCap.Value}");
             }
+
             if (offer.WeeklyCap.HasValue)
             {
                 parts.Add($"weekly cap {offer.WeeklyCap.Value}");
             }
+
             if (offer.SeasonalCap.HasValue)
             {
                 parts.Add($"seasonal cap {offer.SeasonalCap.Value}");
             }
+
             if (offer.HomesteadTier.HasValue)
             {
                 parts.Add($"homestead tier {offer.HomesteadTier.Value}");
@@ -283,6 +293,7 @@ namespace VendorOfferUpdater
                     byId[offer.OfferId] = offer;
                 }
             }
+
             return byId;
         }
 
@@ -298,8 +309,10 @@ namespace VendorOfferUpdater
                     list = new List<VendorOffer>();
                     grouped[key] = list;
                 }
+
                 list.Add(offer);
             }
+
             return grouped;
         }
 

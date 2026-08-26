@@ -148,7 +148,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Shipped seed file (pins the real file against silent drift) ---
-
         [Fact]
         public void Load_ShippedSeedFile_ParsesAllEntriesWithCitation()
         {

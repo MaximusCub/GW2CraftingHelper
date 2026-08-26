@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
-            { 78, "Fine Rift Essence" }
+            { 78, "Fine Rift Essence" },
         };
 
         // The exact value KnownCurrencyNames carries for each id above -
@@ -77,7 +77,7 @@ namespace GW2CraftingHelper.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
-            { 78, "Fine Rift Essence" }
+            { 78, "Fine Rift Essence" },
         };
 
         [Fact]

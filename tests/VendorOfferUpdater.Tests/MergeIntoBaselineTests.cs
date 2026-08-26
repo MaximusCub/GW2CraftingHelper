@@ -24,7 +24,7 @@ namespace VendorOfferUpdater.Tests
                 CostLines = new List<CostLine>(),
                 MerchantName = merchantName,
                 Locations = new List<string>(),
-                SeasonalFestival = seasonalFestival
+                SeasonalFestival = seasonalFestival,
             };
         }
 
@@ -35,11 +35,11 @@ namespace VendorOfferUpdater.Tests
             {
                 MakeOffer("a", "Homestead Refinement\u2014Farm"),
                 MakeOffer("b", "Homestead Refinement\u2014Farm"),
-                MakeOffer("c", "Miyani")
+                MakeOffer("c", "Miyani"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("d", "Homestead Refinement\u2014Farm")
+                MakeOffer("d", "Homestead Refinement\u2014Farm"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -58,11 +58,11 @@ namespace VendorOfferUpdater.Tests
             {
                 MakeOffer("a", "Homestead Refinement\u2014Farm"),
                 MakeOffer("c", "Miyani"),
-                MakeOffer("d", "Battle Master")
+                MakeOffer("d", "Battle Master"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("e", "Homestead Refinement\u2014Farm")
+                MakeOffer("e", "Homestead Refinement\u2014Farm"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -81,11 +81,11 @@ namespace VendorOfferUpdater.Tests
             var baseline = new List<VendorOffer>
             {
                 MakeOffer("stale1", "Homestead Refinement\u2014Metal Forge"),
-                MakeOffer("stale2", "Homestead Refinement\u2014Metal Forge")
+                MakeOffer("stale2", "Homestead Refinement\u2014Metal Forge"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("fresh1", "Homestead Refinement\u2014Metal Forge")
+                MakeOffer("fresh1", "Homestead Refinement\u2014Metal Forge"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -102,12 +102,12 @@ namespace VendorOfferUpdater.Tests
             {
                 MakeOffer("a", "Homestead Refinement\u2014Farm"),
                 MakeOffer("b", "Homestead Refinement\u2014Lumber Mill"),
-                MakeOffer("c", "Miyani")
+                MakeOffer("c", "Miyani"),
             };
             var fresh = new List<VendorOffer>
             {
                 MakeOffer("d", "Homestead Refinement\u2014Farm"),
-                MakeOffer("e", "Homestead Refinement\u2014Lumber Mill")
+                MakeOffer("e", "Homestead Refinement\u2014Lumber Mill"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -123,7 +123,7 @@ namespace VendorOfferUpdater.Tests
             var baseline = new List<VendorOffer>
             {
                 MakeOffer("a", "Homestead Refinement\u2014Farm"),
-                MakeOffer("b", "Miyani")
+                MakeOffer("b", "Miyani"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, new List<VendorOffer>());
@@ -137,7 +137,7 @@ namespace VendorOfferUpdater.Tests
         {
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("a", "Homestead Refinement\u2014Farm")
+                MakeOffer("a", "Homestead Refinement\u2014Farm"),
             };
 
             var result = Program.MergeIntoBaseline(new List<VendorOffer>(), fresh);
@@ -151,12 +151,12 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("zzz", "Miyani")
+                MakeOffer("zzz", "Miyani"),
             };
             var fresh = new List<VendorOffer>
             {
                 MakeOffer("bbb", "Homestead Refinement\u2014Farm"),
-                MakeOffer("aaa", "Homestead Refinement\u2014Farm")
+                MakeOffer("aaa", "Homestead Refinement\u2014Farm"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -188,11 +188,11 @@ namespace VendorOfferUpdater.Tests
             {
                 MakeOffer("stale-a", "Festival Rewards Vendor (Weekly)", 1),
                 MakeOffer("stale-b", "Festival Rewards Vendor (Weekly)", 2),
-                MakeOffer("c", "Miyani", 3)
+                MakeOffer("c", "Miyani", 3),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("fresh-a", "Festival Rewards Vendor (Weekly)", 4)
+                MakeOffer("fresh-a", "Festival Rewards Vendor (Weekly)", 4),
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
@@ -220,12 +220,12 @@ namespace VendorOfferUpdater.Tests
             var baseline = new List<VendorOffer>
             {
                 MakeOffer("stale-protected", "Wintersday Trader (Weekly)", 1),
-                MakeOffer("stale-replaced", "Homestead Refinement\u2014Farm", 2)
+                MakeOffer("stale-replaced", "Homestead Refinement\u2014Farm", 2),
             };
             var fresh = new List<VendorOffer>
             {
                 MakeOffer("fresh-protected", "Wintersday Trader (Weekly)", 3),
-                MakeOffer("fresh-replaced", "Homestead Refinement\u2014Farm", 4)
+                MakeOffer("fresh-replaced", "Homestead Refinement\u2014Farm", 4),
             };
             var skipped = new HashSet<string> { "Wintersday Trader (Weekly)" };
 
@@ -258,11 +258,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash"),
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
@@ -285,11 +285,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1)
+                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash"),
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
@@ -319,11 +319,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1)
+                MakeOffer("shared", "Festival Rewards Vendor (Weekly)", 1),
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
@@ -345,11 +345,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash")
+                MakeOffer("old-hash-format", "Festival Rewards Vendor (Weekly)", 1, seasonalFestival: "dragonbash"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1)
+                MakeOffer("new-hash-format", "Festival Rewards Vendor (Weekly)", 1),
             };
             var skipped = new HashSet<string> { "Festival Rewards Vendor (Weekly)" };
 
@@ -379,11 +379,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween")
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("shared-id", "Miyani", 1)
+                MakeOffer("shared-id", "Miyani", 1),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -403,11 +403,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("old-hash-format", "Miyani", 1, seasonalFestival: "halloween")
+                MakeOffer("old-hash-format", "Miyani", 1, seasonalFestival: "halloween"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("new-hash-format", "Miyani", 1)
+                MakeOffer("new-hash-format", "Miyani", 1),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);
@@ -428,11 +428,11 @@ namespace VendorOfferUpdater.Tests
         {
             var baseline = new List<VendorOffer>
             {
-                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween")
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "halloween"),
             };
             var fresh = new List<VendorOffer>
             {
-                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "dragonbash")
+                MakeOffer("shared-id", "Miyani", 1, seasonalFestival: "dragonbash"),
             };
 
             var result = Program.MergeIntoBaseline(baseline, fresh);

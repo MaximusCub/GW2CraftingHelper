@@ -22,7 +22,7 @@ namespace VendorOfferUpdater.Tests.Helpers
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         public static IReadOnlyList<VendorOfferHasherVector> Load()
@@ -47,7 +47,9 @@ namespace VendorOfferUpdater.Tests.Helpers
         private class VectorFixtureDocument
         {
             public int SchemaVersion { get; set; }
+
             public List<string> SourceHashers { get; set; }
+
             public List<VendorOfferHasherVector> Vectors { get; set; }
         }
     }
@@ -59,15 +61,25 @@ namespace VendorOfferUpdater.Tests.Helpers
     public class VendorOfferHasherVector
     {
         public string Name { get; set; }
+
         public int OutputItemId { get; set; }
+
         public int OutputCount { get; set; }
+
         public List<CostLineVector> CostLines { get; set; }
+
         public string MerchantName { get; set; }
+
         public List<string> Locations { get; set; }
+
         public int? DailyCap { get; set; }
+
         public int? WeeklyCap { get; set; }
+
         public int? HomesteadTier { get; set; }
+
         public int? SeasonalCap { get; set; }
+
         public string ExpectedOfferId { get; set; }
 
         public override string ToString()
@@ -87,7 +99,9 @@ namespace VendorOfferUpdater.Tests.Helpers
     public class CostLineVector
     {
         public string Type { get; set; }
+
         public int Id { get; set; }
+
         public int Count { get; set; }
     }
 }

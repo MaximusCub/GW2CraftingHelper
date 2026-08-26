@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var offers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { new VendorOffer { OutputItemId = 1 } } }
+                { 1, new List<VendorOffer> { new VendorOffer { OutputItemId = 1 } } },
             };
 
             var result = SeasonalOfferFilter.ExcludeSeasonal(offers);
@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
             var seasonal = new VendorOffer { OutputItemId = 1, SeasonalFestival = "halloween" };
             var offers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { regular, seasonal } }
+                { 1, new List<VendorOffer> { regular, seasonal } },
             };
 
             var result = SeasonalOfferFilter.ExcludeSeasonal(offers);
@@ -54,13 +54,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var seasonalList = new List<VendorOffer>
             {
-                new VendorOffer { OutputItemId = 1, SeasonalFestival = "halloween" }
+                new VendorOffer { OutputItemId = 1, SeasonalFestival = "halloween" },
             };
             var unaffectedList = new List<VendorOffer> { new VendorOffer { OutputItemId = 2 } };
             var offers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
                 { 1, seasonalList },
-                { 2, unaffectedList }
+                { 2, unaffectedList },
             };
 
             var result = SeasonalOfferFilter.ExcludeSeasonal(offers);
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
             var offer = new VendorOffer { OutputItemId = 1, SeasonalFestival = "" };
             var offers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
 
             var result = SeasonalOfferFilter.ExcludeSeasonal(offers);

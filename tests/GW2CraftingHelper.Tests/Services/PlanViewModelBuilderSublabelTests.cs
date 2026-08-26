@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- FormatDisciplineSublabel ---
-
         [Fact]
         public void FormatDisciplineSublabel_SingleDiscipline()
         {
@@ -89,7 +88,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Field-test finding E: Mystic Forge is a facility, not a
         // discipline - its sublabel shows the facility name with no level
         // number instead of the internal "MysticForge 0" id string. ---
-
         [Fact]
         public void FormatDisciplineSublabel_SoleMysticForge_ShowsFacilityName_NoLevel()
         {
@@ -135,14 +133,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Recipe sublabel integration ---
-
         [Fact]
         public void RequiredRecipes_Sublabel_ShowsRelevantDisciplines()
         {
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 requiredRecipes: new List<RequiredRecipe>
                 {
@@ -152,8 +149,8 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 1,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "Weaponsmith", "Armorsmith", "Huntsman" },
-                        MinRating = 400
-                    }
+                        MinRating = 400,
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -167,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 500 },
                 },
                 requiredRecipes: new List<RequiredRecipe>
                 {
@@ -177,12 +174,12 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 2,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "Weaponsmith", "Armorsmith", "Huntsman", "Artificer" },
-                        MinRating = 400
-                    }
+                        MinRating = 400,
+                    },
                 },
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
                 });
             var vm = _builder.Build(result);
 
@@ -209,12 +206,12 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 2,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "MysticForge" },
-                        MinRating = 0
-                    }
+                        MinRating = 0,
+                    },
                 },
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 },
                 });
             var vm = _builder.Build(result);
 
@@ -238,7 +235,7 @@ namespace GW2CraftingHelper.Tests.Services
             var result = MakeResult(
                 requiredDisciplines: new List<RequiredDiscipline>
                 {
-                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Weaponsmith", MinRating = 400 },
                 },
                 requiredRecipes: new List<RequiredRecipe>
                 {
@@ -248,12 +245,12 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 2,
                         IsAutoLearned = true,
                         Disciplines = new List<string> { "MysticForge", "Weaponsmith" },
-                        MinRating = 400
-                    }
+                        MinRating = 400,
+                    },
                 },
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -101 }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -101 },
                 });
             var vm = _builder.Build(result);
 

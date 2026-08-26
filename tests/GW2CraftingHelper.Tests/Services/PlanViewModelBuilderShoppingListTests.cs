@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Used Materials ---
-
         [Fact]
         public void UsedMaterials_NonEmpty_CreatesSection()
         {
@@ -22,7 +21,7 @@ namespace GW2CraftingHelper.Tests.Services
                 usedMaterials: new List<UsedMaterial>
                 {
                     new UsedMaterial { ItemId = 10, QuantityUsed = 5 },
-                    new UsedMaterial { ItemId = 20, QuantityUsed = 3 }
+                    new UsedMaterial { ItemId = 20, QuantityUsed = 3 },
                 });
             var vm = _builder.Build(result);
 
@@ -43,11 +42,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: MetaFor((10, "Ori Ingot", "ori.png")),
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 }
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 },
                 },
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 10, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                    new PlanStep { ItemId = 10, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 });
             var vm = _builder.Build(result);
 
@@ -66,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
             // tooltip with an unrelated item's name, rarity and value.
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 24, Quantity = 5, Source = AcquisitionSource.Currency }
+                new PlanStep { ItemId = 24, Quantity = 5, Source = AcquisitionSource.Currency },
             });
             var vm = _builder.Build(result);
 
@@ -94,13 +93,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Shopping List ---
-
         [Fact]
         public void ShoppingList_BuyFromTp_CorrectRowType()
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
             });
             var vm = _builder.Build(result);
 
@@ -114,7 +112,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 },
             });
             var vm = _builder.Build(result);
 
@@ -128,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.Currency }
+                new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.Currency },
             });
             var vm = _builder.Build(result);
 
@@ -142,7 +140,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             });
             var vm = _builder.Build(result);
 
@@ -156,7 +154,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, TotalCost = 5000 }
+                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, TotalCost = 5000 },
             });
             var vm = _builder.Build(result);
 
@@ -169,7 +167,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, UnitCost = 1000, TotalCost = 5000 }
+                new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp, UnitCost = 1000, TotalCost = 5000 },
             });
             var vm = _builder.Build(result);
 
@@ -179,7 +177,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Non-coin currency rows / dash rows ---
-
         [Fact]
         public void ShoppingList_VendorRow_ZeroCoinWithCurrencyCost_PopulatesCurrencyCosts()
         {
@@ -190,7 +187,7 @@ namespace GW2CraftingHelper.Tests.Services
             // it instead of silently dropping it.
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "s.png" },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
@@ -199,8 +196,8 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
                         TotalCost = 0, UnitCost = 0,
-                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
-                    }
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } },
+                    },
                 },
                 currencyMetadata: currencyMeta);
             var vm = _builder.Build(result);
@@ -215,7 +212,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Owned/needed split on shopping-row currency Total cells ---
-
         [Fact]
         public void ShoppingList_VendorRow_OwnedCurrencyAmountsPresent_SetsOwnedQuantityOnCurrencyCosts()
         {
@@ -226,8 +222,8 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
                         TotalCost = 0, UnitCost = 0,
-                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
-                    }
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } },
+                    },
                 });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
             var vm = _builder.Build(result);
@@ -251,8 +247,8 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
                         TotalCost = 0, UnitCost = 0,
-                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
-                    }
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } },
+                    },
                 });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 250 } };
             var vm = _builder.Build(result);
@@ -272,8 +268,8 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromVendor,
                         TotalCost = 0, UnitCost = 0,
-                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } }
-                    }
+                        VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 100 } },
+                    },
                 });
             var vm = _builder.Build(result);
 
@@ -297,8 +293,8 @@ namespace GW2CraftingHelper.Tests.Services
                         TotalCost = 0, UnitCost = 0,
                         VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
                         VendorOfferOutputCount = 1,
-                        VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
-                    }
+                        VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } },
+                    },
                 });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 40 } };
             var vm = _builder.Build(result);
@@ -324,8 +320,8 @@ namespace GW2CraftingHelper.Tests.Services
                     TotalCost = 0, UnitCost = 0,
                     VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 400 } },
                     VendorOfferOutputCount = 4,
-                    VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } }
-                }
+                    VendorOfferCurrencyCostLinesPerBatch = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 4 } },
+                },
             });
             var vm = _builder.Build(result);
 
@@ -346,8 +342,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     ItemId = 1, Quantity = 101, Source = AcquisitionSource.BuyFromVendor,
                     TotalCost = 0, UnitCost = 0,
-                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 152 } }
-                }
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 152 } },
+                },
             });
             var vm = _builder.Build(result);
 
@@ -367,8 +363,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor,
                     TotalCost = 500, UnitCost = 500,
-                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 50 } }
-                }
+                    VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 50 } },
+                },
             });
             var vm = _builder.Build(result);
 
@@ -383,7 +379,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
             });
             var vm = _builder.Build(result);
 
@@ -406,7 +402,7 @@ namespace GW2CraftingHelper.Tests.Services
             // covered here.
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             });
             var vm = _builder.Build(result);
 
@@ -422,7 +418,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards" },
             };
             var result = MakeResult(currencyMetadata: currencyMeta);
 

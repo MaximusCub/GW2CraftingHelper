@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SchemaVersion = 1,
                 GeneratedAt = "2026-01-01T00:00:00Z",
                 Source = "test",
-                Offers = new List<VendorOffer>(offers)
+                Offers = new List<VendorOffer>(offers),
             };
             string json = _loader.Serialize(dataset);
             return new MemoryStream(Encoding.UTF8.GetBytes(json));
@@ -55,10 +55,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost }
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost },
                 },
                 MerchantName = "TestMerchant",
-                Locations = new List<string> { "TestLocation" }
+                Locations = new List<string> { "TestLocation" },
             };
         }
 
@@ -107,7 +107,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SchemaVersion = 1,
                 GeneratedAt = "2026-01-02T00:00:00Z",
                 Source = "overlay",
-                Offers = new List<VendorOffer> { overlayOffer }
+                Offers = new List<VendorOffer> { overlayOffer },
             };
             store.SaveOverlay(overlayDataset);
             store.LoadOverlay();
@@ -131,8 +131,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Offers = new List<VendorOffer>
                 {
                     MakeOffer("offer-1", 100, 50),
-                    MakeOffer("offer-2", 200, 75)
-                }
+                    MakeOffer("offer-2", 200, 75),
+                },
             };
             store.SaveOverlay(dataset);
 
@@ -153,7 +153,7 @@ namespace GW2CraftingHelper.Tests.Services
             store.AddOffersToOverlay(new[]
             {
                 MakeOffer("offer-1", 100, 50),
-                MakeOffer("offer-2", 200, 75)
+                MakeOffer("offer-2", 200, 75),
             });
 
             Assert.True(store.HasAnyOffer(100));
@@ -164,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
             store.AddOffersToOverlay(new[]
             {
                 updatedOffer,
-                MakeOffer("offer-3", 300, 90)
+                MakeOffer("offer-3", 300, 90),
             });
 
             Assert.Equal("Updated", store.GetOffersForItem(100)[0].MerchantName);
@@ -257,10 +257,10 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemId = 100,
                         OutputCount = 1,
                         CostLines = new List<CostLine>(),
-                        Locations = new List<string>()
+                        Locations = new List<string>(),
                     },
-                    MakeOffer("valid", 200, 50)
-                }
+                    MakeOffer("valid", 200, 50),
+                },
             };
             string json = _loader.Serialize(dataset);
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
@@ -466,7 +466,7 @@ namespace GW2CraftingHelper.Tests.Services
             var knownFestivalContextKeys = new HashSet<string>(StringComparer.Ordinal)
             {
                 "halloween", "dragonbash", "wintersday",
-                "festivalofthefourwinds", "lunarnewyear", "superadventurefestival"
+                "festivalofthefourwinds", "lunarnewyear", "superadventurefestival",
             };
 
             string path = FindRepoFile(Path.Combine("ref", "vendor_offers.json"));
@@ -502,7 +502,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- onError callback: real IO failure. ---
-
         [Fact]
         public void LoadBaseline_StreamThrows_InvokesOnErrorInsteadOfThrowing()
         {

@@ -38,10 +38,10 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
-                    MinRating = 400
+                    MinRating = 400,
                 })
                 .WithPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -58,8 +58,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -91,8 +91,8 @@ namespace GW2CraftingHelper.Tests.Services
                     // Untrained relative to the recipe's MinRating 400 -
                     // craft (10c) is excluded from the automatic pick even
                     // though far cheaper than the TP buy (5000c).
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -131,11 +131,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "LearnedFromItem" }
+                    Flags = new List<string> { "LearnedFromItem" },
                 })
                 .WithPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -162,11 +162,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = builder
@@ -184,8 +184,8 @@ namespace GW2CraftingHelper.Tests.Services
                         // though far cheaper than the TP buy, so the plan
                         // buys instead and CraftingTreeBuilder attaches an
                         // automatic reference branch for the excluded craft.
-                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true }
-                    }
+                        new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 100, Active = true },
+                    },
                 };
 
                 result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -237,14 +237,14 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 300, Active = false }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 300, Active = false },
+                },
             };
 
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(items, snapshot, CancellationToken.None,
@@ -280,7 +280,7 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     // No single craft step elsewhere in the plan to seed a Pass
                     // 1 preference - matches PlanResultBuilderTests.
@@ -288,7 +288,7 @@ namespace GW2CraftingHelper.Tests.Services
                     // own setup, so a bare alphabetical fallback would report
                     // "Armorsmith" here if the tiebreak never saw account data.
                     Disciplines = new List<string> { "Armorsmith", "Leatherworker", "Tailor" },
-                    MinRating = 450
+                    MinRating = 450,
                 })
                 .WithPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -298,12 +298,12 @@ namespace GW2CraftingHelper.Tests.Services
 
             var accountDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true },
             };
 
             var items = new List<PlanRequestItem>
             {
-                new PlanRequestItem { ItemId = 1, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
             };
 
             // snapshot: null (as Module.cs passes when "Use Own Materials"
@@ -342,10 +342,10 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 1 },
                     },
                     Disciplines = new List<string> { "Armorsmith", "Leatherworker", "Tailor" },
-                    MinRating = 450
+                    MinRating = 450,
                 })
                 .WithSearchResult(2, 20)
                 .WithRecipe(new RawRecipe
@@ -355,8 +355,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 4, Count = 1 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200)
@@ -370,13 +370,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var accountDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true },
             };
 
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(
@@ -403,11 +403,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 500,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithSearchResult(2, 20)
                 .WithRecipe(new RawRecipe
@@ -417,11 +417,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 },
                     },
                     Disciplines = new List<string> { "Armorsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithPrice(1, buyUnitPrice: 50000, sellUnitPrice: 100000)
                 .WithPrice(2, buyUnitPrice: 10000, sellUnitPrice: 50000)
@@ -437,8 +437,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -483,10 +483,10 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
-                    MinRating = 500
+                    MinRating = 500,
                 })
                 .WithSearchResult(2, 20)
                 .WithRecipe(new RawRecipe
@@ -496,10 +496,10 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
-                    MinRating = 400
+                    MinRating = 400,
                 })
                 .WithPrice(1, buyUnitPrice: 50000, sellUnitPrice: 100000)
                 .WithPrice(2, buyUnitPrice: 10000, sellUnitPrice: 50000)
@@ -516,8 +516,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 2, Count = 1, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -556,7 +556,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Fetch TP prices",
                 "Query vendor offers",
                 "Solve",
-                "Fetch item metadata"
+                "Fetch item metadata",
             };
 
             var timingPattern = new Regex(@"\d+ms");
@@ -601,7 +601,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Solving crafting plan",
                 "Fetching item details",
                 "Checking learned recipes",
-                "Building final result"
+                "Building final result",
             };
 
             Assert.True(progress.Reports.Count >= expectedSubstrings.Length,
@@ -623,6 +623,7 @@ namespace GW2CraftingHelper.Tests.Services
                         break;
                     }
                 }
+
                 Assert.True(found >= 0,
                     $"Progress message containing '{expected}' not found at or after index {searchFrom}. "
                     + $"Reports: [{string.Join(", ", progress.Reports.Select(r => r.Message))}]");

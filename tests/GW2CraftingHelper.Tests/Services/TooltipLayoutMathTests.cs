@@ -34,7 +34,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Row breaking ---
-
         [Fact]
         public void LayoutContent_ShortLine_IsOneRowAtOffsetZero()
         {
@@ -90,7 +89,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Coin runs ---
-
         [Fact]
         public void LayoutContent_CoinSpan_KeepsItsCopperValueAndSitsAfterItsLabel()
         {
@@ -183,7 +181,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Max content width ---
-
         [Fact]
         public void MaxContentWidth_RoomySpriteScreen_UsesBlishsOwnPreferredCap()
         {
@@ -210,7 +207,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Placement (the four-edge clamp) ---
-
         [Fact]
         public void Place_RoomAboveTheCursor_PrefersAbove()
         {
@@ -285,14 +281,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Header rows and per-row heights (G11, G21) ---
-
         [Fact]
         public void HeaderRow_IsIconTall_IndentedPastTheIcon_AndCarriesItsIcon()
         {
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
-                TooltipContent.TextLine("Weapon Strength: 950 - 1,050")
+                TooltipContent.TextLine("Weapon Strength: 950 - 1,050"),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -319,7 +314,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic")
+                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic"),
             });
 
             // 39px indent + a 70px budget for the name itself.
@@ -353,7 +348,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.HeaderLine(null, "Iconless Thing", "Basic"),
-                TooltipContent.TextLine("Basic")
+                TooltipContent.TextLine("Basic"),
             });
 
             Assert.Equal("", content.Lines[0].IconUrl);
@@ -373,7 +368,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.TextLine("prose"),
-                TooltipContent.Line(TooltipSpan.FromCoin(240, "2s 40c"))
+                TooltipContent.Line(TooltipSpan.FromCoin(240, "2s 40c")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -393,7 +388,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 TooltipContent.Line(
                     TooltipSpan.FromText("aaaaa"),
-                    TooltipSpan.FromCoin(240, "2s 40c"))
+                    TooltipSpan.FromCoin(240, "2s 40c")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -409,7 +404,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary")
+                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
             });
 
             Assert.Equal("Bolt", content.ToPlainText());

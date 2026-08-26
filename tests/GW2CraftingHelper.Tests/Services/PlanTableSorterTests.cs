@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinValue = coin,
                 UnitCoinValue = unitCoin,
                 CurrencyCosts = currencies,
-                UnitCurrencyCosts = unitCurrencies
+                UnitCurrencyCosts = unitCurrencies,
             };
         }
 
@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return new List<CurrencyAmountViewModel>
             {
-                new CurrencyAmountViewModel { Name = name, Amount = amount }
+                new CurrencyAmountViewModel { Name = name, Amount = amount },
             };
         }
 
@@ -44,6 +44,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 state.Cycle(column);
             }
+
             return state;
         }
 
@@ -54,6 +55,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 labels.Add(row.Label);
             }
+
             return labels;
         }
 
@@ -91,7 +93,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var rows = new List<PlanRowViewModel>
             {
-                Row("orichalcum ingot"), Row("Ancient Wood Log"), Row("Bolt of Damask")
+                Row("orichalcum ingot"), Row("Ancient Wood Log"), Row("Bolt of Damask"),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Item, TableSortDirection.Ascending));
@@ -122,7 +124,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row("Silk Scrap", 816), Row("Thick Leather Section", 111),
-                Row("Mithril Ore", 9), Row("Elder Wood Log", 136)
+                Row("Mithril Ore", 9), Row("Elder Wood Log", 136),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Amount, TableSortDirection.Ascending));
@@ -137,7 +139,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var rows = new List<PlanRowViewModel>
             {
-                Row("first", 5), Row("second", 5), Row("third", 5), Row("fourth", 1)
+                Row("first", 5), Row("second", 5), Row("third", 5), Row("fourth", 1),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Amount, TableSortDirection.Ascending));
@@ -152,7 +154,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var rows = new List<PlanRowViewModel>
             {
-                Row("expensive", coin: 1234567), Row("cheap", coin: 42), Row("middling", coin: 90000)
+                Row("expensive", coin: 1234567), Row("cheap", coin: 42), Row("middling", coin: 90000),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -168,7 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row("bulk", coin: 5000, unitCoin: 10),
-                Row("single", coin: 900, unitCoin: 900)
+                Row("single", coin: 900, unitCoin: 900),
             };
 
             var byEach = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Ascending));
@@ -185,7 +187,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Row("unpriceable"),
                 Row("karma", currencies: Currency("Karma", 5000)),
-                Row("coin", coin: 100)
+                Row("coin", coin: 100),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -205,7 +207,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Row("currency only", currencies: Currency("Spirit Shard", 1)),
                 Row("mixed", coin: 500, currencies: Currency("Spirit Shard", 3)),
-                Row("coin only", coin: 100)
+                Row("coin only", coin: 100),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -221,7 +223,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row("shards 5", currencies: Currency("Spirit Shard", 5)),
                 Row("karma 900", currencies: Currency("Karma", 900)),
                 Row("shards 2", currencies: Currency("Spirit Shard", 2)),
-                Row("karma 100", currencies: Currency("Karma", 100))
+                Row("karma 100", currencies: Currency("Karma", 100)),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -240,7 +242,7 @@ namespace GW2CraftingHelper.Tests.Services
             // shape a non-evenly-divisible rate produces.
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard" } }
+                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard" } },
             };
             return CurrencyDisplayResolver.ResolveUnitAmounts(
                 outputCount, new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = perBatchCount } },
@@ -256,7 +258,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row("philosopher's stone", unitCurrencies: UnitCurrency(912, 92)),
-                Row("mystic coin", unitCurrencies: UnitCurrency(5, 1))
+                Row("mystic coin", unitCurrencies: UnitCurrency(5, 1)),
             };
             Assert.Equal(0, rows[0].UnitCurrencyCosts[0].Amount);
             Assert.Equal("912 for 92", rows[0].UnitCurrencyCosts[0].BundleLabel);
@@ -276,7 +278,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row("1000 for 3", unitCurrencies: UnitCurrency(1000, 3)),
-                Row("2 for 3", unitCurrencies: UnitCurrency(2, 3))
+                Row("2 for 3", unitCurrencies: UnitCurrency(2, 3)),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Each, TableSortDirection.Ascending));
@@ -292,18 +294,18 @@ namespace GW2CraftingHelper.Tests.Services
             var forward = new List<CurrencyAmountViewModel>
             {
                 new CurrencyAmountViewModel { Name = "Spirit Shard", Amount = 40 },
-                new CurrencyAmountViewModel { Name = "Karma", Amount = 3 }
+                new CurrencyAmountViewModel { Name = "Karma", Amount = 3 },
             };
             var reversed = new List<CurrencyAmountViewModel>
             {
                 new CurrencyAmountViewModel { Name = "Karma", Amount = 3 },
-                new CurrencyAmountViewModel { Name = "Spirit Shard", Amount = 40 }
+                new CurrencyAmountViewModel { Name = "Spirit Shard", Amount = 40 },
             };
             var rows = new List<PlanRowViewModel>
             {
                 Row("shards only", currencies: Currency("Spirit Shard", 1)),
                 Row("forward", currencies: forward),
-                Row("reversed", currencies: reversed)
+                Row("reversed", currencies: reversed),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -320,7 +322,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Row("empty list", currencies: new List<CurrencyAmountViewModel>()),
                 Row("null entry", currencies: new List<CurrencyAmountViewModel> { null }),
-                Row("real currency", currencies: Currency("Karma", 1))
+                Row("real currency", currencies: Currency("Karma", 1)),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -334,7 +336,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row("named", currencies: Currency("Karma", 1)),
-                Row("unnamed", currencies: Currency(null, 1))
+                Row("unnamed", currencies: Currency(null, 1)),
             };
 
             var ascending = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Total, TableSortDirection.Ascending));
@@ -357,7 +359,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Source column (the fifth Shopping List column) ---
-
         private static PlanRowViewModel SourceRow(string label, PlanRowType rowType, string badgeText = null)
         {
             return new PlanRowViewModel { Label = label, RowType = rowType, BadgeText = badgeText };
@@ -371,7 +372,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SourceRow("v", PlanRowType.ShoppingVendor),
                 SourceRow("t1", PlanRowType.ShoppingBuy),
                 SourceRow("c", PlanRowType.ShoppingCurrency),
-                SourceRow("t2", PlanRowType.ShoppingBuy)
+                SourceRow("t2", PlanRowType.ShoppingBuy),
             };
 
             var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
@@ -392,7 +393,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SourceRow("unknown", PlanRowType.ShoppingUnknown),
                 SourceRow("tp", PlanRowType.ShoppingBuy),
-                SourceRow("salvage", PlanRowType.ShoppingUnknown, badgeText: "SALVAGE")
+                SourceRow("salvage", PlanRowType.ShoppingUnknown, badgeText: "SALVAGE"),
             };
 
             var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
@@ -407,7 +408,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SourceRow("tp", PlanRowType.ShoppingBuy),
                 SourceRow("vendor", PlanRowType.ShoppingVendor),
-                SourceRow("currency", PlanRowType.ShoppingCurrency)
+                SourceRow("currency", PlanRowType.ShoppingCurrency),
             };
 
             var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Descending));
@@ -423,7 +424,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 SourceRow("tp", PlanRowType.ShoppingBuy),
-                SourceRow("nothing", PlanRowType.UsedMaterial)
+                SourceRow("nothing", PlanRowType.UsedMaterial),
             };
 
             var sorted = PlanTableSorter.Sort(rows, Sorted(PlanTableColumn.Source, TableSortDirection.Ascending));
@@ -438,6 +439,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 quantities.Add(row.Quantity);
             }
+
             return quantities;
         }
     }
