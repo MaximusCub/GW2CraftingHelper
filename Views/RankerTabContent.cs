@@ -88,7 +88,6 @@ namespace GW2CraftingHelper.Views
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
         private Label _bannerLabel;
-        private Label _emptyStateLabel;
 
         private readonly List<Label> _columnHeaderLabels = new List<Label>();
 
@@ -98,6 +97,13 @@ namespace GW2CraftingHelper.Views
 
         private volatile bool _buildComplete;
         private int _lastLayoutWidth = -1;
+
+        // Table-wide, not per row: the Ready, chip and Days cells all sit to
+        // the LEFT of the coin cell, so letting each row size its own coin
+        // band would put those three columns in a different place on every
+        // row and leave the header labelling nothing.
+        private int _remainingBandWidth;
+        private int _chipBandWidth;
         private int _refreshGeneration;
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
@@ -191,6 +197,16 @@ namespace GW2CraftingHelper.Views
             MainThreadMarshal.Run(() =>
             {
                 RebuildRows();
+
+                // A tab switch during a run rebuilds the chrome from scratch,
+                // so the in-flight state has to be restamped onto it.
+                if (_isRefreshing)
+                {
+                    _refreshButton.Text = "Refreshing... (click to cancel)";
+                    _spinner.Visible = true;
+                    SetControlsEnabled(false);
+                }
+
                 _buildComplete = true;
             });
         }
@@ -269,6 +285,11 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, SectionBandHeight),
                 Parent = container
             };
+
+            // SpriteScreen-parented and holding a global mouse subscription,
+            // so disposing the old container never reaches it - a tab revisit
+            // would otherwise leak one popup per visit.
+            _suggestionPanel?.Dispose();
 
             _searchBox = new AutocompleteTextBox
             {
@@ -411,10 +432,9 @@ namespace GW2CraftingHelper.Views
 
         private void PositionColumnHeader(int barWidth)
         {
-            // The header band's labels sit on the columns they name, using the
-            // same arithmetic the rows do, at a representative zero-chip,
-            // zero-coin width - the header cannot flex per row.
-            var bands = RankerRowLayout.Compute(barWidth, 0, 0);
+            // The header labels sit on the columns they name because every
+            // row shares these same table-wide band widths.
+            var bands = BandsFor(barWidth);
 
             SetHeaderLabel(0, bands.RankX);
             SetHeaderLabel(1, bands.NameX);
@@ -547,7 +567,6 @@ namespace GW2CraftingHelper.Views
             _rows.Clear();
             _bannerPanel = null;
             _bannerLabel = null;
-            _emptyStateLabel = null;
 
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             _lastLayoutWidth = _contentPanel.Width;
@@ -564,7 +583,20 @@ namespace GW2CraftingHelper.Views
                 {
                     _rows.Add(CreateRow(Entries[i], i, barWidth));
                 }
+
+                // Every row's cells are measured before any is rendered, so
+                // the whole table shares one column geometry.
+                RecomputeBandWidths();
+                for (int i = 0; i < _rows.Count; i++)
+                {
+                    RenderRowContent(_rows[i], Entries[i], barWidth);
+                }
             }
+
+            _refreshButton.Enabled = Entries.Count > 0;
+            TooltipFacility.ApplyPlain(_refreshButton, Entries.Count > 0
+                ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
+                : "Add an item to your list first.");
 
             RebuildCaptions(barWidth);
             if (_contentPanel.Parent is Container container)
@@ -630,7 +662,7 @@ namespace GW2CraftingHelper.Views
                 }
                 foreach (string line in TextWrapMath.Wrap(paragraph, usable, usable, measure).Lines)
                 {
-                    _emptyStateLabel = new Label
+                    new Label
                     {
                         Font = UiFonts.Body,
                         Text = line,
@@ -645,6 +677,38 @@ namespace GW2CraftingHelper.Views
                 }
             }
             panel.Size = new Point(barWidth, y + 8);
+        }
+
+        /// <summary>
+        /// Widest coin cell and widest chip across the whole table, so every
+        /// row shares one column geometry and the header labels sit on the
+        /// columns they name. Returns true when either changed.
+        /// </summary>
+        private bool RecomputeBandWidths()
+        {
+            int remaining = MeasureDashWidth();
+            int chip = 0;
+            foreach (var row in _rows)
+            {
+                if (row.RemainingCellWidth > remaining)
+                {
+                    remaining = row.RemainingCellWidth;
+                }
+                if (row.ChipWidth > chip)
+                {
+                    chip = row.ChipWidth;
+                }
+            }
+
+            bool changed = remaining != _remainingBandWidth || chip != _chipBandWidth;
+            _remainingBandWidth = remaining;
+            _chipBandWidth = chip;
+            return changed;
+        }
+
+        private RankerRowLayout.Bands BandsFor(int barWidth)
+        {
+            return RankerRowLayout.Compute(barWidth, _remainingBandWidth, _chipBandWidth);
         }
 
         private RenderedRow CreateRow(RankerWatchlistEntry entry, int index, int barWidth)
@@ -664,7 +728,7 @@ namespace GW2CraftingHelper.Views
                 Parent = _contentPanel
             };
 
-            RenderRowContent(row, entry, barWidth);
+            MeasureRowCells(row);
             return row;
         }
 
@@ -681,14 +745,8 @@ namespace GW2CraftingHelper.Views
             row.RemainingDash = null;
 
             var metrics = row.Metrics;
-
             string chipText = ChipText(metrics);
-            row.ChipWidth = chipText == null ? 0 : LabelHelpers.MeasureSmallTagWidth(chipText);
-            row.RemainingCellWidth = metrics == null
-                ? MeasureDashWidth()
-                : CoinCurrencyRenderer.MeasureValueWidth(metrics.RemainingCoinCost, null, UiFonts.Body);
-
-            var bands = RankerRowLayout.Compute(barWidth, row.RemainingCellWidth, row.ChipWidth);
+            var bands = BandsFor(barWidth);
 
             row.RankLabel = new Label
             {
@@ -786,6 +844,16 @@ namespace GW2CraftingHelper.Views
             LayoutRow(row, bands, measureText: true);
         }
 
+        /// <summary>Cell widths only - no controls built, so it is safe before the table's bands are known.</summary>
+        private static void MeasureRowCells(RenderedRow row)
+        {
+            string chipText = ChipText(row.Metrics);
+            row.ChipWidth = chipText == null ? 0 : LabelHelpers.MeasureSmallTagWidth(chipText);
+            row.RemainingCellWidth = row.Metrics == null
+                ? MeasureDashWidth()
+                : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
+        }
+
         private FeedbackButton CreateRowButton(Panel parent, string glyph, int x, string tooltip)
         {
             var button = new FeedbackButton
@@ -855,7 +923,7 @@ namespace GW2CraftingHelper.Views
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
-                    Text = CurrencyName(shortfall, row.Metrics),
+                    Text = CurrencyName(shortfall),
                     TextColor = DimColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1000,9 +1068,9 @@ namespace GW2CraftingHelper.Views
                     _bannerLabel.Width = Math.Max(0, barWidth - RankerRowLayout.Inset);
                 }
 
+                var bands = BandsFor(barWidth);
                 foreach (var row in _rows)
                 {
-                    var bands = RankerRowLayout.Compute(barWidth, row.RemainingCellWidth, row.ChipWidth);
                     LayoutRow(row, bands, measureText);
                 }
             }
@@ -1063,7 +1131,7 @@ namespace GW2CraftingHelper.Views
             return LabelHelpers.MeasureWith(UiFonts.Body)(RankerReadinessCalculator.DashText);
         }
 
-        private string CurrencyName(RankerCurrencyShortfall shortfall, RankerRowMetrics metrics)
+        private string CurrencyName(RankerCurrencyShortfall shortfall)
         {
             return CurrencyDisplayResolver.ResolveName(shortfall.CurrencyId, CurrencyMetadataFor(shortfall.CurrencyId));
         }
@@ -1508,7 +1576,22 @@ namespace GW2CraftingHelper.Views
             }
 
             row.Metrics = metrics;
-            RenderRowContent(row, entry, Math.Max(0, _contentPanel.Width - ScrollbarAllowance));
+            MeasureRowCells(row);
+
+            int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
+            if (RecomputeBandWidths())
+            {
+                // A wider coin cell moves the Ready, chip and Days columns for
+                // EVERY row, so they all have to follow rather than drifting
+                // out of alignment as results land one at a time.
+                for (int i = 0; i < _rows.Count && i < Entries.Count; i++)
+                {
+                    RenderRowContent(_rows[i], Entries[i], barWidth);
+                }
+                return;
+            }
+
+            RenderRowContent(row, entry, barWidth);
         }
 
         private void FinishRefresh(int myGen, int updated, string failure, bool cancelled)
