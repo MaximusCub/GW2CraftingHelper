@@ -187,6 +187,34 @@ jobs:
           fi
           echo "docs/KNOWN-ISSUES.md: $bytes bytes."
 
+      - name: Files stay within their line budgets
+        shell: bash
+        run: |
+          # A ratchet, not a metric. docs/file-budgets.txt explains itself;
+          # this is the half that has teeth. See the CraftingPlanView regrowth
+          # it was written for.
+          fail=0
+          while read -r path budget; do
+            case "$path" in ''|\#*) continue ;; esac
+            if [ ! -f "$path" ]; then
+              echo "budget entry for a path that no longer exists: $path"
+              echo "  a rename has to move its budget with it, not drop it."
+              fail=1
+              continue
+            fi
+            actual=$(wc -l < "$path")
+            if [ "$actual" -gt "$budget" ]; then
+              echo "$path: $actual lines, budget $budget (+$((actual - budget)))"
+              fail=1
+            fi
+          done < docs/file-budgets.txt
+          if [ "$fail" -ne 0 ]; then
+            echo "Raise the budget in docs/file-budgets.txt in this same commit and"
+            echo "say why in the message, or put the growth somewhere it belongs."
+            exit 1
+          fi
+          echo "Every budgeted file is within its entry."
+
       - name: Relative links in tracked markdown resolve
         shell: bash
         run: |
