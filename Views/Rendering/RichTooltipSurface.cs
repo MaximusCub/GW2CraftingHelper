@@ -414,13 +414,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
 
-                // Light blue, not green: measured on the wiki's
-                // Rune_effects_*.jpg captures (per-row peaks
-                // 95-115/118-138/148-180) and corroborated by FWDekker's
-                // #5599ff replica - see KNOWN-ISSUES #42, gap G3. The exact triple is the
-                // spec's recommendation, not a measurement.
+                // MEASURED on live/eq-weapon-full.png (2026-08-25,
+                // lossless) across six independent lines - two sigil
+                // names, a sigil description, the +8 Agony Infusion pair,
+                // and s07's "Fine" word - all reading (81..85, 145..153,
+                // 240..255) with peak ink (85,153,255). Supersedes the
+                // spec's "recommendation, not a measurement" triple
+                // (120,170,235), which was too pale and too grey; FWDekker's
+                // #5599ff replica value was right. Same blue the game uses
+                // for the Fine rarity.
                 case TooltipSpanRole.Bonus:
-                    return new Color(120, 170, 235);
+                    return new Color(85, 153, 255);
 
                 // A tier above the wearer's equipped count. Unreachable
                 // today - see TooltipSpanRole.BonusInactive.
