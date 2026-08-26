@@ -38,22 +38,6 @@ namespace GW2CraftingHelper.Views
         private const int RowHeight = TopRegionLayoutMath.TopRegionRowHeight;
         private const int InputRowY = TopRegionLayoutMath.InputRowY;
 
-        // Item-row geometry, left to right: search box, "Qty:" label,
-        // quantity field, then the add/remove buttons. The buttons keep a
-        // clear gap from the quantity field so "+" does not read as its
-        // stepper.
-        private const int QtyInputX = 240;
-        private const int QtyInputWidth = 50;
-        private const int RowButtonsX = 320;
-
-        // The row's +/- pair: square, and the same height as every other
-        // button in the module - which is also the height of the search and
-        // quantity boxes they sit beside, so the run now shares one baseline
-        // instead of mixing 28px inputs with 24px buttons.
-        private const int RowButtonSize = UiMetrics.ButtonHeight;
-        private const int RowButtonGap = 8;
-        private const int RowButtonY = 3;
-
         private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
 
@@ -78,7 +62,7 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private TopRegionLayout ComputeTopRegionLayout()
         {
-            return TopRegionLayoutMath.Compute(_itemRows.Count, _treeToolbarVisible);
+            return TopRegionLayoutMath.Compute(_inputRows.Rows.Count, _treeToolbarVisible);
         }
 
         // phaseProgress carries live coarse-phase events for the status
@@ -129,40 +113,14 @@ namespace GW2CraftingHelper.Views
 
         #endregion // General: shared layout constants, colors, top-region geometry & dependencies
 
-        #region 1. Input rows (state) - multi-item plans (gw2efficiency parity)
+        #region Input rows: the multi-item request editor (gw2efficiency parity)
 
-        /// <summary>
-        /// One row of the multi-item input strip (gw2efficiency
-        /// parity): the plain session-persistent selection fields survive
-        /// across Build() calls (tab switches) exactly like _nodeOverrides/
-        /// _ignoredItemIds below - the live Blish controls do not (they are
-        /// disposed and recreated by every Build()/RebuildInputRows() call).
-        /// </summary>
-        private sealed class ItemRowState
-        {
-            public int? ItemId;
-            public string ItemName;
+        // The strip owns the row list and every row control; this view owns
+        // the panel it draws into and the top-region reflow a row
+        // add/remove triggers - see Views/ItemInputRowStrip.cs.
+        private readonly ItemInputRowStrip _inputRows;
 
-            // What the search box last read, kept whether or not it
-            // resolved to an item. ItemName alone cannot carry this: it is
-            // dropped the moment the text stops describing the picked item,
-            // so seeding a rebuilt row from it would wipe half-typed text
-            // on every row add/remove.
-            public string TypedText;
-            public string QuantityText = "1";
-
-            public Panel RowPanel;
-            public AutocompleteTextBox SearchBox;
-            public SuggestionPanel SuggestionPanel;
-            public TextBox QtyInput;
-        }
-
-        // Session-persistent row list, mirroring gw2e's `e.recipes`
-        // array. Populated with one empty row on the first Build();
-        // survives every later Build() (tab switch). No file persistence.
-        private readonly List<ItemRowState> _itemRows = new List<ItemRowState>();
-
-        #endregion // 1. Input rows (state) - multi-item plans (gw2efficiency parity)
+        #endregion // Input rows: the multi-item request editor (gw2efficiency parity)
 
         #region 2. Generate orchestration (state)
 
@@ -725,6 +683,12 @@ namespace GW2CraftingHelper.Views
             _getItemStatBlock = getItemStatBlock;
             _warmItemStatsAsync = warmItemStatsAsync;
             _moduleLifetimeToken = moduleLifetimeToken;
+
+            // Before anything that could read the row count:
+            // ComputeTopRegionLayout asks the strip how many rows there
+            // are, and an unbuilt view is still allowed to be asked.
+            _inputRows = new ItemInputRowStrip(
+                itemSearchProvider, () => ReflowTopRegion(rebuildItemRows: true));
 
             // Seed the per-plan default from the persisted setting so a
             // user who turned "Value own materials" off is not silently
@@ -1854,206 +1818,14 @@ namespace GW2CraftingHelper.Views
         #region 1. Input rows (continued)
 
         /// <summary>
-        /// Disposes every current item row's live controls and rebuilds
-        /// them from _itemRows.
-        /// Called by Build() (initial construction) and by
-        /// AddItemRow/RemoveItemRow via ReflowTopRegion (row-count
-        /// changes) - a full rebuild rather than a patch, matching this
-        /// file's existing dispose+recreate pattern (e.g. RenderPlan
-        /// disposes all of _contentPanel's children on every render rather
-        /// than diffing). N is always small (a handful of rows at most), so
-        /// this is not a hot path.
-        /// </summary>
-        private void RebuildItemRowControls(int w)
-        {
-            foreach (var row in _itemRows)
-            {
-                // SuggestionPanel is SpriteScreen-parented (never a child of
-                // _inputPanel/buildPanel), so it always needs an explicit
-                // Dispose() regardless of which cycle this is - same
-                // reasoning the old single-_suggestionPanel field's Build()
-                // cleanup always had. SuggestionPanel.Dispose() itself is
-                // idempotent (`if (_disposed) return;`), so this is safe to
-                // call even on a row whose SuggestionPanel was already
-                // disposed by a previous rebuild this same Build() cycle.
-                row.SuggestionPanel?.Dispose();
-
-                // RowPanel, by contrast, IS a child of _inputPanel/buildPanel
-                // - across a tab-switch Build() cycle it (and its own
-                // children) were already torn down by ViewAdapter's own
-                // "clear existing children before rebuilding" cascade before
-                // this method ever runs again, which nulls a disposed
-                // control's Parent (see TriggerGenerate's own "a disposed
-                // control's Parent is nulled on disposal" comment). Disposing
-                // it again here would be a double-Dispose on an
-                // already-torn-down control; only a genuine same-cycle
-                // Add/Remove reflow (ReflowTopRegion, _inputPanel still
-                // live) leaves RowPanel.Parent non-null, meaning THIS row
-                // genuinely still needs disposing before its replacement is
-                // built.
-                if (row.RowPanel != null && row.RowPanel.Parent != null)
-                {
-                    row.RowPanel.Dispose();
-                }
-
-                row.SuggestionPanel = null;
-                row.RowPanel = null;
-                row.SearchBox = null;
-                row.QtyInput = null;
-            }
-
-            for (int i = 0; i < _itemRows.Count; i++)
-            {
-                CreateItemRowControls(_itemRows[i], i, w);
-            }
-        }
-
-        /// <summary>
-        /// One input row's controls: search box + qty, a Remove button
-        /// (gw2e's own 2+-rows gate), and on the last row only an Add
-        /// button - attached to the last row rather than its own strip
-        /// row so the single-row case keeps the exact original layout.
-        /// </summary>
-        private void CreateItemRowControls(ItemRowState row, int index, int w)
-        {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(w, RowHeight),
-                Location = new Point(0, index * RowHeight),
-                Parent = _inputPanel,
-            };
-            row.RowPanel = rowPanel;
-
-            var searchBox = new AutocompleteTextBox()
-            {
-                PlaceholderText = "Search items...",
-                Text = row.TypedText ?? row.ItemName ?? "",
-                Size = new Point(200, 28),
-                Location = new Point(0, 3),
-                Parent = rowPanel,
-            }.ReleaseOnDispose().ReleaseOnEnter();
-            row.SearchBox = searchBox;
-
-            // The list drops straight under this box (see
-            // SuggestionPanel.PositionPanel).
-            var suggestionPanel = new SuggestionPanel(searchBox, _itemSearchProvider);
-            suggestionPanel.ItemSelected += (_, args) =>
-            {
-                row.ItemId = args.ItemId;
-                row.ItemName = args.Name;
-            };
-            row.SuggestionPanel = suggestionPanel;
-
-            // A pick is the only thing that resolves a row, so editing the
-            // box afterwards has to drop that resolution - otherwise the
-            // box reads one item while Generate still plans the previously
-            // picked one. Subscribed after SuggestionPanel so a pick's own
-            // Text write clears here first and is re-resolved by the
-            // ItemSelected handler above, in that order.
-            searchBox.TextChanged += (_, __) =>
-            {
-                row.TypedText = searchBox.Text;
-
-                if (!ItemRowSelection.SelectionIsStale(row.ItemId, row.ItemName, searchBox.Text))
-                {
-                    return;
-                }
-
-                row.ItemId = null;
-                row.ItemName = null;
-            };
-
-            new Label()
-            {
-                Font = UiFonts.Body,
-                Text = "Qty:",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(210, 7),
-                Parent = rowPanel,
-            };
-
-            var qtyInput = new TextBox()
-            {
-                Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
-                Size = new Point(QtyInputWidth, 28),
-                Location = new Point(QtyInputX, 3),
-                Parent = rowPanel,
-            }.ReleaseOnDispose().ReleaseOnEnter();
-            qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
-            row.QtyInput = qtyInput;
-
-            int nextX = RowButtonsX;
-            if (ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
-            {
-                var removeButton = new FeedbackButton()
-                {
-                    Text = "-",
-                    Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
-                    Parent = rowPanel,
-                    BasicTooltipText = "Remove this item from the plan",
-                };
-                removeButton.Click += (_, __) => RemoveItemRow(row);
-                nextX += RowButtonSize + RowButtonGap;
-            }
-
-            if (index == _itemRows.Count - 1)
-            {
-                var addButton = new FeedbackButton()
-                {
-                    Text = "+",
-                    Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
-                    Parent = rowPanel,
-                    // Sitting next to the quantity field, a bare "+" reads
-                    // as a stepper. Say what it actually adds.
-                    BasicTooltipText = "Add another item to this plan",
-                };
-                addButton.Click += (_, __) => AddItemRow();
-            }
-        }
-
-        private void AddItemRow()
-        {
-            _itemRows.Add(new ItemRowState());
-            ReflowTopRegion(rebuildItemRows: true);
-        }
-
-        /// <summary>
-        /// The per-row suggestion popups are SpriteScreen-parented, like the
-        /// tickers, so disposing the host window does not reach them and
-        /// nothing else tears them down on unload - and each one holds a
-        /// global mouse subscription for its whole life. Called by
-        /// Module.Unload; every in-session teardown routes through
-        /// RebuildItemRowControls instead.
+        /// The per-row suggestion popups outlive the host window (they are
+        /// SpriteScreen-parented), so Module.Unload asks for them by name.
+        /// Every in-session teardown routes through
+        /// ItemInputRowStrip.Rebuild instead.
         /// </summary>
         public void DisposeSuggestionPanels()
         {
-            foreach (var row in _itemRows)
-            {
-                row.SuggestionPanel?.Dispose();
-                row.SuggestionPanel = null;
-            }
-        }
-
-        private void RemoveItemRow(ItemRowState row)
-        {
-            if (!ItemRowRequestBuilder.CanRemoveRow(_itemRows.Count))
-            {
-                return;
-            }
-
-            int index = _itemRows.IndexOf(row);
-            if (index < 0)
-            {
-                return;
-            }
-
-            row.SuggestionPanel?.Dispose();
-            row.RowPanel?.Dispose();
-            _itemRows.RemoveAt(index);
-            ReflowTopRegion(rebuildItemRows: true);
+            _inputRows.DisposeSuggestionPanels();
         }
 
         /// <summary>
@@ -2089,7 +1861,7 @@ namespace GW2CraftingHelper.Views
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             if (rebuildItemRows)
             {
-                RebuildItemRowControls(w);
+                _inputRows.Rebuild(_inputPanel, w);
             }
 
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
@@ -2131,7 +1903,7 @@ namespace GW2CraftingHelper.Views
         public void Build(Container buildPanel)
         {
             // Screen-parented popups from the previous build cycle (one
-            // per item row) are cleaned up by RebuildItemRowControls below, which
+            // per item row) are cleaned up by the strip rebuild below, which
             // every row already routes through - no separate loop needed
             // here.
 
@@ -2143,14 +1915,7 @@ namespace GW2CraftingHelper.Views
             _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
 
-            // Gw2e's own initial state is one empty row
-            // (`e.recipes = [{id: null, amount: 1}]`) - see _itemRows' own
-            // doc comment. Only ever seeded once; every later Build() call
-            // (tab switch) reuses whatever the session already has.
-            if (_itemRows.Count == 0)
-            {
-                _itemRows.Add(new ItemRowState());
-            }
+            _inputRows.SeedFirstRow();
 
             // Settled BEFORE the layout is computed, from the plan this
             // Build is about to render (a tab switch re-renders whatever
@@ -2181,7 +1946,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, InputRowY),
                 Parent = buildPanel,
             };
-            RebuildItemRowControls(w);
+            _inputRows.Rebuild(_inputPanel, w);
 
             // Controls row: checkbox + generate button
             _controlsPanel = new Panel()
@@ -2951,19 +2716,13 @@ namespace GW2CraftingHelper.Views
             // pre-existing direct updates - these were
             // never part of the dispose+rebuild problem the relayout
             // registry below replaces. The input strip is N rows
-            // (_itemRows.Count) rather than a fixed one, so its own and
+            // (the strip's row count) rather than a fixed one, so its own and
             // every row panel's width need updating too, and the Y offsets
             // below it come from the same ComputeTopRegionLayout formula
             // Build()/ReflowTopRegion use rather than fixed constants.
             var layout = ComputeTopRegionLayout();
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
-            foreach (var row in _itemRows)
-            {
-                if (row.RowPanel != null)
-                {
-                    row.RowPanel.Size = new Point(w, RowHeight);
-                }
-            }
+            _inputRows.ResizeRows(w);
 
             _controlsPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
@@ -3606,7 +3365,7 @@ namespace GW2CraftingHelper.Views
                 return pending;
             }
 
-            foreach (var row in _itemRows)
+            foreach (var row in _inputRows.Rows)
             {
                 if (row.ItemId.HasValue)
                 {
@@ -3678,7 +3437,7 @@ namespace GW2CraftingHelper.Views
         /// text - that is the same stale-selection bug the search box's own
         /// TextChanged handler exists to prevent. Rows removed while the
         /// search was in flight are skipped outright: their state belongs to
-        /// nothing once _itemRows no longer holds them, and their search box
+        /// nothing once the strip no longer holds them, and their search box
         /// has been disposed with the row panel.
         /// <para>
         /// Returns true when some row's name turned out to belong to more
@@ -3690,7 +3449,7 @@ namespace GW2CraftingHelper.Views
             bool anyAmbiguous = false;
             foreach (var entry in matches)
             {
-                if (entry.Row.ItemId.HasValue || !_itemRows.Contains(entry.Row))
+                if (entry.Row.ItemId.HasValue || !_inputRows.Rows.Contains(entry.Row))
                 {
                     continue;
                 }
@@ -3722,7 +3481,7 @@ namespace GW2CraftingHelper.Views
         private int CountUnresolvedTypedRows()
         {
             int count = 0;
-            foreach (var row in _itemRows)
+            foreach (var row in _inputRows.Rows)
             {
                 if (!row.ItemId.HasValue && !string.IsNullOrWhiteSpace(row.SearchBox?.Text))
                 {
@@ -3742,14 +3501,14 @@ namespace GW2CraftingHelper.Views
             // <1 silently corrected to 1, with a user-visible notice) -
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
-            var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
+            var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_inputRows.Rows.Count);
             // Folded together with the label-part collection
-            // below (previously a separate foreach over the same _itemRows)
+            // below (previously a separate foreach over the same row list)
             // now that both need nothing from each other but this loop's own
             // per-row qty correction - see RequestLabelFormatter's own doc
             // comment for why the label itself is capped.
-            var labelParts = new List<string>(_itemRows.Count);
-            foreach (var row in _itemRows)
+            var labelParts = new List<string>(_inputRows.Rows.Count);
+            foreach (var row in _inputRows.Rows)
             {
                 bool qtyInvalid = !int.TryParse(row.QtyInput?.Text, out int qty) || qty < 1;
                 if (qtyInvalid)

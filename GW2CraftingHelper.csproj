@@ -216,6 +216,8 @@
     <Compile Include="Views\AutocompleteTextBox.cs" />
     <Compile Include="Views\SuggestionPanel.cs" />
     <Compile Include="Views\CraftingPlanView.cs" />
+    <Compile Include="Views\ItemInputRowStrip.cs" />
+    <Compile Include="Views\ItemRowState.cs" />
     <Compile Include="Views\Rendering\RarityColors.cs" />
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
