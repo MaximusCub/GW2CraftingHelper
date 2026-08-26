@@ -143,8 +143,16 @@ namespace GW2CraftingHelper.Tests.Services
             using (var handler = new HangingHandler())
             using (var http = new HttpClient(handler))
             {
-                var result = await NoDelay(http, TimeSpan.FromMilliseconds(50))
+                // Bounded by the test, not just by the code under test. The
+                // per-attempt timeout is the ONLY thing that ever completes
+                // this call when the caller passes None, so if that timeout
+                // regresses this test must go RED rather than hang the whole
+                // suite - an unbounded await here burns a CI runner to the job
+                // timeout with no test named as the culprit.
+                var pending = NoDelay(http, TimeSpan.FromMilliseconds(50))
                     .TryGetBuildIdAsync(CancellationToken.None);
+                Assert.Same(pending, await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(10))));
+                var result = await pending;
 
                 // A response that never arrives must be given up on per attempt
                 // and retried, not waited out: the caller is told to degrade.
