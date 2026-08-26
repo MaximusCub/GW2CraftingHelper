@@ -5,6 +5,78 @@ matching `v<version>` git tag on the release commit, so any two shipped
 builds can be compared with `git diff v0.2.0..v0.2.1`. The About tab shows
 the running version.
 
+## 0.3.0 - 2026-08-26
+
+Two new tabs land - a craftability ranker and a plan history - and the
+recipe cache stops forgetting what it already knows.
+
+### Added
+- **Crafting Ranker tab**: a persistent watchlist that ranks the items
+  you track by how close each is to craftable. Higher-priority items
+  claim your shared coin, currencies and materials first, and every row
+  scores readiness across four gates: materials (at buy-order prices),
+  account currencies, time-gated daily crafts, and your characters'
+  crafting disciplines.
+- **Plan History tab**: every successful Generate is recorded. Each row
+  offers View (a frozen summary, no network), Open (restore that exact
+  plan with its pills live) and Re-solve (the same request at today's
+  prices). Rows can be pinned to survive the cap; a Settings entry
+  (default 25) controls how many are kept.
+- **Restored plans regenerate without retyping.** After a restart the
+  item rows, Use Own Materials and price basis that produced the plan
+  come back with it, so Generate Plan works immediately instead of
+  answering "Add at least one item".
+
+### Changed
+- **A game patch no longer wipes the recipe cache.** Recipes do not
+  change when the build number does (measured: 13,371 of 13,371 seed
+  recipes byte-identical across a 275-build gap), so the cache survives
+  patches; one cheap background check per new game build verifies the
+  recipe corpus against the live API and repairs any additions. "Not
+  craftable" answers now ship in the seed and are served instantly -
+  the cold misses that used to hit the API on a first plan each session
+  are gone (measured on Gift of Fortune: 26 misses to 0). The Clear
+  Cache button now clears the recipe cache as well.
+- **Tooltips finish their fidelity pass against the real game client.**
+  The full rarity palette is sampled from lossless live captures (the
+  rarity word itself now carries its rarity colour), the background
+  draws the game's own canvas texture instead of a flat tint, the
+  upgrade-bonus blue matches the measured value, the content width
+  matches the game's wrap, nourishment sub-effects go grey under a
+  white first line, and consecutive infusion lines get their spacing.
+- **The module opens on the Crafting Plan tab.** It is the one tab that
+  works with no API key at all; Snapshot, the old first tab, could only
+  ask for a key. Tab order is now Crafting Plan, Snapshot, Log, Plan
+  History, Crafting Ranker, Settings, About.
+
+### Fixed
+- The recipe cache no longer deletes itself on every launch. It was
+  stamped with build id 0 and treated every start as a game patch, so
+  everything learned in a session was thrown away on the next.
+- One failed recipe search no longer permanently marks an item
+  uncraftable, and one failed price batch no longer marks a whole
+  plan's items unpriceable.
+- Use Own Materials no longer claims materials it cannot see: without
+  account data the checkbox is disabled instead of silently wrong.
+- Restoring a plan no longer flags "Settings changed" or offers to
+  regenerate a plan you just got back.
+- A saved plan from an older version of the module is reported as
+  "starting fresh", not as file corruption.
+- Learned recipes are forgotten when the API key changes, so a second
+  account does not inherit the first one's unlocks.
+- A game-build lookup that hangs at startup is abandoned and retried
+  instead of stalling the status line, and closing the module no longer
+  pulls objects out from under work still in flight.
+
+### Internal
+- The style gate (StyleCop analyzers, warnings as errors) now covers
+  every project in the solution; CI enforces the repo invariants that
+  were previously prose-only (ASCII-only source, csproj/disk sync,
+  Blish-free tests, file-size budgets, citation resolution, a
+  public-surface ratchet); `internal` is the default visibility. The
+  module test suite grew from 2,808 to 3,178 tests (plus 233 tool
+  tests), all exercising real production code paths.
+
 ## 0.2.4 - 2026-08-25
 
 The rest of the module catches up with the crafting planner, plus a
