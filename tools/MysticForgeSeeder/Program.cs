@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 
 namespace MysticForgeSeeder
 {
-    class Program
+    internal class Program
     {
-        static async Task<int> Main(string[] args)
+        private static async Task<int> Main(string[] args)
         {
             using var cts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) =>
@@ -173,6 +173,7 @@ namespace MysticForgeSeeder
                                 $"  CACHE UPDATE: '{name}' " +
                                 $"{oldId} -> {id}");
                         }
+
                         cache[name] = id;
                         resolvedCount++;
                     }
@@ -196,6 +197,7 @@ namespace MysticForgeSeeder
                     {
                         Console.WriteLine($"    - {name}");
                     }
+
                     if (unresolvedNames.Count > 50)
                     {
                         Console.WriteLine(
@@ -209,6 +211,7 @@ namespace MysticForgeSeeder
             {
                 Console.WriteLine("  All names already cached.");
             }
+
             Console.WriteLine();
 
             // ================================================================
@@ -256,7 +259,7 @@ namespace MysticForgeSeeder
                     ingredients.Add(new RecipeIngredient
                     {
                         Id = ingId,
-                        Count = ing.Quantity
+                        Count = ing.Quantity,
                     });
                 }
 
@@ -271,7 +274,7 @@ namespace MysticForgeSeeder
                     OutputItemId = outputId,
                     OutputItemCount = recipe.OutputQuantity,
                     OutputName = recipe.OutputName,
-                    Ingredients = ingredients
+                    Ingredients = ingredients,
                 });
             }
 
@@ -303,6 +306,7 @@ namespace MysticForgeSeeder
                 Console.WriteLine(
                     $"  File size: {fileInfo.Length:N0} bytes");
             }
+
             Console.WriteLine();
 
             // ================================================================
@@ -365,6 +369,7 @@ namespace MysticForgeSeeder
             {
                 return true;
             }
+
             id = 0;
             return false;
         }
@@ -411,6 +416,7 @@ namespace MysticForgeSeeder
                         writer.WriteNumber("count", ing.Count);
                         writer.WriteEndObject();
                     }
+
                     writer.WriteEndArray();
 
                     writer.WriteString("comment",
@@ -445,6 +451,7 @@ namespace MysticForgeSeeder
                 {
                     cache[prop.Name] = prop.Value.GetInt32();
                 }
+
                 Console.WriteLine(
                     $"  Loaded cache ({cache.Count} entries) from {path}");
             }
@@ -484,8 +491,10 @@ namespace MysticForgeSeeder
                 {
                     return dir;
                 }
+
                 dir = Path.GetDirectoryName(dir);
             }
+
             return Directory.GetCurrentDirectory();
         }
     }
@@ -493,16 +502,20 @@ namespace MysticForgeSeeder
     internal class ValidRecipe
     {
         public int OutputItemId { get; set; }
+
         public int OutputItemCount { get; set; }
 
         // Always set at construction (Step 4's one object initializer).
         public string OutputName { get; set; } = string.Empty;
-        public List<RecipeIngredient> Ingredients { get; set; } = new();
+
+        public List<RecipeIngredient> Ingredients { get; set; }
+            = new List<RecipeIngredient>();
     }
 
     internal class RecipeIngredient
     {
         public int Id { get; set; }
+
         public int Count { get; set; }
     }
 }

@@ -547,8 +547,8 @@ tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                      
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                       610
 tools/GW2CraftingHelper.Harness/Program.cs                                                 726
 tools/GW2CraftingHelper.RecipeSeeder/Program.cs                                            697
-tools/MysticForgeSeeder/Program.cs                                                         508
-tools/MysticForgeSeeder/WikiRecipeClient.cs                                                512
+tools/MysticForgeSeeder/Program.cs                                                         521
+tools/MysticForgeSeeder/WikiRecipeClient.cs                                                526
 tools/Shared/FileMysticForgeRecipeSource.cs                                                39
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                   99
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                          80

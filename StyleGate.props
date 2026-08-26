@@ -8,7 +8,7 @@
      project's <NoWarn>: an ID comes out of both lists in the same commit, per
      the shrink-only rule stated there and in CONTRIBUTING.md (Code Style).
 
-     No test- or tool-specific rule deltas exist: the six importing projects
+     No test- or tool-specific rule deltas exist: the seven importing projects
      build clean under the module's exact configuration, so none was needed. -->
 <Project>
 
