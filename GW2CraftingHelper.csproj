@@ -98,6 +98,14 @@
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Models\PersistedPlan.cs" />
+    <Compile Include="Models\PlanHistoryEntry.cs" />
+    <Compile Include="Services\GzipJsonFile.cs" />
+    <Compile Include="Services\PlanHistoryStore.cs" />
+    <Compile Include="Services\PlanHistoryBlobStore.cs" />
+    <Compile Include="Services\PlanHistoryDedupKey.cs" />
+    <Compile Include="Services\PlanHistoryRetention.cs" />
+    <Compile Include="Services\PlanHistoryRowLayout.cs" />
+    <Compile Include="Services\PlanHistoryLabels.cs" />
     <Compile Include="Services\PlanStore.cs" />
     <Compile Include="Services\PlanStoreHelpers.cs" />
     <Compile Include="Services\PlanStructuralValidator.cs" />
