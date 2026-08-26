@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Required Level: 80",
                 "Crafted in the style of the renowned asuran genius, Zojja.",
                 "Account Bound on Use",
-                "2s 40c"
+                "2s 40c",
             }, await LinesFor(RealItemJson.ZojjasWarfists));
         }
 
@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Crafting Material",
                 "Refine into Ingots.",
                 "",
-                "7c"
+                "7c",
             }, await LinesFor(RealItemJson.MithrilOre));
         }
 
@@ -114,7 +114,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Mithril Ore",
                 ItemType = "CraftingMaterial",
-                VendorValue = 7
+                VendorValue = 7,
             }).ToPlainLines();
 
             Assert.Equal("", lines[lines.Count - 2]);
@@ -138,7 +138,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Copper Mining Pick",
                 ItemType = itemType,
                 Description = "Used to gather from copper ore.",
-                VendorValue = 7
+                VendorValue = 7,
             }).ToPlainLines();
 
             Assert.NotEqual("", lines[lines.Count - 2]);
@@ -155,7 +155,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Some Future Thing",
                 ItemType = "MountSkin",
-                VendorValue = 7
+                VendorValue = 7,
             }).ToPlainLines();
 
             Assert.Equal("", lines[lines.Count - 2]);
@@ -201,9 +201,9 @@ namespace GW2CraftingHelper.Tests.Services
                 Attributes = new[]
                 {
                     new ItemAttributeLine("Power", 5),
-                    new ItemAttributeLine("Precision", 5)
+                    new ItemAttributeLine("Precision", 5),
                 },
-                BuffDescription = "+5 Power, +5 Precision"
+                BuffDescription = "+5 Power, +5 Precision",
             };
 
             var lines = ItemStatTooltipComposer.BuildContent(stats).ToPlainLines().ToArray();
@@ -262,7 +262,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Superior Rune of the Scholar",
                 ItemType = "UpgradeComponent",
                 SubType = "Rune",
-                UpgradeBonuses = new[] { "+25 Power", "+35 Ferocity" }
+                UpgradeBonuses = new[] { "+25 Power", "+35 Ferocity" },
             });
 
             var bonuses = content.Lines
@@ -284,7 +284,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Toymaker's Bag",
                 Rarity = "Exotic",
-                ItemType = "Back"
+                ItemType = "Back",
             }).ToPlainLines();
 
             Assert.Equal("Toymaker's Bag", lines[0]);
@@ -300,7 +300,7 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Timed Snack",
-                NourishmentDurationMs = 1800000
+                NourishmentDurationMs = 1800000,
             }).ToPlainLines();
 
             Assert.Equal("Timed Snack", lines[0]);
@@ -318,7 +318,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Odd Hybrid",
                 BuffDescription = "+5% Damage",
-                NourishmentDurationMs = 1800000
+                NourishmentDurationMs = 1800000,
             }).ToPlainLines();
 
             Assert.Equal("Odd Hybrid", lines[0]);
@@ -356,7 +356,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Unique Thing",
                 IsUnique = true,
-                Binding = "Account Bound"
+                Binding = "Account Bound",
             }).ToPlainLines();
 
             Assert.Equal(lines.IndexOf("Unique") + 1, lines.IndexOf("Account Bound"));
@@ -373,7 +373,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Weapon",
                 ItemType = "Weapon",
-                SubType = subType
+                SubType = subType,
             }).ToPlainLines();
 
             if (expected == null)
@@ -383,6 +383,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.DoesNotContain(lines, l => l.StartsWith("("));
                 return;
             }
+
             Assert.Contains(expected, lines);
         }
 
@@ -519,7 +520,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Food",
-                NourishmentDurationMs = durationMs
+                NourishmentDurationMs = durationMs,
             });
 
             Assert.Contains(expected, content.ToPlainLines());
@@ -531,7 +532,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Restricted Thing",
-                Restrictions = new[] { "Guardian", "Warrior" }
+                Restrictions = new[] { "Guardian", "Warrior" },
             });
 
             Assert.Contains("Restricted to: Guardian, Warrior", content.ToPlainLines());
@@ -543,7 +544,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Unrestricted Thing",
-                Restrictions = new string[0]
+                Restrictions = new string[0],
             });
 
             Assert.DoesNotContain(content.ToPlainLines(), l => l.StartsWith("Restricted"));
@@ -555,7 +556,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Odd",
-                Attributes = new[] { new ItemAttributeLine("Power", -5) }
+                Attributes = new[] { new ItemAttributeLine("Power", -5) },
             });
 
             Assert.Contains("-5 Power", content.ToPlainLines());

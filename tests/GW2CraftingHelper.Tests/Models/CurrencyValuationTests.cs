@@ -37,7 +37,7 @@ namespace GW2CraftingHelper.Tests.Models
             var valuation = new CurrencyValuation(new Dictionary<int, long>
             {
                 { 2, 5 },
-                { 23, 1200 }
+                { 23, 1200 },
             });
 
             Assert.True(valuation.TryGetCopperValue(2, out long karmaValue));
@@ -54,7 +54,6 @@ namespace GW2CraftingHelper.Tests.Models
         }
 
         // --- currency-ux-package (Feature 1): three-state precedence ---
-
         [Fact]
         public void Constructor_ClearedCoinCurrencyId_ThrowsArgumentException()
         {
@@ -133,7 +132,6 @@ namespace GW2CraftingHelper.Tests.Models
         // WithDefaults, the merge previously only exercised indirectly via
         // the Blish-coupled (and therefore untestable) ModuleSettings.
         // GetEffectiveCurrencyValuation. ---
-
         [Fact]
         public void WithDefaults_NullPersisted_ProducesOnlyDefaults()
         {

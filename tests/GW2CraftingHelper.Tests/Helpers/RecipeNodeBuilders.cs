@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 Quantity = quantity,
                 Recipes = new List<RecipeOption>(),
                 AchievementId = achievementId,
-                AchievementBit = achievementBit
+                AchievementBit = achievementBit,
             };
         }
 
@@ -41,12 +41,13 @@ namespace GW2CraftingHelper.Tests.Helpers
                 Id = id,
                 IngredientType = "Item",
                 Quantity = quantity,
-                Recipes = new List<RecipeOption>()
+                Recipes = new List<RecipeOption>(),
             };
             if (recipes != null)
             {
                 node.Recipes.AddRange(recipes);
             }
+
             return node;
         }
 
@@ -57,12 +58,13 @@ namespace GW2CraftingHelper.Tests.Helpers
                 RecipeId = recipeId,
                 OutputCount = outputCount,
                 CraftsNeeded = craftsNeeded,
-                Ingredients = new List<RecipeNode>()
+                Ingredients = new List<RecipeNode>(),
             };
             if (ingredients != null)
             {
                 opt.Ingredients.AddRange(ingredients);
             }
+
             return opt;
         }
 

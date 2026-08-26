@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftsNeeded = craftsNeeded,
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             };
 
             // Adjust ingredient quantities to match craftsNeeded
@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = id,
                 IngredientType = "Item",
                 Quantity = qty,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
         }
 
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 5, 10, 1, Leaf(2, 5));
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             _reducer.Reduce(tree, index, null);
@@ -88,7 +88,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- CloneNode must preserve the achievement-dedup fields (KNOWN-ISSUES #26) ---
-
         [Fact]
         public void CloneNode_PreservesAchievementFieldsAndDedupFlag()
         {
@@ -137,7 +136,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -154,7 +153,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -173,7 +172,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 100, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 100, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -198,7 +197,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 10, 10, 2, Leaf(2, 25));
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -216,7 +215,6 @@ namespace GW2CraftingHelper.Tests.Services
         // alone silently disables EV pricing whenever an account snapshot
         // triggers this reduction path, the normal own-materials mode for
         // a real plan) ---
-
         [Fact]
         public void Reduce_ExpectedOutputCountPreservedAcrossClone()
         {
@@ -228,14 +226,14 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 ExpectedOutputCount = 0.31,
                 CraftsNeeded = 249,
-                Ingredients = new List<RecipeNode> { Leaf(2, 249) }
+                Ingredients = new List<RecipeNode> { Leaf(2, 249) },
             };
             var tree = new RecipeNode
             {
                 Id = 19675,
                 IngredientType = "Item",
                 Quantity = 77,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
             var index = new AccountItemIndex(null); // nothing owned
 
@@ -256,14 +254,14 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 ExpectedOutputCount = 0.5,
                 CraftsNeeded = 20,
-                Ingredients = new List<RecipeNode> { Leaf(2, 20) }
+                Ingredients = new List<RecipeNode> { Leaf(2, 20) },
             };
             var tree = new RecipeNode
             {
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 10,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             // Own 4 of item 1 (split across two sources, unlike the
@@ -274,7 +272,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(1, 2, AccountItemIndex.SourceBank)
+                SnapEntry(1, 2, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -299,19 +297,19 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 ExpectedOutputCount = 0.5,
                 CraftsNeeded = 20,
-                Ingredients = new List<RecipeNode> { Leaf(2, 20) }
+                Ingredients = new List<RecipeNode> { Leaf(2, 20) },
             };
             var tree = new RecipeNode
             {
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 10,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -335,7 +333,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(ing1);
             option.Ingredients.Add(ing2);
@@ -344,12 +342,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(tree, index, null);
 
@@ -376,7 +374,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(Leaf(2, 3));
             option.Ingredients.Add(Leaf(99, 50, "Currency"));
@@ -385,13 +383,13 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             // Index has currency id 99 - should not be consumed
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(99, 999, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(99, 999, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -411,7 +409,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(Leaf(2, 3));
             option.Ingredients.Add(Leaf(2, 4));
@@ -420,12 +418,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(tree, index, null);
 
@@ -459,7 +457,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 1, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(3, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(3, 5, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(root, index, null);
 
@@ -504,7 +502,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(500, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(500, 3, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(root, index, null);
 
@@ -524,7 +522,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 3, 10, 1, Leaf(2, 9));
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -539,7 +537,6 @@ namespace GW2CraftingHelper.Tests.Services
         // not just the one the solver would eventually choose - untested
         // before this milestone, since every fixture above uses a single
         // recipe option.)
-
         [Fact]
         public void MultipleRecipeOptions_OnlyPrimaryOptionConsumesPool()
         {
@@ -558,13 +555,13 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+                SnapEntry(2, 2, AccountItemIndex.SourceBank),
             });
             var result = _reducer.Reduce(tree, index, null);
 
@@ -595,12 +592,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -633,13 +630,13 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 10,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             // Own 4 of item 1 itself -> Quantity becomes 6, newCrafts = ceil(6/2) = 3
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(tree, index, null);
 
@@ -652,14 +649,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Per-node owned-quantity attribution ----
-
         [Fact]
         public void OwnedQuantityUsedByNode_RecordsConsumptionKeyedByNodeObject()
         {
             var leaf = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(leaf, index, null);
@@ -687,12 +683,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(tree, index, null);
 
@@ -710,7 +706,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+                SnapEntry(100, 3, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(leaf, index, null);
@@ -733,14 +729,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Source-aware overload tests ----
-
         private static SnapshotItemEntry SnapEntry(int itemId, int count, string source)
         {
             return new SnapshotItemEntry
             {
                 ItemId = itemId,
                 Count = count,
-                Source = source
+                Source = source,
             };
         }
 
@@ -750,7 +745,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -768,7 +763,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+                SnapEntry(100, 3, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -795,7 +790,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 3, AccountItemIndex.SourceBank),
-                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -814,7 +809,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 3, AccountItemIndex.SourceBank),
-                SnapEntry(100, 5, AccountItemIndex.CharacterSourcePrefix + "Alice")
+                SnapEntry(100, 5, AccountItemIndex.CharacterSourcePrefix + "Alice"),
             });
 
             var result = _reducer.Reduce(tree, index, "Alice");
@@ -844,7 +839,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -864,7 +859,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(100, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(100, 4, AccountItemIndex.SourceBank)
+                SnapEntry(100, 4, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -886,7 +881,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 2, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 1, AccountItemIndex.SourceBank)
+                SnapEntry(2, 1, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -920,7 +915,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(ing1);
             option.Ingredients.Add(ing2);
@@ -929,12 +924,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 7, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 7, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -958,7 +953,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(100, 5);
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -982,7 +977,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SnapEntry(100, 2, AccountItemIndex.SourceBank),
                 SnapEntry(100, 3, AccountItemIndex.SourceSharedInventory),
                 SnapEntry(100, 5, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(100, 4, AccountItemIndex.CharacterSourcePrefix + "ActiveHero")
+                SnapEntry(100, 4, AccountItemIndex.CharacterSourcePrefix + "ActiveHero"),
             });
 
             var result = _reducer.Reduce(tree, index, "ActiveHero");
@@ -1027,7 +1022,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SnapEntry(100, 10, null),
                 SnapEntry(100, 10, ""),
-                SnapEntry(100, 3, AccountItemIndex.SourceBank)
+                SnapEntry(100, 3, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -1055,7 +1050,7 @@ namespace GW2CraftingHelper.Tests.Services
             // When items ARE consumed, Sources is a non-null list
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(100, 5, AccountItemIndex.SourceBank)
+                SnapEntry(100, 5, AccountItemIndex.SourceBank),
             });
             var result2 = _reducer.Reduce(Leaf(100, 5), index, null);
 
@@ -1078,12 +1073,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 10, AccountItemIndex.SourceBank)
+                SnapEntry(2, 10, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -1106,7 +1101,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(ing1);
             option.Ingredients.Add(ing2);
@@ -1115,13 +1110,13 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 4, AccountItemIndex.CharacterSourcePrefix + "Zephyr"),
-                SnapEntry(2, 4, AccountItemIndex.SourceBank)
+                SnapEntry(2, 4, AccountItemIndex.SourceBank),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -1144,7 +1139,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RecipeId = 10,
                 OutputCount = 1,
-                CraftsNeeded = 1
+                CraftsNeeded = 1,
             };
             option.Ingredients.Add(Leaf(2, 3));
             option.Ingredients.Add(Leaf(99, 50, "Currency"));
@@ -1153,12 +1148,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 10, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null);
@@ -1189,14 +1184,14 @@ namespace GW2CraftingHelper.Tests.Services
 
             var singleSource = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(1, 4, AccountItemIndex.SourceMaterialStorage),
             });
             var singleResult = _reducer.Reduce(tree, singleSource, null);
 
             var splitSource = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(1, 2, AccountItemIndex.SourceBank)
+                SnapEntry(1, 2, AccountItemIndex.SourceBank),
             });
             var splitResult = _reducer.Reduce(tree, splitSource, null);
 
@@ -1229,7 +1224,6 @@ namespace GW2CraftingHelper.Tests.Services
         // (The guide
         // dictionary a throwaway zero-owned PlanSolver.Solve produces,
         // consumed via Reduce's new optional 4th argument.)
-
         [Fact]
         public void MultipleRecipeOptions_DecisionGuided_NonPrimaryOptionConsumesPoolWhenChosen()
         {
@@ -1250,18 +1244,18 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+                SnapEntry(2, 2, AccountItemIndex.SourceBank),
             });
             var result = _reducer.Reduce(tree, index, null, guide);
 
@@ -1289,12 +1283,12 @@ namespace GW2CraftingHelper.Tests.Services
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceBank)
+                SnapEntry(2, 5, AccountItemIndex.SourceBank),
             });
             var result = _reducer.Reduce(tree, index, null, guide);
 
@@ -1315,7 +1309,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } },
             };
 
             // Node's own stock split across two sources.
@@ -1323,7 +1317,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SnapEntry(1, 2, AccountItemIndex.SourceMaterialStorage),
                 SnapEntry(1, 1, AccountItemIndex.SourceBank),
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
             var result = _reducer.Reduce(tree, index, null, guide);
 
@@ -1359,20 +1353,20 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             // Guide references a totally different NodeId (99) - this
             // node's own NodeId (1) is absent from it.
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+                SnapEntry(2, 2, AccountItemIndex.SourceBank),
             });
             var result = _reducer.Reduce(tree, index, null, guide);
 
@@ -1415,18 +1409,18 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(2, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 2, AccountItemIndex.SourceBank)
+                SnapEntry(2, 2, AccountItemIndex.SourceBank),
             });
             var result = _reducer.Reduce(tree, index, null, guide);
 
@@ -1440,7 +1434,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Sourced_ single-source variants of the guide tests above ----
-
         [Fact]
         public void Sourced_MultipleRecipeOptions_DecisionGuided_NonPrimaryOptionConsumesPoolWhenChosen()
         {
@@ -1455,17 +1448,17 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null, guide);
@@ -1488,12 +1481,12 @@ namespace GW2CraftingHelper.Tests.Services
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null, guide);
@@ -1511,13 +1504,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } }
+                { 1, new SolverDecision { Source = AcquisitionSource.BuyFromTp } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 SnapEntry(1, 3, AccountItemIndex.SourceMaterialStorage),
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null, guide);
@@ -1548,19 +1541,19 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             // Guide references a totally different NodeId (99) - this
             // node's own NodeId (1) is absent from it.
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } }
+                { 99, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 20 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null, guide);
@@ -1591,17 +1584,17 @@ namespace GW2CraftingHelper.Tests.Services
                 IngredientType = "Item",
                 Quantity = 1,
                 NodeId = 1,
-                Recipes = new List<RecipeOption> { optionA, optionB }
+                Recipes = new List<RecipeOption> { optionA, optionB },
             };
 
             var guide = new Dictionary<int, SolverDecision>
             {
-                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } }
+                { 1, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 999 } },
             };
 
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage)
+                SnapEntry(2, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             var result = _reducer.Reduce(tree, index, null, guide);

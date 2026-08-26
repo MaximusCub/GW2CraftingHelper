@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var costs = new List<CurrencyAmountViewModel>
             {
-                new CurrencyAmountViewModel { Amount = 100, Name = "Karma", OwnedQuantity = null }
+                new CurrencyAmountViewModel { Amount = 100, Name = "Karma", OwnedQuantity = null },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -44,7 +44,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var costs = new List<CurrencyAmountViewModel>
             {
-                new CurrencyAmountViewModel { Amount = 0, Name = "Karma", OwnedQuantity = 0, RawOwnedQuantity = 0 }
+                new CurrencyAmountViewModel { Amount = 0, Name = "Karma", OwnedQuantity = 0, RawOwnedQuantity = 0 },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -62,8 +62,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Amount = 500,
                     Name = "Karma",
                     OwnedQuantity = 200,
-                    RawOwnedQuantity = 200
-                }
+                    RawOwnedQuantity = 200,
+                },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -81,8 +81,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Amount = 500,
                     Name = "Spirit Shards",
                     OwnedQuantity = 500,
-                    RawOwnedQuantity = 500
-                }
+                    RawOwnedQuantity = 500,
+                },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -100,8 +100,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Amount = 500,
                     Name = "Spirit Shards",
                     OwnedQuantity = 500, // clamped by CurrencyDisplayResolver
-                    RawOwnedQuantity = 999999
-                }
+                    RawOwnedQuantity = 999999,
+                },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -123,8 +123,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Amount = 500,
                     Name = "Karma",
                     OwnedQuantity = 500,
-                    RawOwnedQuantity = null
-                }
+                    RawOwnedQuantity = null,
+                },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -139,7 +139,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new CurrencyAmountViewModel { Amount = 500, Name = "Karma", OwnedQuantity = 200, RawOwnedQuantity = 200 },
                 new CurrencyAmountViewModel { Amount = 100, Name = "Spirit Shards", OwnedQuantity = 100, RawOwnedQuantity = 250 },
-                new CurrencyAmountViewModel { Amount = 50, Name = "Unresolved Currency", OwnedQuantity = null }
+                new CurrencyAmountViewModel { Amount = 50, Name = "Unresolved Currency", OwnedQuantity = null },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildCurrencyLines(costs);
@@ -147,10 +147,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(new[]
             {
                 "Karma: HAVE 200/500 THIS ROW, NEED 300",
-                "Spirit Shards: HAVE 100/100 THIS ROW (wallet 250)"
+                "Spirit Shards: HAVE 100/100 THIS ROW (wallet 250)",
             }, lines);
         }
-    
+
         [Fact]
         public void BuildRowContent_PutsTheStatBlockAheadOfTheHaveNeedLines()
         {
@@ -158,8 +158,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new CurrencyAmountViewModel
                 {
-                    Amount = 100, Name = "Karma", OwnedQuantity = 40, RawOwnedQuantity = 40
-                }
+                    Amount = 100, Name = "Karma", OwnedQuantity = 40, RawOwnedQuantity = 40,
+                },
             };
 
             var lines = ShoppingRowTooltipFormatter.BuildRowContent(

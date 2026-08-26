@@ -13,7 +13,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineProgressLoggingTests
     {
         // --- Generation progress + rich logging ---
-
         [Fact]
         public async Task GenerateStructuredAsync_ReportsPhaseEventsInOrderWithSanePayloads()
         {
@@ -34,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
                 PlanPhase.CheckingLearnedRecipes,
-                PlanPhase.BuildingDisplay
+                PlanPhase.BuildingDisplay,
             };
 
             Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
@@ -94,7 +93,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
@@ -110,7 +109,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
                 PlanPhase.CheckingLearnedRecipes,
-                PlanPhase.BuildingDisplay
+                PlanPhase.BuildingDisplay,
             };
             Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
             for (int i = 0; i < expectedOrder.Length; i++)
@@ -213,7 +212,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var items = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 },
                 };
 
                 await pipeline.GenerateStructuredAsync(

@@ -23,7 +23,6 @@ namespace GW2CraftingHelper.Tests.Services
             s => (s ?? "").Sum(c => c == 'i' ? 2 : 10);
 
         // --- Ellipsize (moved out of LabelHelpers, behavior unchanged) ---
-
         [Fact]
         public void Ellipsize_TextThatFits_ReturnedWhole()
         {
@@ -56,7 +55,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Wrap ---
-
         [Fact]
         public void Wrap_ShortText_StaysOneLine()
         {
@@ -209,7 +207,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Caller-supplied line cap (ModalDialog: the dialog cannot grow,
         // so the message is capped to the lines that fit above its buttons) ---
-
         [Fact]
         public void Wrap_CallerLineCap_CapsBelowTheDefaultAndEllipsizesTheTail()
         {

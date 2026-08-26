@@ -44,13 +44,14 @@ namespace GW2CraftingHelper.Tests.Services
                 SchemaVersion = 1,
                 GeneratedAt = "2026-01-01T00:00:00Z",
                 Source = "test",
-                Offers = new List<VendorOffer>(offers)
+                Offers = new List<VendorOffer>(offers),
             };
             string json = _loader.Serialize(dataset);
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
             {
                 store.LoadBaseline(stream);
             }
+
             return store;
         }
 
@@ -63,10 +64,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost }
+                    new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = coinCost },
                 },
                 MerchantName = "TestMerchant",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
         }
 
@@ -91,8 +92,8 @@ namespace GW2CraftingHelper.Tests.Services
                     ItemId = 200,
                     Quantity = quantity * 2,
                     Decision = CraftingDecision.BuyFromTp,
-                    SubtreeCost = ingredientSubtreeCost
-                }
+                    SubtreeCost = ingredientSubtreeCost,
+                },
             };
             if (extraChildren != null)
             {
@@ -111,7 +112,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ReferenceRecipeMinRating = minRating,
                 ReferenceRecipeIsLearnedFromItem = learnedFromItem,
                 VendorCurrencyCosts = vendorCurrencyCosts,
-                Children = children
+                Children = children,
             };
         }
 
@@ -275,9 +276,9 @@ namespace GW2CraftingHelper.Tests.Services
                         Quantity = 20,
                         Decision = CraftingDecision.BuyFromVendor,
                         SubtreeCost = 300,
-                        IsCostComponent = true
-                    }
-                }
+                        IsCostComponent = true,
+                    },
+                },
             };
             var result = new CraftingPlanResult { CraftingTree = node };
             var store = MakeStore(CoinSheetOffer(500, 200));
@@ -325,8 +326,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     ItemId = 201,
                     Quantity = 5,
-                    Decision = CraftingDecision.Have
-                }
+                    Decision = CraftingDecision.Have,
+                },
             });
             var result = new CraftingPlanResult { CraftingTree = node };
             var store = MakeStore(CoinSheetOffer(500, 200));
@@ -355,8 +356,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     ItemId = 202,
                     Quantity = 5,
-                    Decision = CraftingDecision.Currency
-                }
+                    Decision = CraftingDecision.Currency,
+                },
             });
             var result = new CraftingPlanResult { CraftingTree = node };
             var store = MakeStore(CoinSheetOffer(500, 200));
@@ -404,7 +405,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = 1,
                 Decision = CraftingDecision.BuyFromVendor,
                 SubtreeCost = 1,
-                VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 2000 } }
+                VendorCurrencyCosts = new List<CostLine> { new CostLine { Type = "Currency", Id = 2, Count = 2000 } },
             };
             var craftChild = new CraftingTreeNode
             {
@@ -412,7 +413,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = 1,
                 Decision = CraftingDecision.Craft,
                 SubtreeCost = 1,
-                Children = new List<CraftingTreeNode> { karmaGrandchild }
+                Children = new List<CraftingTreeNode> { karmaGrandchild },
             };
             var node = BoughtNodeWithReferenceBranch(extraChildren: new[] { craftChild });
             var result = new CraftingPlanResult { CraftingTree = node };
@@ -436,7 +437,7 @@ namespace GW2CraftingHelper.Tests.Services
             var sheetMap = new Dictionary<int, int> { { 999, 500 } };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Chef", Rating = 200 }
+                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Chef", Rating = 200 },
             };
 
             RecipeSheetSavingsCalculator.Apply(
@@ -459,7 +460,7 @@ namespace GW2CraftingHelper.Tests.Services
             var sheetMap = new Dictionary<int, int> { { 999, 500 } };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Chef", Rating = 400 }
+                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Chef", Rating = 400 },
             };
 
             RecipeSheetSavingsCalculator.Apply(
@@ -486,7 +487,7 @@ namespace GW2CraftingHelper.Tests.Services
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
                 new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Armorsmith", Rating = 100 },
-                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Weaponsmith", Rating = 350 }
+                new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Weaponsmith", Rating = 350 },
             };
 
             RecipeSheetSavingsCalculator.Apply(
@@ -508,7 +509,7 @@ namespace GW2CraftingHelper.Tests.Services
             nodeB.ItemId = 101;
             var result = new CraftingPlanResult
             {
-                MultiItemRoots = new List<CraftingTreeNode> { nodeA, nodeB }
+                MultiItemRoots = new List<CraftingTreeNode> { nodeA, nodeB },
             };
             var store = MakeStore(CoinSheetOffer(500, 200), CoinSheetOffer(600, 200));
             var sheetMap = new Dictionary<int, int> { { 999, 500 }, { 998, 600 } };
@@ -551,7 +552,7 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     OfferId = "expensive", OutputItemId = 500, OutputCount = 1,
                     CostLines = new List<CostLine> { new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 999 } },
-                    MerchantName = "Expensive", Locations = new List<string>()
+                    MerchantName = "Expensive", Locations = new List<string>(),
                 },
                 CoinSheetOffer(500, 200));
             var sheetMap = new Dictionary<int, int> { { 999, 500 } };

@@ -6,10 +6,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SnapshotSerializationTests
     {
-
         [Fact]
         public void Serialize_Deserialize_RoundTrip()
         {
@@ -19,12 +17,12 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = 500000,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 42, Name = "Test Item", Count = 10, Source = "Bank" }
+                    new SnapshotItemEntry { ItemId = 42, Name = "Test Item", Count = 10, Source = "Bank" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 3000 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 3000 },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -97,8 +95,8 @@ namespace GW2CraftingHelper.Tests.Services
                         Name = "Copper Ore",
                         IconUrl = "https://render.guildwars2.com/file/ABC/123.png",
                         Count = 10,
-                        Source = "Bank"
-                    }
+                        Source = "Bank",
+                    },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
@@ -107,9 +105,9 @@ namespace GW2CraftingHelper.Tests.Services
                         CurrencyId = 2,
                         CurrencyName = "Karma",
                         IconUrl = "https://render.guildwars2.com/file/DEF/456.png",
-                        Value = 5000
-                    }
-                }
+                        Value = 5000,
+                    },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -129,12 +127,12 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = 0,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 1, Name = "X", IconUrl = "", Count = 1, Source = "Bank" }
+                    new SnapshotItemEntry { ItemId = 1, Name = "X", IconUrl = "", Count = 1, Source = "Bank" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Y", IconUrl = "", Value = 1 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Y", IconUrl = "", Value = 1 },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -169,7 +167,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Per-character discipline display: backward compat for
         // a legacy snapshot.json that predates CharacterDisciplines. ---
-
         [Fact]
         public void Deserialize_OldJsonMissingCharacterDisciplines_ReturnsNull()
         {
@@ -205,8 +202,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Wallet = new List<SnapshotWalletEntry>(),
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Chef", Rating = 300, Active = false }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Chef", Rating = 300, Active = false },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -221,5 +218,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.CharacterDisciplines[0].Active);
         }
     }
-
 }

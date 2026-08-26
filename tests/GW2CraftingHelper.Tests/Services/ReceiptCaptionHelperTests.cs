@@ -13,14 +13,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeCaptionSplitIndex ---
-
         [Fact]
         public void ComputeCaptionSplitIndex_StackedCase_ReturnsFirstNonComponentIndex()
         {
             var node = new CraftingTreeNode
             {
                 IsReferenceBranch = true,
-                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(true), Leaf(false), Leaf(false) }
+                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(true), Leaf(false), Leaf(false) },
             };
 
             Assert.Equal(2, ReceiptCaptionHelper.ComputeCaptionSplitIndex(node));
@@ -32,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = new CraftingTreeNode
             {
                 IsReferenceBranch = true,
-                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(false) }
+                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(false) },
             };
 
             Assert.Equal(1, ReceiptCaptionHelper.ComputeCaptionSplitIndex(node));
@@ -44,7 +43,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = new CraftingTreeNode
             {
                 IsReferenceBranch = false,
-                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(false) }
+                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(false) },
             };
 
             Assert.Equal(-1, ReceiptCaptionHelper.ComputeCaptionSplitIndex(node));
@@ -58,7 +57,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = new CraftingTreeNode
             {
                 IsReferenceBranch = true,
-                Children = new List<CraftingTreeNode> { Leaf(false), Leaf(false) }
+                Children = new List<CraftingTreeNode> { Leaf(false), Leaf(false) },
             };
 
             Assert.Equal(-1, ReceiptCaptionHelper.ComputeCaptionSplitIndex(node));
@@ -73,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
             var node = new CraftingTreeNode
             {
                 IsReferenceBranch = true,
-                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(true) }
+                Children = new List<CraftingTreeNode> { Leaf(true), Leaf(true) },
             };
 
             Assert.Equal(-1, ReceiptCaptionHelper.ComputeCaptionSplitIndex(node));
@@ -94,7 +93,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- CaptionForChildIndex ---
-
         [Fact]
         public void CaptionForChildIndex_IndexZero_VendorPriceCaption()
         {

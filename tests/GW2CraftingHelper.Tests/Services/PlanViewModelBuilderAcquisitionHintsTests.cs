@@ -12,18 +12,17 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Acquisition hints ---
-
         [Fact]
         public void ShoppingList_UnknownSource_WithHint_PopulatesHintText()
         {
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear." }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear." },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);
@@ -37,7 +36,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             });
             var vm = _builder.Build(result);
 
@@ -53,12 +52,12 @@ namespace GW2CraftingHelper.Tests.Services
             // onto a priced row's tooltip.
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced row." }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced row." },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                    new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);
@@ -75,12 +74,12 @@ namespace GW2CraftingHelper.Tests.Services
             // ApplyAcquisitionHint uses for AcquisitionHint.
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "" }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "" },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);
@@ -94,12 +93,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);
@@ -113,12 +112,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear." }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear." },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);
@@ -134,12 +133,12 @@ namespace GW2CraftingHelper.Tests.Services
             // for the item must not appear on a priced row's tag.
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Should never appear.", Badge = "SALVAGE" }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Should never appear.", Badge = "SALVAGE" },
             };
             var result = MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                    new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 },
                 acquisitionHints: hints);
             var vm = _builder.Build(result);

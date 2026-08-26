@@ -79,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Row(1, "1"),
                 Row(2, "2"),
-                Row(3, "3")
+                Row(3, "3"),
             };
             var result = ItemRowRequestBuilder.Build(rows);
 
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Row(10, "2"),
                 Row(null, "1"),
-                Row(20, "4")
+                Row(20, "4"),
             };
             var result = ItemRowRequestBuilder.Build(rows);
 

@@ -224,8 +224,8 @@ namespace GW2CraftingHelper.Tests.Services
             const int labelY = 2;
 
             Assert.True(
-                SnapshotHeaderLayout.StatusRowHeight
-                    > TypeRampMetrics.InkBottom(TypeRampMetrics.StatusInk, labelY),
+                TypeRampMetrics.InkBottom(TypeRampMetrics.StatusInk, labelY)
+                    < SnapshotHeaderLayout.StatusRowHeight,
                 "the status row must clear its own tier's lowest ink");
         }
 
@@ -241,7 +241,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- One right edge for the whole tab ----
-
         private static readonly int ContainerAtWindowMinimum =
             WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
 
@@ -409,6 +408,5 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(200, shared.X);
             Assert.Equal(chromeRight, shared.X + shared.Width);
         }
-
     }
 }

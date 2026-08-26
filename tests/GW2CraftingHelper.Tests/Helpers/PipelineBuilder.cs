@@ -185,11 +185,11 @@ namespace GW2CraftingHelper.Tests.Helpers
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount }
+                        new RawIngredient { Type = "Item", Id = 2, Count = ingredientCount },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithItem(1, "Target", "t.png")
                 .WithItem(2, "Ingredient", "i.png");
@@ -213,8 +213,8 @@ namespace GW2CraftingHelper.Tests.Helpers
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -242,8 +242,8 @@ namespace GW2CraftingHelper.Tests.Helpers
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 1 },
+                    },
                 })
                 .WithSearchResult(2, 20)
                 .WithRecipe(new RawRecipe
@@ -253,8 +253,8 @@ namespace GW2CraftingHelper.Tests.Helpers
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 4, Count = 1 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200)
@@ -306,9 +306,9 @@ namespace GW2CraftingHelper.Tests.Helpers
                     {
                         ItemId = 2,
                         Count = count,
-                        Source = AccountItemIndex.SourceMaterialStorage
-                    }
-                }
+                        Source = AccountItemIndex.SourceMaterialStorage,
+                    },
+                },
             };
         }
     }

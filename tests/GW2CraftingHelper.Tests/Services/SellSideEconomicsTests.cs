@@ -24,11 +24,11 @@ namespace GW2CraftingHelper.Tests.Services
             var usedMaterials = new List<UsedMaterial>
             {
                 new UsedMaterial { ItemId = 1, QuantityUsed = 4 },
-                new UsedMaterial { ItemId = 2, QuantityUsed = 1 } // no price entry -> contributes 0
+                new UsedMaterial { ItemId = 2, QuantityUsed = 1 }, // no price entry -> contributes 0
             };
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { SellInstant = 10 } }
+                { 1, new ItemPrice { SellInstant = 10 } },
             };
 
             // Free mode: reduction never has an opportunity cost.
@@ -66,12 +66,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Plan = new CraftingPlan(),
                 Decisions = new Dictionary<int, SolverDecision>
                 {
-                    { 5, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 9, TotalCost = 777 } }
-                }
+                    { 5, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 9, TotalCost = 777 } },
+                },
             };
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 50, new ItemPrice { SellInstant = 20 } }
+                { 50, new ItemPrice { SellInstant = 20 } },
             };
 
             var economics = SellSideEconomics.ComputePerItemEconomics(
@@ -105,12 +105,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Plan = new CraftingPlan(),
                 Decisions = new Dictionary<int, SolverDecision>
                 {
-                    { 5, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 9, TotalCost = 500 } }
-                }
+                    { 5, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 9, TotalCost = 500 } },
+                },
             };
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 50, new ItemPrice { SellInstant = 100 } }
+                { 50, new ItemPrice { SellInstant = 100 } },
             };
 
             var economics = SellSideEconomics.ComputePerItemEconomics(
@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 100, Quantity = 5 },
-                new PlanRequestItem { ItemId = 200, Quantity = 3 }
+                new PlanRequestItem { ItemId = 200, Quantity = 3 },
             };
 
             var solveResult = new SolveResult
@@ -144,8 +144,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Decisions = new Dictionary<int, SolverDecision>
                 {
                     { 10, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 1, TotalCost = 400 } },
-                    { 20, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 2, TotalCost = 150 } }
-                }
+                    { 20, new SolverDecision { Source = AcquisitionSource.Craft, RecipeId = 2, TotalCost = 150 } },
+                },
             };
 
             // Only root1's item (100) has a live sell price; root2's item
@@ -153,12 +153,12 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 100, new ItemPrice { SellInstant = 100 } },
-                { 300, new ItemPrice { SellInstant = 50 } }
+                { 300, new ItemPrice { SellInstant = 50 } },
             };
 
             var usedMaterials = new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 300, QuantityUsed = 2 }
+                new UsedMaterial { ItemId = 300, QuantityUsed = 2 },
             };
 
             var result = new CraftingPlanResult();
@@ -211,16 +211,16 @@ namespace GW2CraftingHelper.Tests.Services
             // behind the cross-side buy fallback above.
             var pricesForEconomics = new Dictionary<int, ItemPrice>
             {
-                { 99, new ItemPrice { ItemId = 99, SellInstant = 1000 } }
+                { 99, new ItemPrice { ItemId = 99, SellInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } },
             };
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 99, Quantity = 1 },
-                new PlanRequestItem { ItemId = 500, Quantity = 1 }
+                new PlanRequestItem { ItemId = 500, Quantity = 1 },
             };
 
             var solver = new PlanSolver();

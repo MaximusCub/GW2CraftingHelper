@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 CoinCopper = coin,
                 Items = items ?? new List<SnapshotItemEntry>(),
-                Wallet = wallet ?? new List<SnapshotWalletEntry>()
+                Wallet = wallet ?? new List<SnapshotWalletEntry>(),
             };
         }
 
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             cascade.Consume(Consumed(coin: 9999, used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 5, QuantityUsed = 3 }
+                new UsedMaterial { ItemId = 5, QuantityUsed = 3 },
             }));
 
             Assert.Null(cascade.CurrentAvailability.Snapshot);
@@ -103,7 +103,7 @@ namespace GW2CraftingHelper.Tests.Services
                 used: new List<UsedMaterial> { new UsedMaterial { ItemId = 2, QuantityUsed = 25 } },
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 3, Quantity = 10, Source = AcquisitionSource.BuyFromTp }
+                    new PlanStep { ItemId = 3, Quantity = 10, Source = AcquisitionSource.BuyFromTp },
                 }));
 
             var availability = cascade.CurrentAvailability;
@@ -119,7 +119,7 @@ namespace GW2CraftingHelper.Tests.Services
             var cascade = new RankerPriorityCascade(Snapshot(items: new List<SnapshotItemEntry>
             {
                 Item(2, 10, Storage),
-                Item(2, 10, Bank)
+                Item(2, 10, Bank),
             }));
 
             cascade.Consume(Consumed(used: new List<UsedMaterial>
@@ -130,9 +130,9 @@ namespace GW2CraftingHelper.Tests.Services
                     QuantityUsed = 6,
                     Sources = new List<MaterialSourceAllocation>
                     {
-                        new MaterialSourceAllocation { Source = Bank, Quantity = 6 }
-                    }
-                }
+                        new MaterialSourceAllocation { Source = Bank, Quantity = 6 },
+                    },
+                },
             }));
 
             var items = cascade.CurrentAvailability.Snapshot.Items;
@@ -146,12 +146,12 @@ namespace GW2CraftingHelper.Tests.Services
             var cascade = new RankerPriorityCascade(Snapshot(items: new List<SnapshotItemEntry>
             {
                 Item(2, 10, Storage),
-                Item(2, 10, Bank)
+                Item(2, 10, Bank),
             }));
 
             cascade.Consume(Consumed(used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 2, QuantityUsed = 14, Sources = null }
+                new UsedMaterial { ItemId = 2, QuantityUsed = 14, Sources = null },
             }));
 
             Assert.Equal(6, ResidualCount(cascade.CurrentAvailability, 2));
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cascade = new RankerPriorityCascade(Snapshot(items: new List<SnapshotItemEntry>
             {
-                Item(2, 10, Storage)
+                Item(2, 10, Storage),
             }));
 
             cascade.Consume(Consumed(used: new List<UsedMaterial>
@@ -173,9 +173,9 @@ namespace GW2CraftingHelper.Tests.Services
                     QuantityUsed = 4,
                     Sources = new List<MaterialSourceAllocation>
                     {
-                        new MaterialSourceAllocation { Source = "Character:Ghost", Quantity = 4 }
-                    }
-                }
+                        new MaterialSourceAllocation { Source = "Character:Ghost", Quantity = 4 },
+                    },
+                },
             }));
 
             Assert.Equal(6, ResidualCount(cascade.CurrentAvailability, 2));
@@ -186,12 +186,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cascade = new RankerPriorityCascade(Snapshot(items: new List<SnapshotItemEntry>
             {
-                Item(2, 5)
+                Item(2, 5),
             }));
 
             cascade.Consume(Consumed(used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 2, QuantityUsed = 5 }
+                new UsedMaterial { ItemId = 2, QuantityUsed = 5 },
             }));
 
             Assert.Empty(cascade.CurrentAvailability.Snapshot.Items);
@@ -205,7 +205,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             cascade.Consume(Consumed(coin: 60, used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 2, QuantityUsed = 30 }
+                new UsedMaterial { ItemId = 2, QuantityUsed = 30 },
             }));
 
             Assert.Equal(40, original.Items.Single().Count);
@@ -217,12 +217,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cascade = new RankerPriorityCascade(Snapshot(wallet: new List<SnapshotWalletEntry>
             {
-                new SnapshotWalletEntry { CurrencyId = 29, Value = 300 }
+                new SnapshotWalletEntry { CurrencyId = 29, Value = 300 },
             }));
 
             cascade.Consume(Consumed(currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 120 }
+                new CurrencyCost { CurrencyId = 29, Amount = 120 },
             }));
 
             var availability = cascade.CurrentAvailability;
@@ -236,16 +236,16 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cascade = new RankerPriorityCascade(Snapshot(wallet: new List<SnapshotWalletEntry>
             {
-                new SnapshotWalletEntry { CurrencyId = 29, Value = 50 }
+                new SnapshotWalletEntry { CurrencyId = 29, Value = 50 },
             }));
 
             cascade.Consume(Consumed(currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 500 }
+                new CurrencyCost { CurrencyId = 29, Amount = 500 },
             }));
             cascade.Consume(Consumed(currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 500 }
+                new CurrencyCost { CurrencyId = 29, Amount = 500 },
             }));
 
             Assert.Equal(0, cascade.CurrentAvailability.Currency[29]);
@@ -257,12 +257,12 @@ namespace GW2CraftingHelper.Tests.Services
             var cascade = new RankerPriorityCascade(Snapshot(wallet: new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyId = 29, Value = 100 },
-                new SnapshotWalletEntry { CurrencyId = 29, Value = 200 }
+                new SnapshotWalletEntry { CurrencyId = 29, Value = 200 },
             }));
 
             cascade.Consume(Consumed(currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 50 }
+                new CurrencyCost { CurrencyId = 29, Amount = 50 },
             }));
 
             var wallet = cascade.CurrentAvailability.Snapshot.Wallet;
@@ -287,18 +287,18 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cooldowns = new Dictionary<int, DailyCooldownItem>
             {
-                { MithrilliumId, new DailyCooldownItem { ItemId = MithrilliumId, PerDayCap = 1 } }
+                { MithrilliumId, new DailyCooldownItem { ItemId = MithrilliumId, PerDayCap = 1 } },
             };
             var cascade = new RankerPriorityCascade(Snapshot());
 
             cascade.Consume(Consumed(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = MithrilliumId, Quantity = 30, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = MithrilliumId, Quantity = 30, Source = AcquisitionSource.Craft },
             }, cooldowns: cooldowns));
 
             cascade.Consume(Consumed(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = MithrilliumId, Quantity = 20, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = MithrilliumId, Quantity = 20, Source = AcquisitionSource.Craft },
             }, cooldowns: cooldowns));
 
             Assert.Equal(50, cascade.CurrentAvailability.ClaimedGatedUnits[MithrilliumId]);
@@ -309,13 +309,13 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var cooldowns = new Dictionary<int, DailyCooldownItem>
             {
-                { MithrilliumId, new DailyCooldownItem { ItemId = MithrilliumId, PerDayCap = 1 } }
+                { MithrilliumId, new DailyCooldownItem { ItemId = MithrilliumId, PerDayCap = 1 } },
             };
             var cascade = new RankerPriorityCascade(Snapshot());
 
             cascade.Consume(Consumed(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = MithrilliumId, Quantity = 30, Source = AcquisitionSource.BuyFromTp }
+                new PlanStep { ItemId = MithrilliumId, Quantity = 30, Source = AcquisitionSource.BuyFromTp },
             }, cooldowns: cooldowns));
 
             Assert.Empty(cascade.CurrentAvailability.ClaimedGatedUnits);
@@ -340,13 +340,13 @@ namespace GW2CraftingHelper.Tests.Services
             var snapshot = Snapshot(items: new List<SnapshotItemEntry> { Item(2, 5) });
             snapshot.CharacterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 }
+                new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 },
             };
             var cascade = new RankerPriorityCascade(snapshot);
 
             cascade.Consume(Consumed(used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 2, QuantityUsed = 5 }
+                new UsedMaterial { ItemId = 2, QuantityUsed = 5 },
             }));
 
             var disciplines = cascade.CurrentAvailability.Snapshot.CharacterDisciplines;
@@ -366,7 +366,7 @@ namespace GW2CraftingHelper.Tests.Services
             var first = cascade.CurrentAvailability;
             cascade.Consume(Consumed(coin: 300, used: new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 2, QuantityUsed = 30 }
+                new UsedMaterial { ItemId = 2, QuantityUsed = 30 },
             }));
 
             Assert.Equal(1000, first.CoinCopper);

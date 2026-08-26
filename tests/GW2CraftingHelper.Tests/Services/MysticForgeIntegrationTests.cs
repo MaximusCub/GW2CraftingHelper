@@ -132,7 +132,7 @@ namespace GW2CraftingHelper.Tests.Services
                 .GetPricesAsync(new HashSet<int>
                 {
                     GiftOfMagicId, VialOfPowerfulBloodId,
-                    PowerfulVenomSacId, ElaborateTotemId, PileOfCrystallineDustId
+                    PowerfulVenomSacId, ElaborateTotemId, PileOfCrystallineDustId,
                 }, CancellationToken.None);
 
             var solver = new PlanSolver();
@@ -173,7 +173,7 @@ namespace GW2CraftingHelper.Tests.Services
                 .GetPricesAsync(new HashSet<int>
                 {
                     GiftOfMagicId, VialOfPowerfulBloodId,
-                    PowerfulVenomSacId, ElaborateTotemId, PileOfCrystallineDustId
+                    PowerfulVenomSacId, ElaborateTotemId, PileOfCrystallineDustId,
                 }, CancellationToken.None);
 
             var solver = new PlanSolver();
@@ -295,7 +295,7 @@ namespace GW2CraftingHelper.Tests.Services
                 GiftOfFortuneId, GiftOfMagicId, GiftOfMightId,
                 MysticCloverId, GlobOfEctoplasmId,
                 VialOfPowerfulBloodId, PowerfulVenomSacId, ElaborateTotemId, PileOfCrystallineDustId,
-                ViciousFangId, ArmoredScaleId, ViciousClawId, AncientBoneId
+                ViciousFangId, ArmoredScaleId, ViciousClawId, AncientBoneId,
             };
 
             var recipeService = new RecipeService(composite);
@@ -357,7 +357,7 @@ namespace GW2CraftingHelper.Tests.Services
             var allItemIds = new HashSet<int>
             {
                 MysticSalvageKitId, FineSalvageKitId, JourneymansSalvageKitId,
-                MastersSalvageKitId, MysticForgeStoneId
+                MastersSalvageKitId, MysticForgeStoneId,
             };
 
             var itemApi = new InMemoryItemApiClient();
@@ -396,10 +396,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 200, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = 200, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
+                MinRating = 400,
             });
 
             // MF data also has a recipe for item 100
@@ -611,11 +611,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = 600, Count = 3 },
-                    new RawIngredient { Type = "Item", Id = 601, Count = 2 }
+                    new RawIngredient { Type = "Item", Id = 601, Count = 2 },
                 },
                 Disciplines = new List<string> { "Artificer" },
                 MinRating = 300,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             };
 
             var priceApi = new InMemoryPriceApiClient();

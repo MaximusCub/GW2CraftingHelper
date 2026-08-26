@@ -99,7 +99,6 @@ namespace GW2CraftingHelper.Tests.Services
         // TreeRowTooltipComposer.BuildExtraTooltipLines, which no production
         // code called. Wrap (the string form) keeps its coverage below - it
         // is still live for TooltipFacility.ApplyPlain and LogTabContent.
-
         [Fact]
         public void RealOpportunityCostSentence_FitsBudgetOnEveryLine()
         {
@@ -111,7 +110,7 @@ namespace GW2CraftingHelper.Tests.Services
                 NodeId = 1,
                 Decision = CraftingDecision.Craft,
                 SubtreeCost = 5000,
-                DecisionValue = 30000
+                DecisionValue = 30000,
             };
 
             Assert.True(ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content));

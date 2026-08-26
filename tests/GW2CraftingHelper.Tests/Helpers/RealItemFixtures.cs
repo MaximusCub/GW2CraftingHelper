@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 });
             }
         }

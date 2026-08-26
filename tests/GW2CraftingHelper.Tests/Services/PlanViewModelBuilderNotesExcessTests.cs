@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 excessCraftOutputs: new List<ExcessCraftOutput>
                 {
-                    new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 500 }
+                    new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 500 },
                 });
 
             var vm = _builder.Build(result);
@@ -47,7 +47,7 @@ namespace GW2CraftingHelper.Tests.Services
                 excessCraftOutputs: new List<ExcessCraftOutput>
                 {
                     new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 500 },
-                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 3, ReclaimValue = 90 }
+                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 3, ReclaimValue = 90 },
                 });
 
             var vm = _builder.Build(result);
@@ -83,7 +83,7 @@ namespace GW2CraftingHelper.Tests.Services
                 excessCraftOutputs: new List<ExcessCraftOutput>
                 {
                     new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 10 },
-                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 3, ReclaimValue = 10 }
+                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 3, ReclaimValue = 10 },
                 });
 
             var vm = _builder.Build(result);
@@ -110,8 +110,8 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 10,
                         ExcessQuantity = 4,
                         ReclaimValue = null,
-                        IsAccountBound = false
-                    }
+                        IsAccountBound = false,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Tests.Services
                 excessCraftOutputs: new List<ExcessCraftOutput>
                 {
                     new ExcessCraftOutput { ItemId = 10, ExcessQuantity = 12, ReclaimValue = 500 },
-                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 4, ReclaimValue = null }
+                    new ExcessCraftOutput { ItemId = 20, ExcessQuantity = 4, ReclaimValue = null },
                 });
 
             var vm = _builder.Build(result);
@@ -160,8 +160,8 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 10,
                         ExcessQuantity = 5,
                         ReclaimValue = null,
-                        IsAccountBound = true
-                    }
+                        IsAccountBound = true,
+                    },
                 });
 
             var vm = _builder.Build(result);

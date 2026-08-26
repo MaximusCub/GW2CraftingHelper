@@ -115,7 +115,6 @@ namespace GW2CraftingHelper.Tests.Services
         // indistinguishable from one that was never clicked - which is what
         // "reset to defaults when you gen a new plan" means for a reader
         // looking at the header row.
-
         [Fact]
         public void Reset_FromDescending_AlsoClears()
         {

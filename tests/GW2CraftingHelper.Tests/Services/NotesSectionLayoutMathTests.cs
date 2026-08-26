@@ -163,7 +163,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BodyHeight: the arm that now counts LINES, not note rows ---
-
         [Fact]
         public void BodyHeight_CountsWrappedLinesNotNoteRows()
         {

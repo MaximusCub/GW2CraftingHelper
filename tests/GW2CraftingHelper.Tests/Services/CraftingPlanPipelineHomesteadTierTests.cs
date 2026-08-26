@@ -15,7 +15,6 @@ namespace GW2CraftingHelper.Tests.Services
         // as-is by a local override re-solve, matching every other
         // settings-snapshot field on that class (CurrencyValuation,
         // OwnMaterialsMode, ...). ---
-
         [Fact]
         public async Task GenerateStructuredAsync_NoHomesteadTiersArgument_ContextDefaultsToTierZero()
         {
@@ -51,11 +50,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 2,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 400 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 400 },
                         },
                         MerchantName = "Homestead Refinement\u2014Metal Forge",
                         Locations = new List<string>(),
-                        HomesteadTier = 0
+                        HomesteadTier = 0,
                     },
                     new VendorOffer
                     {
@@ -64,12 +63,12 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 1 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 1 },
                         },
                         MerchantName = "Homestead Refinement\u2014Metal Forge",
                         Locations = new List<string>(),
-                        HomesteadTier = 2
-                    }
+                        HomesteadTier = 2,
+                    },
                 });
 
                 var pipeline = PipelineBuilder.Create()
@@ -90,7 +89,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // Tier 2 configured: the far cheaper tier-2 offer is admitted.
                 var tier2 = new HomesteadEfficiencyTiers(new Dictionary<int, int>
                 {
-                    { Gw2Constants.RefinedHomesteadMetalItemId, 2 }
+                    { Gw2Constants.RefinedHomesteadMetalItemId, 2 },
                 });
                 var tieredResult = await pipeline.GenerateStructuredAsync(
                     102205, 2, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,

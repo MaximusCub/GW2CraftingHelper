@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
                 { 100, new List<int> { 1, 2 } },
-                { 200, new List<int> { 3 } }
+                { 200, new List<int> { 3 } },
             };
             var recipes = new Dictionary<int, RawRecipe>
             {
@@ -32,13 +32,13 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputItemCount = 1,
                         Ingredients = new List<RawIngredient>
                         {
-                            new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                            new RawIngredient { Type = "Item", Id = 200, Count = 2 },
                         },
                         Disciplines = new List<string> { "Weaponsmith" },
                         MinRating = 400,
-                        Flags = new List<string> { "AutoLearned" }
+                        Flags = new List<string> { "AutoLearned" },
                     }
-                }
+                },
             };
 
             string searchJson = RecipeCacheSerializer.SerializeSearches(searches);
@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // Seed has search for item 100
                 var searches = new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { 100, new List<int> { 1 } }
+                    { 100, new List<int> { 1 } },
                 };
                 var recipes = new Dictionary<int, RawRecipe>
                 {
@@ -101,9 +101,9 @@ namespace GW2CraftingHelper.Tests.Services
                             Ingredients = new List<RawIngredient>(),
                             Disciplines = new List<string>(),
                             MinRating = 0,
-                            Flags = new List<string>()
+                            Flags = new List<string>(),
                         }
-                    }
+                    },
                 };
 
                 var seed = new SeededRecipeCacheStore();
@@ -364,7 +364,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>(),
                 Disciplines = new List<string>(),
                 MinRating = 0,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             };
         }
 
@@ -462,11 +462,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                    new RawIngredient { Type = "Item", Id = 200, Count = 2 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             cacheStore.PutSearch(200, Array.Empty<int>());
 
@@ -493,7 +493,6 @@ namespace GW2CraftingHelper.Tests.Services
             var cacheStore = new InMemoryRecipeCacheStore();
             cacheStore.PutSearch(100, new List<int> { 1 });
             // recipe 1 and search for 200 are NOT in cache
-
             var api = new InMemoryRecipeApiClient();
             api.AddRecipe(new RawRecipe
             {
@@ -502,14 +501,13 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 200, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = 200, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             // 200 is a leaf - no search results registered
-
             var service = new RecipeService(api, cacheStore: cacheStore);
             var tree = await service.BuildTreeAsync(100, 1, CancellationToken.None);
 
@@ -621,11 +619,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                        new RawIngredient { Type = "Item", Id = 200, Count = 2 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string>()
+                    Flags = new List<string>(),
                 });
 
                 var tree = await new RecipeService(healthy, cacheStore: overlay2)
@@ -660,7 +658,7 @@ namespace GW2CraftingHelper.Tests.Services
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
                 { 100, new List<int> { 1 } },
-                { 300, new List<int>() }
+                { 300, new List<int>() },
             };
             var recipes = new Dictionary<int, RawRecipe>();
 
@@ -677,7 +675,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SeedVersion = 1,
                 Gw2BuildId = 100,
-                CreatedUtc = "2026-01-01T00:00:00Z"
+                CreatedUtc = "2026-01-01T00:00:00Z",
             };
             using (var ms = new MemoryStream(
                 Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeManifest(manifest))))
@@ -711,7 +709,7 @@ namespace GW2CraftingHelper.Tests.Services
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
                 { 100, new List<int> { 1 } },
-                { 300, new List<int>() }
+                { 300, new List<int>() },
             };
             var recipes = new Dictionary<int, RawRecipe>();
 
@@ -728,7 +726,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 SeedVersion = 1,
                 Gw2BuildId = 100,
-                CreatedUtc = "2026-01-01T00:00:00Z"
+                CreatedUtc = "2026-01-01T00:00:00Z",
             };
             using (var ms = new MemoryStream(
                 Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeManifest(manifest))))
@@ -762,6 +760,7 @@ namespace GW2CraftingHelper.Tests.Services
             private int _recipeCallCount;
 
             public int SearchCallCount => _searchCallCount;
+
             public int RecipeCallCount => _recipeCallCount;
 
             public Task<RecipeSearchResult> SearchByOutputAsync(

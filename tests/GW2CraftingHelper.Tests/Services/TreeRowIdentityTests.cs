@@ -57,6 +57,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Assert.True(TreeRowIdentity.SameRow(before.Children[i], after.Children[i]));
             }
+
             Assert.True(TreeRowIdentity.SameRow(before, after));
         }
 
@@ -73,13 +74,13 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },
             };
             var metadata = new Dictionary<int, ItemMetadata>
             {
                 { 1, new ItemMetadata { ItemId = 1, Name = "Finished Thing", IconUrl = "a.png" } },
                 { 2, new ItemMetadata { ItemId = 2, Name = "Material Two", IconUrl = "b.png" } },
-                { 3, new ItemMetadata { ItemId = 3, Name = "Material Three", IconUrl = "c.png" } }
+                { 3, new ItemMetadata { ItemId = 3, Name = "Material Three", IconUrl = "c.png" } },
             };
 
             var before = BuildDisplayTree(tree, prices, metadata, ignored: null);
@@ -130,7 +131,6 @@ namespace GW2CraftingHelper.Tests.Services
         // Each of the five below differs from the baseline in exactly one
         // fact the repaint never re-derives, so accepting it would leave
         // that fact on screen describing the wrong item.
-
         [Fact]
         public void ADifferentItemId_IsPartOfIdentity()
         {
@@ -206,7 +206,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = quantity,
                 Name = name,
                 IconUrl = icon,
-                Rarity = rarity
+                Rarity = rarity,
             };
         }
 
@@ -221,7 +221,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 2);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { barterItemId, new ItemPrice { ItemId = barterItemId, BuyInstant = 10 } }
+                { barterItemId, new ItemPrice { ItemId = barterItemId, BuyInstant = 10 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
@@ -230,13 +230,13 @@ namespace GW2CraftingHelper.Tests.Services
                     new List<VendorOffer>
                     {
                         ItemAndCurrencyVendorOffer(
-                            1, new[] { (barterItemId, 5) }, new[] { (23, 3) })
+                            1, new[] { (barterItemId, 5) }, new[] { (23, 3) }),
                     }
-                }
+                },
             };
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { barterItemId, new ItemMetadata { ItemId = barterItemId, Name = barterItemName, IconUrl = "barter.png" } }
+                { barterItemId, new ItemMetadata { ItemId = barterItemId, Name = barterItemName, IconUrl = "barter.png" } },
             };
 
             var solveResult = new PlanSolver().Solve(tree, prices, vendorOffers);

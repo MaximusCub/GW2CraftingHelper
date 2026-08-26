@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 ItemId = itemId,
                 Count = count,
-                Source = source
+                Source = source,
             };
         }
 
@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 25, AccountItemIndex.SourceMaterialStorage)
+                Entry(100, 25, AccountItemIndex.SourceMaterialStorage),
             });
 
             Assert.Equal(25, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 10, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 5, AccountItemIndex.SourceBank),
-                Entry(100, 3, CharSource("Alice"))
+                Entry(100, 3, CharSource("Alice")),
             });
 
             Assert.Equal(10, index.GetQuantity(100, AccountItemIndex.SourceMaterialStorage));
@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 10, AccountItemIndex.SourceBank),
-                Entry(100, 7, AccountItemIndex.SourceBank)
+                Entry(100, 7, AccountItemIndex.SourceBank),
             });
 
             Assert.Equal(17, index.GetQuantity(100, AccountItemIndex.SourceBank));
@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 10, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 5, AccountItemIndex.SourceBank),
-                Entry(200, 3, AccountItemIndex.SourceSharedInventory)
+                Entry(200, 3, AccountItemIndex.SourceSharedInventory),
             });
 
             var sources100 = index.GetSources(100);
@@ -109,7 +109,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, AccountItemIndex.SourceBank)
+                Entry(100, 10, AccountItemIndex.SourceBank),
             });
 
             Assert.Empty(index.GetSources(999));
@@ -120,7 +120,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(100, 10, AccountItemIndex.SourceBank)
+                Entry(100, 10, AccountItemIndex.SourceBank),
             });
 
             Assert.Equal(0, index.GetQuantity(100, null));
@@ -132,7 +132,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 0, AccountItemIndex.SourceBank),
-                Entry(100, 5, AccountItemIndex.SourceMaterialStorage)
+                Entry(100, 5, AccountItemIndex.SourceMaterialStorage),
             });
 
             Assert.Equal(0, index.GetQuantity(100, AccountItemIndex.SourceBank));
@@ -150,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Entry(100, 1, AccountItemIndex.SourceBank),
                 Entry(100, 2, AccountItemIndex.SourceSharedInventory),
                 Entry(100, 3, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, 4, CharSource("Alice"))
+                Entry(100, 4, CharSource("Alice")),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -170,7 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 1, AccountItemIndex.SourceBank),
                 Entry(100, 2, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, 3, CharSource("Bob"))
+                Entry(100, 3, CharSource("Bob")),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -189,7 +189,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 1, CharSource("Charlie")),
                 Entry(100, 2, CharSource("Alice")),
-                Entry(100, 3, CharSource("Bob"))
+                Entry(100, 3, CharSource("Bob")),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -218,7 +218,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, AccountItemIndex.SourceBank),
-                Entry(100, 3, AccountItemIndex.SourceMaterialStorage)
+                Entry(100, 3, AccountItemIndex.SourceMaterialStorage),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -235,7 +235,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, null),
-                Entry(100, 3, AccountItemIndex.SourceBank)
+                Entry(100, 3, AccountItemIndex.SourceBank),
             });
 
             Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, ""),
-                Entry(100, 3, AccountItemIndex.SourceBank)
+                Entry(100, 3, AccountItemIndex.SourceBank),
             });
 
             Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
@@ -265,7 +265,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 5, "  "),
-                Entry(100, 3, AccountItemIndex.SourceBank)
+                Entry(100, 3, AccountItemIndex.SourceBank),
             });
 
             Assert.Equal(3, index.GetQuantity(100, AccountItemIndex.SourceBank));
@@ -282,7 +282,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, 1, CharSource("Charlie")),
                 Entry(100, 2, CharSource("Alice")),
-                Entry(100, 3, AccountItemIndex.SourceBank)
+                Entry(100, 3, AccountItemIndex.SourceBank),
             });
 
             var sources1 = index.GetSources(100);
@@ -308,7 +308,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Entry(100, 3, AccountItemIndex.SourceSharedInventory),
                 Entry(100, 4, AccountItemIndex.SourceMaterialStorage),
                 Entry(100, 5, CharSource("ActiveHero")),
-                Entry(100, 6, CharSource("Alice"))
+                Entry(100, 6, CharSource("Alice")),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(
@@ -341,7 +341,7 @@ namespace GW2CraftingHelper.Tests.Services
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
                 Entry(100, 1, AccountItemIndex.SourceBank),
-                Entry(100, 2, "Alice")
+                Entry(100, 2, "Alice"),
             });
 
             var prioritized = AccountItemIndex.GetPrioritizedSources(

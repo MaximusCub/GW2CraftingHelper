@@ -97,6 +97,7 @@ namespace GW2CraftingHelper.Tests.Services
                 api.AddPrice(i, buyUnitPrice: i, sellUnitPrice: i * 2);
                 ids.Add(i);
             }
+
             var svc = new TradingPostService(api);
 
             var result = await svc.GetPricesAsync(ids, CancellationToken.None);
@@ -355,6 +356,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 api.AddPrice(i, buyUnitPrice: i, sellUnitPrice: i * 2);
             }
+
             var gate = new TaskCompletionSource<bool>();
             api.Gate = gate.Task;
             var svc = new TradingPostService(api);
@@ -449,6 +451,7 @@ namespace GW2CraftingHelper.Tests.Services
                 api.AddPrice(i, buyUnitPrice: i, sellUnitPrice: i * 2);
                 ids.Add(i);
             }
+
             api.ThrowOnCallNumber = 2; // second batch (ids 201-250) fails
 
             var svc = new TradingPostService(api);

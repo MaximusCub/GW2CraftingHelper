@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Services
                 IsAvailable = true,
                 RawCoin = rawCoin,
                 DecisionValue = decisionValue,
-                CostLines = new List<CostLine>(lines)
+                CostLines = new List<CostLine>(lines),
             };
         }
 
@@ -31,6 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
             new PillSourceCostBreakdown { IsAvailable = false };
 
         private static CostLine Item(int id, int count) => new CostLine { Type = "Item", Id = id, Count = count };
+
         private static CostLine Currency(int id, int count) => new CostLine { Type = "Currency", Id = id, Count = count };
 
         [Fact]
@@ -50,7 +51,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Weighted ---
-
         [Fact]
         public void Weighted_BothValued_LosingStrictlyMoreExpensive_Subdued()
         {
@@ -242,7 +242,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Strict domination ---
-
         [Fact]
         public void StrictDomination_AmalgamatedRiftEssenceShape_SameCoinTenMoreEcto()
         {

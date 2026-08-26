@@ -26,7 +26,6 @@ namespace GW2CraftingHelper.Tests.Services
         // actually ran; it deliberately does not re-assert calculator
         // CONTENT correctness, which the dedicated *CalculatorTests classes
         // already cover in isolation.
-
         private static void AssertAllAdvisoryListsPopulated(CraftingPlanResult result)
         {
             Assert.NotNull(result.CompetencyOpportunities);
@@ -43,7 +42,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             // The public list overload (GenerateStructuredAsync(items, ...))
@@ -72,7 +71,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -87,7 +86,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None,
@@ -99,7 +98,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.MultiItemRoots[0].NodeId, AcquisitionSource.BuyFromTp }
+                { initial.MultiItemRoots[0].NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -130,8 +129,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -141,7 +140,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var items = new List<PlanRequestItem>
             {
-                new PlanRequestItem { ItemId = 1, Quantity = 1 }
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None,
@@ -182,8 +181,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Ingredients = new List<RawIngredient>
                     {
                         new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
-                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
-                    }
+                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 },
+                    },
                 })
                 // No TP price for the root or the vendor-only child - craft and
                 // BuyFromVendor are each the only source for their own item.
@@ -208,11 +207,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 }
+                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 },
                         },
                         MerchantName = "Mystic Forge Attendant",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = builder.WithVendorOfferStore(store).Build();
@@ -233,9 +232,9 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             ItemId = OrdinaryChildItemId,
                             Count = 3,
-                            Source = AccountItemIndex.SourceMaterialStorage
-                        }
-                    }
+                            Source = AccountItemIndex.SourceMaterialStorage,
+                        },
+                    },
                 };
 
                 var result = await pipeline.GenerateStructuredAsync(
@@ -291,8 +290,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Ingredients = new List<RawIngredient>
                     {
                         new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
-                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
-                    }
+                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 },
+                    },
                 })
                 .WithPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20)
                 // Root ALSO has a (much higher) TP price, so it becomes a
@@ -318,11 +317,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 }
+                            new CostLine { Type = "Currency", Id = SpiritShardCurrencyId, Count = 20 },
                         },
                         MerchantName = "Mystic Forge Attendant",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = builder.WithVendorOfferStore(store).Build();
@@ -336,9 +335,9 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             ItemId = OrdinaryChildItemId,
                             Count = 3,
-                            Source = AccountItemIndex.SourceMaterialStorage
-                        }
-                    }
+                            Source = AccountItemIndex.SourceMaterialStorage,
+                        },
+                    },
                 };
 
                 var result = await pipeline.GenerateStructuredAsync(

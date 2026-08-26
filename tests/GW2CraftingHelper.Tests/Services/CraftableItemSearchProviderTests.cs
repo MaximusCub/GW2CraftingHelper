@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Id = i.id,
                 Name = i.name,
-                Icon = i.icon
+                Icon = i.icon,
             }).ToList();
             return new ItemNameSeedData(entries);
         }

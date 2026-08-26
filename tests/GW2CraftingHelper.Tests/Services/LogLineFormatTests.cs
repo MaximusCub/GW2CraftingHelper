@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Tests.Services
                 TimestampUtc = new DateTime(2026, 8, 16, 14, 3, 9, DateTimeKind.Local),
                 Level = ModuleLogLevel.Warn,
                 Tag = tag,
-                Message = message
+                Message = message,
             };
         }
 

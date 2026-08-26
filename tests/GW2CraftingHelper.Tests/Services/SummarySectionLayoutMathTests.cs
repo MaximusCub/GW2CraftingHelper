@@ -17,7 +17,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BodyHeight ---
-
         [Fact]
         public void BodyHeight_Null_ReturnsZero()
         {
@@ -36,7 +35,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CostFormulaTile), // collapsed - still just ONE tile ROW
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
@@ -53,7 +52,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.CostFormulaTile),
                 Row(PlanRowType.CostFormulaTile),
                 Row(PlanRowType.CostFormulaTile),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
@@ -69,7 +68,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.ProfitFormulaTile),
                 Row(PlanRowType.ProfitFormulaTile),
                 Row(PlanRowType.ProfitFormulaTile),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(false)
@@ -87,7 +86,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.CurrencyCost),
                 Row(PlanRowType.CurrencyCost),
                 Row(PlanRowType.CurrencyCost),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
@@ -102,7 +101,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CostFormulaTile),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(false) + PlanContentHeightMath.FallbackTextRowHeight;
@@ -119,7 +118,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.ProfitFormulaTile),
                 Row(PlanRowType.ProfitFormulaTile),
                 Row(PlanRowType.MultiItemNote),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(false)
@@ -142,7 +141,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.CurrencyCost),
                 Row(PlanRowType.CurrencyCost),
                 Row(PlanRowType.MultiItemNote),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
@@ -164,7 +163,6 @@ namespace GW2CraftingHelper.Tests.Services
         // pinned absolutely here (not recomputed from the same constants
         // the production formula reads, which could never fail): a
         // deliberate geometry change re-baselines these literals.
-
         [Fact]
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
@@ -308,13 +306,13 @@ namespace GW2CraftingHelper.Tests.Services
             var withoutCurrency = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CostFormulaTile),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
             var withCurrency = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CostFormulaTile),
                 Row(PlanRowType.CurrencyCost),
-                Row(PlanRowType.SummaryFootnote)
+                Row(PlanRowType.SummaryFootnote),
             };
 
             int currencyTableHeight =
@@ -355,7 +353,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Blue Prophet Shard" },
                 new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Fractal Relic" },
-                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Spirit Shard" }
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Spirit Shard" },
             };
 
             string tooltip = SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(rows);
@@ -424,7 +422,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- The justified-width invariant (replaces the pull-in and
         // centring pair CurrencyHeaderBandWidth/CurrencyTableOffsetX built
         // on, both deleted with the machinery) ---
-
         [Fact]
         public void ComputeCurrencyColumnEdges_MarkerEndsAtThePinnedPanelEdge()
         {
@@ -471,7 +468,6 @@ namespace GW2CraftingHelper.Tests.Services
         // 6-7 digit Karma balance, must not intrude into the Required
         // column - see the class doc comment above the currency-table
         // geometry region) ---
-
         [Fact]
         public void EffectiveCurrencyNumberColumnWidth_BelowFloor_ReturnsFixedFloor()
         {

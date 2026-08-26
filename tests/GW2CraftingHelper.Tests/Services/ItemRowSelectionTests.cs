@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
             var results = new List<ItemSearchResult>
             {
                 Result(19976, "Mystic Coin"),
-                Result(19721, "Mystic Clover")
+                Result(19721, "Mystic Clover"),
             };
 
             var match = ItemRowSelection.MatchTypedName(results, "Mystic Clover");
@@ -104,7 +104,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Result(13318, "Amethyst Gold Ring"),
                 Result(13336, "Amethyst Gold Ring"),
-                Result(13532, "Amethyst Gold Ring")
+                Result(13532, "Amethyst Gold Ring"),
             };
 
             var match = ItemRowSelection.MatchTypedName(results, "Amethyst Gold Ring");
@@ -120,7 +120,7 @@ namespace GW2CraftingHelper.Tests.Services
             var results = new List<ItemSearchResult>
             {
                 Result(13318, "Amethyst Gold Ring"),
-                Result(13318, "amethyst gold ring")
+                Result(13318, "amethyst gold ring"),
             };
 
             var match = ItemRowSelection.MatchTypedName(results, "Amethyst Gold Ring");
@@ -136,7 +136,7 @@ namespace GW2CraftingHelper.Tests.Services
             var results = new List<ItemSearchResult>
             {
                 Result(19976, "Mystic Coin"),
-                Result(19721, "Mystic Clover")
+                Result(19721, "Mystic Clover"),
             };
 
             var match = ItemRowSelection.MatchTypedName(results, "Mystic");
@@ -163,7 +163,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 null,
                 new ItemSearchResult { ItemId = 1, Name = null },
-                Result(19721, "Mystic Clover")
+                Result(19721, "Mystic Clover"),
             };
 
             Assert.Equal(19721, ItemRowSelection.MatchTypedName(results, "Mystic Clover").Result.ItemId);

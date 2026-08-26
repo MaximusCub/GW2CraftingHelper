@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Multi-item plans ---
-
         private static CraftingTreeNode RootNode(int nodeId, int itemId, string name)
         {
             return new CraftingTreeNode
@@ -21,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ItemId = itemId,
                 Name = name,
                 Quantity = 1,
-                Decision = CraftingDecision.Craft
+                Decision = CraftingDecision.Craft,
             };
         }
 
@@ -49,12 +48,12 @@ namespace GW2CraftingHelper.Tests.Services
             var roots = new List<CraftingTreeNode>
             {
                 RootNode(10, 1, "Gift of Exordium"),
-                RootNode(11, 2, "Second Item")
+                RootNode(11, 2, "Second Item"),
             };
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 3 }
+                new PlanRequestItem { ItemId = 2, Quantity = 3 },
             };
             var result = MakeResult(metadata: meta, requestedItems: requested, multiItemRoots: roots);
 
@@ -74,7 +73,7 @@ namespace GW2CraftingHelper.Tests.Services
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
             var result = MakeResult(targetQuantity: 999, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
@@ -92,12 +91,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
                 new PlanRequestItem { ItemId = 2, Quantity = 1 },
-                new PlanRequestItem { ItemId = 3, Quantity = 1 }
+                new PlanRequestItem { ItemId = 3, Quantity = 1 },
             };
             var result = MakeResult(metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode>
                 {
-                    RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B"), RootNode(3, 3, "C")
+                    RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B"), RootNode(3, 3, "C"),
                 });
 
             var vm = _builder.Build(result);
@@ -114,7 +113,7 @@ namespace GW2CraftingHelper.Tests.Services
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
             var result = MakeResult(metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "Gift of Exordium"), RootNode(2, 2, "B") });
@@ -131,7 +130,7 @@ namespace GW2CraftingHelper.Tests.Services
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
@@ -162,7 +161,7 @@ namespace GW2CraftingHelper.Tests.Services
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
             var result = MakeResult(totalCoinCost: 500, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
@@ -184,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
             var result = MakeResult(totalCoinCost: 0, metadata: meta, requestedItems: requested,
                 multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "A"), RootNode(2, 2, "B") });
@@ -204,9 +203,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 9,
                         NodeId = 9,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -229,13 +228,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Multi-item batch sell-side economics ---
-
         private static List<PlanRequestItem> TwoRequestedItems()
         {
             return new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
         }
 

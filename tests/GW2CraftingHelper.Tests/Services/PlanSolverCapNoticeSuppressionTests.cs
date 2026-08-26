@@ -25,7 +25,6 @@ namespace GW2CraftingHelper.Tests.Services
         // suppress-on-Conflict behavior is kept; both tests below document
         // that as an intentional, narrower limitation rather than a silent
         // regression risk. ---
-
         [Fact]
         public void MixedOfferSameWeeklyCap_NoticeStillSuppressed_DocumentedLimitation()
         {
@@ -48,9 +47,9 @@ namespace GW2CraftingHelper.Tests.Services
                     99, new List<VendorOffer>
                     {
                         CoinVendorOffer(99, 2, outputCount: 1, weeklyCap: 1),
-                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 1)
+                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 1),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -92,9 +91,9 @@ namespace GW2CraftingHelper.Tests.Services
                     99, new List<VendorOffer>
                     {
                         CoinVendorOffer(99, 2, outputCount: 1, weeklyCap: 5),
-                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 999)
+                        CoinVendorOffer(99, 150, outputCount: 100, weeklyCap: 999),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -119,7 +118,6 @@ namespace GW2CraftingHelper.Tests.Services
         // specifically. These two tests mirror the Weekly pair exactly,
         // substituting seasonalCap for weeklyCap, to pin the same suppress-
         // on-Conflict behavior for Seasonal. ---
-
         [Fact]
         public void MixedOfferSameSeasonalCap_NoticeStillSuppressed_DocumentedLimitation()
         {
@@ -139,9 +137,9 @@ namespace GW2CraftingHelper.Tests.Services
                     99, new List<VendorOffer>
                     {
                         CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 1),
-                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 1)
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 1),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -181,9 +179,9 @@ namespace GW2CraftingHelper.Tests.Services
                     99, new List<VendorOffer>
                     {
                         CoinVendorOffer(99, 2, outputCount: 1, seasonalCap: 5),
-                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 999)
+                        CoinVendorOffer(99, 150, outputCount: 100, seasonalCap: 999),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
