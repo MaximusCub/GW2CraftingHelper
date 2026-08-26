@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Services
                         Name = entry.Name,
                         IconUrl = entry.IconUrl,
                         Count = entry.Count,
-                        Source = entry.Source
+                        Source = entry.Source,
                     };
                     _residualItems.Add(clone);
 
@@ -84,6 +84,7 @@ namespace GW2CraftingHelper.Services
                         bucket = new List<SnapshotItemEntry>();
                         _itemsById[clone.ItemId] = bucket;
                     }
+
                     bucket.Add(clone);
                 }
             }
@@ -97,6 +98,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     _currency[entry.CurrencyId] = _currency.TryGetValue(entry.CurrencyId, out int existing)
                         ? existing + entry.Value
                         : entry.Value;
@@ -119,7 +121,7 @@ namespace GW2CraftingHelper.Services
                     Currency = new Dictionary<int, int>(_currency),
                     ClaimedGatedUnits = new Dictionary<int, int>(_claimedGatedUnits),
                     ClaimedItemIds = new HashSet<int>(_claimedItemIds),
-                    ClaimedCurrencyIds = new HashSet<int>(_claimedCurrencyIds)
+                    ClaimedCurrencyIds = new HashSet<int>(_claimedCurrencyIds),
                 };
             }
         }
@@ -176,6 +178,7 @@ namespace GW2CraftingHelper.Services
                         {
                             continue;
                         }
+
                         remaining -= TakeFrom(bucket, allocation.Source, allocation.Quantity);
                     }
                 }
@@ -206,10 +209,12 @@ namespace GW2CraftingHelper.Services
                 {
                     break;
                 }
+
                 if (entry.Count <= 0)
                 {
                     continue;
                 }
+
                 if (source != null && !string.Equals(entry.Source, source, StringComparison.Ordinal))
                 {
                     continue;
@@ -220,6 +225,7 @@ namespace GW2CraftingHelper.Services
                 quantity -= take;
                 taken += take;
             }
+
             return taken;
         }
 
@@ -236,6 +242,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!_currency.TryGetValue(cost.CurrencyId, out int held) || held <= 0)
                 {
                     continue;
@@ -255,6 +262,7 @@ namespace GW2CraftingHelper.Services
             {
                 return;
             }
+
             _coinCopper = Math.Max(0, _coinCopper - coinCost);
         }
 
@@ -273,6 +281,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!cooldowns.TryGetValue(step.ItemId, out var cooldown) || cooldown == null || cooldown.PerDayCap <= 0)
                 {
                     continue;
@@ -290,6 +299,7 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             return value > int.MaxValue ? int.MaxValue : (int)value;
         }
 
@@ -323,6 +333,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     if (!_currency.TryGetValue(entry.CurrencyId, out int remaining) || remaining <= 0)
                     {
                         continue;
@@ -333,7 +344,7 @@ namespace GW2CraftingHelper.Services
                         CurrencyId = entry.CurrencyId,
                         CurrencyName = entry.CurrencyName,
                         IconUrl = entry.IconUrl,
-                        Value = remaining
+                        Value = remaining,
                     });
                 }
             }
@@ -344,7 +355,7 @@ namespace GW2CraftingHelper.Services
                 CoinCopper = ClampToInt(_coinCopper),
                 Items = items,
                 Wallet = wallet,
-                CharacterDisciplines = _original.CharacterDisciplines
+                CharacterDisciplines = _original.CharacterDisciplines,
             };
             _dirty = false;
             return _cachedSnapshot;

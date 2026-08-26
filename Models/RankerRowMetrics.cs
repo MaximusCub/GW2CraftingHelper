@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Models
         NotMeasurable,
 
         /// <summary>Nothing left to acquire on any gate.</summary>
-        NothingLeft
+        NothingLeft,
     }
 
     /// <summary>
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Models
         Materials,
         Currencies,
         TimeGates,
-        Disciplines
+        Disciplines,
     }
 
     internal class RankerGateScore
@@ -68,6 +68,7 @@ namespace GW2CraftingHelper.Models
     internal class RankerDisciplineGap
     {
         public string Discipline { get; set; }
+
         public int RequiredRating { get; set; }
 
         /// <summary>Best rating any character has in this discipline; 0 when never learned.</summary>
@@ -93,6 +94,7 @@ namespace GW2CraftingHelper.Models
         public IReadOnlyList<RankerGateScore> Gates { get; set; }
 
         public long RemainingCoinCost { get; set; }
+
         public long BaselineCoinCost { get; set; }
 
         /// <summary>Empty, never null.</summary>

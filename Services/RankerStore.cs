@@ -118,6 +118,7 @@ namespace GW2CraftingHelper.Services
                     {
                         File.Move(tmpPath, _filePath);
                     }
+
                     return true;
                 }
                 catch (Exception ex)

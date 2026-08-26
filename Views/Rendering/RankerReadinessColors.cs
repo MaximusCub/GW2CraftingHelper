@@ -48,6 +48,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return NearDone;
             }
+
             return readiness >= InProgressThreshold ? InProgress : Early;
         }
 
@@ -62,10 +63,12 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return Neutral;
             }
+
             if (days <= 7)
             {
                 return NearDone;
             }
+
             return days <= 30 ? InProgress : Early;
         }
     }

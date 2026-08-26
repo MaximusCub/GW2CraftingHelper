@@ -1001,6 +1001,7 @@ namespace GW2CraftingHelper
             {
                 ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
             }
+
             return null;
         }
 

@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Services
                 VendorCappedItems = Array.Empty<TimegatedItem>(),
                 DisciplineGaps = Array.Empty<RankerDisciplineGap>(),
                 PriorityIndex = priorityIndex,
-                ComputedAtUtc = DateTime.UtcNow
+                ComputedAtUtc = DateTime.UtcNow,
             };
 
             if (baseline?.Plan == null || owned?.Plan == null)
@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
                 ScoreMaterials(baseline, owned),
                 ScoreCurrencies(baseline, owned, heldCurrency, metrics),
                 ScoreTimeGates(baseline, owned, claimedGated, metrics),
-                ScoreDisciplines(owned, metrics)
+                ScoreDisciplines(owned, metrics),
             };
             metrics.Gates = gates;
 
@@ -78,6 +78,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 weighted += gate.Weight * gate.Completion;
                 weightSum += gate.Weight;
                 if (gate.Completion < 1.0)
@@ -110,6 +111,7 @@ namespace GW2CraftingHelper.Services
             {
                 readiness = 0.99;
             }
+
             metrics.Readiness = readiness;
             return metrics;
         }
@@ -153,6 +155,7 @@ namespace GW2CraftingHelper.Services
             {
                 return DashText;
             }
+
             return metrics.DaysRemaining.ToString(CultureInfo.InvariantCulture) + "d";
         }
 
@@ -163,6 +166,7 @@ namespace GW2CraftingHelper.Services
             {
                 return DashText;
             }
+
             return FormatPercent(gate.Completion);
         }
 
@@ -242,7 +246,7 @@ namespace GW2CraftingHelper.Services
                     Needed = need,
                     Held = have,
                     Short = shortAmount,
-                    BaselineNeeded = denominator
+                    BaselineNeeded = denominator,
                 });
 
                 // Unweighted: weighting by need would compare 500 Provisioner
@@ -347,6 +351,7 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     // Rating persists when a discipline is swapped out, so a
                     // learned discipline counts regardless of Active.
                     if (learned.Rating > bestRating)
@@ -361,7 +366,7 @@ namespace GW2CraftingHelper.Services
                     Discipline = requirement.Discipline,
                     RequiredRating = requirement.MinRating,
                     BestRating = bestRating,
-                    BestCharacterName = bestCharacter
+                    BestCharacterName = bestCharacter,
                 });
 
                 // Linear in rating points. Rating is NOT linear in cost - the
@@ -428,6 +433,7 @@ namespace GW2CraftingHelper.Services
                         counted.Add(step.ItemId);
                     }
                 }
+
                 metrics.ContestedItemCount = counted.Count;
             }
 
@@ -442,6 +448,7 @@ namespace GW2CraftingHelper.Services
                         contested++;
                     }
                 }
+
                 metrics.ContestedCurrencyCount = contested;
             }
         }
@@ -462,6 +469,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!cooldowns.TryGetValue(step.ItemId, out var cooldown) || cooldown == null || cooldown.PerDayCap <= 0)
                 {
                     continue;
@@ -471,6 +479,7 @@ namespace GW2CraftingHelper.Services
                     ? existing + step.Quantity
                     : step.Quantity;
             }
+
             return gated;
         }
 
@@ -499,6 +508,7 @@ namespace GW2CraftingHelper.Services
                     days = itemDays;
                 }
             }
+
             return days;
         }
 
@@ -516,10 +526,12 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 summed[cost.CurrencyId] = summed.TryGetValue(cost.CurrencyId, out long existing)
                     ? existing + cost.Amount
                     : cost.Amount;
             }
+
             return summed;
         }
 
@@ -530,7 +542,7 @@ namespace GW2CraftingHelper.Services
                 Gate = gate,
                 Applies = false,
                 Completion = 0,
-                Weight = RankerReadinessWeights.For(gate)
+                Weight = RankerReadinessWeights.For(gate),
             };
         }
 
@@ -541,7 +553,7 @@ namespace GW2CraftingHelper.Services
                 NewGate(RankerGate.Materials),
                 NewGate(RankerGate.Currencies),
                 NewGate(RankerGate.TimeGates),
-                NewGate(RankerGate.Disciplines)
+                NewGate(RankerGate.Disciplines),
             };
         }
 
@@ -551,10 +563,12 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             if (value < 0)
             {
                 return 0;
             }
+
             return value > 1 ? 1 : value;
         }
     }

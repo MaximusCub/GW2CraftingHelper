@@ -209,6 +209,7 @@ namespace GW2CraftingHelper.Services
             {
                 return 0;
             }
+
             int shown = Math.Min(currencyCount, CurrenciesPerLine * MaxCurrencyLines);
             return (shown + CurrenciesPerLine - 1) / CurrenciesPerLine;
         }

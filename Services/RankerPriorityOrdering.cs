@@ -73,6 +73,7 @@ namespace GW2CraftingHelper.Services
                     return i;
                 }
             }
+
             return -1;
         }
 

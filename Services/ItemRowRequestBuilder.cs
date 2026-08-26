@@ -72,7 +72,7 @@ namespace GW2CraftingHelper.Services
                 result.Add(new PlanRequestItem
                 {
                     ItemId = row.ItemId.Value,
-                    Quantity = NormalizeQuantity(row.QuantityText)
+                    Quantity = NormalizeQuantity(row.QuantityText),
                 });
             }
 

@@ -11,8 +11,11 @@ namespace GW2CraftingHelper.Models
     public class RankerWatchlistEntry
     {
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
 
         /// <summary>GW2 API rarity string, for the icon frame colour; null = unknown.</summary>

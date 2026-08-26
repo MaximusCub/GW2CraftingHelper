@@ -36,6 +36,7 @@ namespace GW2CraftingHelper.Views
         private const int ColumnHeaderLabelY = PlanContentHeightMath.ColumnHeaderLabelY;
         private const int TopChromeHeight =
             SectionBandHeight + AddRowHeight + ToolbarHeight + ColumnHeaderRowHeight;
+
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int CaptionLineHeight = 18;
         private const int CaptionsPadding = 10;
@@ -168,14 +169,14 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, TopChromeHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = container
+                Parent = container,
             };
 
             _captionsPanel = new Panel
             {
                 Size = new Point(w, 0),
                 Location = new Point(0, TopChromeHeight),
-                Parent = container
+                Parent = container,
             };
 
             PositionChrome(container, w);
@@ -186,6 +187,7 @@ namespace GW2CraftingHelper.Views
                 {
                     return;
                 }
+
                 PositionChrome(container, container.ContentRegion.Width);
                 RefitRows();
             };
@@ -218,6 +220,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             UpdateStatusLine();
             UpdateBanner();
         }
@@ -249,13 +252,12 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         // Chrome
         // ---------------------------------------------------------------
-
         private void BuildSectionBand(Container container, int width)
         {
             _headerPanel = new Panel
             {
                 Size = new Point(width, SectionBandHeight),
-                Parent = container
+                Parent = container,
             };
 
             new Label
@@ -265,7 +267,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(RankerRowLayout.Inset, SectionTitleY),
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
 
             _headerDivider = new Panel
@@ -273,7 +275,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(Math.Max(0, width - ScrollbarAllowance), 2),
                 Location = new Point(0, SectionBandHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
         }
 
@@ -283,7 +285,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(width, AddRowHeight),
                 Location = new Point(0, SectionBandHeight),
-                Parent = container
+                Parent = container,
             };
 
             // SpriteScreen-parented and holding a global mouse subscription,
@@ -296,7 +298,7 @@ namespace GW2CraftingHelper.Views
                 PlaceholderText = "Search for an item to track...",
                 Size = new Point(SearchBoxWidth, UiMetrics.ButtonHeight),
                 Location = new Point(RankerRowLayout.Inset, 6),
-                Parent = _addPanel
+                Parent = _addPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
 
             _suggestionPanel = new SuggestionPanel(_searchBox, _itemSearchProvider);
@@ -319,6 +321,7 @@ namespace GW2CraftingHelper.Views
                     _pendingItemName = null;
                     _pendingItemIconUrl = null;
                 }
+
                 UpdateAddButtonState();
             };
 
@@ -328,7 +331,7 @@ namespace GW2CraftingHelper.Views
                 Text = "1",
                 Size = new Point(QuantityBoxWidth, UiMetrics.ButtonHeight),
                 Location = new Point(RankerRowLayout.Inset + SearchBoxWidth + 8, 6),
-                Parent = _addPanel
+                Parent = _addPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
 
             _addButton = new FeedbackButton
@@ -337,7 +340,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(AddButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(RankerRowLayout.Inset + SearchBoxWidth + QuantityBoxWidth + 16, 6),
                 Enabled = false,
-                Parent = _addPanel
+                Parent = _addPanel,
             };
             TooltipFacility.ApplyPlain(_addButton, "Add this item to the bottom of your priority list.");
             _addButton.Click += (_, __) => AddPendingItem();
@@ -349,7 +352,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(width, ToolbarHeight),
                 Location = new Point(0, SectionBandHeight + AddRowHeight),
-                Parent = container
+                Parent = container,
             };
 
             _statusLabel = new Label
@@ -360,7 +363,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
                 Location = new Point(RankerRowLayout.Inset, 8),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
 
             _spinner = InlineSpinner.Create(_toolbarPanel, InlineSpinnerLayout.SnapshotStatusSize);
@@ -370,7 +373,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Refresh",
                 Size = new Point(RefreshButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(0, 6),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             _refreshButton.Click += (_, __) => OnRefreshClicked();
         }
@@ -382,7 +385,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(width, ColumnHeaderRowHeight),
                 Location = new Point(0, SectionBandHeight + AddRowHeight + ToolbarHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = container
+                Parent = container,
             };
 
             foreach (string text in new[] { "#", "Item", "Ready", "Days", "Remaining" })
@@ -395,7 +398,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, ColumnHeaderLabelY),
-                    Parent = _columnHeaderPanel
+                    Parent = _columnHeaderPanel,
                 });
             }
         }
@@ -457,6 +460,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             var label = _columnHeaderLabels[index];
             label.Location = new Point(Math.Max(0, rightEdge - label.Width), ColumnHeaderLabelY);
         }
@@ -465,11 +469,10 @@ namespace GW2CraftingHelper.Views
         // Captions - the standing honesty text, below the list so it never
         // scrolls out of view
         // ---------------------------------------------------------------
-
         private static readonly string[] Captions =
         {
             "Each item is measured against what the items above it leave behind: higher-priority rows have first claim on your materials, currencies, coin and daily crafts. Move a row up to give it that claim instead.",
-            "Ready blends four separate barriers - materials at buy-order prices, account currencies, time-gated daily crafts and crafting disciplines - and counts only the ones this item actually has. Hover it for the breakdown."
+            "Ready blends four separate barriers - materials at buy-order prices, account currencies, time-gated daily crafts and crafting disciplines - and counts only the ones this item actually has. Hover it for the breakdown.",
         };
 
         private int MeasureCaptionsHeight(int barWidth)
@@ -486,6 +489,7 @@ namespace GW2CraftingHelper.Views
             {
                 lines += TextWrapMath.Wrap(caption, usable, usable, measure).Lines.Count;
             }
+
             return lines * CaptionLineHeight + CaptionsPadding;
         }
 
@@ -496,6 +500,7 @@ namespace GW2CraftingHelper.Views
                 label.Parent = null;
                 label.Dispose();
             }
+
             _captionLabels.Clear();
 
             if (Entries.Count == 0)
@@ -519,7 +524,7 @@ namespace GW2CraftingHelper.Views
                         AutoSizeHeight = true,
                         Width = usable,
                         Location = new Point(RankerRowLayout.Inset, y),
-                        Parent = _captionsPanel
+                        Parent = _captionsPanel,
                     });
                     y += CaptionLineHeight;
                 }
@@ -529,7 +534,6 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         // Rows
         // ---------------------------------------------------------------
-
         private class RenderedRow
         {
             public int ItemId;
@@ -604,6 +608,7 @@ namespace GW2CraftingHelper.Views
             {
                 PositionChrome(container, container.ContentRegion.Width);
             }
+
             UpdateStatusLine();
         }
 
@@ -617,7 +622,7 @@ namespace GW2CraftingHelper.Views
             _bannerPanel = new Panel
             {
                 Size = new Point(barWidth, BannerHeight),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
             _bannerLabel = new Label
             {
@@ -628,7 +633,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 Width = Math.Max(0, barWidth - RankerRowLayout.Inset),
                 Location = new Point(RankerRowLayout.Inset, 6),
-                Parent = _bannerPanel
+                Parent = _bannerPanel,
             };
         }
 
@@ -640,7 +645,7 @@ namespace GW2CraftingHelper.Views
             "",
             "Every row scores four separate barriers - materials, account currencies, time-gated daily crafts and crafting disciplines - and combines only the ones that item actually has into one Ready percentage you can rank by.",
             "",
-            "Search above to add your first item, then press Refresh."
+            "Search above to add your first item, then press Refresh.",
         };
 
         private void BuildEmptyState(int barWidth)
@@ -648,7 +653,7 @@ namespace GW2CraftingHelper.Views
             var panel = new Panel
             {
                 Size = new Point(barWidth, 0),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             int usable = Math.Max(1, barWidth - 2 * RankerRowLayout.Inset);
@@ -661,6 +666,7 @@ namespace GW2CraftingHelper.Views
                     y += CaptionLineHeight / 2;
                     continue;
                 }
+
                 foreach (string line in TextWrapMath.Wrap(paragraph, usable, usable, measure).Lines)
                 {
                     new Label
@@ -672,11 +678,12 @@ namespace GW2CraftingHelper.Views
                         AutoSizeHeight = true,
                         Width = usable,
                         Location = new Point(8, y),
-                        Parent = panel
+                        Parent = panel,
                     };
                     y += 20;
                 }
             }
+
             panel.Size = new Point(barWidth, y + 8);
         }
 
@@ -695,6 +702,7 @@ namespace GW2CraftingHelper.Views
                 {
                     remaining = row.RemainingCellWidth;
                 }
+
                 if (row.ChipWidth > chip)
                 {
                     chip = row.ChipWidth;
@@ -718,7 +726,7 @@ namespace GW2CraftingHelper.Views
             {
                 ItemId = entry.ItemId,
                 Index = index,
-                FullName = BuildDisplayName(entry)
+                FullName = BuildDisplayName(entry),
             };
             _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
             row.Metrics = metrics != null && metrics.PriorityIndex == index ? metrics : null;
@@ -726,7 +734,7 @@ namespace GW2CraftingHelper.Views
             row.Panel = new Panel
             {
                 Size = new Point(barWidth, RankerRowLayout.RowHeight),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             MeasureRowCells(row);
@@ -758,7 +766,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(bands.RankX, 14),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
@@ -778,7 +786,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 12),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
 
@@ -800,7 +808,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 12),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.DaysLabel, DaysTooltip(metrics));
 
@@ -818,7 +826,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, 12),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 };
                 TooltipFacility.ApplyPlain(row.RemainingDash, metrics == null
                     ? "Not yet calculated - press Refresh."
@@ -869,7 +877,7 @@ namespace GW2CraftingHelper.Views
                 Text = glyph,
                 Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(x, 8),
-                Parent = parent
+                Parent = parent,
             };
             TooltipFacility.ApplyPlain(button, tooltip);
             return button;
@@ -901,7 +909,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 });
                 row.GateValueLabels.Add(new Label
                 {
@@ -913,9 +921,10 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 });
             }
+
             line++;
 
             int currencyLines = RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count);
@@ -937,7 +946,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, y),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 });
                 row.CurrencyValueLabels.Add(new Label
                 {
@@ -947,9 +956,10 @@ namespace GW2CraftingHelper.Views
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, y),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 });
             }
+
             line += currencyLines;
 
             foreach (string note in BuildNotes(metrics))
@@ -964,7 +974,7 @@ namespace GW2CraftingHelper.Views
                     Width = Math.Max(0, bands.SubLineWidth),
                     Location = new Point(bands.SubLineX,
                         RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 });
                 line++;
             }
@@ -985,6 +995,7 @@ namespace GW2CraftingHelper.Views
                     TooltipFacility.ApplyPlain(row.IconName.NameLabel, row.FullName);
                 }
             }
+
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
@@ -1049,6 +1060,7 @@ namespace GW2CraftingHelper.Views
                     {
                         name.Text = shown;
                     }
+
                     TooltipFacility.ApplyPlain(name,
                         string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
                 }
@@ -1067,6 +1079,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             RefitEveryRow(measureText: false);
             _resizeSettle.Schedule();
         }
@@ -1077,6 +1090,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             RefitEveryRow(measureText: true);
             RebuildCaptions(Math.Max(0, _contentPanel.Width - ScrollbarAllowance));
         }
@@ -1112,7 +1126,6 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         // Row text
         // ---------------------------------------------------------------
-
         private static string BuildDisplayName(RankerWatchlistEntry entry)
         {
             string name = string.IsNullOrEmpty(entry.Name) ? "Unknown item" : entry.Name;
@@ -1127,6 +1140,7 @@ namespace GW2CraftingHelper.Views
             {
                 return null;
             }
+
             return metrics.AffordableNow
                 ? "Affordable now"
                 : "Short " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin);
@@ -1145,10 +1159,12 @@ namespace GW2CraftingHelper.Views
             {
                 return null;
             }
+
             if (metrics.AffordableNow)
             {
                 return "You have enough coin for what is left of this item, after paying for everything above it on the list.";
             }
+
             return "You are " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin) +
                 " short of what is left of this item, counting coin that the higher-priority items above it would already have spent.";
         }
@@ -1172,6 +1188,7 @@ namespace GW2CraftingHelper.Views
                     return result.CurrencyMetadata;
                 }
             }
+
             return null;
         }
 
@@ -1181,6 +1198,7 @@ namespace GW2CraftingHelper.Views
             {
                 return "covered";
             }
+
             return shortfall.Short.ToString("N0", CultureInfo.InvariantCulture) + " short";
         }
 
@@ -1203,6 +1221,7 @@ namespace GW2CraftingHelper.Views
                 {
                     text += " (and " + (missing.Count - 1).ToString(CultureInfo.InvariantCulture) + " more)";
                 }
+
                 notes.Add(text);
             }
 
@@ -1213,10 +1232,12 @@ namespace GW2CraftingHelper.Views
                 {
                     parts.Add(StatusText.Count(metrics.ContestedItemCount, "material"));
                 }
+
                 if (metrics.ContestedCurrencyCount > 0)
                 {
                     parts.Add(StatusText.Count(metrics.ContestedCurrencyCount, "currency", "currencies"));
                 }
+
                 notes.Add("Claimed by higher priority: " + string.Join(", ", parts));
             }
 
@@ -1228,6 +1249,7 @@ namespace GW2CraftingHelper.Views
                     // Never render an id. No name means no note.
                     continue;
                 }
+
                 notes.Add(name + ": " + capped.NeededCount.ToString(CultureInfo.InvariantCulture) +
                     " needed, " + capped.CapValue.ToString(CultureInfo.InvariantCulture) + " per " +
                     CapWord(capped.CapType) + " cap");
@@ -1258,6 +1280,7 @@ namespace GW2CraftingHelper.Views
                     return meta.Name;
                 }
             }
+
             return null;
         }
 
@@ -1267,6 +1290,7 @@ namespace GW2CraftingHelper.Views
             {
                 return "Not yet calculated - press Refresh.";
             }
+
             if (metrics.Kind != RankerReadinessKind.Measured)
             {
                 return "This item has no measurable barrier left that the Ranker can score. Read the lines under the row for what is actually outstanding.";
@@ -1275,7 +1299,7 @@ namespace GW2CraftingHelper.Views
             var lines = new List<string>
             {
                 "Ready blends the barriers this item actually has, each measured only against itself - nothing is converted into coin.",
-                ""
+                "",
             };
             foreach (var gate in metrics.Gates)
             {
@@ -1285,6 +1309,7 @@ namespace GW2CraftingHelper.Views
                       " at weight " + gate.Weight.ToString("0.00", CultureInfo.InvariantCulture)
                     : label + ": this item has none");
             }
+
             lines.Add("");
             lines.Add("Weights are renormalised over the barriers that apply, so an item with only materials scores exactly its materials figure.");
             return string.Join("\n", lines);
@@ -1296,6 +1321,7 @@ namespace GW2CraftingHelper.Views
             {
                 return "Not yet calculated - press Refresh.";
             }
+
             if (metrics.DaysRemaining <= 0)
             {
                 return "Nothing in this item's plan is a once-per-day craft.";
@@ -1310,13 +1336,13 @@ namespace GW2CraftingHelper.Views
                 text += " " + StatusText.Count(queued, "day") +
                     " of that is spent on higher-priority items first - move this row up to take those days back.";
             }
+
             return text;
         }
 
         // ---------------------------------------------------------------
         // Mutations
         // ---------------------------------------------------------------
-
         private void AddPendingItem()
         {
             if (_isRefreshing || !_pendingItemId.HasValue)
@@ -1348,7 +1374,7 @@ namespace GW2CraftingHelper.Views
                     ItemId = _pendingItemId.Value,
                     Quantity = quantity,
                     Name = _pendingItemName,
-                    IconUrl = _pendingItemIconUrl
+                    IconUrl = _pendingItemIconUrl,
                 });
                 SetStatus("Added " + _pendingItemName, isError: false);
             }
@@ -1420,6 +1446,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             for (int i = index; i < Entries.Count; i++)
             {
                 _metricsByItemId.Remove(Entries[i].ItemId);
@@ -1440,13 +1467,13 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             _addButton.Enabled = !_isRefreshing && _pendingItemId.HasValue;
         }
 
         // ---------------------------------------------------------------
         // Refresh
         // ---------------------------------------------------------------
-
         private void OnRefreshClicked()
         {
             if (_isRefreshing)
@@ -1454,10 +1481,12 @@ namespace GW2CraftingHelper.Views
                 CancelRefresh();
                 return;
             }
+
             if (Entries.Count == 0)
             {
                 return;
             }
+
             StartRefresh();
         }
 
@@ -1478,7 +1507,7 @@ namespace GW2CraftingHelper.Views
                 Quantity = e.Quantity,
                 Name = e.Name,
                 IconUrl = e.IconUrl,
-                Rarity = e.Rarity
+                Rarity = e.Rarity,
             }).ToList();
 
             Task.Run(() => RunRefreshAsync(entries, myGen, cts.Token));
@@ -1528,6 +1557,7 @@ namespace GW2CraftingHelper.Views
                     {
                         return;
                     }
+
                     ct.ThrowIfCancellationRequested();
 
                     var owned = await _pipeline.GenerateStructuredAsync(
@@ -1544,6 +1574,7 @@ namespace GW2CraftingHelper.Views
                     {
                         return;
                     }
+
                     ct.ThrowIfCancellationRequested();
 
                     var metrics = RankerReadinessCalculator.Compute(baseline, owned, availability, slot);
@@ -1582,6 +1613,7 @@ namespace GW2CraftingHelper.Views
             {
                 text += ". The first refresh of a session downloads recipe data and can take a while.";
             }
+
             SetStatus(text, isError: false);
         }
 
@@ -1615,6 +1647,7 @@ namespace GW2CraftingHelper.Views
                 {
                     RenderRowContent(_rows[i], Entries[i], barWidth);
                 }
+
                 return;
             }
 
@@ -1664,6 +1697,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             _addButton.Enabled = enabled && _pendingItemId.HasValue;
             _searchBox.Enabled = enabled;
             _quantityBox.Enabled = enabled;
@@ -1678,7 +1712,6 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         // Status line
         // ---------------------------------------------------------------
-
         private void SetStatus(string text, bool isError)
         {
             _statusOverride = text;
@@ -1712,6 +1745,7 @@ namespace GW2CraftingHelper.Views
             {
                 text += " - " + StatusText.ForSnapshotAgeSuffix(DateTime.UtcNow - snapshot.CapturedAt);
             }
+
             ApplyStatusText(text, isError: false);
         }
 
@@ -1736,6 +1770,7 @@ namespace GW2CraftingHelper.Views
             {
                 return;
             }
+
             RebuildRows();
         }
     }
