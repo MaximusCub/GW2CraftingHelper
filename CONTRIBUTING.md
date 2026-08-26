@@ -232,11 +232,15 @@ tag; see `docs/RELEASING.md`.
 - **STANDING RULE (Recipe Tree row/pill features):** every new tree-row or
   decision-pill feature extracts its pure text/decision computation into a
   tested, Blish-free `Services/` composer BEFORE wiring it into
-  `Views/Rendering/TreeSectionController.cs` - the 8-for-8 proven pattern
+  `Views/Rendering/TreeSectionController.cs` - the proven pattern
   (`DecisionPillPlanner`, `ValueDetailTooltipBuilder`,
   `PillSubduingEvaluator`/`PillSubduingTooltipBuilder`,
   `ReceiptCaptionHelper`, `CurrencyDisplayResolver`,
-  `TreeRowTooltipComposer`, ...). Only the actual Blish-bound
+  `TreeRowTooltipComposer`, ...). The rule also applies retroactively:
+  `Services/TreeRowShapePlanner.cs` and
+  `Services/PillTooltipTextComposer.cs` are the row-shape and pill-prose
+  decisions extracted back out of `RenderTreeNode`/`RenderDecisionPills`
+  after the fact. Only the actual Blish-bound
   Panel/Label/event-wiring belongs in `TreeSectionController` itself. This
   is not a suggestion to eventually split `TreeSectionController` into a
   stateful/stateless pair - that split was proposed and rejected, with the

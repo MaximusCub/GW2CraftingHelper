@@ -1800,7 +1800,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 // The pill's head prose, and whether the subduing block
                 // belongs after it. Both are pure text decisions, so both
                 // live in the Blish-free PillTooltipTextComposer (see
-                // docs/ARCHITECTURE.md section 5's STANDING RULE); only the
+                // CONTRIBUTING.md's STANDING RULE); only the
                 // click wiring below and the rich composition at the bottom
                 // of this loop need a control. The head is stamped onto
                 // outer/inner/label rather than outer alone because the

@@ -7,9 +7,9 @@ namespace GW2CraftingHelper.Services
     /// What a decision pill's tooltip says at its head, before the renderer
     /// appends the rich blocks (subduing "why it loses", value detail, the
     /// dimmed dead-click line). Pure text from the spec and the node, per
-    /// docs/ARCHITECTURE.md section 5's STANDING RULE - the branches below
-    /// were the bulk of TreeSectionController.RenderDecisionPills and none
-    /// of them needed a control to decide.
+    /// CONTRIBUTING.md's STANDING RULE - the branches below were the bulk
+    /// of TreeSectionController.RenderDecisionPills and none of them
+    /// needed a control to decide.
     /// </summary>
     internal static class PillTooltipTextComposer
     {

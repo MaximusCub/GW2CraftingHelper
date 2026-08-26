@@ -6,9 +6,8 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// One tree row's shape: where its columns start, which of its optional
     /// parts exist, and what its caret says. Decided here rather than in the
-    /// renderer, per docs/ARCHITECTURE.md section 5's STANDING RULE - the
-    /// same split DecisionPillPlanner and TreeRowTooltipComposer already
-    /// make. TreeSectionController turns the answer into Blish controls and
+    /// renderer, per CONTRIBUTING.md's STANDING RULE - the same split
+    /// DecisionPillPlanner and TreeRowTooltipComposer already make. TreeSectionController turns the answer into Blish controls and
     /// owns everything this cannot decide without a font (the ellipsized
     /// name, the quantity prefix's pixel width) or a palette (the rarity and
     /// dimming colors).
