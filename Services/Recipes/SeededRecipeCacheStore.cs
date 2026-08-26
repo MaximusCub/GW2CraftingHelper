@@ -21,6 +21,15 @@ namespace GW2CraftingHelper.Services.Recipes
 
         public RecipeCacheStats Stats => _stats;
 
+        /// <summary>
+        /// How many recipes the corpus holds. 0 means the seed failed to
+        /// load, in which case "no known recipe outputs item X" proves
+        /// nothing - the composite's derived negatives key off this.
+        /// </summary>
+        public int RecipeCount => _recipes.Count;
+
+        public int SearchRowCount => _searches.Count;
+
         public int? SeedBuildId => _seedBuildId;
 
         public int? CurrentBuildId
@@ -67,15 +76,11 @@ namespace GW2CraftingHelper.Services.Recipes
         /// after them, matching CompositeRecipeApiClient's own merge order.
         /// </para>
         /// <para>
-        /// Without this, an item whose seed entry is an EMPTY list - the
-        /// seeder's "the API knows no recipe for this" negative cache row -
-        /// is served as a cache HIT, so nothing ever asks the Mystic Forge
-        /// data whether it has one, and the item renders UNKNOWN. That made
-        /// MF coverage depend on the seeder having run since the wiki data
-        /// was last edited, and (via the stale-seed fallback, which turns
-        /// empty entries into API calls the composite client rescues) on
-        /// the live game build id - neither of which has anything to do
-        /// with wiki-sourced data.
+        /// Without this, wiki-sourced forge recipes would not be part of
+        /// the corpus at all: "no known recipe outputs this item" (the
+        /// answer <see cref="FinalizeIndex"/> and the composite's derived
+        /// negatives are built from) would be wrong for every forge-only
+        /// item, and the item would render UNKNOWN.
         /// </para>
         /// </summary>
         public void MergeMysticForgeRecipes(MysticForgeRecipeData mysticForge)
@@ -88,23 +93,55 @@ namespace GW2CraftingHelper.Services.Recipes
             foreach (var recipe in mysticForge.AllRecipes)
             {
                 _recipes[recipe.Id] = recipe;
-
-                if (!_searches.TryGetValue(recipe.OutputItemId, out var existing))
-                {
-                    _searches[recipe.OutputItemId] = new List<int> { recipe.Id };
-                    continue;
-                }
-
-                if (existing.Contains(recipe.Id))
-                {
-                    continue;
-                }
-
-                var merged = new List<int>(existing.Count + 1);
-                merged.AddRange(existing);
-                merged.Add(recipe.Id);
-                _searches[recipe.OutputItemId] = merged;
+                AddRecipeIdToRow(_searches, recipe.OutputItemId, recipe.Id);
             }
+        }
+
+        /// <summary>
+        /// Makes the search index complete and positive-only: every held
+        /// recipe's output item gains a row carrying that recipe's id, and
+        /// every row still empty afterwards is dropped. An empty row was
+        /// the seeder's stored "the API knows no recipe for this item"
+        /// negative; under the staleness policy negatives are derived at
+        /// lookup time from the corpus (CompositeRecipeCacheStore), so a
+        /// surviving empty row could only shadow real data. Load-time
+        /// only, called after <see cref="MergeMysticForgeRecipes"/>.
+        /// </summary>
+        public void FinalizeIndex()
+        {
+            foreach (var recipe in _recipes.Values)
+            {
+                AddRecipeIdToRow(_searches, recipe.OutputItemId, recipe.Id);
+            }
+
+            var emptyRows = _searches
+                .Where(kvp => kvp.Value.Count == 0)
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (int key in emptyRows)
+            {
+                _searches.Remove(key);
+            }
+        }
+
+        private static void AddRecipeIdToRow(
+            Dictionary<int, IReadOnlyList<int>> searches, int outputItemId, int recipeId)
+        {
+            if (!searches.TryGetValue(outputItemId, out var existing))
+            {
+                searches[outputItemId] = new List<int> { recipeId };
+                return;
+            }
+
+            if (existing.Contains(recipeId))
+            {
+                return;
+            }
+
+            var merged = new List<int>(existing.Count + 1);
+            merged.AddRange(existing);
+            merged.Add(recipeId);
+            searches[outputItemId] = merged;
         }
 
         public void LoadManifest(Stream manifestStream)
@@ -131,12 +168,6 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             if (_searches.TryGetValue(outputItemId, out var result))
             {
-                if (result.Count == 0 && SeedIsStale)
-                {
-                    _stats.IncrementSearchMiss();
-                    return null;
-                }
-
                 _stats.IncrementSearchHit();
                 return result;
             }

@@ -413,6 +413,7 @@ namespace GW2CraftingHelper
             // and no game build id can affect whether they are found - see
             // SeededRecipeCacheStore.MergeMysticForgeRecipes.
             recipeSeed.MergeMysticForgeRecipes(mfData);
+            recipeSeed.FinalizeIndex();
 
             try
             {

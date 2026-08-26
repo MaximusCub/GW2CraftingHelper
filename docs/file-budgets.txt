@@ -166,7 +166,7 @@ Services/Recipes/InMemoryRecipeCacheStore.cs                                    
 Services/Recipes/ItemNameSeedData.cs                                                       56
 Services/Recipes/OverlayRecipeCacheStore.cs                                                424
 Services/Recipes/RecipeCacheSerializer.cs                                                  213
-Services/Recipes/SeededRecipeCacheStore.cs                                                 175
+Services/Recipes/SeededRecipeCacheStore.cs                                                 206
 Services/RecipesColumnMath.cs                                                              79
 Services/RequestLabelFormatter.cs                                                          63
 Services/RequiredRecipesVisibility.cs                                                      99
@@ -432,6 +432,7 @@ tests/GW2CraftingHelper.Tests/Services/RecipeSheetItemSeedServiceTests.cs       
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetSavingsCalculatorTests.cs                606
 tests/GW2CraftingHelper.Tests/Services/Recipes/ItemNameSeedDataTests.cs                    102
 tests/GW2CraftingHelper.Tests/Services/Recipes/RecipeCacheSerializerTests.cs               227
+tests/GW2CraftingHelper.Tests/Services/Recipes/SeedFinalizeIndexTests.cs                   108
 tests/GW2CraftingHelper.Tests/Services/RecipesColumnMathTests.cs                           84
 tests/GW2CraftingHelper.Tests/Services/RequestLabelFormatterTests.cs                       76
 tests/GW2CraftingHelper.Tests/Services/RequiredRecipesVisibilityTests.cs                   144
@@ -509,7 +510,7 @@ tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs            
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                   365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                                 100
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                       610
-tools/GW2CraftingHelper.Harness/Program.cs                                                 706
+tools/GW2CraftingHelper.Harness/Program.cs                                                 713
 tools/GW2CraftingHelper.RecipeSeeder/Program.cs                                            692
 tools/MysticForgeSeeder/Program.cs                                                         508
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                                512

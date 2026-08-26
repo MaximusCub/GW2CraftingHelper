@@ -653,16 +653,31 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(api.SearchCallCount > afterFirstBuild);
         }
 
-        [Fact]
-        public void SeededStore_NegativeEntry_ReturnsNull_WhenSeedStale()
+        // POLICY CHANGE (recipe cache staleness policy): this replaces
+        // SeededStore_NegativeEntry_ReturnsNull_WhenSeedStale and
+        // SeededStore_NegativeEntry_ReturnsEmptyList_WhenSeedFresh, which
+        // pinned the old stored-negative behaviour - an empty seed row
+        // served as an authoritative hit at the seed's build and turned
+        // into an API miss when the build moved. Negatives are no longer
+        // stored at all: FinalizeIndex drops every empty row at load, on
+        // both sides of a build bump, and "no recipe" is derived by
+        // CompositeRecipeCacheStore from the corpus instead.
+        [Theory]
+        [InlineData(100)]
+        [InlineData(200)]
+        public void SeededStore_EmptyRow_IsAbsentAfterFinalizeIndex_AtAnyBuildId(
+            int currentBuildId)
         {
-            // Seed with positive entry (100 -> [1]) and negative entry (300 -> [])
+            // Positive entry (100 -> [1]) and stored negative (300 -> []).
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
                 { 100, new List<int> { 1 } },
                 { 300, new List<int>() }
             };
-            var recipes = new Dictionary<int, RawRecipe>();
+            var recipes = new Dictionary<int, RawRecipe>
+            {
+                { 1, NewRecipe(1, 100) }
+            };
 
             var store = new SeededRecipeCacheStore();
             using (var s1 = new MemoryStream(
@@ -672,6 +687,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 store.Load(s1, s2);
             }
+
+            store.FinalizeIndex();
 
             var manifest = new RecipeSeedManifest
             {
@@ -685,74 +702,19 @@ namespace GW2CraftingHelper.Tests.Services
                 store.LoadManifest(ms);
             }
 
-            // Mark seed as stale (different build)
-            store.SetCurrentBuildId(200);
-            Assert.True(store.SeedIsStale);
+            store.SetCurrentBuildId(currentBuildId);
 
-            // Negative entry becomes a miss when stale
-            var negativeResult = store.TryGetSearch(300);
-            Assert.Null(negativeResult);
+            // The empty row is gone - a genuine miss, never an empty hit.
+            Assert.Null(store.TryGetSearch(300));
 
-            // Positive entry still returns hit
+            // Positives are untouched by the pass and by the build id.
             var positiveResult = store.TryGetSearch(100);
             Assert.NotNull(positiveResult);
             Assert.Single(positiveResult);
             Assert.Equal(1, positiveResult[0]);
 
-            // Stats: 1 hit (positive), 1 miss (stale negative)
             Assert.Equal(1, store.Stats.SearchHits);
             Assert.Equal(1, store.Stats.SearchMisses);
-        }
-
-        [Fact]
-        public void SeededStore_NegativeEntry_ReturnsEmptyList_WhenSeedFresh()
-        {
-            // Same setup as above
-            var searches = new Dictionary<int, IReadOnlyList<int>>
-            {
-                { 100, new List<int> { 1 } },
-                { 300, new List<int>() }
-            };
-            var recipes = new Dictionary<int, RawRecipe>();
-
-            var store = new SeededRecipeCacheStore();
-            using (var s1 = new MemoryStream(
-                Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeSearches(searches))))
-            using (var s2 = new MemoryStream(
-                Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeRecipes(recipes))))
-            {
-                store.Load(s1, s2);
-            }
-
-            var manifest = new RecipeSeedManifest
-            {
-                SeedVersion = 1,
-                Gw2BuildId = 100,
-                CreatedUtc = "2026-01-01T00:00:00Z"
-            };
-            using (var ms = new MemoryStream(
-                Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeManifest(manifest))))
-            {
-                store.LoadManifest(ms);
-            }
-
-            // Same build - seed is fresh
-            store.SetCurrentBuildId(100);
-            Assert.False(store.SeedIsStale);
-
-            // Negative entry is a valid hit when fresh
-            var negativeResult = store.TryGetSearch(300);
-            Assert.NotNull(negativeResult);
-            Assert.Empty(negativeResult);
-
-            // Positive entry still returns hit
-            var positiveResult = store.TryGetSearch(100);
-            Assert.NotNull(positiveResult);
-            Assert.Single(positiveResult);
-
-            // Stats: 2 hits, 0 misses
-            Assert.Equal(2, store.Stats.SearchHits);
-            Assert.Equal(0, store.Stats.SearchMisses);
         }
 
         // Minimal API client that counts calls
