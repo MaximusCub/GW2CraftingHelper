@@ -31,12 +31,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void ColumnHeaderBand_HoldsItsLabelsDescenders()
         {
             int inkBottom = TypeRampMetrics.InkBottom(
-                TypeRampMetrics.ColumnHeaderInk, PlanContentHeightMath.CTableHeaderLabelY);
+                TypeRampMetrics.ColumnHeaderInk, PlanContentHeightMath.ColumnHeaderLabelY);
 
             Assert.True(
-                inkBottom + ScissorSafeClearance <= PlanContentHeightMath.CTableHeaderRowHeight,
+                inkBottom + ScissorSafeClearance <= PlanContentHeightMath.ColumnHeaderRowHeight,
                 $"header ink bottom {inkBottom} crowds the "
-                    + $"{PlanContentHeightMath.CTableHeaderRowHeight}px band");
+                    + $"{PlanContentHeightMath.ColumnHeaderRowHeight}px band");
         }
 
         [Fact]
@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Services
             //
             // Read out of the ink rather than written as the literal 8,
             // because 8 is only what THIS tier seat happens to make it. A
-            // seat swap moves CTableHeaderLabelY with it (18/22 wants 5,
+            // seat swap moves ColumnHeaderLabelY with it (18/22 wants 5,
             // not 4), and this has to name the required value instead of
             // reading as "the other seat is a regression".
             const int bodyHeaderLabelY = 5;
@@ -57,7 +57,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(
                 inheritedCapTop,
-                PlanContentHeightMath.CTableHeaderLabelY + TypeRampMetrics.ColumnHeaderInk.CapTopY);
+                PlanContentHeightMath.ColumnHeaderLabelY + TypeRampMetrics.ColumnHeaderInk.CapTopY);
         }
 
         [Fact]
@@ -133,13 +133,14 @@ namespace GW2CraftingHelper.Tests.Services
         // Used Materials gained an Item/Amount header in audit batch J's
         // chrome unification, and the Shopping List's own 22px unbanded
         // header became the shared 26px band. Both are counted the way the
-        // two c-tables already were - unconditionally, because all four
-        // renderers emit the header before looking at the row count.
+        // two column-header tables already were - unconditionally,
+        // because all four renderers emit the header before looking at
+        // the row count.
         [Fact]
         public void UsedMaterials_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.UsedMaterial), Row(PlanRowType.UsedMaterial), Row(PlanRowType.UsedMaterial) };
-            int expected = PlanContentHeightMath.CTableHeaderRowHeight + 3 * PlanContentHeightMath.UsedMaterialRowHeight;
+            int expected = PlanContentHeightMath.ColumnHeaderRowHeight + 3 * PlanContentHeightMath.UsedMaterialRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, rows));
         }
 
@@ -147,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void UsedMaterials_EmptyRows_IsTheHeaderAlone()
         {
             Assert.Equal(
-                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.ColumnHeaderRowHeight,
                 PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, new List<PlanRowViewModel>()));
         }
 
@@ -155,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void UsedMaterials_NullRows_IsTheHeaderAlone()
         {
             Assert.Equal(
-                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.ColumnHeaderRowHeight,
                 PlanContentHeightMath.SectionBodyHeight(PlanSectionType.UsedMaterials, null));
         }
 
@@ -163,7 +164,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void ShoppingList_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.ShoppingBuy), Row(PlanRowType.ShoppingVendor) };
-            int expected = PlanContentHeightMath.CTableHeaderRowHeight + 2 * PlanContentHeightMath.ShoppingRowHeight;
+            int expected = PlanContentHeightMath.ColumnHeaderRowHeight + 2 * PlanContentHeightMath.ShoppingRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.ShoppingList, rows));
         }
 
@@ -177,7 +178,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void EveryHeaderedSection_ReservesTheSameHeaderHeight(PlanSectionType sectionType)
         {
             Assert.Equal(
-                PlanContentHeightMath.CTableHeaderRowHeight,
+                PlanContentHeightMath.ColumnHeaderRowHeight,
                 PlanContentHeightMath.SectionBodyHeight(sectionType, new List<PlanRowViewModel>()));
         }
 
@@ -218,7 +219,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void Disciplines_IncludesHeaderRowPlusRows()
         {
             var rows = new List<PlanRowViewModel> { Row(PlanRowType.DisciplineRow) };
-            int expected = PlanContentHeightMath.CTableHeaderRowHeight + PlanContentHeightMath.DisciplineRowHeight;
+            int expected = PlanContentHeightMath.ColumnHeaderRowHeight + PlanContentHeightMath.DisciplineRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.RequiredDisciplines, rows));
         }
 
@@ -250,7 +251,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Row(PlanRowType.RecipeRow, sublabel: "Armorsmith 400"),
                 Row(PlanRowType.RecipeRow, sublabel: ""),
             };
-            int expected = PlanContentHeightMath.CTableHeaderRowHeight
+            int expected = PlanContentHeightMath.ColumnHeaderRowHeight
                 + 3 * PlanContentHeightMath.RecipeRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.RequiredRecipes, rows));
         }
@@ -404,7 +405,7 @@ namespace GW2CraftingHelper.Tests.Services
             var root = Node(1, children: children);
             var roots = new List<CraftingTreeNode> { root };
 
-            int expected = PlanContentHeightMath.CTableHeaderRowHeight
+            int expected = PlanContentHeightMath.ColumnHeaderRowHeight
                 + PlanContentHeightMath.TreeNodeHeight(root, 0, false, null);
             Assert.Equal(expected, PlanContentHeightMath.MultiRootTreeFlowHeight(roots, null));
         }
@@ -419,10 +420,10 @@ namespace GW2CraftingHelper.Tests.Services
                 3 * PlanContentHeightMath.TreeRowHeight + 2 * PlanContentHeightMath.MultiRootDividerHeight;
 
             Assert.Equal(
-                PlanContentHeightMath.CTableHeaderRowHeight + PlanContentHeightMath.TreeRowHeight,
+                PlanContentHeightMath.ColumnHeaderRowHeight + PlanContentHeightMath.TreeRowHeight,
                 PlanContentHeightMath.MultiRootTreeFlowHeight(one, null));
             Assert.Equal(
-                PlanContentHeightMath.CTableHeaderRowHeight + perRootRowsAndDividers,
+                PlanContentHeightMath.ColumnHeaderRowHeight + perRootRowsAndDividers,
                 PlanContentHeightMath.MultiRootTreeFlowHeight(three, null));
         }
 
@@ -437,7 +438,7 @@ namespace GW2CraftingHelper.Tests.Services
             // One divider between each pair of consecutive roots (2 gaps
             // for 3 roots) - never before the first or after the last.
             int expected =
-                PlanContentHeightMath.CTableHeaderRowHeight +
+                PlanContentHeightMath.ColumnHeaderRowHeight +
                 PlanContentHeightMath.TreeNodeHeight(rootA, 0, false, null) +
                 PlanContentHeightMath.TreeNodeHeight(rootB, 0, false, null) +
                 PlanContentHeightMath.TreeNodeHeight(rootC, 0, false, null) +
@@ -454,7 +455,7 @@ namespace GW2CraftingHelper.Tests.Services
             var overrides = new Dictionary<int, bool> { { 1, false } }; // collapse root A only
 
             int expected =
-                PlanContentHeightMath.CTableHeaderRowHeight +
+                PlanContentHeightMath.ColumnHeaderRowHeight +
                 PlanContentHeightMath.TreeRowHeight + // rootA collapsed - own row only
                 PlanContentHeightMath.MultiRootDividerHeight +
                 (PlanContentHeightMath.TreeRowHeight + PlanContentHeightMath.TreeRowHeight); // rootB expanded (default)

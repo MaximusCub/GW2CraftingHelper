@@ -406,7 +406,7 @@ namespace GW2CraftingHelper.Views.Rendering
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
                     middleLabel: "Source",
                     middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(

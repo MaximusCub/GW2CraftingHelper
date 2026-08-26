@@ -56,10 +56,10 @@ namespace GW2CraftingHelper.Services
 
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
-        // lowest ink is 26 rather than 21. CTableHeaderLabelY 4 reproduces
+        // lowest ink is 26 rather than 21. ColumnHeaderLabelY 4 reproduces
         // the band the 16pt header drew - cap top 8px down, ink bottom 2px
         // clear of the band's own bottom edge - at the taller font.
-        public const int CTableHeaderRowHeight = 32;
+        public const int ColumnHeaderRowHeight = 32;
 
         // Baseline y of every column-header label inside that band. Lives
         // here rather than with the chrome that draws it
@@ -67,7 +67,7 @@ namespace GW2CraftingHelper.Services
         // is half of the arithmetic above: a label y and a band height that
         // move independently are how a header's descenders end up on the
         // row under them.
-        public const int CTableHeaderLabelY = 4;
+        public const int ColumnHeaderLabelY = 4;
 
         // --- Section header band (drawn by CraftingPlanView.
         // CreateSectionHeader, which aliases all three). ---
@@ -146,20 +146,21 @@ namespace GW2CraftingHelper.Services
             rows = rows ?? Array.Empty<PlanRowViewModel>();
             switch (sectionType)
             {
-                // Both of these draw a CTableHeaderRowHeight band, as the
-                // two c-tables below do. Counted unconditionally, exactly as
-                // two c-tables below are, because all four renderers emit
+                // Both of these draw a ColumnHeaderRowHeight band, as the
+                // two column-header tables below do. Counted
+                // unconditionally, exactly as the two column-header tables
+                // below are, because all four renderers emit
                 // the header before looking at the row count.
                 case PlanSectionType.UsedMaterials:
-                    return CTableHeaderRowHeight + rows.Count * UsedMaterialRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * UsedMaterialRowHeight;
                 case PlanSectionType.ShoppingList:
-                    return CTableHeaderRowHeight + rows.Count * ShoppingRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * ShoppingRowHeight;
                 case PlanSectionType.CraftingSteps:
                     return CraftingStepsBodyHeight(rows);
                 case PlanSectionType.RequiredDisciplines:
-                    return CTableHeaderRowHeight + rows.Count * DisciplineRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * DisciplineRowHeight;
                 case PlanSectionType.RequiredRecipes:
-                    return CTableHeaderRowHeight + rows.Count * RecipeRowHeight;
+                    return ColumnHeaderRowHeight + rows.Count * RecipeRowHeight;
                 default:
                     // Defensive fallback mirrors CreateCollapsibleSection's own
                     // default branch (CreateTextRow, one fixed-height row per
@@ -304,11 +305,12 @@ namespace GW2CraftingHelper.Services
         /// TreeNodeHeight(roots[0], 0, false, ...) by exactly the column
         /// header below.
         /// <para>
-        /// One CTableHeaderRowHeight column header
+        /// One ColumnHeaderRowHeight column header
         /// (TreeSectionController.CreateTreeSection builds it into the
         /// same FlowPanel, above every root) precedes the roots whenever
         /// there is a tree at all - the tree's right-hand columns are
-        /// unlabelled otherwise, unlike every other c-table in the plan.
+        /// unlabelled otherwise, unlike every other column-header table
+        /// in the plan.
         /// An empty/absent roots list renders no tree and therefore no
         /// header either, and still measures 0.
         /// </para>
@@ -321,7 +323,7 @@ namespace GW2CraftingHelper.Services
                 return 0;
             }
 
-            int total = CTableHeaderRowHeight;
+            int total = ColumnHeaderRowHeight;
             for (int i = 0; i < roots.Count; i++)
             {
                 if (i > 0)

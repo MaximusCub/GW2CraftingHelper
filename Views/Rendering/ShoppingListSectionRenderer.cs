@@ -196,7 +196,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var color = TableHeaderStyle.LabelColor;
 
             // This section builds its own header row rather than going
-            // through CTableHeaderRenderer, so "Item" has to opt into the
+            // through ColumnHeaderRowRenderer, so "Item" has to opt into the
             // same box treatment its Amount/Each/Total siblings get for
             // free from CreateRightAlignedLabel.
             // Each label carries its own sort indicator inside its text, so

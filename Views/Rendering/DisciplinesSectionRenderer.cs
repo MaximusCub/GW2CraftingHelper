@@ -8,13 +8,13 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // The Required Disciplines row list, plus the c-table header row this
+    // The Required Disciplines row list, plus the column header row this
     // renderer owns directly.
     //
-    // The "Discipline"/"Level" column header call (CTableHeaderRenderer,
+    // The "Discipline"/"Level" column header call (ColumnHeaderRowRenderer,
     // shared with Required Recipes) lives in this class's Render() below;
     // CraftingPlanView.CreateCollapsibleSection no longer references the
-    // c-table header for either section.
+    // column header row for either section.
     //
     // CreateDisciplineRow's
     // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
@@ -118,13 +118,13 @@ namespace GW2CraftingHelper.Views.Rendering
 
             if (anyCharacterText)
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
                     CharactersHeaderText, charX);
             }
             else
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink);
             }
 

@@ -51,14 +51,14 @@ namespace GW2CraftingHelper.Views.Rendering
         /// measured at another is how a section's rows drift off their
         /// container.
         /// </summary>
-        internal const int RowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
+        internal const int RowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
 
         /// <summary>
         /// Baseline y of every header label inside the band. Aliased to
         /// the height-math constant for the same reason
         /// <see cref="RowHeight"/> is: the two are one piece of arithmetic.
         /// </summary>
-        internal const int LabelY = PlanContentHeightMath.CTableHeaderLabelY;
+        internal const int LabelY = PlanContentHeightMath.ColumnHeaderLabelY;
 
         /// <summary>
         /// Column headers used to be the same size and weight as the rows

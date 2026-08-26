@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Services
     ///
     /// The row-height CONSTANTS themselves are not redefined here - every
     /// formula below reads PlanContentHeightMath's existing public
-    /// CostTileRowHeight/CTableHeaderRowHeight/CurrencyRowHeight/
+    /// CostTileRowHeight/ColumnHeaderRowHeight/CurrencyRowHeight/
     /// FallbackTextRowHeight constants directly, so this class can never
     /// drift from the fixed-row-height convention every other section
     /// already follows; only the Summary-specific COUNTING logic (how many
@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
         ///   - at most one CostTileRowHeight-tall row for the profit
         ///     formula band (present only when ProfitFormulaTile rows
         ///     exist - always exactly 3 when present);
-        ///   - one CTableHeaderRowHeight header plus one CurrencyRowHeight
+        ///   - one ColumnHeaderRowHeight header plus one CurrencyRowHeight
         ///     row per CurrencyCost row, only when at least one exists;
         ///   - one FallbackTextRowHeight row per MultiItemNote row;
         ///   - one FallbackTextRowHeight row for the SummaryFootnote row
@@ -103,7 +103,7 @@ namespace GW2CraftingHelper.Services
 
             if (currencyRowCount > 0)
             {
-                height += PlanContentHeightMath.CTableHeaderRowHeight
+                height += PlanContentHeightMath.ColumnHeaderRowHeight
                     + currencyRowCount * PlanContentHeightMath.CurrencyRowHeight;
             }
 

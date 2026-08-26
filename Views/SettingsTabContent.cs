@@ -1784,8 +1784,8 @@ namespace GW2CraftingHelper.Views
 
         // The plan tables' column-header band, aliased: same tier over the
         // same kind of data columns.
-        private const int CurrencyHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int CurrencyHeaderTextY = PlanContentHeightMath.CTableHeaderLabelY;
+        private const int CurrencyHeaderRowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
+        private const int CurrencyHeaderTextY = PlanContentHeightMath.ColumnHeaderLabelY;
 
         /// <summary>
         /// One "Currency"/"Copper per unit" pair per grid column, sitting on

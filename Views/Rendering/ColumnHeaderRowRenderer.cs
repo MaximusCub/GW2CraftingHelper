@@ -8,9 +8,9 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Each c-table section renderer (Disciplines/Recipes) calls this from
-    // inside its own Render(), the way ShoppingListSectionRenderer owns
-    // CreateShoppingListHeaderRow.
+    // Each column-header table's section renderer (Disciplines/Recipes)
+    // calls this from inside its own Render(), the way
+    // ShoppingListSectionRenderer owns CreateShoppingListHeaderRow.
     //
     // Optional middleLabel/middleX so Required Disciplines
     // can honestly label its per-character availability text with a
@@ -58,9 +58,9 @@ namespace GW2CraftingHelper.Views.Rendering
     // sort indicator (SortableHeaderLabel.Decorate), so the right label's
     // x-tracking below - which right-aligns off the control's own Width -
     // accounts for the indicator without knowing about it.
-    internal static class CTableHeaderRenderer
+    internal static class ColumnHeaderRowRenderer
     {
-        internal static void CreateCTableHeaderRow(
+        internal static void CreateColumnHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,

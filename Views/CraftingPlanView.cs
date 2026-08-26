@@ -5019,7 +5019,7 @@ namespace GW2CraftingHelper.Views
                 case PlanSectionType.RequiredDisciplines:
                     // Row rendering lives in
                     // Views/Rendering/DisciplinesSectionRenderer, which
-                    // also owns its own c-table header call (see
+                    // also owns its own column header row call (see
                     // DisciplinesSectionRenderer's doc comment).
                     new DisciplinesSectionRenderer(this).Render(section, contentFlow, panelWidth);
                     break;
@@ -5163,7 +5163,7 @@ namespace GW2CraftingHelper.Views
             if (visibleRows.Count == 0)
             {
                 // Every recipe is unlocked and the filter is hiding them all -
-                // a friendly single line instead of a c-table header sitting
+                // a friendly single line instead of a column header row sitting
                 // over an empty body.
                 TextRowRenderer.CreateTextRow(
                     RequiredRecipesVisibility.AllUnlockedMessage(section.Rows.Count), contentFlow, panelWidth, this);
@@ -5222,14 +5222,15 @@ namespace GW2CraftingHelper.Views
         // Views/Rendering/CraftStepsSectionRenderer (see the
         // RequiredDisciplines-style call in CreateCollapsibleSection above).
 
-        // --- Required Disciplines / Required Recipes sections (c-table) ---
+        // --- Required Disciplines / Required Recipes sections
+        // (column-header tables) ---
         //
         // Required Disciplines' row rendering lives in
         // Views/Rendering/DisciplinesSectionRenderer; Required
         // Recipes' row rendering (both row heights) in
         // Views/Rendering/RecipesSectionRenderer; the shared
-        // c-table header (CreateCTableHeaderRow) in
-        // Views/Rendering/CTableHeaderRenderer - see that class's doc comment.
+        // column header row (CreateColumnHeaderRow) in
+        // Views/Rendering/ColumnHeaderRowRenderer - see that class's doc comment.
 
         // --- Summary / Total Cost section ---
         //

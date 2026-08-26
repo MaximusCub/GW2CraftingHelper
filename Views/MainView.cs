@@ -285,8 +285,6 @@ namespace GW2CraftingHelper.Views
         // PlanContentHeightMath's own heights, not re-derived here.
         private const int SectionTitleBandHeight = PlanContentHeightMath.SectionHeaderRowHeight;
         private const int SectionTitleTextY = PlanContentHeightMath.SectionHeaderTitleY;
-        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
 
         // The treatment the plan tables give a quantity column.
         private static readonly Color AmountTextColor = new Color(200, 200, 200);
@@ -1637,7 +1635,7 @@ namespace GW2CraftingHelper.Views
 
             var layout = SnapshotResultLayout.Compute(
                 _itemCells.Count, _walletCells.Count, gridWidth, ItemRowHeight, WalletRowHeight,
-                SectionTitleBandHeight, ColumnHeaderRowHeight);
+                SectionTitleBandHeight, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             _resultGridPanel.Size = new Point(gridWidth, layout.TotalHeight);
 
@@ -2180,7 +2178,7 @@ namespace GW2CraftingHelper.Views
 
             chrome.HeaderPanel = new Panel()
             {
-                Size = new Point(0, ColumnHeaderRowHeight),
+                Size = new Point(0, PlanContentHeightMath.ColumnHeaderRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = _resultGridPanel,
             };
@@ -2247,7 +2245,7 @@ namespace GW2CraftingHelper.Views
             chrome.TitleDivider.Size = new Point(gridWidth, 2);
 
             chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
-            chrome.HeaderPanel.Size = new Point(gridWidth, ColumnHeaderRowHeight);
+            chrome.HeaderPanel.Size = new Point(gridWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             int columnCount = section.Grid.ColumnCount;
             int columnWidth = section.Grid.ColumnWidth;
@@ -2273,8 +2271,8 @@ namespace GW2CraftingHelper.Views
                     SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
 
                 chrome.NameHeaders[i].Location =
-                    new Point(columnX + SnapshotItemGridLayout.CellTextX, ColumnHeaderLabelY);
-                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, ColumnHeaderLabelY);
+                    new Point(columnX + SnapshotItemGridLayout.CellTextX, PlanContentHeightMath.ColumnHeaderLabelY);
+                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
             SyncHeaderCells(chrome, columnCount, columnWidth, gridWidth);

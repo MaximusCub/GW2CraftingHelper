@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// so nothing is laid out beside the label and every right-aligned
     /// header keeps tracking its column the way it already did (the
     /// relayout closures right-align off the label's own width, which
-    /// already includes the indicator - see CTableHeaderRenderer). The
+    /// already includes the indicator - see ColumnHeaderRowRenderer). The
     /// hover and the click belong to the cell around it - see
     /// SortableHeaderCells.
     /// <para>

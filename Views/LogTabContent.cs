@@ -57,9 +57,8 @@ namespace GW2CraftingHelper.Views
         private const int StatusRowHeight = 26;
 
         // Same band, tier and label y as every plan table's header.
-        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
-        private const int TopChromeHeight = ToolbarHeight + StatusRowHeight + ColumnHeaderRowHeight;
+        private const int TopChromeHeight =
+            ToolbarHeight + StatusRowHeight + PlanContentHeightMath.ColumnHeaderRowHeight;
 
         // The FlowPanel scrolls, so a row sized to the panel's full width
         // would run under the scrollbar strip.
@@ -350,7 +349,7 @@ namespace GW2CraftingHelper.Views
                 int newWidth = container.ContentRegion.Width;
                 _toolbarPanel.Size = new Point(newWidth, ToolbarHeight);
                 _statusPanel.Size = new Point(newWidth, StatusRowHeight);
-                _columnHeaderPanel.Size = new Point(newWidth, ColumnHeaderRowHeight);
+                _columnHeaderPanel.Size = new Point(newWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
                 _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - TopChromeHeight);
                 PositionToolbar(newWidth);
 
@@ -952,7 +951,7 @@ namespace GW2CraftingHelper.Views
         {
             _columnHeaderPanel = new Panel
             {
-                Size = new Point(width, ColumnHeaderRowHeight),
+                Size = new Point(width, PlanContentHeightMath.ColumnHeaderRowHeight),
                 Location = new Point(0, ToolbarHeight + StatusRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
                 Parent = container,
@@ -965,7 +964,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Time",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
                 Parent = _columnHeaderPanel,
             };
 
@@ -976,7 +975,7 @@ namespace GW2CraftingHelper.Views
                 Text = TagHeaderText,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
                 Parent = _columnHeaderPanel,
             };
 
@@ -987,7 +986,7 @@ namespace GW2CraftingHelper.Views
                 Text = "Message",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
                 Parent = _columnHeaderPanel,
             };
         }
@@ -1008,12 +1007,12 @@ namespace GW2CraftingHelper.Views
 
             if (_tagHeaderLabel != null)
             {
-                _tagHeaderLabel.Location = new Point(bands.TagX, ColumnHeaderLabelY);
+                _tagHeaderLabel.Location = new Point(bands.TagX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
             if (_messageHeaderLabel != null)
             {
-                _messageHeaderLabel.Location = new Point(bands.MessageX, ColumnHeaderLabelY);
+                _messageHeaderLabel.Location = new Point(bands.MessageX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
             return new RowMetrics

@@ -92,11 +92,11 @@ namespace GW2CraftingHelper.Views.Rendering
             // table with a right-hand column nothing names, leaving the
             // reader to infer that a bare "12x" column is a quantity.
             // Unconditional, like the Shopping List's and the two
-            // c-tables', so it can never disagree with
+            // column-header tables', so it can never disagree with
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
             // same way. No rightXForWidth: the Amount column is pinned to
-            // the panel edge, which is CTableHeaderRenderer's own default.
-            CTableHeaderRenderer.CreateCTableHeaderRow(
+            // the panel edge, which is ColumnHeaderRowRenderer's own default.
+            ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
                 SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
                 amountHeaderText, _sink,

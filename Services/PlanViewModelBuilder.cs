@@ -512,7 +512,8 @@ namespace GW2CraftingHelper.Services
         /// Currency table rows: Label is the resolved currency name, rows
         /// sort alphabetically by it, and CurrencyOwnedQuantity is the raw
         /// unclamped wallet holding. Needed/FullyCovered are derived here
-        /// so the c-table renderer stays a dumb read of computed fields.
+        /// so the column-header table renderer stays a dumb read of
+        /// computed fields.
         /// </summary>
         private static void BuildCurrencyTableRows(PlanSectionViewModel section, CraftingPlanResult result)
         {

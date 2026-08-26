@@ -10,7 +10,7 @@ using System.Collections.Generic;
 namespace GW2CraftingHelper.Views.Rendering
 {
     // The Summary/Total Cost section: two formula-band tile rows (CreateFormulaBand), a
-    // c-table for the plan's non-coin currency costs
+    // column-header table for the plan's non-coin currency costs
     // (CreateCurrencyTable), the multi-item batch MultiItemNote banner row
     // (via TextRowRenderer), and a subdued footnote row (CreateFootnoteRow).
     // Height agreement for this shape lives in
@@ -602,11 +602,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // justifies to the panel.
         //
         // 4 columns (Currency | Required | Have | Needed) do not fit
-        // CTableHeaderRenderer's left/middle/right (3-slot) shape, so this
+        // ColumnHeaderRowRenderer's left/middle/right (3-slot) shape, so this
         // hand-rolls its own header row - the same precedent
         // ShoppingListSectionRenderer.CreateShoppingListHeaderRow already
         // set for its own 4-column (Item/Amount/Each/Total) header, rather
-        // than stretching CTableHeaderRenderer's signature to fit a shape
+        // than stretching ColumnHeaderRowRenderer's signature to fit a shape
         // it was not designed for.
         private const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
 

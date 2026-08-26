@@ -237,7 +237,7 @@
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
-    <Compile Include="Views\Rendering\CTableHeaderRenderer.cs" />
+    <Compile Include="Views\Rendering\ColumnHeaderRowRenderer.cs" />
     <Compile Include="Views\Rendering\CraftStepsSectionRenderer.cs" />
     <Compile Include="Views\Rendering\RecipesSectionRenderer.cs" />
     <Compile Include="Views\Rendering\SummarySectionRenderer.cs" />

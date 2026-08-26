@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // above it. RecipesColumnMath owns the edge arithmetic (Blish-free,
     // tested); this file only measures the bands it is handed.
     //
-    // Render() calls CTableHeaderRenderer (the shared header, also used by
+    // Render() calls ColumnHeaderRowRenderer (the shared header, also used by
     // Required Disciplines) directly, exactly as DisciplinesSectionRenderer
     // does - see that class's doc comment.
     //
@@ -103,14 +103,14 @@ namespace GW2CraftingHelper.Views.Rendering
 
             if (anyDiscipline)
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
                     middleXForWidth: w => scan.EdgesFor(w).DisciplineX);
             }
             else
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink);
             }
 

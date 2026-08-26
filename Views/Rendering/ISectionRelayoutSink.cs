@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// CraftingPlanView-private helper extracts it into Views/Rendering
     /// rather than reaching back into the view (KNOWN-ISSUES #39). Shared
     /// row-construction helpers with several callers (TextRowRenderer,
-    /// CTableHeaderRenderer, RowRelayoutHelpers, IconNameRowHelpers) take
+    /// ColumnHeaderRowRenderer, RowRelayoutHelpers, IconNameRowHelpers) take
     /// this interface as a method parameter rather than a
     /// constructor-injected field, since none of them is itself a section
     /// renderer.
