@@ -445,7 +445,7 @@ tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs             
 tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            782
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                         143
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceConcurrencyTests.cs                    226
-tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               947
+tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               949
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetItemSeedServiceTests.cs                  145
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetSavingsCalculatorTests.cs                606
 tests/GW2CraftingHelper.Tests/Services/Recipes/ItemNameSeedDataTests.cs                    102
