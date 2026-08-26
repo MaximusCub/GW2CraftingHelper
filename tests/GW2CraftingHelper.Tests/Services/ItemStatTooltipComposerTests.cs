@@ -168,7 +168,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Header, one blank, then all six positional bonuses - the
             // shape FWDekker's UpgradeComponent builder emits and the one
-            // the game shows for an unequipped rune (spec section 3.2).
+            // the game shows for an unequipped rune (KNOWN-ISSUES #42).
             Assert.Equal("Superior Rune of the Scholar", lines[0]);
             Assert.Equal("", lines[1]);
             Assert.Equal("(1): +25 Power", lines[2]);

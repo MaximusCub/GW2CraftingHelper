@@ -415,7 +415,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             // The name is centred on the icon, not top-aligned (measured,
-            // spec section 1.2); every other row kind sits at its top.
+            // KNOWN-ISSUES #42); every other row kind sits at its top.
             int textY = row.Y + System.Math.Max(0, (row.Height - lineHeight) / 2);
 
             foreach (var placed in row.Spans)

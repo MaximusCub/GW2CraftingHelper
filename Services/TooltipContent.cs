@@ -172,14 +172,14 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>An upgrade's granted bonus - a rune bonus line, a
         /// sigil or infusion buff. NOT a food's nourishment line, which
-        /// the one capture of one measures white (spec section 1.4,
-        /// steak.png).</summary>
+        /// the one capture of one measures white (KNOWN-ISSUES #42).
+        /// </summary>
         Bonus,
 
         /// <summary>
         /// A bonus tier the wearer has not reached. Reserved and unused:
         /// greying a tier needs the character's equipped count, which is
-        /// instance state /v2/items cannot carry (spec section 3.2). It
+        /// instance state /v2/items cannot carry (KNOWN-ISSUES #42). It
         /// exists so an equipped-aware surface does not have to re-plumb
         /// the role through every composer to get it.
         /// </summary>

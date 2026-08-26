@@ -632,7 +632,8 @@ the module adds the two edges Blish does not clamp. Full record:
 The pass that made the rich tooltip read as a game tooltip, measured at 3x
 against wiki captures and FWDekker's replica. **This is the referent for
 every `gap G<N>` id in the codebase**: G1-G24 are that record's gap map, and
-they appear in `Services/ItemStatTooltipComposer.cs`,
+they appear in `Services/ItemDescriptionSanitizer.cs`,
+`Services/ItemStatTooltipComposer.cs`,
 `Services/TooltipContent.cs`, `Services/TooltipLayoutMath.cs`,
 `Services/CoinSegmentMath.cs`, `Views/Rendering/RichTooltipSurface.cs`,
 `Views/Rendering/CoinCurrencyRenderer.cs` and `Views/Rendering/RarityColors.cs`.

@@ -6,8 +6,8 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the
-    /// line order the in-game item tooltip uses (spec section 1.6,
-    /// KNOWN-ISSUES #42): the icon+name header,
+    /// line order the in-game item tooltip uses (KNOWN-ISSUES #42):
+    /// the icon+name header,
     /// what the item DOES (strength/defense, attributes, granted bonuses),
     /// its infusion slots, then the identity block - rarity, type,
     /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();
 
         /// <summary>The game's own description string on a piece of gear
-        /// whose stats have not been chosen yet (spec section 2.2, gap
+        /// whose stats have not been chosen yet (KNOWN-ISSUES #42, gap
         /// G12). Emitted verbatim rather than approximated.</summary>
         private const string SelectStatsPrompt = "Double-click to select stats.";
 
@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Services
             // All of them, none greyed and no (x/6) counter: that needs the
             // character's equipped set, which is instance state /v2/items
             // cannot carry, and an unequipped rune in a bag is exactly what
-            // the game shows this way (spec section 3.2).
+            // the game shows this way (KNOWN-ISSUES #42).
             var bonuses = stats.UpgradeBonuses ?? EmptyStrings;
             for (int i = 0; i < bonuses.Count; i++)
             {
