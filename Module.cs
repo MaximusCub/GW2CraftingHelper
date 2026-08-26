@@ -261,6 +261,13 @@ namespace GW2CraftingHelper
             _settings = new ModuleSettings(settings);
         }
 
+        /// <summary>
+        /// Composition root, split by lifecycle: configure logging, build
+        /// the service graph, load textures, build the views, build the
+        /// window, add its tabs, wire the events. The order below is the
+        /// order those steps depend on each other in - see each step's own
+        /// remarks for what it must come after.
+        /// </summary>
         protected override void Initialize()
         {
             // First line of Initialize, so every construction below can hand
@@ -270,8 +277,24 @@ namespace GW2CraftingHelper
 
             string dataDir = DirectoriesManager.GetFullDirectoryPath("data");
 
+            ConfigureLogging(dataDir);
+            var itemMetadataService = BuildServices(dataDir, lifetimeToken);
+            LoadTextures();
+            BuildViews(dataDir, lifetimeToken, itemMetadataService);
+            BuildWindow();
+            BuildTabs();
+            WireEvents();
+        }
+
+        /// <summary>
+        /// Attaches the log store and the settings subscriptions that feed
+        /// it. Runs before every other step so their onError callbacks can
+        /// reach the Log tab no matter which one fails first.
+        /// </summary>
+        private void ConfigureLogging(string dataDir)
+        {
             // Configured before any other store so their
-            // onError callbacks (below) can always reach ModuleLog.Shared
+            // onError callbacks (BuildServices) can always reach ModuleLog.Shared
             // regardless of construction order - Write() is always safe to
             // call even before Configure() attaches the file store (writes
             // just stay ring-only until then). The log store's OWN IO
@@ -300,7 +323,16 @@ namespace GW2CraftingHelper
             // ModuleLog.SeedFromStore's own doc comment.
             ModuleLog.Shared.PruneOlderThan(_settings.GetClampedLogRetentionDays());
             ModuleLog.Shared.SeedFromStore();
+        }
 
+        /// <summary>
+        /// Builds the stores, API clients, seeds and the crafting pipeline.
+        /// Returns the <see cref="ItemMetadataService"/> because the views
+        /// read its session stat cache for tooltips - the same instance the
+        /// pipeline fills, so a hover shows what the plan already fetched.
+        /// </summary>
+        private ItemMetadataService BuildServices(string dataDir, CancellationToken lifetimeToken)
+        {
             // Every store's IO-failure callback routes to ModuleLog so a
             // store failure is visible in the Log tab, not just in an
             // attached debugger.
@@ -475,6 +507,15 @@ namespace GW2CraftingHelper
                 recipeSheetItemIdByRecipeId: recipeSheetItemIdByRecipeId,
                 activeFestivalNames: ReadActiveFestivalNames);
 
+            return itemMetadataService;
+        }
+
+        /// <summary>
+        /// Loads the three module textures, each falling back rather than
+        /// failing the load.
+        /// </summary>
+        private void LoadTextures()
+        {
             try
             {
                 _moduleIconTexture = ContentsManager.GetTexture("icon.png");
@@ -509,10 +550,18 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Emblem texture load failed, reusing the module icon: {ex.GetType().Name} - {ex.Message}");
                 _emblemTexture = _moduleIconTexture;
             }
+        }
 
-            // The module window is built further down this method, so the
-            // blocked surface is handed over as a lambda rather than a
-            // reference - see ModalBackdrop for what it does with it.
+        /// <summary>
+        /// Builds the dialogs and the five tab views. Runs after
+        /// <see cref="LoadTextures"/> (the About view takes the module
+        /// icon) and before <see cref="BuildWindow"/>, which parents them.
+        /// </summary>
+        private void BuildViews(string dataDir, CancellationToken lifetimeToken, ItemMetadataService itemMetadataService)
+        {
+            // BuildWindow runs after this, so the blocked surface is handed
+            // over as a lambda rather than a reference - see ModalBackdrop
+            // for what it does with it.
             _modalDialog = new ModalDialog(_settings, () => _mainWindow);
             _apiAccessDialog = new ApiAccessDialog();
 
@@ -535,82 +584,9 @@ namespace GW2CraftingHelper
                 // method inside the pipeline, so this lambda needs no
                 // single-vs-multi branch of its own.
                 (items, useOwn, valueOwnMaterials, priceBasis, ct, progress, phaseProgress, requestLabel) =>
-                {
-                    string activeChar = null;
-                    try
-                    {
-                        var mumble = GameService.Gw2Mumble;
-                        if (mumble != null &&
-                            mumble.PlayerCharacter != null &&
-                            !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
-                        {
-                            activeChar = mumble.PlayerCharacter.Name;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Gw2Mumble unavailable - graceful fallback. Debug,
-                        // not Warn: this runs once per Generate click (a
-                        // human-paced action, not a hot loop), but a user
-                        // running Blish without Mumble wired up would hit
-                        // it every single click - Debug (ring-always,
-                        // file-only-when-diagnostics-on) keeps that from
-                        // becoming routine file noise for a purely
-                        // cosmetic fallback (active-character is only used
-                        // for account-bound recipe checks).
-                        ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
-                    }
-
-                    // The EFFECTIVE
-                    // valuation (user overrides + CurrencyDecisionDefaults'
-                    // curated defaults, minus anything explicitly cleared -
-                    // see ModuleSettings.GetEffectiveCurrencyValuation's own
-                    // doc comment) - not the raw GetCurrencyValuation the
-                    // Settings tab itself reads, which must stay default-
-                    // free so it can tell a real user override apart from
-                    // an applied default.
-                    var currencyValuation = _settings.GetEffectiveCurrencyValuation();
-                    // The per-plan valueOwnMaterials parameter drives this
-                    // directly, matching how priceBasis/useOwn are also
-                    // per-plan rather than read from ModuleSettings.
-                    var ownMaterialsMode = valueOwnMaterials
-                        ? OwnMaterialsMode.Valued
-                        : OwnMaterialsMode.Free;
-                    var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
-
-                    // characterDisciplines is passed explicitly so the
-                    // useOwn:false branch (snapshot: null, disabling
-                    // reduction) still feeds the discipline tiebreak the
-                    // same list useOwn:true does - the reported discipline
-                    // must not change with the toggle.
-                    // PersistAfterGenerateAsync awaits the pipeline call
-                    // and saves on success only; a cancelled/failed
-                    // generation propagates unchanged. myPersistGen is
-                    // stamped here, synchronously, before generateTask is
-                    // created - in lockstep with the view's myGen bump.
-                    int myPersistGen = ++_persistGenerateSequence;
-
-                    // The view already passes the lifetime token, but the
-                    // parameter is public surface: linking here means a
-                    // future caller cannot start an untethered generation by
-                    // passing None, and costs one source per Generate click.
-                    var generateCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetimeToken);
-                    ct = generateCts.Token;
-
-                    Task<CraftingPlanResult> generateTask = useOwn
-                        ? _craftingPipeline.GenerateStructuredAsync(
-                            items, _currentSnapshot, ct, progress,
-                            activeChar, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel,
-                            characterDisciplines: _currentSnapshot?.CharacterDisciplines)
-                        : _craftingPipeline.GenerateStructuredAsync(
-                            items, null, ct, progress,
-                            null, priceBasis, currencyValuation, ownMaterialsMode,
-                            homesteadTiers, phaseProgress, requestLabel,
-                            characterDisciplines: _currentSnapshot?.CharacterDisciplines);
-
-                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen, ct, generateCts);
-                },
+                    StartGenerateAsync(
+                        items, useOwn, valueOwnMaterials, priceBasis, ct,
+                        progress, phaseProgress, requestLabel, lifetimeToken),
                 _modalDialog,
                 _itemSearchProvider,
                 _settings,
@@ -637,14 +613,20 @@ namespace GW2CraftingHelper
 
             _settingsContent = new SettingsTabContent(_settings, _modalDialog);
 
-            // DataDir and
-            // _moduleIconTexture are both already in scope at this point in
-            // Initialize() (dataDir computed at the top of this method,
-            // _moduleIconTexture loaded a few lines above) - trivial
+            // dataDir is threaded in as a parameter and _moduleIconTexture
+            // is already loaded (LoadTextures runs first) - trivial
             // plumbing, no new fields needed on Module itself beyond the
             // view instance.
             _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
+        }
 
+        /// <summary>
+        /// Constructs the module window itself. Sizing rationale is in
+        /// WindowSizing; the texture-space regions below are explained
+        /// inline.
+        /// </summary>
+        private void BuildWindow()
+        {
             // SpriteScreen is the GW2 CLIENT area, not the monitor, so a
             // windowed player can legitimately be narrower than the minimum.
             // Enforcing the full minimum there would put the window's right
@@ -692,7 +674,14 @@ namespace GW2CraftingHelper
                     Math.Max(0, (GameService.Graphics.SpriteScreen.Height - WindowSizing.MinWindowHeight) / 2)),
                 SavesPosition = true,
             };
+        }
 
+        /// <summary>
+        /// Adds the window's tabs in strip order. Tab order is the user-
+        /// visible contract; the DEBUG-gated pair is dev-only.
+        /// </summary>
+        private void BuildTabs()
+        {
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
                 () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
@@ -755,7 +744,14 @@ namespace GW2CraftingHelper
                     return new ViewAdapter("About", c => _aboutContent.Build(c));
                 },
                 "About"));
+        }
 
+        /// <summary>
+        /// Wires the window's tab-change handler and the corner icon.
+        /// Last, so every object these handlers touch already exists.
+        /// </summary>
+        private void WireEvents()
+        {
             // Refresh log content when switching to the Log tab
             _mainWindow.TabChanged += (s, e) =>
             {
@@ -784,6 +780,103 @@ namespace GW2CraftingHelper
             {
                 _mainWindow.ToggleWindow();
             };
+        }
+
+        /// <summary>
+        /// One Generate click: reads the active character and the effective
+        /// settings, starts the pipeline, and hands the task to
+        /// <see cref="PersistAfterGenerateAsync"/>.
+        /// </summary>
+        /// <param name="lifetimeToken">
+        /// Passed in rather than read from <c>_lifetimeCts</c> so the token
+        /// is the one captured when the view was built - a later Initialize
+        /// installs a different source, and Unload disposes this one.
+        /// </param>
+        private Task<CraftingPlanResult> StartGenerateAsync(
+            IReadOnlyList<PlanRequestItem> items,
+            bool useOwn,
+            bool valueOwnMaterials,
+            PriceBasis priceBasis,
+            CancellationToken ct,
+            IProgress<PlanStatus> progress,
+            IProgress<PlanPhaseEvent> phaseProgress,
+            string requestLabel,
+            CancellationToken lifetimeToken)
+        {
+            string activeChar = null;
+            try
+            {
+                var mumble = GameService.Gw2Mumble;
+                if (mumble != null &&
+                    mumble.PlayerCharacter != null &&
+                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                {
+                    activeChar = mumble.PlayerCharacter.Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Gw2Mumble unavailable - graceful fallback. Debug,
+                // not Warn: this runs once per Generate click (a
+                // human-paced action, not a hot loop), but a user
+                // running Blish without Mumble wired up would hit
+                // it every single click - Debug (ring-always,
+                // file-only-when-diagnostics-on) keeps that from
+                // becoming routine file noise for a purely
+                // cosmetic fallback (active-character is only used
+                // for account-bound recipe checks).
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            // The EFFECTIVE
+            // valuation (user overrides + CurrencyDecisionDefaults'
+            // curated defaults, minus anything explicitly cleared -
+            // see ModuleSettings.GetEffectiveCurrencyValuation's own
+            // doc comment) - not the raw GetCurrencyValuation the
+            // Settings tab itself reads, which must stay default-
+            // free so it can tell a real user override apart from
+            // an applied default.
+            var currencyValuation = _settings.GetEffectiveCurrencyValuation();
+            // The per-plan valueOwnMaterials parameter drives this
+            // directly, matching how priceBasis/useOwn are also
+            // per-plan rather than read from ModuleSettings.
+            var ownMaterialsMode = valueOwnMaterials
+                ? OwnMaterialsMode.Valued
+                : OwnMaterialsMode.Free;
+            var homesteadTiers = _settings.GetHomesteadEfficiencyTiers();
+
+            // characterDisciplines is passed explicitly so the
+            // useOwn:false branch (snapshot: null, disabling
+            // reduction) still feeds the discipline tiebreak the
+            // same list useOwn:true does - the reported discipline
+            // must not change with the toggle.
+            // PersistAfterGenerateAsync awaits the pipeline call
+            // and saves on success only; a cancelled/failed
+            // generation propagates unchanged. myPersistGen is
+            // stamped here, synchronously, before generateTask is
+            // created - in lockstep with the view's myGen bump.
+            int myPersistGen = ++_persistGenerateSequence;
+
+            // The view already passes the lifetime token, but the
+            // parameter is public surface: linking here means a
+            // future caller cannot start an untethered generation by
+            // passing None, and costs one source per Generate click.
+            var generateCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetimeToken);
+            ct = generateCts.Token;
+
+            Task<CraftingPlanResult> generateTask = useOwn
+                ? _craftingPipeline.GenerateStructuredAsync(
+                    items, _currentSnapshot, ct, progress,
+                    activeChar, priceBasis, currencyValuation, ownMaterialsMode,
+                    homesteadTiers, phaseProgress, requestLabel,
+                    characterDisciplines: _currentSnapshot?.CharacterDisciplines)
+                : _craftingPipeline.GenerateStructuredAsync(
+                    items, null, ct, progress,
+                    null, priceBasis, currencyValuation, ownMaterialsMode,
+                    homesteadTiers, phaseProgress, requestLabel,
+                    characterDisciplines: _currentSnapshot?.CharacterDisciplines);
+
+            return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen, ct, generateCts);
         }
 
         /// <summary>
