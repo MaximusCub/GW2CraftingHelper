@@ -228,7 +228,9 @@
     <Compile Include="Views\Rendering\ISectionRelayoutSink.cs" />
     <Compile Include="Views\Rendering\ITreePlanHost.cs" />
     <Compile Include="Views\Rendering\DisciplinesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\EmptyPlanStateRenderer.cs" />
     <Compile Include="Views\Rendering\NotesSectionRenderer.cs" />
+    <Compile Include="Views\Rendering\PlanHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />

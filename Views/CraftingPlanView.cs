@@ -4111,29 +4111,20 @@ namespace GW2CraftingHelper.Views
             }
         }
 
-        // What the tab says when it holds no plan. The default state was
-        // blank parchment plus a small "Ready" on the status strip, which
-        // names no next action - the Log tab already answers the same
-        // question with a dim label in its own empty content panel, and
-        // this is that pattern.
-        private const string EmptyPlanText =
-            "No plan yet. Search for an item above, then click Generate Plan.";
-
-        private const int EmptyPlanTopGap = 48;
-        private static readonly Color EmptyPlanTextColor = new Color(150, 150, 150);
-
         /// <summary>
-        /// Parents the empty-state label into the (already emptied) content
-        /// panel. Nothing disposes it explicitly: it is a child of
-        /// _contentPanel like every rendered section, so
-        /// ResetContentPanelToEmpty sweeps it on the first render of a real
-        /// plan - which is the "disposed on first render" the finding asks
-        /// for, through the path that already exists rather than a second
-        /// one that could drift from it.
+        /// Empties the content panel and hands it to
+        /// EmptyPlanStateRenderer.
         /// <para>
-        /// The gap is a spacer Panel, not a Location: _contentPanel is a
-        /// SingleTopToBottom FlowPanel and positions its own children, the
-        /// same reason CreateSectionHeader emits a topGap panel.
+        /// The reset is here, not in the renderer: it starts from the same
+        /// "nothing rendered yet" point RenderPlan does, and for the same
+        /// reason - the empty state registers a relayout closure, and
+        /// _relayoutActions is cleared ONLY here. Without it, a tab visit
+        /// with no plan would leave the previous visit's closures in the
+        /// registry, each one writing Size into a control that visit
+        /// already disposed. Idempotent - both call sites reach it with the
+        /// panel already empty (the rollback path calls it explicitly
+        /// first, deliberately, and both the tree-state reset and the
+        /// registry clears are repeat-safe).
         /// </para>
         /// </summary>
         private void ShowEmptyPlanState()
@@ -4143,15 +4134,6 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            // Starts from the same "nothing rendered yet" point RenderPlan
-            // does, and for the same reason: this method registers a
-            // relayout closure, and _relayoutActions is cleared ONLY here.
-            // Without it, a tab visit with no plan would leave the previous
-            // visit's closures in the registry, each one writing Size into
-            // a control that visit already disposed. Idempotent - both call
-            // sites reach it with the panel already empty (the rollback
-            // path calls it explicitly first, deliberately, and both the
-            // tree-state reset and the registry clears are repeat-safe).
             ResetContentPanelToEmpty();
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
@@ -4160,30 +4142,7 @@ namespace GW2CraftingHelper.Views
                 panelWidth = 0;
             }
 
-            var topGap = new Panel()
-            {
-                Size = new Point(panelWidth, EmptyPlanTopGap),
-                Parent = _contentPanel,
-            };
-
-            var label = new Label()
-            {
-                Font = UiFonts.Body,
-                Text = EmptyPlanText,
-                AutoSizeWidth = false,
-                AutoSizeHeight = true,
-                Width = panelWidth,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextColor = EmptyPlanTextColor,
-                Parent = _contentPanel,
-            };
-
-            _relayoutActions.Add(w =>
-            {
-                int width = w > 0 ? w : 0;
-                topGap.Size = new Point(width, EmptyPlanTopGap);
-                label.Width = width;
-            });
+            new EmptyPlanStateRenderer(this).Render(_contentPanel, panelWidth);
         }
 
         /// <summary>
@@ -4224,7 +4183,7 @@ namespace GW2CraftingHelper.Views
 
             int panelWidth = _contentPanel.Width - RightEdgePadding;
 
-            CreatePlanHeader(vm, panelWidth);
+            new PlanHeaderRenderer(this, _getItemStatBlock).Render(vm, _contentPanel, panelWidth);
 
             // Separator under header
             var headerSeparator = new Panel()
@@ -4362,152 +4321,6 @@ namespace GW2CraftingHelper.Views
             }
 
             return vm.TreeRoot != null ? new List<CraftingTreeNode> { vm.TreeRoot } : null;
-        }
-
-        /// <summary>
-        /// Plan header: rarity-framed item icon + the item's own name in
-        /// its rarity colour + a grey quantity, left-aligned at the
-        /// content gutter every section below it also starts at.
-        ///
-        /// Three separate things used to compete here. The block was
-        /// CENTRED while everything under it was left-aligned, so the plan
-        /// had no single left edge. It carried a right-aligned "Generated:
-        /// ..." panel duplicating - to the minute - the timestamp the
-        /// fixed status strip 70px above already shows, so a plan opened
-        /// with the same text twice. And its title shared DefaultFont18
-        /// with every collapsible section header, leaving the page with no
-        /// typographic top level at all.
-        ///
-        /// So: the in-scroll timestamp is gone (the strip keeps it, and it
-        /// never scrolls away); the title is left-aligned and rendered at
-        /// DefaultFont32, and CreateSectionHeader drops to DefaultFont16,
-        /// so Font18-and-up now belongs to the page title alone. The
-        /// "Crafting Plan for " prefix is gone with it - the tab is
-        /// already titled "Crafting Plan" and the strip already says "Plan
-        /// generated", so the prefix cost half the title's width to repeat
-        /// what two other elements say.
-        /// </summary>
-        private void CreatePlanHeader(PlanViewModel vm, int panelWidth)
-        {
-            const int headerHeight = 56;
-            const int iconSize = 40;
-            const int iconBorder = 2;
-            const int iconPad = 10;
-
-            // Same 8px content gutter the Summary section's tiles, the
-            // currency table's icon column and the footnote all start at.
-            const int headerX = 8;
-
-            int frameSize = iconSize + iconBorder * 2;
-
-            var titleFont = UiFonts.Display;
-
-            // Regular weight, one tier down from the title it annotates -
-            // and not the 18-regular it used to be, whose 4px space glyph
-            // rendered " x 42 needed" no wider than Body did.
-            var qtyFont = UiFonts.SmallHeading;
-
-            string nameText = vm.TargetItemName ?? "Unknown Item";
-
-            // "needed", not a bare count: the quantity here is what the
-            // plan still has to obtain after owned materials were
-            // subtracted, which is routinely smaller than the number in
-            // the Qty box the user typed (live capture ph13: box 77,
-            // header 42, 35 already owned). A bare "x 42" beside a box
-            // reading 77 reads as a bug. Deliberately not "to craft" -
-            // a root the solver decided to BUY is just as legitimate.
-            string qtyText = vm.TargetQuantity > 1 ? $" x {vm.TargetQuantity} needed" : "";
-
-            var nameMeasure = titleFont.MeasureString(nameText);
-            int nameWidth = (int)System.Math.Ceiling(nameMeasure.Width);
-            int textHeight = (int)System.Math.Ceiling(nameMeasure.Height);
-
-            int qtyHeight = 0;
-            if (qtyText.Length > 0)
-            {
-                qtyHeight = (int)System.Math.Ceiling(qtyFont.MeasureString(qtyText).Height);
-            }
-
-            int iconY = (headerHeight - frameSize) / 2;
-            int textY = iconY + (frameSize - textHeight) / 2;
-            // Bottom-aligned against the much taller name rather than
-            // top-aligned, with a small optical lift off the descender
-            // line, so the two sit on one reading line.
-            int qtyY = textY + textHeight - qtyHeight - 4;
-
-            var titlePanel = new Panel()
-            {
-                Size = new Point(panelWidth, headerHeight),
-                Parent = _contentPanel,
-            };
-
-            var iconFrame = IconControls.CreateItemIcon(
-                titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
-                iconSize: iconSize, borderThickness: iconBorder);
-
-            int textX = headerX + frameSize + iconPad;
-            var nameLabel = new Label()
-            {
-                Text = nameText,
-                Font = titleFont,
-                TextColor = RarityColors.GetRarityNameColor(vm.TargetRarity),
-                ShowShadow = true,
-                ShadowColor = Color.Black * 0.8f,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(textX, textY),
-                Parent = titlePanel,
-            };
-
-            // PlanViewModel carries no target item id of its own, so the
-            // tree root - the very item this header names - is the id. A
-            // multi-item batch has no single target and no single tooltip
-            // either (TreeRoot is null there by design).
-            //
-            // Composed at hover time, so a plan restored from disk shows
-            // its stats as soon as the background top-up lands (Q13).
-            // Stamped on the Label and the icon as well as the panel:
-            // anything lying over the panel wins the hover outright
-            // (Control.ActiveControl is the deepest capturing control),
-            // the same swallowed-hover class already fixed on tree rows.
-            // The 44px icon is the header's largest target and the most
-            // natural one to point at.
-            var treeRoot = vm.TreeRoot;
-            Func<TooltipContent> buildStatContent =
-                () => TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock);
-            TooltipFacility.ApplyRichDeferred(titlePanel, buildStatContent);
-            TooltipFacility.ApplyRichDeferred(nameLabel, buildStatContent);
-
-            // The icon only for a real item root: a multi-item batch has
-            // no single target (TreeRoot is null by design), and stamping
-            // an always-empty builder over the icon would replace its own
-            // "no icon available" note with silence.
-            if (TreeRowTooltipComposer.RowIdIsAnItemId(treeRoot))
-            {
-                IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
-            }
-
-            if (qtyText.Length > 0)
-            {
-                var qtyLabel = new Label()
-                {
-                    Text = qtyText,
-                    Font = qtyFont,
-                    TextColor = new Color(170, 170, 170),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(textX + nameWidth, qtyY),
-                    Parent = titlePanel,
-                };
-                TooltipFacility.ApplyRichDeferred(qtyLabel, buildStatContent);
-            }
-
-            // Every x here is now a constant or a font-only measurement,
-            // so nothing in the title moves with the panel width - only
-            // the panel's own cosmetic width, same as TextRowRenderer's
-            // rows. The centring anchor (and the right-aligned timestamp
-            // that needed one) is gone.
-            _relayoutActions.Add(w => titlePanel.Size = new Point(w, headerHeight));
         }
 
         /// <summary>
