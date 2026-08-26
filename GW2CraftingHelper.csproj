@@ -106,6 +106,7 @@
     <Compile Include="Services\PlanHistoryRetention.cs" />
     <Compile Include="Services\PlanHistoryRowLayout.cs" />
     <Compile Include="Services\PlanHistoryLabels.cs" />
+    <Compile Include="Views\PlanHistoryTabContent.cs" />
     <Compile Include="Services\PlanStore.cs" />
     <Compile Include="Services\PlanStoreHelpers.cs" />
     <Compile Include="Services\PlanStructuralValidator.cs" />
