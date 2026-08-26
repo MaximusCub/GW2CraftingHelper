@@ -378,7 +378,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    treeFlow, panelWidth, "Item", TreeCaretColWidth + TreeIconFrameSize + TreeNameGap, "Cost", _sink,
+                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, "Cost", _sink,
                     middleLabel: "Source",
                     middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
                         w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
@@ -656,16 +656,6 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Fixed tree-row column grid (spec: "the key gw2e table look" - every
-        // row aligns regardless of depth). Right-anchored columns (pills,
-        // cost) sit at the same x on every row; only the left side (caret,
-        // icon, name) shifts with indent.
-        private const int TreeIndentPer = 24;
-        private const int TreeCaretColWidth = 18;
-        private const int TreeIconSize = 32;
-        private const int TreeIconBorder = 1;
-        private const int TreeIconFrameSize = TreeIconSize + TreeIconBorder * 2;
-        private const int TreeNameGap = 6;
         private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
 
         // Defined in PlanRelayoutMath, which owns the column arithmetic and
@@ -674,14 +664,6 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
 
-        // Left-indent rule down a dimmed subtree: 2px wide (1px is not
-        // guaranteed a physical scanline under Blish's non-integer UI
-        // scale - see LabelHelpers.CreateRowDivider), drawn at every dimmed
-        // row's own indent channel and spanning the full row height, so
-        // consecutive rows at the same depth join into one continuous line
-        // and the branch reads as a single inactive block instead of a
-        // stack of independently-styled rows. Sits inside the existing
-        // TreeRowHeight, so no height math changes.
         // Decision-pill chrome. TightPillPadding is the first thing tried
         // when a row's pills do not fit: 3px of side padding instead of 6
         // still reads as a pill, and squeezing beats hiding a real option
@@ -695,8 +677,8 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int PillPadding = 12;
         private const int TightPillPadding = 6;
 
-        private const int TreeDimmedRuleWidth = 2;
-        private const int TreeDimmedRuleOffset = 8;
+        // The rule's geometry lives in TreeRowShapePlanner; only its color
+        // is a palette decision, so only its color stays here.
         private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
 
         // What a dead click on a dimmed pill means, and the one action
@@ -807,8 +789,13 @@ namespace GW2CraftingHelper.Views.Rendering
         private void RenderTreeNode(
             CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, bool dimmed, string captionText = null)
         {
-            int indent = depth * TreeIndentPer;
-            bool hasChildren = node.Children.Count > 0;
+            // Every column origin, the caret glyph, the quantity prefix and
+            // the dimmed-branch flag come from the Blish-free planner (see
+            // its doc comment and docs/ARCHITECTURE.md section 5's STANDING
+            // RULE); only control construction and the palette stay here.
+            var shape = TreeRowShapePlanner.Plan(node, depth, dimmed, _nodeExpansion);
+            int indent = shape.Indent;
+            bool hasChildren = shape.HasChildren;
 
             var rowPanel = new Panel()
             {
@@ -830,40 +817,23 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel.BackgroundColor = Color.Transparent;
             };
 
-            // Caret column: fixed width even for leaf rows (no children ->
-            // no glyph, but the icon column still starts at the same x as
-            // every sibling), so caret state is scannable at a glance.
-            // Reference-branch nodes (dimmed - see the childDimmed comment
-            // below) always start collapsed regardless of depth, so a bought
-            // node's "what it would cost to craft instead" subtree does not
-            // visually explode the plan the moment its parent expands.
-            // Non-reference nodes keep the existing depth<2 default. Calls
-            // PlanContentHeightMath.IsNodeExpanded (not a hand-duplicated
-            // ternary) so this decision and RefreshTreeContainerHeights'
-            // height arithmetic share one formula and cannot silently
-            // desync - see that method's doc comment.
-            bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, _nodeExpansion);
-
             // Left-indent rule (see TreeDimmedRuleColor). Drawn before
             // every other child so nothing else in the row paints under it,
             // and never on a live row.
             if (dimmed)
             {
-                int ruleX = indent - TreeDimmedRuleOffset;
-                if (ruleX < 0)
-                {
-                    ruleX = 0;
-                }
-
                 new Panel()
                 {
-                    Size = new Point(TreeDimmedRuleWidth, TreeRowHeight),
-                    Location = new Point(ruleX, 0),
+                    Size = new Point(TreeRowShapePlanner.DimmedRuleWidth, TreeRowHeight),
+                    Location = new Point(shape.DimmedRuleX, 0),
                     BackgroundColor = TreeDimmedRuleColor,
                     Parent = rowPanel,
                 };
             }
 
+            // Caret column: fixed width even for leaf rows (no children ->
+            // no glyph, but the icon column still starts at the same x as
+            // every sibling), so caret state is scannable at a glance.
             Label arrowLabel = null;
             if (hasChildren)
             {
@@ -871,9 +841,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 arrowLabel = new Label()
                 {
                     Font = UiFonts.Body,
-                    // ASCII, matching the section headers - the U+25BC/U+25B6
-                    // triangles do not render in Blish's font.
-                    Text = isExpanded ? "v" : ">",
+                    Text = shape.CaretGlyph,
                     TextColor = arrowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -886,17 +854,18 @@ namespace GW2CraftingHelper.Views.Rendering
             // neutral frame plus a dark scrim over the icon itself (Blish
             // panels have no tint/filter property, so a translucent black
             // overlay approximates gw2e's grayscale+opacity filter).
-            int iconX = indent + TreeCaretColWidth;
+            int iconX = shape.IconX;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, node.IconUrl, frameColor, iconX, 3, TreeIconSize, TreeIconBorder);
+                rowPanel, node.IconUrl, frameColor, iconX, 3,
+                TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconBorder);
             Panel iconScrim = null;
             if (dimmed)
             {
                 iconScrim = new Panel()
                 {
-                    Size = new Point(TreeIconSize, TreeIconSize),
-                    Location = new Point(iconX + TreeIconBorder, 3 + TreeIconBorder),
+                    Size = new Point(TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconSize),
+                    Location = new Point(iconX + TreeRowShapePlanner.IconBorder, 3 + TreeRowShapePlanner.IconBorder),
                     BackgroundColor = Color.Black * 0.5f,
                     Parent = rowPanel,
                 };
@@ -907,13 +876,13 @@ namespace GW2CraftingHelper.Views.Rendering
             // never collide with the fixed-position columns to its right.
             // PillColX/costRightEdge/nameMaxWidth now come from
             // PlanRelayoutMath.ComputeTreeColumnEdges - the SAME pure
-            // function the relayout/re-ellipsis closures below call, so the
+            // function RegisterRowResizeHandlers' closures call, so the
             // build and every later resize tick can never disagree about
             // these columns.
-            int nameX = indent + TreeCaretColWidth + TreeIconFrameSize + TreeNameGap;
+            int nameX = shape.NameX;
 
             var nameFont = UiFonts.Body;
-            string qtyPrefix = node.Quantity > 0 ? $"{node.Quantity}x " : "";
+            string qtyPrefix = shape.QuantityPrefix;
             int qtyWidth = qtyPrefix.Length > 0
                 ? (int)System.Math.Ceiling(nameFont.MeasureString(qtyPrefix).Width)
                 : 0;
@@ -1032,64 +1001,7 @@ namespace GW2CraftingHelper.Views.Rendering
             Func<TooltipContent> getStatContent =
                 () => TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
 
-            // This module's only external-URL launch - a context action
-            // (right-click), not a visible icon. Every tree
-            // row gets this, item leaf or internal node alike - a wiki page
-            // that does not exist for an internal-only concept (e.g. a
-            // synthesized cost-component "currency" name) just 404s rather
-            // than crashing anything; WikiLinkBuilder.HasWikiPage/
-            // BuildItemPageUrl additionally suppress the affordance
-            // entirely for the known placeholder names (see
-            // WikiLinkBuilder's SentinelNames), which never resolve to a
-            // real page at all.
-            //
-            // Fix-pass (render-path allocation): HasWikiPage is a cheap
-            // non-whitespace + not-a-placeholder-name check - the actual
-            // URL (Trim + Replace + Uri.EscapeDataString, a closure, and a
-            // delegate) is built lazily inside the press/release handlers
-            // below instead of eagerly for every tree row on every build
-            // and every lazy expand, since most rows are never
-            // right-clicked at all.
-            //
-            // Fix-pass (right-click-as-camera-drag): GW2's own right-drag
-            // is the camera-rotate gesture, and firing on button-DOWN alone
-            // (the previous behavior) meant a drag begun over this row -
-            // input Blish otherwise swallows here today - opened the
-            // browser and yanked focus out of a fullscreen game the
-            // instant the button went down, with no way to abort. Firing
-            // on RightMouseButtonReleased alone is NOT a fix: Blish routes
-            // the release event to whichever row is under the cursor at
-            // release time, so a drag that started on a DIFFERENT row
-            // would open THIS row's page instead. Pairing press+release on
-            // this SAME rowPanel closes that: press arms a per-row flag,
-            // and only this row's own Released handler (which only fires
-            // when the release also lands on this row) can consume it.
-            // MouseLeft additionally disarms the flag the moment the
-            // cursor leaves this row after a press, so a drag that starts
-            // here, wanders off, and is released back over this row later
-            // (from an unrelated gesture) cannot replay a stale arm.
-            //
-            // Unlike toggleHandler below, this handler does NOT exclude
-            // clicks landing on a pill (pillPanels is not yet in scope
-            // here). Intentional and harmless: decision pills carry no
-            // right-click meaning, so a right-click that lands on one
-            // still falls through to this row's wiki-link handler rather
-            // than doing nothing.
-            if (WikiLinkBuilder.HasWikiPage(node.Name))
-            {
-                string nodeName = node.Name;
-                bool wikiLinkArmed = false;
-                rowPanel.RightMouseButtonPressed += (_, __) => wikiLinkArmed = true;
-                rowPanel.MouseLeft += (_, __) => wikiLinkArmed = false;
-                rowPanel.RightMouseButtonReleased += (_, __) =>
-                {
-                    if (wikiLinkArmed)
-                    {
-                        wikiLinkArmed = false;
-                        WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
-                    }
-                };
-            }
+            WireWikiLinkContextAction(rowPanel, node);
 
             UpdateTreeRowTooltip(
                 rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
@@ -1130,22 +1042,106 @@ namespace GW2CraftingHelper.Views.Rendering
             // the layout.
             RenderCostCell(handle, node, edges.CostRightEdge, dimmed);
 
+            FlowPanel childFlow = RenderChildContainer(
+                node, parent, panelWidth, depth, shape, rowPanel, arrowLabel, pillPanels, handle);
+
+            RegisterRowResizeHandlers(handle, rowPanel, childFlow, nameFont);
+        }
+
+        /// <summary>
+        /// The row's right-click-to-wiki context action, wired only for
+        /// names that can resolve to a page - see WikiLinkBuilder's
+        /// SentinelNames for the ones that never can.
+        /// </summary>
+        private static void WireWikiLinkContextAction(Panel rowPanel, CraftingTreeNode node)
+        {
+            // This module's only external-URL launch - a context action
+            // (right-click), not a visible icon. Every tree
+            // row gets this, item leaf or internal node alike - a wiki page
+            // that does not exist for an internal-only concept (e.g. a
+            // synthesized cost-component "currency" name) just 404s rather
+            // than crashing anything; WikiLinkBuilder.HasWikiPage/
+            // BuildItemPageUrl additionally suppress the affordance
+            // entirely for the known placeholder names (see
+            // WikiLinkBuilder's SentinelNames), which never resolve to a
+            // real page at all.
+            //
+            // Fix-pass (render-path allocation): HasWikiPage is a cheap
+            // non-whitespace + not-a-placeholder-name check - the actual
+            // URL (Trim + Replace + Uri.EscapeDataString, a closure, and a
+            // delegate) is built lazily inside the press/release handlers
+            // below instead of eagerly for every tree row on every build
+            // and every lazy expand, since most rows are never
+            // right-clicked at all.
+            //
+            // Fix-pass (right-click-as-camera-drag): GW2's own right-drag
+            // is the camera-rotate gesture, and firing on button-DOWN alone
+            // (the previous behavior) meant a drag begun over this row -
+            // input Blish otherwise swallows here today - opened the
+            // browser and yanked focus out of a fullscreen game the
+            // instant the button went down, with no way to abort. Firing
+            // on RightMouseButtonReleased alone is NOT a fix: Blish routes
+            // the release event to whichever row is under the cursor at
+            // release time, so a drag that started on a DIFFERENT row
+            // would open THIS row's page instead. Pairing press+release on
+            // this SAME rowPanel closes that: press arms a per-row flag,
+            // and only this row's own Released handler (which only fires
+            // when the release also lands on this row) can consume it.
+            // MouseLeft additionally disarms the flag the moment the
+            // cursor leaves this row after a press, so a drag that starts
+            // here, wanders off, and is released back over this row later
+            // (from an unrelated gesture) cannot replay a stale arm.
+            //
+            // Unlike RenderChildContainer's caret handler, this one does
+            // not exclude clicks landing on a pill (this method never sees
+            // them). Intentional and harmless: decision pills carry no
+            // right-click meaning, so a right-click that lands on one
+            // still falls through to this row's wiki-link handler rather
+            // than doing nothing.
+            if (WikiLinkBuilder.HasWikiPage(node.Name))
+            {
+                string nodeName = node.Name;
+                bool wikiLinkArmed = false;
+                rowPanel.RightMouseButtonPressed += (_, __) => wikiLinkArmed = true;
+                rowPanel.MouseLeft += (_, __) => wikiLinkArmed = false;
+                rowPanel.RightMouseButtonReleased += (_, __) =>
+                {
+                    if (wikiLinkArmed)
+                    {
+                        wikiLinkArmed = false;
+                        WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
+                    }
+                };
+        }
+        }
+
+        /// <summary>
+        /// The row's child container and its expand/collapse caret
+        /// handler, or null when the row is a leaf. Recurses into
+        /// <see cref="RenderTreeNode"/> for children visible now; a
+        /// collapsed node's children are built on first expand instead.
+        /// </summary>
+        private FlowPanel RenderChildContainer(
+            CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, TreeRowShape shape,
+            Panel rowPanel, Label arrowLabel, List<Panel> pillPanels, TreeRowHandle handle)
+        {
+            bool hasChildren = shape.HasChildren;
+            bool isExpanded = shape.IsExpanded;
+
             // Child container. Children of a non-Craft decision are this
             // module's own informational reference branch (gw2e has no
             // equivalent ".not-crafted" concept; this dimmed "what it would
-            // cost to craft instead" branch is a module original) - dimmed,
-            // and the
-            // flag does not stack on already-dimmed branches.
+            // cost to craft instead" branch is a module original).
             FlowPanel childFlow = null;
             if (hasChildren)
             {
-                bool childDimmed = dimmed || node.Decision != CraftingDecision.Craft;
+                bool childDimmed = shape.ChildDimmed;
 
                 // Standard (explicit) height, same
                 // as the section header's contentFlow - see that
                 // construction site's comment. Starts at 0; the caller that
                 // ultimately owns this build pass (CreateTreeSection's
-                // initial call, or a toggle handler below) finalizes the
+                // initial call, or the caret handler below) finalizes the
                 // real height via RefreshTreeContainerHeights before
                 // control returns to PreserveScrollAcross's caller.
                 childFlow = new FlowPanel()
@@ -1234,13 +1230,23 @@ namespace GW2CraftingHelper.Views.Rendering
                 rowPanel.Click += toggleHandler;
             }
 
+            return childFlow;
+        }
+
+        /// <summary>
+        /// The row's two resize responses: reposition on every drag
+        /// tick, re-ellipsize the name only once the drag settles.
+        /// </summary>
+        private void RegisterRowResizeHandlers(
+            TreeRowHandle handle, Panel rowPanel, FlowPanel childFlow, BitmapFont nameFont)
+        {
             // Pills/cost cell reposition every drag tick (no
             // MeasureString - pill widths are already-known control Width,
             // CoinCurrencyRenderer.RepositionValueCellRightAligned uses only cached segment text
             // widths); childFlow's width tracks panelWidth with its Height
             // preserved exactly (never perturbs scroll - every
             // row/container height is explicit). The name label is
-            // untouched here; it only re-ellipsizes at settle below.
+            // untouched by the relayout pass; it only re-ellipsizes at settle.
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, TreeRowHeight);
@@ -1773,17 +1779,6 @@ namespace GW2CraftingHelper.Views.Rendering
                 var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
                     borderColor, fillColor, textColor, out Panel inner, out Label label);
 
-                // The pill's head prose. Resolved by the branches below,
-                // then composed with the subduing/value-detail/dead-click
-                // blocks and stamped onto outer/inner/label at the bottom
-                // of this loop - the inner fill panel and its label cover
-                // almost the entire pill, so a tooltip on outer alone is
-                // swallowed by whichever child is under the cursor (labels
-                // capture mouse). Click/MouseEntered/MouseLeft stay on
-                // outer only - unlike tooltip lookup, those already work
-                // correctly today.
-                string tooltipText = null;
-
                 // The dimmed-only difference between this and the two flags
                 // below is exactly what the dead-click tooltip at the
                 // bottom of this loop has to explain.
@@ -1801,17 +1796,27 @@ namespace GW2CraftingHelper.Views.Rendering
                     ? PillSubduingTooltipBuilder.BuildContent(
                         spec.SubduingResult, plan?.ItemMetadata, plan?.CurrencyMetadata)
                     : null;
-                bool appendSubduing = false;
+
+                // The pill's head prose, and whether the subduing block
+                // belongs after it. Both are pure text decisions, so both
+                // live in the Blish-free PillTooltipTextComposer (see
+                // docs/ARCHITECTURE.md section 5's STANDING RULE); only the
+                // click wiring below and the rich composition at the bottom
+                // of this loop need a control. The head is stamped onto
+                // outer/inner/label rather than outer alone because the
+                // inner fill panel and its label cover almost the whole
+                // pill, so a tooltip on outer alone is swallowed by
+                // whichever child is under the cursor (labels capture
+                // mouse). Click/MouseEntered/MouseLeft stay on outer only -
+                // unlike tooltip lookup, those already work correctly.
+                var headPlan = PillTooltipTextComposer.Compose(
+                    spec, node, interactive, ignoreInteractive,
+                    plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
+                string tooltipText = headPlan.Text;
+                bool appendSubduing = headPlan.AppendSubduing && subduingContent != null;
 
                 if (interactive)
                 {
-                    tooltipText = $"Switch to {spec.Text}";
-                    // A decisively-losing
-                    // pill (Kind == Subdued) stays clickable - only its
-                    // tooltip gains the "why" explanation, appended after
-                    // the ordinary "Switch to X" line rather than replacing
-                    // it, since clicking still does exactly that.
-                    appendSubduing = subduingContent != null;
                     var source = spec.Source.Value;
                     outer.Click += (_, __) =>
                     {
@@ -1828,9 +1833,6 @@ namespace GW2CraftingHelper.Views.Rendering
                     // Toggles this ITEM id (not just this node) in
                     // or out of _ignoredItemIds, matching gw2e's own
                     // tree-wide-by-item-id "Ignore" semantics.
-                    tooltipText = node.IsIgnored
-                        ? "Stop treating this item as fully in-hand"
-                        : "Treat this item as fully in-hand (ignore its owned-stock requirement)";
                     int itemId = node.ItemId;
                     outer.Click += (_, __) =>
                     {
@@ -1845,146 +1847,6 @@ namespace GW2CraftingHelper.Views.Rendering
                     outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
                     outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
                     PressFeedback.Wire(outer);
-                }
-                else if (spec.Kind == PillKind.Subdued)
-                {
-                    // Reached only when the click is NOT wired - a dimmed
-                    // row, or no re-solve callback at all. The pill still
-                    // shows why this option loses; the dead-click line
-                    // below is appended after it, never over it.
-                    appendSubduing = subduingContent != null;
-                }
-                else if (spec.Kind == PillKind.Locked)
-                {
-                    // A cost-component leaf's "CURRENCY" badge - its cost
-                    // cell is deliberately blank because the quantity
-                    // itself IS the cost. Never a "no source" situation
-                    // like the other Locked pills, so it gets its own
-                    // tooltip first.
-                    if (node.IsCostComponent)
-                    {
-                        tooltipText = "Paid in a non-coin currency - no gold value to show here";
-                    }
-
-                    // The UNKNOWN pill (node.Decision == Unknown - no
-                    // feasible source at all) is a different situation from
-                    // every other locked pill (exactly one feasible source,
-                    // just not a choice): "Only available source" is
-                    // misleading there since there IS no available source.
-                    // Prefer the seeded wiki hint when one exists.
-                    else if (node.Decision == CraftingDecision.Unknown)
-                    {
-                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
-                            ? node.AcquisitionHint
-                            : "No known acquisition source";
-                    }
-
-                    // guildupgrade-ingredients fix: the GUILD UPGRADE pill
-                    // is the same "no available source" situation as
-                    // UNKNOWN above (not "exactly one feasible source" -
-                    // "Only available source" would be equally misleading
-                    // here), just with its own always-populated
-                    // AcquisitionHint (see CraftingTreeBuilder's
-                    // "GuildUpgrade" branch) instead of a seeded wiki hint.
-                    else if (node.Decision == CraftingDecision.GuildUpgrade)
-                    {
-                        tooltipText = !string.IsNullOrEmpty(node.AcquisitionHint)
-                            ? node.AcquisitionHint
-                            : "Requires a claimed Guild Hall upgrade";
-                    }
-
-                    // The UNRECOGNIZED pill is the same "no available
-                    // source" situation as UNKNOWN/GUILD UPGRADE, not
-                    // "exactly one feasible source" - without this branch
-                    // it falls into the misleading "Only available source"
-                    // default. node.AcquisitionHint is always null here
-                    // (the builder returns before ApplyAcquisitionHint).
-                    else if (node.Decision == CraftingDecision.UnrecognizedIngredient)
-                    {
-                        tooltipText = "Unrecognized ingredient type - no known acquisition source";
-                    }
-
-                    // The plain CURRENCY pill must not fall into the "Only
-                    // available source" default - a currency ingredient is
-                    // paid from the wallet, so no "source" wording applies.
-                    else if (node.Decision == CraftingDecision.Currency)
-                    {
-                        tooltipText = "Paid from your wallet as a game currency - no purchase or crafting source applies";
-                    }
-                    else
-                    {
-                        tooltipText = "Only available source";
-                    }
-                }
-                else if (spec.Kind == PillKind.Selected)
-                {
-                    // The currently-committed source pill is
-                    // non-interactive (clicking it would be a no-op
-                    // re-solve), but still gets a tooltip.
-                    tooltipText = $"Current source: {spec.Text}";
-                }
-                else if ((spec.Kind == PillKind.Have || spec.Kind == PillKind.OwnedInfo) &&
-                    (node.Decision == CraftingDecision.Currency ||
-                     (node.IsCostComponent && !node.SubtreeCost.HasValue)))
-                {
-                    // The plan-scope HAVE/TOTAL pill reuses the same
-                    // PillKind.Have/OwnedInfo the item-ownership pills
-                    // use, so it must be intercepted BEFORE the ordinary
-                    // branches below, whose item-ownership wording means
-                    // nothing for a currency leaf. The pill text is
-                    // plan-scope only; the tooltip adds what the pill text
-                    // cannot: this row's own need (node.Quantity).
-                    int have = 0;
-                    plan?.OwnedCurrencyAmounts?.TryGetValue(node.ItemId, out have);
-                    long planTotal = 0;
-                    plan?.CurrencyPlanTotals?.TryGetValue(node.ItemId, out planTotal);
-                    long shortfall = planTotal > have ? planTotal - have : 0;
-                    tooltipText = shortfall > 0
-                        ? $"Plan needs {planTotal} total, you have {have} - short {shortfall}. This row needs {node.Quantity}."
-                        : $"Plan needs {planTotal} total, you have {have} - fully covered. This row needs {node.Quantity}.";
-                }
-                else if (spec.Kind == PillKind.Have)
-                {
-                    // An ITEM cost-component leaf can never reach this
-                    // branch (it gets only badges, never PillKind.Have);
-                    // a currency leaf CAN, but is always intercepted by
-                    // the currency-specific branch above - so this
-                    // tooltip only needs the ordinary-item wording. For a
-                    // genuinely-owned Have node, Quantity is 0, so
-                    // OwnedQuantityUsed alone is the original total demand.
-                    tooltipText = $"Needs {node.OwnedQuantityUsed} - all covered by your materials";
-                }
-                else if (spec.Kind == PillKind.OwnedInfo)
-                {
-                    if (node.IsCostComponent)
-                    {
-                        // The "OWN n" badge's tooltip - owning some of a
-                        // cost component never reduces what must be
-                        // handed over or this line's cost; stated
-                        // explicitly so it is never mistaken for the
-                        // "reduced the plan" vocabulary used elsewhere.
-                        tooltipText =
-                            $"You own {node.ComponentOwnedQuantity} - informational only, " +
-                            "does not change the plan cost";
-                    }
-                    else
-                    {
-                        // Matches the "HAVE {used}/{total} NEEDED" pill
-                        // wording; remaining (node.Quantity) is total
-                        // minus used.
-                        int totalDemand = node.OwnedQuantityUsed + node.Quantity;
-                        tooltipText =
-                            $"Needs {totalDemand} total - {node.OwnedQuantityUsed} covered by your materials, " +
-                            $"{node.Quantity} left to acquire";
-                    }
-                }
-                else if (spec.Kind == PillKind.AchievementBitDeduped)
-                {
-                    // KNOWN-ISSUES #26: explains the "COUNTED
-                    // ELSEWHERE" semantics - nothing here is actually
-                    // owned, this exact occurrence is just already required
-                    // elsewhere in the tree.
-                    tooltipText = "Already counted elsewhere in the tree - this item is obtained once, not needed again here";
                 }
 
                 // Appends the value-detail

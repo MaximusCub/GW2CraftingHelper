@@ -197,6 +197,8 @@
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
     <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />
+    <Compile Include="Services\TreeRowShapePlanner.cs" />
+    <Compile Include="Services\PillTooltipTextComposer.cs" />
     <Compile Include="Services\TooltipTextFormat.cs" />
     <Compile Include="Services\TooltipContent.cs" />
     <Compile Include="Services\TooltipLayoutMath.cs" />
