@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 NodeId = nodeId,
                 Decision = decision,
-                Children = children
+                Children = children,
             };
         }
 
@@ -202,7 +202,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CraftStep),
-                Row(PlanRowType.TimegatedNotice)
+                Row(PlanRowType.TimegatedNotice),
             };
             int expected = PlanContentHeightMath.CraftStepRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.CraftingSteps, rows));
@@ -267,7 +267,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- IsNodeExpanded ---
-
         [Fact]
         public void IsNodeExpanded_OverridePresent_WinsOverDefault()
         {
@@ -294,7 +293,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Tree height ---
-
         [Fact]
         public void TreeNodeHeight_Leaf_IsSingleRow()
         {
@@ -384,7 +382,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- MultiRootTreeFlowHeight ---
-
         [Fact]
         public void MultiRootTreeFlowHeight_NullRoots_IsZero()
         {

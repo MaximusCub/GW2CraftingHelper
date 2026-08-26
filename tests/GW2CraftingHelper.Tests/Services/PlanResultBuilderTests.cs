@@ -44,7 +44,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Disciplines = disciplines ?? new List<string>(),
                 MinRating = minRating,
                 Flags = flags ?? new List<string>(),
-                ExpectedOutputCount = expectedOutputCount ?? 0
+                ExpectedOutputCount = expectedOutputCount ?? 0,
             };
 
             foreach (var ing in ingredients)
@@ -57,12 +57,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = itemId,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
         }
 
         // Leaf comes from Helpers/RecipeNodeBuilders.cs.
-
         [Fact]
         public void RequiredDisciplines_FromCraftSteps_HighestRatingWins()
         {
@@ -86,8 +85,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -114,8 +113,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.BuyFromTp }
-                }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.BuyFromTp },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -144,8 +143,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -180,13 +179,13 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true }
+                new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Tailor", Rating = 500, Active = true },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -222,8 +221,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -255,8 +254,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -292,8 +291,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -327,8 +326,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -366,8 +365,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -409,8 +408,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
                     new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 20 },
-                    new PlanStep { ItemId = 5, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 30 }
-                }
+                    new PlanStep { ItemId = 5, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 30 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -444,8 +443,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.BuyFromVendor }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.BuyFromVendor },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -471,8 +470,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 5, Quantity = 10, Source = AcquisitionSource.Currency }
-                }
+                    new PlanStep { ItemId = 5, Quantity = 10, Source = AcquisitionSource.Currency },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -497,8 +496,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -530,8 +529,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -560,8 +559,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -587,8 +586,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -100 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -615,8 +614,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -645,8 +644,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -678,8 +677,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = -1592 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -701,8 +700,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 5,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 5, Source = AcquisitionSource.BuyFromTp },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -726,8 +725,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -754,8 +753,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -780,8 +779,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -805,8 +804,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             // Learned set does NOT contain recipe 10
@@ -832,8 +831,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             // Learned set CONTAINS recipe 10
@@ -859,8 +858,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -886,8 +885,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -908,13 +907,13 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 5,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromTp }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.BuyFromTp },
+                },
             };
 
             var usedMaterials = new List<UsedMaterial>
             {
-                new UsedMaterial { ItemId = 1, QuantityUsed = 3 }
+                new UsedMaterial { ItemId = 1, QuantityUsed = 3 },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -943,7 +942,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftsNeeded = 1,
                 Disciplines = new List<string> { "Tailor" },
                 MinRating = 100,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             };
             rootOption.Ingredients.Add(firstBranch);
             rootOption.Ingredients.Add(secondBranch);
@@ -953,7 +952,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = 1,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { rootOption }
+                Recipes = new List<RecipeOption> { rootOption },
             };
         }
 
@@ -967,7 +966,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CraftsNeeded = 1,
                 Disciplines = new List<string> { discipline },
                 MinRating = minRating,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             };
 
             return new RecipeNode
@@ -975,7 +974,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Id = nodeId,
                 IngredientType = "Item",
                 Quantity = 1,
-                Recipes = new List<RecipeOption> { option }
+                Recipes = new List<RecipeOption> { option },
             };
         }
 
@@ -1001,8 +1000,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 },
-                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 }
-                }
+                    new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -1034,8 +1033,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Steps = new List<PlanStep>
                 {
                     new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 },
-                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 }
-                }
+                    new PlanStep { ItemId = 3, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 99 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -1064,8 +1063,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 1 },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();
@@ -1089,8 +1088,8 @@ namespace GW2CraftingHelper.Tests.Services
                 TargetQuantity = 1,
                 Steps = new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromTp }
-                }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromTp },
+                },
             };
 
             var metadata = new Dictionary<int, ItemMetadata>();

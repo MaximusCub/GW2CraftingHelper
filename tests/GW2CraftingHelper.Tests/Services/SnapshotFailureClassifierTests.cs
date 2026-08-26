@@ -18,7 +18,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class SnapshotFailureClassifierTests
     {
         // ---- ApiAccessNotReady (highest priority) ----
-
         [Fact]
         public void Classify_AllSourcesInvalidAccessToken_ReturnsApiAccessNotReady()
         {
@@ -76,7 +75,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- NetworkOrApiDown ----
-
         [Fact]
         public void Classify_AllSourcesTimeout_ReturnsNetworkOrApiDown()
         {
@@ -138,7 +136,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- PartialFailure ----
-
         [Fact]
         public void Classify_SomeSourcesFailedWithNonTokenCause_ReturnsPartialFailure()
         {
@@ -162,7 +159,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Unknown ----
-
         [Fact]
         public void Classify_TotalFailureWithUnrecognizedType_ReturnsUnknown()
         {
@@ -203,7 +199,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Classify(Exception) overload ----
-
         [Fact]
         public void ClassifyException_SnapshotFetchFailedException_UsesItsPerSourceDetail()
         {

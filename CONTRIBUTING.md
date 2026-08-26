@@ -76,6 +76,13 @@ reports, and commit the two together - the diff is confined to that one
 rule and the build proves it stays fixed. **The list only ever shrinks.**
 Suppressing a new rule to make a build pass is not a use of this list.
 
+The same gate covers the test and tool projects: each SDK-style project
+imports `StyleGate.props`, which references the same ruleset and carries a
+copy of the module's `<NoWarn>` list (the module cannot import it - see the
+comment in that file). Taking a rule on therefore means deleting its ID
+from both `GW2CraftingHelper.csproj` and `StyleGate.props` in the same
+commit, and fixing what every project then reports.
+
 The three largest remaining are `SA1117` (202, parameter layout), `SA1201`
 (173, member ordering) and `SA1401` (172, public fields). None has a
 mechanical fix that leaves the code better than it found it, which is why

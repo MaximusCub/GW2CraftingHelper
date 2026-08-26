@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Weaponsmith", Rating = 300 },
                 new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 400 },
-                new SnapshotCharacterDiscipline { CharacterName = "Carol", Discipline = "Armorsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Carol", Discipline = "Armorsmith", Rating = 100 },
             };
 
             var result = CraftCompetencyEvaluator.BuildBestRatingByDiscipline(characters);
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 null,
                 new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = null, Rating = 400 },
-                new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 300 }
+                new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 300 },
             };
 
             var result = CraftCompetencyEvaluator.BuildBestRatingByDiscipline(characters);

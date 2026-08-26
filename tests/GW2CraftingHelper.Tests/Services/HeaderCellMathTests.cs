@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Tests.Services
             var extents = new[]
             {
                 new HeaderCellMath.LabelExtent(50, 40),
-                new HeaderCellMath.LabelExtent(500, 79)
+                new HeaderCellMath.LabelExtent(500, 79),
             };
             var buffer = new HeaderCellMath.CellRange[extents.Length];
 
@@ -150,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
             var labels = new[]
             {
                 new HeaderCellMath.LabelExtent(50, 40, 500),
-                new HeaderCellMath.LabelExtent(560, 79)
+                new HeaderCellMath.LabelExtent(560, 79),
             };
 
             var ranges = HeaderCellMath.Partition(700, labels);
@@ -172,7 +172,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new[]
                 {
                     new HeaderCellMath.LabelExtent(10, 30, 900),
-                    new HeaderCellMath.LabelExtent(120, 40)
+                    new HeaderCellMath.LabelExtent(120, 40),
                 });
             AssertPartitions(past, 200);
 
@@ -181,7 +181,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new[]
                 {
                     new HeaderCellMath.LabelExtent(10, 30, -50),
-                    new HeaderCellMath.LabelExtent(120, 40)
+                    new HeaderCellMath.LabelExtent(120, 40),
                 });
             AssertPartitions(before, 200);
             Assert.Equal(0, before[0].Width);
@@ -196,7 +196,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new HeaderCellMath.LabelExtent(40, 30, 460),
                 new HeaderCellMath.LabelExtent(500, 79, 600),
                 new HeaderCellMath.LabelExtent(640, 30, 1060),
-                new HeaderCellMath.LabelExtent(1100, 79)
+                new HeaderCellMath.LabelExtent(1100, 79),
             };
 
             var ranges = HeaderCellMath.Partition(1200, labels);

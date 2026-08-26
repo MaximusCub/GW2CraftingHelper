@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- A Quantity == 0 node
         // must never leave a standalone "ghost" step, even when its own
         // resolved Source/stepKey does not match any other occurrence's ---
-
         [Fact]
         public void QuantityZeroNode_NestedUnderCraftedParent_MismatchedStepKey_NoGhostStep()
         {
@@ -35,7 +34,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 900, new ItemPrice { ItemId = 900, BuyInstant = 100 } },
-                { 901, new ItemPrice { ItemId = 901, BuyInstant = 1 } }
+                { 901, new ItemPrice { ItemId = 901, BuyInstant = 1 } },
             };
 
             var result = new PlanSolver().Solve(root, prices, null, PriceBasis.InstantBuy);
@@ -62,7 +61,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 900, new ItemPrice { ItemId = 900, BuyInstant = 100 } }
+                { 900, new ItemPrice { ItemId = 900, BuyInstant = 100 } },
             };
 
             var result = new PlanSolver().Solve(root, prices, null, PriceBasis.InstantBuy);

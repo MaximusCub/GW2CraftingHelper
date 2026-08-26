@@ -54,12 +54,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             ZojjasClaymore, OriGsBlade, OriGsHilt, Inscription,
             DeldrimorSteel, OriIngot, IronIngot, SteelIngot,
-            GlobEcto, GlobDarkMatter
+            GlobEcto, GlobDarkMatter,
         };
 
         private static readonly int[] AllRecipeIds =
         {
-            RecipeClaymore, RecipeBlade, RecipeDeldrimor, RecipeInscription
+            RecipeClaymore, RecipeBlade, RecipeDeldrimor, RecipeInscription,
         };
 
         private static (CraftingPlanPipeline pipeline, InMemoryAccountRecipeClient accountRecipes)
@@ -79,11 +79,11 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = OriGsBlade, Count = 1 },
                     new RawIngredient { Type = "Item", Id = OriGsHilt, Count = 1 },
                     new RawIngredient { Type = "Item", Id = Inscription, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = GlobDarkMatter, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = GlobDarkMatter, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 500,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             // Orichalcum GS Blade recipe
@@ -96,11 +96,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = OriIngot, Count = 3 },
-                    new RawIngredient { Type = "Item", Id = DeldrimorSteel, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = DeldrimorSteel, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 450,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             // Deldrimor Steel Ingot recipe
@@ -113,11 +113,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = IronIngot, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = SteelIngot, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = SteelIngot, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 450,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             // Inscription recipe (NOT AutoLearned)
@@ -130,11 +130,11 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = OriIngot, Count = 5 },
-                    new RawIngredient { Type = "Item", Id = GlobEcto, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = GlobEcto, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 500,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             });
 
             // Leaf items: no recipes
@@ -389,8 +389,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = OriGsBlade, Count = 1, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(
@@ -449,7 +449,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Solve",
                 "Fetch item metadata",
                 "Fetch learned recipes",
-                "Build result"
+                "Build result",
             };
 
             var timingPattern = new Regex(@"\d+ms");

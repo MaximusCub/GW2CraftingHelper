@@ -46,7 +46,7 @@ namespace VendorOfferUpdater.Models
                 { "Wintersday", "wintersday" },
                 { "Festival of the Four Winds", "festivalofthefourwinds" },
                 { "Lunar New Year", "lunarnewyear" },
-                { "Super Adventure Festival", "superadventurefestival" }
+                { "Super Adventure Festival", "superadventurefestival" },
             };
 
         /// <summary>

@@ -27,7 +27,7 @@ namespace VendorOfferUpdater.Tests
         private static readonly JsonSerializerOptions ReadOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         private static string LoadShippedJson()
@@ -103,9 +103,9 @@ namespace VendorOfferUpdater.Tests
                         OutputCount = 1,
                         MerchantName = "Hearth's Glow & Co",
                         Locations = null,
-                        CostLines = new List<CostLine>()
-                    }
-                }
+                        CostLines = new List<CostLine>(),
+                    },
+                },
             };
 
             Assert.Equal(

@@ -38,11 +38,11 @@ namespace GW2CraftingHelper.Tests.Services
                     InfixAttributes = new List<RawItemAttribute>
                     {
                         new RawItemAttribute { Attribute = "Power", Modifier = 47 },
-                        new RawItemAttribute { Attribute = "CritDamage", Modifier = 34 }
+                        new RawItemAttribute { Attribute = "CritDamage", Modifier = 34 },
                     },
                     StatChoiceIds = new List<int>(),
-                    Bonuses = new List<string>()
-                }
+                    Bonuses = new List<string>(),
+                },
             };
         }
 
@@ -99,7 +99,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Q13: the restored-plan background top-up ---
-
         [Fact]
         public async Task WarmStatBlocks_FillsTheCacheForAPlanThatWasRestoredRatherThanGenerated()
         {
@@ -171,7 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
             var api = new InMemoryItemApiClient();
             var seed = new ItemNameSeedData(new List<ItemNameEntry>
             {
-                new ItemNameEntry { Id = 999, Name = "Seeded Thing", Icon = "icon" }
+                new ItemNameEntry { Id = 999, Name = "Seeded Thing", Icon = "icon" },
             });
             var service = new ItemMetadataService(api, seed);
 

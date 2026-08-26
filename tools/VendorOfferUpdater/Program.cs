@@ -14,9 +14,9 @@ using VendorOfferUpdater.Models;
 
 namespace VendorOfferUpdater
 {
-    class Program
+    internal class Program
     {
-        static async Task<int> Main(string[] args)
+        private static async Task<int> Main(string[] args)
         {
             using var cts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) =>
@@ -164,7 +164,7 @@ namespace VendorOfferUpdater
                 MaxTotalRequests = maxRequests,
                 MaxRuntime = TimeSpan.FromMinutes(maxRuntimeMinutes),
                 DelayBetweenRequestsMs = delayMs,
-                DryRun = dryRun
+                DryRun = dryRun,
             };
 
             outputPath ??= Path.Combine(FindRepoRoot(), "ref", "vendor_offers.json");
@@ -174,10 +174,12 @@ namespace VendorOfferUpdater
             {
                 Console.WriteLine($"Query:  {queryCondition}");
             }
+
             if (dryRun)
             {
                 Console.WriteLine("Mode:   DRY RUN (no HTTP calls to wiki)");
             }
+
             Console.WriteLine(
                 $"Limits: maxDepth={queryOptions.MaxPrefixDepth}, " +
                 $"maxRequests={queryOptions.MaxTotalRequests}, " +
@@ -272,6 +274,7 @@ namespace VendorOfferUpdater
                             $"{mergeResult.Merged.Count} total");
                         wikiResults = mergeResult.Merged;
                     }
+
                     string cacheJson = JsonSerializer.Serialize(wikiResults);
                     await File.WriteAllTextAsync(wikiCachePath, cacheJson);
                     Console.WriteLine(
@@ -456,7 +459,7 @@ namespace VendorOfferUpdater
                     var readOptions = new JsonSerializerOptions
                     {
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                        PropertyNameCaseInsensitive = true
+                        PropertyNameCaseInsensitive = true,
                     };
                     var baseline = JsonSerializer.Deserialize<VendorOfferDataset>(baselineJson, readOptions)
                                    ?? new VendorOfferDataset();
@@ -500,6 +503,7 @@ namespace VendorOfferUpdater
                             "to clean up any now-stale baseline rows for: " +
                             string.Join(", ", mergeResult.MerchantNamesProtected));
                     }
+
                     Console.WriteLine();
                 }
 
@@ -524,7 +528,7 @@ namespace VendorOfferUpdater
                 {
                     SchemaVersion = 1,
                     Source = "gw2wiki-smw",
-                    Offers = finalOffers
+                    Offers = finalOffers,
                 };
 
                 string json = SerializeDataset(dataset);
@@ -551,7 +555,7 @@ namespace VendorOfferUpdater
                     Source = dataset.Source,
                     OfferCount = finalOffers.Count,
                     Sha256 = HashFile(outputPath),
-                    GeneratedAt = DateTime.UtcNow.ToString("o")
+                    GeneratedAt = DateTime.UtcNow.ToString("o"),
                 };
                 await File.WriteAllTextAsync(manifestPath, SerializeManifest(manifest));
                 Console.WriteLine($"Written provenance manifest to {manifestPath}");
@@ -607,9 +611,12 @@ namespace VendorOfferUpdater
         /// </summary>
         internal sealed class WikiCacheMergeResult
         {
-            public List<WikiVendorResult> Merged { get; set; } = new();
+            public List<WikiVendorResult> Merged { get; set; } = new List<WikiVendorResult>();
+
             public int Added { get; set; }
+
             public int Refreshed { get; set; }
+
             public int Unchanged { get; set; }
         }
 
@@ -656,6 +663,7 @@ namespace VendorOfferUpdater
                 {
                     addedKeys.Add(key);
                 }
+
                 merged[key] = r;
             }
 
@@ -668,7 +676,7 @@ namespace VendorOfferUpdater
                 Merged = merged.Values.ToList(),
                 Added = added,
                 Refreshed = refreshed,
-                Unchanged = unchanged
+                Unchanged = unchanged,
             };
         }
 
@@ -678,16 +686,18 @@ namespace VendorOfferUpdater
         /// </summary>
         internal sealed class BaselineMergeResult
         {
-            public List<VendorOffer> Merged { get; set; } = new();
+            public List<VendorOffer> Merged { get; set; } = new List<VendorOffer>();
+
             public int RemovedFromBaseline { get; set; }
-            public List<string> MerchantNamesReplaced { get; set; } = new();
+
+            public List<string> MerchantNamesReplaced { get; set; } = new List<string>();
 
             // Merchants that appeared in the
             // fresh batch but were EXCLUDED from wholesale replacement
             // because merchantsWithSkippedRows flagged them - their
             // baseline offers were kept, not dropped. See
             // MergeIntoBaseline's own doc comment.
-            public List<string> MerchantNamesProtected { get; set; } = new();
+            public List<string> MerchantNamesProtected { get; set; } = new List<string>();
         }
 
         /// <summary>
@@ -769,6 +779,7 @@ namespace VendorOfferUpdater
                     {
                         continue;
                     }
+
                     if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
                     {
                         continue;
@@ -778,6 +789,7 @@ namespace VendorOfferUpdater
                     {
                         replacedTagsByOfferId[o.OfferId] = o.SeasonalFestival;
                     }
+
                     replacedTagsByContentKey[ComputeContentKey(o)] = o.SeasonalFestival;
                 }
 
@@ -789,6 +801,7 @@ namespace VendorOfferUpdater
                         {
                             continue;
                         }
+
                         if (!merchantsReplacedSet.Contains(o.MerchantName ?? string.Empty))
                         {
                             continue;
@@ -848,6 +861,7 @@ namespace VendorOfferUpdater
                             winner.SeasonalFestival = taggedSibling.SeasonalFestival;
                         }
                     }
+
                     return winner;
                 })
                 .ToList();
@@ -902,6 +916,7 @@ namespace VendorOfferUpdater
                             {
                                 offer.OfferId = survivor.OfferId;
                             }
+
                             byContentKey[contentKey] = offer;
                         }
                     }
@@ -924,7 +939,7 @@ namespace VendorOfferUpdater
                 Merged = merged,
                 RemovedFromBaseline = removed,
                 MerchantNamesReplaced = merchantsReplaced,
-                MerchantNamesProtected = merchantsProtected
+                MerchantNamesProtected = merchantsProtected,
             };
         }
 
@@ -960,7 +975,11 @@ namespace VendorOfferUpdater
                 .ToList();
             for (int i = 0; i < sortedCosts.Count; i++)
             {
-                if (i > 0) sb.Append(',');
+                if (i > 0)
+                {
+                    sb.Append(',');
+                }
+
                 sb.Append(sortedCosts[i].Type);
                 sb.Append(':');
                 sb.Append(sortedCosts[i].Id);
@@ -1000,10 +1019,16 @@ namespace VendorOfferUpdater
             Dictionary<string, int> itemIdMap)
         {
             int outputCount = result.OutputQuantity ?? 1;
-            if (outputCount <= 0) outputCount = 1;
+            if (outputCount <= 0)
+            {
+                outputCount = 1;
+            }
 
             string? merchant = result.MerchantName;
-            if (string.IsNullOrEmpty(merchant)) return null;
+            if (string.IsNullOrEmpty(merchant))
+            {
+                return null;
+            }
 
             var costLines = new List<CostLine>();
 
@@ -1016,7 +1041,7 @@ namespace VendorOfferUpdater
                     {
                         Type = "Currency",
                         Id = currencyId.Value,
-                        Count = cost.Value
+                        Count = cost.Value,
                     });
                 }
                 else if (!string.IsNullOrEmpty(cost.Currency) &&
@@ -1026,7 +1051,7 @@ namespace VendorOfferUpdater
                     {
                         Type = "Item",
                         Id = itemId,
-                        Count = cost.Value
+                        Count = cost.Value,
                     });
                 }
                 else if (!string.IsNullOrEmpty(cost.Currency))
@@ -1041,7 +1066,7 @@ namespace VendorOfferUpdater
                     {
                         Type = "Currency",
                         Id = Gw2Constants.CoinCurrencyId,
-                        Count = cost.Value
+                        Count = cost.Value,
                     });
                 }
             }
@@ -1121,7 +1146,7 @@ namespace VendorOfferUpdater
                 WeeklyCap = result.WeeklyCap,
                 HomesteadTier = homesteadTier,
                 SeasonalCap = result.SeasonalCap,
-                SeasonalFestival = seasonalFestival
+                SeasonalFestival = seasonalFestival,
             };
         }
 
@@ -1456,6 +1481,7 @@ namespace VendorOfferUpdater
                     {
                         cache.Remove(key);
                     }
+
                     if (staleEmptyKeys.Count > 0)
                     {
                         Console.WriteLine(
@@ -1481,7 +1507,7 @@ namespace VendorOfferUpdater
             var toWrite = new Dictionary<string, string>(cache, StringComparer.Ordinal)
             {
                 [SeasonalWikitextCacheVersionKey] =
-                    SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture)
+                    SeasonalWikitextCacheVersion.ToString(CultureInfo.InvariantCulture),
             };
 
             var sorted = toWrite
@@ -1531,6 +1557,7 @@ namespace VendorOfferUpdater
                 {
                     cache[prop.Name] = prop.Value.GetInt32();
                 }
+
                 Console.WriteLine($"Loaded item ID cache ({cache.Count} entries) from {path}");
             }
             catch
@@ -1574,7 +1601,7 @@ namespace VendorOfferUpdater
             var readOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
             };
 
             var before = JsonSerializer.Deserialize<VendorOfferDataset>(
@@ -1624,7 +1651,7 @@ namespace VendorOfferUpdater
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = false,
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             };
 
             return EscapeNonAscii(JsonSerializer.Serialize(dataset, jsonOptions));
@@ -1678,7 +1705,7 @@ namespace VendorOfferUpdater
             var jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = true
+                WriteIndented = true,
             };
 
             string json = JsonSerializer.Serialize(manifest, jsonOptions);
@@ -1719,6 +1746,7 @@ namespace VendorOfferUpdater
                     sb.Append(c);
                 }
             }
+
             return sb.ToString();
         }
 
@@ -1731,6 +1759,7 @@ namespace VendorOfferUpdater
                 {
                     return dir;
                 }
+
                 dir = Path.GetDirectoryName(dir);
             }
 
@@ -1790,6 +1819,5 @@ namespace VendorOfferUpdater
                 .ToList();
             return before - offers.Count;
         }
-
     }
 }

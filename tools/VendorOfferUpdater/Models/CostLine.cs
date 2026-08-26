@@ -10,7 +10,9 @@ namespace VendorOfferUpdater.Models
         // comment for why a non-null default would risk a round-trip
         // difference in that case.
         public string? Type { get; set; }
+
         public int Id { get; set; }
+
         public int Count { get; set; }
     }
 }

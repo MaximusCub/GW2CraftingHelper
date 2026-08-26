@@ -23,8 +23,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -73,8 +73,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Ingredients = new List<RawIngredient>
                     {
                         new RawIngredient { Type = "Item", Id = 2, Count = 1 },
-                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -113,8 +113,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(items, null, CancellationToken.None,
@@ -205,8 +205,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -263,11 +263,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 },
                         },
                         MerchantName = "Test NPC",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 // No recipe for item 1
@@ -316,12 +316,12 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 }
+                            new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 },
                         },
                         MerchantName = "Candy Corn Vendor (Weekly)",
                         Locations = new List<string>(),
-                        SeasonalFestival = Gw2Constants.HalloweenFestivalName
-                    }
+                        SeasonalFestival = Gw2Constants.HalloweenFestivalName,
+                    },
                 });
 
                 // No recipe for item 1

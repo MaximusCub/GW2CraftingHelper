@@ -66,7 +66,11 @@ namespace VendorOfferUpdater
                 .ToList();
             for (int i = 0; i < sortedCosts.Count; i++)
             {
-                if (i > 0) sb.Append(',');
+                if (i > 0)
+                {
+                    sb.Append(',');
+                }
+
                 sb.Append(sortedCosts[i].Type);
                 sb.Append(':');
                 sb.Append(sortedCosts[i].Id.ToString(CultureInfo.InvariantCulture));
@@ -83,7 +87,11 @@ namespace VendorOfferUpdater
                 .ToList();
             for (int i = 0; i < sortedLocations.Count; i++)
             {
-                if (i > 0) sb.Append(',');
+                if (i > 0)
+                {
+                    sb.Append(',');
+                }
+
                 sb.Append(sortedLocations[i]);
             }
 

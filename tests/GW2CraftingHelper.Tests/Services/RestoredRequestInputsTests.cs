@@ -27,7 +27,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         public void Dispose()
         {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(_tempDir, true);
+            }
+            catch
+            {
+            }
         }
 
         private static PersistedPlan MultiItemPlan()
@@ -39,7 +45,7 @@ namespace GW2CraftingHelper.Tests.Services
                 RequestItems = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 5, Quantity = 3 },
-                    new PlanRequestItem { ItemId = 6, Quantity = 250 }
+                    new PlanRequestItem { ItemId = 6, Quantity = 250 },
                 },
                 UseOwnMaterials = false,
                 PriceBasis = PriceBasis.InstantBuy,
@@ -49,9 +55,9 @@ namespace GW2CraftingHelper.Tests.Services
                     ItemMetadata = new Dictionary<int, ItemMetadata>
                     {
                         { 5, new ItemMetadata { ItemId = 5, Name = "Bolt of Gossamer" } },
-                        { 6, new ItemMetadata { ItemId = 6, Name = "Cured Thick Leather Square" } }
-                    }
-                }
+                        { 6, new ItemMetadata { ItemId = 6, Name = "Cured Thick Leather Square" } },
+                    },
+                },
             };
         }
 
@@ -95,7 +101,7 @@ namespace GW2CraftingHelper.Tests.Services
             // whitespace name - both must fall back the same way.
             plan.Result.ItemMetadata = new Dictionary<int, ItemMetadata>
             {
-                { 5, new ItemMetadata { ItemId = 5, Name = "   " } }
+                { 5, new ItemMetadata { ItemId = 5, Name = "   " } },
             };
             _store.Save(plan);
             var loaded = _store.LoadLatest();
@@ -146,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 5, Quantity = 0 },
-                    new PlanRequestItem { ItemId = 6, Quantity = -3 }
+                    new PlanRequestItem { ItemId = 6, Quantity = -3 },
                 },
                 null);
 
@@ -160,7 +166,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 5, Quantity = 1 },
-                    null
+                    null,
                 },
                 null);
 

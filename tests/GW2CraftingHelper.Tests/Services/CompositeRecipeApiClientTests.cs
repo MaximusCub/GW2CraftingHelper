@@ -147,10 +147,10 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 200, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = 200, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
+                MinRating = 400,
             });
 
             var mfData = LoadMfData(TwoMfRecipesJson);

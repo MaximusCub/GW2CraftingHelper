@@ -29,12 +29,11 @@ namespace GW2CraftingHelper.Tests.Services
                 NodeId = 1,
                 Decision = CraftingDecision.Craft,
                 SubtreeCost = subtreeCost,
-                DecisionValue = decisionValue
+                DecisionValue = decisionValue,
             };
         }
 
         // --- ValueDetailTooltipBuilder ---
-
         [Fact]
         public void ValueDetail_EveryGoldFigureIsACoinSpan()
         {
@@ -83,7 +82,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- PillSubduingTooltipBuilder ---
-
         [Fact]
         public void Subduing_WeightedMargin_IsACoinSpanInsideItsSentence()
         {
@@ -116,11 +114,11 @@ namespace GW2CraftingHelper.Tests.Services
             var deltas = new List<PillCostDelta>
             {
                 new PillCostDelta("Coin", 0, 5000),
-                new PillCostDelta("Item", 100, 10)
+                new PillCostDelta("Item", 100, 10),
             };
             var itemMetadata = new Dictionary<int, ItemMetadata>
             {
-                { 100, new ItemMetadata { ItemId = 100, Name = "Glob of Ectoplasm" } }
+                { 100, new ItemMetadata { ItemId = 100, Name = "Glob of Ectoplasm" } },
             };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 
@@ -141,7 +139,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TreeRowTooltipComposer ---
-
         [Fact]
         public void TreeRow_UnitPrice_IsACoinSpan()
         {
@@ -152,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Mithril Ingot",
                 Decision = CraftingDecision.BuyFromTp,
                 Quantity = 4,
-                UnitCost = 2345
+                UnitCost = 2345,
             };
 
             var content = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null);
@@ -177,7 +174,7 @@ namespace GW2CraftingHelper.Tests.Services
                 NodeId = 5,
                 Name = "Mithril Ingot",
                 Decision = CraftingDecision.BuyFromVendor,
-                PriceSideFellBack = true
+                PriceSideFellBack = true,
             };
 
             var plan = new PlanViewModel { PriceBasis = PriceBasis.BuyOrder };
@@ -198,7 +195,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Mithril Ingot",
                 Decision = CraftingDecision.BuyFromTp,
                 Quantity = 4,
-                UnitCost = 100
+                UnitCost = 100,
             };
 
             var content = TreeRowTooltipComposer.BuildExtraTooltipContent(node, "What-if: 4 extra", null);

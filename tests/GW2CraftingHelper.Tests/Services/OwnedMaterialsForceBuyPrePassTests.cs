@@ -9,7 +9,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class OwnedMaterialsForceBuyPrePassTests
     {
         // Leaf/Craftable/Option come from Helpers/RecipeNodeBuilders.cs.
-
         [Fact]
         public void BuyBeatsCraftByMoreThan15Percent_ForcesRootIntoForceBuySet()
         {
@@ -21,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -46,7 +45,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 95 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -64,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
 
@@ -98,12 +97,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 200 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 5 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 5 } },
             };
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
 
             // Without characterDisciplines: the pre-pass's own solve is
@@ -144,7 +143,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } },
             };
             var solver = new PlanSolver();
 
@@ -164,7 +163,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 

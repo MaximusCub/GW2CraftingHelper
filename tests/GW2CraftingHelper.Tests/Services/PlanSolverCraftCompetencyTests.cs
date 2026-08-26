@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Services
         private static readonly Dictionary<int, ItemPrice> CraftBeatsBuyPrices = new Dictionary<int, ItemPrice>
         {
             { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }, // buy is expensive
-            { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }    // ingredient is cheap -> craft (60) beats buy (1000)
+            { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }, // ingredient is cheap -> craft (60) beats buy (1000),
         };
 
         private static RecipeNode WeaponsmithTree()
@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Tests.Services
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 400 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 400 },
             };
 
             var result = solver.Solve(
@@ -77,7 +77,7 @@ namespace GW2CraftingHelper.Tests.Services
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
 
             var result = solver.Solve(
@@ -119,12 +119,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Option(10, 1, 1, new List<string> { "Weaponsmith" }, 400, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 0 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 0 },
             };
 
             var result = solver.Solve(
@@ -144,7 +144,7 @@ namespace GW2CraftingHelper.Tests.Services
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
             var overrides = new Dictionary<int, AcquisitionSource> { { 0, AcquisitionSource.Craft } };
 
@@ -178,12 +178,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 600 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } },
             };
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
 
             var result = solver.Solve(
@@ -229,17 +229,17 @@ namespace GW2CraftingHelper.Tests.Services
                 Option(10, 1, 1, new List<string> { "Weaponsmith" }, 500, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
                 // No price for item 1 itself - no TP alternative.
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 500000) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 500000) } },
             };
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 0 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 0 },
             };
 
             var result = solver.Solve(
@@ -277,7 +277,6 @@ namespace GW2CraftingHelper.Tests.Services
         // PlanSolverPillSubduingTests already exercises for the subduing
         // feature - proves the whole CheapestCraftUntrained threading, not
         // just the isolated calculator/Decision-field coverage above.
-
         private static CraftingTreeNode SolveAndBuildRootNode(
             RecipeNode tree, Dictionary<int, ItemPrice> prices,
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
@@ -312,11 +311,11 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 20 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 20 } },
             };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 },
             };
 
             var root = SolveAndBuildRootNode(tree, prices, null, characterDisciplines);
@@ -355,11 +354,11 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 600 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 800 } },
             };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
 
             var root = SolveAndBuildRootNode(tree, prices, null, characterDisciplines);
@@ -406,11 +405,11 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
             var forceBuyOnly = new HashSet<int> { 0 };
 
@@ -470,11 +469,11 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 1000 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 1000 } },
             };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Weaponsmith", Rating = 100 },
             };
 
             var solver = new PlanSolver();
@@ -554,11 +553,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, occ1, occ2));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 300, new ItemPrice { ItemId = 300, BuyInstant = 100 } }
+                { 300, new ItemPrice { ItemId = 300, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 200, new List<VendorOffer> { CoinVendorOffer(200, 1000, outputCount: 100) } }
+                { 200, new List<VendorOffer> { CoinVendorOffer(200, 1000, outputCount: 100) } },
             };
             var characterDisciplines = new List<SnapshotCharacterDiscipline>();
 

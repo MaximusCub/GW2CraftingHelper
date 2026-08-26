@@ -5,10 +5,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class StatusStoreTests : IDisposable
     {
-
         private readonly string _tempDir;
         private readonly StatusStore _store;
 
@@ -21,7 +19,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         public void Dispose()
         {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(_tempDir, true);
+            }
+            catch
+            {
+            }
         }
 
         [Fact]
@@ -58,7 +62,6 @@ namespace GW2CraftingHelper.Tests.Services
         // it in place and can leave a partial status.txt. Mirrors
         // SnapshotStoreTests' pair so both the create (File.Move) and the
         // overwrite (File.Replace) branch are covered. ---
-
         [Fact]
         public void Save_LeavesNoTmpFileBehind()
         {
@@ -79,7 +82,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- onError callback: real IO failure. ---
-
         [Fact]
         public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
         {
@@ -111,5 +113,4 @@ namespace GW2CraftingHelper.Tests.Services
             store.Save("some status"); // no-op onError default - must not throw
         }
     }
-
 }

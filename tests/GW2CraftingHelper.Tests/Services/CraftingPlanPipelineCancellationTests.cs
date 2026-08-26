@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var planTask = pipeline.GenerateStructuredAsync(
@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = ingredients,
                     Disciplines = new List<string> { "Weaponsmith" },
-                    MinRating = 400
+                    MinRating = 400,
                 })
                 .Build();
         }

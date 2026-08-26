@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 2, 5 },
                 { 23, 1200 },
-                { 63, 800 }
+                { 63, 800 },
             });
 
             string json = CurrencyValuationSerializer.Serialize(valuation);
@@ -117,7 +117,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- currency-ux-package (Feature 1): "Cleared" round-trip ---
-
         [Fact]
         public void SerializeThenDeserialize_RoundTripsClearedIds()
         {

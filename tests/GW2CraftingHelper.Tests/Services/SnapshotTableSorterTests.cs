@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new SnapshotSearchRow { Name = "Mystic Clover", TotalCount = 30 },
                 new SnapshotSearchRow { Name = "copper ore", TotalCount = 250 },
-                new SnapshotSearchRow { Name = "Ectoplasm", TotalCount = 30 }
+                new SnapshotSearchRow { Name = "Ectoplasm", TotalCount = 30 },
             };
         }
 
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
             return new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyName = "Karma", Value = 1200 },
-                new SnapshotWalletEntry { CurrencyName = "Astral Acclaim", Value = 80 }
+                new SnapshotWalletEntry { CurrencyName = "Astral Acclaim", Value = 80 },
             };
         }
 
@@ -95,7 +95,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<SnapshotSearchRow>
             {
                 new SnapshotSearchRow { Name = null, TotalCount = 1 },
-                new SnapshotSearchRow { Name = "Bolt of Silk", TotalCount = 2 }
+                new SnapshotSearchRow { Name = "Bolt of Silk", TotalCount = 2 },
             };
 
             var order = SnapshotTableSorter.ItemOrder(rows, Clicked(SnapshotTableColumn.Name, 1));

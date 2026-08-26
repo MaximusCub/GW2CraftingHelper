@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.RecipeSeeder.Tests
                 LastRequestUri = request.RequestUri;
                 var response = new HttpResponseMessage(_statusCode)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
                 return Task.FromResult(response);
             }

@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Tests.Services
             // claim: every client that can hold the minimum is at least
             // two-up, and the one-column fallback is only reachable below it.
             Assert.True(windowForTwoColumns < WindowSizing.MinWindowWidth);
-            Assert.True(WindowSizing.MinWindowWidth < windowForThreeColumns);
+            Assert.True(windowForThreeColumns > WindowSizing.MinWindowWidth);
 
             Assert.Equal(1, ColumnCountAtWindow(windowForTwoColumns - 1));
             Assert.Equal(2, ColumnCountAtWindow(windowForTwoColumns));
@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Tests.Services
                 columnWidth, SnapshotItemGridLayout.AmountColumnFloor);
 
             Assert.True(
-                SnapshotItemGridLayout.SnapshotNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
+                nameRunBudget >= SnapshotItemGridLayout.SnapshotNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx,
                 "a full-length name must not ellipsize in a column at the window minimum");
         }
 

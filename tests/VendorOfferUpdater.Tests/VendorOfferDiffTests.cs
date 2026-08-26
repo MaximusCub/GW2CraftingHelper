@@ -32,8 +32,8 @@ namespace VendorOfferUpdater.Tests
                 SeasonalFestival = festival,
                 CostLines = new List<CostLine>
                 {
-                    new CostLine { Type = "Currency", Id = 1, Count = coinCost }
-                }
+                    new CostLine { Type = "Currency", Id = 1, Count = coinCost },
+                },
             };
 
             // The real dataset's offerId is a content hash over every field but
@@ -170,7 +170,7 @@ namespace VendorOfferUpdater.Tests
             var after = new List<VendorOffer>
             {
                 Offer(1, "Miyani", 150),
-                Offer(1, "Miyani", 150, outputCount: 5)
+                Offer(1, "Miyani", 150, outputCount: 5),
             };
 
             var result = VendorOfferDiff.Compute(before, after);
@@ -221,11 +221,11 @@ namespace VendorOfferUpdater.Tests
         {
             var before = new List<VendorOffer>
             {
-                Offer(2, "Zho", 100), Offer(1, "Miyani", 100), Offer(3, "Arriske", 100)
+                Offer(2, "Zho", 100), Offer(1, "Miyani", 100), Offer(3, "Arriske", 100),
             };
             var after = new List<VendorOffer>
             {
-                Offer(3, "Arriske", 200), Offer(1, "Miyani", 300), Offer(9, "Zho", 100)
+                Offer(3, "Arriske", 200), Offer(1, "Miyani", 300), Offer(9, "Zho", 100),
             };
 
             string first = VendorOfferDiff.Format(VendorOfferDiff.Compute(before, after), "a", "b");

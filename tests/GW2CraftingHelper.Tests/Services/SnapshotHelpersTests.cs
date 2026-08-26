@@ -5,12 +5,9 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SnapshotHelpersTests
     {
-
         // -- SplitWalletAndCoins -------------------------------------
-
         [Fact]
         public void SplitWalletAndCoins_WithCurrencyId1_ExtractsCoinCopper()
         {
@@ -18,7 +15,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 123456 },
                 new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 5000 },
-                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 100 }
+                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 100 },
             };
 
             var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
@@ -33,7 +30,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var entries = new List<SnapshotWalletEntry>
             {
-                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 5000 }
+                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 5000 },
             };
 
             var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
@@ -67,7 +64,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
                 null,
-                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 50 }
+                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 50 },
             };
 
             var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
@@ -82,7 +79,7 @@ namespace GW2CraftingHelper.Tests.Services
             var entries = new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 10000 },
-                new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 5000 }
+                new SnapshotWalletEntry { CurrencyId = 1, CurrencyName = "Coin", Value = 5000 },
             };
 
             var (coinCopper, wallet) = SnapshotHelpers.SplitWalletAndCoins(entries);
@@ -91,5 +88,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(wallet);
         }
     }
-
 }

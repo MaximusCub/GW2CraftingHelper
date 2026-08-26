@@ -49,7 +49,7 @@ namespace VendorOfferUpdater.Tests
                 WeeklyCap = weeklyCap,
                 SeasonalCap = seasonalCap,
                 Requirement = requirement,
-                TemporarySeasonalValue = temporarySeasonalValue
+                TemporarySeasonalValue = temporarySeasonalValue,
             };
         }
 
@@ -60,7 +60,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
-                new WikiCostEntry { Value = 500, Currency = "Karma" }
+                new WikiCostEntry { Value = 500, Currency = "Karma" },
             });
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -79,7 +79,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
-                new WikiCostEntry { Value = 10000, Currency = "Coin" }
+                new WikiCostEntry { Value = 10000, Currency = "Coin" },
             });
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -96,11 +96,11 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var itemIdMap = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase)
             {
-                ["Glob of Ectoplasm"] = 19721
+                ["Glob of Ectoplasm"] = 19721,
             };
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
-                new WikiCostEntry { Value = 3, Currency = "Glob of Ectoplasm" }
+                new WikiCostEntry { Value = 3, Currency = "Glob of Ectoplasm" },
             });
 
             var offer = Program.ConvertToOffer(result, helper, itemIdMap);
@@ -119,7 +119,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
-                new WikiCostEntry { Value = 256, Currency = "" }
+                new WikiCostEntry { Value = 256, Currency = "" },
             });
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -136,7 +136,7 @@ namespace VendorOfferUpdater.Tests
             using var _ = httpClient;
             var result = MakeResult(costEntries: new List<WikiCostEntry>
             {
-                new WikiCostEntry { Value = 10, Currency = "Unknown Token" }
+                new WikiCostEntry { Value = 10, Currency = "Unknown Token" },
             });
 
             var offer = Program.ConvertToOffer(result, helper, new Dictionary<string, int>());
@@ -264,7 +264,6 @@ namespace VendorOfferUpdater.Tests
 
         // Astral Acclaim package: SeasonalCap threading,
         // mirroring the daily/weekly cases above.
-
         [Fact]
         public async Task SeasonalCapData_ThreadedIntoOffer()
         {
@@ -320,7 +319,6 @@ namespace VendorOfferUpdater.Tests
 
         // HomesteadTier wiring end-to-end through
         // ConvertToOffer.
-
         [Fact]
         public async Task NonHomesteadMerchant_HomesteadTierStaysNull()
         {
@@ -444,7 +442,6 @@ namespace VendorOfferUpdater.Tests
         // Festival-vendor auto-tagging follow-up:
         // SeasonalFestival threading through ConvertToOffer, mirroring the
         // HomesteadTier wiring block above.
-
         [Fact]
         public async Task NoTemporarySeasonalValue_SeasonalFestivalStaysNull()
         {

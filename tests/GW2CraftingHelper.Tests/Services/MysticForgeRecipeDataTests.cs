@@ -389,7 +389,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- expectedOutputCount (Mystic Clover EV support) ---
-
         [Fact]
         public void Load_ExpectedOutputCount_ParsedAsFractionalDouble()
         {

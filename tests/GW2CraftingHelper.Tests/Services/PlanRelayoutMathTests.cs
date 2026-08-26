@@ -6,7 +6,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanRelayoutMathTests
     {
         // --- CenterX ---
-
         [Fact]
         public void CenterX_EvenRemainder_SplitsEqually()
         {
@@ -26,7 +25,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- RightAlignedX ---
-
         [Fact]
         public void RightAlignedX_SubtractsWidthFromEdge()
         {
@@ -43,7 +41,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- NameMaxWidthBeforeColumn ---
-
         [Fact]
         public void NameMaxWidthBeforeColumn_TypicalUsedMaterialsRow()
         {
@@ -67,7 +64,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- HeaderSplitBeforeColumn (the sortable header's hit area) ---
-
         [Fact]
         public void HeaderSplit_SitsInTheGapTheNameColumnStopsAt()
         {
@@ -103,7 +99,6 @@ namespace GW2CraftingHelper.Tests.Services
         // space to the block's right instead of giving it to the name
         // column. Every block is now pinned to the panel edge and the name
         // column is the only one that flexes.
-
         [Fact]
         public void PinnedRightEdge_IsThePanelEdgeLessOneMargin()
         {
@@ -168,7 +163,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeTreeColumnEdges ---
-
         [Fact]
         public void ComputeTreeColumnEdges_TypicalPanelWidth_MatchesManualArithmetic()
         {
@@ -424,7 +418,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeCostTileGeometry ---
-
         [Fact]
         public void ComputeCostTileGeometry_TypicalWidth_TilesFillEvenly()
         {
@@ -462,7 +455,6 @@ namespace GW2CraftingHelper.Tests.Services
         // CraftingPlanView.RenderDecisionPills uses this pure helper to
         // decide how many (already width-measured, emission-order) pills
         // to actually render.
-
         [Fact]
         public void ComputeVisiblePillCount_AllPillsFit_ReturnsFullCount()
         {
@@ -607,6 +599,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 used += PlanRelayoutMath.ReducedWidth(widths[i], fit.WidthReduction) + 6;
             }
+
             Assert.True(used + fit.OverflowPillWidth <= 240);
         }
 

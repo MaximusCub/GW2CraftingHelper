@@ -15,7 +15,6 @@ using GW2CraftingHelper.Services.Recipes;
 namespace GW2CraftingHelper.Harness
 {
     // --- Null API clients for offline mode ---
-
     internal class NullRecipeApiClient : IRecipeApiClient
     {
         public Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
@@ -52,17 +51,18 @@ namespace GW2CraftingHelper.Harness
     }
 
     // --- Profile item definition ---
-
     internal class ProfileItem
     {
         public string Name { get; set; }
+
         public int ItemId { get; set; }
+
         public int Quantity { get; set; }
+
         public bool RequiresLive { get; set; }
     }
 
     // --- Program ---
-
     internal class Program
     {
         private static int Main(string[] args)
@@ -96,12 +96,14 @@ namespace GW2CraftingHelper.Harness
                         {
                             profile = int.Parse(args[++i], CultureInfo.InvariantCulture);
                         }
+
                         break;
                     case "--iterations":
                         if (i + 1 < args.Length)
                         {
                             iterations = int.Parse(args[++i], CultureInfo.InvariantCulture);
                         }
+
                         break;
                     case "--live":
                         live = true;
@@ -138,6 +140,7 @@ namespace GW2CraftingHelper.Harness
                                 return 1;
                             }
                         }
+
                         break;
                 }
             }
@@ -260,7 +263,9 @@ namespace GW2CraftingHelper.Harness
                         {
                             buildId = await FetchBuildIdAsync(httpClient);
                         }
-                        catch { }
+                        catch
+                        {
+                        }
                     }
 
                     if (buildId.HasValue)
@@ -320,7 +325,7 @@ namespace GW2CraftingHelper.Harness
                     {
                         { Gw2Constants.RefinedHomesteadFiberItemId, homesteadTier },
                         { Gw2Constants.RefinedHomesteadMetalItemId, homesteadTier },
-                        { Gw2Constants.RefinedHomesteadWoodItemId, homesteadTier }
+                        { Gw2Constants.RefinedHomesteadWoodItemId, homesteadTier },
                     });
                     Console.WriteLine($"Homestead efficiency tier: {homesteadTier} (all materials)");
                     Console.WriteLine();
@@ -337,6 +342,7 @@ namespace GW2CraftingHelper.Harness
                     {
                         await RunItemProfile(pipeline, item, iterations, raw, mode, homesteadTiers);
                     }
+
                     Console.WriteLine();
                 }
 
@@ -370,8 +376,8 @@ namespace GW2CraftingHelper.Harness
                             Name = "Gift of Fortune",
                             ItemId = 19626,
                             Quantity = 1,
-                            RequiresLive = false
-                        }
+                            RequiresLive = false,
+                        },
                     };
                     if (live)
                     {
@@ -380,9 +386,10 @@ namespace GW2CraftingHelper.Harness
                             Name = "Zojja's Claymore",
                             ItemId = 46762,
                             Quantity = 1,
-                            RequiresLive = true
+                            RequiresLive = true,
                         });
                     }
+
                     return items;
                 case 2:
                     return new List<ProfileItem>
@@ -392,8 +399,8 @@ namespace GW2CraftingHelper.Harness
                             Name = "Exordium",
                             ItemId = 90551,
                             Quantity = 1,
-                            RequiresLive = false
-                        }
+                            RequiresLive = false,
+                        },
                     };
                 case 3:
                     // Klobjarne Geirr is the
@@ -411,8 +418,8 @@ namespace GW2CraftingHelper.Harness
                             Name = "Klobjarne Geirr",
                             ItemId = 103815,
                             Quantity = 1,
-                            RequiresLive = false
-                        }
+                            RequiresLive = false,
+                        },
                     };
                 default:
                     return null;
@@ -572,6 +579,7 @@ namespace GW2CraftingHelper.Harness
                         {
                             break;
                         }
+
                         timingLines.Add(line);
                     }
                 }
@@ -639,8 +647,10 @@ namespace GW2CraftingHelper.Harness
                         {
                             warmPhaseData[phase.Name].Add(phase.ElapsedMs);
                         }
+
                         runTotal += phase.ElapsedMs;
                     }
+
                     warmTotals.Add(runTotal);
                 }
 
@@ -648,6 +658,7 @@ namespace GW2CraftingHelper.Harness
                 {
                     entry.Value.Sort();
                 }
+
                 warmTotals.Sort();
 
                 double warmMedianTotal = Median(warmTotals);
@@ -687,11 +698,13 @@ namespace GW2CraftingHelper.Harness
             {
                 return 0;
             }
+
             int mid = sorted.Count / 2;
             if (sorted.Count % 2 == 0)
             {
                 return (sorted[mid - 1] + sorted[mid]) / 2.0;
             }
+
             return sorted[mid];
         }
 

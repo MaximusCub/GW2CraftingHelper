@@ -34,11 +34,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = Ingredient, Count = 3 }
+                    new RawIngredient { Type = "Item", Id = Ingredient, Count = 3 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -74,11 +74,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = Ingredient, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = Ingredient, Count = 1 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             recipeApi.AddSearchResult(Ingredient, 20);
             recipeApi.AddRecipe(new RawRecipe
@@ -88,11 +88,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = SubIngredient, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = SubIngredient, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var priceApi = new InMemoryPriceApiClient();
@@ -119,9 +119,9 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = coin,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = itemId, Count = count, Source = Storage, Name = "Held" }
+                    new SnapshotItemEntry { ItemId = itemId, Count = count, Source = Storage, Name = "Held" },
                 },
-                Wallet = new List<SnapshotWalletEntry>()
+                Wallet = new List<SnapshotWalletEntry>(),
             };
         }
 

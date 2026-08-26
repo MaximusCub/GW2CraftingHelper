@@ -150,6 +150,7 @@ namespace VendorOfferUpdater
                     nonAlpha.Add(r.MerchantName);
                 }
             }
+
             foreach (var name in nonAlpha.OrderBy(n => n, StringComparer.Ordinal))
             {
                 _stats.NonAlphaVendors.Add(name);
@@ -213,7 +214,10 @@ namespace VendorOfferUpdater
                 foreach (var resultProp in results.EnumerateObject())
                 {
                     var parsed = ParseResult(resultProp.Name, resultProp.Value);
-                    if (parsed == null) continue;
+                    if (parsed == null)
+                    {
+                        continue;
+                    }
 
                     _stats.TotalRowsFetched++;
                     string compositeKey = ComputeCompositeKey(parsed);
@@ -240,6 +244,7 @@ namespace VendorOfferUpdater
                         hitOffsetLimit = true;
                         break;
                     }
+
                     offset = nextOffset;
                     await Task.Delay(_effectiveDelay, ct);
                 }
@@ -255,7 +260,7 @@ namespace VendorOfferUpdater
                 Prefix = vendorPrefix,
                 Depth = depth,
                 RowsAdded = partitionRowsAdded,
-                HttpRequests = partitionHttpRequests
+                HttpRequests = partitionHttpRequests,
             };
             _stats.Partitions.Add(pStats);
 
@@ -373,6 +378,7 @@ namespace VendorOfferUpdater
                     $"  Level {d}: up to {maxPartitions} prefixes " +
                     $"({PartitionPrefixes.Length} per overflow at level {d - 1})");
             }
+
             Console.WriteLine();
             Console.WriteLine(
                 "Actual request count is unknown without probing - " +
@@ -429,6 +435,7 @@ namespace VendorOfferUpdater
                         {
                             cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
                         }
+
                         // Add jitter: +/-10%
                         int jitter = (int)(cooldownMs * 0.1);
                         cooldownMs += Random.Shared.Next(-jitter, jitter + 1);
@@ -753,17 +760,24 @@ namespace VendorOfferUpdater
         // "?? string.Empty" coalescing below already treats a deserialized
         // PageName as possibly null.
         public string? PageName { get; set; }
+
         public int GameId { get; set; }
 
         // The following are all set conditionally, after construction,
         // only when their SMW printout is present on the page - each stays
         // null when the wiki row has no data for that property.
         public string? ItemName { get; set; }
+
         public int? OutputQuantity { get; set; }
+
         public List<WikiCostEntry> CostEntries { get; set; } = new List<WikiCostEntry>();
+
         public string? MerchantName { get; set; }
+
         public List<string> Locations { get; set; } = new List<string>();
+
         public int? DailyCap { get; set; }
+
         public int? WeeklyCap { get; set; }
 
         // Astral Acclaim package: Wizard's Vault seasonal purchase cap, or

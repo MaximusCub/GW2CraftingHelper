@@ -29,8 +29,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RecipeSheetSavingsOpportunity
                     {
                         ItemId = 10, RecipeId = 999, SheetItemId = 500,
-                        SheetCost = 200, SavingsPerUnit = 20, DisciplineBlocked = false
-                    }
+                        SheetCost = 200, SavingsPerUnit = 20, DisciplineBlocked = false,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -56,8 +56,8 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 10, RecipeId = 999, SheetItemId = 500,
                         SheetCost = 200, SavingsPerUnit = 20,
-                        DisciplineBlocked = true, Discipline = "Chef", RequiredRating = 400
-                    }
+                        DisciplineBlocked = true, Discipline = "Chef", RequiredRating = 400,
+                    },
                 });
 
             var vm = _builder.Build(result);
@@ -75,7 +75,7 @@ namespace GW2CraftingHelper.Tests.Services
                 recipeSheetSavingsOpportunities: new List<RecipeSheetSavingsOpportunity>
                 {
                     new RecipeSheetSavingsOpportunity { ItemId = 10, RecipeId = 1, SheetItemId = 100, SheetCost = 10, SavingsPerUnit = 1 },
-                    new RecipeSheetSavingsOpportunity { ItemId = 20, RecipeId = 2, SheetItemId = 200, SheetCost = 10, SavingsPerUnit = 1 }
+                    new RecipeSheetSavingsOpportunity { ItemId = 20, RecipeId = 2, SheetItemId = 200, SheetCost = 10, SavingsPerUnit = 1 },
                 });
 
             var vm = _builder.Build(result);

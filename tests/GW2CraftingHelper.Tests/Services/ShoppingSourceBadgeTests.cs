@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
             }));
 
             Assert.Equal("TP", ShoppingSourceBadge.ForRow(ShoppingRows(vm)[0]));
@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 },
             }));
 
             Assert.Equal("VENDOR", ShoppingSourceBadge.ForRow(ShoppingRows(vm)[0]));
@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.Currency }
+                new PlanStep { ItemId = 1, Quantity = 2, Source = AcquisitionSource.Currency },
             }));
 
             Assert.Equal("CURRENCY", ShoppingSourceBadge.ForRow(ShoppingRows(vm)[0]));
@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             }));
 
             Assert.Equal("UNKNOWN", ShoppingSourceBadge.ForRow(ShoppingRows(vm)[0]));
@@ -71,12 +71,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" },
             };
             var vm = _builder.Build(MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints));
 
@@ -95,12 +95,12 @@ namespace GW2CraftingHelper.Tests.Services
             // contributes 0. The hint text still reaches TooltipForRow.
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Bought with account-bound tokens.", Badge = badge }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Bought with account-bound tokens.", Badge = badge },
             };
             var vm = _builder.Build(MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints));
 
@@ -122,7 +122,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 },
                 new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.Currency },
-                new PlanStep { ItemId = 4, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 4, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             }));
 
             var rows = ShoppingRows(vm);
@@ -139,7 +139,7 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: MetaFor((10, "Ori Ingot", "ori.png")),
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 }
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 },
                 }));
 
             var used = vm.Sections.First(s => s.SectionType == PlanSectionType.UsedMaterials).Rows[0];
@@ -154,7 +154,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Badge hover prose (the badge column's own tooltip: the
         // capitals say WHICH source, this says what to do about it) ---
-
         [Fact]
         public void EveryBadgedRow_AlsoCarriesProse()
         {
@@ -163,7 +162,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
                 new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.BuyFromVendor, TotalCost = 100 },
                 new PlanStep { ItemId = 3, Quantity = 2, Source = AcquisitionSource.Currency },
-                new PlanStep { ItemId = 4, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 4, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             }));
 
             Assert.All(
@@ -176,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 }
+                new PlanStep { ItemId = 1, Quantity = 3, Source = AcquisitionSource.BuyFromTp, TotalCost = 300 },
             }));
 
             Assert.Equal("Buy on the Trading Post", ShoppingSourceBadge.TooltipForRow(ShoppingRows(vm)[0]));
@@ -189,12 +188,12 @@ namespace GW2CraftingHelper.Tests.Services
             // the wiki" line is strictly less useful on top of it.
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" }
+                [1] = new AcquisitionHint { ItemId = 1, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" },
             };
             var vm = _builder.Build(MakeResult(
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                    new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
                 },
                 acquisitionHints: hints));
 
@@ -207,7 +206,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var vm = _builder.Build(MakeResult(steps: new List<PlanStep>
             {
-                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource }
+                new PlanStep { ItemId = 1, Quantity = 1, Source = AcquisitionSource.UnknownSource },
             }));
 
             Assert.Equal(
@@ -222,7 +221,7 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: MetaFor((10, "Ori Ingot", "ori.png")),
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 }
+                    new UsedMaterial { ItemId = 10, QuantityUsed = 5 },
                 }));
 
             var used = vm.Sections.First(s => s.SectionType == PlanSectionType.UsedMaterials).Rows[0];

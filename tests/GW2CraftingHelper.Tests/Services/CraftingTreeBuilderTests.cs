@@ -18,6 +18,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 dict[id] = new ItemMetadata { ItemId = id, Name = name, IconUrl = icon };
             }
+
             return dict;
         }
 
@@ -45,7 +46,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var metadata = Meta((1, "Copper Ore", "copper.png"));
 
@@ -69,12 +70,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = new Dictionary<int, ItemMetadata>
             {
                 { 1, new ItemMetadata { ItemId = 1, Name = "Sword", IconUrl = "s.png" } },
-                { 2, new ItemMetadata { ItemId = 2, Name = "Ingot", IconUrl = "i.png", Rarity = "Fine" } }
+                { 2, new ItemMetadata { ItemId = 2, Name = "Ingot", IconUrl = "i.png", Rarity = "Fine" } },
             };
 
             var node = BuildViaRealSolver(tree, prices, metadata);
@@ -93,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var metadata = Meta(
                 (1, "Sword", "sword.png"),
@@ -158,7 +159,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },       // buy: 5 * 5 = 25
                 { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },      // buy: 1 * 50 = 50
-                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }     // craft(3) via 4: 2 * 1000 = 2000
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }, // craft(3) via 4: 2 * 1000 = 2000,
             };
             var metadata = Meta(
                 (2, "Bought Item", "b.png"),
@@ -203,7 +204,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },
-                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } },
             };
             var metadata = Meta((2, "Bought Item", "b.png"), (4, "Raw", "r.png"));
 
@@ -226,7 +227,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 5 } },
-                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } }
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 1000 } },
             };
             var metadata = Meta((2, "Bought Item", "b.png"), (4, "Raw", "r.png"));
 
@@ -248,7 +249,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var metadata = Meta((1, "Sword", "sword.png"), (2, "Ingot", "ingot.png"));
 
@@ -289,7 +290,7 @@ namespace GW2CraftingHelper.Tests.Services
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 1 } },     // buy: 5 * 1 = 5
                 { 3, new ItemPrice { ItemId = 3, BuyInstant = 200 } },   // buy: 1 * 200 = 200 (craft via 5 is cheaper: 20)
                 { 5, new ItemPrice { ItemId = 5, BuyInstant = 20 } },    // buy: 1 * 20 = 20 (craft via 6 is far pricier: 1000)
-                { 6, new ItemPrice { ItemId = 6, BuyInstant = 1000 } }   // buy: 1 * 1000 = 1000
+                { 6, new ItemPrice { ItemId = 6, BuyInstant = 1000 } }, // buy: 1 * 1000 = 1000,
             };
             var metadata = Meta(
                 (2, "Root Bought", "r.png"),
@@ -348,7 +349,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Achievement-bit dedup collapses to Have + IsAchievementBitDeduped ----
-
         [Fact]
         public void AchievementBitDedupedNode_CollapsesToHave_SetsFlag()
         {
@@ -376,7 +376,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Manually "Ignore"-d items collapse to Have + IsIgnored ----
-
         [Fact]
         public void IgnoredItem_CollapsesToHave_SetsIsIgnored()
         {
@@ -384,7 +383,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } },
             };
             var metadata = Meta((1, "Ignored Item", "ignored.png"));
             var ignoredItemIds = new HashSet<int> { 1 };
@@ -405,7 +404,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
             var ignoredItemIds = new HashSet<int> { 999 }; // different item id
@@ -424,7 +423,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
 
@@ -465,7 +464,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var solveResult = solver.Solve(root, prices, null);
 
@@ -522,7 +521,7 @@ namespace GW2CraftingHelper.Tests.Services
             var decisions = new Dictionary<int, SolverDecision>();
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { 24, new ItemMetadata { ItemId = 24, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+                { 24, new ItemMetadata { ItemId = 24, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -547,7 +546,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta();
             var currencyMetadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -567,7 +566,6 @@ namespace GW2CraftingHelper.Tests.Services
         // with no defined relationship to each other, and treating one as
         // the other on the strength of a numeric match would risk silently
         // showing the wrong name, price, icon, or rarity on any collision.
-
         [Fact]
         public void GuildUpgradeNode_DecisionIsGuildUpgrade_WithGenericLabelAndHint_NoRawId()
         {
@@ -614,7 +612,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta();
             var currencyMetadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 73, new CurrencyMetadata { CurrencyId = 73, Name = "Unrelated Wallet Currency", IconUrl = "wrong.png" } }
+                { 73, new CurrencyMetadata { CurrencyId = 73, Name = "Unrelated Wallet Currency", IconUrl = "wrong.png" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -646,7 +644,7 @@ namespace GW2CraftingHelper.Tests.Services
             var decisions = new Dictionary<int, SolverDecision>();
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -700,7 +698,6 @@ namespace GW2CraftingHelper.Tests.Services
         // comment for the full explanation; UnrecognizedIngredientType_
         // NeverGetsIgnorePill_EvenThoughDecisionLooksLikeNoSource below is
         // the direct regression test for that finding.
-
         [Fact]
         public void UnrecognizedIngredientType_DecisionIsUnrecognizedIngredient_NeverMislabeled()
         {
@@ -768,11 +765,11 @@ namespace GW2CraftingHelper.Tests.Services
             var decisions = new Dictionary<int, SolverDecision>();
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } },
             };
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 829, new AcquisitionHint { ItemId = 829, Hint = "Salvage from unrelated item", Badge = "SALVAGE" } }
+                { 829, new AcquisitionHint { ItemId = 829, Hint = "Salvage from unrelated item", Badge = "SALVAGE" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -809,11 +806,11 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } }
+                { 0, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 500 } },
             };
             var metadata = new Dictionary<int, ItemMetadata>
             {
-                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } }
+                { 829, new ItemMetadata { ItemId = 829, Name = "Unrelated Item", IconUrl = "wrong.png", Rarity = "Legendary" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -841,7 +838,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 10000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 5000 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Final", "final.png"),
@@ -891,7 +888,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 10);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } },
             };
             var metadata = Meta((1, "Item", "item.png"));
 
@@ -916,13 +913,13 @@ namespace GW2CraftingHelper.Tests.Services
                             OutputCount = 1,
                             CostLines = new List<CostLine>
                             {
-                                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 }
+                                new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 },
                             },
                             MerchantName = "Test",
-                            Locations = new List<string>()
-                        }
+                            Locations = new List<string>(),
+                        },
                     }
-                }
+                },
             };
             var metadata2 = Meta((2, "Vendor Item", "vendor.png"));
             var vendorNode = BuildViaRealSolver(tree2, prices2, metadata2, vendorOffers);
@@ -954,13 +951,13 @@ namespace GW2CraftingHelper.Tests.Services
                             CostLines = new List<CostLine>
                             {
                                 new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 10 },
-                                new CostLine { Type = "Currency", Id = 23, Count = 50 }
+                                new CostLine { Type = "Currency", Id = 23, Count = 50 },
                             },
                             MerchantName = "Miyani",
-                            Locations = new List<string>()
-                        }
+                            Locations = new List<string>(),
+                        },
                     }
-                }
+                },
             };
             var metadata = Meta((1, "Vendor Item", "vendor.png"));
 
@@ -979,7 +976,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 50 } },
             };
             var metadata = Meta((1, "Item", "item.png"));
 
@@ -1004,7 +1001,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -1050,7 +1047,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -1081,7 +1078,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(3, 10, "Currency")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -1112,7 +1109,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -1144,14 +1141,14 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
                 (2, "Mat", "m.png"));
             var currencyMetadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } },
             };
 
             var root = BuildViaRealSolver(tree, prices, metadata, currencyMetadata: currencyMetadata);
@@ -1177,14 +1174,14 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
                 (2, "Mat", "m.png"));
             var currencyMetadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } }
+                { 61, new CurrencyMetadata { CurrencyId = 61, Name = "Research Note", IconUrl = "note.png" } },
             };
 
             var root = BuildViaRealSolver(tree, prices, metadata, currencyMetadata: currencyMetadata);
@@ -1201,7 +1198,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(23, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 23, new ItemPrice { ItemId = 23, BuyInstant = 100 } }
+                { 23, new ItemPrice { ItemId = 23, BuyInstant = 100 } },
             };
             var metadata = Meta((23, "Vial of Blood", "vial.png"));
 
@@ -1227,7 +1224,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Acquisition hints ---
-
         [Fact]
         public void UnknownDecision_WithHint_SetsAcquisitionHint()
         {
@@ -1237,7 +1233,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((71994, "Ball of Dark Energy", "b.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear." } }
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear." } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -1256,7 +1252,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((99, "Mystery", "m.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint." } }
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint." } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -1275,12 +1271,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var metadata = Meta((1, "Copper Ore", "copper.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 1, new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced node.", Badge = "SALVAGE" } }
+                { 1, new AcquisitionHint { ItemId = 1, Hint = "Should never appear on a priced node.", Badge = "SALVAGE" } },
             };
 
             var solver = new PlanSolver();
@@ -1302,7 +1298,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((71994, "Ball of Dark Energy", "b.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" } }
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Salvaged from ascended gear.", Badge = "SALVAGE" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -1321,7 +1317,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((70698, "Gift of the Jungle", "g.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 70698, new AcquisitionHint { ItemId = 70698, Hint = "Received for map completion." } }
+                { 70698, new AcquisitionHint { ItemId = 70698, Hint = "Received for map completion." } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -1341,7 +1337,7 @@ namespace GW2CraftingHelper.Tests.Services
             var metadata = Meta((99, "Mystery", "m.png"));
             var hints = new Dictionary<int, AcquisitionHint>
             {
-                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint.", Badge = "SALVAGE" } }
+                { 71994, new AcquisitionHint { ItemId = 71994, Hint = "Unrelated item's hint.", Badge = "SALVAGE" } },
             };
 
             var builder = new CraftingTreeBuilder();
@@ -1352,7 +1348,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Per-node owned-quantity attribution ----
-
         [Fact]
         public void OwnedQuantityUsedByNodeId_PopulatesMatchingNode()
         {
@@ -1360,7 +1355,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 7;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
             var ownedUsage = new Dictionary<int, int> { { 7, 3 } };
@@ -1378,7 +1373,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 7;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
             var ownedUsage = new Dictionary<int, int> { { 99, 3 } }; // different node id
@@ -1396,7 +1391,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 7;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } }
+                { 7, new SolverDecision { Source = AcquisitionSource.BuyFromTp, TotalCost = 200 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
 
@@ -1435,7 +1430,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var solveResult = solver.Solve(root, prices, null);
             // Child's real NodeId, assigned by the solve above (root=0, child=1).
@@ -1453,7 +1448,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- MapSource fails loudly on an unmapped AcquisitionSource ----
-
         [Fact]
         public void MapSource_UnmappedAcquisitionSource_ThrowsArgumentOutOfRangeException()
         {
@@ -1469,7 +1463,7 @@ namespace GW2CraftingHelper.Tests.Services
             node.NodeId = 0;
             var decisions = new Dictionary<int, SolverDecision>
             {
-                { 0, new SolverDecision { Source = AcquisitionSource.Currency, TotalCost = 100 } }
+                { 0, new SolverDecision { Source = AcquisitionSource.Currency, TotalCost = 100 } },
             };
             var metadata = Meta((1, "Item", "i.png"));
 
@@ -1508,13 +1502,13 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, quantity);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { itemCostItemId, new ItemPrice { ItemId = itemCostItemId, BuyInstant = 10 } }
+                { itemCostItemId, new ItemPrice { ItemId = itemCostItemId, BuyInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(
                 1, new[] { (itemCostItemId, itemCostCount) }, new[] { (currencyId, currencyCount) });
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((itemCostItemId, "Glob of Ectoplasm", "ecto.png"));
 
@@ -1561,7 +1555,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Price-side fallback (DISPLAY CAVEAT gap): item cost-component leaf PriceSideFellBack ----
-
         [Fact]
         public void MixedOffer_ItemCostPreferredSideEmpty_LeafFlagsPriceSideFellBack()
         {
@@ -1578,12 +1571,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, new[] { (23, 3) });
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((42, "Glob of Ectoplasm", "ecto.png"));
 
@@ -1648,12 +1641,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, currencyCostLines: null);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -1687,12 +1680,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, currencyCostLines: null);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -1711,7 +1704,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 10) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 0, currencyId: 23, currencyCount: 10) } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -1728,7 +1721,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 50) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 50) } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -1749,7 +1742,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 20, currencyId: 23, currencyCount: 10) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, coinCost: 20, currencyId: 23, currencyCount: 10) } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -1814,7 +1807,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "shard.png" } }
+                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "shard.png" } },
             };
             var (node, _) = BuildMixedVendorNode(currencyMetadata: currencyMeta);
             var currencyLeaf = node.Children.Single(c => c.ItemId == 23);
@@ -1840,12 +1833,12 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 2);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(1, new[] { (42, 5) }, new[] { (23, 3) });
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((42, "Ecto", "e.png"));
             var solver = new PlanSolver();
@@ -1919,13 +1912,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(
                 500, new[] { (42, 3) }, new[] { (23, 5) }, coinCost: 0, outputCount: 15);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 500, new List<VendorOffer> { offer } }
+                { 500, new List<VendorOffer> { offer } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -1991,13 +1984,13 @@ namespace GW2CraftingHelper.Tests.Services
 
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } }
+                { 42, new ItemPrice { ItemId = 42, BuyInstant = 0, SellInstant = 10 } },
             };
             var offer = ItemAndCurrencyVendorOffer(
                 500, new[] { (42, 3) }, new[] { (23, 5) }, coinCost: 0, outputCount: 15);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 500, new List<VendorOffer> { offer } }
+                { 500, new List<VendorOffer> { offer } },
             };
             var metadata = Meta(
                 (1, "Root", "r.png"),
@@ -2048,7 +2041,7 @@ namespace GW2CraftingHelper.Tests.Services
                 currencyCostLines: new[] { (23, 3), (24, 5), (25, 7) });
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -2078,7 +2071,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 42, new ItemPrice { ItemId = 42, BuyInstant = 10 } },
-                { 99, new ItemPrice { ItemId = 99, BuyInstant = 100000 } }
+                { 99, new ItemPrice { ItemId = 99, BuyInstant = 100000 } },
             };
             // Item + raw coin (no currency line) - 2 kinds (item, coin),
             // avoiding an unvalued-currency fallback tier so the vendor
@@ -2088,7 +2081,7 @@ namespace GW2CraftingHelper.Tests.Services
                 1, new[] { (42, 5) }, currencyCostLines: null, coinCost: 20);
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var metadata = Meta(
                 (1, "Vendor+Recipe Item", "v.png"),
@@ -2128,7 +2121,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 2);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } },
             };
             var metadata = Meta((1, "Copper Ore", "copper.png"));
 
@@ -2156,7 +2149,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 20 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 20 } },
             };
             var metadata = Meta(
                 (1, "Sword", "sword.png"),
@@ -2189,11 +2182,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 0, SellInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 40) } },
             };
             var metadata = Meta((1, "Vendor Item", "v.png"));
 
@@ -2205,7 +2198,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- currency-ux-package (Feature 3): DecisionValue threading ---
-
         [Fact]
         public void BuyFromVendorNode_ValuedCurrency_DecisionValueDivergesFromSubtreeCost()
         {
@@ -2215,11 +2207,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var metadata = Meta((1, "Karma Item", "karma.png"));
@@ -2240,7 +2232,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var metadata = Meta((1, "TP Item", "tp.png"));
             var solver = new PlanSolver();
@@ -2260,7 +2252,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 1)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } },
             };
             var metadata = Meta((1, "Crafted Item", "c.png"), (2, "Material", "m.png"));
             var solver = new PlanSolver();

@@ -212,7 +212,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- SeedRestored
         // (new public production surface with zero prior test coverage) ---
-
         [Fact]
         public void SeedRestored_OnVirginBoard_SetsSequenceZeroNotInFlightAndFinalStatusText()
         {
@@ -295,7 +294,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Regression: ClearRestoredSeed (new public production
         // surface with zero prior test coverage) ---
-
         [Fact]
         public void ClearRestoredSeed_AfterSeedRestored_ClearsFinalStatusTextAndReturnsTrue()
         {

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The module's style gate, packaged as one import for the SDK-style test and
+     tool projects so every project in the solution answers to the same ruleset
+     and the same warning ratchet. GW2CraftingHelper.csproj cannot import this
+     file - it is a packages.config project, and a PackageReference item inside
+     one flips NuGet into a mixed restore mode - so it carries its own copy of
+     these settings, and the NoWarn list below must stay in sync with that
+     project's <NoWarn>: an ID comes out of both lists in the same commit, per
+     the shrink-only rule stated there and in CONTRIBUTING.md (Code Style).
+
+     No test- or tool-specific rule deltas exist: the six importing projects
+     build clean under the module's exact configuration, so none was needed. -->
+<Project>
+
+  <PropertyGroup>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);SA1005;SA1009;SA1111;SA1114;SA1116;SA1117;SA1118;SA1119;SA1120;SA1122;SA1127;SA1128;SA1201;SA1202;SA1203;SA1204;SA1208;SA1210;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
+    <!-- NuGet audit advisories (NU1901-NU1904) stay visible as warnings but do
+         not fail the build: they appear when a new advisory is published to
+         nuget.org, not when this repo's code changes, so gating on them would
+         let an external event break every build through a style gate. Measured
+         2026-08-26: System.Text.Encodings.Web 5.0.0 (transitive, via the pinned
+         System.Text.Json 5.0.0) already carries a critical advisory
+         (GHSA-ghhp-997w-qr28) that SDK 8's direct-only default audit mode does
+         not surface; a future SDK bump or direct-package advisory would. -->
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

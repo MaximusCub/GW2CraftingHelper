@@ -74,7 +74,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Source column (the badge stopped trailing the name and
         // became an aligned column inside the pinned right-hand block) ---
-
         [Fact]
         public void SourceColumn_SitsOneGapAndOneAmountBandLeftOfTheAmountEdge()
         {
@@ -127,7 +126,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- SegmentRunWidth (currency-segment width computation, KNOWN-ISSUES #16) ---
-
         [Fact]
         public void SegmentRunWidth_Null_ReturnsZero()
         {
@@ -176,7 +174,6 @@ namespace GW2CraftingHelper.Tests.Services
         // (the per-frame resize hot path passes SegmentLayoutHandle.TextWidths,
         // a concrete int[], to a non-allocating overload rather than the
         // IReadOnlyList<int> one above; both must agree on every result) ---
-
         [Fact]
         public void SegmentRunWidthArrayOverload_Null_ReturnsZero()
         {
@@ -213,7 +210,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeEdgesForPanel (the justified-width invariant) ---
-
         [Fact]
         public void ComputeEdgesForPanel_AnchorsTheTotalColumnToThePinnedPanelEdge()
         {
@@ -322,6 +318,5 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(500 - PlanRelayoutMath.TableRightMargin, edges.TotalRightEdge);
         }
-
     }
 }

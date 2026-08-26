@@ -276,7 +276,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 55, new ItemPrice { ItemId = 55, BuyInstant = 100 } },
-                { 60, new ItemPrice { ItemId = 60, BuyInstant = 10 } }
+                { 60, new ItemPrice { ItemId = 60, BuyInstant = 10 } },
             };
 
             var solver = new PlanSolver();

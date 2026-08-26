@@ -10,7 +10,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanSolverForceBuyOnlyTests
     {
         // --- Cost diagnostics + force-buy-only exclusion ---
-
         [Fact]
         public void CostDiagnostics_PopulatedForEveryItemNode_RegardlessOfDecision()
         {
@@ -19,7 +18,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
             var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
@@ -57,12 +56,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 5000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
             var characterDisciplines = new List<SnapshotCharacterDiscipline>
             {
-                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 }
+                new SnapshotCharacterDiscipline { CharacterName = "Toon", Discipline = "Armorsmith", Rating = 400 },
             };
 
             var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
@@ -95,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
 
@@ -126,14 +125,14 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
 
             var forceBuyOnly = new HashSet<int> { 0 };
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 0, AcquisitionSource.Craft }
+                { 0, AcquisitionSource.Craft },
             };
 
             var result = solver.Solve(
@@ -151,7 +150,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 30 } },
             };
             var solver = new PlanSolver();
 

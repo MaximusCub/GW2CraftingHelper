@@ -11,8 +11,11 @@ namespace VendorOfferUpdater.Models
     public class VendorOfferManifest
     {
         public int ManifestVersion { get; set; } = 1;
+
         public int SchemaVersion { get; set; } = 1;
+
         public string Source { get; set; } = string.Empty;
+
         public int OfferCount { get; set; }
 
         /// <summary>
