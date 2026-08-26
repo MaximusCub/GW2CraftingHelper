@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Tests.Services
             var hidden = TopRegionLayoutMath.Compute(rowCount: 2, treeToolbarVisible: false);
             var shown = TopRegionLayoutMath.Compute(rowCount: 2, treeToolbarVisible: true);
 
-            int delta = TopRegionLayoutMath.TreeToolbarRowHeight + TopRegionLayoutMath.RowGap;
+            int delta = TopRegionLayoutMath.TreeToolbarRowHeight + TopRegionLayoutMath.TopRegionRowGap;
 
             // Everything at or above the toolbar row is untouched...
             Assert.Equal(hidden.InputPanelHeight, shown.InputPanelHeight);
@@ -101,7 +101,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var shown = TopRegionLayoutMath.Compute(rowCount: 1, treeToolbarVisible: true);
 
-            Assert.True(shown.TreeToolbarRowY >= shown.ControlsRowY + TopRegionLayoutMath.RowHeight);
+            Assert.True(shown.TreeToolbarRowY >= shown.ControlsRowY + TopRegionLayoutMath.TopRegionRowHeight);
             Assert.True(
                 shown.StatusRowY >= shown.TreeToolbarRowY + TopRegionLayoutMath.TreeToolbarRowHeight);
         }
@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var layout = TopRegionLayoutMath.Compute(rowCount, toolbar);
 
-                Assert.Equal(rowCount * TopRegionLayoutMath.RowHeight, layout.InputPanelHeight);
+                Assert.Equal(rowCount * TopRegionLayoutMath.TopRegionRowHeight, layout.InputPanelHeight);
                 Assert.True(layout.ControlsRowY > TopRegionLayoutMath.InputRowY);
                 Assert.True(layout.TreeToolbarRowY >= layout.ControlsRowY);
                 Assert.True(layout.StatusRowY >= layout.TreeToolbarRowY);

@@ -67,9 +67,9 @@ namespace GW2CraftingHelper.Services
         /// old fixed 190px name column was itself sized from ("Pristine
         /// Fractal Relic").
         /// </summary>
-        public const int NameRunChars = 22;
+        public const int SettingsCurrencyNameRunChars = 22;
 
-        public const int CellNameFloor = NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
+        public const int CellNameFloor = SettingsCurrencyNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
 
         /// <summary>The pinned block: amount box, gap, Ignore checkbox, tag
         /// slot.</summary>

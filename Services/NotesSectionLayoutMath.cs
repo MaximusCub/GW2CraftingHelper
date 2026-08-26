@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
         public const int LabelX = 8;
 
         /// <summary>Right-edge padding shared with every other section.</summary>
-        public const int RightPadding = 8;
+        public const int RightPadding = UiSpacing.SectionRightPad;
 
         /// <summary>Gap reserved between the text and a coin cell.</summary>
         public const int CoinGap = 12;

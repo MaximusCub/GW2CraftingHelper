@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Views
         // Blish-free Services/TopRegionLayoutMath (three call sites lay the
         // strip out from it); these two are aliases so the row builders in
         // this file keep reading naturally.
-        private const int RowHeight = TopRegionLayoutMath.RowHeight;
+        private const int RowHeight = TopRegionLayoutMath.TopRegionRowHeight;
         private const int InputRowY = TopRegionLayoutMath.InputRowY;
 
         // Item-row geometry, left to right: search box, "Qty:" label,

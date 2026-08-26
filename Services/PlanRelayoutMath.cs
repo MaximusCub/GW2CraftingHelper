@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Services
         /// Gap every plan table keeps between its right-hand block and the
         /// panel's right edge.
         /// </summary>
-        public const int TableRightMargin = 8;
+        public const int TableRightMargin = UiSpacing.SectionRightPad;
 
         /// <summary>
         /// Right edge of every plan table's right-hand block, at every

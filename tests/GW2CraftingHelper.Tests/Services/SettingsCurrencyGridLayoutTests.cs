@@ -372,7 +372,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(
                 1210 - SettingsCurrencyGridLayout.MinColumnWidth, wide - narrow);
             Assert.True(narrow
-                >= SettingsCurrencyGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx);
+                >= SettingsCurrencyGridLayout.SettingsCurrencyNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx);
         }
 
         [Fact]

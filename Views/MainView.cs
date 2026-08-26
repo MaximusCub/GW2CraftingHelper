@@ -135,7 +135,7 @@ namespace GW2CraftingHelper.Views
         private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
 
         /// <summary>Left gutter every element on this tab starts at.</summary>
-        private const int Inset = SnapshotHeaderLayout.Inset;
+        private const int Inset = SnapshotHeaderLayout.SnapshotHeaderInset;
 
         private const int HeaderButtonWidth = 100;
 

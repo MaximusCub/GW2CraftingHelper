@@ -130,7 +130,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int NarrowColumn = 400;
 
             Assert.Equal(
-                PlanRelayoutMath.PinnedRightEdge(NarrowColumn) - AboutLayoutMath.Inset,
+                PlanRelayoutMath.PinnedRightEdge(NarrowColumn) - AboutLayoutMath.AboutInset,
                 AboutLayoutMath.TextBudget(NarrowColumn));
         }
 
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             const int MeasuredBand = 150;
 
             Assert.Equal(
-                AboutLayoutMath.Inset + MeasuredBand + AboutLayoutMath.LabelToValueGap,
+                AboutLayoutMath.AboutInset + MeasuredBand + AboutLayoutMath.LabelToValueGap,
                 AboutLayoutMath.ValueX(MeasuredBand));
         }
 

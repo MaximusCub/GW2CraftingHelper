@@ -78,7 +78,7 @@ namespace GW2CraftingHelper.Tests.Services
                 columnWidth, SnapshotItemGridLayout.AmountColumnFloor);
 
             Assert.True(
-                SnapshotItemGridLayout.NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
+                SnapshotItemGridLayout.SnapshotNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx <= nameRunBudget,
                 "a full-length name must not ellipsize in a column at the window minimum");
         }
 

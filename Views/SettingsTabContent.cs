@@ -86,10 +86,10 @@ namespace GW2CraftingHelper.Views
         // SettingsFormLayout, which derives them from the plan tables' own
         // pinned-right-edge rule; these are compile-time aliases so the call
         // sites below read as geometry rather than as lookups.
-        private const int RowHeight = SettingsFormLayout.RowHeight;
+        private const int RowHeight = SettingsFormLayout.SettingsRowHeight;
         private const int NameColumnX = SettingsFormLayout.CellLeftPad;
         private const int InputWidth = SettingsFormLayout.InputWidth;
-        private const int RowGap = SettingsFormLayout.RowGap;
+        private const int RowGap = SettingsFormLayout.SettingsRowGap;
 
         // PlanContentHeightMath's SectionTitle band, aliased rather than
         // re-derived: these headings are the same tier and rule.
@@ -2169,7 +2169,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = WarningTextColor,
-                Location = new Point(SettingsSaveBarLayout.Inset, 10),
+                Location = new Point(SettingsSaveBarLayout.SettingsSaveBarInset, 10),
                 Visible = false,
                 Parent = _saveBarPanel,
             };
@@ -2187,7 +2187,7 @@ namespace GW2CraftingHelper.Views
                 Text = "",
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
-                Location = new Point(SettingsSaveBarLayout.Inset, 9),
+                Location = new Point(SettingsSaveBarLayout.SettingsSaveBarInset, 9),
                 Parent = _saveBarPanel,
             };
 
@@ -2198,7 +2198,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Discard",
                 Size = new Point(DiscardButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
+                Location = new Point(SettingsSaveBarLayout.SettingsSaveBarInset, SaveBarButtonY),
                 BasicTooltipText = "Throw away every unsaved edit on this tab and restore the last saved values.",
                 Visible = false,
                 Parent = _saveBarPanel,
@@ -2212,7 +2212,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Save",
                 Size = new Point(SaveButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(SettingsSaveBarLayout.Inset, SaveBarButtonY),
+                Location = new Point(SettingsSaveBarLayout.SettingsSaveBarInset, SaveBarButtonY),
                 BasicTooltipText = "Save every section on this tab.",
                 Parent = _saveBarPanel,
             };

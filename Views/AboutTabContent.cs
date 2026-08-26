@@ -99,7 +99,7 @@ namespace GW2CraftingHelper.Views
         // Every horizontal constant on this tab comes from AboutLayoutMath,
         // which derives them from the plan tables' own pinned-right-edge
         // rule and from the reading measure it declares.
-        private const int Inset = AboutLayoutMath.Inset;
+        private const int Inset = AboutLayoutMath.AboutInset;
         private const int RowHeight = 30;
         private const int RowLabelY = 7;
         private const int RowInputY = 3;

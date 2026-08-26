@@ -120,6 +120,7 @@
     <Compile Include="Services\TreeToolbarRowLayout.cs" />
     <Compile Include="Services\TreeRowIdentity.cs" />
     <Compile Include="Services\TypeRampMetrics.cs" />
+    <Compile Include="Services\UiSpacing.cs" />
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\FirstLoadSnapshotGate.cs" />
     <Compile Include="Services\ScrollAnchorMath.cs" />

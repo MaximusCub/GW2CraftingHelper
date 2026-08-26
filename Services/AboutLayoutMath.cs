@@ -20,7 +20,9 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class AboutLayoutMath
     {
-        public const int Inset = 16;
+        /// <summary>Left gutter of both columns - the module's content
+        /// inset.</summary>
+        public const int AboutInset = UiSpacing.Inset;
 
         /// <summary>Gutter between the facts column and the prose column.
         /// Wider than a within-column gap so the two read as two documents
@@ -81,7 +83,7 @@ namespace GW2CraftingHelper.Services
         public const int ValueFloor = 200;
 
         public const int FactsMinWidth =
-            Inset + LabelFloor + LabelToValueGap + ValueFloor + PlanRelayoutMath.TableRightMargin;
+            AboutInset + LabelFloor + LabelToValueGap + ValueFloor + PlanRelayoutMath.TableRightMargin;
 
         /// <summary>Two columns need both minimums plus the gutter.</summary>
         public const int TwoColumnThreshold = FactsMinWidth + ColumnGutter + ProseMeasure;
@@ -115,7 +117,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int TextBudget(int columnWidth)
         {
-            int available = PlanRelayoutMath.PinnedRightEdge(columnWidth) - Inset;
+            int available = PlanRelayoutMath.PinnedRightEdge(columnWidth) - AboutInset;
             if (available < 20)
             {
                 available = 20;
@@ -129,7 +131,7 @@ namespace GW2CraftingHelper.Services
         public static int ValueX(int labelBandWidth)
         {
             int band = labelBandWidth > LabelFloor ? labelBandWidth : LabelFloor;
-            return Inset + band + LabelToValueGap;
+            return AboutInset + band + LabelToValueGap;
         }
 
         /// <summary>

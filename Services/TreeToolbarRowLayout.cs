@@ -29,15 +29,15 @@ namespace GW2CraftingHelper.Services
     public static class TreeToolbarRowLayout
     {
         /// <summary>Gap between two buttons in the same group.</summary>
-        public const int ButtonGap = 4;
+        public const int TreeToolbarButtonGap = 4;
 
         /// <summary>
         /// Separates the three plan-mutating presets from the two view-only
         /// actions, and the whole cluster from the chip strip. Wider than
-        /// <see cref="ButtonGap"/> on purpose: "Buy All" re-solves the whole
-        /// plan and "Expand All" only opens branches, and sitting them 4px
-        /// apart in one undifferentiated run invited exactly the misclick
-        /// that costs a set of manual overrides.
+        /// <see cref="TreeToolbarButtonGap"/> on purpose: "Buy All" re-solves
+        /// the whole plan and "Expand All" only opens branches, and sitting
+        /// them 4px apart in one undifferentiated run invited exactly the
+        /// misclick that costs a set of manual overrides.
         /// </summary>
         public const int GroupGap = 20;
 
@@ -57,10 +57,10 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        public static readonly ButtonSlot CollapseAll = new ButtonSlot(96, ButtonGap);
+        public static readonly ButtonSlot CollapseAll = new ButtonSlot(96, TreeToolbarButtonGap);
         public static readonly ButtonSlot ExpandAll = new ButtonSlot(92, GroupGap);
-        public static readonly ButtonSlot BuyAll = new ButtonSlot(70, ButtonGap);
-        public static readonly ButtonSlot CraftAll = new ButtonSlot(76, ButtonGap);
+        public static readonly ButtonSlot BuyAll = new ButtonSlot(70, TreeToolbarButtonGap);
+        public static readonly ButtonSlot CraftAll = new ButtonSlot(76, TreeToolbarButtonGap);
         public static readonly ButtonSlot BestPath = new ButtonSlot(80, 0);
 
         /// <summary>

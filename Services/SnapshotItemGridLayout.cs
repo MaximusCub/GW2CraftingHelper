@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
         /// Per column it simply ellipsizes earlier.
         /// </para>
         /// </summary>
-        public const int NameRunChars = 45;
+        public const int SnapshotNameRunChars = 45;
 
         /// <summary>Gap before the Amount column pinned to a cell's right -
         /// the same 12px the plan's name columns keep.</summary>
@@ -85,7 +85,7 @@ namespace GW2CraftingHelper.Services
         /// </para>
         /// </summary>
         public const int MinColumnWidth =
-            CellTextX + (NameRunChars * MaxCharWidthPx) + CellAmountGap + AmountColumnFloor + CellTextRightPad;
+            CellTextX + (SnapshotNameRunChars * MaxCharWidthPx) + CellAmountGap + AmountColumnFloor + CellTextRightPad;
 
         /// <summary>Right edge every cell's Amount column is pinned to. A
         /// cell justifies like a plan table row: this edge is a function of

@@ -41,11 +41,11 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>Left gutter every element on this tab starts at. Five
         /// things here used to sit at x=0.</summary>
-        public const int Inset = 16;
+        public const int SnapshotHeaderInset = UiSpacing.Inset;
 
         /// <summary>Gap between the tab's two right-anchored header buttons -
         /// the module's one button gap, not the 20 they used to keep.</summary>
-        public const int HeaderButtonGap = 8;
+        public const int HeaderButtonGap = UiSpacing.ButtonGap;
 
         /// <summary>Gap the result line keeps clear of the coin block beside
         /// it - the module's one name-to-column gap.</summary>
@@ -87,7 +87,7 @@ namespace GW2CraftingHelper.Services
                 ChromeRightEdge(containerWidth),
                 coinBlockWidth > 0 ? coinBlockWidth : 0,
                 ResultLineToCoinGap,
-                Inset);
+                SnapshotHeaderInset);
         }
 
         /// <summary>
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int StatusMaxWidth(int containerWidth, int spinnerReserve)
         {
-            int width = ChromeRightEdge(containerWidth) - Inset
+            int width = ChromeRightEdge(containerWidth) - SnapshotHeaderInset
                 - (spinnerReserve > 0 ? spinnerReserve : 0);
             return width > 20 ? width : 20;
         }
@@ -170,7 +170,7 @@ namespace GW2CraftingHelper.Services
             // chrome element - it used to start at x=0, sixteen pixels
             // left of the box it sits under.
             return new SourceFilterPlacement(
-                false, Inset, searchRowHeight + rowGap, SourceFilterWidth(panelWidth, Inset));
+                false, SnapshotHeaderInset, searchRowHeight + rowGap, SourceFilterWidth(panelWidth, SnapshotHeaderInset));
         }
 
         /// <summary>

@@ -16,14 +16,16 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class SettingsSaveBarLayout
     {
-        public const int Inset = SettingsFormLayout.CellLeftPad;
+        public const int SettingsSaveBarInset = SettingsFormLayout.CellLeftPad;
 
         /// <summary>Gap between the chip and the status line, and between
         /// the status line and the button cluster: the strip reads as
         /// clusters rather than as a run of controls.</summary>
         public const int ChipToStatusGap = TreeChipStripLayout.ChipGap;
 
-        public const int ButtonGap = 8;
+        /// <summary>Gap inside the Save/Discard pair - the module's one
+        /// button gap.</summary>
+        public const int SettingsSaveBarButtonGap = UiSpacing.ButtonGap;
 
         /// <summary>Floor for the status line's own budget - below this it
         /// would ellipsize to nothing on a bar whose buttons already fit.</summary>
@@ -61,10 +63,10 @@ namespace GW2CraftingHelper.Services
 
             int rightEdge = PlanRelayoutMath.PinnedRightEdge(barWidth);
             int saveX = PlanRelayoutMath.RightAlignedX(rightEdge, safeSave);
-            int discardX = safeDiscard > 0 ? saveX - ButtonGap - safeDiscard : saveX;
+            int discardX = safeDiscard > 0 ? saveX - SettingsSaveBarButtonGap - safeDiscard : saveX;
 
-            int chipX = Inset;
-            int statusX = safeChip > 0 ? Inset + safeChip + ChipToStatusGap : Inset;
+            int chipX = SettingsSaveBarInset;
+            int statusX = safeChip > 0 ? SettingsSaveBarInset + safeChip + ChipToStatusGap : SettingsSaveBarInset;
 
             int statusMaxWidth = discardX - ChipToStatusGap - statusX;
             if (statusMaxWidth < MinStatusWidth)

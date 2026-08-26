@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void NameFloor_HoldsTheWidestLabelTheTabShips()
         {
-            Assert.True("Metal (Metal Forge)".Length <= SettingsFormLayout.NameRunChars);
+            Assert.True("Metal (Metal Forge)".Length <= SettingsFormLayout.SettingsNameRunChars);
         }
 
         [Theory]

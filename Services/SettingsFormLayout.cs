@@ -16,9 +16,9 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     public static class SettingsFormLayout
     {
-        /// <summary>Left inset inside every board column - the same 16 the
-        /// section titles sit at.</summary>
-        public const int CellLeftPad = 16;
+        /// <summary>Left inset inside every board column - the same inset
+        /// the section titles sit at.</summary>
+        public const int CellLeftPad = UiSpacing.Inset;
 
         /// <summary>Gap between a flexing name and the column pinned to its
         /// right: the module's one name-to-column gap.</summary>
@@ -26,12 +26,12 @@ namespace GW2CraftingHelper.Services
 
         public const int InputWidth = 80;
         public const int InputToTagGap = 8;
-        public const int RowHeight = 30;
+        public const int SettingsRowHeight = 30;
         public const int DescriptionLineHeight = 22;
 
         /// <summary>Gap between one control group and the next inside a
         /// section.</summary>
-        public const int RowGap = 10;
+        public const int SettingsRowGap = 10;
 
         /// <summary>Gap between one section block and the next in a board
         /// column.</summary>
@@ -48,9 +48,9 @@ namespace GW2CraftingHelper.Services
         /// upper-bound-per-character rule that class already uses. 22 covers
         /// the widest label the tab ships ("Metal (Metal Forge)", 19).
         /// </summary>
-        public const int NameRunChars = 22;
+        public const int SettingsNameRunChars = 22;
 
-        public const int NameFloor = NameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
+        public const int NameFloor = SettingsNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
 
         // The click-volume row's cluster - the widest on the tab, and so
         // what MinColumnWidth is sized to hold. The slider stays FIXED at
