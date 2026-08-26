@@ -154,6 +154,21 @@ namespace GW2CraftingHelper
         private Texture2D _cornerIconTexture;
         private Texture2D _emblemTexture;
 
+        // Cancelled FIRST in Unload, before anything this module owns is
+        // disposed. Everything that outlives a single frame runs under it:
+        // plan generation, the typed-name search, the restored-plan stat
+        // top-up and the startup build-id fetch. Without it, disabling the
+        // module mid-generation left a continuation chain running against
+        // the HttpClient Unload had just disposed, finishing by writing the
+        // dead instance's plan.json - which the next enable would restore.
+        //
+        // Deliberately never disposed: the token is captured by in-flight
+        // work and by CreateLinkedTokenSource callers, and disposing the
+        // source while they still hold it buys nothing (a cancelled source
+        // with no live registrations holds no unmanaged state) at the cost
+        // of turning an orderly cancel into an ObjectDisposedException.
+        private CancellationTokenSource _lifetimeCts;
+
         // The single-fetch slot: the claim that decides which caller gets
         // to refresh, and the CancellationTokenSource that refresh runs
         // under. Both used to be bare fields here (a volatile bool checked
@@ -248,6 +263,11 @@ namespace GW2CraftingHelper
 
         protected override void Initialize()
         {
+            // First line of Initialize, so every construction below can hand
+            // its token to work that must not outlive this module instance.
+            _lifetimeCts = new CancellationTokenSource();
+            var lifetimeToken = _lifetimeCts.Token;
+
             string dataDir = DirectoriesManager.GetFullDirectoryPath("data");
 
             // Configured before any other store so their
@@ -405,12 +425,24 @@ namespace GW2CraftingHelper
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             recipeOverlay.Load(currentGw2BuildId: null);
 
-            // Async build ID fetch for overlay invalidation + seed staleness
+            // Async build ID fetch for overlay invalidation + seed staleness.
+            // Fire-and-forget, but tethered: InvalidateIfStale is a cache
+            // invalidation over the on-disk data dir, and on a fast
+            // disable-then-re-enable (one click in Manage Modules) this task
+            // could invalidate the previous instance's overlay cache while
+            // the new instance was loading its own. The token is re-checked
+            // after the await because that is where the instance can have
+            // gone away; the mutations themselves are synchronous.
             Task.Run(async () =>
             {
                 try
                 {
-                    int buildId = await FetchGw2BuildIdAsync();
+                    int buildId = await FetchGw2BuildIdAsync(lifetimeToken);
+                    if (lifetimeToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
                     recipeOverlay.InvalidateIfStale(buildId);
                     recipeSeed.SetCurrentBuildId(buildId);
                 }
@@ -558,6 +590,13 @@ namespace GW2CraftingHelper
                     // created - in lockstep with the view's myGen bump.
                     int myPersistGen = ++_persistGenerateSequence;
 
+                    // The view already passes the lifetime token, but the
+                    // parameter is public surface: linking here means a
+                    // future caller cannot start an untethered generation by
+                    // passing None, and costs one source per Generate click.
+                    var generateCts = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetimeToken);
+                    ct = generateCts.Token;
+
                     Task<CraftingPlanResult> generateTask = useOwn
                         ? _craftingPipeline.GenerateStructuredAsync(
                             items, _currentSnapshot, ct, progress,
@@ -570,7 +609,7 @@ namespace GW2CraftingHelper
                             homesteadTiers, phaseProgress, requestLabel,
                             characterDisciplines: _currentSnapshot?.CharacterDisciplines);
 
-                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen);
+                    return PersistAfterGenerateAsync(generateTask, items, useOwn, priceBasis, valueOwnMaterials, myPersistGen, ct, generateCts);
                 },
                 _modalDialog,
                 _itemSearchProvider,
@@ -592,7 +631,8 @@ namespace GW2CraftingHelper
                 // all. Fills only the session stat side table - see
                 // ItemMetadataService.WarmStatBlocksAsync for why it is
                 // not GetMetadataAsync.
-                ids => itemMetadataService.WarmStatBlocksAsync(ids, CancellationToken.None)
+                ids => itemMetadataService.WarmStatBlocksAsync(ids, lifetimeToken),
+                () => lifetimeToken
             );
 
             _settingsContent = new SettingsTabContent(_settings, _modalDialog);
@@ -1103,6 +1143,11 @@ namespace GW2CraftingHelper
 
         protected override void Unload()
         {
+            // FIRST, before any disposal below: every in-flight await this
+            // module owns is running against objects the next few lines are
+            // about to destroy - the HttpClient most of all.
+            _lifetimeCts?.Cancel();
+
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
 
             // The SettingEntry objects outlive this module instance
@@ -1484,7 +1529,31 @@ namespace GW2CraftingHelper
             bool useOwnMaterials,
             PriceBasis priceBasis,
             bool valueOwnMaterials,
-            int myPersistGen)
+            int myPersistGen,
+            CancellationToken ct,
+            CancellationTokenSource generateCts)
+        {
+            try
+            {
+                return await PersistOrSkipAsync(
+                    generateTask, requestItems, useOwnMaterials, priceBasis, valueOwnMaterials, myPersistGen, ct);
+            }
+            finally
+            {
+                // The linked source created per Generate click, owned by this
+                // continuation because it is the last thing still using it.
+                generateCts?.Dispose();
+            }
+        }
+
+        private async Task<CraftingPlanResult> PersistOrSkipAsync(
+            Task<CraftingPlanResult> generateTask,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis,
+            bool valueOwnMaterials,
+            int myPersistGen,
+            CancellationToken ct)
         {
             var result = await generateTask;
 
@@ -1497,6 +1566,14 @@ namespace GW2CraftingHelper
             }
 
             if (myPersistGen != _persistGenerateSequence)
+            {
+                return result;
+            }
+
+            // A generation that completed as the module was being unloaded
+            // must not write plan.json: the module is gone, and the next
+            // enable would restore a plan the user never saw finish.
+            if (ct.IsCancellationRequested)
             {
                 return result;
             }
@@ -1670,9 +1747,13 @@ namespace GW2CraftingHelper
         }
 #endif
 
-        private async Task<int> FetchGw2BuildIdAsync()
+        private async Task<int> FetchGw2BuildIdAsync(CancellationToken lifetimeToken)
         {
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+            // The 3-second budget is the request's own; linking it with the
+            // module lifetime means an unload also ends the wait, instead of
+            // leaving it pending against an HttpClient Unload has disposed.
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, lifetimeToken))
             {
                 var response = await _httpClient.GetAsync(
                     "https://api.guildwars2.com/v2/build", cts.Token);

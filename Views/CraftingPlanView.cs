@@ -97,6 +97,13 @@ namespace GW2CraftingHelper.Views
         // the background. Never on the hover path - see
         // ItemMetadataService.GetCachedStatBlock.
         private readonly Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
+
+        // Supplier rather than a stored CancellationToken so this view takes
+        // no dependency on when the module's source is created - the view is
+        // constructed inside Initialize, alongside it. Null in any caller
+        // that does not supply one (the tests), where the token is None -
+        // exactly the pre-existing behaviour.
+        private readonly Func<CancellationToken> _moduleLifetimeToken;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
         private readonly PlanViewModelBuilder _vmBuilder = new PlanViewModelBuilder();
@@ -668,7 +675,15 @@ namespace GW2CraftingHelper.Views
             // see StartRestoredStatWarmup. Optional; without it a restored
             // plan simply has no stat blocks until the user regenerates,
             // which is the pre-existing behaviour.
-            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null,
+            // Module.Unload cancels this before it disposes the HttpClient
+            // every API client in the pipeline was built over. The two long
+            // awaits this view starts - plan generation and the typed-name
+            // search - run under it, so disabling the module mid-generation
+            // ends them instead of leaving them running against disposed
+            // objects. Optional; without it both use CancellationToken.None,
+            // which is what they did before.
+            Func<CancellationToken> moduleLifetimeToken = null)
         {
             _generateAsync = generateAsync;
             _modalDialog = modalDialog;
@@ -678,6 +693,7 @@ namespace GW2CraftingHelper.Views
             _resolveOverridesSync = resolveOverridesSync;
             _getItemStatBlock = getItemStatBlock;
             _warmItemStatsAsync = warmItemStatsAsync;
+            _moduleLifetimeToken = moduleLifetimeToken;
 
             // Seed the per-plan default from the persisted setting so a
             // user who turned "Value own materials" off is not silently
@@ -3475,6 +3491,15 @@ namespace GW2CraftingHelper.Views
         /// site).
         /// </para>
         /// </summary>
+        /// <summary>
+        /// The module's lifetime token, or None when this view was built
+        /// without one. Read per call, never cached - see the field comment.
+        /// </summary>
+        private CancellationToken ModuleLifetimeToken()
+        {
+            return _moduleLifetimeToken == null ? CancellationToken.None : _moduleLifetimeToken();
+        }
+
         private void SetGenerateInputsEnabled(bool enabled)
         {
             if (_generateButton != null)
@@ -3552,7 +3577,7 @@ namespace GW2CraftingHelper.Views
                 try
                 {
                     results = await _itemSearchProvider.SearchAsync(
-                        entry.Text, TypedNameSearchResults, CancellationToken.None);
+                        entry.Text, TypedNameSearchResults, ModuleLifetimeToken());
                 }
                 catch (Exception ex)
                 {
@@ -3799,7 +3824,7 @@ namespace GW2CraftingHelper.Views
             {
                 var result = await _generateAsync(
                     requestItems, _useOwnMaterials, _valueOwnMaterials, _priceBasis,
-                    CancellationToken.None, null, phaseProgress, requestLabel);
+                    ModuleLifetimeToken(), null, phaseProgress, requestLabel);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this
                 // continuation may resume on a ThreadPool thread. vm-building
