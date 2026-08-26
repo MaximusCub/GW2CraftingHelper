@@ -886,7 +886,9 @@ namespace GW2CraftingHelper.Tests.Services
 
                 // Opens the gate late as well, so a build that does wait on
                 // the persist fails the assertion below instead of hanging.
-                Task.Delay(System.TimeSpan.FromSeconds(5))
+                // Deliberately not awaited - it is a watchdog, and the
+                // discard says so.
+                _ = Task.Delay(System.TimeSpan.FromSeconds(5))
                     .ContinueWith(t => gated.Release());
 
                 var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);

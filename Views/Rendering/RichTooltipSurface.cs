@@ -42,25 +42,11 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
-        /// The game's own canvas: near-black with a blue-green cast,
-        /// faintly translucent, over the whole box.
-        /// <para>
-        /// The tint (25,32,34) is Blish's game-derived tooltip texture's
-        /// median (decompiled 1.3.0, drawn at 0.98), and all three lossless
-        /// 2026-08-25 live captures show the same cast over their scenes -
-        /// interior medians (31,34,33), (31,40,45), (28,33,36): green ~+5
-        /// and blue ~+7 over red, where the previous pure black had none
-        /// and read colder and flatter than the game.
-        /// </para>
-        /// <para>
-        /// 0.82, retuned from 0.92 against the maintainer's in-game
-        /// capture: a real tooltip's interior is not flat - medians shift
-        /// ~20 levels per channel across ONE box, (34,38,40) to (43,55,55) -
-        /// which puts the game nearer 0.75-0.85. The UPPER end of that band,
-        /// since audit H6 requires content behind never to bleed through
-        /// legibly. The ONE translucent layer: Blish's own art (0.98) is
-        /// suppressed by <see cref="PaintBeforeChildren"/>.
-        /// </para>
+        /// FALLBACK canvas only: the game-derived art's median tint at its
+        /// measured coverage, used when the "tooltip" texture cannot be
+        /// loaded, and for the strips of a pathological box that outruns
+        /// the 942px art. The normal path draws the texture itself - see
+        /// <see cref="PaintBeforeChildren"/>.
         /// </summary>
         /// <remarks>
         /// Named for the surface rather than plainly <c>BackgroundColor</c>: at
@@ -71,24 +57,45 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </remarks>
         private static readonly Color SurfaceBackgroundColor = new Color(25, 32, 34) * 0.82f;
 
+        /// <summary>
+        /// Blish's own multiplier on the "tooltip" texture (decompiled
+        /// 1.3.0), and independently the live client's: fitting
+        /// composite = s*artAlpha*artRGB + (1 - s*artAlpha)*scene to two
+        /// clean interior patches of live2/k-2 puts s at 0.98 and 1.00,
+        /// residual std ~1 quantisation level (fidelity-audit, 8.4
+        /// closure). The audit's F5 note suggested 0.82 here; that number
+        /// belonged to the flat FILL, whose constant carries its own
+        /// coverage - the texture's alpha channel (mean ~0.80) already
+        /// supplies the transparency, so scaling it again would land the
+        /// box near 0.66 coverage and fail audit H6's no-legible-bleed
+        /// requirement. Measurement wins.
+        /// </summary>
+        private const float CanvasArtOpacity = 0.98f;
+
+        /// <summary>
+        /// The game's tooltip canvas, via Blish's content service - the
+        /// module ships no copy of the art. Null only if the ref archive
+        /// fails to yield it, in which case the flat fallback tint paints
+        /// instead (Blish caches the miss, so this stays null for the
+        /// session); cached here because <c>GetTexture</c> is a dictionary
+        /// probe per call and this runs every paint.
+        /// </summary>
+        private static Texture2D _canvasArt;
+
         /// <summary>1px, near-black, all four edges - measured on column
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
         private static readonly Color BorderColor = new Color(6, 10, 12);
 
-        /// <summary>
-        /// The game DARKENS inward from its border - it never brightens.
-        /// Inward luminance profiles on all three lossless 2026-08-25 live
-        /// captures (s05/s07/eq-weapon-full) read border ~6-8, then ~9-10,
-        /// then ~16-30, flattening to a ~27-35 interior plateau, with no
-        /// overshoot anywhere. The bright ring the prior wave drew here
-        /// ((166,175,174)*0.22, doubling the brightness of a 1px ring) was
-        /// backwards and is deleted. Blish's own art does the same dimming
-        /// via edge bands at Black*0.5/0.6 (decompiled); these two inset
-        /// rings reproduce that fall-off over the flat fill.
-        /// </summary>
-        private static readonly Color VignetteInset1Color = Color.Black * 0.3f;
-
-        private static readonly Color VignetteInset2Color = Color.Black * 0.15f;
+        // The two Black*0.3f/0.15f vignette rings that used to sit here
+        // reproduced the measured inward darkening over the FLAT fill. The
+        // 2026-08-26 live2 captures show that fall-off is baked into the
+        // canvas art's own left/top crop edge (live left-edge profile of
+        // k-2 matches the raw asset columns at (3+inset) to ~1 level), and
+        // that the game adds NOTHING on the right/bottom - interiors run
+        // flat to the border there. Drawing the art makes the rings a
+        // double-darkening on two edges and an invention on the other two,
+        // so they are gone; Blish's eight Black*0.5/0.6 edge bands were
+        // Blish's addition, not the game's, and stay suppressed.
 
         /// <summary>
         /// Every glyph in a game tooltip carries a dark halo (measured at
@@ -173,12 +180,17 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// The game's canvas instead of Blish's. Blish's own override
-        /// (decompiled, 1.3.0) draws its "tooltip" texture at
-        /// <c>Color.White * 0.98f</c> plus four dark inner edge bands;
-        /// replacing it outright is what lets the fill be translucent
-        /// without stacking two translucent layers, and what makes the
-        /// border a single measured pixel rather than Blish's gradient.
+        /// The game's canvas, drawn the way the game itself draws it: the
+        /// "tooltip" art cropped 1:1 from (3,4) at 0.98 - the exact call
+        /// Blish's own override makes (decompiled, 1.3.0), which the
+        /// live client provably shares: clean interior patches of
+        /// live2/k-2 correlate with the texture at r=0.983 at the
+        /// predicted alignment, and the composite model at 0.98 leaves
+        /// ~1 level of residual (fidelity-audit, 8.4 - the background is
+        /// textured, not flat, settling what F5's flat tint deferred).
+        /// What is still replaced relative to Blish: its eight dark edge
+        /// bands (the game has none - see the note where the vignette
+        /// rings used to be) give way to the single measured border pixel.
         /// <para>
         /// Blish's content edge buffer - <c>Thickness(4 top, 4 right,
         /// 3 bottom, 6 left)</c>, which <c>RecalculateLayout</c> turns into
@@ -191,28 +203,58 @@ namespace GW2CraftingHelper.Views.Rendering
         public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
         {
             var pixel = ContentService.Textures.Pixel;
-            spriteBatch.DrawOnCtrl(this, pixel, bounds, SurfaceBackgroundColor);
+            var art = _canvasArt;
+            if (art == null || art.IsDisposed)
+            {
+                art = _canvasArt = GameService.Content.GetTexture("tooltip", null);
+            }
+
+            if (art == null)
+            {
+                spriteBatch.DrawOnCtrl(this, pixel, bounds, SurfaceBackgroundColor);
+            }
+            else
+            {
+                int srcW = TooltipLayoutMath.CanvasArtSourceLength(
+                    bounds.Width, art.Width, TooltipLayoutMath.CanvasArtSourceX);
+                int srcH = TooltipLayoutMath.CanvasArtSourceLength(
+                    bounds.Height, art.Height, TooltipLayoutMath.CanvasArtSourceY);
+
+                if (srcW > 0 && srcH > 0)
+                {
+                    spriteBatch.DrawOnCtrl(
+                        this, art,
+                        new Rectangle(bounds.X, bounds.Y, srcW, srcH),
+                        new Rectangle(
+                            TooltipLayoutMath.CanvasArtSourceX,
+                            TooltipLayoutMath.CanvasArtSourceY,
+                            srcW, srcH),
+                        Color.White * CanvasArtOpacity);
+                }
+
+                // A box that outruns the 939x938 the crop can source
+                // (never seen - max content width 392 plus chrome) gets
+                // the fallback tint on the uncovered strips rather than
+                // a stretch: only ever right/bottom, since the crop is
+                // anchored to the box's top-left like the game's.
+                if (srcW < bounds.Width)
+                {
+                    spriteBatch.DrawOnCtrl(
+                        this, pixel,
+                        new Rectangle(bounds.X + srcW, bounds.Y, bounds.Width - srcW, bounds.Height),
+                        SurfaceBackgroundColor);
+                }
+
+                if (srcH < bounds.Height)
+                {
+                    spriteBatch.DrawOnCtrl(
+                        this, pixel,
+                        new Rectangle(bounds.X, bounds.Y + srcH, srcW, bounds.Height - srcH),
+                        SurfaceBackgroundColor);
+                }
+            }
 
             DrawEdges(spriteBatch, pixel, bounds, BorderColor);
-
-            // The two-step inward dim band the live edge profiles show,
-            // drawn only where a ring fits without overdrawing the border
-            // or its opposite edge.
-            if (bounds.Width > 2 && bounds.Height > 2)
-            {
-                DrawEdges(
-                    spriteBatch, pixel,
-                    new Rectangle(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2),
-                    VignetteInset1Color);
-            }
-
-            if (bounds.Width > 4 && bounds.Height > 4)
-            {
-                DrawEdges(
-                    spriteBatch, pixel,
-                    new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, bounds.Height - 4),
-                    VignetteInset2Color);
-            }
         }
 
         private void DrawEdges(SpriteBatch spriteBatch, Texture2D pixel, Rectangle bounds, Color color)

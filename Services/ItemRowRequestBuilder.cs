@@ -69,15 +69,24 @@ namespace GW2CraftingHelper.Services
                     continue;
                 }
 
-                if (!int.TryParse(row.QuantityText, out int qty) || qty < 1)
+                result.Add(new PlanRequestItem
                 {
-                    qty = 1;
-                }
-
-                result.Add(new PlanRequestItem { ItemId = row.ItemId.Value, Quantity = qty });
+                    ItemId = row.ItemId.Value,
+                    Quantity = NormalizeQuantity(row.QuantityText),
+                });
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Blank, unparseable or below 1 all become 1, silently. Shared with
+        /// the Crafting Ranker's Add field so the two entry points cannot
+        /// drift into two different rules.
+        /// </summary>
+        public static int NormalizeQuantity(string quantityText)
+        {
+            return !int.TryParse(quantityText, out int qty) || qty < 1 ? 1 : qty;
         }
     }
 }

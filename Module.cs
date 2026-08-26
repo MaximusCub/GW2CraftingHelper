@@ -79,6 +79,8 @@ namespace GW2CraftingHelper
         private AboutTabContent _aboutContent;
 
         private ModuleSettings _settings;
+        private RankerStore _rankerStore;
+        private RankerTabContent _rankerContent;
         private SnapshotStore _snapshotStore;
         private StatusStore _statusStore;
         private Gw2AccountSnapshotService _snapshotService;
@@ -370,6 +372,7 @@ namespace GW2CraftingHelper
 
             _snapshotStore = new SnapshotStore(dataDir, onStoreError);
             _statusStore = new StatusStore(dataDir, onStoreError);
+            _rankerStore = new RankerStore(dataDir, onStoreError);
             _planStore = new PlanStore(dataDir, onStoreError, onStoreInfo);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
             _lastStatus = _statusStore.Load();
@@ -834,21 +837,32 @@ namespace GW2CraftingHelper
             _mainWindow.Tabs.Add(_logTab);
 
 #if DEBUG
-            // Dev builds only. Both views are BuildPlaceholder - a single
-            // "Coming Soon" label - and a released overlay should not
-            // advertise unfinished work in its own tab strip. Delete the
-            // two directives (not the tabs) when the features land; see
-            // docs/ROADMAP.md.
+            // Dev builds only: still a BuildPlaceholder "Coming Soon" label,
+            // and a released overlay should not advertise unfinished work in
+            // its own tab strip. Delete the directives (not the tab) when the
+            // feature lands; see docs/ROADMAP.md.
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156691),
                 () => new ViewAdapter("Plan History", BuildPlaceholder),
                 "Plan History"));
+#endif
+
+            _rankerContent = new RankerTabContent(
+                _craftingPipeline,
+                _itemSearchProvider,
+                _settings,
+                _rankerStore,
+                () => _currentSnapshot,
+                TryGetActiveCharacterName);
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156686),
-                () => new ViewAdapter("Crafting Ranker", BuildPlaceholder),
+                () =>
+                {
+                    _rankerContent.BeginRebuild();
+                    return new ViewAdapter("Crafting Ranker", c => _rankerContent.Build(c));
+                },
                 "Crafting Ranker"));
-#endif
 
             _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
@@ -893,6 +907,9 @@ namespace GW2CraftingHelper
                 {
                     _logContent.Refresh();
                 }
+
+                // View-only: never starts a solve on a tab switch.
+                _rankerContent?.Refresh();
             };
 
             _cornerIcon = new CornerIcon()
@@ -1050,6 +1067,33 @@ namespace GW2CraftingHelper
         /// the typed text again.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// Best-effort active character name. Debug, not Warn: a user running
+        /// Blish without Mumble wired up would hit this on every plan
+        /// generation and every ranker refresh, and the fallback is purely
+        /// cosmetic (active-character is only used for account-bound recipe
+        /// checks).
+        /// </summary>
+        private string TryGetActiveCharacterName()
+        {
+            try
+            {
+                var mumble = GameService.Gw2Mumble;
+                if (mumble != null &&
+                    mumble.PlayerCharacter != null &&
+                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                {
+                    return mumble.PlayerCharacter.Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            return null;
+        }
+
         private void PromptForUnsavedSettings()
         {
             if (_settingsContent == null || _modalDialog == null)
@@ -1428,6 +1472,7 @@ namespace GW2CraftingHelper
             Views.Rendering.TooltipFacility.Shutdown();
 
             Views.Rendering.ClickSound.Unload();
+            _rankerContent?.Teardown();
             _settingsContent?.Teardown();
             _aboutContent?.Teardown();
 
