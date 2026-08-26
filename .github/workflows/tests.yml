@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   pull_request:
+  # release.yml calls this workflow and gates publishing on it, so a tagged
+  # build cannot ship without the suite passing first. A `branches:` filter
+  # with no `tags:` key excludes tag refs entirely, so without this the
+  # release path ran no tests at all.
+  workflow_call:
 
 # Without this, three pushes in a row leave six runs racing and the last one to
 # finish wins the status rather than the newest commit.
@@ -24,7 +29,14 @@ jobs:
       - name: ASCII-only .cs source
         shell: bash
         run: |
-          violations=$(git ls-files -z '*.cs' | xargs -0 -r grep -lP '[^\x00-\x7F]' || true)
+          # LC_ALL=C is load-bearing. In a UTF-8 locale PCRE runs in UTF mode,
+          # where a byte that is not valid UTF-8 never matches [^\x00-\x7F] at
+          # all - so the step caught a UTF-8 em-dash and a BOM but waved through
+          # Windows-1252 curly quotes (0x93/0x94), the likeliest way non-ASCII
+          # reaches a Windows C# repo. Byte mode matches on bytes and catches
+          # all three. `env` because xargs execs grep directly, not via a shell.
+          violations=$(git ls-files -z '*.cs' \
+            | xargs -0 -r env LC_ALL=C grep -laP '[^\x00-\x7F]' || true)
           if [ -n "$violations" ]; then
             echo "CLAUDE.md requires ASCII-only .cs source. Represent runtime glyphs"
             echo "with escape sequences instead. Non-ASCII characters found in:"
@@ -37,8 +49,14 @@ jobs:
         run: |
           # ref/ holds data generated from the GW2 API and the wiki, not authored
           # text, so item names there are outside the rule.
+          #
+          # Byte mode here too, for the reason above - but the pattern must be
+          # the em-dash's UTF-8 bytes, not \x{2014}: under LC_ALL=C, PCRE rejects
+          # a code point above 0xFF outright ("character code point value in
+          # \x{} is too large", rc=2), and the `|| true` below would swallow
+          # that into a step that silently passes forever.
           hits=$(git ls-files -z '*.cs' '*.csproj' '*.yml' '*.yaml' '*.json' '*.config' \
-            | xargs -0 -r grep -lP '\x{2014}' | grep -v '^ref/' || true)
+            | xargs -0 -r env LC_ALL=C grep -laP '\xE2\x80\x94' | grep -v '^ref/' || true)
           if [ -n "$hits" ]; then
             echo "CLAUDE.md forbids em-dashes in source and config. Use '-' or '--'."
             echo "Found in:"
@@ -259,6 +277,16 @@ jobs:
         run: |
           # Anything we cannot resolve falls through to building, never to skipping.
           code=true
+          # release.yml calls this workflow on a tag ref and gates publishing on
+          # the result. A docs-only skip there would hand the release job a
+          # green `tests` status that ran no tests - re-tagging an existing
+          # release commit is enough to reach it - which is the exact hole this
+          # gate exists to close. Tag refs always run the whole suite.
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "tag ref: running the full suite regardless of what changed"
+            exit 0
+          fi
           base="$BASE_SHA"
           if [ -z "$base" ]; then
             base="$BEFORE_SHA"
@@ -325,3 +353,20 @@ jobs:
 
       - name: Run vendor offer updater tests
         run: dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
+
+      # Release|x64 is the configuration release.yml ships from. CI already
+      # reaches it, but only as a side effect: the module test step above pulls
+      # the module in through a ProjectReference pinned with SetPlatform=x64,
+      # so BuildBlishHUDModule runs because a test project happened to ask for
+      # it. That coverage vanishes silently the day SetPlatform changes or the
+      # test project stops referencing the module. Build it by name and assert
+      # the .bhm came out, so the artefact players install is a thing CI checks
+      # on purpose rather than a thing it happens to produce.
+      - name: Build the shipping configuration (Release/x64)
+        run: dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release
+
+      - name: Verify the .bhm was produced
+        shell: bash
+        run: |
+          test -f bin/x64/Release/GW2CraftingHelper.bhm
+          ls -l bin/x64/Release/GW2CraftingHelper.bhm

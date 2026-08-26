@@ -13,7 +13,21 @@ permissions:
   contents: write
 
 jobs:
+  # A tag can be pushed to any commit, including one that never saw a pull
+  # request, and the tests workflow's `push: branches:` filter does not match
+  # tag refs - so before this, `git tag v0.2.5 && git push --tags` built and
+  # published a .bhm with zero tests run. Calling the tests workflow rather
+  # than repeating its steps means the release is gated on exactly the suite
+  # CI runs, with no second list to drift out of sync.
+  tests:
+    uses: ./.github/workflows/tests.yml
+    # The workflow-level contents:write below exists for the publish step; the
+    # suite only ever reads the checkout.
+    permissions:
+      contents: read
+
   release:
+    needs: tests
     runs-on: windows-latest
 
     steps:
