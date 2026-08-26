@@ -770,18 +770,18 @@ namespace GW2CraftingHelper.Views
 
         // ---- Section board ----
         //
-        // Four short sections packed into as many SettingsFormLayout
-        // .MinColumnWidth columns as the panel holds. Every block is
-        // measured at the resolved column width first (a description wraps,
-        // so a block's height is a function of that width) and placed
-        // second; ColumnBoardLayout owns the packing.
+        // Four short sections packed into as many
+        // SettingsFormLayout.SettingsFormMinColumnWidth columns as the panel
+        // holds. Every block is measured at the resolved column width first
+        // (a description wraps, so a block's height is a function of that
+        // width) and placed second; ColumnBoardLayout owns the packing.
         private SectionBlock BeginSection(string title, params string[] prose)
         {
             var section = new SectionBlock
             {
                 Panel = new Panel()
                 {
-                    Size = new Point(SettingsFormLayout.MinColumnWidth, SectionHeaderRowHeight),
+                    Size = new Point(SettingsFormLayout.SettingsFormMinColumnWidth, SectionHeaderRowHeight),
                     Parent = _boardPanel,
                 },
             };
@@ -804,7 +804,7 @@ namespace GW2CraftingHelper.Views
             // edge instead of the title floating inside its own rule.
             section.Rule = new Panel()
             {
-                Size = new Point(SettingsFormLayout.MinColumnWidth, 2),
+                Size = new Point(SettingsFormLayout.SettingsFormMinColumnWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = section.Panel,
@@ -935,7 +935,7 @@ namespace GW2CraftingHelper.Views
 
             int boardWidth = _panelWidth;
             int columnCount = ColumnBoardLayout.ComputeColumnCount(
-                boardWidth, SettingsFormLayout.MinColumnWidth, _sections.Count);
+                boardWidth, SettingsFormLayout.SettingsFormMinColumnWidth, _sections.Count);
             int columnWidth = ColumnBoardLayout.ComputeColumnWidth(boardWidth, columnCount);
 
             var heights = new List<int>(_sections.Count);
@@ -945,7 +945,7 @@ namespace GW2CraftingHelper.Views
             }
 
             var board = ColumnBoardLayout.Compute(
-                heights, boardWidth, SettingsFormLayout.MinColumnWidth, SettingsFormLayout.SectionGap);
+                heights, boardWidth, SettingsFormLayout.SettingsFormMinColumnWidth, SettingsFormLayout.SectionGap);
 
             for (int i = 0; i < _sections.Count; i++)
             {
@@ -1134,7 +1134,7 @@ namespace GW2CraftingHelper.Views
 
             row.Panel = new Panel()
             {
-                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Size = new Point(SettingsFormLayout.SettingsFormMinColumnWidth, RowHeight),
                 Parent = section.Panel,
             };
 
@@ -1279,7 +1279,7 @@ namespace GW2CraftingHelper.Views
 
             var rowPanel = new Panel()
             {
-                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Size = new Point(SettingsFormLayout.SettingsFormMinColumnWidth, RowHeight),
                 Parent = section.Panel,
             };
             row.Panel = rowPanel;
@@ -1499,7 +1499,7 @@ namespace GW2CraftingHelper.Views
 
             row.Panel = new Panel()
             {
-                Size = new Point(SettingsFormLayout.MinColumnWidth, RowHeight),
+                Size = new Point(SettingsFormLayout.SettingsFormMinColumnWidth, RowHeight),
                 Parent = section.Panel,
             };
             row.DescriptionLabel = CreateWrappedLabel(section.Panel);
@@ -1709,9 +1709,9 @@ namespace GW2CraftingHelper.Views
         // One line per currency: name, input, Clear, and one tag slot that
         // shows either the default/cleared state or an "Invalid" warning.
         // The horizontal constants live in SettingsCurrencyGridLayout so its
-        // MinColumnWidth (the one/two-column threshold) is derived from the
-        // same numbers, not hand-copied from them; these are compile-time
-        // aliases, not a second copy.
+        // SettingsCurrencyMinColumnWidth (the one/two-column threshold) is
+        // derived from the same numbers, not hand-copied from them; these
+        // are compile-time aliases, not a second copy.
         // 32, not 30: the cell's labels sit at y=6, whose lowest Font16 ink
         // is y=27 - exactly the top of the 30px row's own divider
         // (30 - 2 - CellDividerClearance).
@@ -1955,7 +1955,8 @@ namespace GW2CraftingHelper.Views
                 //
                 // Not the longer "Ignore default": the cell reserves
                 // SettingsCurrencyGridLayout.CellClearWidth (74px) for this
-                // control, and widening that widens MinColumnWidth with it.
+                // control, and widening that widens
+                // SettingsCurrencyMinColumnWidth with it.
                 // That was load-bearing at the old 930px window minimum,
                 // whose panel could not hold two columns at all; the 1378px
                 // minimum clears the two-column threshold by ~344px, so the

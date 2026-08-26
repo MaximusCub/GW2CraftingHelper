@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(198, SettingsFormLayout.NameFloor);
             Assert.Equal(336, SettingsFormLayout.WidestClusterWidth);
-            Assert.Equal(570, SettingsFormLayout.MinColumnWidth);
+            Assert.Equal(570, SettingsFormLayout.SettingsFormMinColumnWidth);
             Assert.Equal(546, SettingsFormLayout.ProseMeasure);
         }
 
@@ -32,10 +32,10 @@ namespace GW2CraftingHelper.Tests.Services
             // pixels: a board one pixel short of two floors stays single.
             Assert.Equal(
                 1,
-                ColumnBoardLayout.ComputeColumnCount(1139, SettingsFormLayout.MinColumnWidth, 8));
+                ColumnBoardLayout.ComputeColumnCount(1139, SettingsFormLayout.SettingsFormMinColumnWidth, 8));
             Assert.Equal(
                 2,
-                ColumnBoardLayout.ComputeColumnCount(1140, SettingsFormLayout.MinColumnWidth, 8));
+                ColumnBoardLayout.ComputeColumnCount(1140, SettingsFormLayout.SettingsFormMinColumnWidth, 8));
         }
 
         [Fact]
@@ -47,7 +47,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Theory]
         [InlineData(FloorColumnWidth)]
         [InlineData(WideColumnWidth)]
-        [InlineData(SettingsFormLayout.MinColumnWidth)]
+        [InlineData(SettingsFormLayout.SettingsFormMinColumnWidth)]
         public void ClusterRightEdge_IsThePinnedRightEdgeAndNothingElse(int columnWidth)
         {
             Assert.Equal(
@@ -110,7 +110,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void VolumeClusterPinsRightWithTheSliderFixed()
         {
-            foreach (int columnWidth in new[] { SettingsFormLayout.MinColumnWidth, FloorColumnWidth, WideColumnWidth })
+            foreach (int columnWidth in new[] { SettingsFormLayout.SettingsFormMinColumnWidth, FloorColumnWidth, WideColumnWidth })
             {
                 int rightEdge = SettingsFormLayout.ClusterRightEdge(columnWidth);
 
@@ -138,11 +138,11 @@ namespace GW2CraftingHelper.Tests.Services
         public void NameMaxWidth_TakesEveryRecoveredPixel()
         {
             int narrow = SettingsFormLayout.NameMaxWidth(
-                SettingsFormLayout.MinColumnWidth, SettingsFormLayout.WidestClusterWidth);
+                SettingsFormLayout.SettingsFormMinColumnWidth, SettingsFormLayout.WidestClusterWidth);
             int wide = SettingsFormLayout.NameMaxWidth(
                 WideColumnWidth, SettingsFormLayout.WidestClusterWidth);
 
-            Assert.Equal(WideColumnWidth - SettingsFormLayout.MinColumnWidth, wide - narrow);
+            Assert.Equal(WideColumnWidth - SettingsFormLayout.SettingsFormMinColumnWidth, wide - narrow);
             Assert.True(narrow >= SettingsFormLayout.NameFloor);
         }
 
@@ -251,18 +251,18 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(
                 2, ColumnBoardLayout.ComputeColumnCount(
-                    panelAtFloor, SettingsFormLayout.MinColumnWidth, 4));
+                    panelAtFloor, SettingsFormLayout.SettingsFormMinColumnWidth, 4));
             Assert.Equal(
                 4, ColumnBoardLayout.ComputeColumnCount(
-                    4 * SettingsFormLayout.MinColumnWidth, SettingsFormLayout.MinColumnWidth, 4));
+                    4 * SettingsFormLayout.SettingsFormMinColumnWidth, SettingsFormLayout.SettingsFormMinColumnWidth, 4));
 
             // And one column still exceeds the min even on the narrow-screen
             // floor, so nothing clips there.
             int narrowPanel = WindowSizing.TabPanelWidthFor(WindowSizing.NarrowScreenFloorWidth);
             Assert.Equal(
                 1, ColumnBoardLayout.ComputeColumnCount(
-                    narrowPanel, SettingsFormLayout.MinColumnWidth, 4));
-            Assert.True(narrowPanel > SettingsFormLayout.MinColumnWidth);
+                    narrowPanel, SettingsFormLayout.SettingsFormMinColumnWidth, 4));
+            Assert.True(narrowPanel > SettingsFormLayout.SettingsFormMinColumnWidth);
         }
     }
 }

@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Left edge of a cell's text column: the 32px icon at x=2 plus its
         /// right gap. Same number MainView's rows have always used; it lives
-        /// here so <see cref="MinColumnWidth"/> is derived from the geometry
+        /// here so <see cref="SnapshotMinColumnWidth"/> is derived from the geometry
         /// the cells are actually built with and cannot drift from it.
         /// </summary>
         public const int CellTextX = 40;
@@ -84,7 +84,7 @@ namespace GW2CraftingHelper.Services
         /// each) and a third only once the window reaches 1758px.
         /// </para>
         /// </summary>
-        public const int MinColumnWidth =
+        public const int SnapshotMinColumnWidth =
             CellTextX + (SnapshotNameRunChars * MaxCharWidthPx) + CellAmountGap + AmountColumnFloor + CellTextRightPad;
 
         /// <summary>Right edge every cell's Amount column is pinned to. A
@@ -179,29 +179,24 @@ namespace GW2CraftingHelper.Services
             return width > 0 ? width : 0;
         }
 
-        /// <summary>
-        /// As many whole <see cref="MinColumnWidth"/> columns as fit, never
-        /// fewer than one. Not capped at two: the count is derived from the
-        /// width the player gave the window, so a wide window gets three or
-        /// more columns and every one of them is still at least
-        /// MinColumnWidth across.
-        /// </summary>
+        /// <summary>The shared grid law at this grid's own
+        /// <see cref="SnapshotMinColumnWidth"/> - see <see cref="GridLayout"/>.
+        /// Uncapped: the count is derived from the width the player gave the
+        /// window, so a wide window gets three or more columns and every one
+        /// of them is still at least SnapshotMinColumnWidth across.</summary>
         public static int ComputeColumnCount(int gridWidth)
         {
-            int columns = gridWidth / MinColumnWidth;
-            return columns > 1 ? columns : 1;
+            return GridLayout.ColumnCount(gridWidth, SnapshotMinColumnWidth);
         }
 
         public static int ComputeColumnWidth(int gridWidth)
         {
-            return gridWidth > 0 ? gridWidth / ComputeColumnCount(gridWidth) : 0;
+            return GridLayout.ColumnWidth(gridWidth, ComputeColumnCount(gridWidth));
         }
 
         public static int ComputeHeight(int count, int gridWidth, int rowHeight)
         {
-            int safeCount = count > 0 ? count : 0;
-            int columnCount = ComputeColumnCount(gridWidth);
-            int rowCount = (safeCount + columnCount - 1) / columnCount;
+            int rowCount = GridLayout.RowCount(count, ComputeColumnCount(gridWidth));
             return rowCount * (rowHeight > 0 ? rowHeight : 0);
         }
 
@@ -233,7 +228,7 @@ namespace GW2CraftingHelper.Services
                     column * columnWidth, offsetY + (row * safeRowHeight), column, row);
             }
 
-            int rowCount = (safeCount + columnCount - 1) / columnCount;
+            int rowCount = GridLayout.RowCount(safeCount, columnCount);
             return new Grid(cells, columnCount, columnWidth, rowCount, rowCount * safeRowHeight);
         }
     }

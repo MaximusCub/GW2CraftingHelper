@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Services
         public const int NameFloor = SettingsNameRunChars * SnapshotItemGridLayout.MaxCharWidthPx;
 
         // The click-volume row's cluster - the widest on the tab, and so
-        // what MinColumnWidth is sized to hold. The slider stays FIXED at
+        // what SettingsFormMinColumnWidth is sized to hold. The slider stays FIXED at
         // 200: only the name flexes, exactly as in a plan table, because a
         // 700px volume slider on a wide column is a worse artefact than the
         // space it would fill.
@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Services
         /// the left pad, a 22-character name floor, the name-to-control gap,
         /// the widest cluster the tab ships, and the table right margin.
         /// </summary>
-        public const int MinColumnWidth =
+        public const int SettingsFormMinColumnWidth =
             CellLeftPad + NameFloor + NameToControlGap + WidestClusterWidth
             + PlanRelayoutMath.TableRightMargin;
 
@@ -83,7 +83,7 @@ namespace GW2CraftingHelper.Services
         /// runs a line wider than one, whatever the panel does.
         /// </summary>
         public const int ProseMeasure =
-            MinColumnWidth - CellLeftPad - PlanRelayoutMath.TableRightMargin;
+            SettingsFormMinColumnWidth - CellLeftPad - PlanRelayoutMath.TableRightMargin;
 
         /// <summary>Right edge every row's control cluster pins to.</summary>
         public static int ClusterRightEdge(int columnWidth)

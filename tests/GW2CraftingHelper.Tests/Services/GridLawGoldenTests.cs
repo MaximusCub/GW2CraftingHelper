@@ -66,9 +66,10 @@ namespace GW2CraftingHelper.Tests.Services
                 int snapCols = SnapshotItemGridLayout.ComputeColumnCount(width);
                 int curCols = SettingsCurrencyGridLayout.ComputeColumnCount(width);
                 int boardCols4 = ColumnBoardLayout.ComputeColumnCount(
-                    width, SettingsFormLayout.MinColumnWidth, blockHeights.Length);
+                    width, SettingsFormLayout.SettingsFormMinColumnWidth, blockHeights.Length);
                 var board = ColumnBoardLayout.Compute(
-                    blockHeights, width, SettingsFormLayout.MinColumnWidth, SettingsFormLayout.SettingsRowGap);
+                    blockHeights, width, SettingsFormLayout.SettingsFormMinColumnWidth,
+                    SettingsFormLayout.SettingsRowGap);
 
                 var sb = new StringBuilder(64);
                 sb.Append(width).Append('|')
@@ -81,7 +82,7 @@ namespace GW2CraftingHelper.Tests.Services
                     .Append(boardCols4).Append('|')
                     .Append(ColumnBoardLayout.ComputeColumnWidth(width, boardCols4)).Append('|')
                     .Append(board.Height).Append('|')
-                    .Append(ColumnBoardLayout.ComputeColumnCount(width, SettingsFormLayout.MinColumnWidth, 1));
+                    .Append(ColumnBoardLayout.ComputeColumnCount(width, SettingsFormLayout.SettingsFormMinColumnWidth, 1));
 
                 lines.Add(sb.ToString());
             }

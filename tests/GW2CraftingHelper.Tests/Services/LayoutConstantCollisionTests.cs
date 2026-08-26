@@ -60,6 +60,22 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotEqual(SettingsFormLayout.SettingsRowGap, TopRegionLayoutMath.TopRegionRowGap);
             Assert.NotEqual(
                 SettingsFormLayout.SettingsNameRunChars, SnapshotItemGridLayout.SnapshotNameRunChars);
+
+            // Three grids, three cell contents, three minimum widths. They
+            // share the COLUMN LAW (Services/GridLayout), never the number
+            // they feed it: a currency row holds a name and three controls,
+            // a snapshot cell a name and an amount, a settings section a
+            // wrapped description. Each class's own tests pin its value; the
+            // point here is that one value can never become all three.
+            Assert.NotEqual(
+                SnapshotItemGridLayout.SnapshotMinColumnWidth,
+                SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth);
+            Assert.NotEqual(
+                SnapshotItemGridLayout.SnapshotMinColumnWidth,
+                SettingsFormLayout.SettingsFormMinColumnWidth);
+            Assert.NotEqual(
+                SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth,
+                SettingsFormLayout.SettingsFormMinColumnWidth);
         }
     }
 }
