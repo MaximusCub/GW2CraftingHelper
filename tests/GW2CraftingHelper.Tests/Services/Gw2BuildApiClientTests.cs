@@ -39,6 +39,26 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // A /v2/build that never answers - the case the per-attempt timeout
+        // exists for, and the only one a scripted response cannot express.
+        private class HangingHandler : HttpMessageHandler
+        {
+            public int Calls { get; private set; }
+
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Calls++;
+                var abandoned = new TaskCompletionSource<bool>();
+                using (cancellationToken.Register(() => abandoned.TrySetResult(true)))
+                {
+                    await abandoned.Task;
+                }
+
+                throw new OperationCanceledException(cancellationToken);
+            }
+        }
+
         private static Func<HttpResponseMessage> Ok(int buildId)
         {
             return () => new HttpResponseMessage(HttpStatusCode.OK)
@@ -112,6 +132,23 @@ namespace GW2CraftingHelper.Tests.Services
 
                 // Bounded: the caller is told to degrade, not left waiting.
                 Assert.Equal(3, handler.Calls);
+            }
+        }
+
+        [Fact]
+        public async Task TryGetBuildId_HungResponse_IsAbandonedAndRetried()
+        {
+            using (var handler = new HangingHandler())
+            using (var http = new HttpClient(handler))
+            {
+                var result = await NoDelay(http).TryGetBuildIdAsync(CancellationToken.None);
+
+                // A response that never arrives must be given up on per attempt
+                // and retried, not waited out: the caller is told to degrade.
+                Assert.Null(result.BuildId);
+                Assert.Equal(3, result.Attempts);
+                Assert.Equal(3, handler.Calls);
+                Assert.IsAssignableFrom<OperationCanceledException>(result.LastError);
             }
         }
 
