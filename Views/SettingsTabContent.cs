@@ -321,6 +321,12 @@ namespace GW2CraftingHelper.Views
         private TextBox _logRetentionDaysInput;
         private FormRow _logRetentionDaysRow;
 
+        // Plan History's one setting rides in the Logging section rather
+        // than a section of its own, so the board's column count does not
+        // change for a single row.
+        private TextBox _planHistoryMaxEntriesInput;
+        private FormRow _planHistoryMaxEntriesRow;
+
         // Held only to be disposed - see DisposeClickVolumeSlider.
         private TrackBar _clickVolumeSlider;
 
@@ -620,6 +626,7 @@ namespace GW2CraftingHelper.Views
             // itself read as a change.
             state.AddText(SettingsFormState.LogMaxSizeMbKey, _logMaxSizeInput?.Text);
             state.AddText(SettingsFormState.LogRetentionDaysKey, _logRetentionDaysInput?.Text);
+            state.AddText(SettingsFormState.PlanHistoryMaxEntriesKey, _planHistoryMaxEntriesInput?.Text);
             state.AddText(
                 SettingsFormState.SnapshotRefreshIntervalMinutesKey,
                 _snapshotRefreshIntervalInput?.Text);
@@ -1470,6 +1477,11 @@ namespace GW2CraftingHelper.Views
                 section, "Log retention", "days (1-365)", "Must be 1-365", null);
             _logRetentionDaysInput = _logRetentionDaysRow.Input;
 
+            _planHistoryMaxEntriesRow = AddInputRow(
+                section, "Plan history kept", "plans (5-200)", "Must be 5-200",
+                "How many previously-generated plans the Plan History tab keeps. Pinned entries are never removed.");
+            _planHistoryMaxEntriesInput = _planHistoryMaxEntriesRow.Input;
+
             BandSectionTagSlot(section);
         }
 
@@ -1542,6 +1554,14 @@ namespace GW2CraftingHelper.Views
             }
 
             SetRowError(_logRetentionDaysRow, "");
+
+            if (_planHistoryMaxEntriesInput != null)
+            {
+                _planHistoryMaxEntriesInput.Text =
+                    _settings.PlanHistoryMaxEntries.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            SetRowError(_planHistoryMaxEntriesRow, "");
         }
 
         private int SaveLoggingSettings()
@@ -1573,6 +1593,20 @@ namespace GW2CraftingHelper.Views
             else if (_logRetentionDaysRow != null)
             {
                 SetRowError(_logRetentionDaysRow, _logRetentionDaysRow.ErrorText);
+                invalidCount++;
+            }
+
+            SetRowError(_planHistoryMaxEntriesRow, "");
+            if (SettingsInputParser.TryParsePlanHistoryMaxEntries(_planHistoryMaxEntriesInput?.Text, out int maxEntries))
+            {
+                // Enforced at the next capture, not retroactively: a
+                // lowered cap does not delete rows until a Generate next
+                // runs the retention pass - nothing holds a live copy.
+                _settings.PlanHistoryMaxEntries.Value = maxEntries;
+            }
+            else if (_planHistoryMaxEntriesRow != null)
+            {
+                SetRowError(_planHistoryMaxEntriesRow, _planHistoryMaxEntriesRow.ErrorText);
                 invalidCount++;
             }
 

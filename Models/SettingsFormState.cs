@@ -107,6 +107,7 @@ namespace GW2CraftingHelper.Models
 
         public const string LogMaxSizeMbKey = "log.maxSizeMb";
         public const string LogRetentionDaysKey = "log.retentionDays";
+        public const string PlanHistoryMaxEntriesKey = "planHistory.maxEntries";
         public const string SnapshotRefreshIntervalMinutesKey = "snapshot.refreshIntervalMinutes";
 
         // Duplicates are rejected rather than overwritten: two controls

@@ -99,6 +99,14 @@ namespace GW2CraftingHelper.Services
         // SettingsTabContent).
         public SettingEntry<bool> LogDiagnosticsEnabled { get; private set; }
 
+        // How many previously-generated plans the Plan History tab keeps.
+        // Default 25 (each entry owns a gzipped PersistedPlan blob, so the
+        // cap bounds disk use to single-digit MB). Pinned entries are
+        // never removed by the cap. Read through
+        // GetClampedPlanHistoryMaxEntries below - same hand-edited-file
+        // contract as every clamped accessor here.
+        public SettingEntry<int> PlanHistoryMaxEntries { get; private set; }
+
         // Replaces Module.cs's
         // previously-hardcoded `StaleThreshold` constant. Default 10 minutes
         // (matching the constant it replaces), clamped 1-120. Read directly
@@ -169,6 +177,11 @@ namespace GW2CraftingHelper.Services
                 "LogDiagnosticsEnabled", false,
                 () => "Diagnostics logging",
                 () => "Log fine-grained diagnostic events (including scroll machinery) to the Log tab and file");
+
+            PlanHistoryMaxEntries = settings.DefineSetting(
+                "PlanHistoryMaxEntries", 25,
+                () => "Plan history entries kept",
+                () => "How many previously-generated plans the Plan History tab keeps. Pinned entries are never removed.");
 
             SnapshotRefreshIntervalMinutes = settings.DefineSetting(
                 "SnapshotRefreshIntervalMinutes", 10,
@@ -289,6 +302,34 @@ namespace GW2CraftingHelper.Services
         public int GetClampedLogRetentionDays()
         {
             return ClampRetentionDays(LogRetentionDays.Value);
+        }
+
+        // Mirrors SettingsInputParser.TryParsePlanHistoryMaxEntries'
+        // 5-200 bound - the duplication is deliberate, see
+        // ClampLogMaxSizeBytes' own comment. A hand-edited settings file
+        // must never break the Plan History tab: 0 or a negative value
+        // would evict every row on the next capture.
+        private const int MinPlanHistoryMaxEntries = 5;
+        private const int MaxPlanHistoryMaxEntries = 200;
+
+        /// <summary>
+        /// Clamped PlanHistoryMaxEntries for actual use - see the field's
+        /// own comment.
+        /// </summary>
+        public int GetClampedPlanHistoryMaxEntries()
+        {
+            int value = PlanHistoryMaxEntries.Value;
+            if (value < MinPlanHistoryMaxEntries)
+            {
+                return MinPlanHistoryMaxEntries;
+            }
+
+            if (value > MaxPlanHistoryMaxEntries)
+            {
+                return MaxPlanHistoryMaxEntries;
+            }
+
+            return value;
         }
 
         // Mirrors SettingsInputParser.TryParseRefreshIntervalMinutes' own
