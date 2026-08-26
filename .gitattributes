@@ -31,9 +31,13 @@ ref/recipe_sheet_items.json text=auto diff merge -linguist-generated
 # recipe_search_seed.json and recipes_seed.json ARE seeder output, so they say
 # so - linguist-generated collapses them in a PR view by default while diff and
 # merge keep them readable when someone opens them. mystic_forge_recipes.json is
-# hand-curated on top of its seeded rows, so it is not marked generated. -diff
-# renders all three as "Binary files differ" in review, and -merge turns a
-# concurrent edit into a whole-file binary conflict.
-ref/mystic_forge_recipes.json text=auto diff merge -linguist-generated
-ref/recipe_search_seed.json text=auto diff merge linguist-generated=true
-ref/recipes_seed.json text=auto diff merge linguist-generated=true
+# hand-curated on top of its seeded rows, so it is not marked generated.
+# eol=lf, not text=auto, for the same reason as the manifests - and measured
+# the hard way: ShippedSeedManifest sha-pins the two recipe seeds, and the
+# first CI run with text=auto failed both pins because the Windows runner
+# checks out CRLF (the earlier claim here that GitHub's image uses
+# autocrlf=input was wrong - PR #184 run 32988578177 is the counterexample).
+# The seeder writes LF; eol=lf hands every clone the bytes the digest names.
+ref/mystic_forge_recipes.json text eol=lf diff merge -linguist-generated
+ref/recipe_search_seed.json text eol=lf diff merge linguist-generated=true
+ref/recipes_seed.json text eol=lf diff merge linguist-generated=true
