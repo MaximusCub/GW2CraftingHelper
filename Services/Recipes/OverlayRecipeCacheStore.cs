@@ -21,9 +21,28 @@ namespace GW2CraftingHelper.Services.Recipes
 
         private readonly RecipeCacheStats _stats = new RecipeCacheStats();
         private readonly object _gate = new object();
-        private bool _dirty;
+
+        // Tracked per file, not as one flag: the two caches fill at very
+        // different rates (a session that learns a search learns no new
+        // recipe at all when the shipped seed already has them), and each
+        // rewrite is a whole-file write whether one entry changed or none.
+        private bool _searchesDirty;
+        private bool _recipesDirty;
+        private bool _stampDirty;
+
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
+
+        // Recipes persisted by an earlier session are only servable once the
+        // live game build is known to match the build they were cached from.
+        // Module.cs learns that build from an async /v2/build call that lands
+        // seconds after Load, so Load leaves the overlay files on disk UNREAD
+        // and sets this instead; ResolveDeferredLocked below then either
+        // reads them in (builds match) or deletes them (they do not). Until
+        // that happens the maps hold only what THIS session fetched, so a
+        // plan generated in the meantime - or in a whole session whose build
+        // check failed - can never be built from another build's recipes.
+        private bool _deferredDiskLoad;
 
         // See StatusStore's
         // matching field comment.
@@ -32,6 +51,8 @@ namespace GW2CraftingHelper.Services.Recipes
         private static readonly TimeSpan FlushDebounce = TimeSpan.FromSeconds(2);
 
         public RecipeCacheStats Stats => _stats;
+
+        private bool IsDirty => _searchesDirty || _recipesDirty || _stampDirty;
 
         public OverlayRecipeCacheStore(string dataDir, Action<string, Exception> onError = null)
         {
@@ -46,6 +67,13 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             lock (_gate)
             {
+                _deferredDiskLoad = false;
+
+                // Every branch below replaces the maps with what disk holds,
+                // so anything put into them before this call is gone and must
+                // not be flushed back out.
+                ClearDirtyLocked();
+
                 if (!Directory.Exists(_cacheDir))
                 {
                     _searches = new Dictionary<int, IReadOnlyList<int>>();
@@ -73,9 +101,22 @@ namespace GW2CraftingHelper.Services.Recipes
                     }
                 }
 
-                // If build ID known and mismatches, invalidate
-                if (currentGw2BuildId.HasValue
-                    && _storedBuildId.HasValue
+                _searches = new Dictionary<int, IReadOnlyList<int>>();
+                _recipes = new Dictionary<int, RawRecipe>();
+
+                if (!currentGw2BuildId.HasValue)
+                {
+                    // Vintage unproven - see _deferredDiskLoad. A manifest
+                    // alone is enough to defer: its build id is the one
+                    // PersistLocked would otherwise stamp onto entries this
+                    // session fetched under a build nobody has checked.
+                    _deferredDiskLoad = _storedBuildId.HasValue
+                        || File.Exists(_searchPath)
+                        || File.Exists(_recipesPath);
+                    return;
+                }
+
+                if (_storedBuildId.HasValue
                     && currentGw2BuildId.Value != _storedBuildId.Value)
                 {
                     Debug.WriteLine(
@@ -83,52 +124,11 @@ namespace GW2CraftingHelper.Services.Recipes
                         $"(stored={_storedBuildId}, current={currentGw2BuildId}). " +
                         $"Clearing overlay.");
                     DeleteOverlayFiles();
-                    _searches = new Dictionary<int, IReadOnlyList<int>>();
-                    _recipes = new Dictionary<int, RawRecipe>();
+                    _storedBuildId = null;
                     return;
                 }
 
-                // Load search overlay
-                if (File.Exists(_searchPath))
-                {
-                    try
-                    {
-                        using (var fs = File.OpenRead(_searchPath))
-                        {
-                            _searches = RecipeCacheSerializer.LoadSearchSeed(fs);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _onError?.Invoke("Failed to load search overlay", ex);
-                        _searches = new Dictionary<int, IReadOnlyList<int>>();
-                    }
-                }
-                else
-                {
-                    _searches = new Dictionary<int, IReadOnlyList<int>>();
-                }
-
-                // Load recipe overlay
-                if (File.Exists(_recipesPath))
-                {
-                    try
-                    {
-                        using (var fs = File.OpenRead(_recipesPath))
-                        {
-                            _recipes = RecipeCacheSerializer.LoadRecipeSeed(fs);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _onError?.Invoke("Failed to load recipe overlay", ex);
-                        _recipes = new Dictionary<int, RawRecipe>();
-                    }
-                }
-                else
-                {
-                    _recipes = new Dictionary<int, RawRecipe>();
-                }
+                LoadOverlayFilesLocked();
             }
         }
 
@@ -136,6 +136,8 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             lock (_gate)
             {
+                ResolveDeferredLocked(currentGw2BuildId);
+
                 if (_storedBuildId.HasValue
                     && _storedBuildId.Value != currentGw2BuildId)
                 {
@@ -147,8 +149,108 @@ namespace GW2CraftingHelper.Services.Recipes
                     _searches = new Dictionary<int, IReadOnlyList<int>>();
                     _recipes = new Dictionary<int, RawRecipe>();
                     _storedBuildId = null;
-                    _dirty = false;
+                    ClearDirtyLocked();
                 }
+            }
+        }
+
+        // Settles a deferred load now that the live build is known: reads the
+        // persisted overlay in if it was cached from this same build,
+        // discards it if it was not. Whatever this session has already
+        // fetched is kept either way - those entries are current-build by
+        // construction, and win over a same-key entry off disk.
+        private void ResolveDeferredLocked(int currentGw2BuildId)
+        {
+            if (!_deferredDiskLoad)
+            {
+                return;
+            }
+
+            _deferredDiskLoad = false;
+
+            if (_storedBuildId.HasValue && _storedBuildId.Value == currentGw2BuildId)
+            {
+                LoadOverlayFilesLocked();
+                return;
+            }
+
+            Debug.WriteLine(
+                $"Recipe overlay stale " +
+                $"(stored={_storedBuildId}, current={currentGw2BuildId}). " +
+                $"Discarding unread overlay.");
+            DeleteOverlayFiles();
+            _storedBuildId = null;
+        }
+
+        private void LoadOverlayFilesLocked()
+        {
+            if (File.Exists(_searchPath))
+            {
+                try
+                {
+                    using (var fs = File.OpenRead(_searchPath))
+                    {
+                        MergeUnder(RecipeCacheSerializer.LoadSearchSeed(fs), _searches);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _onError?.Invoke("Failed to load search overlay", ex);
+                }
+            }
+
+            if (File.Exists(_recipesPath))
+            {
+                try
+                {
+                    using (var fs = File.OpenRead(_recipesPath))
+                    {
+                        MergeUnder(RecipeCacheSerializer.LoadRecipeSeed(fs), _recipes);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _onError?.Invoke("Failed to load recipe overlay", ex);
+                }
+            }
+        }
+
+        private static void MergeUnder<T>(
+            IDictionary<int, T> loaded, IDictionary<int, T> target)
+        {
+            foreach (var entry in loaded)
+            {
+                if (!target.ContainsKey(entry.Key))
+                {
+                    target[entry.Key] = entry.Value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stamps the live game build id onto the overlay, so the manifest
+        /// written by the next flush records the build the cached recipes
+        /// came from.
+        /// <para>
+        /// Must be called AFTER <see cref="InvalidateIfStale"/>, which clears
+        /// the stored build when it wipes a stale overlay - an earlier stamp
+        /// would be discarded, the manifest would record 0, and the next
+        /// launch would treat the overlay as stale and delete it again.
+        /// </para>
+        /// </summary>
+        public void SetCurrentBuildId(int buildId)
+        {
+            lock (_gate)
+            {
+                ResolveDeferredLocked(buildId);
+
+                if (_storedBuildId.HasValue && _storedBuildId.Value == buildId)
+                {
+                    return;
+                }
+
+                _storedBuildId = buildId;
+                _stampDirty = true;
             }
         }
 
@@ -187,7 +289,7 @@ namespace GW2CraftingHelper.Services.Recipes
             lock (_gate)
             {
                 _searches[outputItemId] = recipeIds;
-                _dirty = true;
+                _searchesDirty = true;
             }
         }
 
@@ -196,7 +298,7 @@ namespace GW2CraftingHelper.Services.Recipes
             lock (_gate)
             {
                 _recipes[recipeId] = recipe;
-                _dirty = true;
+                _recipesDirty = true;
             }
         }
 
@@ -204,7 +306,17 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             lock (_gate)
             {
-                if (!_dirty)
+                if (!IsDirty)
+                {
+                    return;
+                }
+
+                // Nothing to write while the live build is still unknown:
+                // this session's entries have no build id to be honestly
+                // stamped with, and persisting them would overwrite an
+                // overlay that has not even been read yet (_deferredDiskLoad).
+                // The dirty flags stay set, so a later resolve still flushes.
+                if (_deferredDiskLoad)
                 {
                     return;
                 }
@@ -219,7 +331,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 PersistLocked();
-                _dirty = false;
+                ClearDirtyLocked();
                 _lastFlushUtc = DateTime.UtcNow;
             }
         }
@@ -230,15 +342,24 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 Directory.CreateDirectory(_cacheDir);
 
-                // Write searches
-                string searchJson = RecipeCacheSerializer.SerializeSearches(_searches);
-                AtomicWrite(_searchPath, searchJson);
+                if (_searchesDirty)
+                {
+                    string searchJson = RecipeCacheSerializer.SerializeSearches(_searches);
+                    AtomicWrite(_searchPath, searchJson);
+                }
 
-                // Write recipes
-                string recipeJson = RecipeCacheSerializer.SerializeRecipes(_recipes);
-                AtomicWrite(_recipesPath, recipeJson);
+                if (_recipesDirty)
+                {
+                    string recipeJson = RecipeCacheSerializer.SerializeRecipes(_recipes);
+                    AtomicWrite(_recipesPath, recipeJson);
+                }
 
-                // Write manifest
+                // The manifest goes out on every persist, not just a stamp
+                // change: it dates the two files above, and its build id is
+                // what the next launch checks them against.
+                // 0 means "written before the live build id was known"; the
+                // next Load treats it as a mismatch and discards the overlay
+                // once, rather than serving recipes of unknown vintage.
                 var manifest = new RecipeOverlayManifest
                 {
                     Gw2BuildId = _storedBuildId ?? 0,
@@ -251,6 +372,13 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 _onError?.Invoke("Failed to persist recipe overlay", ex);
             }
+        }
+
+        private void ClearDirtyLocked()
+        {
+            _searchesDirty = false;
+            _recipesDirty = false;
+            _stampDirty = false;
         }
 
         private static void AtomicWrite(string path, string content)

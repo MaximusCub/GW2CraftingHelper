@@ -42,6 +42,19 @@ namespace GW2CraftingHelper.Services
         // cancellation stays strictly per-caller in both directions.
         private readonly Dictionary<int, Task> _inFlight = new Dictionary<int, Task>();
 
+        // Ids an answered batch REQUESTED but the response did not
+        // contain: /v2/commerce/prices omits untradeable items entirely,
+        // so an account-bound id (gifts, clovers, a legendary target
+        // itself) never reaches _cache above and would otherwise be
+        // re-requested on every call forever. Mirrors
+        // ItemMetadataService._knownMissing, but TTL'd on the same
+        // CacheTtl clock as the positive cache rather than kept for the
+        // session: an item that becomes tradeable in a patch is then
+        // exactly as stale as an already-cached price is, no worse.
+        // Growth is bounded by the same thing _cache's is - how many
+        // distinct ids one session looks up.
+        private readonly Dictionary<int, DateTime> _knownMissing = new Dictionary<int, DateTime>();
+
         public TradingPostService(IPriceApiClient api, Func<DateTime> utcNow = null)
         {
             _api = api;
@@ -81,6 +94,11 @@ namespace GW2CraftingHelper.Services
                 foreach (var id in uniqueIds)
                 {
                     if (_cache.TryGetValue(id, out var cached) && now - cached.FetchedUtc < CacheTtl)
+                    {
+                        continue;
+                    }
+
+                    if (_knownMissing.TryGetValue(id, out var missedUtc) && now - missedUtc < CacheTtl)
                     {
                         continue;
                     }
@@ -241,11 +259,12 @@ namespace GW2CraftingHelper.Services
                     {
                         // CancellationToken.None, not any caller's ct -
                         // see this method's own doc comment.
-                        var entries = await _api.GetPricesAsync(batch, CancellationToken.None);
+                        var response = await _api.GetPricesAsync(batch, CancellationToken.None);
 
                         lock (_cacheLock)
                         {
-                            foreach (var entry in entries)
+                            var returned = new HashSet<int>();
+                            foreach (var entry in response.Entries)
                             {
                                 var price = new ItemPrice
                                 {
@@ -254,6 +273,33 @@ namespace GW2CraftingHelper.Services
                                     SellInstant = entry.BuyUnitPrice,
                                 };
                                 _cache[entry.Id] = (price, fetchedUtc);
+                                returned.Add(entry.Id);
+
+                                // Newly tradeable: drop the stale negative
+                                // entry rather than leaving two records of
+                                // the same id disagreeing.
+                                _knownMissing.Remove(entry.Id);
+                            }
+
+                            // Only a batch the endpoint actually answered
+                            // proves an id is absent: a thrown batch
+                            // (below) tells us nothing, and neither does a
+                            // 404, which the endpoint returns for an
+                            // outage as readily as for "every id here is
+                            // untradeable" (see
+                            // PriceBatchResult.AbsenceProven). Negative-
+                            // caching either would blank every price in
+                            // the plan for a full CacheTtl without so much
+                            // as another request to recover from.
+                            if (response.AbsenceProven)
+                            {
+                                foreach (var id in batch)
+                                {
+                                    if (!returned.Contains(id))
+                                    {
+                                        _knownMissing[id] = fetchedUtc;
+                                    }
+                                }
                             }
                         }
 

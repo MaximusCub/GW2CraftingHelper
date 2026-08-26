@@ -29,16 +29,30 @@ labelled otherwise.
 ## The release protocol, step by step
 
 1. Land the work on `master`.
-2. Bump `manifest.json`'s `version` (the About tab reads it live). Check
+2. Re-run the recipe seeder from the repo root and commit the refreshed
+   `ref/` seeds:
+
+   ```
+   dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+   ```
+
+   Roughly 1-2 minutes against the live API (measured 2026-08-25: 1m53s
+   cold, 59s on an immediate re-run). `--output-dir ref` is not optional:
+   the tool's own default writes into its `bin/` folder, not the repo's.
+   Why it is a release step: the seed pins the GW2 build id it was built
+   against, and once that id no longer matches the live build every
+   negative row in the seed stops counting as a cache hit, putting every
+   user on the slow live-API path for their first plan of each session.
+3. Bump `manifest.json`'s `version` (the About tab reads it live). Check
    that `manifest.json`'s `description` still matches the GitHub repo
    description - it is the sidebar text, the search-result snippet, and the
    Open Graph card used every time the link is pasted into Discord or
    Reddit, and it is the only sentence most people will ever read.
-3. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
+4. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
    user-facing voice the existing entries use, not commit-message voice.
    The release workflow uses this section verbatim as the release body and
    fails the build if it is missing.
-4. **Sweep the prose that names a version.** `manifest.json` is not the
+5. **Sweep the prose that names a version.** `manifest.json` is not the
    only place a version number is written down, and the others drift
    silently because nothing reads them: this file (the v0.2.x paragraph at
    the top, the `manifest.json` fields section, the "what a real release
@@ -48,19 +62,19 @@ labelled otherwise.
    any claim you re-checked with `(measured YYYY-MM-DD)` rather than "at
    the time of writing". This step exists because ROADMAP.md and
    RELEASING.md both still said v0.2.3 was newest after v0.2.4 shipped.
-5. **If the plan view changed, refresh `docs/images/`.** The README's
+6. **If the plan view changed, refresh `docs/images/`.** The README's
    screenshots are the only proof a visitor has that the product works.
    They went stale once already: the shots taken 2026-07-23 showed columns
    packed hard left with a wide empty band, which is the exact layout the
    0.2.3 entry in `CHANGELOG.md` describes as removed. Retake against the
    current build at full window width, cropped to whole rows.
-6. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+7. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-7. Tag the release commit `v<version>` and push the tag. That triggers
+8. Tag the release commit `v<version>` and push the tag. That triggers
    `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
    publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
    asset is attached.
-8. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+9. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be

@@ -185,6 +185,49 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(recipeB.IsMissing);
         }
 
+        // The pipeline holds no learned-recipe state between generations:
+        // every GenerateStructuredAsync asks its IAccountRecipeClient
+        // again. Any caching therefore has to live in the client, and this
+        // count stays one-per-generation whatever that client does with
+        // the request.
+        [Fact]
+        public async Task GenerateStructuredAsync_TwoGenerations_AsksTheAccountClientEachTime()
+        {
+            var accountClient = new InMemoryAccountRecipeClient();
+            accountClient.AddLearnedRecipe(10);
+
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target Item", "target.png")
+                .WithItem(2, "Ingredient", "ingredient.png")
+                .WithAccountRecipeClient(accountClient)
+                .Build();
+
+            await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+            var second = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(2, accountClient.GetCallCount);
+
+            // And the ids still reach the annotation on both runs.
+            var recipe = second.RequiredRecipes.FirstOrDefault(r => r.RecipeId == 10);
+            Assert.NotNull(recipe);
+            Assert.False(recipe.IsMissing);
+        }
+
         [Fact]
         public async Task MissingItemMetadata_StillProducesValidPlan()
         {

@@ -363,7 +363,7 @@ namespace GW2CraftingHelper.Services
 
             // Fetch learned recipe IDs (if permission available)
             ISet<int> learnedRecipeIds =
-                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
+                await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, phaseTracker, ct);
 
             // Build structured result
             phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
@@ -830,8 +830,10 @@ namespace GW2CraftingHelper.Services
             IProgress<PlanStatus> progress,
             Stopwatch sw,
             List<string> timingLog,
+            PhaseTracker phaseTracker,
             CancellationToken ct)
         {
+            phaseTracker.Start(PlanPhase.CheckingLearnedRecipes, "Checking learned recipes", null);
             progress?.Report(new PlanStatus { Message = "Checking learned recipes..." });
             sw.Restart();
             ISet<int> learnedRecipeIds = null;

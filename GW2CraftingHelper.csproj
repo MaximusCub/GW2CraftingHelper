@@ -158,6 +158,7 @@
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
     <Compile Include="Services\PlanStripStatusBoard.cs" />
     <Compile Include="Services\PlanStripTickDecision.cs" />
+    <Compile Include="Services\OwnMaterialsGate.cs" />
     <Compile Include="Services\RequestLabelFormatter.cs" />
     <Compile Include="Services\SnapshotEpochGuard.cs" />
     <Compile Include="Services\SnapshotCommitGate.cs" />
@@ -192,6 +193,7 @@
     <Compile Include="Services\RecipeSheetItemSeedService.cs" />
     <Compile Include="Services\JsonSeedReader.cs" />
     <Compile Include="Services\SeasonalVendorTipCalculator.cs" />
+    <Compile Include="Services\CachingAccountRecipeClient.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
@@ -212,6 +214,7 @@
     <Compile Include="Services\Gw2RecipeApiClient.cs" />
     <Compile Include="Services\Gw2PriceApiClient.cs" />
     <Compile Include="Services\Gw2ItemApiClient.cs" />
+    <Compile Include="Services\Gw2BuildApiClient.cs" />
     <Compile Include="Views\MainView.cs" />
     <Compile Include="Views\AutocompleteTextBox.cs" />
     <Compile Include="Views\SuggestionPanel.cs" />

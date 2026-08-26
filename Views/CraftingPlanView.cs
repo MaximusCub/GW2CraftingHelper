@@ -105,10 +105,16 @@ namespace GW2CraftingHelper.Views
         private PlanViewModel _currentPlan;
 
         private DateTime _planGeneratedAt;
-        // Defaults to true - a deliberate divergence from gw2efficiency,
-        // whose default is unchecked. Purely in-memory session state,
-        // reset on every module reload.
+        // The user's INTENT, not what the next plan will do - read through
+        // OwnMaterialsGate, never directly, wherever the answer reaches the
+        // checkbox or the solver. Defaults to true, a deliberate divergence
+        // from gw2efficiency, whose default is unchecked. Purely in-memory
+        // session state, reset on every module reload.
         private bool _useOwnMaterials = true;
+        // Whether an account snapshot exists to subtract from; pushed by
+        // the host every tick (Module.Update) so a key added mid-session,
+        // or a Clear Cache, moves the gate without a restart.
+        private bool _accountDataAvailable;
         // gw2efficiency's own default is "buy price" (buy orders); echoed
         // here so a fresh plan matches gw2e's view rather than
         // systematically overpricing every material.
@@ -1966,13 +1972,16 @@ namespace GW2CraftingHelper.Views
                 Parent = buildPanel,
             };
 
+            var ownMaterialsState = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
             _ownMaterialsCheckbox = new Checkbox()
             {
                 Text = "Use Own Materials",
-                Checked = _useOwnMaterials,
+                Checked = ownMaterialsState.Checked,
+                Enabled = ownMaterialsState.Enabled,
                 Location = new Point(0, 7),
                 Parent = _controlsPanel,
             };
+            TooltipFacility.ApplyPlain(_ownMaterialsCheckbox, ownMaterialsState.Tooltip);
             // CheckedChanged is wired further down, AFTER
             // _valueOwnMaterialsCheckbox is constructed - the handler
             // dereferences that field unconditionally, and wiring it
@@ -2017,7 +2026,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Value Own Materials",
                 Checked = _valueOwnMaterials,
-                Enabled = _useOwnMaterials,
+                Enabled = ownMaterialsState.Checked,
                 Location = new Point(350, 7),
                 Parent = _controlsPanel,
                 // With this ON, owned materials are priced at market rate
@@ -3173,15 +3182,15 @@ namespace GW2CraftingHelper.Views
 
             if (_currentPlan != null)
             {
-                // Show modal confirmation before regenerating
+                // Show modal confirmation before regenerating. The gate
+                // carries the optimistic intent onto the Value Own
+                // Materials checkbox (its own Checked value is preserved
+                // either way, only whether it can be clicked follows Use
+                // Own Materials); the box itself is then armed shut so it
+                // cannot be clicked again until the dialog answers.
                 _useOwnMaterials = newValue;
+                ApplyOwnMaterialsGate();
                 _ownMaterialsCheckbox.Enabled = false;
-                // Keep the Value Own Materials
-                // checkbox's Enabled state in lockstep with the optimistic
-                // _useOwnMaterials value at every point it changes here -
-                // its own Checked value is preserved either way, only
-                // whether it can be clicked follows Use Own Materials.
-                _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
 
                 // Undoes the optimistic arm above. Used for both the dialog's
                 // Cancel (which its X/Escape path also runs) and a refused
@@ -3191,11 +3200,7 @@ namespace GW2CraftingHelper.Views
                 Action revert = () =>
                 {
                     _useOwnMaterials = !_useOwnMaterials;
-                    _suppressToggle = true;
-                    _ownMaterialsCheckbox.Checked = _useOwnMaterials;
-                    _suppressToggle = false;
-                    _ownMaterialsCheckbox.Enabled = true;
-                    _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+                    ApplyOwnMaterialsGate();
                 };
 
                 // Aligned to the tree's confirm matrix: state the outcome
@@ -3207,7 +3212,11 @@ namespace GW2CraftingHelper.Views
                         : "Regenerate the plan with own materials excluded? Manual decisions and ignore marks are cleared.",
                     () =>
                     {
-                        _ownMaterialsCheckbox.Enabled = true;
+                        // Disarms through the gate, not straight to
+                        // Enabled = true: a Clear Cache landing while this
+                        // dialog was open must not hand back a live,
+                        // ticked box with no snapshot behind it.
+                        ApplyOwnMaterialsGate();
                         _ = TriggerGenerate();
                     },
                     revert,
@@ -3222,13 +3231,69 @@ namespace GW2CraftingHelper.Views
             }
 
             _useOwnMaterials = newValue;
-            _valueOwnMaterialsCheckbox.Enabled = _useOwnMaterials;
+            ApplyOwnMaterialsGate();
 
             // Only reached with no plan on screen (the branch above
             // regenerates behind a confirm), so nothing is being made
             // stale here - but the toggle still only takes effect on the
             // next Generate, and saying so beats leaving "Ready" up.
             MarkSettingsChanged();
+        }
+
+        /// <summary>
+        /// Tells the tab whether an account snapshot exists to subtract
+        /// from. Called by the host on every tick, so a key granted
+        /// mid-session or a Clear Cache moves the "Use Own Materials" gate
+        /// with no restart; unchanged values cost a bool compare.
+        /// </summary>
+        public void SetAccountDataAvailable(bool available)
+        {
+            if (_accountDataAvailable == available)
+            {
+                return;
+            }
+
+            _accountDataAvailable = available;
+            ApplyOwnMaterialsGate();
+        }
+
+        /// <summary>
+        /// Writes <see cref="OwnMaterialsGate"/>'s answer onto the two
+        /// checkboxes it governs. The gate's answer is written here and in
+        /// Build() and nowhere else, so the box's Checked can never drift
+        /// from the value Generate solves with. (The confirm path below
+        /// separately disables the box while its dialog is up; that arm is
+        /// undone by its own revert, which lands back here.)
+        /// <para>
+        /// Null-guarded rather than main-thread-only for the same reason
+        /// <see cref="ApplyRestoredPlan"/> is: Build() publishes these
+        /// fields from whatever thread Blish ran it on, so a host tick can
+        /// arrive before the controls exist.
+        /// </para>
+        /// </summary>
+        private void ApplyOwnMaterialsGate()
+        {
+            if (_ownMaterialsCheckbox == null)
+            {
+                return;
+            }
+
+            var state = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
+
+            // A programmatic Checked write raises CheckedChanged exactly
+            // like a click, and this is not a user decision - unsuppressed
+            // it would open the regenerate confirm on its own.
+            _suppressToggle = true;
+            _ownMaterialsCheckbox.Checked = state.Checked;
+            _suppressToggle = false;
+
+            _ownMaterialsCheckbox.Enabled = state.Enabled;
+            TooltipFacility.ApplyPlain(_ownMaterialsCheckbox, state.Tooltip);
+
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Enabled = state.Checked;
+            }
         }
 
         /// <summary>
@@ -3668,10 +3733,17 @@ namespace GW2CraftingHelper.Views
                 _statusBoard.UpdatePhase(myGen, (int)pe.Phase, PlanStripTickDecision.FormatPhaseText(pe));
             });
 
+            // The gated value, not the raw intent: what the checkbox shows
+            // is what the plan is solved with, and what gets persisted with
+            // it (see OwnMaterialsGate).
+            bool useOwnMaterials = OwnMaterialsGate
+                .Resolve(_useOwnMaterials, _accountDataAvailable)
+                .Checked;
+
             try
             {
                 var result = await _generateAsync(
-                    requestItems, _useOwnMaterials, _valueOwnMaterials, _priceBasis,
+                    requestItems, useOwnMaterials, _valueOwnMaterials, _priceBasis,
                     ModuleLifetimeToken(), null, phaseProgress, requestLabel);
 
                 // Blish HUD's XNA host has no SynchronizationContext, so this

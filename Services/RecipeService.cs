@@ -16,10 +16,18 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, IReadOnlyList<int>> _searchCache = new Dictionary<int, IReadOnlyList<int>>();
         private readonly Dictionary<int, RawRecipe> _recipeCache = new Dictionary<int, RawRecipe>();
         private readonly object _cacheGate = new object();
+        private Task _pendingCacheFlush = Task.CompletedTask;
 
         private const int DefaultMaxConcurrency = 4;
 
         public Action<string> OnStatusUpdate { get; set; }
+
+        /// <summary>
+        /// The persist started by the last completed tree build. Completes
+        /// when that write has landed on disk; callers that need the overlay
+        /// durable at a chosen moment wait on this rather than racing it.
+        /// </summary>
+        public Task PendingCacheFlush => Volatile.Read(ref _pendingCacheFlush);
 
         public RecipeService(
             IRecipeApiClient api,
@@ -44,7 +52,7 @@ namespace GW2CraftingHelper.Services
             }
             finally
             {
-                _cacheStore.Flush(force: true);
+                SchedulePersist();
             }
         }
 
@@ -118,8 +126,22 @@ namespace GW2CraftingHelper.Services
             }
             finally
             {
-                _cacheStore.Flush(force: true);
+                SchedulePersist();
             }
+        }
+
+        /// <summary>
+        /// Persists what this build discovered without the caller waiting for
+        /// it. The overlay store rewrites its whole cache to disk, tens of
+        /// milliseconds of file IO that CraftingPlanPipeline would otherwise
+        /// spend inside its tree-build phase, growing with the cache; nothing
+        /// downstream of the build reads those files.
+        /// </summary>
+        private void SchedulePersist()
+        {
+            Volatile.Write(
+                ref _pendingCacheFlush,
+                Task.Run(() => _cacheStore.Flush(force: true)));
         }
 
         /// <summary>
@@ -419,16 +441,31 @@ namespace GW2CraftingHelper.Services
 
             var result = await _api.SearchByOutputAsync(itemId, ct);
 
+            // Only an answer the search endpoint actually gave is worth
+            // keeping: a 404 means "nothing produces this item" as readily as
+            // it means the endpoint is down (see
+            // RecipeSearchResult.AbsenceProven), and what survives such a
+            // response is at best incomplete - empty for an ordinary item,
+            // or Mystic-Forge-only for one the composite client could fill
+            // in. Cached, that renders a craftable item as an uncraftable (or
+            // half-craftable) leaf and stops every later attempt short of the
+            // API that would correct it: for the session in _searchCache, and
+            // until the next game build in the persistent overlay.
+            if (!result.AbsenceProven)
+            {
+                return result.RecipeIds;
+            }
+
             lock (_cacheGate)
             {
                 if (!_searchCache.ContainsKey(itemId))
                 {
-                    _searchCache[itemId] = result;
+                    _searchCache[itemId] = result.RecipeIds;
                 }
             }
 
-            _cacheStore.PutSearch(itemId, result);
-            return result;
+            _cacheStore.PutSearch(itemId, result.RecipeIds);
+            return result.RecipeIds;
         }
 
         private async Task<RawRecipe> GetRecipeCachedAsync(int recipeId, CancellationToken ct)

@@ -144,45 +144,306 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // This case previously pinned the defect: it flushed an overlay that
+        // had never been told the live build, then asserted the manifest read
+        // back as "the same build ID (0 since null was used)" - the exact
+        // state that made InvalidateIfStale delete the overlay on every
+        // launch, before it was ever read. It now asserts the real contract.
         [Fact]
         public void Overlay_Invalidates_OnBuildChange()
         {
             using (var tmp = new TempDirectory())
             {
+                const int buildId = 205780;
                 string tempDir = tmp.Path;
 
-                // Create overlay with data and flush
+                // Create overlay with data, stamped with the live build, and flush
                 var overlay = new OverlayRecipeCacheStore(tempDir);
                 overlay.Load(currentGw2BuildId: null);
+                overlay.SetCurrentBuildId(buildId);
                 overlay.PutSearch(100, new List<int> { 1 });
-                overlay.PutRecipe(1, new RawRecipe
-                {
-                    Id = 1,
-                    OutputItemId = 100,
-                    OutputItemCount = 1,
-                    Ingredients = new List<RawIngredient>(),
-                    Disciplines = new List<string>(),
-                    MinRating = 0,
-                    Flags = new List<string>()
-                });
+                overlay.PutRecipe(1, NewRecipe(1, 100));
                 overlay.Flush(force: true);
 
-                // Verify files exist
+                // Verify files exist and the manifest carries the real build id
                 string cacheDir = Path.Combine(tempDir, "recipe_cache");
                 Assert.True(File.Exists(Path.Combine(cacheDir, "search_overlay.json")));
                 Assert.True(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
                 Assert.True(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tempDir));
 
-                // Reload with same build ID (0 since null was used) - data preserved
+                // Reload at the same build - data preserved
                 var overlay2 = new OverlayRecipeCacheStore(tempDir);
                 overlay2.Load(currentGw2BuildId: null);
+                overlay2.InvalidateIfStale(buildId);
                 Assert.NotNull(overlay2.TryGetSearch(100));
+                Assert.NotNull(overlay2.TryGetRecipe(1));
 
-                // Reload with different build ID - data cleared
+                // Reload at a different build - data cleared and files removed
                 var overlay3 = new OverlayRecipeCacheStore(tempDir);
-                overlay3.Load(currentGw2BuildId: 12345);
+                overlay3.Load(currentGw2BuildId: null);
+                overlay3.InvalidateIfStale(buildId + 1);
                 Assert.Null(overlay3.TryGetSearch(100));
                 Assert.Null(overlay3.TryGetRecipe(1));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "search_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+            }
+        }
+
+        // Walks four "sessions" in Module.cs's own order - Load(null), then
+        // InvalidateIfStale(build), then SetCurrentBuildId(build) - because
+        // InvalidateIfStale clears the stored build, so a stamp placed before
+        // it would be discarded and the overlay would persist unstamped.
+        [Fact]
+        public void Overlay_SurvivesRestart_AtSameBuild_AndRestampsAfterBuildChange()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildA = 205780;
+                const int buildB = 205781;
+                string tempDir = tmp.Path;
+
+                var session1 = new OverlayRecipeCacheStore(tempDir);
+                session1.Load(currentGw2BuildId: null);
+                session1.InvalidateIfStale(buildA);
+                session1.SetCurrentBuildId(buildA);
+                session1.PutSearch(100, new List<int> { 1 });
+                session1.PutRecipe(1, NewRecipe(1, 100));
+                session1.Flush(force: true);
+                Assert.Equal(buildA, ReadOverlayManifestBuildId(tempDir));
+
+                // Restart at the same build: the overlay is served from disk,
+                // and adding to it keeps the stamp.
+                var session2 = new OverlayRecipeCacheStore(tempDir);
+                session2.Load(currentGw2BuildId: null);
+                session2.InvalidateIfStale(buildA);
+                session2.SetCurrentBuildId(buildA);
+                var search = session2.TryGetSearch(100);
+                Assert.NotNull(search);
+                Assert.Equal(1, search[0]);
+                Assert.Equal(100, session2.TryGetRecipe(1).OutputItemId);
+                session2.PutSearch(200, new List<int> { 2 });
+                session2.PutRecipe(2, NewRecipe(2, 200));
+                session2.Flush(force: true);
+                Assert.Equal(buildA, ReadOverlayManifestBuildId(tempDir));
+
+                // Restart on a new game build: the stale overlay is wiped, and
+                // what the session rebuilds is stamped with the NEW build - so
+                // the next restart keeps it instead of wiping again.
+                var session3 = new OverlayRecipeCacheStore(tempDir);
+                session3.Load(currentGw2BuildId: null);
+                session3.InvalidateIfStale(buildB);
+                session3.SetCurrentBuildId(buildB);
+                Assert.Null(session3.TryGetSearch(100));
+                Assert.Null(session3.TryGetRecipe(1));
+                session3.PutSearch(300, new List<int> { 3 });
+                session3.PutRecipe(3, NewRecipe(3, 300));
+                session3.Flush(force: true);
+                Assert.Equal(buildB, ReadOverlayManifestBuildId(tempDir));
+
+                var session4 = new OverlayRecipeCacheStore(tempDir);
+                session4.Load(currentGw2BuildId: null);
+                session4.InvalidateIfStale(buildB);
+                session4.SetCurrentBuildId(buildB);
+                Assert.NotNull(session4.TryGetSearch(300));
+                Assert.NotNull(session4.TryGetRecipe(3));
+                Assert.Null(session4.TryGetSearch(100));
+            }
+        }
+
+        // Module.cs cannot pass a build id to Load - it learns the live build
+        // from an async /v2/build call that lands seconds later - so a plan
+        // generated in those seconds must not be built from recipes cached
+        // under a different build.
+        [Fact]
+        public void Overlay_WithheldFromReads_UntilTheBuildCheckResolves()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string tempDir = tmp.Path;
+
+                var session1 = new OverlayRecipeCacheStore(tempDir);
+                session1.Load(currentGw2BuildId: null);
+                session1.SetCurrentBuildId(buildId);
+                session1.PutSearch(100, new List<int> { 1 });
+                session1.PutRecipe(1, NewRecipe(1, 100));
+                session1.Flush(force: true);
+
+                var session2 = new OverlayRecipeCacheStore(tempDir);
+                session2.Load(currentGw2BuildId: null);
+
+                // Vintage still unproven - a miss, exactly as if the overlay
+                // were empty.
+                Assert.Null(session2.TryGetSearch(100));
+                Assert.Null(session2.TryGetRecipe(1));
+
+                // Whatever this session fetched itself is current-build by
+                // construction, so it is served throughout.
+                session2.PutSearch(200, new List<int> { 2 });
+                Assert.NotNull(session2.TryGetSearch(200));
+
+                session2.InvalidateIfStale(buildId);
+
+                Assert.NotNull(session2.TryGetSearch(100));
+                Assert.Equal(100, session2.TryGetRecipe(1).OutputItemId);
+                Assert.NotNull(session2.TryGetSearch(200));
+            }
+        }
+
+        // A /v2/build call that times out or throws leaves Module.cs's
+        // background task in its catch, so the overlay is never resolved at
+        // all. That session must neither serve the persisted overlay nor
+        // destroy it - re-stamping it with this session's fetches under the
+        // OLD build id would make cross-build recipes survive indefinitely.
+        [Fact]
+        public void Overlay_BuildCheckNeverResolves_LeavesPersistedOverlayUntouched()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string tempDir = tmp.Path;
+
+                var session1 = new OverlayRecipeCacheStore(tempDir);
+                session1.Load(currentGw2BuildId: null);
+                session1.SetCurrentBuildId(buildId);
+                session1.PutSearch(100, new List<int> { 1 });
+                session1.Flush(force: true);
+
+                var session2 = new OverlayRecipeCacheStore(tempDir);
+                session2.Load(currentGw2BuildId: null);
+                session2.PutSearch(300, new List<int> { 3 });
+                session2.Flush(force: true);
+
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tempDir));
+
+                // What is on disk is still session 1's overlay, unchanged and
+                // still stamped with the build it was cached from.
+                var session3 = new OverlayRecipeCacheStore(tempDir);
+                session3.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(session3.TryGetSearch(100));
+                Assert.Null(session3.TryGetSearch(300));
+            }
+        }
+
+        // Load's own mismatch branch - the path the offline harness uses,
+        // which passes the build id straight to Load instead of calling
+        // InvalidateIfStale afterwards.
+        [Fact]
+        public void Overlay_Load_WithMismatchedBuildId_ClearsOverlay()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string tempDir = tmp.Path;
+
+                var overlay = new OverlayRecipeCacheStore(tempDir);
+                overlay.Load(currentGw2BuildId: buildId);
+                overlay.SetCurrentBuildId(buildId);
+                overlay.PutSearch(100, new List<int> { 1 });
+                overlay.Flush(force: true);
+
+                var sameBuild = new OverlayRecipeCacheStore(tempDir);
+                sameBuild.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(sameBuild.TryGetSearch(100));
+
+                var otherBuild = new OverlayRecipeCacheStore(tempDir);
+                otherBuild.Load(currentGw2BuildId: 12345);
+                Assert.Null(otherBuild.TryGetSearch(100));
+            }
+        }
+
+        private static RawRecipe NewRecipe(int recipeId, int outputItemId)
+        {
+            return new RawRecipe
+            {
+                Id = recipeId,
+                OutputItemId = outputItemId,
+                OutputItemCount = 1,
+                Ingredients = new List<RawIngredient>(),
+                Disciplines = new List<string>(),
+                MinRating = 0,
+                Flags = new List<string>()
+            };
+        }
+
+        // A plan that learns a search and no new recipe - what a
+        // build-current seed makes the common case - must leave the recipe
+        // cache file alone. Deleting it behind the store's back is the
+        // deterministic way to see whether the next flush touches it.
+        [Fact]
+        public void Overlay_FlushRewritesOnlyTheCacheThatChanged()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load(currentGw2BuildId: null);
+                overlay.SetCurrentBuildId(buildId);
+                overlay.PutSearch(100, new List<int> { 1 });
+                overlay.PutRecipe(1, NewRecipe(1, 100));
+                overlay.Flush(force: true);
+
+                string recipesPath = Path.Combine(
+                    tmp.Path, "recipe_cache", "recipes_overlay.json");
+                File.Delete(recipesPath);
+
+                overlay.PutSearch(200, new List<int> { 2 });
+                overlay.Flush(force: true);
+
+                Assert.False(File.Exists(recipesPath));
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tmp.Path));
+
+                var reloaded = new OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(reloaded.TryGetSearch(100));
+                Assert.NotNull(reloaded.TryGetSearch(200));
+            }
+        }
+
+        // Load replaces the maps with what disk holds, so entries put before
+        // it are gone; a flush afterwards must not resurrect the overlay
+        // files Load's build-mismatch branch just deleted, least of all with
+        // an empty cache stamped build 0.
+        [Fact]
+        public void Overlay_LoadAtNewBuild_LeavesNothingForALaterFlushToWrite()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildA = 205780;
+                const int buildB = 205781;
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+
+                var first = new OverlayRecipeCacheStore(tmp.Path);
+                first.Load(currentGw2BuildId: null);
+                first.SetCurrentBuildId(buildA);
+                first.PutSearch(100, new List<int> { 1 });
+                first.Flush(force: true);
+                Assert.Equal(buildA, ReadOverlayManifestBuildId(tmp.Path));
+
+                var second = new OverlayRecipeCacheStore(tmp.Path);
+                second.Load(currentGw2BuildId: null);
+                second.PutSearch(200, new List<int> { 2 });
+                second.Load(currentGw2BuildId: buildB);
+                second.Flush(force: true);
+
+                Assert.Null(second.TryGetSearch(100));
+                Assert.Null(second.TryGetSearch(200));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "search_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+            }
+        }
+
+        private static int ReadOverlayManifestBuildId(string dataDir)
+        {
+            string manifestPath = Path.Combine(dataDir, "recipe_cache", "overlay_manifest.json");
+            using (var fs = File.OpenRead(manifestPath))
+            {
+                return RecipeCacheSerializer
+                    .LoadManifest<RecipeOverlayManifest>(fs)
+                    .Gw2BuildId;
             }
         }
 
@@ -268,6 +529,128 @@ namespace GW2CraftingHelper.Tests.Services
             var leafSearch = cacheStore.TryGetSearch(200);
             Assert.NotNull(leafSearch);
             Assert.Empty(leafSearch);
+        }
+
+        // An item the search endpoint genuinely has no recipe for is worth
+        // remembering across sessions: without a persisted negative row every
+        // raw material in a plan costs a live search on every launch. This
+        // pins that optimization so a later change to what gets persisted
+        // cannot quietly drop it.
+        [Fact]
+        public async Task RecipeService_ProvenEmptySearch_IsServedFromDisk_NextSession()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+
+                var overlay1 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay1.Load(currentGw2BuildId: null);
+                overlay1.InvalidateIfStale(buildId);
+                overlay1.SetCurrentBuildId(buildId);
+
+                var api1 = new CountingRecipeApiClient();
+                var session1 = new RecipeService(api1, cacheStore: overlay1);
+                var tree1 = await session1.BuildTreeAsync(100, 1, CancellationToken.None);
+
+                // The persist runs off the build's own path, so the next
+                // session may only read disk once it has landed.
+                await session1.PendingCacheFlush;
+
+                Assert.Empty(tree1.Recipes);
+                Assert.Equal(1, api1.SearchCallCount);
+
+                var overlay2 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay2.Load(currentGw2BuildId: null);
+                overlay2.InvalidateIfStale(buildId);
+                overlay2.SetCurrentBuildId(buildId);
+
+                var api2 = new CountingRecipeApiClient();
+                var tree2 = await new RecipeService(api2, cacheStore: overlay2)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                Assert.Empty(tree2.Recipes);
+                Assert.Equal(0, api2.SearchCallCount);
+            }
+        }
+
+        // The other half: a 404 from /v2/recipes/search is empty without
+        // being an answer, and the overlay now outlives the session, so
+        // persisting one would record a craftable item as an uncraftable
+        // leaf in every plan until ArenaNet ships a new game build.
+        [Fact]
+        public async Task RecipeService_UnprovenEmptySearch_IsNotPersisted_NorRepeatedNextSession()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+
+                var overlay1 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay1.Load(currentGw2BuildId: null);
+                overlay1.InvalidateIfStale(buildId);
+                overlay1.SetCurrentBuildId(buildId);
+
+                var outage = new InMemoryRecipeApiClient();
+                outage.Return404ForSearch.Add(100);
+                var degradedSession = new RecipeService(outage, cacheStore: overlay1);
+                var degradedTree = await degradedSession
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+                await degradedSession.PendingCacheFlush;
+
+                // The plan still degrades to a leaf for this run - the
+                // recipes are genuinely unknown - it just leaves no record.
+                Assert.Empty(degradedTree.Recipes);
+
+                var inspect = new OverlayRecipeCacheStore(tmp.Path);
+                inspect.Load(currentGw2BuildId: null);
+                inspect.InvalidateIfStale(buildId);
+                Assert.Null(inspect.TryGetSearch(100));
+
+                // A later session with a healthy endpoint asks it again and
+                // gets the real tree.
+                var overlay2 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay2.Load(currentGw2BuildId: null);
+                overlay2.InvalidateIfStale(buildId);
+                overlay2.SetCurrentBuildId(buildId);
+
+                var healthy = new InMemoryRecipeApiClient();
+                healthy.AddSearchResult(100, 1);
+                healthy.AddRecipe(new RawRecipe
+                {
+                    Id = 1,
+                    OutputItemId = 100,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string>()
+                });
+
+                var tree = await new RecipeService(healthy, cacheStore: overlay2)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                Assert.Single(tree.Recipes);
+                Assert.Equal(200, tree.Recipes[0].Ingredients[0].Id);
+            }
+        }
+
+        // Within one session too: a transient 404 must not freeze the item
+        // as a leaf for every later Generate the way an answered empty does.
+        [Fact]
+        public async Task RecipeService_UnprovenEmptySearch_IsNotHeldInTheSessionCache()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.Return404ForSearch.Add(100);
+
+            var service = new RecipeService(api, cacheStore: new InMemoryRecipeCacheStore());
+            await service.BuildTreeAsync(100, 1, CancellationToken.None);
+            int afterFirstBuild = api.SearchCallCount;
+
+            await service.BuildTreeAsync(100, 1, CancellationToken.None);
+
+            Assert.True(api.SearchCallCount > afterFirstBuild);
         }
 
         [Fact]
@@ -381,11 +764,12 @@ namespace GW2CraftingHelper.Tests.Services
             public int SearchCallCount => _searchCallCount;
             public int RecipeCallCount => _recipeCallCount;
 
-            public Task<IReadOnlyList<int>> SearchByOutputAsync(
+            public Task<RecipeSearchResult> SearchByOutputAsync(
                 int itemId, CancellationToken ct)
             {
                 Interlocked.Increment(ref _searchCallCount);
-                return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+                return Task.FromResult(
+                    new RecipeSearchResult(Array.Empty<int>(), absenceProven: true));
             }
 
             public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)

@@ -15,19 +15,25 @@ namespace GW2CraftingHelper.Services
             _mfData = mfData;
         }
 
-        public async Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        // The wiki-derived Mystic Forge recipes are a local overlay, never
+        // evidence about what the API endpoint knows, so AbsenceProven is
+        // always the primary's: an outage stays unproven even when MF data
+        // fills the answer, because the API's own recipes for this item are
+        // still unknown.
+        public async Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            var apiResults = await _primary.SearchByOutputAsync(itemId, ct);
+            var apiResult = await _primary.SearchByOutputAsync(itemId, ct);
+            var apiResults = apiResult.RecipeIds;
             var mfResults = _mfData.SearchByOutput(itemId);
 
             if (mfResults.Count == 0)
             {
-                return apiResults;
+                return apiResult;
             }
 
             if (apiResults.Count == 0)
             {
-                return mfResults;
+                return new RecipeSearchResult(mfResults, apiResult.AbsenceProven);
             }
 
             // Merge: API first, then MF, deduplicated
@@ -50,7 +56,7 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            return merged;
+            return new RecipeSearchResult(merged, apiResult.AbsenceProven);
         }
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)

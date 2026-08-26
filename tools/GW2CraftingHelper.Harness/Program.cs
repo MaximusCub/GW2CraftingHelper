@@ -18,9 +18,12 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullRecipeApiClient : IRecipeApiClient
     {
-        public Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+            // Offline mode answers for the endpoint, so its empties are as
+            // final as a 2xx body's - nothing here is a degraded API.
+            return Task.FromResult(
+                new RecipeSearchResult(Array.Empty<int>(), absenceProven: true));
         }
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
@@ -31,10 +34,11 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullPriceApiClient : IPriceApiClient
     {
-        public Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public Task<PriceBatchResult> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<RawPriceEntry>>(Array.Empty<RawPriceEntry>());
+            return Task.FromResult(
+                new PriceBatchResult(Array.Empty<RawPriceEntry>(), absenceProven: true));
         }
     }
 
@@ -252,6 +256,9 @@ namespace GW2CraftingHelper.Harness
                     recipeOverlay.Load(buildId);
                     if (buildId.HasValue)
                     {
+                        // Load already dropped a mismatched overlay, so the
+                        // stamp lands on whatever survived.
+                        recipeOverlay.SetCurrentBuildId(buildId.Value);
                         recipeSeed.SetCurrentBuildId(buildId.Value);
                     }
                 }

@@ -64,9 +64,36 @@ namespace GW2CraftingHelper.Services
         public int? AchievementId { get; set; }
     }
 
+    /// <summary>
+    /// One recipe-search lookup, and whether an empty answer is evidence
+    /// that the item has no recipe. Mirrors <see cref="PriceBatchResult"/>.
+    /// </summary>
+    internal class RecipeSearchResult
+    {
+        public RecipeSearchResult(IReadOnlyList<int> recipeIds, bool absenceProven)
+        {
+            RecipeIds = recipeIds ?? new List<int>();
+            AbsenceProven = absenceProven;
+        }
+
+        public IReadOnlyList<int> RecipeIds { get; }
+
+        /// <summary>
+        /// True only when <see cref="RecipeIds"/> was parsed from a 2xx body,
+        /// which lists every recipe producing the item: an empty one then
+        /// means the item genuinely has no recipe and may be negative-cached
+        /// on disk. /v2/recipes/search answers 404 both for "nothing produces
+        /// this item" and for an endpoint-level outage, and the two are
+        /// indistinguishable to a caller, so a 404 sets this false -
+        /// persisting that empty would record a craftable item as an
+        /// uncraftable leaf until the next game build.
+        /// </summary>
+        public bool AbsenceProven { get; }
+    }
+
     internal interface IRecipeApiClient
     {
-        Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct);
+        Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct);
 
         Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct);
     }

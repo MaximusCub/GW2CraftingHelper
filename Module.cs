@@ -141,6 +141,11 @@ namespace GW2CraftingHelper
 
         private HttpClient _httpClient;
         private CraftingPlanPipeline _craftingPipeline;
+
+        // Held apart from the pipeline that owns it purely so
+        // OnSubtokenUpdated can drop the cached ids: they belong to the
+        // account the old subtoken addressed.
+        private CachingAccountRecipeClient _accountRecipeClient;
         private PlanStore _planStore;
 
         // Lives here rather than on CraftingPlanView so it survives a
@@ -149,6 +154,7 @@ namespace GW2CraftingHelper
         // Module constructs exactly once.
         private readonly PlanStripStatusBoard _planStripStatusBoard = new PlanStripStatusBoard();
         private VendorOfferStore _vendorOfferStore;
+        private OverlayRecipeCacheStore _recipeOverlay;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
         private Texture2D _cornerIconTexture;
@@ -176,6 +182,10 @@ namespace GW2CraftingHelper
         // unsynchronized statements) - see SnapshotRefreshSlot's own doc
         // comment for the race that shape allowed.
         private readonly SnapshotRefreshSlot _refreshSlot = new SnapshotRefreshSlot();
+
+        // Cancels the background /v2/build lookup, which retries across
+        // several seconds and holds _httpClient - Unload disposes that.
+        private readonly CancellationTokenSource _buildIdCts = new CancellationTokenSource();
 
         // Bumped only by ClearCache; a
         // fetch that captured an older epoch before starting must discard
@@ -463,33 +473,47 @@ namespace GW2CraftingHelper
                 RecipeSheetItemSeedService.Load);
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
+            _recipeOverlay = recipeOverlay;
             recipeOverlay.Load(currentGw2BuildId: null);
 
-            // Async build ID fetch for overlay invalidation + seed staleness.
-            // Fire-and-forget, but tethered: InvalidateIfStale is a cache
-            // invalidation over the on-disk data dir, and on a fast
-            // disable-then-re-enable (one click in Manage Modules) this task
-            // could invalidate the previous instance's overlay cache while
-            // the new instance was loading its own. The token is re-checked
-            // after the await because that is where the instance can have
-            // gone away; the mutations themselves are synchronous.
+            // Async build ID fetch for overlay invalidation + seed staleness
+            var buildApi = new Gw2BuildApiClient(_httpClient);
             Task.Run(async () =>
             {
                 try
                 {
-                    int buildId = await FetchGw2BuildIdAsync(lifetimeToken);
-                    if (lifetimeToken.IsCancellationRequested)
+                    var build = await buildApi.TryGetBuildIdAsync(_buildIdCts.Token);
+
+                    if (!build.BuildId.HasValue)
                     {
+                        // Neither store is told a build, so the persisted
+                        // recipe overlay stays unread AND unwritten for the
+                        // whole session (see
+                        // OverlayRecipeCacheStore._deferredDiskLoad): every
+                        // plan re-fetches its recipes live and the session
+                        // discards what it learned. Warn, not Debug - a user
+                        // whose /v2/build is blocked or slow has no other
+                        // signal that their recipe cache is switched off.
+                        string reason = build.LastError == null
+                            ? "no response"
+                            : $"[{build.LastError.GetType().Name}] {build.LastError.Message}";
+                        Logger.Warn("GW2 build ID unavailable after {0} attempts - the persisted recipe cache is neither read nor written this session: {1}", build.Attempts, reason);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"GW2 build ID unavailable after {build.Attempts} attempts - the persisted recipe cache is neither read nor written this session: {reason}");
                         return;
                     }
 
-                    recipeOverlay.InvalidateIfStale(buildId);
-                    recipeSeed.SetCurrentBuildId(buildId);
+                    // Stamp only after the staleness check: InvalidateIfStale
+                    // clears the overlay's stored build when it wipes, so the
+                    // reverse order would leave the manifest recording 0 and
+                    // the overlay would be deleted again on the next launch.
+                    recipeOverlay.InvalidateIfStale(build.BuildId.Value);
+                    recipeOverlay.SetCurrentBuildId(build.BuildId.Value);
+                    recipeSeed.SetCurrentBuildId(build.BuildId.Value);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
                 {
-                    Logger.Debug("Could not fetch GW2 build ID for cache validation: {0}", ex.Message);
-                    ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Could not fetch GW2 build ID for cache validation: {ex.Message}");
+                    // Unloaded mid-fetch: _buildIdCts is cancelled and
+                    // _httpClient disposed before this task can finish.
                 }
             });
 
@@ -501,6 +525,9 @@ namespace GW2CraftingHelper
             // a hover reads. Never a fetch (GetCachedStatBlock).
             var itemMetadataService = new ItemMetadataService(itemApi, itemNameSeed);
 
+            _accountRecipeClient = new CachingAccountRecipeClient(
+                new Gw2AccountRecipeClient(Gw2ApiManager));
+
             _craftingPipeline = new CraftingPlanPipeline(
                 new RecipeService(recipeApi, cacheStore: recipeCacheStore),
                 new TradingPostService(priceApi),
@@ -508,7 +535,7 @@ namespace GW2CraftingHelper
                 itemMetadataService,
                 _vendorOfferStore,
                 reducer: new InventoryReducer(),
-                accountRecipeClient: new Gw2AccountRecipeClient(Gw2ApiManager),
+                accountRecipeClient: _accountRecipeClient,
                 currencyMetadataService: new CurrencyMetadataService(_httpClient),
                 acquisitionHints: acquisitionHints,
                 dailyCooldownItems: dailyCooldownItems,
@@ -690,15 +717,22 @@ namespace GW2CraftingHelper
         /// </summary>
         private void BuildTabs()
         {
-            _mainWindow.Tabs.Add(new Tab(
-                AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
-                "Snapshot"));
-
+            // Crafting Plan first, and Blish opens on the first tab. It is
+            // the one tab that works with no API key at all - recipes,
+            // prices and vendor offers are public data - whereas Snapshot
+            // can only say "No snapshot available. Click Refresh Now.",
+            // which is not an instruction a key-less user can carry out.
+            // Nothing reads a tab by index; the two tabs held as fields
+            // (_logTab, _settingsTab) are compared by reference.
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156711),
                 () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
                 "Crafting Plan"));
+
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156699),
+                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
+                "Snapshot"));
 
             _logTab = new Tab(
                 AsyncTexture2D.FromAssetId(156701),
@@ -1100,6 +1134,13 @@ namespace GW2CraftingHelper
         {
             bool statusApplied = false;
 
+            // Not folded into the _snapshotDirty drain below: Clear Cache
+            // drops the snapshot without setting that flag, and the plan
+            // tab must stop offering "Use Own Materials" the moment there
+            // is nothing to subtract. A reference read plus a bool compare
+            // per tick; the view early-returns when nothing changed.
+            _craftingContent?.SetAccountDataAvailable(_currentSnapshot != null);
+
             if (_snapshotDirty)
             {
                 Logger.Info("Applying snapshot to view CapturedAt={0:o}", _pendingSnapshot?.CapturedAt);
@@ -1261,6 +1302,14 @@ namespace GW2CraftingHelper
 
             _refreshSlot.CancelCurrent();
 
+            _buildIdCts.Cancel();
+            _buildIdCts.Dispose();
+
+            // RecipeService persists off the plan path, so the last plan's
+            // discoveries can still be in memory when the module goes away.
+            // A no-op unless something is actually unwritten.
+            _recipeOverlay?.Flush(force: true);
+
             // The scroll-verify/resize-debounce/wheel-wrap-verify tickers
             // are parented to the SpriteScreen, not this view's control
             // tree, so nothing else tears them down on unload - this must
@@ -1326,6 +1375,10 @@ namespace GW2CraftingHelper
 
         private void OnSubtokenUpdated(object sender, ValueEventArgs<IEnumerable<Gw2Sharp.WebApi.V2.Models.TokenPermission>> e)
         {
+            // The key may now address a different account, which no TTL can
+            // detect - see CachingAccountRecipeClient.Invalidate.
+            _accountRecipeClient?.Invalidate();
+
             if (_snapshotService.HasRequiredPermissions())
             {
                 _ = RefreshSnapshotInBackgroundAsync();
@@ -1848,24 +1901,5 @@ namespace GW2CraftingHelper
             };
         }
 #endif
-
-        private async Task<int> FetchGw2BuildIdAsync(CancellationToken lifetimeToken)
-        {
-            // The 3-second budget is the request's own; linking it with the
-            // module lifetime means an unload also ends the wait, instead of
-            // leaving it pending against an HttpClient Unload has disposed.
-            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
-            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, lifetimeToken))
-            {
-                var response = await _httpClient.GetAsync(
-                    "https://api.guildwars2.com/v2/build", cts.Token);
-                response.EnsureSuccessStatusCode();
-                string json = await response.Content.ReadAsStringAsync();
-                using (var doc = System.Text.Json.JsonDocument.Parse(json))
-                {
-                    return doc.RootElement.GetProperty("id").GetInt32();
-                }
-            }
-        }
     }
 }
