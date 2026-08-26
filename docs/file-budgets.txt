@@ -218,7 +218,7 @@ Services/SummarySectionLayoutMath.cs                                            
 Services/TableSortState.cs                                                                 105
 Services/TextWrapMath.cs                                                                   324
 Services/TooltipContent.cs                                                                 435
-Services/TooltipLayoutMath.cs                                                              368
+Services/TooltipLayoutMath.cs                                                              401
 Services/TooltipTextFormat.cs                                                              136
 Services/TopRegionLayoutMath.cs                                                            99
 Services/TradingPostMath.cs                                                                57
@@ -271,10 +271,10 @@ Views/Rendering/NotesSectionRenderer.cs                                         
 Views/Rendering/PillColors.cs                                                              125
 Views/Rendering/PlanHeaderRenderer.cs                                                      172
 Views/Rendering/PressFeedback.cs                                                           118
-Views/Rendering/RankerReadinessColors.cs                                                   75
-Views/Rendering/RarityColors.cs                                                            57
+Views/Rendering/RarityColors.cs                                                            71
 Views/Rendering/RecipesSectionRenderer.cs                                                  332
-Views/Rendering/RichTooltipSurface.cs                                                      515
+Views/Rendering/RichTooltipSurface.cs                                                      557
+Views/Rendering/RankerReadinessColors.cs                                                   75
 Views/Rendering/RowRelayoutHelpers.cs                                                      72
 Views/Rendering/ShoppingBadgeColors.cs                                                     72
 Views/Rendering/ShoppingListSectionRenderer.cs                                             487
@@ -488,7 +488,7 @@ tests/GW2CraftingHelper.Tests/Services/TableSortStateTests.cs                   
 tests/GW2CraftingHelper.Tests/Services/TextWrapMathTests.cs                                297
 tests/GW2CraftingHelper.Tests/Services/TooltipComposerContentTests.cs                      215
 tests/GW2CraftingHelper.Tests/Services/TooltipContentTests.cs                              152
-tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                           428
+tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                           464
 tests/GW2CraftingHelper.Tests/Services/TooltipSpanRoleTests.cs                             108
 tests/GW2CraftingHelper.Tests/Services/TooltipTextFormatTests.cs                           138
 tests/GW2CraftingHelper.Tests/Services/TopRegionLayoutMathTests.cs                         141
