@@ -42,8 +42,16 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
-        /// The game's own canvas: pure black, faintly translucent, over
-        /// the whole box.
+        /// The game's own canvas: near-black with a blue-green cast,
+        /// faintly translucent, over the whole box.
+        /// <para>
+        /// The tint (25,32,34) is Blish's game-derived tooltip texture's
+        /// median (decompiled 1.3.0, drawn at 0.98), and all three lossless
+        /// 2026-08-25 live captures show the same cast over their scenes -
+        /// interior medians (31,34,33), (31,40,45), (28,33,36): green ~+5
+        /// and blue ~+7 over red, where the previous pure black had none
+        /// and read colder and flatter than the game.
+        /// </para>
         /// <para>
         /// 0.82, retuned from 0.92 against the maintainer's in-game
         /// capture: a real tooltip's interior is not flat - medians shift
@@ -61,17 +69,26 @@ namespace GW2CraftingHelper.Views.Rendering
         /// depended on whether it sat in this class or in an initializer for
         /// some other control.
         /// </remarks>
-        private static readonly Color SurfaceBackgroundColor = new Color(0, 0, 0) * 0.82f;
+        private static readonly Color SurfaceBackgroundColor = new Color(25, 32, 34) * 0.82f;
 
         /// <summary>1px, near-black, all four edges - measured on column
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
         private static readonly Color BorderColor = new Color(6, 10, 12);
 
-        /// <summary>The light line the game runs immediately inside its
-        /// dark border - the capture shows a pair, not one edge. This
-        /// file's own chrome grey at low alpha: a highlight on the canvas,
-        /// not a second border.</summary>
-        private static readonly Color BevelColor = new Color(166, 175, 174) * 0.22f;
+        /// <summary>
+        /// The game DARKENS inward from its border - it never brightens.
+        /// Inward luminance profiles on all three lossless 2026-08-25 live
+        /// captures (s05/s07/eq-weapon-full) read border ~6-8, then ~9-10,
+        /// then ~16-30, flattening to a ~27-35 interior plateau, with no
+        /// overshoot anywhere. The bright ring the prior wave drew here
+        /// ((166,175,174)*0.22, doubling the brightness of a 1px ring) was
+        /// backwards and is deleted. Blish's own art does the same dimming
+        /// via edge bands at Black*0.5/0.6 (decompiled); these two inset
+        /// rings reproduce that fall-off over the flat fill.
+        /// </summary>
+        private static readonly Color VignetteInset1Color = Color.Black * 0.3f;
+
+        private static readonly Color VignetteInset2Color = Color.Black * 0.15f;
 
         /// <summary>
         /// Every glyph in a game tooltip carries a dark halo (measured at
@@ -96,13 +113,26 @@ namespace GW2CraftingHelper.Views.Rendering
         private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
 
         /// <summary>
-        /// TOOLTIP-LOCAL, deliberately: the measured in-game boxes are
-        /// 300-332px wide and gw2efficiency caps at 350, while Blish's own
-        /// 500 stays the preferred width for every plain tooltip in the
-        /// module (gap G24). The shared
+        /// TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the preferred
+        /// width for every plain tooltip in the module (gap G24); the shared
         /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
+        /// <para>
+        /// 392 is the game's measured wrap maximum converted into THIS
+        /// surface's measurement space. The game wraps text at 333-347px
+        /// (bracketed by wrapped-vs-unwrapped lines on the 2026-08-25 live
+        /// captures and two native-scale wiki captures, fidelity-audit
+        /// section 1.3), but this surface deliberately renders at
+        /// Menomonia 16 where the game uses ~14 (the module-wide
+        /// readability bump, G25/F9). Re-measuring the live strings through
+        /// Blish's exact chain - <c>MeasureString</c> with the
+        /// <c>LetterSpacing = -1</c> Blish sets on every font - puts
+        /// DefaultFont16 at 1.153x the game's text width, scaling the
+        /// bracket to 384-400; midpoint 392. The old 350 was a game-pixel
+        /// constant applied unscaled to the larger font, which broke prose
+        /// one word earlier than the game on every multi-line description.
+        /// </para>
         /// </summary>
-        private const int MaxContentWidth = 350;
+        private const int MaxContentWidth = 392;
 
         /// <summary>
         /// The game's coin icon is ~0.8x its line height (~13px on a 16px
@@ -165,14 +195,23 @@ namespace GW2CraftingHelper.Views.Rendering
 
             DrawEdges(spriteBatch, pixel, bounds, BorderColor);
 
-            // One pixel inside the border, and only where there is room
-            // for both: at two pixels wide it would overdraw it.
+            // The two-step inward dim band the live edge profiles show,
+            // drawn only where a ring fits without overdrawing the border
+            // or its opposite edge.
             if (bounds.Width > 2 && bounds.Height > 2)
             {
                 DrawEdges(
                     spriteBatch, pixel,
                     new Rectangle(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2),
-                    BevelColor);
+                    VignetteInset1Color);
+            }
+
+            if (bounds.Width > 4 && bounds.Height > 4)
+            {
+                DrawEdges(
+                    spriteBatch, pixel,
+                    new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, bounds.Height - 4),
+                    VignetteInset2Color);
             }
         }
 
@@ -401,13 +440,17 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
 
-                // Light blue, not green: measured on the wiki's
-                // Rune_effects_*.jpg captures (per-row peaks
-                // 95-115/118-138/148-180) and corroborated by FWDekker's
-                // #5599ff replica - see KNOWN-ISSUES #42, gap G3. The exact triple is the
-                // spec's recommendation, not a measurement.
+                // MEASURED on live/eq-weapon-full.png (2026-08-25,
+                // lossless) across six independent lines - two sigil
+                // names, a sigil description, the +8 Agony Infusion pair,
+                // and s07's "Fine" word - all reading (81..85, 145..153,
+                // 240..255) with peak ink (85,153,255). Supersedes the
+                // spec's "recommendation, not a measurement" triple
+                // (120,170,235), which was too pale and too grey; FWDekker's
+                // #5599ff replica value was right. Same blue the game uses
+                // for the Fine rarity.
                 case TooltipSpanRole.Bonus:
-                    return new Color(120, 170, 235);
+                    return new Color(85, 153, 255);
 
                 // A tier above the wearer's equipped count. Unreachable
                 // today - see TooltipSpanRole.BonusInactive.
@@ -434,10 +477,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.Reminder:
                     return new Color(175, 175, 175);
 
-                // Genuine secondary annotations only ("0/500 in Material
-                // Storage", measured #939496). The identity block is white.
+                // Secondary annotations and parentheticals. Lifted from
+                // 150 (the older #939496 "0/500 in Material Storage"
+                // measurement) to the 2026-08-25 live captures' grey:
+                // "(Two-Handed)" reads (160,161,162) and "(Cooldown: N
+                // Seconds)" (160,161,161) on eq-weapon-full, lossless.
                 case TooltipSpanRole.Muted:
-                    return new Color(150, 150, 150);
+                    return new Color(160, 160, 160);
 
                 default:
                     return Color.White;

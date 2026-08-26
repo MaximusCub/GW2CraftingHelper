@@ -1,5 +1,18 @@
 > **Frozen record - 2026-08-23, branch `tooltip-authenticity`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
+>
+> **Superseded in part - 2026-08-26, branch `tooltip-fidelity`.** Lossless
+> live captures (2026-08-25, `/mnt/c/Dev/Blish/tooltips/live/`, audited in
+> `/mnt/c/Dev/Blish/tooltips/fidelity-audit.md`) overturned several claims
+> below: the rarity WORD is drawn in the rarity colour, not white (the
+> 2012-2016 captures behind G5's white reading predate a game change); the
+> upgrade blue is measured at (85,153,255), not the spec's recommended
+> value; `MaxContentWidth` moved 350 -> 392; the inner bevel ring is not in
+> the game (it darkens inward); and the canvas carries a blue-green cast,
+> not pure black. Desktop-gate step 3's "so are the rarity word" clause and
+> the line-order map's `<Rarity> white` row are the superseded statements.
+> The white ATTRIBUTE lines, line order, and blank rules were all
+> re-confirmed by the same captures.
 
 ## Tooltip authenticity (tooltip-authenticity)
 
