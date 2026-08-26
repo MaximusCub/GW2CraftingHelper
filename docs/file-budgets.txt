@@ -50,6 +50,7 @@ Models/MaterialSourceAllocation.cs                                              
 Models/OwnMaterialsMode.cs                                                                 43
 Models/PersistedPlan.cs                                                                    124
 Models/PillSourceCostBreakdown.cs                                                          76
+Models/PlanHistoryEntry.cs                                                                 106
 Models/PlanRequestItem.cs                                                                  15
 Models/PlanSolveContext.cs                                                                 196
 Models/PlanStatus.cs                                                                       11
@@ -66,7 +67,7 @@ Models/ReducedTreeResult.cs                                                     
 Models/RequiredDiscipline.cs                                                               9
 Models/RequiredRecipe.cs                                                                   28
 Models/SeasonalVendorTip.cs                                                                48
-Models/SettingsFormState.cs                                                                134
+Models/SettingsFormState.cs                                                                135
 Models/SnapshotCharacterDiscipline.cs                                                      24
 Models/SnapshotItemEntry.cs                                                                15
 Models/SnapshotSearchRow.cs                                                                42
@@ -77,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                               35
 Models/VendorOffer.cs                                                                      57
 Models/VendorOfferDataset.cs                                                               15
-Module.cs                                                                                  2061
+Module.cs                                                                                  2517
 Properties/AssemblyInfo.cs                                                                 12
 Services/AboutLayoutMath.cs                                                                163
 Services/AccountCurrencyIndex.cs                                                           44
@@ -110,6 +111,7 @@ Services/Gw2AccountSnapshotService.cs                                           
 Services/Gw2ItemApiClient.cs                                                               199
 Services/Gw2PriceApiClient.cs                                                              66
 Services/Gw2RecipeApiClient.cs                                                             203
+Services/GzipJsonFile.cs                                                                   60
 Services/HeaderCellMath.cs                                                                 135
 Services/IAccountRecipeClient.cs                                                           13
 Services/IItemApiClient.cs                                                                 126
@@ -137,7 +139,7 @@ Services/ModuleLog.cs                                                           
 Services/ModuleLogEntry.cs                                                                 43
 Services/ModuleLogLevel.cs                                                                 20
 Services/ModuleLogStore.cs                                                                 272
-Services/ModuleSettings.cs                                                                 393
+Services/ModuleSettings.cs                                                                 434
 Services/MysticForgeRecipeData.cs                                                          211
 Services/NotesSectionLayoutMath.cs                                                         111
 Services/OwnedMaterialsForceBuyPrePass.cs                                                  128
@@ -146,11 +148,17 @@ Services/PillSubduingEvaluator.cs                                               
 Services/PillSubduingTooltipBuilder.cs                                                     101
 Services/PillTooltipTextComposer.cs                                                        224
 Services/PlanContentHeightMath.cs                                                          340
+Services/PlanHistoryBlobStore.cs                                                           216
+Services/PlanHistoryDedupKey.cs                                                            104
+Services/PlanHistoryLabels.cs                                                              82
+Services/PlanHistoryRetention.cs                                                           102
+Services/PlanHistoryRowLayout.cs                                                           154
+Services/PlanHistoryStore.cs                                                               135
 Services/PlanPhaseEvent.cs                                                                 73
 Services/PlanRelayoutMath.cs                                                               402
 Services/PlanResultBuilder.cs                                                              375
 Services/PlanSolver.cs                                                                     2012
-Services/PlanStore.cs                                                                      210
+Services/PlanStore.cs                                                                      165
 Services/PlanStoreHelpers.cs                                                               209
 Services/PlanStripStatusBoard.cs                                                           307
 Services/PlanStripTickDecision.cs                                                          97
@@ -189,7 +197,7 @@ Services/SeasonalVendorTipCalculator.cs                                         
 Services/SellSideEconomics.cs                                                              406
 Services/SettingsCurrencyGridLayout.cs                                                     254
 Services/SettingsFormLayout.cs                                                             174
-Services/SettingsInputParser.cs                                                            201
+Services/SettingsInputParser.cs                                                            239
 Services/SettingsSaveBarLayout.cs                                                          80
 Services/ShoppingColumnMath.cs                                                             183
 Services/ShoppingRowTooltipFormatter.cs                                                    146
@@ -213,7 +221,7 @@ Services/SolverDecision.cs                                                      
 Services/SourceFilterFlowLayout.cs                                                         85
 Services/StaticItemSearchProvider.cs                                                       42
 Services/StatusStore.cs                                                                    73
-Services/StatusText.cs                                                                     263
+Services/StatusText.cs                                                                     286
 Services/StatusUpdateGuard.cs                                                              38
 Services/SummarySectionLayoutMath.cs                                                       399
 Services/TableSortState.cs                                                                 105
@@ -252,6 +260,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                          2795
 Views/ModalBackdrop.cs                                                                     132
 Views/ModalDialog.cs                                                                       398
+Views/PlanHistoryTabContent.cs                                                             1205
 Views/RankerTabContent.cs                                                                  1777
 Views/Rendering/ClickSound.cs                                                              197
 Views/Rendering/CoinCurrencyRenderer.cs                                                    564
@@ -291,7 +300,7 @@ Views/Rendering/UiFonts.cs                                                      
 Views/Rendering/UiMetrics.cs                                                               47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                            206
 Views/ResizableTabbedWindow.cs                                                             153
-Views/SettingsTabContent.cs                                                                2577
+Views/SettingsTabContent.cs                                                                2611
 Views/SuggestionPanel.cs                                                                   489
 Views/ViewAdapter.cs                                                                       90
 tests/GW2CraftingHelper.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                        122
@@ -396,6 +405,12 @@ tests/GW2CraftingHelper.Tests/Services/PillSubduingEvaluatorTests.cs            
 tests/GW2CraftingHelper.Tests/Services/PillSubduingTooltipBuilderTests.cs                  130
 tests/GW2CraftingHelper.Tests/Services/PillTooltipTextComposerTests.cs                     284
 tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                       484
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryBlobStoreTests.cs                        324
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryDedupKeyTests.cs                         94
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryLabelsTests.cs                           77
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryRetentionTests.cs                        139
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryRowLayoutTests.cs                        125
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryStoreTests.cs                            234
 tests/GW2CraftingHelper.Tests/Services/PlanPhaseTimingSummaryTests.cs                      201
 tests/GW2CraftingHelper.Tests/Services/PlanRelayoutMathTests.cs                            697
 tests/GW2CraftingHelper.Tests/Services/PlanResultBuilderTests.cs                           1103
@@ -464,7 +479,7 @@ tests/GW2CraftingHelper.Tests/Services/SeasonalVendorTipCalculatorTests.cs      
 tests/GW2CraftingHelper.Tests/Services/SellSideEconomicsTests.cs                           246
 tests/GW2CraftingHelper.Tests/Services/SettingsCurrencyGridLayoutTests.cs                  519
 tests/GW2CraftingHelper.Tests/Services/SettingsFormLayoutTests.cs                          268
-tests/GW2CraftingHelper.Tests/Services/SettingsInputParserTests.cs                         306
+tests/GW2CraftingHelper.Tests/Services/SettingsInputParserTests.cs                         338
 tests/GW2CraftingHelper.Tests/Services/SettingsSaveBarLayoutTests.cs                       117
 tests/GW2CraftingHelper.Tests/Services/ShoppingColumnMathTests.cs                          327
 tests/GW2CraftingHelper.Tests/Services/ShoppingRowTooltipFormatterTests.cs                 193
@@ -484,7 +499,7 @@ tests/GW2CraftingHelper.Tests/Services/SnapshotStoreTests.cs                    
 tests/GW2CraftingHelper.Tests/Services/SnapshotTableSorterTests.cs                         147
 tests/GW2CraftingHelper.Tests/Services/SourceFilterFlowLayoutTests.cs                      127
 tests/GW2CraftingHelper.Tests/Services/StatusStoreTests.cs                                 116
-tests/GW2CraftingHelper.Tests/Services/StatusTextTests.cs                                  327
+tests/GW2CraftingHelper.Tests/Services/StatusTextTests.cs                                  345
 tests/GW2CraftingHelper.Tests/Services/StatusUpdateGuardTests.cs                           33
 tests/GW2CraftingHelper.Tests/Services/SummarySectionLayoutMathTests.cs                    537
 tests/GW2CraftingHelper.Tests/Services/TableSortStateTests.cs                              192

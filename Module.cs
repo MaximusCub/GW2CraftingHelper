@@ -81,6 +81,27 @@ namespace GW2CraftingHelper
         private ModuleSettings _settings;
         private RankerStore _rankerStore;
         private RankerTabContent _rankerContent;
+
+        // Plan History: the index is held in memory for the module's
+        // lifetime and mutated under _planHistoryLock from two sides -
+        // the capture path's ThreadPool continuation
+        // (CaptureHistoryEntry) and the tab's main-thread mutations
+        // (MutateHistoryIndex). Every mutation persists before the lock
+        // is released, so the in-memory index and plan_history.json can
+        // never disagree for longer than one write.
+        private PlanHistoryStore _planHistoryStore;
+        private PlanHistoryBlobStore _planHistoryBlobStore;
+        private PlanHistoryIndex _planHistoryIndex =
+            new PlanHistoryIndex { SchemaVersion = PlanHistoryIndex.CurrentSchemaVersion };
+
+        private readonly object _planHistoryLock = new object();
+        private PlanHistoryTabContent _planHistoryContent;
+        private Tab _planHistoryTab;
+
+        // Held so OpenHistoryEntry/ResolveHistoryEntryAsync can switch
+        // the window to the Crafting Plan tab; compared by reference,
+        // like _logTab/_settingsTab.
+        private Tab _craftingPlanTab;
         private SnapshotStore _snapshotStore;
         private StatusStore _statusStore;
         private Gw2AccountSnapshotService _snapshotService;
@@ -373,6 +394,8 @@ namespace GW2CraftingHelper
             _snapshotStore = new SnapshotStore(dataDir, onStoreError);
             _statusStore = new StatusStore(dataDir, onStoreError);
             _rankerStore = new RankerStore(dataDir, onStoreError);
+            _planHistoryStore = new PlanHistoryStore(dataDir, onStoreError);
+            _planHistoryBlobStore = new PlanHistoryBlobStore(dataDir, onStoreError);
             _planStore = new PlanStore(dataDir, onStoreError, onStoreInfo);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
             _lastStatus = _statusStore.Load();
@@ -812,10 +835,11 @@ namespace GW2CraftingHelper
             // which is not an instruction a key-less user can carry out.
             // Nothing reads a tab by index; the two tabs held as fields
             // (_logTab, _settingsTab) are compared by reference.
-            _mainWindow.Tabs.Add(new Tab(
+            _craftingPlanTab = new Tab(
                 AsyncTexture2D.FromAssetId(156711),
                 () => new ViewAdapter("Crafting Plan", c => _craftingContent.Build(c)),
-                "Crafting Plan"));
+                "Crafting Plan");
+            _mainWindow.Tabs.Add(_craftingPlanTab);
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
@@ -836,16 +860,23 @@ namespace GW2CraftingHelper
                 "Log");
             _mainWindow.Tabs.Add(_logTab);
 
-#if DEBUG
-            // Dev builds only: still a BuildPlaceholder "Coming Soon" label,
-            // and a released overlay should not advertise unfinished work in
-            // its own tab strip. Delete the directives (not the tab) when the
-            // feature lands; see docs/ROADMAP.md.
-            _mainWindow.Tabs.Add(new Tab(
+            _planHistoryContent = new PlanHistoryTabContent(
+                SnapshotHistoryEntries,
+                MutateHistoryIndex,
+                OpenHistoryEntry,
+                ResolveHistoryEntryAsync,
+                _modalDialog,
+                _settings);
+
+            _planHistoryTab = new Tab(
                 AsyncTexture2D.FromAssetId(156691),
-                () => new ViewAdapter("Plan History", BuildPlaceholder),
-                "Plan History"));
-#endif
+                () =>
+                {
+                    _planHistoryContent.BeginRebuild();
+                    return new ViewAdapter("Plan History", c => _planHistoryContent.Build(c));
+                },
+                "Plan History");
+            _mainWindow.Tabs.Add(_planHistoryTab);
 
             _rankerContent = new RankerTabContent(
                 _craftingPipeline,
@@ -910,6 +941,11 @@ namespace GW2CraftingHelper
 
                 // View-only: never starts a solve on a tab switch.
                 _rankerContent?.Refresh();
+
+                if (_mainWindow.SelectedTab == _planHistoryTab)
+                {
+                    _planHistoryContent?.Refresh();
+                }
             };
 
             _cornerIcon = new CornerIcon()
@@ -1256,6 +1292,28 @@ namespace GW2CraftingHelper
                 _planRestoreDirty = true;
             }
 
+            // Plan History index: a single small synchronous read, held
+            // in memory for the session. A missing file is the ordinary
+            // first run; a corrupt one already logged its one Warn inside
+            // the store and came back empty. The orphan sweep then drops
+            // any blob no surviving row links to (e.g. rows lost to a
+            // corrupt index).
+            var loadedHistory = _planHistoryStore.Load();
+            var keepIds = new List<string>();
+            lock (_planHistoryLock)
+            {
+                _planHistoryIndex = loadedHistory;
+                foreach (var entry in loadedHistory.Entries)
+                {
+                    if (entry?.EntryId != null)
+                    {
+                        keepIds.Add(entry.EntryId);
+                    }
+                }
+            }
+
+            _planHistoryBlobStore.DeleteOrphans(keepIds);
+
             Gw2ApiManager.SubtokenUpdated += OnSubtokenUpdated;
 
             if (_snapshotService.HasRequiredPermissions())
@@ -1473,6 +1531,7 @@ namespace GW2CraftingHelper
 
             Views.Rendering.ClickSound.Unload();
             _rankerContent?.Teardown();
+            _planHistoryContent?.Teardown();
             _settingsContent?.Teardown();
             _aboutContent?.Teardown();
 
@@ -1917,6 +1976,21 @@ namespace GW2CraftingHelper
                 IgnoredItemIds = new List<int>(),
             });
 
+            // Same thread, same superseded-generation guard: every
+            // successful Generate lands (or dedup-bumps) a history row.
+            // A capture failure must never fail the Generate whose result
+            // is already on screen.
+            try
+            {
+                CaptureHistoryEntry(
+                    generatedAt, requestItems, useOwnMaterials, priceBasis, valueOwnMaterials, result);
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "store",
+                    $"Plan history capture failed: {ex.GetType().Name} - {ex.Message}");
+            }
+
             return result;
         }
 
@@ -2040,22 +2114,404 @@ namespace GW2CraftingHelper
             }
         }
 
-#if DEBUG
-        // Compiled only where its two callers are - see the tab
-        // registration in BuildMainWindow.
-        private static void BuildPlaceholder(Container container)
+        /// <summary>
+        /// A copy of the index rows for the Plan History tab, taken under
+        /// the lock so a capture landing mid-render cannot resize the
+        /// list out from under an enumeration.
+        /// </summary>
+        private IReadOnlyList<PlanHistoryEntry> SnapshotHistoryEntries()
         {
-            new Label()
+            lock (_planHistoryLock)
             {
-                Text = "Coming Soon",
-                Font = UiFonts.Body,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(20, 20),
-                TextColor = new Color(150, 150, 150),
-                Parent = container,
-            };
+                return new List<PlanHistoryEntry>(_planHistoryIndex.Entries);
+            }
         }
-#endif
+
+        /// <summary>
+        /// Runs one tab-side index mutation (pin, delete, clear) under
+        /// the lock, deletes the blob of every row the mutation removed
+        /// (diffed by entry id, so the tab never has to know about the
+        /// blob store), and persists the index before returning.
+        /// </summary>
+        private void MutateHistoryIndex(Action<PlanHistoryIndex> mutation)
+        {
+            if (mutation == null)
+            {
+                return;
+            }
+
+            lock (_planHistoryLock)
+            {
+                var index = _planHistoryIndex;
+                var removedIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var entry in index.Entries)
+                {
+                    if (entry?.EntryId != null)
+                    {
+                        removedIds.Add(entry.EntryId);
+                    }
+                }
+
+                mutation(index);
+
+                foreach (var entry in index.Entries)
+                {
+                    if (entry?.EntryId != null)
+                    {
+                        removedIds.Remove(entry.EntryId);
+                    }
+                }
+
+                foreach (string removedId in removedIds)
+                {
+                    _planHistoryBlobStore.Delete(removedId);
+                }
+
+                _planHistoryStore.Save(index);
+            }
+        }
+
+        private PlanHistoryEntry FindHistoryEntry(PlanHistoryIndex index, string entryId)
+        {
+            foreach (var entry in index.Entries)
+            {
+                if (entry != null && string.Equals(entry.EntryId, entryId, StringComparison.Ordinal))
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Captures (or dedup-bumps) a history row for a successful
+        /// Generate. Runs on the persist continuation's ThreadPool
+        /// thread, inside the same superseded-generation guard as the
+        /// plan.json write, so a superseded generation never lands a row.
+        /// Retention runs here, before the Save, never lazily at render.
+        /// </summary>
+        private void CaptureHistoryEntry(
+            DateTime generatedAt,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis,
+            bool valueOwnMaterials,
+            CraftingPlanResult result)
+        {
+            if (result?.Plan == null || _planHistoryStore == null || _planHistoryBlobStore == null)
+            {
+                return;
+            }
+
+            // A fresh Generate always starts with no overrides and no
+            // ignores (TreeSectionController.ResetForNewPlan), so the
+            // entry's ignore set is empty by construction here.
+            string key = PlanHistoryDedupKey.Compute(
+                requestItems, useOwnMaterials, priceBasis, valueOwnMaterials, null);
+
+            lock (_planHistoryLock)
+            {
+                var index = _planHistoryIndex;
+
+                PlanHistoryEntry entry = null;
+                foreach (var candidate in index.Entries)
+                {
+                    if (candidate != null
+                        && string.Equals(PlanHistoryDedupKey.ForEntry(candidate), key, StringComparison.Ordinal))
+                    {
+                        entry = candidate;
+                        break;
+                    }
+                }
+
+                if (entry == null)
+                {
+                    entry = new PlanHistoryEntry
+                    {
+                        EntryId = Guid.NewGuid().ToString("N"),
+                        CreatedAtUtc = DateTime.UtcNow,
+                    };
+                    index.Entries.Add(entry);
+                }
+
+                entry.LastGeneratedAtUtc = DateTime.UtcNow;
+                entry.RequestItems = CopyRequestItems(requestItems);
+                entry.UseOwnMaterials = useOwnMaterials;
+                entry.PriceBasis = priceBasis;
+                entry.ValueOwnMaterials = valueOwnMaterials;
+                entry.IgnoredItemIds = new List<int>();
+                entry.ItemSummaries = BuildItemSummaries(requestItems, result);
+                entry.TotalCoinCostAtGeneration = result.Plan.TotalCoinCost;
+                entry.OverrideCountAtGeneration = 0;
+                entry.IgnoredCountAtGeneration = 0;
+
+                var samples = entry.CostSamples != null
+                    ? new List<PlanHistorySample>(entry.CostSamples)
+                    : new List<PlanHistorySample>();
+                samples.Add(new PlanHistorySample
+                {
+                    TimestampUtc = DateTime.UtcNow,
+                    TotalCoinCost = result.Plan.TotalCoinCost,
+                });
+                while (samples.Count > PlanHistoryRetention.MaxCostSamples)
+                {
+                    samples.RemoveAt(0);
+                }
+
+                entry.CostSamples = samples;
+
+                bool blobSaved = _planHistoryBlobStore.Save(entry.EntryId, new PersistedPlan
+                {
+                    // Set explicitly, never via a property initializer -
+                    // see PersistedPlan.SchemaVersion.
+                    SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                    GeneratedAt = generatedAt,
+                    RequestItems = requestItems,
+                    UseOwnMaterials = useOwnMaterials,
+                    PriceBasis = priceBasis,
+                    ValueOwnMaterials = valueOwnMaterials,
+                    Result = result,
+                    NodeOverrides = new Dictionary<int, AcquisitionSource>(),
+                    IgnoredItemIds = new List<int>(),
+                });
+                entry.BlobPresent = blobSaved;
+                entry.BlobSchemaVersion = blobSaved ? PersistedPlan.CurrentSchemaVersion : 0;
+
+                // Blob-only cap first (the row degrades to Re-solve),
+                // then the row cap (row and blob both go).
+                foreach (string evictId in PlanHistoryRetention.SelectForBlobEviction(
+                    index.Entries, PlanHistoryRetention.PlanHistoryBlobCap))
+                {
+                    _planHistoryBlobStore.Delete(evictId);
+                    var evicted = FindHistoryEntry(index, evictId);
+                    if (evicted != null)
+                    {
+                        evicted.BlobPresent = false;
+                    }
+                }
+
+                foreach (string evictId in PlanHistoryRetention.SelectForEviction(
+                    index.Entries, _settings.GetClampedPlanHistoryMaxEntries()))
+                {
+                    _planHistoryBlobStore.Delete(evictId);
+                    index.Entries.RemoveAll(e =>
+                        e != null && string.Equals(e.EntryId, evictId, StringComparison.Ordinal));
+                }
+
+                _planHistoryStore.Save(index);
+            }
+
+            MainThreadMarshal.Run(() => _planHistoryContent?.Refresh());
+        }
+
+        private static List<PlanRequestItem> CopyRequestItems(IReadOnlyList<PlanRequestItem> requestItems)
+        {
+            var copy = new List<PlanRequestItem>();
+            if (requestItems == null)
+            {
+                return copy;
+            }
+
+            foreach (var item in requestItems)
+            {
+                if (item != null)
+                {
+                    copy.Add(new PlanRequestItem { ItemId = item.ItemId, Quantity = item.Quantity });
+                }
+            }
+
+            return copy;
+        }
+
+        private static List<PlanHistoryItemSummary> BuildItemSummaries(
+            IReadOnlyList<PlanRequestItem> requestItems, CraftingPlanResult result)
+        {
+            var summaries = new List<PlanHistoryItemSummary>();
+            if (requestItems == null)
+            {
+                return summaries;
+            }
+
+            foreach (var item in requestItems)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                ItemMetadata metadata = null;
+                if (result.ItemMetadata != null)
+                {
+                    result.ItemMetadata.TryGetValue(item.ItemId, out metadata);
+                }
+
+                summaries.Add(new PlanHistoryItemSummary
+                {
+                    ItemId = item.ItemId,
+                    Name = metadata?.Name,
+                    IconUrl = metadata?.IconUrl,
+                    Rarity = metadata?.Rarity,
+                    Quantity = item.Quantity,
+                });
+            }
+
+            return summaries;
+        }
+
+        /// <summary>
+        /// "Open": restores a history entry's exact saved plan into the
+        /// Crafting Plan tab, pills live, zero network - mirroring the
+        /// startup restore drain in Update() exactly, including the
+        /// _lastPersistedPlanMetadata publication that keeps the NEXT
+        /// pill click persisting under the right request/timestamp.
+        /// Main thread only (a button Click). Returns false when the blob
+        /// could not be read; the row's BlobPresent is cleared and
+        /// persisted so it degrades to Re-solve.
+        /// </summary>
+        private bool OpenHistoryEntry(PlanHistoryEntry entry)
+        {
+            if (entry == null)
+            {
+                return false;
+            }
+
+            var plan = _planHistoryBlobStore.Load(entry.EntryId);
+            if (plan == null)
+            {
+                lock (_planHistoryLock)
+                {
+                    var row = FindHistoryEntry(_planHistoryIndex, entry.EntryId);
+                    if (row != null && row.BlobPresent)
+                    {
+                        row.BlobPresent = false;
+                        _planHistoryStore.Save(_planHistoryIndex);
+                    }
+                }
+
+                return false;
+            }
+
+            lock (_generateCompletionLock)
+            {
+                _lastPersistedPlanMetadata = new PersistedPlanMetadata(
+                    plan.GeneratedAt,
+                    plan.RequestItems,
+                    plan.UseOwnMaterials,
+                    plan.PriceBasis,
+                    plan.ValueOwnMaterials);
+            }
+
+            _craftingContent?.ApplyRestoredPlan(
+                plan.Result,
+                plan.GeneratedAt,
+                plan.NodeOverrides,
+                plan.IgnoredItemIds,
+                plan.ValueOwnMaterials,
+                plan.RequestItems,
+                plan.UseOwnMaterials,
+                plan.PriceBasis);
+
+            // The opened entry IS the current plan now. Off the UI
+            // thread, like every other plan.json write; PlanStore.Save's
+            // internal lock makes a race with a persist-in-flight safe.
+            Task.Run(() => _planStore.Save(plan));
+
+            _mainWindow.SelectedTab = _craftingPlanTab;
+            return true;
+        }
+
+        /// <summary>
+        /// "Re-solve": runs the entry's request back through the SAME
+        /// Generate path a Crafting Plan click uses - including
+        /// PersistAfterGenerateAsync, so the result becomes the current
+        /// plan on disk and dedup-bumps this same history row - then
+        /// renders it through ApplyRestoredPlan (which also reseeds the
+        /// request inputs) and switches tabs. IgnoredItemIds ARE
+        /// replayed through the restore path; NodeOverrides never are
+        /// (they are only valid against the exact result they were
+        /// captured with). Returns null on success, an error message on
+        /// failure; a cancellation propagates as
+        /// OperationCanceledException.
+        /// </summary>
+        private async Task<string> ResolveHistoryEntryAsync(
+            PlanHistoryEntry entry, CancellationToken ct)
+        {
+            if (entry == null)
+            {
+                return "No entry.";
+            }
+
+            // Copied before the await: the capture bump mutates the same
+            // entry object on another thread once the generate lands.
+            var requestItems = CopyRequestItems(entry.RequestItems);
+            bool useOwnMaterials = entry.UseOwnMaterials;
+            var priceBasis = entry.PriceBasis;
+            bool valueOwnMaterials = entry.ValueOwnMaterials;
+            var ignoredItemIds = entry.IgnoredItemIds != null
+                ? new List<int>(entry.IgnoredItemIds)
+                : new List<int>();
+            string requestLabel = PlanHistoryLabels.RowLabel(entry);
+
+            if (requestItems.Count == 0)
+            {
+                return "This entry has no request to re-solve.";
+            }
+
+            // StartGenerateAsync reads Gw2Mumble and per-plan settings,
+            // so it is invoked on the main thread exactly like a Generate
+            // click; only the await runs out here.
+            var startTcs = new TaskCompletionSource<Task<CraftingPlanResult>>();
+            MainThreadMarshal.Run(() =>
+            {
+                try
+                {
+                    startTcs.SetResult(StartGenerateAsync(
+                        requestItems, useOwnMaterials, valueOwnMaterials, priceBasis,
+                        ct, null, null, requestLabel, _lifetimeCts.Token));
+                }
+                catch (Exception ex)
+                {
+                    startTcs.SetException(ex);
+                }
+            });
+
+            CraftingPlanResult result;
+            try
+            {
+                var generateTask = await startTcs.Task.ConfigureAwait(false);
+                result = await generateTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+
+            if (result == null)
+            {
+                return "Generation produced no plan.";
+            }
+
+            var generatedAt = DateTime.Now;
+            MainThreadMarshal.Run(() =>
+            {
+                _craftingContent?.ApplyRestoredPlan(
+                    result,
+                    generatedAt,
+                    new Dictionary<int, AcquisitionSource>(),
+                    ignoredItemIds,
+                    valueOwnMaterials,
+                    requestItems,
+                    useOwnMaterials,
+                    priceBasis);
+                _mainWindow.SelectedTab = _craftingPlanTab;
+            });
+
+            return null;
+        }
     }
 }

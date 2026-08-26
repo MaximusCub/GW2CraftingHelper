@@ -197,5 +197,43 @@ namespace GW2CraftingHelper.Services
             minutes = parsed;
             return true;
         }
+
+        // Mirrors ModuleSettings.GetClampedPlanHistoryMaxEntries' 5-200
+        // bound - the parser rejects what the accessor would clamp, so a
+        // typed value is either stored verbatim or refused with an error.
+        private const int MinPlanHistoryMaxEntries = 5;
+        private const int MaxPlanHistoryMaxEntries = 200;
+
+        /// <summary>
+        /// Attempts to parse <paramref name="text"/> as a Plan History
+        /// entry cap (5-200). Returns false (with
+        /// <paramref name="maxEntries"/> set to 0) for null, blank,
+        /// non-numeric, or out-of-range input - mirrors
+        /// TryParseRetentionDays' own shape.
+        /// </summary>
+        public static bool TryParsePlanHistoryMaxEntries(string text, out int maxEntries)
+        {
+            maxEntries = 0;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            string trimmed = text.Trim();
+
+            if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
+            {
+                return false;
+            }
+
+            if (parsed < MinPlanHistoryMaxEntries || parsed > MaxPlanHistoryMaxEntries)
+            {
+                return false;
+            }
+
+            maxEntries = parsed;
+            return true;
+        }
     }
 }

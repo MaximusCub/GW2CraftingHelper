@@ -315,5 +315,23 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(expected, StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(minutes)));
         }
+
+        // ForAgeAgo rides the SAME ladder with a plain "ago" framing -
+        // the Plan History detail panel's cost-delta line.
+        [Theory]
+        [InlineData(0.5, "just now")]
+        [InlineData(1, "1m ago")]
+        [InlineData(65, "1h 5m ago")]
+        [InlineData(2880, "2d ago")]
+        public void ForAgeAgo_BucketLadder(double minutes, string expected)
+        {
+            Assert.Equal(expected, StatusText.ForAgeAgo(TimeSpan.FromMinutes(minutes)));
+        }
+
+        [Fact]
+        public void ForAgeAgo_Negative_ClampedToZero()
+        {
+            Assert.Equal("just now", StatusText.ForAgeAgo(TimeSpan.FromSeconds(-5)));
+        }
     }
 }

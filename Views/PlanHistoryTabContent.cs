@@ -1,0 +1,1205 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
+using Blish_HUD;
+using Blish_HUD.Controls;
+using GW2CraftingHelper.Models;
+using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Views.Rendering;
+using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
+
+namespace GW2CraftingHelper.Views
+{
+    /// <summary>
+    /// The Plan History tab: a list of previously-generated plans, newest
+    /// first with pinned rows on top, each offering View (free, frozen
+    /// summary), Open (restore the exact saved plan, pills live, no
+    /// network) and Re-solve (run the same request again at today's
+    /// prices).
+    ///
+    /// Structurally a RankerTabContent-shaped tab: fixed chrome siblings
+    /// plus one scrolling FlowPanel, held for the module's lifetime with
+    /// BeginRebuild because the expanded-row selection and the in-flight
+    /// re-solve state must survive a tab switch. All data flows through
+    /// Module-owned delegates - this view never touches a store directly.
+    /// </summary>
+    internal class PlanHistoryTabContent
+    {
+        private static readonly Logger Logger = Logger.GetLogger<PlanHistoryTabContent>();
+
+        private const int SectionBandHeight = PlanContentHeightMath.SectionHeaderRowHeight;
+        private const int SectionTitleY = PlanContentHeightMath.SectionHeaderTitleY;
+        private const int ToolbarHeight = 40;
+        private const int ColumnHeaderRowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
+        private const int ColumnHeaderLabelY = PlanContentHeightMath.ColumnHeaderLabelY;
+        private const int TopChromeHeight = SectionBandHeight + ToolbarHeight + ColumnHeaderRowHeight;
+
+        private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
+        private const int ClearButtonWidth = 120;
+        private const int DetailIconSize = 20;
+
+        private static readonly Color DimColor = new Color(150, 150, 150);
+        private static readonly Color StatusColor = new Color(200, 200, 200);
+        private static readonly Color ErrorColor = new Color(255, 100, 100);
+        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
+
+        private const string EmptyStateText =
+            "No plans generated yet. Generate a plan from the Crafting Plan tab and it will appear here.";
+
+        private readonly Func<IReadOnlyList<PlanHistoryEntry>> _snapshotEntries;
+        private readonly Action<Action<PlanHistoryIndex>> _mutateIndex;
+        private readonly Func<PlanHistoryEntry, bool> _openEntry;
+
+        // Returns null on success, an error message on failure; throws
+        // OperationCanceledException on cancellation.
+        private readonly Func<PlanHistoryEntry, CancellationToken, Task<string>> _resolveEntryAsync;
+        private readonly ModalDialog _modalDialog;
+        private readonly ModuleSettings _settings;
+        private readonly ResizeSettleDebounce _resizeSettle;
+
+        private readonly List<RenderedRow> _rows = new List<RenderedRow>();
+        private readonly List<Label> _columnHeaderLabels = new List<Label>();
+
+        private Panel _headerPanel;
+        private Panel _headerDivider;
+        private Panel _toolbarPanel;
+        private Panel _columnHeaderPanel;
+        private FlowPanel _contentPanel;
+        private Label _statusLabel;
+        private LoadingSpinner _spinner;
+        private FeedbackButton _clearButton;
+
+        private volatile bool _buildComplete;
+        private int _lastLayoutWidth = -1;
+
+        // Table-wide, so every row shares one column geometry and the
+        // header labels sit on the columns they name.
+        private int _costBandWidth;
+        private int _whenBandWidth;
+
+        private string _expandedEntryId;
+        private bool _isResolving;
+        private CancellationTokenSource _resolveCts;
+        private string _statusOverride;
+        private bool _statusIsError;
+
+        public PlanHistoryTabContent(
+            Func<IReadOnlyList<PlanHistoryEntry>> snapshotEntries,
+            Action<Action<PlanHistoryIndex>> mutateIndex,
+            Func<PlanHistoryEntry, bool> openEntry,
+            Func<PlanHistoryEntry, CancellationToken, Task<string>> resolveEntryAsync,
+            ModalDialog modalDialog,
+            ModuleSettings settings)
+        {
+            _snapshotEntries = snapshotEntries ?? (() => new List<PlanHistoryEntry>());
+            _mutateIndex = mutateIndex ?? (_ => { });
+            _openEntry = openEntry ?? (_ => false);
+            _resolveEntryAsync = resolveEntryAsync;
+            _modalDialog = modalDialog;
+            _settings = settings;
+
+            _resizeSettle = new ResizeSettleDebounce(
+                RefitAfterResizeSettle,
+                MainThreadMarshal.Run,
+                ResizeSettleDebounce.DefaultSettleMs,
+                ex => Logger.Warn(ex, "Plan History row re-fit wait failed"));
+        }
+
+        /// <summary>Main thread, immediately before Blish queues the off-thread Build.</summary>
+        public void BeginRebuild()
+        {
+            _buildComplete = false;
+            if (!_isResolving)
+            {
+                // A transient status ("Entry deleted") should not outlive
+                // the visit that caused it; the in-flight re-solve status
+                // must.
+                _statusOverride = null;
+            }
+        }
+
+        public void Build(Container container)
+        {
+            _buildComplete = false;
+            _rows.Clear();
+            _columnHeaderLabels.Clear();
+            _lastLayoutWidth = -1;
+
+            int w = container.ContentRegion.Width;
+
+            BuildSectionBand(container, w);
+            BuildToolbar(container, w);
+            BuildColumnHeader(container, w);
+
+            _contentPanel = new FlowPanel
+            {
+                Size = new Point(w, Math.Max(0, container.ContentRegion.Height - TopChromeHeight)),
+                Location = new Point(0, TopChromeHeight),
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                CanScroll = true,
+                Parent = container,
+            };
+
+            PositionChrome(container, w);
+
+            container.Resized += (_, __) =>
+            {
+                if (!_buildComplete)
+                {
+                    return;
+                }
+
+                PositionChrome(container, container.ContentRegion.Width);
+                RefitRows();
+            };
+
+            // Build() runs on a ThreadPool thread; every control touch
+            // below lands on the main thread, and _buildComplete is set
+            // inside the same queued callback so no entry point can
+            // observe a half-built tab.
+            MainThreadMarshal.Run(() =>
+            {
+                RebuildRows();
+
+                // A tab switch during a re-solve rebuilds the chrome from
+                // scratch, so the in-flight state has to be restamped.
+                if (_isResolving)
+                {
+                    _spinner.Visible = true;
+                    SetControlsEnabled(false);
+                }
+
+                _buildComplete = true;
+            });
+        }
+
+        /// <summary>
+        /// Re-reads the index and rebuilds the list. Called on tab switch
+        /// and (via MainThreadMarshal) after a capture lands while the tab
+        /// is live. No-ops until Build has completed.
+        /// </summary>
+        public void Refresh()
+        {
+            if (!_buildComplete || !IsLive)
+            {
+                return;
+            }
+
+            RebuildRows();
+
+            if (_isResolving)
+            {
+                _spinner.Visible = true;
+                SetControlsEnabled(false);
+            }
+        }
+
+        public void Teardown()
+        {
+            try
+            {
+                _resolveCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            _resizeSettle.Cancel();
+        }
+
+        private bool IsLive => _contentPanel != null && _contentPanel.Parent != null;
+
+        // ---------------------------------------------------------------
+        // Chrome
+        // ---------------------------------------------------------------
+        private void BuildSectionBand(Container container, int width)
+        {
+            _headerPanel = new Panel
+            {
+                Size = new Point(width, SectionBandHeight),
+                Parent = container,
+            };
+
+            new Label
+            {
+                Font = UiFonts.SectionTitle,
+                Text = "Plan History",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(PlanHistoryRowLayout.Inset, SectionTitleY),
+                Parent = _headerPanel,
+            };
+
+            _headerDivider = new Panel
+            {
+                Size = new Point(Math.Max(0, width - ScrollbarAllowance), 2),
+                Location = new Point(0, SectionBandHeight - 3),
+                BackgroundColor = SectionDividerColor,
+                Parent = _headerPanel,
+            };
+        }
+
+        private void BuildToolbar(Container container, int width)
+        {
+            _toolbarPanel = new Panel
+            {
+                Size = new Point(width, ToolbarHeight),
+                Location = new Point(0, SectionBandHeight),
+                Parent = container,
+            };
+
+            _statusLabel = new Label
+            {
+                Font = UiFonts.Status,
+                Text = "",
+                AutoSizeWidth = false,
+                AutoSizeHeight = true,
+                TextColor = StatusColor,
+                Location = new Point(PlanHistoryRowLayout.Inset, 8),
+                Parent = _toolbarPanel,
+            };
+
+            _spinner = InlineSpinner.Create(_toolbarPanel, InlineSpinnerLayout.SnapshotStatusSize);
+
+            _clearButton = new FeedbackButton
+            {
+                Text = "Clear History",
+                Size = new Point(ClearButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(0, 6),
+                Parent = _toolbarPanel,
+            };
+            TooltipFacility.ApplyPlain(_clearButton, "Remove every unpinned entry. Pinned entries are kept.");
+            _clearButton.Click += (_, __) => OnClearHistoryClicked();
+        }
+
+        private void BuildColumnHeader(Container container, int width)
+        {
+            _columnHeaderPanel = new Panel
+            {
+                Size = new Point(width, ColumnHeaderRowHeight),
+                Location = new Point(0, SectionBandHeight + ToolbarHeight),
+                BackgroundColor = TableHeaderStyle.BandColor,
+                Parent = container,
+            };
+
+            foreach (string text in new[] { "Plan", "Cost", "Generated" })
+            {
+                _columnHeaderLabels.Add(new Label
+                {
+                    Font = TableHeaderStyle.Font,
+                    TextColor = TableHeaderStyle.LabelColor,
+                    Text = text,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(0, ColumnHeaderLabelY),
+                    Parent = _columnHeaderPanel,
+                });
+            }
+        }
+
+        private void PositionChrome(Container container, int width)
+        {
+            int height = container.ContentRegion.Height;
+            int barWidth = Math.Max(0, width - ScrollbarAllowance);
+
+            _headerPanel.Size = new Point(width, SectionBandHeight);
+            _headerDivider.Size = new Point(barWidth, 2);
+            _toolbarPanel.Size = new Point(width, ToolbarHeight);
+            _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);
+
+            _clearButton.Location = new Point(
+                Math.Max(0, barWidth - PlanHistoryRowLayout.Inset - ClearButtonWidth),
+                _clearButton.Location.Y);
+
+            int statusRight = _clearButton.Location.X - InlineSpinnerLayout.SnapshotStatusSize
+                - 2 * InlineSpinnerLayout.LabelGap;
+            _statusLabel.Width = Math.Max(0, statusRight - PlanHistoryRowLayout.Inset);
+            InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
+
+            PositionColumnHeader(barWidth);
+
+            _contentPanel.Size = new Point(width, Math.Max(0, height - TopChromeHeight));
+            _contentPanel.Location = new Point(0, TopChromeHeight);
+        }
+
+        private void PositionColumnHeader(int barWidth)
+        {
+            var bands = BandsFor(barWidth);
+
+            SetHeaderLabel(0, bands.IconX);
+            SetHeaderLabelRight(1, bands.CostRightEdge);
+            SetHeaderLabelRight(2, bands.WhenX + bands.WhenWidth);
+        }
+
+        private void SetHeaderLabel(int index, int x)
+        {
+            if (index < _columnHeaderLabels.Count)
+            {
+                _columnHeaderLabels[index].Location = new Point(x, ColumnHeaderLabelY);
+            }
+        }
+
+        private void SetHeaderLabelRight(int index, int rightEdge)
+        {
+            if (index >= _columnHeaderLabels.Count)
+            {
+                return;
+            }
+
+            var label = _columnHeaderLabels[index];
+            label.Location = new Point(Math.Max(0, rightEdge - label.Width), ColumnHeaderLabelY);
+        }
+
+        // ---------------------------------------------------------------
+        // Rows
+        // ---------------------------------------------------------------
+        private class RenderedRow
+        {
+            public PlanHistoryEntry Entry;
+            public string FullLabel;
+            public bool LabelShortened;
+            public Panel Panel;
+            public IconNameRowHelpers.IconNameHandle IconName;
+            public CoinCurrencyRenderer.ValueCellHandle CostCell;
+            public Label WhenLabel;
+            public FeedbackButton View;
+            public FeedbackButton Open;
+            public FeedbackButton Resolve;
+            public FeedbackButton Pin;
+            public FeedbackButton Delete;
+            public Panel DetailPanel;
+            public readonly List<Label> DetailFlexLabels = new List<Label>();
+            public readonly List<string> DetailFlexFulls = new List<string>();
+        }
+
+        private void RebuildRows()
+        {
+            if (_contentPanel == null)
+            {
+                return;
+            }
+
+            _contentPanel.ClearChildren();
+            _rows.Clear();
+
+            int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
+            _lastLayoutWidth = _contentPanel.Width;
+
+            var entries = PlanHistoryRetention.SortForDisplay(_snapshotEntries());
+
+            // Drop a stale expansion whose row is gone (deleted/evicted).
+            if (_expandedEntryId != null
+                && entries.FindIndex(e => string.Equals(e.EntryId, _expandedEntryId, StringComparison.Ordinal)) < 0)
+            {
+                _expandedEntryId = null;
+            }
+
+            MeasureBandWidths(entries);
+
+            if (entries.Count == 0)
+            {
+                BuildEmptyState();
+            }
+            else
+            {
+                var bands = BandsFor(barWidth);
+                foreach (var entry in entries)
+                {
+                    _rows.Add(CreateRow(entry, barWidth, bands));
+                }
+            }
+
+            _clearButton.Enabled = !_isResolving && entries.Count > 0;
+            UpdateStatusLine();
+        }
+
+        private void BuildEmptyState()
+        {
+            // Wrapped in a Panel because the FlowPanel owns its direct
+            // children's positions - a bare Label's (8, 8) would be
+            // overridden by the flow.
+            int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
+            var panel = new Panel
+            {
+                Size = new Point(barWidth, 44),
+                Parent = _contentPanel,
+            };
+
+            new Label
+            {
+                Font = UiFonts.Body,
+                Text = EmptyStateText,
+                TextColor = DimColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(8, 8),
+                Parent = panel,
+            };
+        }
+
+        /// <summary>
+        /// Widest coin cell and widest timestamp across the whole table.
+        /// Pure measurement, no controls built.
+        /// </summary>
+        private void MeasureBandWidths(IReadOnlyList<PlanHistoryEntry> entries)
+        {
+            var measure = LabelHelpers.MeasureWith(UiFonts.Body);
+            int cost = 0;
+            int when = 0;
+            foreach (var entry in entries)
+            {
+                int costWidth = CoinCurrencyRenderer.MeasureValueWidth(
+                    entry.TotalCoinCostAtGeneration, null, UiFonts.Body);
+                if (costWidth > cost)
+                {
+                    cost = costWidth;
+                }
+
+                int whenWidth = measure(WhenText(entry));
+                if (whenWidth > when)
+                {
+                    when = whenWidth;
+                }
+            }
+
+            _costBandWidth = cost;
+            _whenBandWidth = when;
+        }
+
+        private PlanHistoryRowLayout.Bands BandsFor(int barWidth)
+        {
+            return PlanHistoryRowLayout.Compute(barWidth, _costBandWidth, _whenBandWidth);
+        }
+
+        private static string WhenText(PlanHistoryEntry entry)
+        {
+            return entry.LastGeneratedAtUtc.ToLocalTime()
+                .ToString(StatusText.TimestampFormat, CultureInfo.InvariantCulture);
+        }
+
+        private RenderedRow CreateRow(PlanHistoryEntry entry, int barWidth, in PlanHistoryRowLayout.Bands bands)
+        {
+            var row = new RenderedRow
+            {
+                Entry = entry,
+                FullLabel = PlanHistoryLabels.RowLabel(entry),
+            };
+
+            row.Panel = new Panel
+            {
+                Size = new Point(barWidth, PlanHistoryRowLayout.RowHeight),
+                Parent = _contentPanel,
+            };
+
+            var firstSummary = FirstSummary(entry);
+            row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
+                row.Panel, firstSummary?.IconUrl, firstSummary?.Rarity,
+                bands.IconX, 5, row.FullLabel, UiFonts.Body,
+                bands.NameX + bands.NameWidth, 0, 0, bands.NameX, 12);
+            ApplyRowTooltip(row);
+
+            row.CostCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
+                row.Panel, entry.TotalCoinCostAtGeneration, null, bands.CostRightEdge, 12, UiFonts.Body);
+
+            row.WhenLabel = LabelHelpers.CreateRightAlignedLabel(
+                row.Panel, WhenText(entry), UiFonts.Body, StatusColor,
+                bands.WhenX + bands.WhenWidth, 12);
+
+            row.View = CreateActionButton(row.Panel, "View", bands.ViewX,
+                "Show what this plan cost when it was generated. Nothing is recalculated.");
+            row.View.Click += (_, __) => ToggleDetail(entry.EntryId);
+
+            if (entry.BlobPresent)
+            {
+                row.Open = CreateActionButton(row.Panel, "Open", bands.OpenX,
+                    "Load this exact saved plan into the Crafting Plan tab, with its decision pills, "
+                        + "at the prices it was generated with. Replaces the plan currently shown there.");
+                row.Open.Click += (_, __) => OnOpenClicked(entry);
+            }
+            else
+            {
+                // Open is hidden, not disabled - the remaining buttons
+                // re-pack so no dead slot sits in the cluster; View takes
+                // the Open slot, staying adjacent to Re-solve.
+                row.View.Location = new Point(bands.OpenX, row.View.Location.Y);
+            }
+
+            row.Resolve = CreateActionButton(row.Panel, "Re-solve", bands.ResolveX,
+                "Run this same request again at current prices and show it in the Crafting Plan tab. "
+                    + "Replaces the plan currently shown there. Manual decision overrides are not restored.");
+            row.Resolve.Click += (_, __) => OnResolveClicked(entry);
+
+            row.Pin = CreateIconButton(row.Panel, entry.Pinned ? "\u25CF" : "\u25CB", bands.PinX,
+                entry.Pinned
+                    ? "Unpin this entry."
+                    : "Pin this entry so it is never removed automatically.");
+            row.Pin.Click += (_, __) => OnPinClicked(entry);
+
+            row.Delete = CreateIconButton(row.Panel, "\u2715", bands.DeleteX,
+                "Remove this entry from the history.");
+            row.Delete.Click += (_, __) => OnDeleteClicked(entry);
+
+            if (_isResolving)
+            {
+                SetRowEnabled(row, false);
+            }
+
+            if (string.Equals(_expandedEntryId, entry.EntryId, StringComparison.Ordinal))
+            {
+                row.DetailPanel = BuildDetailPanel(row, entry, barWidth, bands);
+            }
+
+            return row;
+        }
+
+        private static PlanHistoryItemSummary FirstSummary(PlanHistoryEntry entry)
+        {
+            if (entry.ItemSummaries == null)
+            {
+                return null;
+            }
+
+            foreach (var summary in entry.ItemSummaries)
+            {
+                if (summary != null)
+                {
+                    return summary;
+                }
+            }
+
+            return null;
+        }
+
+        private void ApplyRowTooltip(RenderedRow row)
+        {
+            var entry = row.Entry;
+            var itemLines = PlanHistoryLabels.ItemLineTexts(entry);
+            bool nameShortened = !string.Equals(row.IconName.NameLabel.Text, row.FullLabel, StringComparison.Ordinal);
+            row.LabelShortened = nameShortened || itemLines.Count > 3;
+
+            string tooltip = null;
+            if (row.LabelShortened)
+            {
+                var lines = new List<string>(itemLines);
+                if (entry.OverrideCountAtGeneration > 0)
+                {
+                    lines.Add(StatusText.ForOverridesChip(entry.OverrideCountAtGeneration));
+                }
+
+                if (entry.IgnoredCountAtGeneration > 0)
+                {
+                    lines.Add(StatusText.ForIgnoredChip(entry.IgnoredCountAtGeneration));
+                }
+
+                tooltip = string.Join("\n", lines);
+            }
+
+            // Stamped on every control in the row's name band - Blish
+            // resolves the tooltip on the control under the mouse and does
+            // not bubble.
+            TooltipFacility.ApplyPlain(row.Panel, tooltip);
+            TooltipFacility.ApplyPlain(row.IconName.NameLabel, tooltip);
+            IconControls.ApplyPlainToIconTree(row.IconName.IconFrame, tooltip);
+        }
+
+        private FeedbackButton CreateActionButton(Panel parent, string text, int x, string tooltip)
+        {
+            var button = new FeedbackButton
+            {
+                Text = text,
+                Size = new Point(PlanHistoryRowLayout.ActionButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(x, 8),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(button, tooltip);
+            return button;
+        }
+
+        private FeedbackButton CreateIconButton(Panel parent, string glyph, int x, string tooltip)
+        {
+            var button = new FeedbackButton
+            {
+                Text = glyph,
+                Size = new Point(PlanHistoryRowLayout.IconButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(x, 8),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(button, tooltip);
+            return button;
+        }
+
+        // ---------------------------------------------------------------
+        // Detail panel
+        // ---------------------------------------------------------------
+        private Panel BuildDetailPanel(
+            RenderedRow row, PlanHistoryEntry entry, int barWidth, in PlanHistoryRowLayout.Bands bands)
+        {
+            var itemLines = PlanHistoryLabels.ItemLineTexts(entry);
+            bool hasChips = entry.OverrideCountAtGeneration > 0 || entry.IgnoredCountAtGeneration > 0;
+            bool hasBlobNote = !entry.BlobPresent;
+            bool hasOverridesNote = entry.OverrideCountAtGeneration > 0;
+            long sampleDelta = SampleDelta(entry, out DateTime previousSampleAtUtc);
+            bool hasSampleLine = sampleDelta != 0;
+
+            int height = PlanHistoryRowLayout.DetailHeight(
+                itemLines.Count, hasChips, hasSampleLine, hasBlobNote, hasOverridesNote);
+
+            // A direct sibling inserted after the row inside the same
+            // FlowPanel, so the flow handles the reflow.
+            var panel = new Panel
+            {
+                Size = new Point(barWidth, height),
+                Parent = _contentPanel,
+            };
+
+            int rightEdge = Math.Max(0, barWidth - PlanHistoryRowLayout.Inset);
+            int x = bands.NameX;
+            int y = 6;
+
+            var summaries = entry.ItemSummaries ?? new List<PlanHistoryItemSummary>();
+            int line = 0;
+            foreach (var summary in summaries)
+            {
+                if (summary == null)
+                {
+                    continue;
+                }
+
+                IconControls.CreateItemIcon(
+                    panel, summary.IconUrl, summary.Rarity, x, y,
+                    iconSize: DetailIconSize, borderThickness: 1);
+
+                int textX = x + DetailIconSize + 2 + 8;
+                string full = line < itemLines.Count ? itemLines[line] : "";
+                AddFlexLabel(row, panel, full, UiFonts.Body, textX, y + 1, rightEdge);
+                y += PlanHistoryRowLayout.DetailItemLineHeight;
+                line++;
+            }
+
+            AddFlexLabel(
+                row, panel,
+                PlanHistoryLabels.SettingsLine(entry.UseOwnMaterials, entry.PriceBasis, entry.ValueOwnMaterials),
+                UiFonts.Caption, x, y + 3, rightEdge);
+            y += PlanHistoryRowLayout.DetailSettingsLineHeight;
+
+            if (hasChips)
+            {
+                int chipX = x;
+                if (entry.OverrideCountAtGeneration > 0)
+                {
+                    string chipText = StatusText.ForOverridesChip(entry.OverrideCountAtGeneration);
+                    var chip = LabelHelpers.CreateSmallTag(panel, chipText, chipX, y, DimColor, DimColor * 0.15f);
+                    chipX += LabelHelpers.MeasureSmallTagWidth(chipText) + TreeChipStripLayout.ChipGap;
+                }
+
+                if (entry.IgnoredCountAtGeneration > 0)
+                {
+                    LabelHelpers.CreateSmallTag(
+                        panel, StatusText.ForIgnoredChip(entry.IgnoredCountAtGeneration),
+                        chipX, y, DimColor, DimColor * 0.15f);
+                }
+
+                y += PlanHistoryRowLayout.DetailChipsLineHeight;
+            }
+
+            AddFlexLabel(
+                row, panel,
+                StatusText.Stamp("Generated", entry.CreatedAtUtc.ToLocalTime()),
+                UiFonts.Caption, x, y + 2, rightEdge);
+            y += PlanHistoryRowLayout.DetailCaptionLineHeight;
+
+            if (hasSampleLine)
+            {
+                BuildSampleLine(panel, sampleDelta, previousSampleAtUtc, x, y + 2);
+                y += PlanHistoryRowLayout.DetailNoteLineHeight;
+            }
+
+            if (hasBlobNote)
+            {
+                AddFlexLabel(
+                    row, panel, "Not saved in full - Re-solve to rebuild it.",
+                    UiFonts.Caption, x, y + 2, rightEdge);
+                y += PlanHistoryRowLayout.DetailNoteLineHeight;
+            }
+
+            if (hasOverridesNote)
+            {
+                AddFlexLabel(
+                    row, panel,
+                    StatusText.ForOverridesChip(entry.OverrideCountAtGeneration)
+                        + " - restored by Open, not by Re-solve.",
+                    UiFonts.Caption, x, y + 2, rightEdge);
+            }
+
+            return panel;
+        }
+
+        private void AddFlexLabel(
+            RenderedRow row, Panel panel, string full, BitmapFont font,
+            int x, int y, int rightEdge)
+        {
+            string shown = LabelHelpers.EllipsizeToWidth(font, full, Math.Max(0, rightEdge - x));
+            var label = new Label
+            {
+                Font = font,
+                Text = shown,
+                TextColor = font == UiFonts.Caption ? DimColor : StatusColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x, y),
+                Parent = panel,
+            };
+            TooltipFacility.ApplyPlain(
+                label, string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+            row.DetailFlexLabels.Add(label);
+            row.DetailFlexFulls.Add(full);
+        }
+
+        /// <summary>
+        /// Newest sample minus the one before it; 0 when there are fewer
+        /// than two samples or the costs match (the line is omitted).
+        /// </summary>
+        private static long SampleDelta(PlanHistoryEntry entry, out DateTime previousSampleAtUtc)
+        {
+            previousSampleAtUtc = default(DateTime);
+            var samples = entry.CostSamples;
+            if (samples == null || samples.Count < 2)
+            {
+                return 0;
+            }
+
+            var newest = samples[samples.Count - 1];
+            var previous = samples[samples.Count - 2];
+            if (newest == null || previous == null)
+            {
+                return 0;
+            }
+
+            previousSampleAtUtc = previous.TimestampUtc;
+            return newest.TotalCoinCost - previous.TotalCoinCost;
+        }
+
+        private void BuildSampleLine(Panel panel, long delta, DateTime previousSampleAtUtc, int x, int y)
+        {
+            long magnitude = Math.Abs(delta);
+            var segments = CoinCurrencyRenderer.BuildCoinSegments(magnitude, UiFonts.Caption);
+            CoinCurrencyRenderer.LayoutCoinSegments(panel, segments, x, y, UiFonts.Caption);
+            int coinWidth = CoinCurrencyRenderer.TotalCoinSegmentsWidth(segments);
+
+            string suffix = (delta < 0 ? " cheaper than " : " dearer than ")
+                + StatusText.ForAgeAgo(DateTime.UtcNow - previousSampleAtUtc);
+            new Label
+            {
+                Font = UiFonts.Caption,
+                Text = suffix,
+                TextColor = DimColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x + coinWidth + 4, y),
+                Parent = panel,
+            };
+        }
+
+        // ---------------------------------------------------------------
+        // Refit
+        // ---------------------------------------------------------------
+        private void RefitRows()
+        {
+            if (!IsLive || _contentPanel.Width == _lastLayoutWidth)
+            {
+                return;
+            }
+
+            RefitEveryRow(measureText: false);
+            _resizeSettle.Schedule();
+        }
+
+        private void RefitAfterResizeSettle()
+        {
+            if (!IsLive)
+            {
+                return;
+            }
+
+            RefitEveryRow(measureText: true);
+        }
+
+        private void RefitEveryRow(bool measureText)
+        {
+            int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
+            _lastLayoutWidth = _contentPanel.Width;
+
+            var bands = BandsFor(barWidth);
+            int rightEdge = Math.Max(0, barWidth - PlanHistoryRowLayout.Inset);
+
+            _contentPanel.SuspendLayout();
+            try
+            {
+                foreach (var row in _rows)
+                {
+                    LayoutRow(row, bands, rightEdge, measureText);
+                }
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
+            }
+
+            PositionColumnHeader(barWidth);
+        }
+
+        private void LayoutRow(
+            RenderedRow row, in PlanHistoryRowLayout.Bands bands, int rightEdge, bool measureText)
+        {
+            row.Panel.Size = new Point(bands.RowWidth, row.Panel.Height);
+
+            if (measureText)
+            {
+                if (IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
+                        bands.NameX + bands.NameWidth, 0, 0))
+                {
+                    ApplyRowTooltip(row);
+                }
+            }
+
+            row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
+            row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
+
+            CoinCurrencyRenderer.RepositionValueCellRightAligned(row.CostCell, bands.CostRightEdge, 12);
+            row.WhenLabel.Location = new Point(
+                Math.Max(0, bands.WhenX + bands.WhenWidth - row.WhenLabel.Width), 12);
+
+            row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, 8);
+            if (row.Open != null)
+            {
+                row.Open.Location = new Point(bands.OpenX, 8);
+            }
+
+            row.Resolve.Location = new Point(bands.ResolveX, 8);
+            row.Pin.Location = new Point(bands.PinX, 8);
+            row.Delete.Location = new Point(bands.DeleteX, 8);
+
+            if (row.DetailPanel != null)
+            {
+                row.DetailPanel.Size = new Point(bands.RowWidth, row.DetailPanel.Height);
+                if (measureText)
+                {
+                    for (int i = 0; i < row.DetailFlexLabels.Count; i++)
+                    {
+                        var label = row.DetailFlexLabels[i];
+                        string full = row.DetailFlexFulls[i];
+                        string shown = LabelHelpers.EllipsizeToWidth(
+                            label.Font, full, Math.Max(0, rightEdge - label.Location.X));
+                        if (!string.Equals(label.Text, shown, StringComparison.Ordinal))
+                        {
+                            label.Text = shown;
+                            TooltipFacility.ApplyPlain(
+                                label, string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Actions
+        // ---------------------------------------------------------------
+        private void ToggleDetail(string entryId)
+        {
+            _expandedEntryId = string.Equals(_expandedEntryId, entryId, StringComparison.Ordinal)
+                ? null
+                : entryId;
+            RebuildRows();
+        }
+
+        private void OnOpenClicked(PlanHistoryEntry entry)
+        {
+            if (_isResolving)
+            {
+                return;
+            }
+
+            bool opened = _openEntry(entry);
+            if (!opened)
+            {
+                SetStatus(
+                    "That saved plan could not be loaded - use Re-solve to rebuild it at current prices.",
+                    isError: false);
+
+                // The failed load cleared BlobPresent on the row - rebuild
+                // so Open disappears and the note shows.
+                RebuildRows();
+            }
+        }
+
+        private void OnResolveClicked(PlanHistoryEntry entry)
+        {
+            if (_isResolving || _resolveEntryAsync == null)
+            {
+                return;
+            }
+
+            _isResolving = true;
+            var cts = new CancellationTokenSource();
+            _resolveCts = cts;
+
+            SetControlsEnabled(false);
+            _spinner.Visible = true;
+            SetStatus("Re-solving...", isError: false);
+
+            Task.Run(async () =>
+            {
+                string failure = null;
+                bool cancelled = false;
+                try
+                {
+                    failure = await _resolveEntryAsync(entry, cts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled = true;
+                }
+                catch (Exception ex)
+                {
+                    failure = ex.Message;
+                    Logger.Warn(ex, "Plan History re-solve failed");
+                }
+
+                MainThreadMarshal.Run(() => FinishResolve(failure, cancelled));
+            });
+        }
+
+        private void FinishResolve(string failure, bool cancelled)
+        {
+            _isResolving = false;
+
+            if (cancelled)
+            {
+                _statusOverride = null;
+            }
+            else if (failure != null)
+            {
+                _statusOverride = StatusText.ForGenerationFailure(failure);
+                _statusIsError = true;
+            }
+            else
+            {
+                _statusOverride = "Re-solved - see the Crafting Plan tab";
+                _statusIsError = false;
+            }
+
+            if (!_buildComplete || !IsLive)
+            {
+                return;
+            }
+
+            _spinner.Visible = false;
+
+            // The re-solve's capture bumped the row (cost, stamp, sample),
+            // so rebuild rather than merely re-enabling.
+            RebuildRows();
+        }
+
+        private void OnPinClicked(PlanHistoryEntry entry)
+        {
+            if (_isResolving)
+            {
+                return;
+            }
+
+            string entryId = entry.EntryId;
+            bool saved = MutateEntries(index =>
+            {
+                var target = index.Entries.Find(
+                    e => e != null && string.Equals(e.EntryId, entryId, StringComparison.Ordinal));
+                if (target != null)
+                {
+                    target.Pinned = !target.Pinned;
+                }
+            });
+
+            RebuildRows();
+            if (!saved)
+            {
+                SetStatus("Plan History could not be saved - see the Log tab.", isError: true);
+            }
+        }
+
+        private void OnDeleteClicked(PlanHistoryEntry entry)
+        {
+            if (_isResolving)
+            {
+                return;
+            }
+
+            // No dialog: single-row deletion is low-friction and
+            // recoverable by re-generating.
+            string entryId = entry.EntryId;
+            bool saved = MutateEntries(index => index.Entries.RemoveAll(
+                e => e != null && string.Equals(e.EntryId, entryId, StringComparison.Ordinal)));
+
+            RebuildRows();
+            SetStatus(saved ? "Entry deleted" : "Plan History could not be saved - see the Log tab.",
+                isError: !saved);
+        }
+
+        private void OnClearHistoryClicked()
+        {
+            if (_isResolving || _modalDialog == null)
+            {
+                return;
+            }
+
+            _modalDialog.Show(
+                "This removes every unpinned entry from Plan History. Continue?",
+                ClearUnpinnedEntries,
+                null,
+                "Clear");
+        }
+
+        private void ClearUnpinnedEntries()
+        {
+            int removed = 0;
+            int pinnedKept = 0;
+            bool saved = MutateEntries(index =>
+            {
+                removed = index.Entries.RemoveAll(e => e == null || !e.Pinned);
+                pinnedKept = index.Entries.Count;
+            });
+
+            RebuildRows();
+
+            if (!saved)
+            {
+                SetStatus("Plan History could not be saved - see the Log tab.", isError: true);
+                return;
+            }
+
+            string text = StatusText.Count(removed, "plan") + " removed";
+            if (pinnedKept > 0)
+            {
+                text += " - " + StatusText.Count(pinnedKept, "pinned plan") + " kept";
+            }
+
+            SetStatus(text, isError: false);
+        }
+
+        /// <summary>
+        /// Runs one index mutation through the Module-owned delegate.
+        /// Returns false when the mutation could not be persisted (the
+        /// in-memory index keeps the change either way, so the UI never
+        /// lies about what the user just did).
+        /// </summary>
+        private bool MutateEntries(Action<PlanHistoryIndex> mutation)
+        {
+            try
+            {
+                _mutateIndex(mutation);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Plan History index mutation failed");
+                return false;
+            }
+        }
+
+        private void SetControlsEnabled(bool enabled)
+        {
+            if (_clearButton != null)
+            {
+                _clearButton.Enabled = enabled && _rows.Count > 0;
+            }
+
+            foreach (var row in _rows)
+            {
+                SetRowEnabled(row, enabled);
+            }
+        }
+
+        private static void SetRowEnabled(RenderedRow row, bool enabled)
+        {
+            row.View.Enabled = enabled;
+            if (row.Open != null)
+            {
+                row.Open.Enabled = enabled;
+            }
+
+            row.Resolve.Enabled = enabled;
+            row.Pin.Enabled = enabled;
+            row.Delete.Enabled = enabled;
+        }
+
+        // ---------------------------------------------------------------
+        // Status line
+        // ---------------------------------------------------------------
+        private void SetStatus(string text, bool isError)
+        {
+            _statusOverride = text;
+            _statusIsError = isError;
+            ApplyStatusText(text, isError);
+        }
+
+        private void UpdateStatusLine()
+        {
+            if (_statusOverride != null)
+            {
+                ApplyStatusText(_statusOverride, _statusIsError);
+                return;
+            }
+
+            int shown = _rows.Count;
+            if (shown == 0)
+            {
+                ApplyStatusText("", isError: false);
+                return;
+            }
+
+            int pinned = 0;
+            foreach (var row in _rows)
+            {
+                if (row.Entry.Pinned)
+                {
+                    pinned++;
+                }
+            }
+
+            int cap = _settings?.GetClampedPlanHistoryMaxEntries() ?? 25;
+            string text;
+            if (shown >= cap)
+            {
+                text = StatusText.Count(shown, "plan")
+                    + " kept (limit " + cap.ToString(CultureInfo.InvariantCulture)
+                    + ") - oldest unpinned entries are removed automatically";
+            }
+            else
+            {
+                text = StatusText.Count(shown, "plan") + " kept";
+                if (pinned > 0)
+                {
+                    text += " - " + pinned.ToString(CultureInfo.InvariantCulture) + " pinned";
+                }
+            }
+
+            ApplyStatusText(text, isError: false);
+        }
+
+        private void ApplyStatusText(string text, bool isError)
+        {
+            if (_statusLabel == null)
+            {
+                return;
+            }
+
+            string shown = LabelHelpers.EllipsizeToWidth(UiFonts.Status, text, Math.Max(0, _statusLabel.Width));
+            _statusLabel.Text = shown;
+            _statusLabel.TextColor = isError ? ErrorColor : StatusColor;
+            TooltipFacility.ApplyPlain(
+                _statusLabel, string.Equals(shown, text, StringComparison.Ordinal) ? null : text);
+            InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
+        }
+    }
+}
