@@ -10,13 +10,21 @@ namespace GW2CraftingHelper.Services
     /// Loads/saves the generated Crafting Plan tab's content so it
     /// survives a module
     /// close/reopen. Mirrors SnapshotStore's shape (single-file JSON,
-    /// atomic .tmp+Replace write) with one deliberate divergence: a
-    /// corrupt or old-schema file is NOT silently swallowed to null the
-    /// way SnapshotStore's Deserialize is - it is logged at Warn via
-    /// onError, same as every I/O failure below, before falling back to
-    /// null (see PlanStoreHelpers.DeserializePersistedPlan's own doc
-    /// comment). A missing file is still silent - "fresh start" with no
+    /// atomic .tmp+Replace write) with one deliberate divergence: an
+    /// unreadable file is NOT silently swallowed to null the
+    /// way SnapshotStore's Deserialize is - it is logged before falling
+    /// back to null (see PlanStoreHelpers.DeserializePersistedPlan's own
+    /// doc comment). A missing file is still silent - "fresh start" with no
     /// plan is the ordinary first-run case, not a failure.
+    /// <para>
+    /// Two unreadable-file verdicts, two severities, because merging them
+    /// once cost a full forensic investigation (2026-08-23): a corrupt or
+    /// otherwise unparseable file goes to onError (Warn, same as every I/O
+    /// failure below), while a file written at an older SHIPPED schema
+    /// version - expected, benign, and repaired by the next Generate - goes
+    /// to onInfo (Info). Any caller wiring one and not the other silently
+    /// drops half the story.
+    /// </para>
     /// <para>
     /// Unlike SnapshotStore/StatusStore (whose callers are already
     /// serialized by a higher-level in-flight guard - see Module's own
@@ -57,6 +65,12 @@ namespace GW2CraftingHelper.Services
         // matching field comment.
         private readonly Action<string, Exception> _onError;
 
+        // The benign counterpart of _onError, unique to this store: it
+        // carries the one load outcome that is neither a failure nor
+        // silent. Severity lives at the wiring site (Module.cs), same as
+        // _onError - the store itself stays logging-framework-free.
+        private readonly Action<string> _onInfo;
+
         // Serializes Save only - see this class's own doc comment for why
         // (two genuinely independent callers, unlike every other store in
         // this module). LoadLatest needs no lock: the atomic .tmp+Replace
@@ -66,10 +80,14 @@ namespace GW2CraftingHelper.Services
         // place.
         private readonly object _saveLock = new object();
 
-        public PlanStore(string dataDirectoryPath, Action<string, Exception> onError = null)
+        public PlanStore(
+            string dataDirectoryPath,
+            Action<string, Exception> onError = null,
+            Action<string> onInfo = null)
         {
             _filePath = Path.Combine(dataDirectoryPath, "plan.json");
             _onError = onError;
+            _onInfo = onInfo;
         }
 
         public PersistedPlan LoadLatest()
@@ -84,6 +102,14 @@ namespace GW2CraftingHelper.Services
                 byte[] bytes = File.ReadAllBytes(_filePath);
                 string json = IsGzip(bytes) ? DecompressToJson(bytes) : Encoding.UTF8.GetString(bytes);
                 return Deserialize(json);
+            }
+            catch (PlanSchemaVersionMismatchException ex)
+            {
+                // Deliberately NOT routed through _onError: nothing failed.
+                // The message already names both versions and says what
+                // happens next, so it needs no "Failed to load" framing.
+                _onInfo?.Invoke(ex.Message);
+                return null;
             }
             catch (Exception ex)
             {

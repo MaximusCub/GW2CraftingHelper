@@ -339,9 +339,17 @@ namespace GW2CraftingHelper
             Action<string, Exception> onStoreError = (message, ex) =>
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "store", $"{message}: {ex.GetType().Name} - {ex.Message}");
 
+            // PlanStore alone also reports a non-failure: a saved plan
+            // written by a build at an older shipped schema version. It is
+            // expected, benign and repaired by the next Generate, so it
+            // must read as routine in the log rather than as damage - see
+            // PlanStore's own doc comment.
+            Action<string> onStoreInfo = message =>
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "store", message);
+
             _snapshotStore = new SnapshotStore(dataDir, onStoreError);
             _statusStore = new StatusStore(dataDir, onStoreError);
-            _planStore = new PlanStore(dataDir, onStoreError);
+            _planStore = new PlanStore(dataDir, onStoreError, onStoreInfo);
             _snapshotService = new Gw2AccountSnapshotService(Gw2ApiManager);
             _lastStatus = _statusStore.Load();
 
@@ -1069,9 +1077,10 @@ namespace GW2CraftingHelper
             // is only ever pushed to from Update(), never touched directly
             // here (see Update()'s own "Applying restored plan to view"
             // block). A missing file is silent (LoadLatest returns null,
-            // nothing to restore); a corrupt/old-schema file already
-            // logged its own Warn inside PlanStore.LoadLatest - either way
-            // this is a no-op fresh start, never a crash.
+            // nothing to restore); an unreadable file already logged inside
+            // PlanStore.LoadLatest (Warn if corrupt, Info if merely written
+            // by another schema version) - either way this is a no-op fresh
+            // start, never a crash.
             var loadedPlan = _planStore.LoadLatest();
             if (loadedPlan != null)
             {

@@ -23,10 +23,9 @@ namespace GW2CraftingHelper.Services
     /// trims by SIZE on every call (cheap - one FileInfo.Length syscall),
     /// while <see cref="PruneOlderThan"/> is meant to be called once per
     /// session (Module.LoadAsync) for the AGE-based check. Both use the
-    /// same atomic .tmp + File.Replace rewrite StatusStore.Save and
-    /// VendorOfferStore.SaveOverlay already use (NOT SnapshotStore's own
-    /// pre-fix File.WriteAllText - see SnapshotStore's own updated doc
-    /// comment for that correction).
+    /// same atomic .tmp + File.Replace rewrite every other store in the
+    /// module shares (SnapshotStore.Save, StatusStore.Save, PlanStore.Save,
+    /// VendorOfferStore.SaveOverlay).
     /// </para>
     /// <para>
     /// Blish-free (see ModuleLogEntry's own doc comment for why) and takes

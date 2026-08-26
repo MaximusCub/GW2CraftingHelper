@@ -37,6 +37,11 @@ namespace GW2CraftingHelper.Services
             }
         }
 
+        // Atomic .tmp+Replace write, matching SnapshotStore/PlanStore/
+        // VendorOfferStore/ModuleLogStore. Previously the .tmp was written
+        // and then File.Copy'd over the target, which truncates and rewrites
+        // it in place - a crash mid-copy left a partial status.txt, exactly
+        // what the temp file was there to prevent.
         public void Save(string status)
         {
             try
@@ -49,8 +54,15 @@ namespace GW2CraftingHelper.Services
 
                 string tmpPath = _filePath + ".tmp";
                 File.WriteAllText(tmpPath, status ?? "");
-                File.Copy(tmpPath, _filePath, true);
-                File.Delete(tmpPath);
+
+                if (File.Exists(_filePath))
+                {
+                    File.Replace(tmpPath, _filePath, null);
+                }
+                else
+                {
+                    File.Move(tmpPath, _filePath);
+                }
             }
             catch (Exception ex)
             {

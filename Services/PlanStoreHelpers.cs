@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
@@ -8,12 +9,13 @@ namespace GW2CraftingHelper.Services
     /// Serialization for plan persistence - mirrors SnapshotHelpers'
     /// shape, with two deliberate differences: (1) DeserializePersistedPlan
     /// does NOT swallow a parse/schema failure into a silent null itself.
-    /// A corrupt or old-schema
-    /// file requires a Warn log line (unlike snapshot.json's own
+    /// An unreadable file requires a log line (unlike snapshot.json's own
     /// silent-null precedent) - so this
     /// lets the exception propagate to PlanStore.LoadLatest's single
-    /// try/catch, which already logs via the same onError callback every
-    /// other store uses (see PlanStore.cs). (2) Compact (not Indented)
+    /// try/catch, which reports a corrupt file at Warn via the same onError
+    /// callback every other store uses and drift from an older SHIPPED
+    /// schema version at Info via its own onInfo callback (see PlanStore.cs).
+    /// (2) Compact (not Indented)
     /// formatting - see SerializePersistedPlan's own doc comment.
     /// </summary>
     internal static class PlanStoreHelpers
@@ -48,9 +50,12 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Deserializes a PersistedPlan from a JSON string. Returns null
         /// for null/whitespace input. Throws (does not swallow) for
-        /// malformed JSON, a schema too degraded to render safely (no
-        /// Result/Plan at all, or a SchemaVersion mismatch - see
-        /// PersistedPlan.CurrentSchemaVersion's own doc comment), or a
+        /// malformed JSON, a document too degraded to render safely (no
+        /// Result/Plan at all), a SchemaVersion mismatch (as
+        /// PlanSchemaVersionMismatchException for an older shipped version,
+        /// as InvalidDataException for an unrecorded (0) or newer-than-this-
+        /// build one - see PersistedPlan.CurrentSchemaVersion's own doc
+        /// comment), or a
         /// structurally-valid-but-degraded object graph (round 4 review-fix,
         /// critical - see PlanStructuralValidator's own doc comment) - see
         /// this class's own doc comment for why.
@@ -73,19 +78,58 @@ namespace GW2CraftingHelper.Services
                 json, new JsonSerializerSettings { MaxDepth = 512 });
 
             // A structurally valid but too-degraded-to-render object (e.g.
-            // an old schema missing the fields this feature actually needs,
-            // or a JSON document that happened to parse but was never a
-            // real PersistedPlan at all) must not be handed back as if it
-            // were usable - "never partially render".
-            // The SchemaVersion check is what makes
-            // this actually enforceable going forward: a future member
-            // rename/removal elsewhere on this graph would otherwise still
-            // pass the structural Result/Plan check below while coming back
-            // silently defaulted.
-            if (plan?.Result?.Plan == null || plan.SchemaVersion != PersistedPlan.CurrentSchemaVersion)
+            // a JSON document that happened to parse but was never a real
+            // PersistedPlan at all) must not be handed back as if it were
+            // usable - "never partially render".
+            //
+            // Damage and drift are two different verdicts and must never
+            // share one message: they were merged until 2026-08-23, when a
+            // routine rejection of an 8-day-old file logged as a possible
+            // corruption and took a forensic reconstruction to explain.
+            // Result/Plan has existed since schema 1, so a document without
+            // it was never a valid plan file at ANY version - that is
+            // damage, and only damage may say "corrupt". Checked first for
+            // exactly that reason.
+            if (plan?.Result?.Plan == null)
             {
                 throw new InvalidDataException(
-                    "Persisted plan is missing Result/Plan or has an unsupported SchemaVersion - corrupt or old-schema file.");
+                    "Persisted plan is missing Result/Plan - corrupt file.");
+            }
+
+            // Drift: a recognizable plan file written by another build at a
+            // version this one actually shipped. Expected, benign, and
+            // self-healing on the next Generate, so it carries its own
+            // exception type - PlanStore.LoadLatest reports it at Info, not
+            // Warn. The check is also what makes the tolerance contract
+            // enforceable going forward: a future member rename/removal
+            // elsewhere on this graph would otherwise pass the structural
+            // check above while coming back silently defaulted.
+            //
+            // Two versions are deliberately NOT drift and take the error
+            // channel instead, each with its own wording:
+            //   0 - never a shipped version. It is what Newtonsoft leaves
+            //       when the field is absent (PersistedPlan.SchemaVersion
+            //       carries no initializer precisely so absence stays
+            //       detectable), so it means either a file older than the
+            //       version gate itself or a construction site that forgot
+            //       to stamp it - a module defect whose every save is
+            //       silently unrestorable. Info would bury that.
+            //   anything else - a version this build never shipped, i.e.
+            //       above current (a newer build wrote it, and this one
+            //       cannot know what is in it) or negative (only a
+            //       hand-edited file reaches that).
+            int observed = plan.SchemaVersion;
+            int expected = PersistedPlan.CurrentSchemaVersion;
+            if (observed >= 1 && observed < expected)
+            {
+                throw new PlanSchemaVersionMismatchException(observed, expected);
+            }
+
+            if (observed != expected)
+            {
+                throw new InvalidDataException(observed == 0
+                    ? $"Persisted plan records no schema version at all, this build expects {expected} - it predates the version gate, or whatever wrote it never set PersistedPlan.SchemaVersion."
+                    : $"Persisted plan is schema {observed}, which this build ({expected}) never shipped - written by a newer build, or the field was damaged.");
             }
 
             // a single, class-level walk of
@@ -137,6 +181,29 @@ namespace GW2CraftingHelper.Services
                     root.IsPlanRoot = true;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// A recognizable plan file written by a build at an OLDER shipped
+    /// PersistedPlan.CurrentSchemaVersion (an unrecorded or newer version is
+    /// not this, and does not come here - see the throw site's own comment
+    /// in DeserializePersistedPlan). Kept distinct from the plain
+    /// InvalidDataException the corrupt/degraded paths throw so the ONE
+    /// caller that can tell a user anything - PlanStore.LoadLatest - can
+    /// report it as the routine, self-healing event it is (Info, no
+    /// "corrupt") rather than as damage. Derives straight from Exception
+    /// only because InvalidDataException is sealed on .NET Framework; every
+    /// other handler on this path is a catch-all, so it still degrades to
+    /// the same null + one log line. The message names both versions,
+    /// which is what the 2026-08-23 incident had to reconstruct from commit
+    /// timestamps.
+    /// </summary>
+    internal sealed class PlanSchemaVersionMismatchException : Exception
+    {
+        internal PlanSchemaVersionMismatchException(int observedVersion, int expectedVersion)
+            : base($"Saved plan file is schema {observedVersion}, this build expects {expectedVersion} - starting fresh.")
+        {
         }
     }
 }
