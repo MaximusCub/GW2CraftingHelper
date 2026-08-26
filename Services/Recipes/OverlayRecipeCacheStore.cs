@@ -21,7 +21,16 @@ namespace GW2CraftingHelper.Services.Recipes
 
         private readonly RecipeCacheStats _stats = new RecipeCacheStats();
         private readonly object _gate = new object();
-        private bool _dirty;
+
+        // Tracked per file, not as one flag: the two caches fill at very
+        // different rates (a session that learns a search learns no new
+        // recipe at all when the shipped seed already has them), and each
+        // rewrite is a whole-file write whether one entry changed or none.
+        private bool _searchesDirty;
+        private bool _recipesDirty;
+        private bool _stampDirty;
+
+        private bool IsDirty => _searchesDirty || _recipesDirty || _stampDirty;
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
 
@@ -58,6 +67,11 @@ namespace GW2CraftingHelper.Services.Recipes
             lock (_gate)
             {
                 _deferredDiskLoad = false;
+
+                // Every branch below replaces the maps with what disk holds,
+                // so anything put into them before this call is gone and must
+                // not be flushed back out.
+                ClearDirtyLocked();
 
                 if (!Directory.Exists(_cacheDir))
                 {
@@ -134,7 +148,7 @@ namespace GW2CraftingHelper.Services.Recipes
                     _searches = new Dictionary<int, IReadOnlyList<int>>();
                     _recipes = new Dictionary<int, RawRecipe>();
                     _storedBuildId = null;
-                    _dirty = false;
+                    ClearDirtyLocked();
                 }
             }
         }
@@ -235,7 +249,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 _storedBuildId = buildId;
-                _dirty = true;
+                _stampDirty = true;
             }
         }
 
@@ -272,7 +286,7 @@ namespace GW2CraftingHelper.Services.Recipes
             lock (_gate)
             {
                 _searches[outputItemId] = recipeIds;
-                _dirty = true;
+                _searchesDirty = true;
             }
         }
 
@@ -281,7 +295,7 @@ namespace GW2CraftingHelper.Services.Recipes
             lock (_gate)
             {
                 _recipes[recipeId] = recipe;
-                _dirty = true;
+                _recipesDirty = true;
             }
         }
 
@@ -289,7 +303,7 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             lock (_gate)
             {
-                if (!_dirty)
+                if (!IsDirty)
                 {
                     return;
                 }
@@ -298,7 +312,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 // this session's entries have no build id to be honestly
                 // stamped with, and persisting them would overwrite an
                 // overlay that has not even been read yet (_deferredDiskLoad).
-                // _dirty stays set, so a later resolve still flushes.
+                // The dirty flags stay set, so a later resolve still flushes.
                 if (_deferredDiskLoad)
                 {
                     return;
@@ -314,7 +328,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 PersistLocked();
-                _dirty = false;
+                ClearDirtyLocked();
                 _lastFlushUtc = DateTime.UtcNow;
             }
         }
@@ -325,15 +339,21 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 Directory.CreateDirectory(_cacheDir);
 
-                // Write searches
-                string searchJson = RecipeCacheSerializer.SerializeSearches(_searches);
-                AtomicWrite(_searchPath, searchJson);
+                if (_searchesDirty)
+                {
+                    string searchJson = RecipeCacheSerializer.SerializeSearches(_searches);
+                    AtomicWrite(_searchPath, searchJson);
+                }
 
-                // Write recipes
-                string recipeJson = RecipeCacheSerializer.SerializeRecipes(_recipes);
-                AtomicWrite(_recipesPath, recipeJson);
+                if (_recipesDirty)
+                {
+                    string recipeJson = RecipeCacheSerializer.SerializeRecipes(_recipes);
+                    AtomicWrite(_recipesPath, recipeJson);
+                }
 
-                // Write manifest
+                // The manifest goes out on every persist, not just a stamp
+                // change: it dates the two files above, and its build id is
+                // what the next launch checks them against.
                 // 0 means "written before the live build id was known"; the
                 // next Load treats it as a mismatch and discards the overlay
                 // once, rather than serving recipes of unknown vintage.
@@ -349,6 +369,13 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 _onError?.Invoke("Failed to persist recipe overlay", ex);
             }
+        }
+
+        private void ClearDirtyLocked()
+        {
+            _searchesDirty = false;
+            _recipesDirty = false;
+            _stampDirty = false;
         }
 
         private static void AtomicWrite(string path, string content)

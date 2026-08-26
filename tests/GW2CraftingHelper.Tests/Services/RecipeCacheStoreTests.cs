@@ -368,6 +368,74 @@ namespace GW2CraftingHelper.Tests.Services
             };
         }
 
+        // A plan that learns a search and no new recipe - what a
+        // build-current seed makes the common case - must leave the recipe
+        // cache file alone. Deleting it behind the store's back is the
+        // deterministic way to see whether the next flush touches it.
+        [Fact]
+        public void Overlay_FlushRewritesOnlyTheCacheThatChanged()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load(currentGw2BuildId: null);
+                overlay.SetCurrentBuildId(buildId);
+                overlay.PutSearch(100, new List<int> { 1 });
+                overlay.PutRecipe(1, NewRecipe(1, 100));
+                overlay.Flush(force: true);
+
+                string recipesPath = Path.Combine(
+                    tmp.Path, "recipe_cache", "recipes_overlay.json");
+                File.Delete(recipesPath);
+
+                overlay.PutSearch(200, new List<int> { 2 });
+                overlay.Flush(force: true);
+
+                Assert.False(File.Exists(recipesPath));
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tmp.Path));
+
+                var reloaded = new OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(reloaded.TryGetSearch(100));
+                Assert.NotNull(reloaded.TryGetSearch(200));
+            }
+        }
+
+        // Load replaces the maps with what disk holds, so entries put before
+        // it are gone; a flush afterwards must not resurrect the overlay
+        // files Load's build-mismatch branch just deleted, least of all with
+        // an empty cache stamped build 0.
+        [Fact]
+        public void Overlay_LoadAtNewBuild_LeavesNothingForALaterFlushToWrite()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildA = 205780;
+                const int buildB = 205781;
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+
+                var first = new OverlayRecipeCacheStore(tmp.Path);
+                first.Load(currentGw2BuildId: null);
+                first.SetCurrentBuildId(buildA);
+                first.PutSearch(100, new List<int> { 1 });
+                first.Flush(force: true);
+                Assert.Equal(buildA, ReadOverlayManifestBuildId(tmp.Path));
+
+                var second = new OverlayRecipeCacheStore(tmp.Path);
+                second.Load(currentGw2BuildId: null);
+                second.PutSearch(200, new List<int> { 2 });
+                second.Load(currentGw2BuildId: buildB);
+                second.Flush(force: true);
+
+                Assert.Null(second.TryGetSearch(100));
+                Assert.Null(second.TryGetSearch(200));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "search_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+            }
+        }
+
         private static int ReadOverlayManifestBuildId(string dataDir)
         {
             string manifestPath = Path.Combine(dataDir, "recipe_cache", "overlay_manifest.json");
