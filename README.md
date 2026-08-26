@@ -65,10 +65,35 @@ session that measured it.
 
 ## Screenshots
 
-Recipe tree with per-node decision pills, Best Path / Craft All / Buy All /
-Ignore controls, and the Total Cost breakdown:
+The Total Cost band - materials value, what your own materials cover, and
+the actual coin cost, with the currencies the plan needs:
+
+![Crafting plan Total Cost band with currency requirements](docs/images/plan-total-cost.png)
+
+Recipe tree with per-node decision pills (Craft / TP / Vendor / Ignore) and
+per-row costs:
 
 ![Crafting plan recipe tree with decision pills](docs/images/plan-recipe-tree.png)
+
+Account snapshot - items and currencies across bank, material storage,
+shared inventory and every character, with search and source filters:
+
+![Account snapshot with per-source item locations](docs/images/snapshot.png)
+
+Crafting Ranker - a priority list where each row is measured against what
+the rows above it leave behind; readiness blends materials, currencies,
+time-gated crafts and disciplines:
+
+![Crafting Ranker with readiness scores and per-gate breakdown](docs/images/crafting-ranker.png)
+
+Plan History - every generated plan kept with its cost and date; open a
+saved plan exactly as it was, or re-solve it at today's prices:
+
+![Plan History with View, Open and Re-solve](docs/images/plan-history.png)
+
+Item tooltips mirror the in-game look, measured from live captures:
+
+![GW2-authentic item tooltip](docs/images/item-tooltip.png)
 
 Used Materials and Shopping List sections (item names colored by GW2
 rarity) with vendor-tagged shopping rows:
