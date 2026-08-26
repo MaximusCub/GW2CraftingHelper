@@ -14,9 +14,13 @@ namespace VendorOfferUpdater.Models
         // instead of the key being omitted, since output serialization
         // uses DefaultIgnoreCondition.WhenWritingNull).
         public string? OfferId { get; set; }
+
         public int OutputItemId { get; set; }
+
         public int OutputCount { get; set; }
+
         public List<CostLine> CostLines { get; set; } = new List<CostLine>();
+
         public string? MerchantName { get; set; }
 
         // Nullable, not just an empty list: --merge-into deliberately
@@ -25,7 +29,9 @@ namespace VendorOfferUpdater.Models
         // against a baseline that never had the "locations" key at all -
         // see the --merge-into round-trip fix in Program.cs.
         public List<string>? Locations { get; set; } = new List<string>();
+
         public int? DailyCap { get; set; }
+
         public int? WeeklyCap { get; set; }
 
         // Astral Acclaim package: Wizard's Vault seasonal purchase cap

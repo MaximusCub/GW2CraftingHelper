@@ -13,10 +13,10 @@ namespace VendorOfferUpdater.Tests.Helpers
     /// </summary>
     public class FakeHttpHandler : HttpMessageHandler
     {
-        private readonly List<(Func<string, bool> Predicate, string Body, HttpStatusCode StatusCode)> _urlMap = new();
-        private readonly Queue<(string Body, HttpStatusCode StatusCode)> _queue = new();
+        private readonly List<(Func<string, bool> Predicate, string Body, HttpStatusCode StatusCode)> _urlMap = new List<(Func<string, bool> Predicate, string Body, HttpStatusCode StatusCode)>();
+        private readonly Queue<(string Body, HttpStatusCode StatusCode)> _queue = new Queue<(string Body, HttpStatusCode StatusCode)>();
 
-        public List<string> RequestedUrls { get; } = new();
+        public List<string> RequestedUrls { get; } = new List<string>();
 
         /// <summary>
         /// Register a canned response for URLs matching the predicate.
@@ -48,7 +48,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 {
                     return Task.FromResult(new HttpResponseMessage(statusCode)
                     {
-                        Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+                        Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
                     });
                 }
             }
@@ -58,7 +58,7 @@ namespace VendorOfferUpdater.Tests.Helpers
                 var (qBody, qStatus) = _queue.Dequeue();
                 return Task.FromResult(new HttpResponseMessage(qStatus)
                 {
-                    Content = new StringContent(qBody, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(qBody, System.Text.Encoding.UTF8, "application/json"),
                 });
             }
 

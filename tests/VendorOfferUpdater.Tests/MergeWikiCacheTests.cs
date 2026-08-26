@@ -21,7 +21,7 @@ namespace VendorOfferUpdater.Tests
                 CostEntries = new List<WikiCostEntry>(),
                 Locations = new List<string>(),
                 DailyCap = dailyCap,
-                WeeklyCap = weeklyCap
+                WeeklyCap = weeklyCap,
             };
         }
 
@@ -33,11 +33,11 @@ namespace VendorOfferUpdater.Tests
             // fresh copy must win, not the stale cached copy.
             var existing = new List<WikiVendorResult>
             {
-                MakeResult("Some Item", dailyCap: null)
+                MakeResult("Some Item", dailyCap: null),
             };
             var fresh = new List<WikiVendorResult>
             {
-                MakeResult("Some Item", dailyCap: 5)
+                MakeResult("Some Item", dailyCap: 5),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);
@@ -55,11 +55,11 @@ namespace VendorOfferUpdater.Tests
             var existing = new List<WikiVendorResult>
             {
                 MakeResult("Untouched Page", dailyCap: 3),
-                MakeResult("Refreshed Page", dailyCap: null)
+                MakeResult("Refreshed Page", dailyCap: null),
             };
             var fresh = new List<WikiVendorResult>
             {
-                MakeResult("Refreshed Page", dailyCap: 7)
+                MakeResult("Refreshed Page", dailyCap: 7),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);
@@ -79,11 +79,11 @@ namespace VendorOfferUpdater.Tests
         {
             var existing = new List<WikiVendorResult>
             {
-                MakeResult("Existing Page")
+                MakeResult("Existing Page"),
             };
             var fresh = new List<WikiVendorResult>
             {
-                MakeResult("New Page")
+                MakeResult("New Page"),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);
@@ -100,7 +100,7 @@ namespace VendorOfferUpdater.Tests
             var fresh = new List<WikiVendorResult>
             {
                 MakeResult("Page A"),
-                MakeResult("Page B")
+                MakeResult("Page B"),
             };
 
             var result = Program.MergeWikiCache(new List<WikiVendorResult>(), fresh);
@@ -117,7 +117,7 @@ namespace VendorOfferUpdater.Tests
             var existing = new List<WikiVendorResult>
             {
                 MakeResult("Page A", dailyCap: 2),
-                MakeResult("Page B", weeklyCap: 4)
+                MakeResult("Page B", weeklyCap: 4),
             };
 
             var result = Program.MergeWikiCache(existing, new List<WikiVendorResult>());
@@ -133,11 +133,11 @@ namespace VendorOfferUpdater.Tests
         {
             var existing = new List<WikiVendorResult>
             {
-                MakeResult(null, dailyCap: 1)
+                MakeResult(null, dailyCap: 1),
             };
             var fresh = new List<WikiVendorResult>
             {
-                MakeResult(null, dailyCap: 9)
+                MakeResult(null, dailyCap: 9),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);
@@ -163,12 +163,12 @@ namespace VendorOfferUpdater.Tests
             var existing = new List<WikiVendorResult>
             {
                 MakeResult("Untouched Page", dailyCap: 3),
-                MakeResult("Refreshed Page", dailyCap: null)
+                MakeResult("Refreshed Page", dailyCap: null),
             };
             var fresh = new List<WikiVendorResult>
             {
                 MakeResult("Refreshed Page", dailyCap: 5),
-                MakeResult("Refreshed Page", dailyCap: 7)
+                MakeResult("Refreshed Page", dailyCap: 7),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);
@@ -191,12 +191,12 @@ namespace VendorOfferUpdater.Tests
             // are one net new page, not two.
             var existing = new List<WikiVendorResult>
             {
-                MakeResult("Existing Page")
+                MakeResult("Existing Page"),
             };
             var fresh = new List<WikiVendorResult>
             {
                 MakeResult("New Page", dailyCap: 1),
-                MakeResult("New Page", dailyCap: 2)
+                MakeResult("New Page", dailyCap: 2),
             };
 
             var result = Program.MergeWikiCache(existing, fresh);

@@ -21,7 +21,7 @@ namespace VendorOfferUpdater.Tests
                 MerchantName = merchantName,
                 OutputItemId = outputItemId,
                 OutputCount = 1,
-                CostLines = new List<CostLine>()
+                CostLines = new List<CostLine>(),
             };
         }
 
@@ -46,7 +46,7 @@ namespace VendorOfferUpdater.Tests
                 MakeOffer("Battle Master", 12345),
                 // Same item, different merchant - the real Gift of Battle
                 // path must never be caught by a merchant-scoped refusal.
-                MakeOffer("Some Other Vendor", 19678)
+                MakeOffer("Some Other Vendor", 19678),
             };
 
             int removed = Program.ApplyExclusions(ref offers, dir);
