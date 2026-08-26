@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// metric would score it, because only the materials gate applies and
     /// renormalisation divides by its own weight.
     /// </summary>
-    public static class RankerReadinessCalculator
+    internal static class RankerReadinessCalculator
     {
         /// <summary>
         /// baseline is the snapshot:null solve, owned is the solve against

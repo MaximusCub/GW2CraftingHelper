@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Views
     /// AboutTabContent, because the watchlist, the ephemeral per-row metrics
     /// and the in-flight refresh token all have to survive a tab switch.
     /// </summary>
-    public class RankerTabContent
+    internal class RankerTabContent
     {
         private static readonly Logger Logger = Logger.GetLogger<RankerTabContent>();
 
@@ -32,8 +32,8 @@ namespace GW2CraftingHelper.Views
         private const int SectionTitleY = PlanContentHeightMath.SectionHeaderTitleY;
         private const int AddRowHeight = 40;
         private const int ToolbarHeight = 40;
-        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
+        private const int ColumnHeaderRowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
+        private const int ColumnHeaderLabelY = PlanContentHeightMath.ColumnHeaderLabelY;
         private const int TopChromeHeight =
             SectionBandHeight + AddRowHeight + ToolbarHeight + ColumnHeaderRowHeight;
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
@@ -1129,7 +1129,7 @@ namespace GW2CraftingHelper.Views
             }
             return metrics.AffordableNow
                 ? "Affordable now"
-                : "Short " + CoinCurrencyRenderer.FormatCoinText(metrics.ShortfallCoin);
+                : "Short " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin);
         }
 
         private static Color ChipBorderColor(RankerRowMetrics metrics)
@@ -1149,7 +1149,7 @@ namespace GW2CraftingHelper.Views
             {
                 return "You have enough coin for what is left of this item, after paying for everything above it on the list.";
             }
-            return "You are " + CoinCurrencyRenderer.FormatCoinText(metrics.ShortfallCoin) +
+            return "You are " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin) +
                 " short of what is left of this item, counting coin that the higher-priority items above it would already have spent.";
         }
 

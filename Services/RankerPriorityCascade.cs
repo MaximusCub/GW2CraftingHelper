@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
     ///
     /// Blish-free by construction.
     /// </summary>
-    public sealed class RankerPriorityCascade
+    internal sealed class RankerPriorityCascade
     {
         private readonly AccountSnapshot _original;
         private readonly List<SnapshotItemEntry> _residualItems;

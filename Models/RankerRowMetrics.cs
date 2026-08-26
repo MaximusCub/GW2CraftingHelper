@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Models
         Disciplines
     }
 
-    public class RankerGateScore
+    internal class RankerGateScore
     {
         public RankerGate Gate { get; set; }
 
@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Models
         public double Weight { get; set; }
     }
 
-    public class RankerCurrencyShortfall
+    internal class RankerCurrencyShortfall
     {
         public int CurrencyId { get; set; }
 
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Models
         public long BaselineNeeded { get; set; }
     }
 
-    public class RankerDisciplineGap
+    internal class RankerDisciplineGap
     {
         public string Discipline { get; set; }
         public int RequiredRating { get; set; }
@@ -82,7 +82,7 @@ namespace GW2CraftingHelper.Models
     /// plus the slot's cascade availability. Display-ready: the view does no
     /// arithmetic and handles no edge cases.
     /// </summary>
-    public class RankerRowMetrics
+    internal class RankerRowMetrics
     {
         public RankerReadinessKind Kind { get; set; }
 

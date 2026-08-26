@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Models
     /// intermediate's ingredients, so the consumption record is the solver's
     /// own UsedMaterials, taken after the solve.
     /// </summary>
-    public class RankerSlotAvailability
+    internal class RankerSlotAvailability
     {
         /// <summary>
         /// The snapshot to hand the pipeline for this slot's owned solve.
