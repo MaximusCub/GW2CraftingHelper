@@ -463,6 +463,44 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(leafSearch);
         }
 
+        // An item the search endpoint genuinely has no recipe for is worth
+        // remembering across sessions: without a persisted negative row every
+        // raw material in a plan costs a live search on every launch. This
+        // pins that optimization so a later change to what gets persisted
+        // cannot quietly drop it.
+        [Fact]
+        public async Task RecipeService_ProvenEmptySearch_IsServedFromDisk_NextSession()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+
+                var overlay1 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay1.Load(currentGw2BuildId: null);
+                overlay1.InvalidateIfStale(buildId);
+                overlay1.SetCurrentBuildId(buildId);
+
+                var api1 = new CountingRecipeApiClient();
+                var tree1 = await new RecipeService(api1, cacheStore: overlay1)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                Assert.Empty(tree1.Recipes);
+                Assert.Equal(1, api1.SearchCallCount);
+
+                var overlay2 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay2.Load(currentGw2BuildId: null);
+                overlay2.InvalidateIfStale(buildId);
+                overlay2.SetCurrentBuildId(buildId);
+
+                var api2 = new CountingRecipeApiClient();
+                var tree2 = await new RecipeService(api2, cacheStore: overlay2)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                Assert.Empty(tree2.Recipes);
+                Assert.Equal(0, api2.SearchCallCount);
+            }
+        }
+
         [Fact]
         public void SeededStore_NegativeEntry_ReturnsNull_WhenSeedStale()
         {
