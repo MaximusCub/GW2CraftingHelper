@@ -205,16 +205,21 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                // Log seed staleness once per run
+                // Say once per run when derived negatives may be behind the
+                // live build: the seed predates it and no corpus probe has
+                // confirmed the id list yet.
                 if (!staleReported
                     && _cacheStore is CompositeRecipeCacheStore composite
-                    && composite.SeedIsStale)
+                    && composite.SeedIsStale
+                    && !composite.NegativesVerifiedAtCurrentBuild)
                 {
+                    int lastVerified = composite.NegativesVerifiedBuildId > 0
+                        ? composite.NegativesVerifiedBuildId
+                        : composite.SeedBuildId ?? 0;
                     OnStatusUpdate?.Invoke(string.Format(
                         CultureInfo.InvariantCulture,
-                        "Recipe seed built for build {0}; current build {1}; seed negative entries will fall back to API.",
-                        composite.SeedBuildId,
-                        composite.CurrentBuildId));
+                        "Recipe data not verified against the live build (last verified at build {0}); recipes added since then may show as UNKNOWN.",
+                        lastVerified));
                     staleReported = true;
                 }
 
@@ -464,7 +469,18 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            _cacheStore.PutSearch(itemId, result.RecipeIds);
+            // Only a non-empty answer is persisted, mirroring the null
+            // guard on PutRecipe below: the search endpoint returns an
+            // empty answer for 15 real craftable items whose recipes are
+            // fetchable by id, so an empty answer is never a fact worth
+            // keeping beyond this session. Cross-session "no recipe"
+            // answers are derived from the corpus by
+            // CompositeRecipeCacheStore instead.
+            if (result.RecipeIds.Count > 0)
+            {
+                _cacheStore.PutSearch(itemId, result.RecipeIds);
+            }
+
             return result.RecipeIds;
         }
 

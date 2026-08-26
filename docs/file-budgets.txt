@@ -157,14 +157,14 @@ Services/PlanViewModelBuilder.cs                                                
 Services/ReceiptCaptionHelper.cs                                                           106
 Services/RecipeClientFactory.cs                                                            66
 Services/RecipeNodeIds.cs                                                                  45
-Services/RecipeService.cs                                                                  527
+Services/RecipeService.cs                                                                  543
 Services/RecipeSheetItemSeedService.cs                                                     78
 Services/RecipeSheetSavingsCalculator.cs                                                   321
-Services/Recipes/CompositeRecipeCacheStore.cs                                              84
+Services/Recipes/CompositeRecipeCacheStore.cs                                              121
 Services/Recipes/IRecipeCacheStore.cs                                                      44
 Services/Recipes/InMemoryRecipeCacheStore.cs                                               56
 Services/Recipes/ItemNameSeedData.cs                                                       56
-Services/Recipes/OverlayRecipeCacheStore.cs                                                441
+Services/Recipes/OverlayRecipeCacheStore.cs                                                449
 Services/Recipes/RecipeCacheSerializer.cs                                                  233
 Services/Recipes/SeededRecipeCacheStore.cs                                                 209
 Services/RecipesColumnMath.cs                                                              79
@@ -424,7 +424,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs 
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSublabelTests.cs                264
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSummaryTests.cs                 1181
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                        124
-tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            797
+tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            921
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                         143
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceConcurrencyTests.cs                    226
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               947

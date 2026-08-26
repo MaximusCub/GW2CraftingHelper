@@ -313,6 +313,14 @@ namespace GW2CraftingHelper.Services.Recipes
         {
             lock (_gate)
             {
+                // An empty row is never stored: "no recipe" is derived from
+                // the corpus at lookup time (CompositeRecipeCacheStore), so
+                // the only thing an empty row can do is shadow data.
+                if (recipeIds == null || recipeIds.Count == 0)
+                {
+                    return;
+                }
+
                 _searches[outputItemId] = recipeIds;
                 _searchesDirty = true;
             }

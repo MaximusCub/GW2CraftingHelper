@@ -125,8 +125,12 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.NotNull(result);
                 Assert.Single(result);
 
-                // Missing item returns null
-                Assert.Null(composite.TryGetSearch(500));
+                // POLICY CHANGE: an item the loaded corpus knows no recipe
+                // for is an authoritative EMPTY answer now (previously a
+                // null miss that fell through to the API).
+                var unknown = composite.TryGetSearch(500);
+                Assert.NotNull(unknown);
+                Assert.Empty(unknown);
 
                 // Put goes to overlay
                 composite.PutSearch(500, new List<int> { 10 });
@@ -324,6 +328,125 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // Spec 2.3: the composite's final branch. With a loaded corpus,
+        // "no known recipe outputs this item" is exact and counts as a
+        // search HIT (so the "Discovering recipes from API..." heuristic
+        // does not fire for derived negatives).
+        [Fact]
+        public void Composite_LoadedCorpus_DerivesAnAuthoritativeNegative_AsAHit()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var seed = NewSeedWithOneRecipe();
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load();
+                var composite = new CompositeRecipeCacheStore(seed, overlay);
+
+                var negative = composite.TryGetSearch(999);
+                Assert.NotNull(negative);
+                Assert.Empty(negative);
+                Assert.Equal(1, composite.Stats.SearchHits);
+                Assert.Equal(0, composite.Stats.SearchMisses);
+            }
+        }
+
+        // The empty-corpus guard: Module.cs's seed-load catch can leave an
+        // empty seed, and an empty corpus proves nothing - the miss (and
+        // with it the API fallback) must be preserved.
+        [Fact]
+        public void Composite_EmptyCorpus_ReturnsNullForUnknownItem()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var seed = new SeededRecipeCacheStore();
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load();
+                var composite = new CompositeRecipeCacheStore(seed, overlay);
+
+                Assert.Null(composite.TryGetSearch(999));
+                Assert.Equal(1, composite.Stats.SearchMisses);
+            }
+        }
+
+        // Spec step 4's evidence: a plan whose items are all in the seed
+        // corpus asks the search endpoint for NOTHING - raw materials
+        // resolve as derived negatives - and an item the API would answer
+        // empty for leaves no row on disk. Red against the old code twice
+        // over: the miss for item 200 used to go to the API, and the empty
+        // answer used to be persisted.
+        [Fact]
+        public async Task RecipeService_OverACompositeCorpus_AnswersNegativesLocally_AndPersistsNoEmptyRow()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                var seed = NewSeedWithOneRecipe();
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load();
+                var composite = new CompositeRecipeCacheStore(seed, overlay);
+
+                var api = new CountingRecipeApiClient();
+                var service = new RecipeService(api, cacheStore: composite);
+                var tree = await service.BuildTreeAsync(100, 1, CancellationToken.None);
+                await service.PendingCacheFlush;
+
+                // Item 100 crafts from the seed; ingredient 200 is a leaf
+                // answered by the corpus, not the API.
+                Assert.Single(tree.Recipes);
+                Assert.Empty(tree.Recipes[0].Ingredients[0].Recipes);
+                Assert.Equal(0, api.SearchCallCount);
+                Assert.Equal(0, api.RecipeCallCount);
+
+                // Nothing was learned, so nothing was written - least of
+                // all an empty row for item 200.
+                string searchPath = Path.Combine(
+                    tmp.Path, "recipe_cache", "search_overlay.json");
+                Assert.False(File.Exists(searchPath));
+
+                var inspect = new OverlayRecipeCacheStore(tmp.Path);
+                inspect.Load();
+                Assert.Null(inspect.TryGetSearch(200));
+            }
+        }
+
+        // Seed corpus: recipe 1 makes item 100 from 2x item 200.
+        private static SeededRecipeCacheStore NewSeedWithOneRecipe()
+        {
+            var searches = new Dictionary<int, IReadOnlyList<int>>
+            {
+                { 100, new List<int> { 1 } }
+            };
+            var recipes = new Dictionary<int, RawRecipe>
+            {
+                {
+                    1, new RawRecipe
+                    {
+                        Id = 1,
+                        OutputItemId = 100,
+                        OutputItemCount = 1,
+                        Ingredients = new List<RawIngredient>
+                        {
+                            new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                        },
+                        Disciplines = new List<string> { "Weaponsmith" },
+                        MinRating = 400,
+                        Flags = new List<string>()
+                    }
+                }
+            };
+
+            var seed = new SeededRecipeCacheStore();
+            using (var s1 = new MemoryStream(
+                Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeSearches(searches))))
+            using (var s2 = new MemoryStream(
+                Encoding.UTF8.GetBytes(RecipeCacheSerializer.SerializeRecipes(recipes))))
+            {
+                seed.Load(s1, s2);
+            }
+
+            seed.FinalizeIndex();
+            return seed;
+        }
+
         private static RawRecipe NewRecipe(int recipeId, int outputItemId)
         {
             return new RawRecipe
@@ -498,10 +621,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(cachedRecipe);
             Assert.Equal(100, cachedRecipe.OutputItemId);
 
-            // Leaf search for 200 was Put into cache after API
-            var leafSearch = cacheStore.TryGetSearch(200);
-            Assert.NotNull(leafSearch);
-            Assert.Empty(leafSearch);
+            // POLICY CHANGE: the empty leaf answer for 200 used to be Put
+            // into the store; empty answers are session-only now (the
+            // endpoint lies for 15 real craftable items), so the store
+            // gains no row.
+            Assert.Null(cacheStore.TryGetSearch(200));
         }
 
         // POLICY CHANGE: evolved from
