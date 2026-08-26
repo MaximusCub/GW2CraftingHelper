@@ -172,20 +172,24 @@ namespace GW2CraftingHelper.Harness
                 IPriceApiClient priceApi;
                 IItemApiClient itemApi;
 
+                // Loaded once, wired both into the composite API client
+                // and (below) merged into the recipe seed - mirroring
+                // Module.cs, so the corpus the derived negatives are built
+                // from includes the forge recipes here too.
+                var mfData = RecipeClientFactory.LoadData(new FileMysticForgeRecipeSource());
+
                 if (live)
                 {
                     httpClient = new HttpClient();
                     var rawRecipeApi = new Gw2RecipeApiClient(httpClient);
-                    var mfSource = new FileMysticForgeRecipeSource();
-                    recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfSource);
+                    recipeApi = RecipeClientFactory.Create(rawRecipeApi, mfData);
                     priceApi = new Gw2PriceApiClient(httpClient);
                     itemApi = new Gw2ItemApiClient(httpClient);
                 }
                 else
                 {
                     var nullRecipe = new NullRecipeApiClient();
-                    var mfSource = new FileMysticForgeRecipeSource();
-                    recipeApi = RecipeClientFactory.Create(nullRecipe, mfSource);
+                    recipeApi = RecipeClientFactory.Create(nullRecipe, mfData);
                     priceApi = new NullPriceApiClient();
                     itemApi = new NullItemApiClient();
                 }
@@ -222,6 +226,9 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
+                recipeSeed.MergeMysticForgeRecipes(mfData);
+                recipeSeed.FinalizeIndex();
+
                 string seedManifestPath = Path.Combine(baseDir, "ref", "recipe_seed_manifest.json");
                 if (File.Exists(seedManifestPath))
                 {
@@ -244,6 +251,8 @@ namespace GW2CraftingHelper.Harness
                 }
 
                 {
+                    recipeOverlay.Load();
+
                     int? buildId = null;
                     if (live && httpClient != null)
                     {
@@ -253,11 +262,9 @@ namespace GW2CraftingHelper.Harness
                         }
                         catch { }
                     }
-                    recipeOverlay.Load(buildId);
+
                     if (buildId.HasValue)
                     {
-                        // Load already dropped a mismatched overlay, so the
-                        // stamp lands on whatever survived.
                         recipeOverlay.SetCurrentBuildId(buildId.Value);
                         recipeSeed.SetCurrentBuildId(buildId.Value);
                     }

@@ -205,16 +205,21 @@ namespace GW2CraftingHelper.Services
                     }
                 }
 
-                // Log seed staleness once per run
+                // Say once per run when derived negatives may be behind the
+                // live build: the seed predates it and no corpus probe has
+                // confirmed the id list yet.
                 if (!staleReported
                     && _cacheStore is CompositeRecipeCacheStore composite
-                    && composite.SeedIsStale)
+                    && composite.SeedIsStale
+                    && !composite.NegativesVerifiedAtCurrentBuild)
                 {
+                    int lastVerified = composite.NegativesVerifiedBuildId > 0
+                        ? composite.NegativesVerifiedBuildId
+                        : composite.SeedBuildId ?? 0;
                     OnStatusUpdate?.Invoke(string.Format(
                         CultureInfo.InvariantCulture,
-                        "Recipe seed built for build {0}; current build {1}; seed negative entries will fall back to API.",
-                        composite.SeedBuildId,
-                        composite.CurrentBuildId));
+                        "Recipe data not verified against the live build (last verified at build {0}); recipes added since then may show as UNKNOWN.",
+                        lastVerified));
                     staleReported = true;
                 }
 
@@ -414,6 +419,19 @@ namespace GW2CraftingHelper.Services
             return node;
         }
 
+        /// <summary>
+        /// Drops one item's session-cached search row, so a corpus repair
+        /// landing mid-session (RecipeCorpusVerifier) is visible to later
+        /// builds instead of shadowed by the L0 memo for the whole session.
+        /// </summary>
+        public void InvalidateSearch(int outputItemId)
+        {
+            lock (_cacheGate)
+            {
+                _searchCache.Remove(outputItemId);
+            }
+        }
+
         private async Task<IReadOnlyList<int>> SearchByOutputCachedAsync(int itemId, CancellationToken ct)
         {
             lock (_cacheGate)
@@ -447,10 +465,9 @@ namespace GW2CraftingHelper.Services
             // RecipeSearchResult.AbsenceProven), and what survives such a
             // response is at best incomplete - empty for an ordinary item,
             // or Mystic-Forge-only for one the composite client could fill
-            // in. Cached, that renders a craftable item as an uncraftable (or
-            // half-craftable) leaf and stops every later attempt short of the
-            // API that would correct it: for the session in _searchCache, and
-            // until the next game build in the persistent overlay.
+            // in. Held in _searchCache, that would render a craftable item
+            // as an uncraftable (or half-craftable) leaf for the rest of
+            // the session.
             if (!result.AbsenceProven)
             {
                 return result.RecipeIds;
@@ -464,7 +481,18 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            _cacheStore.PutSearch(itemId, result.RecipeIds);
+            // Only a non-empty answer is persisted, mirroring the null
+            // guard on PutRecipe below: the search endpoint returns an
+            // empty answer for 15 real craftable items whose recipes are
+            // fetchable by id, so an empty answer is never a fact worth
+            // keeping beyond this session. Cross-session "no recipe"
+            // answers are derived from the corpus by
+            // CompositeRecipeCacheStore instead.
+            if (result.RecipeIds.Count > 0)
+            {
+                _cacheStore.PutSearch(itemId, result.RecipeIds);
+            }
+
             return result.RecipeIds;
         }
 

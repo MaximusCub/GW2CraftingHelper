@@ -82,7 +82,7 @@ and not compilation units. File counts measured with `ls <dir>/*.cs | wc -l`.
 | --- | --- | --- |
 | `Models/` (49) | The data shapes passed between layers: the plan result, the display tree, the view model the renderers read. | `PlanViewModel.cs`, `CraftingTreeNode.cs`, `CraftingPlanResult.cs`, `CurrencyValuation.cs` |
 | `Services/` (141, flat) | Every piece of logic in the module: the solver, pricing, the offline-seed loaders, the pure layout arithmetic, and the text/decision composers the views render. | `PlanSolver.cs`, `CraftingPlanPipeline.cs`, `PlanViewModelBuilder.cs`, `VendorBatchSolver.cs`, `PlanContentHeightMath.cs` |
-| `Services/Recipes/` (7) | Recipe cache stores and the committed seed readers behind them. | `RecipeCacheSerializer.cs`, `OverlayRecipeCacheStore.cs`, `ItemNameSeedData.cs` |
+| `Services/Recipes/` (8) | Recipe cache stores, the committed seed readers behind them, and the corpus probe that verifies them against the live build. | `RecipeCacheSerializer.cs`, `OverlayRecipeCacheStore.cs`, `RecipeCorpusVerifier.cs` |
 | `Services/Diagnostics/` (2) | Plan-generation phase timing, summarised into the plan's debug log by `CraftingPlanPipeline`. | `PlanTimingAnalyzer.cs`, `PlanPhaseTimingSummary.cs` |
 | `Views/` (14) | The Blish-bound layer: one file per tab, the window, and the two main-thread primitives. | `CraftingPlanView.cs` (5,281 lines - the plan tab), `MainView.cs` (Snapshot), `SettingsTabContent.cs`, `MainThreadMarshal.cs` |
 | `Views/Rendering/` (34) | Per-section renderers, the two seams they reach the view through, plus the shared drawing primitives (fonts, coin rows, rarity colors, tooltips). | `TreeSectionController.cs`, `ITreePlanHost.cs`, `SummarySectionRenderer.cs`, `UiFonts.cs`, `CoinCurrencyRenderer.cs` |
