@@ -30,7 +30,6 @@ namespace GW2CraftingHelper.Services.Recipes
         private bool _recipesDirty;
         private bool _stampDirty;
 
-        private bool IsDirty => _searchesDirty || _recipesDirty || _stampDirty;
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
 
@@ -52,6 +51,8 @@ namespace GW2CraftingHelper.Services.Recipes
         private static readonly TimeSpan FlushDebounce = TimeSpan.FromSeconds(2);
 
         public RecipeCacheStats Stats => _stats;
+
+        private bool IsDirty => _searchesDirty || _recipesDirty || _stampDirty;
 
         public OverlayRecipeCacheStore(string dataDir, Action<string, Exception> onError = null)
         {
