@@ -106,7 +106,7 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
-            // Step 1: Build recipe tree
+            // Build recipe tree
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus
             {
@@ -141,8 +141,9 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Steps 2 through result build, shared by the single-item and
-        /// multi-item paths. Callers run Step 1 (tree build) themselves so
+        /// Everything from price lookup through the result build, shared by
+        /// the single-item and multi-item paths. Callers build the tree
+        /// themselves so
         /// PlanPhaseTimingSummary keeps its per-path phase labels. items is
         /// null on the single-item path; when set, tree is the synthetic
         /// multi-item wrapper and targetItemId/quantity carry the wrapper
@@ -171,7 +172,7 @@ namespace GW2CraftingHelper.Services
             // force-buy pre-pass - see AchievementBitDedupPrePass.
             AchievementBitDedupPrePass.Apply(tree);
 
-            // Step 2: Collect all item IDs from the tree for price lookup
+            // Collect all item IDs from the tree for price lookup
             progress?.Report(new PlanStatus { Message = "Collecting item IDs..." });
             sw.Restart();
             var allItemIds = new HashSet<int>();
@@ -179,7 +180,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Collect item IDs: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 3: Fetch TP prices
+            // Fetch TP prices
             phaseTracker.Start(PlanPhase.FetchingPrices, "Fetching prices", allItemIds.Count);
             progress?.Report(new PlanStatus
             {
@@ -191,7 +192,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch TP prices: {sw.ElapsedMilliseconds}ms ({allItemIds.Count} items)");
 
-            // Step 4: Query vendor offers, then price any vendor-only cost items
+            // Query vendor offers, then price any vendor-only cost items
             var vendorContext = await FetchPricedVendorContextAsync(
                 allItemIds, prices, progress, sw, timingLog, ct);
             var vendorOffers = vendorContext.VendorOffers;
@@ -211,7 +212,8 @@ namespace GW2CraftingHelper.Services
             if (useForceBuyPrePass)
             {
                 // Pre-assign stable NodeIds to the unreduced tree before
-                // Step 6 clones it: CloneNode preserves NodeIds, so the
+                // the inventory reduction clones it: CloneNode preserves
+                // NodeIds, so the
                 // pre-pass's forceBuyOnlyNodeIds keys match the ids the
                 // real solve uses.
                 RecipeNodeIds.Assign(tree);
@@ -257,7 +259,7 @@ namespace GW2CraftingHelper.Services
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
-            // Step 6: Inventory reduction
+            // Inventory reduction
             phaseTracker.Start(PlanPhase.SolvingDecisions, "Solving decisions", null);
             progress?.Report(new PlanStatus { Message = "Reducing inventory..." });
             sw.Restart();
@@ -281,7 +283,7 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Inventory reduction: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7: Solve. assignNodeIds:false only when the pre-pass
+            // Solve. assignNodeIds:false only when the pre-pass
             // pre-assigned ids, so forceBuyOnlyNodeIds' keys still match.
             progress?.Report(new PlanStatus { Message = "Solving crafting plan..." });
             sw.Restart();
@@ -299,12 +301,12 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
 
-            // Step 7b: convert the reference-keyed owned-usage side channel
+            // Convert the reference-keyed owned-usage side channel
             // into a NodeId-keyed lookup now that Solve() assigned NodeIds.
             IReadOnlyDictionary<int, int> ownedQuantityUsedByNodeId =
                 BuildOwnedQuantityUsedByNodeId(ownedQuantityUsedByNode);
 
-            // Step 8: Fetch item metadata for all step items + target + used materials + tree items
+            // Fetch item metadata for all step items + target + used materials + tree items
             // Fetch metadata for EVERY tree item (not just chosen-path ones):
             // local override re-solves can surface any node's item in steps,
             // and the cached SolveContext metadata must cover them all.
@@ -355,15 +357,15 @@ namespace GW2CraftingHelper.Services
             sw.Stop();
             timingLog.Add($"Fetch item metadata: {sw.ElapsedMilliseconds}ms ({metadataIds.Count} items)");
 
-            // Step 9: Await the currency metadata fetch started above
+            // Await the currency metadata fetch started above
             IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata =
                 await AwaitCurrencyMetadataOrNullAsync(currencyTask, progress, sw, timingLog, ct);
 
-            // Step 10: Fetch learned recipe IDs (if permission available)
+            // Fetch learned recipe IDs (if permission available)
             ISet<int> learnedRecipeIds =
                 await FetchLearnedRecipeIdsAsync(progress, sw, timingLog, ct);
 
-            // Step 11: Build structured result
+            // Build structured result
             phaseTracker.Start(PlanPhase.BuildingDisplay, "Building display", null);
             progress?.Report(new PlanStatus { Message = "Building final result..." });
             sw.Restart();
@@ -565,7 +567,7 @@ namespace GW2CraftingHelper.Services
             var timingLog = new List<string>();
             var phaseTracker = new PhaseTracker(phaseProgress, _moduleLog);
 
-            // Step 1: Build each item's own tree, then wrap them under the
+            // Build each item's own tree, then wrap them under the
             // synthetic multi-item root (RecipeService.BuildMultiItemTreeAsync).
             phaseTracker.Start(PlanPhase.BuildingTree, "Building recipe tree", null, FirstRunTreeHint);
             progress?.Report(new PlanStatus

@@ -147,8 +147,12 @@ COMPOUND operation: `Children`'s own lock protects each individual
 "dispose-every-old-child, then add-every-new-one" sequence, so two
 interleaved rebuilds can each finish disposing before either starts adding,
 and both survive - duplicated content, e.g. the doubled "No log entries
-yet." placeholders `LogTabContent` hit live on 2026-07-23
-(`LogTabContent.cs`'s `_buildComplete` doc comment). Marshaling the whole
+yet." placeholders `LogTabContent` hit live on 2026-07-23, and - on the
+second path, where `Module.cs`'s `TabChanged` handler called `Refresh()`
+on the main thread while `Build()`'s own tail was still running on a
+ThreadPool thread - two threads enqueuing into `_renderedRows` at once,
+crashing with "Destination array was not long enough" inside
+`Queue<T>.SetCapacity`. Marshaling the whole
 tail onto the main thread still closes this correctly, just for the right
 reason: it prevents two rebuilds from interleaving AT ALL (a single thread
 cannot run two call stacks at the same instant), rather than relying on a
@@ -225,6 +229,32 @@ HUD's mouse-hook backends feed the same buggy getter, so a real player
 fast-flicking the wheel upward hits it. The module cannot patch Blish
 HUD's own binary, so it classifies and corrects the value on the way in
 instead.
+
+The decompiled getter, verbatim:
+
+```csharp
+int num = Convert.ToInt32((MouseData & 0xFFFF0000u) >> 16);
+if (num > SystemInformation.MouseWheelScrollDelta) num -= 65536;
+return num;
+```
+
+**The `-60000` threshold, derived:** a wrapped-positive event's raw value
+is `N*120 - 65536` for an intended up-notch count `N >= 2`, i.e. the band
+`[-65416 .. -60016]` (`N=46`, an already-absurd flick), falling further for
+larger `N`. A genuine down-delta never comes near it: the largest measured
+is `-840` (7 coalesced down-notches), and an implausible 40-notch down-flick
+is only `-4800`. `-60000` sits between the two, so `raw <= -60000` selects
+exactly the corruption. A single up-notch (`N=1`, unsigned 120) sits *at*
+the threshold, not above it, so the vendored getter leaves it alone - which
+is why single notches in both directions are clean.
+
+**Why 120 is hardcoded** in the sanitizer and in
+`CraftingPlanView.ApplyWheelWrapCorrection`'s `intendedDelta / 120.0`
+notch arithmetic, while `MouseWheelScrollLines` is read live: 120 is Win32's
+`WHEEL_DELTA`, the fixed unit a low-level mouse hook reports for one notch.
+`SystemInformation.MouseWheelScrollDelta` is Microsoft's managed accessor
+for that same constant and is not user-configurable, unlike
+`MouseWheelScrollLines`, which is.
 
 **Where:** `Services/WheelDeltaSanitizer.cs` (pure, Blish-free,
 unit-tested); consumed by `CraftingPlanView.ApplyWheelWrapCorrection`.

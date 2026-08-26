@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// neighbours, which is a separate decision and an unmade one.
         ///
         /// <para>
-        /// Three heights were in use across the tabs (audit batch J, L3):
+        /// Three heights were in use across the tabs:
         /// 30 on the Snapshot tab's Clear Cache / Refresh Now, 28 on the Log
         /// tab's three buttons, Settings' Save and the plan's Generate Plan, and
         /// 24 on the plan's five Recipe Tree actions and its per-row +/-

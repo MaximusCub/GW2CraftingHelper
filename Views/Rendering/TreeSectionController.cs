@@ -371,7 +371,7 @@ namespace GW2CraftingHelper.Views.Rendering
             //
             // Hoisted above the header because the header's title now
             // carries the tree's node count, which comes out of this same
-            // walk (audit batch J, L2). It reads nothing the header
+            // walk. It reads nothing the header
             // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
             _costColumnWidths = scan.CostWidths;
@@ -446,7 +446,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // silently broke.
             if (_sink.RelayoutCount == relayoutCountBeforeTree)
             {
-                Logger.Warn("M33 C2b: Recipe Tree root rendered but registered no relayout closures - it will not track live window resize.");
+                Logger.Warn("Recipe Tree root rendered but registered no relayout closures - it will not track live window resize.");
             }
 #endif
 

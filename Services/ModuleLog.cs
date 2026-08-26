@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Services
 
         // Shared best-effort drain budget for the two callers that need
         // queued writes on disk before they proceed: Module.Unload and
-        // <see cref="DeleteFileAndReset"/>. Short by design - neither may
+        // DeleteFileAndReset. Short by design - neither may
         // hang on a stuck flush.
         internal static readonly TimeSpan FlushDrainBudget = TimeSpan.FromMilliseconds(250);
 

@@ -14,7 +14,8 @@ namespace GW2CraftingHelper.Services
             // Value-Own-Materials (VOM) design, Candidate A: the Decisions
             // dictionary from a throwaway zero-owned PlanSolver.Solve on the
             // SAME unreduced tree (with forceBuyOnlyNodeIds already applied)
-            // - see CraftingPlanPipeline's Step 5.5/5.6 doc comments. Keyed
+            // - see CraftingPlanPipeline.RunPipelineAsync's zero-owned solve.
+            // Keyed
             // by RecipeNode.NodeId, which must already be assigned on
             // `tree` (RecipeNodeIds.Assign) before this call, since it is
             // what CloneNode below preserves onto the clone this method

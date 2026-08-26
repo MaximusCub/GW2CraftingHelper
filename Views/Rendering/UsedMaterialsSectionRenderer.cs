@@ -88,10 +88,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
 
-            // Item/Amount column header. This was the one plan table with
-            // a right-hand column and no header naming it (audit batch J,
-            // L2) - the reader had to infer that a bare "12x" column was a
-            // quantity. Unconditional, like the Shopping List's and the two
+            // Item/Amount column header. Without it this is the one plan
+            // table with a right-hand column nothing names, leaving the
+            // reader to infer that a bare "12x" column is a quantity.
+            // Unconditional, like the Shopping List's and the two
             // c-tables', so it can never disagree with
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
             // same way. No rightXForWidth: the Amount column is pinned to

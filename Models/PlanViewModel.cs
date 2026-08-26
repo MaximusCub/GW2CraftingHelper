@@ -49,38 +49,28 @@ namespace GW2CraftingHelper.Models
         // any other fallback text row.
         TimegatedNotice,
 
-        // A single plain informational line appended to the
-        // Summary/Total Cost section
-        // ONLY for a genuine multi-item batch (2+ requested items),
-        // describing the batch-level Sell value/Profit
-        // rollup - see SellSideEconomics.ApplyBatchSellSideEconomics
-        // and PlanViewModelBuilder.BuildSummarySection.
-        // The rollup has NO craft-vs-buy filter at all
-        // (SellSideEconomics.ApplyBatchSellSideEconomics' own doc comment,
-        // divergence item 1): a bought-but-tradable root
-        // with a live sell price still contributes to the sum. The
-        // Label text is therefore deliberately NOT gw2e's own verbatim
-        // Cost Breakdown banner ("Profit numbers are the sum of all
-        // crafted recipes." - docs/gw2e-parity-spec.md)
-        // - "crafted recipes" would be
-        // inaccurate for a craft-agnostic, tradable-only rollup; see
-        // docs/KNOWN-ISSUES #25's divergence record. Rendered via
-        // the same plain-text row pattern as TimegatedNotice.
+        // One plain informational line appended to the Summary/Total Cost
+        // section for a genuine multi-item batch (2+ requested items),
+        // describing the batch-level Sell value/Profit rollup - see
+        // SellSideEconomics.ApplyBatchSellSideEconomics and
+        // PlanViewModelBuilder.BuildSummarySection. That rollup has no
+        // craft-vs-buy filter (a bought-but-tradable root with a live sell
+        // price still contributes), so the Label text does not reuse gw2e's
+        // "Profit numbers are the sum of all crafted recipes." banner
+        // (docs/gw2e-parity-spec.md, and KNOWN-ISSUES #25's divergence
+        // record). Rendered via TimegatedNotice's plain-text row pattern.
         MultiItemNote,
 
         // One tile of the Total Cost section's first formula band -
-        // "Total Materials Value - Your
-        // Materials Used = Actual Cost to Craft". Collapses to a single
-        // "Actual Cost to Craft" tile (one row of this type) only when
-        // there is no materials-used middle term AND the plan has a real
-        // cost to show; a plan whose coin cost and materials-used term
+        // "Total Materials Value - Your Materials Used = Actual Cost to
+        // Craft". Collapses to a single "Actual Cost to Craft" tile only
+        // when there is no materials-used middle term AND the plan has a
+        // real cost to show; a plan whose coin cost and materials-used term
         // are both zero renders all three tiles at 0
-        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule). A
-        // zero produced by unpriceable nodes renders the tiles too, with
-        // PlanViewModelBuilder.UnpricedTileMarker on each Label and the
-        // matching SummaryFootnote row explaining it.
-        // Rendered as an equal-width stat tile, same shape the old
-        // CoinTotal band used - see SummarySectionRenderer.
+        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule), as
+        // does a zero produced by unpriceable nodes - those carry
+        // PlanViewModelBuilder.UnpricedTileMarker plus a SummaryFootnote
+        // row. Rendered as an equal-width stat tile by SummarySectionRenderer.
         CostFormulaTile,
 
         // One tile of the Total Cost section's second formula band -
@@ -106,7 +96,7 @@ namespace GW2CraftingHelper.Models
         // total line - NotesSectionRenderer draws a right-aligned coin cell
         // only when CoinValue > 0, mirroring CoinCurrencyRenderer's own
         // "hasCoin = copper > 0" convention. Never carries StatusTag/
-        // BadgeText (no pills in this section, per the brief).
+        // BadgeText - the Notes section draws no pills.
         NoteLine,
     }
 
@@ -125,14 +115,11 @@ namespace GW2CraftingHelper.Models
 
         public CraftingTreeNode TreeRoot { get; set; }
 
-        // Populated INSTEAD of TreeRoot for a genuine multi-item batch
-        // (2+ requested items) -
-        // one full CraftingTreeNode per requested item, in request order,
-        // mirrors CraftingPlanResult.MultiItemRoots' own doc comment
-        // exactly (the synthetic wrapper root never surfaces here either).
-        // Null for a single-item plan, which continues to populate
-        // TreeRoot as before - CraftingPlanView.RenderPlan branches on
-        // whichever of the two is non-null.
+        // Populated INSTEAD of TreeRoot for a genuine multi-item batch (2+
+        // requested items): one full CraftingTreeNode per requested item, in
+        // request order, with no synthetic wrapper root - see
+        // CraftingPlanResult.MultiItemRoots. Null for a single-item plan;
+        // CraftingPlanView.RenderPlan branches on whichever is non-null.
         public List<CraftingTreeNode> MultiItemRoots { get; set; }
 
         // Passthrough of CraftingPlanResult.CurrencyMetadata (see that
@@ -144,15 +131,13 @@ namespace GW2CraftingHelper.Models
         // resolver's own null-safe fallbacks handle that case.
         public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
 
-        // source-selection-simplification (maintainer-approved redesign,
-        // docs/gw2e-considerations.md): passthrough of CraftingPlanResult.
-        // ItemMetadata, mirroring CurrencyMetadata's own precedent exactly
-        // - lets the recipe-tree renderer resolve a Subdued pill's
-        // StrictDomination item-kind deltas (raw item ids, e.g. Globs of
-        // Ectoplasm) to a display-ready name via PlanViewModelBuilder.
-        // ResolveName at render time, the same "id-only in the pure
-        // layers, resolved only at render" split CurrencyMetadata already
-        // establishes. Null under the same conditions as the source field.
+        // Passthrough of CraftingPlanResult.ItemMetadata, on the same
+        // precedent as CurrencyMetadata above: the recipe-tree renderer
+        // resolves a Subdued pill's StrictDomination item-kind deltas (raw
+        // item ids) to a display-ready name via
+        // PlanViewModelBuilder.ResolveName at render time, keeping ids out
+        // of the pure layers' output. Null under the same conditions as the
+        // source field.
         public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
 
         // Passthrough of

@@ -146,10 +146,8 @@ namespace GW2CraftingHelper.Services
             rows = rows ?? Array.Empty<PlanRowViewModel>();
             switch (sectionType)
             {
-                // Both of these gained a CTableHeaderRowHeight band in
-                // audit batch J's chrome unification: Used Materials had no
-                // header at all, and the Shopping List's was its own 22px
-                // unbanded style. Counted unconditionally, exactly as the
+                // Both of these draw a CTableHeaderRowHeight band, as the
+                // two c-tables below do. Counted unconditionally, exactly as
                 // two c-tables below are, because all four renderers emit
                 // the header before looking at the row count.
                 case PlanSectionType.UsedMaterials:

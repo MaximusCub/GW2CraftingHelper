@@ -230,7 +230,7 @@ namespace GW2CraftingHelper.Services
             /// which is exactly the number of rows the section renders once
             /// Expand All is pressed, and so the count the section header
             /// shows in parentheses like every other countable section
-            /// (audit batch J, L2). It rides this walk rather than a second
+            /// It rides this walk rather than a second
             /// one for the same reason the widths do.
             /// </summary>
             public readonly int NodeCount;

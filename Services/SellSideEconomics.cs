@@ -54,7 +54,7 @@ namespace GW2CraftingHelper.Services
             // reduction consumed would have netted after TP fees. VOM design
             // (Candidate A) UPDATE: in Valued mode, reduction is now
             // decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
-            // guide - see CraftingPlanPipeline's Step 5.5/5.6 doc comments),
+            // guide, built by CraftingPlanPipeline's zero-owned solve),
             // so owned mats are consumed first at zero acquisition cost ONLY
             // along the branch a zero-owned baseline would actually choose
             // to craft - not along every node's primary recipe option

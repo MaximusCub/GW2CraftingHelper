@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Views
         // manifest.json" for the source URL, "Not listed in manifest.json"
         // for the author - so one screen answered the same question three
         // ways, and two of the three named an implementation detail the
-        // reader has no way to act on (audit batch J, L7).
+        // reader has no way to act on.
         private const string NotAvailableText = "Not available";
         private const string BlishHudDependencyNamespace = "bh.blishhud";
 

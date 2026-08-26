@@ -1580,9 +1580,8 @@ namespace GW2CraftingHelper.Views
                         // Matches target within tolerance: the write is
                         // holding. Exit on this first confirmed-stable
                         // frame rather than requiring a multi-frame streak -
-                        // height is not still drifting (directive A), so one
-                        // clean frame is sufficient evidence nothing is
-                        // fighting the restore.
+                        // one clean frame is sufficient evidence that
+                        // nothing is fighting the restore.
                         if (diagEnabled)
                         {
                             LogScrollDiag($"verify exit reason=stable frame={ScrollDiagFrame()} realFrame={frame} target={target:0.0000} contentHeight={contentHeight}");
@@ -3066,16 +3065,15 @@ namespace GW2CraftingHelper.Views
         /// reason).
         ///
         /// A write here keeps the visible position correct for the
-        /// remainder of THIS tick (no flash mid-drag, matching directive
-        /// B's zero-flash goal); OnPanelResized separately arms a bounded
+        /// remainder of THIS tick, so the drag never flashes;
+        /// OnPanelResized separately arms a bounded
         /// verify window at drag SETTLE (ResizeSettleStep), not per tick,
         /// to contest that trailing later-frame reset once the drag stops
         /// producing new ticks - see StartResizeScrollVerify. A per-tick
-        /// verify window was deliberately not used: it would spawn (or
+        /// verify window is not used: it would spawn (or
         /// cancel-and-replace) a FrameTicker on every single drag frame,
-        /// which is the "spam" the task explicitly ruled out, and the
-        /// per-tick synchronous write already keeps each tick visually
-        /// correct without one.
+        /// and the per-tick synchronous write already keeps each tick
+        /// visually correct without one.
         /// </summary>
         private void PreserveScrollAcrossResize(int savedOffsetPx, int newContentPanelHeight)
         {
@@ -3256,7 +3254,7 @@ namespace GW2CraftingHelper.Views
             if (debugScrollbar != null && debugScrollbar.ScrollDistance != debugScrollBefore)
             {
                 Logger.Warn(
-                    "M33 C2b invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
+                    "Invariant violated: a relayout closure changed the scrollbar position (before={0:0.0000} after={1:0.0000}) - relayout must be scroll-neutral.",
                     debugScrollBefore, debugScrollbar.ScrollDistance);
             }
 #endif
@@ -3730,7 +3728,7 @@ namespace GW2CraftingHelper.Views
             // row's selection + quantity into the request list the
             // pipeline needs. Per-row quantity validation mirrors the
             // old single-quantity-box behavior exactly (invalid/blank/
-            // &lt;1 silently corrected to 1, with a user-visible notice) -
+            // <1 silently corrected to 1, with a user-visible notice) -
             // just applied once per row instead of once total.
             bool anyQtyInvalid = false;
             var rowInputs = new List<ItemRowRequestBuilder.RowInput>(_itemRows.Count);
@@ -5057,7 +5055,7 @@ namespace GW2CraftingHelper.Views
             if (section.Rows.Count > 0 && _relayoutActions.Count == relayoutCountBeforeBody)
             {
                 Logger.Warn(
-                    "M33 C2b: section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
+                    "Section {0} rendered {1} row(s) but its body registered no relayout closures - it will not track live window resize. See CreateCollapsibleSection.",
                     section.SectionType, section.Rows.Count);
             }
 #endif
@@ -5188,7 +5186,7 @@ namespace GW2CraftingHelper.Views
             if (_relayoutActions.Count == relayoutCountBeforeBody)
             {
                 Logger.Warn(
-                    "M33 C2b: section {0} rendered but its body registered no relayout closures - it will not track live window resize. See CreateRequiredRecipesSection.",
+                    "Section {0} rendered but its body registered no relayout closures - it will not track live window resize. See CreateRequiredRecipesSection.",
                     section.SectionType);
             }
 #endif

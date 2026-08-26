@@ -22,9 +22,8 @@ namespace GW2CraftingHelper.Services
     /// this class formats is for a HOVER TOOLTIP only - it must never be
     /// copied into a displayed total anywhere else in the app.
     ///
-    /// this hover can never
-    /// fire for the "unpriceable component" trigger the brief lists
-    /// alongside valued currencies. PlanSolver.RecomputeComparisonValues
+    /// This hover can never fire for an unpriceable component, only for a
+    /// valued currency. PlanSolver.RecomputeComparisonValues
     /// sets ComparisonValue = TotalCost for every fallback-tier decision,
     /// and fallback tier propagates transitively up through every Craft
     /// ancestor, so an unvalued currency or GuildUpgrade ingredient

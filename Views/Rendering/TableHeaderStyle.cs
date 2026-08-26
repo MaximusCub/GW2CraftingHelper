@@ -10,10 +10,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// draws itself with.
     ///
     /// <para>
-    /// <b>Inventory this replaces</b> (audit batch J, L3, re-taken at this
-    /// HEAD rather than from the audit's own older reading): three styles
-    /// across six tables. Four tables - Required Recipes, Required
-    /// Disciplines, the Recipe Tree (banded by batch D) and the Total Cost
+    /// <b>Inventory this replaces</b> (measured at this HEAD): three
+    /// styles across six tables. Four tables - Required Recipes, Required
+    /// Disciplines, the Recipe Tree and the Total Cost
     /// section's currency table - drew a dark band with DefaultFont14 white
     /// labels at 26px. The Shopping List drew no band, DefaultFont12 in
     /// #999999, at 22px. Used Materials had a right-hand Amount column and

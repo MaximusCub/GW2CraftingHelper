@@ -159,8 +159,8 @@ namespace GW2CraftingHelper.Models
         /// <summary>
         /// VOM finding #1 fix: the ORIGINAL, unreduced tree from GENERATION
         /// time (the same `tree` OwnedMaterialsForceBuyPrePass and the
-        /// zero-owned decision pass ran against - see CraftingPlanPipeline's
-        /// Step 5.5/5.6), snapshotted here ONLY when the force-buy pre-pass
+        /// zero-owned decision pass ran against, in
+        /// CraftingPlanPipeline), snapshotted here ONLY when the force-buy pre-pass
         /// ran (ForceBuyOnlyNodeIds != null) so ResolveWithOverrides can
         /// re-run InventoryReducer.Reduce with an overrides-aware guide on
         /// every local re-solve, instead of permanently replaying overrides

@@ -116,81 +116,20 @@ namespace GW2CraftingHelper.Views
         // RebuildRows.
         private bool _hasRenderedAnyRow;
 
-        // True once Build's own initial RebuildRows call (see the bottom
-        // of Build) has finished. Originally added (PR #99) to guard
-        // PollForUpdates against a real race: per docs/ARCHITECTURE.md
-        // Section 1, Blish HUD's own WindowBase2.ShowView runs a tab's
-        // Build() via View.DoLoad().ContinueWith(...) - with no
-        // SynchronizationContext installed, that continuation resumes on a
-        // ThreadPool thread, not the main/game thread. Without this guard,
-        // PollForUpdates() (main thread, driven by Module.Update() as soon
-        // as SelectedTab flips to the Log tab) could invoke RebuildRows()
-        // concurrently with Build()'s own tail RebuildRows() call, on the
-        // SAME freshly-created _contentPanel - this produced two stacked
-        // "No log entries yet." placeholders, confirmed live.
-        // <para>
-        // A second path reaches the SAME hazard:
-        // Module.cs's TabChanged handler also calls Refresh() ->
-        // RebuildRows() synchronously on the main thread whenever the Log
-        // tab becomes selected; without this latch, Build()'s
-        // ThreadPool-thread RebuildRows() call
-        // and TabChanged's main-thread RebuildRows() call landed on the
-        // SAME instance at the same time, and two threads concurrently
-        // Enqueue-ing into _renderedRows corrupted its internal array,
-        // crashing with "Destination array was not long enough" inside
-        // Queue&lt;T&gt;.SetCapacity.
-        // </para>
-        // <para>
-        // Fix: Build()'s own tail (the RebuildRows() call plus the write to
-        // this field) is now marshaled onto the main thread via
-        // MainThreadMarshal.Run (see Build()'s own comment) - so it, along
-        // with PollForUpdates() and Refresh() (both main-thread-only
-        // already), can never execute concurrently with anything: a single
-        // thread cannot run two call stacks at the same instant, so the
-        // race is impossible BY CONSTRUCTION, not merely guarded. This
-        // field is KEPT (not removed as obsolete) - it still gates
-        // PollForUpdates(), Refresh(), the level dropdown/search box
-        // ValueChanged/TextChanged handlers, and ClearView() against acting
-        // before Build()'s own queued tail has actually landed, which
-        // avoids a wasted, redundant RebuildRows() pass rather than a crash
-        // now - belt-and-braces, not a safety requirement any more.
-        // volatile is REMOVED: every read and write of this field now
-        // happens on the main thread only (Build()'s write runs inside the
-        // MainThreadMarshal.Run callback), so there is no remaining
-        // cross-thread visibility concern for volatile to address, and
-        // keeping it would misleadingly suggest this field is still
-        // accessed from more than one thread.
-        // </para>
-        // <para>
-        // PRECISE INVARIANT (the claim this fix actually establishes, not a
-        // broader one): <see cref="_renderedRows"/>, <see
-        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
-        // <see cref="_fullPrefixWidth"/>, <see cref="_lastLayoutWidth"/>, the
-        // Module-owned "Clear View" floor reached via
-        // <see cref="_getClearedBeforeVersion"/>/
-        // <see cref="_setClearedBeforeVersion"/>, this field, and
-        // _contentPanel's Children collection are MAIN-THREAD-ONLY - every
-        // entry point that touches them (Build's marshaled tail,
+        // True once Build's own tail - marshaled onto the main thread via
+        // MainThreadMarshal.Run - has run its initial RebuildRows. Gates
         // PollForUpdates, Refresh, the level dropdown/search box handlers
-        // via RebuildRowsIfBuilt, ClearView, and the container Resized
-        // handler - counting with it the trailing re-fit it defers through
-        // _resizeSettle, which marshals back onto this same thread) runs on
-        // the main thread, and the five of those (every
-        // one except Build's own tail, which IS the thing being awaited)
-        // additionally defer to Build's tail rather than acting while it is
-        // still pending. This is narrower than "every field this class
-        // touches is main-thread-only": the control fields (_toolbarPanel,
-        // _levelDropdown, _searchBox, _followCheckbox, _clearViewButton,
-        // _copyButton, _deleteFileButton, _statusPanel, _statusLabel,
-        // _contentPanel) are still first
-        // PUBLISHED by the rest of Build()'s body on the ThreadPool thread,
-        // same as every Blish view in this module - any main-thread read of
-        // one of them (e.g. CopyToClipboard/SetStatus reading
-        // _statusLabel, which does not touch any of the state above and so
-        // is deliberately NOT gated on this field) must stay behind its
-        // existing null guard (IsLive, _searchBox?, _statusLabel == null)
-        // rather than assume the field is already non-null.
-        // </para>
+        // and ClearView so none of them rebuilds before that tail lands.
+        //
+        // This field is MAIN-THREAD-ONLY, and so are _renderedRows,
+        // _lastSeenVersion, _hasRenderedAnyRow, _fullPrefixWidth,
+        // _lastLayoutWidth, the Module-owned "Clear View" floor reached
+        // through _getClearedBeforeVersion/_setClearedBeforeVersion, and
+        // _contentPanel's Children. The control fields are NOT: the rest of
+        // Build publishes them from a ThreadPool thread, so a main-thread
+        // read of one (CopyToClipboard/SetStatus reading _statusLabel) must
+        // keep its null guard. What single-threading closes is two rebuilds
+        // interleaving - see docs/ARCHITECTURE.md section 1.
         private bool _buildComplete;
 
         // FIFO of every currently-displayed "real" row (never the
@@ -311,7 +250,7 @@ namespace GW2CraftingHelper.Views
             // Textbox first, then the dropdown that narrows it - the
             // order the Snapshot tab's own search row uses. This row read
             // dropdown-then-textbox, so the module's two search rows were
-            // mirror images of each other (audit batch J, M12).
+            // mirror images of each other.
             _searchBox = new TextBox
             {
                 Size = new Point(LogToolbarLayout.SearchMinWidth, SearchBoxHeight),

@@ -257,7 +257,7 @@ namespace GW2CraftingHelper.Views
         // One status label for the whole tab, next to the one Save button in
         // the header bar (see BuildSaveBar) - the four per-section Save rows
         // and their four status labels this replaced are recorded in
-        // KNOWN-ISSUES #55 (audit batch G supersedes B14).
+        // KNOWN-ISSUES #55.
         private Label _statusLabel;
 
         // The save bar's own controls. The dirty chip and Discard are hidden
@@ -1740,8 +1740,8 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(CurrencyFilterWidth, 26),
                 Location = new Point(CellNameX, CellInputY),
                 // "Search {scope}..." - the one placeholder shape the
-                // module's other three search boxes use (audit batch J,
-                // M12). This box was the lone "Filter ..." spelling.
+                // module's other three search boxes use; this box was the
+                // lone "Filter ..." spelling.
                 PlaceholderText = "Search currencies...",
                 Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
@@ -1951,7 +1951,7 @@ namespace GW2CraftingHelper.Views
                 // "Clear" named an ACTION this control does not perform:
                 // it is a persistent three-state flag that suppresses the
                 // curated default, not a button that empties the box beside
-                // it (audit batch J, M12). "Ignore" names the state.
+                // it. "Ignore" names the state.
                 //
                 // Not the longer "Ignore default": the cell reserves
                 // SettingsCurrencyGridLayout.CellClearWidth (74px) for this

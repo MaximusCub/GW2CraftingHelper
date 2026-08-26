@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Models
         // (RecipeOption.Flags contains "LearnedFromItem" - see
         // PlanResultBuilder). Drives which wiki page the Required Recipes
         // Missing! row links to (WikiLinkBuilder.BuildRequiredRecipeUrl):
-        // the recipe's own "Recipe: &lt;name&gt;" sheet page when true, the
+        // the recipe's own "Recipe: <name>" sheet page when true, the
         // output item's page + "#Acquisition" anchor otherwise.
         public bool IsLearnedFromItem { get; set; }
 

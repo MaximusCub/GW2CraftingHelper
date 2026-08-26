@@ -353,7 +353,7 @@ namespace GW2CraftingHelper.Services
             ISet<int> competencyIndependentForceBuyNodeIds = null,
             // When non-null, populated with each node's raw (buyCost,
             // craftCost) so OwnedMaterialsForceBuyPrePass can apply gw2e's
-            // buyPrice &lt; craftDecisionPrice * 0.85 rule without
+            // buyPrice < craftDecisionPrice * 0.85 rule without
             // duplicating this method's aggregation. Never affects this
             // solve's own Decisions/Plan.
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,

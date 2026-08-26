@@ -381,7 +381,7 @@ namespace GW2CraftingHelper.Views
         // gate) and runs its finally straight away, so a single flag would
         // let that no-op click switch the running auto-refresh's spinner
         // off. The spinner shows the OR of the two - see
-        // <see cref="ApplySpinnerVisibility"/>.
+        // ApplySpinnerVisibility.
         private bool _backgroundRefreshInFlight;
         private Color _defaultStatusColor;
 
@@ -731,77 +731,31 @@ namespace GW2CraftingHelper.Views
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
 
-            // Same hazard family as the LogTabContent field crash
-            // (KNOWN-ISSUES #36): Blish HUD runs a tab's Build() via
-            // View.DoLoad().ContinueWith(...) on a ThreadPool thread, not the
-            // main/game thread (docs/ARCHITECTURE.md Section 1). Unlike
-            // LogTabContent, this instance is never recreated per tab visit
-            // (Module.cs creates ONE MainView in Initialize() and keeps
-            // reusing it), and Module.Update() calls SetSnapshot()/
-            // SetStatus() on it every tick a background refresh completes -
-            // regardless of which tab is currently selected, so it is not
-            // even limited to "user is on the Snapshot tab right now". Both
-            // paths end up calling UpdateCoinDisplay/ApplyStatusDisplay/
-            // RebuildContent, which dispose-then-add into _coinPanel.
-            // Children/_contentPanel.Children.
-            // <para>
-            // NOT the hazard, despite resembling one: Blish's own
-            // Container.Children (ControlCollection&lt;T&gt;) is itself
-            // ReaderWriterLockSlim-guarded on every operation - Add, Remove,
-            // AddRange, and the indexer all EnterWriteLock; Count and the
-            // indexer getter EnterReadLock; GetEnumerator EnterReadLocks and
-            // releases it from its ControlEnumerator's Dispose() -
-            // independently confirmed by decompiling
-            // packages/BlishHUD.1.3.0's Blish HUD.exe with ilspycmd. Unlike
-            // LogTabContent's plain unsynchronized Queue&lt;(long,Label)&gt;,
-            // concurrent Children access cannot corrupt the collection's own
-            // internals.
-            // </para>
-            // <para>
-            // The two hazards marshaling this tail actually closes: (a)
-            // dispose-then-add is a non-atomic COMPOUND sequence - Children's
-            // own lock protects each individual Add/Remove call, but nothing
-            // holds a lock across the whole "dispose every old child, then
-            // add every new one" sequence, so two interleaved
-            // UpdateCoinDisplay/RebuildContent calls can each finish
-            // disposing the OLD children before either adds the NEW ones,
-            // and both survive - duplicated content, the same shape as the
-            // doubled "No log entries yet." placeholders LogTabContent
-            // hit live (see LogTabContent.cs's _buildComplete doc
-            // comment); and (b) the top-of-Build
-            // _searchDebounceCts?.Cancel();?.Dispose(); sequence this branch
-            // moved into this tail used to run directly in Build()'s
-            // ThreadPool-thread body, racing ScheduleSearchRebuild()/
-            // RebuildContent(), which write the same field on the main
-            // thread - CancellationTokenSource.Cancel() calls
-            // ThrowIfDisposed(), so whichever call landed second on the
-            // shared reference could throw ObjectDisposedException.
-            // Marshaling this tail onto the main thread serializes it
-            // against every Update()-driven SetSnapshot/SetStatus call and
-            // every main-thread handler touching the same fields, so
-            // neither hazard can occur - impossible BY CONSTRUCTION, matching
-            // LogTabContent's fix (which closes the DIFFERENT hazard of an
-            // actually-unsynchronized Queue&lt;T&gt;, not a Children race).
-            // </para>
-            // UpdateCoinDisplay is called here (rather than earlier, right
-            // after _coinPanel is created) so all three calls land in the
-            // same queued callback as the _searchDebounceCts cleanup above.
-            // <para>
-            // This does NOT make every MainView mutation path main-thread-
-            // only - unlike the state above, the panel/control fields
-            // themselves (_headerPanel, _contentPanel, _coinPanel,
-            // _searchBox, the checkboxes, etc.) are still first published
-            // by the REST of Build()'s body on this same ThreadPool thread,
-            // same as LogTabContent's eight control fields. This file's own
-            // Clear Cache/Refresh Now/checkbox/dropdown click handlers are
-            // wired up mid-body and become clickable the instant each
-            // control is parented, so they can run on the main thread while
-            // Build() is still constructing later controls; that is only
-            // survivable because every one of those handlers' downstream
-            // calls (UpdateCoinDisplay, ApplyStatusDisplay, RebuildContent)
-            // already null-guards the field it touches. Pre-existing
-            // pattern, not changed by this fix.
-            // </para>
+            // Build() runs on a ThreadPool thread (docs/ARCHITECTURE.md
+            // section 1), and this instance is never recreated: Module.cs
+            // creates ONE MainView and Module.Update() calls SetSnapshot()/
+            // SetStatus() on it on the main thread every tick a background
+            // refresh completes, whatever tab is selected. Both paths reach
+            // UpdateCoinDisplay/ApplyStatusDisplay/RebuildContent, which
+            // dispose-then-add into _coinPanel/_contentPanel Children - a
+            // compound sequence Blish's own per-call Children lock does not
+            // cover, so two interleaved rebuilds can each finish disposing
+            // before either adds, and both survive (KNOWN-ISSUES #36, and
+            // docs/ARCHITECTURE.md section 1 for the decompiled evidence).
+            // The same tail also cancels+disposes _searchDebounceCts, which
+            // ScheduleSearchRebuild/RebuildContent write from the main
+            // thread; whichever Cancel() landed second on a disposed source
+            // would throw ObjectDisposedException. Marshaling the whole tail
+            // serializes it against both.
+            //
+            // This does NOT make MainView main-thread-only: the control
+            // fields are still published by the rest of Build()'s body on
+            // the ThreadPool thread, and the click handlers wired mid-body
+            // become live before Build() finishes - which is survivable only
+            // because every downstream call null-guards the field it
+            // touches. UpdateCoinDisplay is called here, rather than right
+            // after _coinPanel is created, so all three calls land in the
+            // same queued callback as the _searchDebounceCts cleanup.
             MainThreadMarshal.Run(() =>
             {
                 // Supersedes any debounce armed by a previous visit to this
