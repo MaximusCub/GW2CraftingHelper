@@ -501,6 +501,84 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // The other half: a 404 from /v2/recipes/search is empty without
+        // being an answer, and the overlay now outlives the session, so
+        // persisting one would record a craftable item as an uncraftable
+        // leaf in every plan until ArenaNet ships a new game build.
+        [Fact]
+        public async Task RecipeService_UnprovenEmptySearch_IsNotPersisted_NorRepeatedNextSession()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+
+                var overlay1 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay1.Load(currentGw2BuildId: null);
+                overlay1.InvalidateIfStale(buildId);
+                overlay1.SetCurrentBuildId(buildId);
+
+                var outage = new InMemoryRecipeApiClient();
+                outage.Return404ForSearch.Add(100);
+                var degradedTree = await new RecipeService(outage, cacheStore: overlay1)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                // The plan still degrades to a leaf for this run - the
+                // recipes are genuinely unknown - it just leaves no record.
+                Assert.Empty(degradedTree.Recipes);
+
+                var inspect = new OverlayRecipeCacheStore(tmp.Path);
+                inspect.Load(currentGw2BuildId: null);
+                inspect.InvalidateIfStale(buildId);
+                Assert.Null(inspect.TryGetSearch(100));
+
+                // A later session with a healthy endpoint asks it again and
+                // gets the real tree.
+                var overlay2 = new OverlayRecipeCacheStore(tmp.Path);
+                overlay2.Load(currentGw2BuildId: null);
+                overlay2.InvalidateIfStale(buildId);
+                overlay2.SetCurrentBuildId(buildId);
+
+                var healthy = new InMemoryRecipeApiClient();
+                healthy.AddSearchResult(100, 1);
+                healthy.AddRecipe(new RawRecipe
+                {
+                    Id = 1,
+                    OutputItemId = 100,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 200, Count = 2 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string>()
+                });
+
+                var tree = await new RecipeService(healthy, cacheStore: overlay2)
+                    .BuildTreeAsync(100, 1, CancellationToken.None);
+
+                Assert.Single(tree.Recipes);
+                Assert.Equal(200, tree.Recipes[0].Ingredients[0].Id);
+            }
+        }
+
+        // Within one session too: a transient 404 must not freeze the item
+        // as a leaf for every later Generate the way an answered empty does.
+        [Fact]
+        public async Task RecipeService_UnprovenEmptySearch_IsNotHeldInTheSessionCache()
+        {
+            var api = new InMemoryRecipeApiClient();
+            api.Return404ForSearch.Add(100);
+
+            var service = new RecipeService(api, cacheStore: new InMemoryRecipeCacheStore());
+            await service.BuildTreeAsync(100, 1, CancellationToken.None);
+            int afterFirstBuild = api.SearchCallCount;
+
+            await service.BuildTreeAsync(100, 1, CancellationToken.None);
+
+            Assert.True(api.SearchCallCount > afterFirstBuild);
+        }
+
         [Fact]
         public void SeededStore_NegativeEntry_ReturnsNull_WhenSeedStale()
         {
@@ -612,11 +690,12 @@ namespace GW2CraftingHelper.Tests.Services
             public int SearchCallCount => _searchCallCount;
             public int RecipeCallCount => _recipeCallCount;
 
-            public Task<IReadOnlyList<int>> SearchByOutputAsync(
+            public Task<RecipeSearchResult> SearchByOutputAsync(
                 int itemId, CancellationToken ct)
             {
                 Interlocked.Increment(ref _searchCallCount);
-                return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+                return Task.FromResult(
+                    new RecipeSearchResult(Array.Empty<int>(), absenceProven: true));
             }
 
             public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)

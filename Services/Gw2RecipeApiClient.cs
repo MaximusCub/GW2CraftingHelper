@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
             _http = http;
         }
 
-        public async Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public async Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
             // Even with the schema version pinned, upstream's search
             // index has its own gap: some recipes exist and are fetchable
@@ -40,9 +40,12 @@ namespace GW2CraftingHelper.Services
             string json = await GetJsonAsync(url, ct);
             if (json == null)
             {
-                return new List<int>();
+                // Empty, but NOT proof of absence - see
+                // RecipeSearchResult.AbsenceProven.
+                return new RecipeSearchResult(new List<int>(), absenceProven: false);
             }
-            return JsonConvert.DeserializeObject<List<int>>(json);
+            return new RecipeSearchResult(
+                JsonConvert.DeserializeObject<List<int>>(json), absenceProven: true);
         }
 
         public async Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)

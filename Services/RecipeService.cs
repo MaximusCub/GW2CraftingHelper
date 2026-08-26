@@ -413,16 +413,31 @@ namespace GW2CraftingHelper.Services
 
             var result = await _api.SearchByOutputAsync(itemId, ct);
 
+            // Only an answer the search endpoint actually gave is worth
+            // keeping: a 404 means "nothing produces this item" as readily as
+            // it means the endpoint is down (see
+            // RecipeSearchResult.AbsenceProven), and what survives such a
+            // response is at best incomplete - empty for an ordinary item,
+            // or Mystic-Forge-only for one the composite client could fill
+            // in. Cached, that renders a craftable item as an uncraftable (or
+            // half-craftable) leaf and stops every later attempt short of the
+            // API that would correct it: for the session in _searchCache, and
+            // until the next game build in the persistent overlay.
+            if (!result.AbsenceProven)
+            {
+                return result.RecipeIds;
+            }
+
             lock (_cacheGate)
             {
                 if (!_searchCache.ContainsKey(itemId))
                 {
-                    _searchCache[itemId] = result;
+                    _searchCache[itemId] = result.RecipeIds;
                 }
             }
 
-            _cacheStore.PutSearch(itemId, result);
-            return result;
+            _cacheStore.PutSearch(itemId, result.RecipeIds);
+            return result.RecipeIds;
         }
 
         private async Task<RawRecipe> GetRecipeCachedAsync(int recipeId, CancellationToken ct)

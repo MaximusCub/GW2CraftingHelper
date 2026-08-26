@@ -18,9 +18,12 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullRecipeApiClient : IRecipeApiClient
     {
-        public Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+            // Offline mode answers for the endpoint, so its empties are as
+            // final as a 2xx body's - nothing here is a degraded API.
+            return Task.FromResult(
+                new RecipeSearchResult(Array.Empty<int>(), absenceProven: true));
         }
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
