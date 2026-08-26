@@ -408,6 +408,54 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // Spec step 6 (Clear Cache): the only manual route out of a bad
+        // overlay once wipe-on-mismatch is gone. All three files go, a
+        // later flush does not resurrect them, a fresh Load yields an
+        // empty overlay, and the seed keeps serving through the composite.
+        [Fact]
+        public void Overlay_Clear_DeletesAllFiles_AndSeedStillServes()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load();
+                overlay.SetCurrentBuildId(buildId);
+                overlay.PutSearch(700, new List<int> { 7 });
+                overlay.PutRecipe(7, NewRecipe(7, 700));
+                overlay.SetCorpusVerified(buildId, 3);
+                overlay.Flush(force: true);
+                Assert.True(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+
+                overlay.Clear();
+
+                Assert.False(File.Exists(Path.Combine(cacheDir, "search_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "recipes_overlay.json")));
+                Assert.False(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+                Assert.Null(overlay.TryGetSearch(700));
+                Assert.Null(overlay.TryGetRecipe(7));
+
+                // The verification stamp is zeroed, so the probe re-arms.
+                Assert.Equal(0, overlay.NegativesVerifiedBuildId);
+
+                // Nothing dirty survives Clear for a later flush to
+                // resurrect.
+                overlay.Flush(force: true);
+                Assert.False(File.Exists(Path.Combine(cacheDir, "overlay_manifest.json")));
+
+                var reloaded = new OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load();
+                Assert.Null(reloaded.TryGetSearch(700));
+
+                var composite = new CompositeRecipeCacheStore(
+                    NewSeedWithOneRecipe(), reloaded);
+                Assert.Equal(new[] { 1 }, composite.TryGetSearch(100));
+                Assert.Empty(composite.TryGetSearch(700));
+            }
+        }
+
         // Spec 2.6: the session search memo has no invalidation of its
         // own, so a corpus repair landing mid-session would stay invisible
         // for item ids already resolved this session. InvalidateSearch is

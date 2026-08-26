@@ -347,6 +347,28 @@ namespace GW2CraftingHelper.Services.Recipes
             }
         }
 
+        /// <summary>
+        /// The manual route out of a bad overlay, now that build changes
+        /// never wipe one (Module.ClearCache): deletes the three files and
+        /// resets the in-memory overlay to empty. The shipped seed is
+        /// untouched, and the zeroed verification stamp re-arms the corpus
+        /// probe.
+        /// </summary>
+        public void Clear()
+        {
+            lock (_gate)
+            {
+                DeleteOverlayFiles();
+                _searches = new Dictionary<int, IReadOnlyList<int>>();
+                _recipes = new Dictionary<int, RawRecipe>();
+                _storedBuildId = null;
+                _negativesVerifiedBuildId = 0;
+                _verifiedKnownRecipeCount = 0;
+                _droppedLearnedNegatives = 0;
+                ClearDirtyLocked();
+            }
+        }
+
         public void Flush(bool force = false)
         {
             lock (_gate)

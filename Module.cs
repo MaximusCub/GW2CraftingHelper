@@ -1686,7 +1686,25 @@ namespace GW2CraftingHelper
                 // no automatic route to a snapshot until Blish restarts.
                 _firstLoadRefreshAttempted = false;
                 _sinceFirstLoadGateCheck = FirstLoadGateCheckInterval;
+
+                // Recipe overlay too: the only manual route out of a bad
+                // learned overlay now that build changes never wipe one
+                // (staleness policy). Costs one cold rebuild; the shipped
+                // seed is untouched.
+                _recipeOverlay?.Clear();
+                ModuleLog.Shared.Write(ModuleLogLevel.Info, "store", "Clear Cache: recipe overlay cleared; seed data retained.");
             });
+
+            // Outside the gate's lock: restamp provenance if the live build
+            // is known, and re-verify the now-seed-only corpus in the
+            // background (Clear zeroed the stamp, so the probe re-arms).
+            int liveBuild = Volatile.Read(ref _liveGw2BuildId);
+            if (liveBuild != 0)
+            {
+                _recipeOverlay?.SetCurrentBuildId(liveBuild);
+            }
+
+            KickCorpusVerification();
         }
 
         private void PersistStatus(string status)
