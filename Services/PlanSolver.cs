@@ -200,6 +200,38 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// What the recipe phase found: the four trackers the decision
+        /// reads. Copies, deliberately - BestRecipeTracker is a mutable
+        /// struct that must only ever be accumulated through a direct
+        /// local, so this carries the finished state out and nothing more.
+        /// </summary>
+        private readonly struct RecipeCandidates
+        {
+            /// <summary>Cheapest recipe whose cost is comparable in coin.</summary>
+            public readonly BestRecipeTracker BestComparable;
+
+            /// <summary>Cheapest recipe demoted by an unvalued currency.</summary>
+            public readonly BestRecipeTracker BestFallback;
+
+            /// <summary>The same two, restricted to recipes the account can craft.</summary>
+            public readonly BestRecipeTracker BestCompetentComparable;
+
+            public readonly BestRecipeTracker BestCompetentFallback;
+
+            public RecipeCandidates(
+                BestRecipeTracker bestComparable,
+                BestRecipeTracker bestFallback,
+                BestRecipeTracker bestCompetentComparable,
+                BestRecipeTracker bestCompetentFallback)
+            {
+                BestComparable = bestComparable;
+                BestFallback = bestFallback;
+                BestCompetentComparable = bestCompetentComparable;
+                BestCompetentFallback = bestCompetentFallback;
+            }
+        }
+
+        /// <summary>
         /// Solve-invariant state threaded through every Evaluate()
         /// recursion, constructed once per Solve() call. Only the node
         /// under evaluation varies per call and stays a plain parameter.
@@ -758,19 +790,356 @@ namespace GW2CraftingHelper.Services
             // valuation affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
-            long? comparableVendorValue = vendorEvaluation.BestComparableValue;
-            long? comparableVendorCoinCost = vendorEvaluation.BestComparableCoinCost;
-            List<CostLine> comparableVendorCurrencyCosts = vendorEvaluation.BestComparableCurrencyCosts;
-            VendorBatchSolver.VendorOfferBatch? comparableVendorBatch = vendorEvaluation.BestComparableBatch;
-            long? fallbackVendorCoinCost = vendorEvaluation.FallbackCoinCost;
-            List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
-            VendorBatchSolver.VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
 
-            List<VendorItemCostLine> comparableVendorItemCosts = vendorEvaluation.BestComparableItemCosts;
-            bool comparableVendorHasRawCoin = vendorEvaluation.BestComparableHasRawCoin;
-            List<VendorItemCostLine> fallbackVendorItemCosts = vendorEvaluation.FallbackItemCosts;
-            bool fallbackVendorHasRawCoin = vendorEvaluation.FallbackHasRawCoin;
+            var candidates = SelectBestRecipes(node, ctx);
+            var bestComparable = candidates.BestComparable;
+            var bestFallback = candidates.BestFallback;
+            var bestCompetentComparable = candidates.BestCompetentComparable;
+            var bestCompetentFallback = candidates.BestCompetentFallback;
 
+            // canCraft = gw2e's "hasComponents": true whenever a recipe
+            // exists, comparable or fallback tier alike. A node with a
+            // comparable recipe but no buy price always force-crafts via
+            // PickCheapest (craftBeatsBuy is true when buyCost is null).
+            bool canCraft = bestComparable.Cost.HasValue || bestFallback.Cost.HasValue;
+            bool canBuyTp = buyTotalCost.HasValue;
+            bool canBuyVendor = vendorEvaluation.BestComparableValue.HasValue ||
+                                vendorEvaluation.FallbackCoinCost.HasValue;
+
+            // The force-buy pre-pass marks this node craft:false before
+            // the automatic comparison; a manual override (checked next,
+            // using the unmodified canCraft) still always wins.
+            bool isForceBuyOnly = ctx.ForceBuyOnlyNodeIds != null &&
+                ctx.ForceBuyOnlyNodeIds.Contains(node.NodeId);
+            bool craftExcludedFromAutoPick = isForceBuyOnly;
+
+            // Craft should only win the automatic pick when some character
+            // can actually craft it - checked against whichever recipe
+            // would actually be used. Folded into the same
+            // craftExcludedFromAutoPick flag the force-buy pre-pass uses;
+            // canCraft and the manual-override branch never read it, so
+            // CRAFT stays clickable. Null bestRatingByDiscipline means
+            // competency unknown and never penalizes.
+            //
+            // Also gated on a genuine COMPARABLE next-best source
+            // existing: a node whose only path is Craft must still
+            // auto-pick Craft, or its cost drops out of the plan entirely
+            // (UnknownSource, null TotalCost). A fallback-tier vendor
+            // offer does not count as a genuine alternative - excluding
+            // craft for one would commit an unvalued-currency purchase and
+            // silently drop the node's real priced cost from the gold
+            // total.
+            bool hasComparableAlternative = buyTotalCost.HasValue || vendorEvaluation.BestComparableValue.HasValue;
+            // Prefer the best competent option per tier (comparable
+            // first), falling back to the raw best only when no competent
+            // option exists anywhere. That raw fallback still wins
+            // automatically when hasComparableAlternative is false - the
+            // "no genuine alternative -> auto-craft regardless of
+            // competency" carve-out. Also the recipe fed to
+            // BuildCraftCostBreakdown, so the CRAFT pill's comparison uses
+            // whichever recipe would actually be used.
+            bool anyCompetentCraftOption = bestCompetentComparable.Option != null ||
+                bestCompetentFallback.Option != null;
+
+            // Resolved once into a single CraftAutoPickCandidate -
+            // comparable-first, fallback otherwise, competent-preferred
+            // within each tier. A fallback-tier candidate's
+            // ComparisonValue is null; a null Option means no recipe at all.
+            CraftAutoPickCandidate? autoPickCandidate;
+            if (bestCompetentComparable.Option != null)
+            {
+                autoPickCandidate = new CraftAutoPickCandidate(
+                    bestCompetentComparable.Option, bestCompetentComparable.RealCost,
+                    bestCompetentComparable.Cost, bestCompetentComparable.RecipeId);
+            }
+            else if (bestCompetentFallback.Option != null)
+            {
+                autoPickCandidate = new CraftAutoPickCandidate(
+                    bestCompetentFallback.Option, bestCompetentFallback.RealCost,
+                    null, bestCompetentFallback.RecipeId);
+            }
+            else if (bestComparable.Option != null)
+            {
+                autoPickCandidate = new CraftAutoPickCandidate(
+                    bestComparable.Option, bestComparable.RealCost,
+                    bestComparable.Cost, bestComparable.RecipeId);
+            }
+            else if (bestFallback.Option != null)
+            {
+                autoPickCandidate = new CraftAutoPickCandidate(
+                    bestFallback.Option, bestFallback.RealCost,
+                    null, bestFallback.RecipeId);
+            }
+            else
+            {
+                autoPickCandidate = null;
+            }
+
+            RecipeOption autoPickCraftOption = autoPickCandidate?.Option;
+
+            // DecisionValue must reflect the tier autoPickCraftOption came
+            // from - null for a fallback-tier pick, per
+            // PillSourceCostBreakdown.DecisionValue's null contract.
+            long? craftBreakdownDecisionValue = autoPickCandidate?.ComparisonValue;
+
+            // The real cost/RecipeId twin of craftBreakdownDecisionValue,
+            // feeding PickCheapest and the Craft Commit sites so they
+            // always operate on the same recipe; falls back to the raw
+            // (possibly-incompetent) cost when nothing competent exists
+            // and craftExcludedFromAutoPick is false.
+            long? autoPickCraftRealCost = autoPickCandidate?.RealCost;
+            int autoPickRecipeId = autoPickCandidate?.RecipeId ?? 0;
+
+            // Tracked separately from craftExcludedFromAutoPick (which the
+            // force-buy pre-pass also sets) so Plan Notes can tell "no
+            // character is trained" apart from "buying is cheaper".
+            bool craftExcludedByCompetency = autoPickCraftOption != null &&
+                hasComparableAlternative &&
+                !anyCompetentCraftOption;
+            if (craftExcludedByCompetency)
+            {
+                craftExcludedFromAutoPick = true;
+            }
+
+            // The numerically cheapest raw craft candidate overall - same
+            // tier priority as autoPickCraftOption but without the
+            // competent-first override, so this can be untrained even when
+            // the auto pick resolved to a competent recipe.
+            RecipeOption cheapestCraftOptionOverall = bestComparable.Option ?? bestFallback.Option;
+            long? cheapestCraftRealCostOverall = bestComparable.Option != null
+                ? bestComparable.RealCost
+                : bestFallback.RealCost;
+
+            // Gated on !isCompetencyIndependentForceBuy, not
+            // !isForceBuyOnly: force-buy membership can itself be
+            // competency-caused (the pre-pass's craft diagnostic is
+            // competency-resolved), in which case training would empty the
+            // force-buy set - exactly the opportunity this field reports.
+            // Only a node forced under both evaluations of the 0.85 rule
+            // is genuinely forced regardless of training.
+            bool isCompetencyIndependentForceBuy = ctx.CompetencyIndependentForceBuyNodeIds != null &&
+                ctx.CompetencyIndependentForceBuyNodeIds.Contains(node.NodeId);
+            bool cheapestCraftUntrained = !isCompetencyIndependentForceBuy &&
+                cheapestCraftOptionOverall != null &&
+                ctx.BestRatingByDiscipline != null &&
+                !CraftCompetencyEvaluator.AccountCanCraft(
+                    cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, ctx.BestRatingByDiscipline);
+
+            // Raw cost breakdowns for every feasible source, computed
+            // unconditionally and never fed back into any comparison (see
+            // PillSourceCostBreakdown).
+            var tpBreakdown = canBuyTp
+                ? new PillSourceCostBreakdown
+                {
+                    IsAvailable = true,
+                    RawCoin = buyTotalCost.Value,
+                    DecisionValue = buyTotalCost.Value,
+                }
+                : new PillSourceCostBreakdown { IsAvailable = false };
+
+            PillSourceCostBreakdown vendorBreakdown;
+            if (vendorEvaluation.BestComparableValue.HasValue)
+            {
+                vendorBreakdown = BuildVendorCostBreakdown(
+                    vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableItemCosts,
+                    vendorEvaluation.BestComparableValue);
+            }
+            else if (vendorEvaluation.FallbackCoinCost.HasValue)
+            {
+                // Fallback tier: an unvalued non-coin currency line exists
+                // on this offer - DecisionValue stays null, mirroring
+                // hasUnvaluedCurrency's craft-side treatment.
+                vendorBreakdown = BuildVendorCostBreakdown(
+                    vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackItemCosts, null);
+            }
+            else
+            {
+                vendorBreakdown = new PillSourceCostBreakdown { IsAvailable = false };
+            }
+
+            // Raw diagnostics for OwnedMaterialsForceBuyPrePass, recorded
+            // regardless of decision. CraftCost is the same tier/
+            // competency-resolved pair the Craft commit sites use - a
+            // competency-blind figure here would let the 0.85 comparison
+            // run on a craft cost the real solve would never commit to.
+            if (ctx.CostDiagnostics != null)
+            {
+                ctx.CostDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
+            }
+
+            // The competency-blind twin of the write above, letting the
+            // pre-pass run its second 0.85 evaluation without a second
+            // Solve() call.
+            if (ctx.RawCraftCostDiagnostics != null)
+            {
+                ctx.RawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
+            }
+
+            // True when any direct ingredient of this breakdown's recipe
+            // was reduced by owned account stock (see
+            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock).
+            bool craftIngredientsReducedByOwnedStock = autoPickCraftOption != null &&
+                ctx.OwnedQuantityUsedByNode != null &&
+                AnyIngredientReducedByOwnedStock(autoPickCraftOption, ctx.OwnedQuantityUsedByNode);
+            var craftBreakdown = autoPickCraftOption != null
+                ? BuildCraftCostBreakdown(autoPickCraftOption, craftBreakdownDecisionValue, craftIngredientsReducedByOwnedStock)
+                : new PillSourceCostBreakdown { IsAvailable = false };
+
+            // cost = real coin (Decision.TotalCost); comparisonValue =
+            // parent-comparison value; Commit returns comparisonValue.
+            // hasUnvaluedCurrency is passed true only from the
+            // fallback-tier commit sites.
+            long? Commit(
+                AcquisitionSource src, long? cost, long? comparisonValue,
+                int recipeId, List<CostLine> vendorCurrencyCosts,
+                VendorBatchSolver.VendorOfferBatch? vendorBatch = null,
+                // Only passed non-default by the BuyFromVendor call sites.
+                List<VendorItemCostLine> vendorItemCosts = null,
+                bool vendorHasRawCoin = false,
+                bool hasUnvaluedCurrency = false)
+            {
+                ctx.Memo[node.NodeId] = new Decision
+                {
+                    Source = src,
+                    TotalCost = cost,
+                    ComparisonValue = comparisonValue,
+                    RecipeId = recipeId,
+                    VendorCurrencyCosts = vendorCurrencyCosts,
+                    VendorItemCosts = vendorItemCosts,
+                    VendorHasRawCoin = vendorHasRawCoin,
+                    CanCraft = canCraft,
+                    CanBuyTp = canBuyTp,
+                    CanBuyVendor = canBuyVendor,
+                    HasUnvaluedCurrency = hasUnvaluedCurrency,
+                    VendorBatch = vendorBatch,
+                    // buyPriceSideFellBack is computed unconditionally, so
+                    // gate on the committed Source actually being BuyFromTp.
+                    PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack,
+                    CraftCostBreakdown = craftBreakdown,
+                    BuyFromTpCostBreakdown = tpBreakdown,
+                    BuyFromVendorCostBreakdown = vendorBreakdown,
+                    CraftExcludedByCompetency = craftExcludedByCompetency,
+                    CraftExcludedRealCost = craftExcludedByCompetency ? autoPickCraftRealCost : null,
+                    CraftExcludedDisciplines = craftExcludedByCompetency ? autoPickCraftOption?.Disciplines : null,
+                    CraftExcludedMinRating = craftExcludedByCompetency ? (autoPickCraftOption?.MinRating ?? 0) : 0,
+                    CheapestCraftUntrained = cheapestCraftUntrained,
+                    CheapestCraftRealCost = cheapestCraftUntrained ? cheapestCraftRealCostOverall : null,
+                    CheapestCraftDisciplines = cheapestCraftUntrained ? cheapestCraftOptionOverall?.Disciplines : null,
+                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0,
+                };
+                return comparisonValue;
+            }
+
+            // A user override wins whenever it is feasible for this node;
+            // infeasible overrides are ignored and the best path applies.
+            if (ctx.Overrides != null &&
+                ctx.Overrides.TryGetValue(node.NodeId, out var forced))
+            {
+                if (forced == AcquisitionSource.Craft && canCraft)
+                {
+                    // Comparable-first, fallback otherwise - same
+                    // precedence as VendorBatchSolver's override handling.
+                    return bestComparable.Cost.HasValue
+                        ? Commit(AcquisitionSource.Craft, bestComparable.RealCost, bestComparable.Cost, bestComparable.RecipeId, null)
+                        : Commit(AcquisitionSource.Craft, bestFallback.RealCost, bestFallback.Cost, bestFallback.RecipeId, null, hasUnvaluedCurrency: true);
+                }
+
+                if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
+                {
+                    return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
+                }
+
+                if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
+                {
+                    return vendorEvaluation.BestComparableValue.HasValue
+                        ? Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableValue, 0, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableBatch, vendorEvaluation.BestComparableItemCosts, vendorEvaluation.BestComparableHasRawCoin)
+                        : Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCoinCost, 0, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackBatch, vendorEvaluation.FallbackItemCosts, vendorEvaluation.FallbackHasRawCoin, hasUnvaluedCurrency: true);
+                }
+            }
+
+            // Three-way comparison: vendor (coin + valued currency lines)
+            // vs TP buy vs craft. Only the comparable craft cost
+            // participates - craftBreakdownDecisionValue is null for a
+            // fallback-tier pick, so that arm contributes nothing here,
+            // exactly like a fallback-tier vendor offer.
+            var source = PickCheapest(
+                buyTotalCost,
+                craftExcludedFromAutoPick ? null : craftBreakdownDecisionValue,
+                vendorEvaluation.BestComparableValue);
+
+            if (source == AcquisitionSource.BuyFromVendor)
+            {
+                return Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableValue, 0, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableBatch, vendorEvaluation.BestComparableItemCosts, vendorEvaluation.BestComparableHasRawCoin);
+            }
+
+            if (source == AcquisitionSource.BuyFromTp)
+            {
+                return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
+            }
+
+            if (source == AcquisitionSource.Craft)
+            {
+                // Commit the same recipe PickCheapest just compared - the
+                // competent comparable option when one exists, or the raw
+                // one when nothing competent exists and craft had no
+                // genuine alternative to lose to.
+                return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, craftBreakdownDecisionValue, autoPickRecipeId, null);
+            }
+
+            // Fallback: nothing comparable beat buy (UnknownSource here
+            // implies buyCost, the comparable craft cost, and
+            // vendorEvaluation.BestComparableValue are all null). A fallback-tier craft
+            // or vendor offer is a concrete acquisition even though its
+            // full cost cannot honestly be compared with coin, and is
+            // used as a last resort. When both exist, the numerically
+            // cheaper REAL coin cost wins and an exact tie keeps vendor -
+            // comparing real cost (never the valuation-tainted craftCost)
+            // keeps both sides on the same scale. Force-buy-only nodes
+            // never fall back to craft. Otherwise this is gw2e's "Not
+            // sold or crafted".
+            //
+            // autoPickCraftRealCost is gated to the fallback tier only
+            // (craftBreakdownDecisionValue null): a comparable-tier craft
+            // that legitimately lost PickCheapest must not get a second
+            // chance here.
+            long? fallbackCraftCost = craftExcludedFromAutoPick || craftBreakdownDecisionValue.HasValue
+                ? null
+                : autoPickCraftRealCost;
+
+            if (fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.HasValue)
+            {
+                bool fallbackVendorWins = vendorEvaluation.FallbackCoinCost.HasValue &&
+                    (!fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.Value <= fallbackCraftCost.Value);
+
+                if (fallbackVendorWins)
+                {
+                    return Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCoinCost, 0, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackBatch, vendorEvaluation.FallbackItemCosts, vendorEvaluation.FallbackHasRawCoin, hasUnvaluedCurrency: true);
+                }
+
+                // fallbackCraftCost == autoPickCraftRealCost here (the
+                // fallback-tier commit sites use the same real value for
+                // both cost and comparisonValue).
+                return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, autoPickCraftRealCost, autoPickRecipeId, null, hasUnvaluedCurrency: true);
+            }
+
+            return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
+        }
+
+        /// <summary>
+        /// The recipe phase of <see cref="Evaluate"/>: every option this
+        /// node has, costed and ranked into the four trackers the decision
+        /// below reads - cheapest comparable, cheapest fallback, and the
+        /// cheapest of each that the account can actually craft.
+        /// </summary>
+        /// <remarks>
+        /// Recurses into <see cref="Evaluate"/> for every Item ingredient,
+        /// so the memo is filled for the whole subtree before this returns.
+        /// Pure code motion out of Evaluate - no arithmetic, comparison,
+        /// tie-break or ordering here differs from the inline version it
+        /// replaced (see Goldens/plan-solver).
+        /// </remarks>
+        private RecipeCandidates SelectBestRecipes(RecipeNode node, EvaluateContext ctx)
+        {
             // Evaluate recipe options. Every non-currency ingredient of
             // every recipe is always evaluated - no short-circuit on the
             // first unpriceable ingredient - so every node always gets a
@@ -936,332 +1305,8 @@ namespace GW2CraftingHelper.Services
                 }
             }
 
-            // canCraft = gw2e's "hasComponents": true whenever a recipe
-            // exists, comparable or fallback tier alike. A node with a
-            // comparable recipe but no buy price always force-crafts via
-            // PickCheapest (craftBeatsBuy is true when buyCost is null).
-            bool canCraft = bestComparable.Cost.HasValue || bestFallback.Cost.HasValue;
-            bool canBuyTp = buyTotalCost.HasValue;
-            bool canBuyVendor = comparableVendorValue.HasValue ||
-                                fallbackVendorCoinCost.HasValue;
-
-            // The force-buy pre-pass marks this node craft:false before
-            // the automatic comparison; a manual override (checked next,
-            // using the unmodified canCraft) still always wins.
-            bool isForceBuyOnly = ctx.ForceBuyOnlyNodeIds != null &&
-                ctx.ForceBuyOnlyNodeIds.Contains(node.NodeId);
-            bool craftExcludedFromAutoPick = isForceBuyOnly;
-
-            // Craft should only win the automatic pick when some character
-            // can actually craft it - checked against whichever recipe
-            // would actually be used. Folded into the same
-            // craftExcludedFromAutoPick flag the force-buy pre-pass uses;
-            // canCraft and the manual-override branch never read it, so
-            // CRAFT stays clickable. Null bestRatingByDiscipline means
-            // competency unknown and never penalizes.
-            //
-            // Also gated on a genuine COMPARABLE next-best source
-            // existing: a node whose only path is Craft must still
-            // auto-pick Craft, or its cost drops out of the plan entirely
-            // (UnknownSource, null TotalCost). A fallback-tier vendor
-            // offer does not count as a genuine alternative - excluding
-            // craft for one would commit an unvalued-currency purchase and
-            // silently drop the node's real priced cost from the gold
-            // total.
-            bool hasComparableAlternative = buyTotalCost.HasValue || comparableVendorValue.HasValue;
-            // Prefer the best competent option per tier (comparable
-            // first), falling back to the raw best only when no competent
-            // option exists anywhere. That raw fallback still wins
-            // automatically when hasComparableAlternative is false - the
-            // "no genuine alternative -> auto-craft regardless of
-            // competency" carve-out. Also the recipe fed to
-            // BuildCraftCostBreakdown, so the CRAFT pill's comparison uses
-            // whichever recipe would actually be used.
-            bool anyCompetentCraftOption = bestCompetentComparable.Option != null ||
-                bestCompetentFallback.Option != null;
-
-            // Resolved once into a single CraftAutoPickCandidate -
-            // comparable-first, fallback otherwise, competent-preferred
-            // within each tier. A fallback-tier candidate's
-            // ComparisonValue is null; a null Option means no recipe at all.
-            CraftAutoPickCandidate? autoPickCandidate;
-            if (bestCompetentComparable.Option != null)
-            {
-                autoPickCandidate = new CraftAutoPickCandidate(
-                    bestCompetentComparable.Option, bestCompetentComparable.RealCost,
-                    bestCompetentComparable.Cost, bestCompetentComparable.RecipeId);
-            }
-            else if (bestCompetentFallback.Option != null)
-            {
-                autoPickCandidate = new CraftAutoPickCandidate(
-                    bestCompetentFallback.Option, bestCompetentFallback.RealCost,
-                    null, bestCompetentFallback.RecipeId);
-            }
-            else if (bestComparable.Option != null)
-            {
-                autoPickCandidate = new CraftAutoPickCandidate(
-                    bestComparable.Option, bestComparable.RealCost,
-                    bestComparable.Cost, bestComparable.RecipeId);
-            }
-            else if (bestFallback.Option != null)
-            {
-                autoPickCandidate = new CraftAutoPickCandidate(
-                    bestFallback.Option, bestFallback.RealCost,
-                    null, bestFallback.RecipeId);
-            }
-            else
-            {
-                autoPickCandidate = null;
-            }
-
-            RecipeOption autoPickCraftOption = autoPickCandidate?.Option;
-
-            // DecisionValue must reflect the tier autoPickCraftOption came
-            // from - null for a fallback-tier pick, per
-            // PillSourceCostBreakdown.DecisionValue's null contract.
-            long? craftBreakdownDecisionValue = autoPickCandidate?.ComparisonValue;
-
-            // The real cost/RecipeId twin of craftBreakdownDecisionValue,
-            // feeding PickCheapest and the Craft Commit sites so they
-            // always operate on the same recipe; falls back to the raw
-            // (possibly-incompetent) cost when nothing competent exists
-            // and craftExcludedFromAutoPick is false.
-            long? autoPickCraftRealCost = autoPickCandidate?.RealCost;
-            int autoPickRecipeId = autoPickCandidate?.RecipeId ?? 0;
-
-            // Tracked separately from craftExcludedFromAutoPick (which the
-            // force-buy pre-pass also sets) so Plan Notes can tell "no
-            // character is trained" apart from "buying is cheaper".
-            bool craftExcludedByCompetency = autoPickCraftOption != null &&
-                hasComparableAlternative &&
-                !anyCompetentCraftOption;
-            if (craftExcludedByCompetency)
-            {
-                craftExcludedFromAutoPick = true;
-            }
-
-            // The numerically cheapest raw craft candidate overall - same
-            // tier priority as autoPickCraftOption but without the
-            // competent-first override, so this can be untrained even when
-            // the auto pick resolved to a competent recipe.
-            RecipeOption cheapestCraftOptionOverall = bestComparable.Option ?? bestFallback.Option;
-            long? cheapestCraftRealCostOverall = bestComparable.Option != null
-                ? bestComparable.RealCost
-                : bestFallback.RealCost;
-
-            // Gated on !isCompetencyIndependentForceBuy, not
-            // !isForceBuyOnly: force-buy membership can itself be
-            // competency-caused (the pre-pass's craft diagnostic is
-            // competency-resolved), in which case training would empty the
-            // force-buy set - exactly the opportunity this field reports.
-            // Only a node forced under both evaluations of the 0.85 rule
-            // is genuinely forced regardless of training.
-            bool isCompetencyIndependentForceBuy = ctx.CompetencyIndependentForceBuyNodeIds != null &&
-                ctx.CompetencyIndependentForceBuyNodeIds.Contains(node.NodeId);
-            bool cheapestCraftUntrained = !isCompetencyIndependentForceBuy &&
-                cheapestCraftOptionOverall != null &&
-                ctx.BestRatingByDiscipline != null &&
-                !CraftCompetencyEvaluator.AccountCanCraft(
-                    cheapestCraftOptionOverall.Disciplines, cheapestCraftOptionOverall.MinRating, ctx.BestRatingByDiscipline);
-
-            // Raw cost breakdowns for every feasible source, computed
-            // unconditionally and never fed back into any comparison (see
-            // PillSourceCostBreakdown).
-            var tpBreakdown = canBuyTp
-                ? new PillSourceCostBreakdown
-                {
-                    IsAvailable = true,
-                    RawCoin = buyTotalCost.Value,
-                    DecisionValue = buyTotalCost.Value,
-                }
-                : new PillSourceCostBreakdown { IsAvailable = false };
-
-            PillSourceCostBreakdown vendorBreakdown;
-            if (comparableVendorValue.HasValue)
-            {
-                vendorBreakdown = BuildVendorCostBreakdown(
-                    comparableVendorCoinCost, comparableVendorCurrencyCosts, comparableVendorItemCosts,
-                    comparableVendorValue);
-            }
-            else if (fallbackVendorCoinCost.HasValue)
-            {
-                // Fallback tier: an unvalued non-coin currency line exists
-                // on this offer - DecisionValue stays null, mirroring
-                // hasUnvaluedCurrency's craft-side treatment.
-                vendorBreakdown = BuildVendorCostBreakdown(
-                    fallbackVendorCoinCost, fallbackVendorCurrencyCosts, fallbackVendorItemCosts, null);
-            }
-            else
-            {
-                vendorBreakdown = new PillSourceCostBreakdown { IsAvailable = false };
-            }
-
-            // Raw diagnostics for OwnedMaterialsForceBuyPrePass, recorded
-            // regardless of decision. CraftCost is the same tier/
-            // competency-resolved pair the Craft commit sites use - a
-            // competency-blind figure here would let the 0.85 comparison
-            // run on a craft cost the real solve would never commit to.
-            if (ctx.CostDiagnostics != null)
-            {
-                ctx.CostDiagnostics[node.NodeId] = (buyTotalCost, craftBreakdownDecisionValue ?? autoPickCraftRealCost);
-            }
-
-            // The competency-blind twin of the write above, letting the
-            // pre-pass run its second 0.85 evaluation without a second
-            // Solve() call.
-            if (ctx.RawCraftCostDiagnostics != null)
-            {
-                ctx.RawCraftCostDiagnostics[node.NodeId] = cheapestCraftRealCostOverall;
-            }
-
-            // True when any direct ingredient of this breakdown's recipe
-            // was reduced by owned account stock (see
-            // PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock).
-            bool craftIngredientsReducedByOwnedStock = autoPickCraftOption != null &&
-                ctx.OwnedQuantityUsedByNode != null &&
-                AnyIngredientReducedByOwnedStock(autoPickCraftOption, ctx.OwnedQuantityUsedByNode);
-            var craftBreakdown = autoPickCraftOption != null
-                ? BuildCraftCostBreakdown(autoPickCraftOption, craftBreakdownDecisionValue, craftIngredientsReducedByOwnedStock)
-                : new PillSourceCostBreakdown { IsAvailable = false };
-
-            // cost = real coin (Decision.TotalCost); comparisonValue =
-            // parent-comparison value; Commit returns comparisonValue.
-            // hasUnvaluedCurrency is passed true only from the
-            // fallback-tier commit sites.
-            long? Commit(
-                AcquisitionSource src, long? cost, long? comparisonValue,
-                int recipeId, List<CostLine> vendorCurrencyCosts,
-                VendorBatchSolver.VendorOfferBatch? vendorBatch = null,
-                // Only passed non-default by the BuyFromVendor call sites.
-                List<VendorItemCostLine> vendorItemCosts = null,
-                bool vendorHasRawCoin = false,
-                bool hasUnvaluedCurrency = false)
-            {
-                ctx.Memo[node.NodeId] = new Decision
-                {
-                    Source = src,
-                    TotalCost = cost,
-                    ComparisonValue = comparisonValue,
-                    RecipeId = recipeId,
-                    VendorCurrencyCosts = vendorCurrencyCosts,
-                    VendorItemCosts = vendorItemCosts,
-                    VendorHasRawCoin = vendorHasRawCoin,
-                    CanCraft = canCraft,
-                    CanBuyTp = canBuyTp,
-                    CanBuyVendor = canBuyVendor,
-                    HasUnvaluedCurrency = hasUnvaluedCurrency,
-                    VendorBatch = vendorBatch,
-                    // buyPriceSideFellBack is computed unconditionally, so
-                    // gate on the committed Source actually being BuyFromTp.
-                    PriceSideFellBack = src == AcquisitionSource.BuyFromTp && buyPriceSideFellBack,
-                    CraftCostBreakdown = craftBreakdown,
-                    BuyFromTpCostBreakdown = tpBreakdown,
-                    BuyFromVendorCostBreakdown = vendorBreakdown,
-                    CraftExcludedByCompetency = craftExcludedByCompetency,
-                    CraftExcludedRealCost = craftExcludedByCompetency ? autoPickCraftRealCost : null,
-                    CraftExcludedDisciplines = craftExcludedByCompetency ? autoPickCraftOption?.Disciplines : null,
-                    CraftExcludedMinRating = craftExcludedByCompetency ? (autoPickCraftOption?.MinRating ?? 0) : 0,
-                    CheapestCraftUntrained = cheapestCraftUntrained,
-                    CheapestCraftRealCost = cheapestCraftUntrained ? cheapestCraftRealCostOverall : null,
-                    CheapestCraftDisciplines = cheapestCraftUntrained ? cheapestCraftOptionOverall?.Disciplines : null,
-                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0,
-                };
-                return comparisonValue;
-            }
-
-            // A user override wins whenever it is feasible for this node;
-            // infeasible overrides are ignored and the best path applies.
-            if (ctx.Overrides != null &&
-                ctx.Overrides.TryGetValue(node.NodeId, out var forced))
-            {
-                if (forced == AcquisitionSource.Craft && canCraft)
-                {
-                    // Comparable-first, fallback otherwise - same
-                    // precedence as VendorBatchSolver's override handling.
-                    return bestComparable.Cost.HasValue
-                        ? Commit(AcquisitionSource.Craft, bestComparable.RealCost, bestComparable.Cost, bestComparable.RecipeId, null)
-                        : Commit(AcquisitionSource.Craft, bestFallback.RealCost, bestFallback.Cost, bestFallback.RecipeId, null, hasUnvaluedCurrency: true);
-                }
-
-                if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
-                {
-                    return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
-                }
-
-                if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
-                {
-                    return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin, hasUnvaluedCurrency: true);
-                }
-            }
-
-            // Three-way comparison: vendor (coin + valued currency lines)
-            // vs TP buy vs craft. Only the comparable craft cost
-            // participates - craftBreakdownDecisionValue is null for a
-            // fallback-tier pick, so that arm contributes nothing here,
-            // exactly like a fallback-tier vendor offer.
-            var source = PickCheapest(
-                buyTotalCost,
-                craftExcludedFromAutoPick ? null : craftBreakdownDecisionValue,
-                comparableVendorValue);
-
-            if (source == AcquisitionSource.BuyFromVendor)
-            {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin);
-            }
-
-            if (source == AcquisitionSource.BuyFromTp)
-            {
-                return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
-            }
-
-            if (source == AcquisitionSource.Craft)
-            {
-                // Commit the same recipe PickCheapest just compared - the
-                // competent comparable option when one exists, or the raw
-                // one when nothing competent exists and craft had no
-                // genuine alternative to lose to.
-                return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, craftBreakdownDecisionValue, autoPickRecipeId, null);
-            }
-
-            // Fallback: nothing comparable beat buy (UnknownSource here
-            // implies buyCost, the comparable craft cost, and
-            // comparableVendorValue are all null). A fallback-tier craft
-            // or vendor offer is a concrete acquisition even though its
-            // full cost cannot honestly be compared with coin, and is
-            // used as a last resort. When both exist, the numerically
-            // cheaper REAL coin cost wins and an exact tie keeps vendor -
-            // comparing real cost (never the valuation-tainted craftCost)
-            // keeps both sides on the same scale. Force-buy-only nodes
-            // never fall back to craft. Otherwise this is gw2e's "Not
-            // sold or crafted".
-            //
-            // autoPickCraftRealCost is gated to the fallback tier only
-            // (craftBreakdownDecisionValue null): a comparable-tier craft
-            // that legitimately lost PickCheapest must not get a second
-            // chance here.
-            long? fallbackCraftCost = craftExcludedFromAutoPick || craftBreakdownDecisionValue.HasValue
-                ? null
-                : autoPickCraftRealCost;
-
-            if (fallbackCraftCost.HasValue || fallbackVendorCoinCost.HasValue)
-            {
-                bool fallbackVendorWins = fallbackVendorCoinCost.HasValue &&
-                    (!fallbackCraftCost.HasValue || fallbackVendorCoinCost.Value <= fallbackCraftCost.Value);
-
-                if (fallbackVendorWins)
-                {
-                    return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin, hasUnvaluedCurrency: true);
-                }
-
-                // fallbackCraftCost == autoPickCraftRealCost here (the
-                // fallback-tier commit sites use the same real value for
-                // both cost and comparisonValue).
-                return Commit(AcquisitionSource.Craft, autoPickCraftRealCost, autoPickCraftRealCost, autoPickRecipeId, null, hasUnvaluedCurrency: true);
-            }
-
-            return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
+            return new RecipeCandidates(
+                bestComparable, bestFallback, bestCompetentComparable, bestCompetentFallback);
         }
 
         /// <summary>

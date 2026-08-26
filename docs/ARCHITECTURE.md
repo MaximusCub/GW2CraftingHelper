@@ -574,8 +574,11 @@ inventing a new one. The load-bearing rules:
   (there is no buy cost to lose to), matching gw2efficiency's
   `isCheaperToCraft = craftPrice-defined && (!buyPrice || decisionPrice < buyPrice)`.
 
-**Where:** `Services/PlanSolver.cs` (`Evaluate`, `PickCheapest`); the
-normative spec these rules echo is `docs/gw2e-parity-spec.md`.
+**Where:** `Services/PlanSolver.cs` (`Evaluate`, `SelectBestRecipes`,
+`PickCheapest`); the normative spec these rules echo is
+`docs/gw2e-parity-spec.md`. Whole-result goldens for these decisions live
+in `tests/GW2CraftingHelper.Tests/Goldens/plan-solver/` - a difference
+there is a finding to investigate, never a file to re-baseline.
 
 **Full history:** KNOWN-ISSUES items 20, 21, 24, 25, 26 (the M33-M37
 parity waves); `docs/gw2e-parity-spec.md` for the researched gw2efficiency
