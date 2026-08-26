@@ -197,10 +197,12 @@ namespace GW2CraftingHelper.Views
         // Moved onto Module itself (Module._logViewClearedBeforeVersion -
         // see that field's own doc comment for the full threading
         // rationale), accessed here through this getter/setter delegate
-        // pair - mirrors TreeSectionController's own constructor-injected
-        // getter/setter pattern for state that outlives a single render
-        // (CraftingPlanView's _currentPlan get/set pair) rather than
-        // introducing a new holder type. ClearView() calls
+        // pair - the same "reach state that outlives a single render
+        // through its owner" shape TreeSectionController uses for
+        // CraftingPlanView's _currentPlan (there as ITreePlanHost.
+        // CurrentPlan; two members is too thin a seam to justify an
+        // interface here) rather than introducing a new holder type.
+        // ClearView() calls
         // _setClearedBeforeVersion; GetFilteredEntries (RebuildRows' own
         // helper) and AppendNewRows call _getClearedBeforeVersion - both
         // only from this class's existing main-thread-only entry points

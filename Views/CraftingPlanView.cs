@@ -23,7 +23,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    internal class CraftingPlanView : ISectionRelayoutSink
+    internal class CraftingPlanView : ISectionRelayoutSink, ITreePlanHost
     {
         #region General: shared layout constants, colors, top-region geometry & dependencies
 
@@ -419,6 +419,45 @@ namespace GW2CraftingHelper.Views
 
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
 
+        // ITreePlanHost implementation - explicit-interface for the same
+        // reason as ISectionRelayoutSink above: TreeSectionController gets
+        // named, compiler-checked access to exactly these members and to
+        // nothing else, and none of them becomes part of this class's own
+        // callable surface. Every one forwards to the private member that
+        // used to be handed over as a constructor delegate.
+        void ITreePlanHost.PreserveScrollAcross(Action mutate) => PreserveScrollAcross(mutate);
+
+        void ITreePlanHost.SetStatus(string status) => SetStatus(status);
+
+        void ITreePlanHost.RenderPlanAfterResolve(PlanViewModel vm) => RenderPlanAfterResolve(vm);
+
+        PlanViewModel ITreePlanHost.CurrentPlan
+        {
+            get => _currentPlan;
+            set => _currentPlan = value;
+        }
+
+        int ITreePlanHost.PanelWidth => GetCurrentPanelWidth();
+
+        void ITreePlanHost.SetLastDebugLog(IReadOnlyList<string> log) => _lastDebugLog = log;
+
+        void ITreePlanHost.SetTreeToolbar(TreeToolbarCommands commands) => _treeToolbarCommands = commands;
+
+        (Panel HeaderPanel, Label ArrowLabel, FlowPanel ContentFlow) ITreePlanHost.CreateTreeSectionHeader(
+            string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
+            Func<bool> suppressToggle)
+        {
+            // routeChromeToTreeRegistry: the chrome this call registers
+            // must join the tree's registry, not the one a preserving
+            // re-render clears. Unpacks the private SectionHeaderHandle
+            // into a ValueTuple so the nested type never becomes visible
+            // outside this class.
+            var header = CreateSectionHeader(
+                title, sectionKey, panelWidth, defaultExpanded, suppressToggle,
+                routeChromeToTreeRegistry: true);
+            return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
+        }
+
         /// <summary>
         /// The sink TreeSectionController registers through - the same
         /// contract as the view's own, routed to the tree-scoped registries
@@ -444,12 +483,6 @@ namespace GW2CraftingHelper.Views
 
             public int RelayoutCount => _view._treeRelayoutActions.Count;
         }
-
-        // Set only for the duration of the tree's own CreateSectionHeader
-        // call, so the shared section chrome that call registers joins the
-        // tree's registry rather than the one a preserving re-render
-        // clears. Every other section's header is unaffected.
-        private bool _routeSectionChromeToTree;
 
         // Set by a re-ellipsis closure that cannot honour the registry's
         // no-height-change contract at the settled width (today only the
@@ -702,36 +735,16 @@ namespace GW2CraftingHelper.Views
                 _valueOwnMaterials = settings.ValueOwnMaterials.Value;
             }
 
-            // Wires TreeSectionController's collaborator delegates: four
-            // plain method groups, plus three small adapters over state
-            // with no method to bind (including unpacking the private
-            // SectionHeaderHandle into a ValueTuple so the nested type
-            // never becomes visible outside this class).
+            // The tree's two seams onto this view are both interfaces
+            // implemented above: TreeRelayoutSink for relayout
+            // registration, this view itself for the rest (ITreePlanHost).
+            // The two trailing hooks stay delegates because null is a
+            // meaningful value for them - see the controller's own fields.
             _treeController = new TreeSectionController(
                 new TreeRelayoutSink(this),
-                _resolveOverridesSync,
+                this,
                 _vmBuilder,
-                PreserveScrollAcross,
-                SetStatus,
-                RenderPlanAfterResolve,
-                GetCurrentPanelWidth,
-                () => _currentPlan,
-                vm => _currentPlan = vm,
-                log => _lastDebugLog = log,
-                (title, sectionKey, panelWidth, defaultExpanded, suppressToggle) =>
-                {
-                    _routeSectionChromeToTree = true;
-                    try
-                    {
-                        var header = CreateSectionHeader(title, sectionKey, panelWidth, defaultExpanded, suppressToggle);
-                        return (header.HeaderPanel, header.ArrowLabel, header.ContentFlow);
-                    }
-                    finally
-                    {
-                        _routeSectionChromeToTree = false;
-                    }
-                },
-                commands => _treeToolbarCommands = commands,
+                _resolveOverridesSync,
                 getItemStatBlock,
                 (nodeId, rowPanel) => RegisterScrollAnchor(TreeRowAnchorKey(nodeId), rowPanel));
         }
@@ -4763,10 +4776,18 @@ namespace GW2CraftingHelper.Views
         /// it one press on the control dims the whole header and plays the
         /// click sound twice) - only Required Recipes' "Hide Unlocked"
         /// checkbox still needs either.
+        /// <para>
+        /// routeChromeToTreeRegistry sends this header's own relayout
+        /// closure to the tree-scoped registry instead of the view's, so
+        /// the tree's chrome survives a preserving re-render that clears
+        /// the view's. Only the Recipe Tree passes it - see
+        /// ITreePlanHost.CreateTreeSectionHeader.
+        /// </para>
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
-            Func<bool> suppressToggle = null, Func<bool> suppressPress = null)
+            Func<bool> suppressToggle = null, Func<bool> suppressPress = null,
+            bool routeChromeToTreeRegistry = false)
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
@@ -4893,7 +4914,7 @@ namespace GW2CraftingHelper.Views
             // exactly (whatever it was most recently finalized to by
             // PlanContentHeightMath) so this can never disturb scroll
             // state.
-            (_routeSectionChromeToTree ? _treeRelayoutActions : _relayoutActions).Add(w =>
+            (routeChromeToTreeRegistry ? _treeRelayoutActions : _relayoutActions).Add(w =>
             {
                 topGap.Size = new Point(w, SectionSpacing);
                 headerPanel.Size = new Point(w, SectionHeaderRowHeight);

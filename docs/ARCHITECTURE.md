@@ -403,17 +403,24 @@ WP-24, WP-25) extracted:
 `Views/Rendering`; nothing in `Views/Rendering` references either. A
 renderer that needs a view-private helper extracts the helper into
 `Views/Rendering` rather than widening the view's surface, and what a
-renderer needs from the view arrives through `ISectionRelayoutSink` or a
-constructor delegate. This was violated once - a `GetPillColors`
+renderer needs from the view arrives through a narrow interface the view
+implements explicitly - `ISectionRelayoutSink` for relayout registration,
+`ITreePlanHost` (`Views/Rendering/ITreePlanHost.cs`) for everything
+`TreeSectionController` needs beyond it - or, where null is itself a
+meaningful value, a constructor delegate. This was violated once - a `GetPillColors`
 `private -> internal` bump on `CraftingPlanView` - and reverted for this
 reason; the rule is stated here so the revert does not have to be
 re-litigated in each file. `MainView -> Views/Rendering` (e.g.
 `CoinCurrencyRenderer.AddSegmentSpec`) is a forward call and fine.
 
 `TreeSectionController` is constructed once, in `CraftingPlanView`'s own
-constructor (`Views/CraftingPlanView.cs` ~614), and lives as long as the
+constructor (`Views/CraftingPlanView.cs` ~743), and lives as long as the
 view: one owner, one lifetime. That is what lets a pill click re-solve
-locally without resetting the user's overrides. Splitting it into a
+locally without resetting the user's overrides. The constructor takes the
+two sinks, the view-model builder, the solver callback and two optional
+hooks; it used to take fourteen positional arguments, ten of them bare
+delegates, two of which shared the type `Action<PlanViewModel>` with
+opposite meanings, so transposing them compiled. Splitting it into a
 stateful/stateless pair was proposed and rejected - see
 [`docs/DECISIONS.md`](DECISIONS.md). New tree-row and pill features grow
 the `Services/` side of the boundary instead, under `CONTRIBUTING.md`'s
@@ -435,14 +442,15 @@ the remaining scroll/resize/wheel machinery stays in `CraftingPlanView.cs`,
 fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
 
 The file has since grown back past its own pre-decomposition baseline:
-**4,960 lines, measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`),
-against the ~4,802 above. `Views/Rendering/` holds 8,722 lines across 33
-files on the same date, so the split of plan-tab code is now roughly 64%
+**5,281 lines, measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`),
+against the ~4,802 above. `Views/Rendering/` holds 8,817 lines across 34
+files on the same date, so the split of plan-tab code is now roughly 63%
 outside the view - a ratio that can move in either direction, unlike the
 one-off before/after figure. Both numbers, and the date, so a later reader
 can re-run the two commands rather than take a characterization on trust.
 
 **Where:** `Views/Rendering/ISectionRelayoutSink.cs`,
+`Views/Rendering/ITreePlanHost.cs`,
 `Views/Rendering/TreeSectionController.cs`, the seven
 `Views/Rendering/*SectionRenderer.cs` files (the six M38 ones plus
 `NotesSectionRenderer`), and the surviving
