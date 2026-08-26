@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ParseRecipe_RealVersionedCurrencyRecipe_UsesIdKeyForEveryIngredientType()
         {
-            // KNOWN-ISSUES recipe-ingestion bug class: replaces
+            // KNOWN-ISSUES #48: replaces
             // a contract-mirror test that fabricated a "hypothetical"
             // explicit-type shape keyed on "item_id" - which is NOT what
             // the real API sends for a typed ingredient and is exactly the

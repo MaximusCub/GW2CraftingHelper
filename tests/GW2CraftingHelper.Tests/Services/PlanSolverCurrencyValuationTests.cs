@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
@@ -323,7 +324,7 @@ namespace GW2CraftingHelper.Tests.Services
         /// further - through CraftingTreeBuilder.BuildTree (which copies
         /// decision.ComparisonValue verbatim onto
         /// CraftingTreeNode.DecisionValue) and then
-        /// ValueDetailTooltipBuilder.TryBuild, the exact two production
+        /// ValueDetailTooltipBuilder.TryBuildContent, the exact two production
         /// steps between a solved decision and the tooltip a CRAFT pill
         /// hover renders. CurrencyDecisionDefaults' own curated value is
         /// used (via CurrencyValuation.WithDefaults) rather than a
@@ -364,13 +365,13 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, root.SubtreeCost);
             Assert.Equal(360000, root.DecisionValue);
 
-            bool fired = ValueDetailTooltipBuilder.TryBuild(root, null, out string tooltipText);
+            bool fired = ValueDetailTooltipBuilder.TryBuildContent(root, null, out var tooltip);
 
             Assert.True(fired);
-            Assert.NotNull(tooltipText);
-            Assert.Contains("Crafting gold price:", tooltipText);
-            Assert.Contains("Currencies:", tooltipText);
-            Assert.Contains("Optimization price:", tooltipText);
+            Assert.NotNull(tooltip);
+            Assert.Contains("Crafting gold price:", tooltip.ToPlainText());
+            Assert.Contains("Currencies:", tooltip.ToPlainText());
+            Assert.Contains("Optimization price:", tooltip.ToPlainText());
         }
 
         [Fact]
@@ -446,10 +447,10 @@ namespace GW2CraftingHelper.Tests.Services
             var treeNode = new CraftingTreeBuilder().BuildTree(
                 tree, result.Decisions, new Dictionary<int, ItemMetadata>());
 
-            bool tooltipBuilt = ValueDetailTooltipBuilder.TryBuild(treeNode, null, out string tooltipText);
+            bool tooltipBuilt = ValueDetailTooltipBuilder.TryBuildContent(treeNode, null, out var tooltip);
 
             Assert.False(tooltipBuilt);
-            Assert.Null(tooltipText);
+            Assert.Null(tooltip);
         }
     }
 }

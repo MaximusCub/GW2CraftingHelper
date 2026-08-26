@@ -4,9 +4,10 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class ModuleSettings
+    internal class ModuleSettings
     {
         public SettingEntry<int> ModalDialogX { get; private set; }
+
         public SettingEntry<int> ModalDialogY { get; private set; }
 
         // User-provided coin valuations for non-coin currencies (karma,
@@ -18,10 +19,10 @@ namespace GW2CraftingHelper.Services
 
         // gw2efficiency-style "value own materials" (upgraded over time
         // from a display-only opportunity-cost tweak into a real
-        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass;
-        // the VOM design (Candidate A) further upgraded it into a full
-        // decision-invariant reduction - see InventoryReducer's
-        // zeroOwnedDecisions doc comment): when enabled, a node is
+        // force-buy pre-pass - see OwnedMaterialsForceBuyPrePass - and
+        // then into a full decision-invariant reduction, see
+        // InventoryReducer's zeroOwnedDecisions doc comment): when enabled,
+        // a node is
         // force-excluded from crafting whenever buying it outright costs
         // less than 85% of its own components' fresh buy cost
         // (gw2efficiency's getCheaperToBuyItemIds), owned stock only ever
@@ -29,7 +30,7 @@ namespace GW2CraftingHelper.Services
         // choose (never a never-chosen branch), and the plan's profit
         // figure is reduced by owned materials' sell opportunity cost.
         //
-        // SUPERSEDED (VOM design Section 5): this setting is kept defined
+        // SUPERSEDED: this setting is kept defined
         // ONLY for backward compatibility with an already-persisted
         // settings.json value (mirroring the ScrollDiagnosticsEnabled
         // precedent below) - it is no longer read on the live Module.cs
@@ -51,10 +52,12 @@ namespace GW2CraftingHelper.Services
         // default AND its own no-API-key fallback, and matches this repo's
         // "no invented data" posture better than assuming any upgrade
         // level. Deliberately NO master "do you even own Homestead" gate -
-        // gw2e has none either; see KNOWN-ISSUES.md item 24 for that
+        // gw2e has none either; see KNOWN-ISSUES #24 for that
         // recorded, deferred divergence option.
         public SettingEntry<int> HomesteadFiberTier { get; private set; }
+
         public SettingEntry<int> HomesteadMetalTier { get; private set; }
+
         public SettingEntry<int> HomesteadWoodTier { get; private set; }
 
         // Gates the scroll-machinery diagnostic
@@ -86,7 +89,7 @@ namespace GW2CraftingHelper.Services
         public SettingEntry<int> LogRetentionDays { get; private set; }
 
         // The ONE diagnostics toggle for the whole module
-        // (d2-log-system.md Section 5) -
+        // (dev/proposals/d2-log-system.md Section 5) -
         // subsumes ScrollDiagnosticsEnabled above and additionally gates
         // whether Debug-level ModuleLog entries reach the file sink (they
         // always still land in the in-memory ring regardless - see
@@ -194,15 +197,23 @@ namespace GW2CraftingHelper.Services
             {
                 { Gw2Constants.RefinedHomesteadFiberItemId, ClampTier(HomesteadFiberTier.Value) },
                 { Gw2Constants.RefinedHomesteadMetalItemId, ClampTier(HomesteadMetalTier.Value) },
-                { Gw2Constants.RefinedHomesteadWoodItemId, ClampTier(HomesteadWoodTier.Value) }
+                { Gw2Constants.RefinedHomesteadWoodItemId, ClampTier(HomesteadWoodTier.Value) },
             };
             return new HomesteadEfficiencyTiers(map);
         }
 
         private static int ClampTier(int tier)
         {
-            if (tier < 0) return 0;
-            if (tier > 2) return 2;
+            if (tier < 0)
+            {
+                return 0;
+            }
+
+            if (tier > 2)
+            {
+                return 2;
+            }
+
             return tier;
         }
 
@@ -221,8 +232,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampLogMaxSizeBytes(int maxSizeBytes)
         {
-            if (maxSizeBytes < MinLogMaxSizeBytes) return MinLogMaxSizeBytes;
-            if (maxSizeBytes > MaxLogMaxSizeBytes) return MaxLogMaxSizeBytes;
+            if (maxSizeBytes < MinLogMaxSizeBytes)
+            {
+                return MinLogMaxSizeBytes;
+            }
+
+            if (maxSizeBytes > MaxLogMaxSizeBytes)
+            {
+                return MaxLogMaxSizeBytes;
+            }
+
             return maxSizeBytes;
         }
 
@@ -237,8 +256,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampRetentionDays(int retentionDays)
         {
-            if (retentionDays < MinLogRetentionDays) return MinLogRetentionDays;
-            if (retentionDays > MaxLogRetentionDays) return MaxLogRetentionDays;
+            if (retentionDays < MinLogRetentionDays)
+            {
+                return MinLogRetentionDays;
+            }
+
+            if (retentionDays > MaxLogRetentionDays)
+            {
+                return MaxLogRetentionDays;
+            }
+
             return retentionDays;
         }
 
@@ -278,8 +305,16 @@ namespace GW2CraftingHelper.Services
 
         private static int ClampSnapshotRefreshIntervalMinutes(int minutes)
         {
-            if (minutes < MinSnapshotRefreshIntervalMinutes) return MinSnapshotRefreshIntervalMinutes;
-            if (minutes > MaxSnapshotRefreshIntervalMinutes) return MaxSnapshotRefreshIntervalMinutes;
+            if (minutes < MinSnapshotRefreshIntervalMinutes)
+            {
+                return MinSnapshotRefreshIntervalMinutes;
+            }
+
+            if (minutes > MaxSnapshotRefreshIntervalMinutes)
+            {
+                return MaxSnapshotRefreshIntervalMinutes;
+            }
+
             return minutes;
         }
 

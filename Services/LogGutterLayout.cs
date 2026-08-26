@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// gets right, and they now apply to the SUM of the two bands.
     /// </para>
     /// </summary>
-    public static class LogGutterLayout
+    internal static class LogGutterLayout
     {
         /// <summary>Left gutter the tab's content starts at. Four things on
         /// this tab used to sit at x=0.</summary>
@@ -47,12 +47,19 @@ namespace GW2CraftingHelper.Services
         public static int TimeBand(IReadOnlyList<int> perLevelWidths)
         {
             int band = 0;
-            if (perLevelWidths == null) return band;
+            if (perLevelWidths == null)
+            {
+                return band;
+            }
 
             for (int i = 0; i < perLevelWidths.Count; i++)
             {
-                if (perLevelWidths[i] > band) band = perLevelWidths[i];
+                if (perLevelWidths[i] > band)
+                {
+                    band = perLevelWidths[i];
+                }
             }
+
             return band;
         }
 

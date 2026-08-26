@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Services
     /// claims "plan requires"; it states only what
     /// this row's own numbers actually mean.
     /// </summary>
-    public static class ShoppingRowTooltipFormatter
+    internal static class ShoppingRowTooltipFormatter
     {
         /// <summary>
         /// The whole shopping row tooltip as CONTENT rather than as a
@@ -53,6 +53,7 @@ namespace GW2CraftingHelper.Services
             {
                 extras.Add(hintText);
             }
+
             extras.AddRange(BuildCurrencyLines(currencyCosts));
 
             return ItemRowTooltipComposer.BuildRowContent(stats, fullName, nameTruncated, extras);
@@ -93,9 +94,10 @@ namespace GW2CraftingHelper.Services
         /// vocabulary must never look plan-scope when it isn't. The "(wallet
         /// N)" aside is worded the same way for the same reason: "wallet" is
         /// the one term this codebase now uses for a raw account-wide
-        /// holding figure, matching the Summary c-table's "Have" column and
-        /// the tree's "HAVE x/y TOTAL" pill - a THIS ROW/wallet line can
-        /// never be mistaken for the plan-scope facts those two show.
+        /// holding figure, matching the Summary column-header table's
+        /// "Have" column and the tree's "HAVE x/y TOTAL" pill - a THIS
+        /// ROW/wallet line can never be mistaken for the plan-scope facts
+        /// those two show.
         /// </summary>
         public static IReadOnlyList<string> BuildCurrencyLines(IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
         {
@@ -134,8 +136,10 @@ namespace GW2CraftingHelper.Services
                 {
                     line += $" (wallet {rawHeld})";
                 }
+
                 lines.Add(line);
             }
+
             return lines;
         }
     }

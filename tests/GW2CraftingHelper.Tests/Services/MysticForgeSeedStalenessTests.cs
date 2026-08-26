@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// run against a game build that does NOT match the seed's, since that
     /// is the state the report was filed from.
     /// <para>
-    /// Measured outcome (see docs/KNOWN-ISSUES.md, field-fixes-3 item 4):
+    /// Measured outcome (see KNOWN-ISSUES #60, item 4):
     /// no route reproduces the reported UNKNOWN for Gift of Rays - it
     /// crafts from the shipped seed on every one of them, including as a
     /// child of the real parent plan. What these tests pin is that the

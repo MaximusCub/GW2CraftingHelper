@@ -3,10 +3,12 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class SolverDecision
+    internal class SolverDecision
     {
         public AcquisitionSource Source { get; internal set; }
+
         public int RecipeId { get; internal set; }
+
         public long? TotalCost { get; internal set; }
 
         // The comparison figure PlanSolver actually ranked this decision
@@ -68,7 +70,9 @@ namespace GW2CraftingHelper.Services
         // alternative, rather than treating this flag alone as "equally
         // comparable" to TP/Craft.
         public bool CanCraft { get; internal set; }
+
         public bool CanBuyTp { get; internal set; }
+
         public bool CanBuyVendor { get; internal set; }
 
         // True only when Source is BuyFromTp and the committed unit price
@@ -81,7 +85,9 @@ namespace GW2CraftingHelper.Services
         // Ultimately consumed by PillSubduingEvaluator - never read by
         // any cost total.
         public PillSourceCostBreakdown CraftCostBreakdown { get; internal set; }
+
         public PillSourceCostBreakdown BuyFromTpCostBreakdown { get; internal set; }
+
         public PillSourceCostBreakdown BuyFromVendorCostBreakdown { get; internal set; }
 
         // True only when craft was excluded from the automatic pick
@@ -90,8 +96,11 @@ namespace GW2CraftingHelper.Services
         // The companion fields describe the recipe that would have won -
         // only meaningful when CraftExcludedByCompetency is true.
         public bool CraftExcludedByCompetency { get; internal set; }
+
         public long? CraftExcludedRealCost { get; internal set; }
+
         public IReadOnlyList<string> CraftExcludedDisciplines { get; internal set; }
+
         public int CraftExcludedMinRating { get; internal set; }
 
         // True whenever the numerically cheapest raw craft recipe overall
@@ -104,8 +113,11 @@ namespace GW2CraftingHelper.Services
         // competency-caused force-buy must not hide a real training
         // opportunity.
         public bool CheapestCraftUntrained { get; internal set; }
+
         public long? CheapestCraftRealCost { get; internal set; }
+
         public IReadOnlyList<string> CheapestCraftDisciplines { get; internal set; }
+
         public int CheapestCraftMinRating { get; internal set; }
     }
 }

@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Models
     /// requirement - a concrete "train this discipline and save N"
     /// opportunity rather than a silent cost increase.
     /// </summary>
-    public class CompetencyOpportunity
+    internal class CompetencyOpportunity
     {
         public int ItemId { get; set; }
 
@@ -24,6 +24,7 @@ namespace GW2CraftingHelper.Models
         public long DeltaCost { get; set; }
 
         public IReadOnlyList<string> Disciplines { get; set; }
+
         public int MinRating { get; set; }
     }
 }

@@ -1,63 +1,43 @@
-###############################################################################
-# Set default behavior to automatically normalize line endings.
-###############################################################################
 * text=auto
 
-###############################################################################
-# Set default behavior for command prompt diff.
-#
-# This is need for earlier builds of msysgit that does not have it on by
-# default for csharp files.
-# Note: This is only used by command line
-###############################################################################
-#*.cs     diff=csharp
+# ref/ holds the offline seeders' output - up to ~15MB of minified JSON on a
+# single line. -text keeps git from line-ending-normalising an opaque blob,
+# -diff stops `git diff` / `git show` / GitHub from rendering one into a
+# terminal, a PR view, or an agent's context window, and -merge turns a
+# conflict into a loud failure instead of a silent mangle. Declared as a glob
+# so a new seeder output is covered before anyone remembers to add it here.
+ref/*.json -text -diff -merge linguist-generated=true
 
-###############################################################################
-# Set the merge driver for project and solution files
-#
-# Merging from the command prompt will add diff markers to the files if there
-# are conflicts (Merging from VS is not affected by the settings below, in VS
-# the diff markers are never inserted). Diff markers may cause the following 
-# file extensions to fail to load in VS. An alternative would be to treat
-# these files as binary and thus will always conflict and require user
-# intervention with every merge. To do so, just uncomment the entries below
-###############################################################################
-#*.sln       merge=binary
-#*.csproj    merge=binary
-#*.vbproj    merge=binary
-#*.vcxproj   merge=binary
-#*.vcproj    merge=binary
-#*.dbproj    merge=binary
-#*.fsproj    merge=binary
-#*.lsproj    merge=binary
-#*.wixproj   merge=binary
-#*.modelproj merge=binary
-#*.sqlproj   merge=binary
-#*.wwaproj   merge=binary
+# ...except the files under ref/ a human writes and a reviewer has to read:
+# the provenance manifests, the hand-curated vendor exclusions (each row
+# carries its own evidence), and the hand-maintained hint/cooldown/sheet
+# lists. These are small, and making them unreadable would defeat the point.
+# eol=lf rather than text=auto on the manifests specifically: Program.cs's
+# SerializeManifest forces LF, and VendorOfferManifestTests compares the
+# shipped file's bytes to its output. text=auto would hand a Windows clone
+# (core.autocrlf=true) a CRLF working copy and fail that test on unmodified
+# code. CI stays green either way - GitHub's windows image sets autocrlf=input
+# - so the breakage would land on a contributor's machine, not the runner.
+ref/*_manifest.json text eol=lf diff merge -linguist-generated
+ref/vendor_offer_exclusions.json text=auto diff merge -linguist-generated
+ref/acquisition_hints_seed.json text=auto diff merge -linguist-generated
+ref/daily_cooldown_items.json text=auto diff merge -linguist-generated
+ref/recipe_sheet_items.json text=auto diff merge -linguist-generated
 
-###############################################################################
-# behavior for image files
-#
-# image files are treated as binary by default.
-###############################################################################
-#*.jpg   binary
-#*.png   binary
-#*.gif   binary
-
-###############################################################################
-# diff behavior for common document formats
-# 
-# Convert binary document formats to text before diffing them. This feature
-# is only available from the command line. Turn it on by uncommenting the 
-# entries below.
-###############################################################################
-#*.doc   diff=astextplain
-#*.DOC   diff=astextplain
-#*.docx  diff=astextplain
-#*.DOCX  diff=astextplain
-#*.dot   diff=astextplain
-#*.DOT   diff=astextplain
-#*.pdf   diff=astextplain
-#*.PDF   diff=astextplain
-#*.rtf   diff=astextplain
-#*.RTF   diff=astextplain
+# ...and the three large seeds that are pretty-printed rather than minified.
+# The glob above assumes seeder output is one opaque line, which is true of
+# vendor_offers.json and item_name_seed.json but not of these: at two-space
+# indent they diff line-by-line and auto-merge like any other text file, and
+# recipe_search_seed.json and recipes_seed.json ARE seeder output, so they say
+# so - linguist-generated collapses them in a PR view by default while diff and
+# merge keep them readable when someone opens them. mystic_forge_recipes.json is
+# hand-curated on top of its seeded rows, so it is not marked generated.
+# eol=lf, not text=auto, for the same reason as the manifests - and measured
+# the hard way: ShippedSeedManifest sha-pins the two recipe seeds, and the
+# first CI run with text=auto failed both pins because the Windows runner
+# checks out CRLF (the earlier claim here that GitHub's image uses
+# autocrlf=input was wrong - PR #184 run 32988578177 is the counterexample).
+# The seeder writes LF; eol=lf hands every clone the bytes the digest names.
+ref/mystic_forge_recipes.json text eol=lf diff merge -linguist-generated
+ref/recipe_search_seed.json text eol=lf diff merge linguist-generated=true
+ref/recipes_seed.json text eol=lf diff merge linguist-generated=true

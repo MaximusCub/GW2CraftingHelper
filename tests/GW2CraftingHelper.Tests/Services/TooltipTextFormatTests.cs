@@ -2,12 +2,13 @@ using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
     // The single wrap seam both tooltip composers return through. Blish's
-    // own 500px cap already bounds width (see docs/KNOWN-ISSUES.md); what
+    // own 500px cap already bounds width (see KNOWN-ISSUES #43); what
     // these tests pin is what that cap does not give - a break point the
     // module controls, an over-long token hard-split instead of overflowing,
     // and no silent truncation of a long tooltip's tail.
@@ -93,27 +94,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(wrapped.Length >= 60);
         }
 
-        [Fact]
-        public void WrapLines_NullInput_ReturnsEmptyList()
-        {
-            Assert.Empty(TooltipTextFormat.WrapLines(null));
-        }
-
-        [Fact]
-        public void WrapLines_ExpandsOverBudgetEntryAndKeepsShortOnes()
-        {
-            var lines = new List<string>
-            {
-                "Right-click: Open wiki page",
-                "A vendor cost item's instant-buy price is unavailable - its buy-order price is used"
-            };
-
-            var wrapped = TooltipTextFormat.WrapLines(lines);
-
-            Assert.Equal("Right-click: Open wiki page", wrapped[0]);
-            Assert.True(wrapped.Count > 2);
-            Assert.All(wrapped, l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars, l));
-        }
+        // The WrapLines_* tests that stood here were dropped with
+        // TooltipTextFormat.WrapLines itself: its only caller was
+        // TreeRowTooltipComposer.BuildExtraTooltipLines, which no production
+        // code called. Wrap (the string form) keeps its coverage below - it
+        // is still live for TooltipFacility.ApplyPlain and LogTabContent.
 
         [Fact]
         public void RealOpportunityCostSentence_FitsBudgetOnEveryLine()
@@ -129,14 +114,25 @@ namespace GW2CraftingHelper.Tests.Services
                 DecisionValue = 30000
             };
 
-            Assert.True(ValueDetailTooltipBuilder.TryBuild(node, null, out string text));
+            Assert.True(ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content));
+
+            // The composer emits it unwrapped - the rich surface wraps by
+            // pixels. What this test still pins is that the seam, fed a real
+            // production sentence rather than a retyped one, breaks it
+            // within budget without losing words.
+            string sentence = Assert.Single(
+                content.ToPlainLines(),
+                l => l.StartsWith("This is an estimated opportunity cost"));
+            Assert.True(sentence.Length > TooltipTextFormat.LineBudgetChars);
+
+            string wrapped = TooltipTextFormat.Wrap(sentence);
 
             Assert.All(
-                text.Split('\n'),
+                wrapped.Split('\n'),
                 l => Assert.True(l.Length <= TooltipTextFormat.LineBudgetChars, l));
             Assert.Contains(
                 "This is an estimated opportunity cost for the used currencies in the recipe.",
-                text.Replace("\n", " "));
+                wrapped.Replace("\n", " "));
         }
     }
 }

@@ -2,15 +2,18 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class CompositeRecipeCacheStore : IRecipeCacheStore
+    internal class CompositeRecipeCacheStore : IRecipeCacheStore
     {
         private readonly SeededRecipeCacheStore _seed;
         private readonly OverlayRecipeCacheStore _overlay;
         private readonly RecipeCacheStats _stats = new RecipeCacheStats();
 
         public RecipeCacheStats Stats => _stats;
+
         public bool SeedIsStale => _seed.SeedIsStale;
+
         public int? SeedBuildId => _seed.SeedBuildId;
+
         public int? CurrentBuildId => _seed.CurrentBuildId;
 
         public CompositeRecipeCacheStore(

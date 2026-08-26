@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// CanCraft or a manual override - only whether Craft may win
     /// AUTOMATICALLY.
     /// </summary>
-    public static class CraftCompetencyEvaluator
+    internal static class CraftCompetencyEvaluator
     {
         // Recipe "Disciplines" tags that are informational source facts, not
         // real, player-levelable GW2 crafting disciplines - a recipe
@@ -69,6 +69,7 @@ namespace GW2CraftingHelper.Services
                     best[cd.Discipline] = cd.Rating;
                 }
             }
+
             return best;
         }
 
@@ -95,6 +96,7 @@ namespace GW2CraftingHelper.Services
             {
                 return true;
             }
+
             if (disciplines == null || disciplines.Count == 0)
             {
                 return true;
@@ -107,6 +109,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 anyRealDiscipline = true;
                 if (bestRatingByDiscipline.TryGetValue(discipline, out int rating) && rating >= minRating)
                 {

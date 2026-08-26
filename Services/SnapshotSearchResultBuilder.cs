@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Blish-free search/filter/aggregation logic for the Snapshot tab's
     /// account-inventory browser (snapshot search,
-    /// d1-snapshot-about-settings.md Feature 1). MainView.cs is the only
+    /// dev/proposals/d1-snapshot-about-settings.md Feature 1). MainView.cs is the only
     /// caller; every method here is a pure function over already-loaded
     /// AccountSnapshot/AccountItemIndex data - no I/O, no Blish_HUD/
     /// Gw2Sharp/Microsoft.Xna usings (repo invariant: tests must stay
@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     /// display-row shape on top of it.
     /// </para>
     /// </summary>
-    public static class SnapshotSearchResultBuilder
+    internal static class SnapshotSearchResultBuilder
     {
         /// <summary>
         /// Shortest query allowed to match a character label. Item and
@@ -255,7 +255,7 @@ namespace GW2CraftingHelper.Services
                     Name = name,
                     IconUrl = kvp.Value.IconUrl ?? string.Empty,
                     TotalCount = total,
-                    Breakdown = breakdown
+                    Breakdown = breakdown,
                 });
             }
 
@@ -466,10 +466,9 @@ namespace GW2CraftingHelper.Services
         /// the internal "Character:" encoding prefix and spacing out the
         /// PascalCase storage-location names (e.g. "MaterialStorage" -&gt;
         /// "Material Storage") - a small polish fix so the raw internal
-        /// token never reaches the UI verbatim (d1-snapshot-about-
-        /// settings.md Feature 1's explicit call-out; the underlying
-        /// strings are already display-safe, not raw ids, so this is
-        /// cosmetic only, not a repo-invariant fix). Returns "Unknown" for
+        /// token never reaches the UI verbatim. The underlying strings are
+        /// already display-safe, not raw ids, so this is cosmetic only, not
+        /// an ids-stay-internal fix. Returns "Unknown" for
         /// a null/empty source.
         /// </summary>
         public static string FormatSourceLabel(string rawSource)

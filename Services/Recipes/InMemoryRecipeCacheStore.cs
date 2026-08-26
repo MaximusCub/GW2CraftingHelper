@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class InMemoryRecipeCacheStore : IRecipeCacheStore
+    internal class InMemoryRecipeCacheStore : IRecipeCacheStore
     {
         private readonly Dictionary<int, IReadOnlyList<int>> _searches =
             new Dictionary<int, IReadOnlyList<int>>();
@@ -21,6 +21,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 _stats.IncrementSearchHit();
                 return result;
             }
+
             _stats.IncrementSearchMiss();
             return null;
         }
@@ -32,6 +33,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 _stats.IncrementRecipeHit();
                 return result;
             }
+
             _stats.IncrementRecipeMiss();
             return null;
         }

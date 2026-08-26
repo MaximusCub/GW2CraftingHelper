@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// null, which is also RecipeNode.AchievementId/AchievementBit's own
     /// default).
     /// </summary>
-    public static class RecipeNodeBuilders
+    internal static class RecipeNodeBuilders
     {
         public static RecipeNode Leaf(int id, int quantity, string type = "Item", int? achievementId = null, int? achievementBit = null)
         {

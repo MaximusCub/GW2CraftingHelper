@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// on one bar. Stated here so it is not re-litigated.
     /// </para>
     /// </summary>
-    public static class LogToolbarLayout
+    internal static class LogToolbarLayout
     {
         public const int Inset = LogGutterLayout.GutterX;
         public const int Gap = 8;
@@ -95,7 +95,10 @@ namespace GW2CraftingHelper.Services
             int fixedLeft = Gap + dropdownWidth + Gap + followWidth;
             int available = deleteX - Gap - Inset - fixedLeft;
             int searchWidth = available > SearchMaxWidth ? SearchMaxWidth : available;
-            if (searchWidth < 0) searchWidth = 0;
+            if (searchWidth < 0)
+            {
+                searchWidth = 0;
+            }
 
             int dropdownX = Inset + searchWidth + Gap;
             int followX = dropdownX + dropdownWidth + Gap;

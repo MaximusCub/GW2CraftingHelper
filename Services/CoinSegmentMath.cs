@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 
 namespace GW2CraftingHelper.Services
 {
@@ -18,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// control creation, ...) stays in CoinCurrencyRenderer since it is
     /// genuinely Blish-bound.
     /// </summary>
-    public static class CoinSegmentMath
+    internal static class CoinSegmentMath
     {
         public const int CoinIconSize = 20;
         public const int CoinLabelIconGap = 2;
@@ -51,9 +52,7 @@ namespace GW2CraftingHelper.Services
         /// The three-way coin split every display site uses: 10000 copper
         /// per gold, 100 per silver. Negative input clamps to 0, matching
         /// the clamp every caller applied before this consolidation - a
-        /// negative coin amount is never displayed. Formatting stays with
-        /// the callers on purpose: sites legitimately differ (always three
-        /// units vs leading-zero units omitted), only the split is shared.
+        /// negative coin amount is never displayed.
         /// </summary>
         public static (long Gold, long Silver, long Copper) Split(long copper)
         {
@@ -61,6 +60,7 @@ namespace GW2CraftingHelper.Services
             {
                 copper = 0;
             }
+
             return (copper / 10000, (copper % 10000) / 100, copper % 100);
         }
 
@@ -85,6 +85,40 @@ namespace GW2CraftingHelper.Services
                 showGold ? gold.ToString() : null,
                 showSilver ? (showGold ? silver.ToString("D2") : silver.ToString()) : null,
                 showSilver ? cop.ToString("D2") : cop.ToString());
+        }
+
+        /// <summary>
+        /// A coin amount as one plain string, spelled exactly the way the
+        /// icons spell it: leading all-zero units omitted, a trailing unit
+        /// zero-padded once a larger one precedes it. 1005 copper is
+        /// "10s 05c", never "0g 10s 5c" - the game prints "10c", not
+        /// "0g 0s 10c".
+        ///
+        /// <para>
+        /// The module's ONE plain coin format. Four composers used to keep
+        /// a private copy of this and three of them spelled it differently;
+        /// each copy cited the same reason, that CoinCurrencyRenderer lives
+        /// in Views.Rendering and a Blish-free class cannot reference it.
+        /// The layer rule is real - it is why this method is here and not
+        /// there - but the conclusion was not: nothing stopped the format
+        /// living beside the split it is derived from.
+        /// </para>
+        /// </summary>
+        public static string GameStyleText(long copper)
+        {
+            var (gold, silver, cop) = FormatSegmentTexts(copper);
+            var sb = new StringBuilder(16);
+            if (gold != null)
+            {
+                sb.Append(gold).Append("g ");
+            }
+
+            if (silver != null)
+            {
+                sb.Append(silver).Append("s ");
+            }
+
+            return sb.Append(cop).Append('c').ToString();
         }
 
         public struct CoinSegmentSpec
@@ -117,13 +151,18 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments, int iconSize = 0)
         {
-            if (segments.Count == 0) return 0;
+            if (segments.Count == 0)
+            {
+                return 0;
+            }
+
             int effectiveIcon = iconSize > 0 ? iconSize : CoinIconSize;
             int width = 0;
             foreach (var seg in segments)
             {
                 width += seg.TextWidth + CoinLabelIconGap + effectiveIcon + CoinSegmentGap;
             }
+
             return width - CoinSegmentGap;
         }
 
@@ -135,7 +174,11 @@ namespace GW2CraftingHelper.Services
         public static int TotalCurrencySegmentsWidth(List<CurrencySegmentSpec> segments)
         {
             var widths = new List<int>(segments.Count);
-            foreach (var seg in segments) widths.Add(seg.TextWidth);
+            foreach (var seg in segments)
+            {
+                widths.Add(seg.TextWidth);
+            }
+
             return ShoppingColumnMath.SegmentRunWidth(widths, CoinIconSize, CoinLabelIconGap, CoinSegmentGap);
         }
     }

@@ -8,6 +8,22 @@ using VendorOfferUpdater.Models;
 
 namespace VendorOfferUpdater
 {
+    /// <summary>
+    /// Computes the SHA-256 <c>offerId</c> that keys every row in
+    /// ref/vendor_offers.json. Sole implementation: the module used to
+    /// carry a hand-maintained copy in Services/, which nothing in the
+    /// module ever called, and which was deleted rather than kept in sync.
+    /// <para>
+    /// What pins the output is tests/shared/vendor_offer_hasher_vectors.json,
+    /// replayed by VendorOfferHasherGoldenVectorTests in this project's
+    /// suite. Any change to the string built below - segment order, names,
+    /// separators, sort rules, the "null" spelling - changes every id in
+    /// the 15MB dataset, so a deliberate format change means regenerating
+    /// that fixture AND accepting that existing rows keep their old ids
+    /// only for as long as --merge-into copies untouched baseline objects
+    /// through verbatim.
+    /// </para>
+    /// </summary>
     public static class VendorOfferHasher
     {
         public static string ComputeOfferId(
@@ -26,13 +42,13 @@ namespace VendorOfferUpdater
             // this code, whether or not its own tier is null. Existing
             // rows only stay stable because callers like --merge-into copy
             // untouched baseline objects through rather than recomputing
-            // them. Mirrors Services/VendorOfferHasher.cs exactly.
+            // them.
             int? homesteadTier = null,
             // Astral Acclaim package: same non-backward-
             // compatible-hash caveat as homesteadTier above, appended last
             // so existing positional callers that already pass homesteadTier
             // keep meaning exactly what they meant before this parameter
-            // existed. Mirrors Services/VendorOfferHasher.cs exactly.
+            // existed.
             int? seasonalCap = null)
         {
             var sb = new StringBuilder();

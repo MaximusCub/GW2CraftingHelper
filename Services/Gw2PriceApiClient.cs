@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2PriceApiClient : IPriceApiClient
+    internal class Gw2PriceApiClient : IPriceApiClient
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 
@@ -18,12 +18,12 @@ namespace GW2CraftingHelper.Services
             _http = http;
         }
 
-        public async Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public async Task<PriceBatchResult> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
             if (itemIds == null || itemIds.Count == 0)
             {
-                return new List<RawPriceEntry>();
+                return new PriceBatchResult(new List<RawPriceEntry>(), absenceProven: true);
             }
 
             var ids = string.Join(",", itemIds);
@@ -34,7 +34,9 @@ namespace GW2CraftingHelper.Services
             {
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    return new List<RawPriceEntry>();
+                    // Empty, but NOT proof of absence - see
+                    // PriceBatchResult.AbsenceProven.
+                    return new PriceBatchResult(new List<RawPriceEntry>(), absenceProven: false);
                 }
 
                 if (!response.IsSuccessStatusCode)
@@ -53,11 +55,11 @@ namespace GW2CraftingHelper.Services
                     {
                         Id = item.Value<int>("id"),
                         BuyUnitPrice = item["buys"]?.Value<int>("unit_price") ?? 0,
-                        SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0
+                        SellUnitPrice = item["sells"]?.Value<int>("unit_price") ?? 0,
                     });
                 }
 
-                return results;
+                return new PriceBatchResult(results, absenceProven: true);
             }
         }
     }

@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <see cref="BestPath"/> does (TreeSectionController.
         /// ApplyBestPathPreset clears the same dictionary and re-solves) -
         /// the two differ only in the status line they write and the
-        /// dialog they ask. See docs/KNOWN-ISSUES.md.
+        /// dialog they ask. See KNOWN-ISSUES #59.
         /// </summary>
         internal Action ClearOverrides;
 

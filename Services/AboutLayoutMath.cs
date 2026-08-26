@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
@@ -16,9 +18,11 @@ namespace GW2CraftingHelper.Services
     /// the tab in one edit.
     /// </para>
     /// </summary>
-    public static class AboutLayoutMath
+    internal static class AboutLayoutMath
     {
-        public const int Inset = 16;
+        /// <summary>Left gutter of both columns - the module's content
+        /// inset.</summary>
+        public const int AboutInset = UiSpacing.Inset;
 
         /// <summary>Gutter between the facts column and the prose column.
         /// Wider than a within-column gap so the two read as two documents
@@ -36,6 +40,30 @@ namespace GW2CraftingHelper.Services
         public const int ProseTargetChars = 66;
 
         public const int ProseMeasure = 560;
+
+        public const string SourceLabel = "Source";
+        public const string AuthorLabel = "Author";
+        public const string BuiltWithLabel = "Built with";
+        public const string LicenseLabel = "License";
+        public const string CreditsLabel = "Credits";
+        public const string DataDirectoryLabel = "Data directory";
+
+        /// <summary>
+        /// The six fact labels the tab ships, in render order. They live
+        /// here rather than inline in the view so
+        /// <see cref="LabelRunChars"/> can be checked against the strings it
+        /// exists to hold - a floor derived from one label copied into a
+        /// test proves nothing about the other five.
+        /// </summary>
+        public static readonly IReadOnlyList<string> FactLabels = new[]
+        {
+            SourceLabel,
+            AuthorLabel,
+            BuiltWithLabel,
+            LicenseLabel,
+            CreditsLabel,
+            DataDirectoryLabel,
+        };
 
         /// <summary>
         /// Floor for the facts column's label band: 14 characters ("Data
@@ -55,7 +83,7 @@ namespace GW2CraftingHelper.Services
         public const int ValueFloor = 200;
 
         public const int FactsMinWidth =
-            Inset + LabelFloor + LabelToValueGap + ValueFloor + PlanRelayoutMath.TableRightMargin;
+            AboutInset + LabelFloor + LabelToValueGap + ValueFloor + PlanRelayoutMath.TableRightMargin;
 
         /// <summary>Two columns need both minimums plus the gutter.</summary>
         public const int TwoColumnThreshold = FactsMinWidth + ColumnGutter + ProseMeasure;
@@ -67,7 +95,11 @@ namespace GW2CraftingHelper.Services
 
         public static int ColumnWidth(int panelWidth)
         {
-            if (panelWidth <= 0) return 0;
+            if (panelWidth <= 0)
+            {
+                return 0;
+            }
+
             return ColumnCount(panelWidth) == 1 ? panelWidth : (panelWidth - ColumnGutter) / 2;
         }
 
@@ -85,8 +117,12 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static int TextBudget(int columnWidth)
         {
-            int available = PlanRelayoutMath.PinnedRightEdge(columnWidth) - Inset;
-            if (available < 20) available = 20;
+            int available = PlanRelayoutMath.PinnedRightEdge(columnWidth) - AboutInset;
+            if (available < 20)
+            {
+                available = 20;
+            }
+
             return available < ProseMeasure ? available : ProseMeasure;
         }
 
@@ -95,7 +131,7 @@ namespace GW2CraftingHelper.Services
         public static int ValueX(int labelBandWidth)
         {
             int band = labelBandWidth > LabelFloor ? labelBandWidth : LabelFloor;
-            return Inset + band + LabelToValueGap;
+            return AboutInset + band + LabelToValueGap;
         }
 
         /// <summary>
@@ -116,7 +152,11 @@ namespace GW2CraftingHelper.Services
         public static int CopyBoxWidth(int columnWidth, int labelBandWidth)
         {
             int width = ValueMaxWidth(columnWidth, labelBandWidth);
-            if (width < ValueFloor) width = ValueFloor;
+            if (width < ValueFloor)
+            {
+                width = ValueFloor;
+            }
+
             return width < ProseMeasure ? width : ProseMeasure;
         }
     }

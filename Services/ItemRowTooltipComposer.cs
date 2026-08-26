@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// surface shows is unit-testable without a live control.
     /// </para>
     /// </summary>
-    public static class ItemRowTooltipComposer
+    internal static class ItemRowTooltipComposer
     {
         /// <summary>
         /// The core, for a caller that already has its stat block composed

@@ -72,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
 
                 string line = File.ReadAllText(store.FilePath).TrimEnd('\n', '\r');
 
-                // Short property names deliberately (d2-log-system.md
+                // Short property names deliberately (dev/proposals/d2-log-system.md
                 // Section 4.1) - this file is written far more often than
                 // snapshot.json, so every byte compounds across the
                 // retention window.
@@ -114,7 +114,7 @@ namespace GW2CraftingHelper.Tests.Services
 
                 // Simulates a crash mid-append leaving a truncated last
                 // line - exactly the failure JSONL (vs. one big JSON array)
-                // is chosen to tolerate, per d2-log-system.md Section 4.1.
+                // is chosen to tolerate, per dev/proposals/d2-log-system.md Section 4.1.
                 File.AppendAllText(store.FilePath, "{\"t\":\"not valid json truncat");
 
                 var entries = store.ReadAll();
@@ -194,15 +194,41 @@ namespace GW2CraftingHelper.Tests.Services
                 var store = new ModuleLogStore(tmp.Path);
                 store.AppendLine(MakeEntry("recent", "m", DateTime.UtcNow));
 
-                DateTime before = File.GetLastWriteTimeUtc(store.FilePath);
-                System.Threading.Thread.Sleep(20);
-                store.PruneOlderThan(14);
-                DateTime after = File.GetLastWriteTimeUtc(store.FilePath);
+                // A line ReadAll skips and RewriteAtomic cannot reproduce:
+                // the rewrite reserializes only the entries it parsed, so
+                // this sentinel surviving IS the proof the file was left
+                // alone. Replaces a Thread.Sleep(20) plus a
+                // File.GetLastWriteTimeUtc comparison, which false-passed on
+                // any filesystem whose mtime granularity exceeded 20ms.
+                File.AppendAllText(store.FilePath, "not-a-serialized-entry\n");
+                string before = File.ReadAllText(store.FilePath);
 
-                // Nothing was old enough to drop - PruneOlderThan should not
-                // have touched the file at all (RewriteAtomic only runs
-                // when the entry count actually changed).
-                Assert.Equal(before, after);
+                store.PruneOlderThan(14);
+
+                Assert.Equal(before, File.ReadAllText(store.FilePath));
+                Assert.Contains("not-a-serialized-entry", File.ReadAllText(store.FilePath));
+            }
+        }
+
+        [Fact]
+        public void PruneOlderThan_SomethingToDrop_DoesRewrite()
+        {
+            // The other half of the tripwire above: with something actually
+            // old enough to drop, the same sentinel is gone. Without this,
+            // "the file was not rewritten" would pass just as happily if
+            // PruneOlderThan never rewrote anything at all.
+            using (var tmp = new TempDirectory())
+            {
+                var store = new ModuleLogStore(tmp.Path);
+                store.AppendLine(MakeEntry("recent", "m", DateTime.UtcNow));
+                store.AppendLine(MakeEntry("ancient", "m", DateTime.UtcNow.AddYears(-5)));
+                File.AppendAllText(store.FilePath, "not-a-serialized-entry\n");
+
+                store.PruneOlderThan(14);
+
+                string after = File.ReadAllText(store.FilePath);
+                Assert.DoesNotContain("not-a-serialized-entry", after);
+                Assert.Single(store.ReadAll());
             }
         }
 

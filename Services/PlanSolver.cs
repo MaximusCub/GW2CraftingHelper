@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// baseline, strict-cheaper craft/vendor comparisons, Mystic Clover EV
     /// pricing, force-craft) for the durable rationale.
     /// </summary>
-    public class PlanSolver
+    internal class PlanSolver
     {
         // The vendor-batching sub-engine lives in the injected
         // VendorBatchSolver collaborator; the parameterless constructor
@@ -200,6 +200,38 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// What the recipe phase found: the four trackers the decision
+        /// reads. Copies, deliberately - BestRecipeTracker is a mutable
+        /// struct that must only ever be accumulated through a direct
+        /// local, so this carries the finished state out and nothing more.
+        /// </summary>
+        private readonly struct RecipeCandidates
+        {
+            /// <summary>Cheapest recipe whose cost is comparable in coin.</summary>
+            public readonly BestRecipeTracker BestComparable;
+
+            /// <summary>Cheapest recipe demoted by an unvalued currency.</summary>
+            public readonly BestRecipeTracker BestFallback;
+
+            /// <summary>The same two, restricted to recipes the account can craft.</summary>
+            public readonly BestRecipeTracker BestCompetentComparable;
+
+            public readonly BestRecipeTracker BestCompetentFallback;
+
+            public RecipeCandidates(
+                BestRecipeTracker bestComparable,
+                BestRecipeTracker bestFallback,
+                BestRecipeTracker bestCompetentComparable,
+                BestRecipeTracker bestCompetentFallback)
+            {
+                BestComparable = bestComparable;
+                BestFallback = bestFallback;
+                BestCompetentComparable = bestCompetentComparable;
+                BestCompetentFallback = bestCompetentFallback;
+            }
+        }
+
+        /// <summary>
         /// Solve-invariant state threaded through every Evaluate()
         /// recursion, constructed once per Solve() call. Only the node
         /// under evaluation varies per call and stays a plain parameter.
@@ -209,15 +241,25 @@ namespace GW2CraftingHelper.Services
         private sealed class EvaluateContext
         {
             public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+
             public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
+
             public Dictionary<int, Decision> Memo { get; }
+
             public PriceBasis PriceBasis { get; }
+
             public IReadOnlyDictionary<int, AcquisitionSource> Overrides { get; }
+
             public CurrencyValuation CurrencyValuation { get; }
+
             public ISet<int> ForceBuyOnlyNodeIds { get; }
+
             public ISet<int> CompetencyIndependentForceBuyNodeIds { get; }
+
             public Dictionary<int, (long? BuyCost, long? CraftCost)> CostDiagnostics { get; }
+
             public Dictionary<int, long?> RawCraftCostDiagnostics { get; }
+
             public ISet<int> IgnoredItemIds { get; }
 
             /// <summary>Never null - normalized in the constructor.</summary>
@@ -282,12 +324,19 @@ namespace GW2CraftingHelper.Services
         private sealed class CollectContext
         {
             public Dictionary<int, Decision> Memo { get; }
+
             public Dictionary<(int, AcquisitionSource, int), PlanStep> StepMap { get; }
+
             public Dictionary<int, long> CurrencyMap { get; }
+
             public Dictionary<(int, int), int> CraftOrder { get; }
+
             public Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState> VendorBatchTracking { get; }
+
             public Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>> VendorOccurrences { get; }
+
             public Dictionary<(int, AcquisitionSource, int), List<int>> CraftOccurrences { get; }
+
             public ISet<int> IgnoredItemIds { get; }
 
             public CollectContext(
@@ -336,7 +385,7 @@ namespace GW2CraftingHelper.Services
             ISet<int> competencyIndependentForceBuyNodeIds = null,
             // When non-null, populated with each node's raw (buyCost,
             // craftCost) so OwnedMaterialsForceBuyPrePass can apply gw2e's
-            // buyPrice &lt; craftDecisionPrice * 0.85 rule without
+            // buyPrice < craftDecisionPrice * 0.85 rule without
             // duplicating this method's aggregation. Never affects this
             // solve's own Decisions/Plan.
             Dictionary<int, (long? BuyCost, long? CraftCost)> costDiagnostics = null,
@@ -523,14 +572,15 @@ namespace GW2CraftingHelper.Services
                             {
                                 break;
                             }
+
                             currencyShares[i]++;
                             leftover--;
                         }
                     }
                 }
+
                 // else: totalQuantity <= 0 is defensive only - currencyShares
                 // stays all-zero rather than divide by zero.
-
                 for (int i = 0; i < occurrences.Count; i++)
                 {
                     int nodeId = occurrences[i].NodeId;
@@ -623,6 +673,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
@@ -633,7 +684,7 @@ namespace GW2CraftingHelper.Services
                 Steps = steps,
                 TotalCoinCost = totalCoinCost,
                 CurrencyCosts = currencyCosts,
-                TimegatedItems = timegatedItems
+                TimegatedItems = timegatedItems,
             };
 
             // Convert internal memo to public decisions dict
@@ -665,14 +716,14 @@ namespace GW2CraftingHelper.Services
                     CheapestCraftUntrained = kvp.Value.CheapestCraftUntrained,
                     CheapestCraftRealCost = kvp.Value.CheapestCraftRealCost,
                     CheapestCraftDisciplines = kvp.Value.CheapestCraftDisciplines,
-                    CheapestCraftMinRating = kvp.Value.CheapestCraftMinRating
+                    CheapestCraftMinRating = kvp.Value.CheapestCraftMinRating,
                 };
             }
 
             return new SolveResult
             {
                 Plan = plan,
-                Decisions = decisions
+                Decisions = decisions,
             };
         }
 
@@ -720,7 +771,7 @@ namespace GW2CraftingHelper.Services
                     // are explicitly false rather than omitted.
                     CraftCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                     BuyFromTpCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
-                    BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false }
+                    BuyFromVendorCostBreakdown = new PillSourceCostBreakdown { IsAvailable = false },
                 };
                 return 0L;
             }
@@ -739,182 +790,12 @@ namespace GW2CraftingHelper.Services
             // valuation affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
-            long? comparableVendorValue = vendorEvaluation.BestComparableValue;
-            long? comparableVendorCoinCost = vendorEvaluation.BestComparableCoinCost;
-            List<CostLine> comparableVendorCurrencyCosts = vendorEvaluation.BestComparableCurrencyCosts;
-            VendorBatchSolver.VendorOfferBatch? comparableVendorBatch = vendorEvaluation.BestComparableBatch;
-            long? fallbackVendorCoinCost = vendorEvaluation.FallbackCoinCost;
-            List<CostLine> fallbackVendorCurrencyCosts = vendorEvaluation.FallbackCurrencyCosts;
-            VendorBatchSolver.VendorOfferBatch? fallbackVendorBatch = vendorEvaluation.FallbackBatch;
 
-            List<VendorItemCostLine> comparableVendorItemCosts = vendorEvaluation.BestComparableItemCosts;
-            bool comparableVendorHasRawCoin = vendorEvaluation.BestComparableHasRawCoin;
-            List<VendorItemCostLine> fallbackVendorItemCosts = vendorEvaluation.FallbackItemCosts;
-            bool fallbackVendorHasRawCoin = vendorEvaluation.FallbackHasRawCoin;
-
-            // Evaluate recipe options. Every non-currency ingredient of
-            // every recipe is always evaluated - no short-circuit on the
-            // first unpriceable ingredient - so every node always gets a
-            // memo entry, even under a recipe this node doesn't choose.
-            //
-            // An unpriceable ingredient doesn't disqualify its recipe
-            // (gw2e's craftPrice = sum(component.craftResultPrice || 0)):
-            // it contributes zero, so craftCost is defined whenever
-            // recipes exist. Coin totals are then deliberately partial;
-            // the descendant still surfaces with its own decision.
-            //
-            // Recipe candidates split into COMPARABLE and FALLBACK tiers,
-            // mirroring EvaluateVendorOffers: a recipe with an unvalued
-            // Currency ingredient never competes on coin cost (its real
-            // cost is unknown, and ranking by priced ingredients alone
-            // would hide it), but stays offered (CanCraft true) and is
-            // used when nothing coin-comparable exists.
-            var bestComparable = default(BestRecipeTracker);
-            var bestFallback = default(BestRecipeTracker);
-
-            // Tracked in addition to bestComparable/bestFallback,
-            // restricted to recipes that pass AccountCanCraft: gating the
-            // auto-pick on only the single cheapest option's competency
-            // wrongly excluded the whole Craft arm even when a costlier
-            // sibling recipe in the same tier was fully craftable. The
-            // unfiltered bests still feed canCraft and manual overrides.
-            var bestCompetentComparable = default(BestRecipeTracker);
-            var bestCompetentFallback = default(BestRecipeTracker);
-
-            foreach (var recipe in node.Recipes)
-            {
-                // craftCost sums ingredient ComparisonValues and drives
-                // recipe selection; craftRealCost sums the same
-                // ingredients' real TotalCost (read back from memo) and
-                // becomes the committed decision's real coin cost.
-                //
-                // EV pricing (fractional Mystic Forge recipes): ingredient
-                // quantities were already scaled by RecipeService using
-                // CraftsNeeded = ceil(quantity / ExpectedOutputCount), so
-                // the summed costs already reflect the expected number of
-                // attempts; adjusting again here would double-amortize.
-                // A no-op for ordinary recipes (ExpectedOutputCount
-                // defaults to OutputCount).
-                long craftCost = 0L;
-                long craftRealCost = 0L;
-                // Accumulated separately and folded in only if this recipe
-                // stays comparable - mirrors EvaluateVendorOffers'
-                // valuationCopper/allValued split: a fallback-tier recipe
-                // discards ALL valuation, never partially retains it.
-                long valuationCopper = 0L;
-                bool hasUnvaluedCurrency = false;
-
-                foreach (var ingredient in recipe.Ingredients)
-                {
-                    if (ingredient.IngredientType == "Currency")
-                    {
-                        // A Currency ingredient tagged with the coin
-                        // currency id IS real copper - CurrencyValuation
-                        // hard-throws if keyed on that id, so without this
-                        // branch a coin-typed ingredient would always
-                        // demote its recipe to the fallback tier.
-                        // Contributes to both comparison and real cost.
-                        if (ingredient.Id == Gw2Constants.CoinCurrencyId)
-                        {
-                            craftCost += (long)ingredient.Quantity;
-                            craftRealCost += (long)ingredient.Quantity;
-                            continue;
-                        }
-
-                        // Currencies contribute to the craft-vs-buy
-                        // decision value only (via user valuation), never
-                        // to the displayed real coin cost - the plan's
-                        // gold total never invents an exchange rate. An
-                        // unvalued currency demotes the recipe to the
-                        // fallback tier instead of contributing zero.
-                        if (ctx.CurrencyValuation != null &&
-                            ctx.CurrencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
-                        {
-                            try
-                            {
-                                valuationCopper = checked(valuationCopper + (long)ingredient.Quantity * copperPerUnit);
-                            }
-                            catch (OverflowException)
-                            {
-                                // Absurd valuation input; demote to fallback
-                                // rather than crash - mirrors
-                                // EvaluateVendorOffers.
-                                hasUnvaluedCurrency = true;
-                            }
-                        }
-                        else
-                        {
-                            hasUnvaluedCurrency = true;
-                        }
-                        continue;
-                    }
-
-                    if (ingredient.IngredientType != "Item")
-                    {
-                        // Non-Item ingredient (GuildUpgrade/unrecognized):
-                        // its id space has no relationship to prices or
-                        // valuations, so it demotes the recipe to the
-                        // fallback tier and contributes zero.
-                        hasUnvaluedCurrency = true;
-                        continue;
-                    }
-
-                    long? ingredientCost = Evaluate(ingredient, ctx);
-                    craftCost += ingredientCost ?? 0L;
-                    var ingredientDecision = ctx.Memo[ingredient.NodeId];
-                    craftRealCost += ingredientDecision.TotalCost ?? 0L;
-
-                    // Transitive fallback-tier propagation: a chosen
-                    // ingredient whose own decision is fallback-tier
-                    // taints this recipe too - otherwise a currency cost
-                    // one Craft level down would launder back into a
-                    // comparable-looking ancestor.
-                    if (ingredientDecision.HasUnvaluedCurrency)
-                    {
-                        hasUnvaluedCurrency = true;
-                    }
-                }
-
-                // Valuation only reaches craftCost when this recipe stays
-                // comparable - mirrors EvaluateVendorOffers' allValued gate.
-                if (!hasUnvaluedCurrency)
-                {
-                    // craftCost and valuationCopper can each stay in range
-                    // while their sum overflows; demote to fallback rather
-                    // than crash.
-                    try
-                    {
-                        craftCost = checked(craftCost + valuationCopper);
-                    }
-                    catch (OverflowException)
-                    {
-                        hasUnvaluedCurrency = true;
-                    }
-                }
-
-                bool competent = CraftCompetencyEvaluator.AccountCanCraft(
-                    recipe.Disciplines, recipe.MinRating, ctx.BestRatingByDiscipline);
-                if (hasUnvaluedCurrency)
-                {
-                    // Ranked on real cost only (never the valuation-
-                    // tainted craftCost), passed for BOTH tracker slots so
-                    // the returned ComparisonValue can never carry hidden
-                    // valuation upward.
-                    bestFallback.Offer(craftRealCost, craftRealCost, recipe);
-                    if (competent)
-                    {
-                        bestCompetentFallback.Offer(craftRealCost, craftRealCost, recipe);
-                    }
-                }
-                else
-                {
-                    bestComparable.Offer(craftCost, craftRealCost, recipe);
-                    if (competent)
-                    {
-                        bestCompetentComparable.Offer(craftCost, craftRealCost, recipe);
-                    }
-                }
-            }
+            var candidates = SelectBestRecipes(node, ctx);
+            var bestComparable = candidates.BestComparable;
+            var bestFallback = candidates.BestFallback;
+            var bestCompetentComparable = candidates.BestCompetentComparable;
+            var bestCompetentFallback = candidates.BestCompetentFallback;
 
             // canCraft = gw2e's "hasComponents": true whenever a recipe
             // exists, comparable or fallback tier alike. A node with a
@@ -922,8 +803,8 @@ namespace GW2CraftingHelper.Services
             // PickCheapest (craftBeatsBuy is true when buyCost is null).
             bool canCraft = bestComparable.Cost.HasValue || bestFallback.Cost.HasValue;
             bool canBuyTp = buyTotalCost.HasValue;
-            bool canBuyVendor = comparableVendorValue.HasValue ||
-                                fallbackVendorCoinCost.HasValue;
+            bool canBuyVendor = vendorEvaluation.BestComparableValue.HasValue ||
+                                vendorEvaluation.FallbackCoinCost.HasValue;
 
             // The force-buy pre-pass marks this node craft:false before
             // the automatic comparison; a manual override (checked next,
@@ -948,7 +829,7 @@ namespace GW2CraftingHelper.Services
             // craft for one would commit an unvalued-currency purchase and
             // silently drop the node's real priced cost from the gold
             // total.
-            bool hasComparableAlternative = buyTotalCost.HasValue || comparableVendorValue.HasValue;
+            bool hasComparableAlternative = buyTotalCost.HasValue || vendorEvaluation.BestComparableValue.HasValue;
             // Prefer the best competent option per tier (comparable
             // first), falling back to the raw best only when no competent
             // option exists anywhere. That raw fallback still wins
@@ -1052,24 +933,24 @@ namespace GW2CraftingHelper.Services
                 {
                     IsAvailable = true,
                     RawCoin = buyTotalCost.Value,
-                    DecisionValue = buyTotalCost.Value
+                    DecisionValue = buyTotalCost.Value,
                 }
                 : new PillSourceCostBreakdown { IsAvailable = false };
 
             PillSourceCostBreakdown vendorBreakdown;
-            if (comparableVendorValue.HasValue)
+            if (vendorEvaluation.BestComparableValue.HasValue)
             {
                 vendorBreakdown = BuildVendorCostBreakdown(
-                    comparableVendorCoinCost, comparableVendorCurrencyCosts, comparableVendorItemCosts,
-                    comparableVendorValue);
+                    vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableItemCosts,
+                    vendorEvaluation.BestComparableValue);
             }
-            else if (fallbackVendorCoinCost.HasValue)
+            else if (vendorEvaluation.FallbackCoinCost.HasValue)
             {
                 // Fallback tier: an unvalued non-coin currency line exists
                 // on this offer - DecisionValue stays null, mirroring
                 // hasUnvaluedCurrency's craft-side treatment.
                 vendorBreakdown = BuildVendorCostBreakdown(
-                    fallbackVendorCoinCost, fallbackVendorCurrencyCosts, fallbackVendorItemCosts, null);
+                    vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackItemCosts, null);
             }
             else
             {
@@ -1144,7 +1025,7 @@ namespace GW2CraftingHelper.Services
                     CheapestCraftUntrained = cheapestCraftUntrained,
                     CheapestCraftRealCost = cheapestCraftUntrained ? cheapestCraftRealCostOverall : null,
                     CheapestCraftDisciplines = cheapestCraftUntrained ? cheapestCraftOptionOverall?.Disciplines : null,
-                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0
+                    CheapestCraftMinRating = cheapestCraftUntrained ? (cheapestCraftOptionOverall?.MinRating ?? 0) : 0,
                 };
                 return comparisonValue;
             }
@@ -1162,15 +1043,17 @@ namespace GW2CraftingHelper.Services
                         ? Commit(AcquisitionSource.Craft, bestComparable.RealCost, bestComparable.Cost, bestComparable.RecipeId, null)
                         : Commit(AcquisitionSource.Craft, bestFallback.RealCost, bestFallback.Cost, bestFallback.RecipeId, null, hasUnvaluedCurrency: true);
                 }
+
                 if (forced == AcquisitionSource.BuyFromTp && canBuyTp)
                 {
                     return Commit(AcquisitionSource.BuyFromTp, buyTotalCost, buyTotalCost, 0, null);
                 }
+
                 if (forced == AcquisitionSource.BuyFromVendor && canBuyVendor)
                 {
-                    return comparableVendorValue.HasValue
-                        ? Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin)
-                        : Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin, hasUnvaluedCurrency: true);
+                    return vendorEvaluation.BestComparableValue.HasValue
+                        ? Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableValue, 0, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableBatch, vendorEvaluation.BestComparableItemCosts, vendorEvaluation.BestComparableHasRawCoin)
+                        : Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCoinCost, 0, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackBatch, vendorEvaluation.FallbackItemCosts, vendorEvaluation.FallbackHasRawCoin, hasUnvaluedCurrency: true);
                 }
             }
 
@@ -1182,11 +1065,11 @@ namespace GW2CraftingHelper.Services
             var source = PickCheapest(
                 buyTotalCost,
                 craftExcludedFromAutoPick ? null : craftBreakdownDecisionValue,
-                comparableVendorValue);
+                vendorEvaluation.BestComparableValue);
 
             if (source == AcquisitionSource.BuyFromVendor)
             {
-                return Commit(AcquisitionSource.BuyFromVendor, comparableVendorCoinCost, comparableVendorValue, 0, comparableVendorCurrencyCosts, comparableVendorBatch, comparableVendorItemCosts, comparableVendorHasRawCoin);
+                return Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.BestComparableCoinCost, vendorEvaluation.BestComparableValue, 0, vendorEvaluation.BestComparableCurrencyCosts, vendorEvaluation.BestComparableBatch, vendorEvaluation.BestComparableItemCosts, vendorEvaluation.BestComparableHasRawCoin);
             }
 
             if (source == AcquisitionSource.BuyFromTp)
@@ -1205,7 +1088,7 @@ namespace GW2CraftingHelper.Services
 
             // Fallback: nothing comparable beat buy (UnknownSource here
             // implies buyCost, the comparable craft cost, and
-            // comparableVendorValue are all null). A fallback-tier craft
+            // vendorEvaluation.BestComparableValue are all null). A fallback-tier craft
             // or vendor offer is a concrete acquisition even though its
             // full cost cannot honestly be compared with coin, and is
             // used as a last resort. When both exist, the numerically
@@ -1223,14 +1106,14 @@ namespace GW2CraftingHelper.Services
                 ? null
                 : autoPickCraftRealCost;
 
-            if (fallbackCraftCost.HasValue || fallbackVendorCoinCost.HasValue)
+            if (fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.HasValue)
             {
-                bool fallbackVendorWins = fallbackVendorCoinCost.HasValue &&
-                    (!fallbackCraftCost.HasValue || fallbackVendorCoinCost.Value <= fallbackCraftCost.Value);
+                bool fallbackVendorWins = vendorEvaluation.FallbackCoinCost.HasValue &&
+                    (!fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.Value <= fallbackCraftCost.Value);
 
                 if (fallbackVendorWins)
                 {
-                    return Commit(AcquisitionSource.BuyFromVendor, fallbackVendorCoinCost, fallbackVendorCoinCost, 0, fallbackVendorCurrencyCosts, fallbackVendorBatch, fallbackVendorItemCosts, fallbackVendorHasRawCoin, hasUnvaluedCurrency: true);
+                    return Commit(AcquisitionSource.BuyFromVendor, vendorEvaluation.FallbackCoinCost, vendorEvaluation.FallbackCoinCost, 0, vendorEvaluation.FallbackCurrencyCosts, vendorEvaluation.FallbackBatch, vendorEvaluation.FallbackItemCosts, vendorEvaluation.FallbackHasRawCoin, hasUnvaluedCurrency: true);
                 }
 
                 // fallbackCraftCost == autoPickCraftRealCost here (the
@@ -1240,6 +1123,190 @@ namespace GW2CraftingHelper.Services
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
+        }
+
+        /// <summary>
+        /// The recipe phase of <see cref="Evaluate"/>: every option this
+        /// node has, costed and ranked into the four trackers the decision
+        /// below reads - cheapest comparable, cheapest fallback, and the
+        /// cheapest of each that the account can actually craft.
+        /// </summary>
+        /// <remarks>
+        /// Recurses into <see cref="Evaluate"/> for every Item ingredient,
+        /// so the memo is filled for the whole subtree before this returns.
+        /// Pure code motion out of Evaluate - no arithmetic, comparison,
+        /// tie-break or ordering here differs from the inline version it
+        /// replaced (see Goldens/plan-solver).
+        /// </remarks>
+        private RecipeCandidates SelectBestRecipes(RecipeNode node, EvaluateContext ctx)
+        {
+            // Evaluate recipe options. Every non-currency ingredient of
+            // every recipe is always evaluated - no short-circuit on the
+            // first unpriceable ingredient - so every node always gets a
+            // memo entry, even under a recipe this node doesn't choose.
+            //
+            // An unpriceable ingredient doesn't disqualify its recipe
+            // (gw2e's craftPrice = sum(component.craftResultPrice || 0)):
+            // it contributes zero, so craftCost is defined whenever
+            // recipes exist. Coin totals are then deliberately partial;
+            // the descendant still surfaces with its own decision.
+            //
+            // Recipe candidates split into COMPARABLE and FALLBACK tiers,
+            // mirroring EvaluateVendorOffers: a recipe with an unvalued
+            // Currency ingredient never competes on coin cost (its real
+            // cost is unknown, and ranking by priced ingredients alone
+            // would hide it), but stays offered (CanCraft true) and is
+            // used when nothing coin-comparable exists.
+            var bestComparable = default(BestRecipeTracker);
+            var bestFallback = default(BestRecipeTracker);
+
+            // Tracked in addition to bestComparable/bestFallback,
+            // restricted to recipes that pass AccountCanCraft: gating the
+            // auto-pick on only the single cheapest option's competency
+            // wrongly excluded the whole Craft arm even when a costlier
+            // sibling recipe in the same tier was fully craftable. The
+            // unfiltered bests still feed canCraft and manual overrides.
+            var bestCompetentComparable = default(BestRecipeTracker);
+            var bestCompetentFallback = default(BestRecipeTracker);
+
+            foreach (var recipe in node.Recipes)
+            {
+                // craftCost sums ingredient ComparisonValues and drives
+                // recipe selection; craftRealCost sums the same
+                // ingredients' real TotalCost (read back from memo) and
+                // becomes the committed decision's real coin cost.
+                //
+                // EV pricing (fractional Mystic Forge recipes): ingredient
+                // quantities were already scaled by RecipeService using
+                // CraftsNeeded = ceil(quantity / ExpectedOutputCount), so
+                // the summed costs already reflect the expected number of
+                // attempts; adjusting again here would double-amortize.
+                // A no-op for ordinary recipes (ExpectedOutputCount
+                // defaults to OutputCount).
+                long craftCost = 0L;
+                long craftRealCost = 0L;
+                // Accumulated separately and folded in only if this recipe
+                // stays comparable - mirrors EvaluateVendorOffers'
+                // valuationCopper/allValued split: a fallback-tier recipe
+                // discards ALL valuation, never partially retains it.
+                long valuationCopper = 0L;
+                bool hasUnvaluedCurrency = false;
+
+                foreach (var ingredient in recipe.Ingredients)
+                {
+                    if (ingredient.IngredientType == "Currency")
+                    {
+                        // A Currency ingredient tagged with the coin
+                        // currency id IS real copper - CurrencyValuation
+                        // hard-throws if keyed on that id, so without this
+                        // branch a coin-typed ingredient would always
+                        // demote its recipe to the fallback tier.
+                        // Contributes to both comparison and real cost.
+                        if (ingredient.Id == Gw2Constants.CoinCurrencyId)
+                        {
+                            craftCost += (long)ingredient.Quantity;
+                            craftRealCost += (long)ingredient.Quantity;
+                            continue;
+                        }
+
+                        // Currencies contribute to the craft-vs-buy
+                        // decision value only (via user valuation), never
+                        // to the displayed real coin cost - the plan's
+                        // gold total never invents an exchange rate. An
+                        // unvalued currency demotes the recipe to the
+                        // fallback tier instead of contributing zero.
+                        if (ctx.CurrencyValuation != null &&
+                            ctx.CurrencyValuation.TryGetCopperValue(ingredient.Id, out long copperPerUnit))
+                        {
+                            try
+                            {
+                                valuationCopper = checked(valuationCopper + (long)ingredient.Quantity * copperPerUnit);
+                            }
+                            catch (OverflowException)
+                            {
+                                // Absurd valuation input; demote to fallback
+                                // rather than crash - mirrors
+                                // EvaluateVendorOffers.
+                                hasUnvaluedCurrency = true;
+                            }
+                        }
+                        else
+                        {
+                            hasUnvaluedCurrency = true;
+                        }
+
+                        continue;
+                    }
+
+                    if (ingredient.IngredientType != "Item")
+                    {
+                        // Non-Item ingredient (GuildUpgrade/unrecognized):
+                        // its id space has no relationship to prices or
+                        // valuations, so it demotes the recipe to the
+                        // fallback tier and contributes zero.
+                        hasUnvaluedCurrency = true;
+                        continue;
+                    }
+
+                    long? ingredientCost = Evaluate(ingredient, ctx);
+                    craftCost += ingredientCost ?? 0L;
+                    var ingredientDecision = ctx.Memo[ingredient.NodeId];
+                    craftRealCost += ingredientDecision.TotalCost ?? 0L;
+
+                    // Transitive fallback-tier propagation: a chosen
+                    // ingredient whose own decision is fallback-tier
+                    // taints this recipe too - otherwise a currency cost
+                    // one Craft level down would launder back into a
+                    // comparable-looking ancestor.
+                    if (ingredientDecision.HasUnvaluedCurrency)
+                    {
+                        hasUnvaluedCurrency = true;
+                    }
+                }
+
+                // Valuation only reaches craftCost when this recipe stays
+                // comparable - mirrors EvaluateVendorOffers' allValued gate.
+                if (!hasUnvaluedCurrency)
+                {
+                    // craftCost and valuationCopper can each stay in range
+                    // while their sum overflows; demote to fallback rather
+                    // than crash.
+                    try
+                    {
+                        craftCost = checked(craftCost + valuationCopper);
+                    }
+                    catch (OverflowException)
+                    {
+                        hasUnvaluedCurrency = true;
+                    }
+                }
+
+                bool competent = CraftCompetencyEvaluator.AccountCanCraft(
+                    recipe.Disciplines, recipe.MinRating, ctx.BestRatingByDiscipline);
+                if (hasUnvaluedCurrency)
+                {
+                    // Ranked on real cost only (never the valuation-
+                    // tainted craftCost), passed for BOTH tracker slots so
+                    // the returned ComparisonValue can never carry hidden
+                    // valuation upward.
+                    bestFallback.Offer(craftRealCost, craftRealCost, recipe);
+                    if (competent)
+                    {
+                        bestCompetentFallback.Offer(craftRealCost, craftRealCost, recipe);
+                    }
+                }
+                else
+                {
+                    bestComparable.Offer(craftCost, craftRealCost, recipe);
+                    if (competent)
+                    {
+                        bestCompetentComparable.Offer(craftCost, craftRealCost, recipe);
+                    }
+                }
+            }
+
+            return new RecipeCandidates(
+                bestComparable, bestFallback, bestCompetentComparable, bestCompetentFallback);
         }
 
         /// <summary>
@@ -1299,6 +1366,7 @@ namespace GW2CraftingHelper.Services
             {
                 lines.AddRange(currencyCosts);
             }
+
             if (itemCosts != null)
             {
                 foreach (var line in itemCosts)
@@ -1313,7 +1381,7 @@ namespace GW2CraftingHelper.Services
                 IsAvailable = true,
                 RawCoin = (coinCost ?? 0L) - itemFoldedValue,
                 CostLines = lines,
-                DecisionValue = decisionValue
+                DecisionValue = decisionValue,
             };
         }
 
@@ -1348,6 +1416,7 @@ namespace GW2CraftingHelper.Services
                         rawCoin += ingredient.Quantity;
                         continue;
                     }
+
                     var key = ("Currency", ingredient.Id);
                     lineTotals[key] = lineTotals.TryGetValue(key, out int existing)
                         ? existing + ingredient.Quantity
@@ -1381,7 +1450,7 @@ namespace GW2CraftingHelper.Services
                 CostLines = lines,
                 DecisionValue = decisionValue,
                 IsIncomplete = isIncomplete,
-                RawQuantitiesReducedByOwnedStock = rawQuantitiesReducedByOwnedStock
+                RawQuantitiesReducedByOwnedStock = rawQuantitiesReducedByOwnedStock,
             };
         }
 
@@ -1403,6 +1472,7 @@ namespace GW2CraftingHelper.Services
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -1424,6 +1494,7 @@ namespace GW2CraftingHelper.Services
                 {
                     ctx.CurrencyMap[node.Id] = node.Quantity;
                 }
+
                 return;
             }
 
@@ -1482,6 +1553,7 @@ namespace GW2CraftingHelper.Services
                         Collect(itemRoot, ctx, ref craftCounter);
                     }
                 }
+
                 return;
             }
 
@@ -1544,6 +1616,7 @@ namespace GW2CraftingHelper.Services
                     craftOccurrenceList = new List<int>();
                     craftOccurrences[stepKey] = craftOccurrenceList;
                 }
+
                 craftOccurrenceList.Add(node.NodeId);
             }
 
@@ -1566,7 +1639,7 @@ namespace GW2CraftingHelper.Services
                     vendorBatchTracking[stepKey] = new VendorBatchSolver.VendorBatchState
                     {
                         Batch = batch,
-                        Conflict = false
+                        Conflict = false,
                     };
                 }
 
@@ -1579,6 +1652,7 @@ namespace GW2CraftingHelper.Services
                     occurrenceList = new List<(int NodeId, int Quantity)>();
                     vendorOccurrences[stepKey] = occurrenceList;
                 }
+
                 occurrenceList.Add((node.NodeId, node.Quantity));
             }
 
@@ -1594,6 +1668,7 @@ namespace GW2CraftingHelper.Services
                 {
                     existing.UnitCost = existing.TotalCost / existing.Quantity;
                 }
+
                 if (decision.Source == AcquisitionSource.BuyFromVendor)
                 {
                     existing.VendorCurrencyCosts = _vendorBatchSolver.MergeVendorCurrencyCosts(
@@ -1620,7 +1695,7 @@ namespace GW2CraftingHelper.Services
                     RecipeId = decision.RecipeId,
                     VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                         ? _vendorBatchSolver.MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
-                        : null
+                        : null,
                 };
             }
         }
@@ -1648,6 +1723,7 @@ namespace GW2CraftingHelper.Services
                 {
                     continue;
                 }
+
                 if (!stepMap.TryGetValue(kvp.Key, out var step) || step.VendorOfferOutputCount <= 0)
                 {
                     continue;
@@ -1718,14 +1794,17 @@ namespace GW2CraftingHelper.Services
                         {
                             craftRealCost += ingredient.Quantity;
                         }
+
                         continue;
                     }
+
                     if (ingredient.IngredientType != "Item")
                     {
                         // Non-Item ingredient: never a real coin
                         // contribution and carries no memo entry; skip.
                         continue;
                     }
+
                     craftRealCost += RecomputeCraftCosts(ingredient, memo, ignoredItemIds) ?? 0L;
                 }
             }
@@ -1809,6 +1888,7 @@ namespace GW2CraftingHelper.Services
                                 // Evaluate() time); defense in depth only.
                             }
                         }
+
                         continue;
                     }
 
@@ -1884,6 +1964,7 @@ namespace GW2CraftingHelper.Services
                     return (long)quantity * unitPrice;
                 }
             }
+
             return null;
         }
 

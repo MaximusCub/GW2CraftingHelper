@@ -2,7 +2,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Pure decision for whether a completed account-snapshot fetch may
-    /// still commit its result (KNOWN-ISSUES item 31a-F1 - snapshot
+    /// still commit its result (KNOWN-ISSUES #31/31a-F1 - snapshot
     /// auto-refresh vs Clear Cache race). Mirrors StatusUpdateGuard's
     /// shape: the caller captures an epoch before starting the fetch's
     /// await, Module.ClearCache bumps the same shared epoch counter, and
@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// event this guard needs to detect is "did the user clear the cache
     /// while my fetch was still running".
     /// </summary>
-    public static class SnapshotEpochGuard
+    internal static class SnapshotEpochGuard
     {
         public static bool ShouldCommit(int myEpoch, int currentEpoch)
         {

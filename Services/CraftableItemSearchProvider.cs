@@ -8,7 +8,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CraftableItemSearchProvider : IItemSearchProvider
+    internal class CraftableItemSearchProvider : IItemSearchProvider
     {
         private readonly List<CachedEntry> _entries;
 
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
                     Id = e.Id,
                     Name = e.Name,
                     NameLower = e.Name.ToLowerInvariant(),
-                    Icon = e.Icon
+                    Icon = e.Icon,
                 })
                 .ToList();
         }
@@ -112,7 +112,7 @@ namespace GW2CraftingHelper.Services
                 ItemId = entry.Id,
                 Name = entry.Name,
                 IconUrl = entry.Icon,
-                IsPlanTarget = true
+                IsPlanTarget = true,
             };
         }
 

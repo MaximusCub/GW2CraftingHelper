@@ -6,10 +6,12 @@ namespace GW2CraftingHelper.Services
     /// render a specific message (e.g. "2 of 5 sources") without re-parsing
     /// the original exception itself.
     /// </summary>
-    public class SnapshotFailureClassification
+    internal class SnapshotFailureClassification
     {
         public SnapshotFailureKind Kind { get; }
+
         public int FailedSourceCount { get; }
+
         public int TotalSourceCount { get; }
 
         public SnapshotFailureClassification(SnapshotFailureKind kind, int failedSourceCount, int totalSourceCount)

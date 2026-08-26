@@ -250,7 +250,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(0, days);
         }
 
-        // --- TryParseRefreshIntervalMinutes (d1-snapshot-about-settings.md Feature 3) ---
+        // --- TryParseRefreshIntervalMinutes (dev/proposals/d1-snapshot-about-settings.md Feature 3) ---
 
         [Theory]
         [InlineData("1", 1)]

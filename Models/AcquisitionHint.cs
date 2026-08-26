@@ -7,9 +7,10 @@ namespace GW2CraftingHelper.Models
     /// and a short pill/tag label, respectively); SourceUrl and
     /// LastVerified are provenance for maintainers only.
     /// </summary>
-    public class AcquisitionHint
+    internal class AcquisitionHint
     {
         public int ItemId { get; set; }
+
         public string Hint { get; set; }
 
         // Short pill/tag label (e.g. "SALVAGE", "EXPLORE") shown in place of
@@ -19,6 +20,7 @@ namespace GW2CraftingHelper.Models
         public string Badge { get; set; }
 
         public string SourceUrl { get; set; }
+
         public string LastVerified { get; set; }
     }
 }

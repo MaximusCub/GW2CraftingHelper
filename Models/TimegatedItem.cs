@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public enum TimegatedCapType
+    internal enum TimegatedCapType
     {
         Daily,
         Weekly,
@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Models
         // offer can carry a Seasonal cap alongside either of them, and
         // both notices are reported when both are exceeded (see
         // VendorBatchSolver.FinalizeVendorBatches).
-        Seasonal
+        Seasonal,
     }
 
     /// <summary>
@@ -23,10 +23,12 @@ namespace GW2CraftingHelper.Models
     /// notice, computed once per merged shopping-list row after the plan is
     /// fully solved. See VendorBatchSolver.FinalizeVendorBatches.
     /// </summary>
-    public class TimegatedItem
+    internal class TimegatedItem
     {
         public int ItemId { get; set; }
+
         public TimegatedCapType CapType { get; set; }
+
         public int CapValue { get; set; }
 
         /// <summary>Total vendor purchases the merged plan needs (ceil(quantity / offer.OutputCount)).</summary>

@@ -535,8 +535,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Multi-recipe-option pool consumption ----
-        // (m34-r2-gw2e-owned-materials.md Section 6.2.5:
-        // previously EVERY RecipeOption on a node drained the shared pool,
+        // (Previously EVERY RecipeOption on a node drained the shared pool,
         // not just the one the solver would eventually choose - untested
         // before this milestone, since every fixture above uses a single
         // recipe option.)
@@ -1227,7 +1226,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- VOM design (Candidate A): decision-guided pool consumption ----
-        // (design-value-own-materials.md Section 6 test plan - the guide
+        // (The guide
         // dictionary a throwaway zero-owned PlanSolver.Solve produces,
         // consumed via Reduce's new optional 4th argument.)
 

@@ -7,9 +7,9 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the
     /// line order the in-game item tooltip uses (spec section 1.6,
-    /// docs/KNOWN-ISSUES.md "Tooltip authenticity"): the icon+name header,
+    /// KNOWN-ISSUES #42): the icon+name header,
     /// what the item DOES (strength/defense, attributes, granted bonuses),
-    /// its infusion slots, then the white identity block - rarity, type,
+    /// its infusion slots, then the identity block - rarity, type,
     /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
     /// all, unlabelled, the vendor value.
     ///
@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// this class only ever asks "is it present".
     /// </para>
     /// </summary>
-    public static class ItemStatTooltipComposer
+    internal static class ItemStatTooltipComposer
     {
         private static readonly IReadOnlyList<ItemAttributeLine> EmptyAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();
@@ -69,11 +69,12 @@ namespace GW2CraftingHelper.Services
                 // upgrade component, whose bonus lines FWDekker's
                 // UpgradeComponent builder breaks before - inferred, no
                 // unequipped-rune capture exists. Gap G15; the warhelm
-                // divergence this leaves is in docs/KNOWN-ISSUES.md.
+                // divergence this leaves is in KNOWN-ISSUES #42.
                 if (i > 0 || !bodyOpensUnderHeader)
                 {
                     builder.Separator();
                 }
+
                 builder.Append(blocks[i]);
             }
 
@@ -88,6 +89,7 @@ namespace GW2CraftingHelper.Services
                 {
                     builder.Separator();
                 }
+
                 builder.Append(value);
             }
 
@@ -258,13 +260,11 @@ namespace GW2CraftingHelper.Services
 
         private static void AppendNourishment(TooltipContentBuilder builder, ItemStatBlock stats)
         {
-            // WHITE, not the upgrade-bonus blue: steak.png's two
-            // nourishment bands measure (252,254,253) and (252,255,255),
-            // the same white as "Food" and "Required Level: 10" on that
-            // capture. It is details.description - the very field this
-            // renders - so the measurement is of this line, not of a
-            // neighbour. The blue is measured on RUNE and SIGIL bonuses
-            // only (Rune_effects_*.jpg).
+            // The first line is WHITE, the trailing effect lines GREY
+            // (~162): measured on the allspice capture (fidelity-audit F7,
+            // one modern JPEG, but the 162-vs-240 gap is unambiguous). Not
+            // the upgrade-bonus blue in any case - that is measured on
+            // rune and sigil bonuses only.
             //
             // Ascended food returns details:{type:Food} and nothing else
             // (measured on 91805). Silence, not a "no effect data" marker:
@@ -272,7 +272,19 @@ namespace GW2CraftingHelper.Services
             // would be the one thing this module never does.
             if (!string.IsNullOrEmpty(stats.NourishmentDescription))
             {
-                builder.Text(stats.NourishmentDescription).EndLine();
+                string description = stats.NourishmentDescription
+                    .Replace("\r\n", "\n").Replace('\r', '\n');
+                int firstBreak = description.IndexOf('\n');
+                if (firstBreak < 0)
+                {
+                    builder.Text(description).EndLine();
+                }
+                else
+                {
+                    builder.Text(description.Substring(0, firstBreak)).EndLine();
+                    builder.Styled(
+                        description.Substring(firstBreak + 1), TooltipSpanRole.Muted).EndLine();
+                }
             }
 
             if (stats.NourishmentDurationMs.HasValue && stats.NourishmentDurationMs.Value > 0)
@@ -282,8 +294,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The slot block: its own block between blanks, one line per slot
-        /// so the block's height matches the game's (gap G16).
+        /// The slot lines, each its own blank-separated block: on
+        /// live/eq-weapon-full.png (2026-08-25) two sigils and two
+        /// infusions each render as blank / block / blank, corroborated on
+        /// spire, ascended_comparison LEFT and naptown RIGHT - not one
+        /// contiguous run (gap G16, fidelity-audit F8).
         /// </summary>
         private static TooltipContent BuildInfusionSlots(ItemStatBlock stats)
         {
@@ -293,9 +308,14 @@ namespace GW2CraftingHelper.Services
             // own copy is instance state /v2/items cannot know, and
             // claiming the slots are empty would be a guess. That wording
             // difference is an accepted divergence from the game's
-            // "Unused Infusion Slot" - see docs/KNOWN-ISSUES.md.
+            // "Unused Infusion Slot" - see KNOWN-ISSUES #42.
             for (int i = 0; i < stats.InfusionSlotCount; i++)
             {
+                if (i > 0)
+                {
+                    slots.Separator();
+                }
+
                 slots.Text("Infusion Slot").EndLine();
             }
 
@@ -304,16 +324,18 @@ namespace GW2CraftingHelper.Services
 
         private static TooltipContent BuildIdentityBlock(ItemStatBlock stats)
         {
-            // Every line here is WHITE in the game - nothing in the
-            // identity block is grey, and the rarity WORD is white even
-            // though the name line above it is not (spec section 1.6,
-            // gaps G4/G5).
             var identity = new TooltipContentBuilder();
 
-            // Basic is suppressed outright, as the game suppresses it (G20).
+            // The rarity word carries the rarity colour, same as the name
+            // line: measured on the 2026-08-25 live captures - s07's "Fine"
+            // reads (82,146,240) and eq-weapon-full's "Legendary"
+            // (153,51,255), both on non-comparison hovers. The 2012-2016
+            // captures behind the old white reading (G5) are superseded;
+            // the game changed. Basic is still suppressed outright, as the
+            // game suppresses it (G20).
             if (!string.IsNullOrEmpty(stats.Rarity) && stats.Rarity != "Basic")
             {
-                identity.Text(stats.Rarity).EndLine();
+                identity.RarityText(stats.Rarity, stats.Rarity).EndLine();
             }
 
             string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
@@ -333,10 +355,13 @@ namespace GW2CraftingHelper.Services
                 identity.Text(SpaceCamelCase(type) + (isArmor ? " Armor" : "")).EndLine();
             }
 
+            // Grey, not white: "(Two-Handed)" measures (160,161,162) on
+            // live/eq-weapon-full.png (2026-08-25, lossless), same grey as
+            // the game's other parentheticals.
             string hand = WeaponHand(stats);
             if (hand != null)
             {
-                identity.Text(hand).EndLine();
+                identity.Styled(hand, TooltipSpanRole.Muted).EndLine();
             }
 
             if (!string.IsNullOrEmpty(stats.DamageType))
@@ -403,6 +428,7 @@ namespace GW2CraftingHelper.Services
             {
                 builder.Styled(span.Text, span.Role);
             }
+
             builder.EndLine();
         }
 
@@ -421,7 +447,7 @@ namespace GW2CraftingHelper.Services
             }
 
             return new TooltipContentBuilder()
-                .Coin(stats.VendorValue.Value, FormatCoin(stats.VendorValue.Value))
+                .Coin(stats.VendorValue.Value, CoinSegmentMath.GameStyleText(stats.VendorValue.Value))
                 .Build();
         }
 
@@ -484,8 +510,10 @@ namespace GW2CraftingHelper.Services
                 {
                     sb.Append(' ');
                 }
+
                 sb.Append(c);
             }
+
             return sb.ToString();
         }
 
@@ -496,6 +524,7 @@ namespace GW2CraftingHelper.Services
             {
                 return $"{totalMinutes} m";
             }
+
             int hours = totalMinutes / 60;
             int minutes = totalMinutes % 60;
             return minutes == 0 ? $"{hours} h" : $"{hours} h {minutes} m";
@@ -507,27 +536,6 @@ namespace GW2CraftingHelper.Services
         private static string FormatCount(int value)
         {
             return value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        // Deliberately duplicates the plain coin FORMAT rather than
-        // referencing CoinCurrencyRenderer - that class is Blish-coupled
-        // and this one must stay Blish-free. The SPLIT and the
-        // leading-zero-unit rule are shared via CoinSegmentMath, so this
-        // plain rendering cannot drift from the icons the rich path draws:
-        // the game prints "10c", never "0g 0s 10c" (gap G14).
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.FormatSegmentTexts(copper);
-            var sb = new StringBuilder(16);
-            if (gold != null)
-            {
-                sb.Append(gold).Append("g ");
-            }
-            if (silver != null)
-            {
-                sb.Append(silver).Append("s ");
-            }
-            return sb.Append(cop).Append('c').ToString();
         }
     }
 }

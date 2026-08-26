@@ -2,39 +2,348 @@ name: tests
 
 on:
   push:
+    branches: [master]
   pull_request:
+  # release.yml calls this workflow and gates publishing on it, so a tagged
+  # build cannot ship without the suite passing first. A `branches:` filter
+  # with no `tags:` key excludes tag refs entirely, so without this the
+  # release path ran no tests at all.
+  workflow_call:
+
+# Without this, three pushes in a row leave six runs racing and the last one to
+# finish wins the status rather than the newest commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: windows-latest
+  # Each check below passed on the commit that introduced it, so this job can
+  # only ever go red on a regression. Every rule it enforces is stated in
+  # CLAUDE.md or CONTRIBUTING.md and was, until now, enforced by prose alone.
+  invariants:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: ASCII-only source check (advisory)
+      - name: ASCII-only .cs source
         shell: bash
         run: |
-          echo "CLAUDE.md requires ASCII-only .cs source. Listing current violations below;"
-          echo "this step is advisory (non-blocking) until the pre-existing violations it"
-          echo "found are cleaned up in a follow-up pass - see M38 WP-02."
-          violations=$(grep -rlP '[^\x00-\x7F]' --include='*.cs' . \
-            | grep -v '^\./packages/' | grep -v '/obj/' | grep -v '/bin/' || true)
+          # LC_ALL=C is load-bearing. In a UTF-8 locale PCRE runs in UTF mode,
+          # where a byte that is not valid UTF-8 never matches [^\x00-\x7F] at
+          # all - so the step caught a UTF-8 em-dash and a BOM but waved through
+          # Windows-1252 curly quotes (0x93/0x94), the likeliest way non-ASCII
+          # reaches a Windows C# repo. Byte mode matches on bytes and catches
+          # all three. `env` because xargs execs grep directly, not via a shell.
+          violations=$(git ls-files -z '*.cs' \
+            | xargs -0 -r env LC_ALL=C grep -laP '[^\x00-\x7F]' || true)
           if [ -n "$violations" ]; then
+            echo "CLAUDE.md requires ASCII-only .cs source. Represent runtime glyphs"
+            echo "with escape sequences instead. Non-ASCII characters found in:"
             echo "$violations"
-          else
-            echo "(clean - no non-ASCII characters found in .cs source)"
+            exit 1
           fi
+
+      - name: No em-dash in source or config
+        shell: bash
+        run: |
+          # ref/ holds data generated from the GW2 API and the wiki, not authored
+          # text, so item names there are outside the rule.
+          #
+          # Byte mode here too, for the reason above - but the pattern must be
+          # the em-dash's UTF-8 bytes, not \x{2014}: under LC_ALL=C, PCRE rejects
+          # a code point above 0xFF outright ("character code point value in
+          # \x{} is too large", rc=2), and the `|| true` below would swallow
+          # that into a step that silently passes forever.
+          hits=$(git ls-files -z '*.cs' '*.csproj' '*.yml' '*.yaml' '*.json' '*.config' \
+            | xargs -0 -r env LC_ALL=C grep -laP '\xE2\x80\x94' | grep -v '^ref/' || true)
+          if [ -n "$hits" ]; then
+            echo "CLAUDE.md forbids em-dashes in source and config. Use '-' or '--'."
+            echo "Found in:"
+            echo "$hits"
+            exit 1
+          fi
+
+      - name: Tests stay free of Blish HUD and Gw2Sharp
+        shell: bash
+        run: |
+          # The test project references the module, so every Blish type is already
+          # on the test compiler's path: without this check a stray using would
+          # compile and pass. Comment lines are allowed, since several tests
+          # explain which Blish-bound seam they were written to avoid.
+          hits=$(git ls-files -z 'tests/*.cs' | xargs -0 -r grep -nE '(Blish_HUD|Gw2Sharp)' \
+            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(//|\*|/\*)' || true)
+          if [ -n "$hits" ]; then
+            echo "Tests must never reference Blish HUD or Gw2Sharp:"
+            echo "$hits"
+            exit 1
+          fi
+          pkgs=$(git ls-files -z 'tests/*.csproj' | xargs -0 -r grep -inE 'Blish|Gw2Sharp' || true)
+          if [ -n "$pkgs" ]; then
+            echo "Test projects must not reference Blish HUD or Gw2Sharp:"
+            echo "$pkgs"
+            exit 1
+          fi
+
+      - name: csproj Compile list matches disk
+        shell: bash
+        run: |
+          # The legacy csproj lists every source file by hand (CONTRIBUTING.md
+          # explains why it stays that way). An unregistered .cs compiles nowhere
+          # and fails nothing, so the omission is invisible without this check.
+          grep -oP '(?<=<Compile Include=")[^"]+' GW2CraftingHelper.csproj \
+            | tr '\\' '/' | sort > /tmp/compile-list.txt
+          git ls-files 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' 'Contracts/*.cs' \
+            'Properties/*.cs' 'Module.cs' | sort > /tmp/source-files.txt
+          drift=$(comm -3 /tmp/compile-list.txt /tmp/source-files.txt)
+          if [ -n "$drift" ]; then
+            echo "GW2CraftingHelper.csproj and disk disagree."
+            echo "Left column: in the csproj but not on disk."
+            echo "Right column: on disk but missing a <Compile Include> entry."
+            echo "$drift"
+            exit 1
+          fi
+
+      - name: Live docs cite source paths that exist
+        shell: bash
+        run: |
+          # dev/ and docs/research are dated point-in-time records, frozen by
+          # policy, so a path that moved after they were written is not a
+          # regression. Paths written with an elision are illustrative.
+          live=$(git ls-files '*.md' | grep -vE '^(dev/|docs/research/)')
+          missing=""
+          for path in $(grep -rhoP '`(Views|Services|Models|Contracts|tools)/[^`*]+\.cs`' $live \
+            | tr -d '`' | grep -v '\.\.\.' | sort -u || true); do
+            if [ ! -f "$path" ]; then
+              missing="$missing $path"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Live docs cite source files that do not exist:$missing"
+            exit 1
+          fi
+
+      - name: Source cites markdown paths that exist
+        shell: bash
+        run: |
+          # The mirror of the check above. Comments used to cite design docs by
+          # bare filename - "design-plan-notes.md", "decision-map.md" - and nine
+          # of those had never been committed at all, so a reader chasing the
+          # rationale for shipped behaviour found nothing. Only comment lines are
+          # scanned, so a future code path that writes a .md is not a citation.
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+
+          files = subprocess.run(['git', 'ls-files', '*.cs'], capture_output=True,
+                                 text=True, check=True).stdout.split()
+          token = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_./-]*\.md')
+          bad = []
+          for f in files:
+              for n, line in enumerate(open(f, encoding='utf-8'), 1):
+                  s = line.lstrip()
+                  if not (s.startswith('//') or s.startswith('*')):
+                      continue
+                  for m in token.finditer(s):
+                      if not os.path.exists(m.group(0)):
+                          bad.append(f'{f}:{n}: {m.group(0)}')
+          if bad:
+              print('Source cites markdown files that do not exist. Cite by')
+              print('repo-relative path, or state the fact instead of pointing at it:')
+              print('\n'.join(bad))
+              sys.exit(1)
+          print('Every markdown citation in .cs comments resolves.')
+          PY
+
+      - name: "Every KNOWN-ISSUES #N cited from source resolves"
+        shell: bash
+        run: |
+          # Source cites the tracker over 200 times. Until 2026-08-25 it did so
+          # in six different shapes, only one of which resolved to anything;
+          # this is what keeps the surviving shape honest.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          tracker = open('docs/KNOWN-ISSUES.md', encoding='utf-8').read()
+          headings = set()
+          for m in re.finditer(r'^### (\d+)\.', tracker, re.M):
+              headings.add(int(m.group(1)))
+          for m in re.finditer(r'^### Items (\d+)-(\d+):', tracker, re.M):
+              headings.update(range(int(m.group(1)), int(m.group(2)) + 1))
+
+          files = subprocess.run(['git', 'ls-files', '*.cs'], capture_output=True,
+                                 text=True, check=True).stdout.split()
+          # A citation may wrap onto the next comment line, so comment markers and
+          # newlines are folded away before the numbers are read off.
+          cite = re.compile(r'KNOWN-ISSUES\s*((?:#\d+[a-z]?(?:\.\d+)?[/, ]*)+)')
+          bad = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              flat = re.sub(r'\n\s*(?:///|//|\*)', ' ', text)
+              for m in cite.finditer(flat):
+                  for n in re.findall(r'#(\d+)', m.group(1)):
+                      if int(n) not in headings:
+                          bad.append(f'{f}: KNOWN-ISSUES #{n}')
+          if bad:
+              print('Source cites KNOWN-ISSUES entries that have no heading:')
+              print('\n'.join(sorted(set(bad))))
+              sys.exit(1)
+          print(f'{len(headings)} catalog entries; every cited number resolves.')
+          PY
+
+      - name: KNOWN-ISSUES stays under its rotation threshold
+        shell: bash
+        run: |
+          # The previous threshold was ~100KB, prose-only, and set below the
+          # file's own post-rotation floor - true the day it was written, so it
+          # could never fire. 250KB is headroom above the measured 72KB floor.
+          bytes=$(wc -c < docs/KNOWN-ISSUES.md)
+          if [ "$bytes" -gt 256000 ]; then
+            echo "docs/KNOWN-ISSUES.md is $bytes bytes, past the 250KB threshold."
+            echo "Milestone records belong in dev/records/, one file per branch;"
+            echo "if they are already there, the ledger is due a consolidation."
+            exit 1
+          fi
+          echo "docs/KNOWN-ISSUES.md: $bytes bytes."
+
+      - name: Files stay within their line budgets
+        shell: bash
+        run: |
+          # A ratchet, not a metric. docs/file-budgets.txt explains itself;
+          # this is the half that has teeth. See the CraftingPlanView regrowth
+          # it was written for.
+          fail=0
+          while read -r path budget; do
+            case "$path" in ''|\#*) continue ;; esac
+            if [ ! -f "$path" ]; then
+              echo "budget entry for a path that no longer exists: $path"
+              echo "  a rename has to move its budget with it, not drop it."
+              fail=1
+              continue
+            fi
+            actual=$(wc -l < "$path")
+            if [ "$actual" -gt "$budget" ]; then
+              echo "$path: $actual lines, budget $budget (+$((actual - budget)))"
+              fail=1
+            fi
+          done < docs/file-budgets.txt
+          if [ "$fail" -ne 0 ]; then
+            echo "Raise the budget in docs/file-budgets.txt in this same commit and"
+            echo "say why in the message, or put the growth somewhere it belongs."
+            exit 1
+          fi
+          echo "Every budgeted file is within its entry."
+
+      - name: Relative links in tracked markdown resolve
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+
+          files = subprocess.run(['git', 'ls-files', '*.md'], capture_output=True,
+                                 text=True, check=True).stdout.split('\n')
+          broken = []
+          for f in filter(None, files):
+              for target in re.findall(r'\]\(([^)]+)\)', open(f, encoding='utf-8').read()):
+                  if target.startswith(('http', 'mailto:', '#')):
+                      continue
+                  path = target.split('#')[0].replace('%20', ' ')
+                  if path and not os.path.exists(os.path.join(os.path.dirname(f), path)):
+                      broken.append(f'{f} -> {target}')
+          if broken:
+              print('Broken relative markdown links:')
+              print('\n'.join(broken))
+              sys.exit(1)
+          print(f'{len(files)} markdown files, no broken relative links.')
+          PY
+
+  # 40% of the last 300 commits touched nothing outside docs/. A job skipped by
+  # an `if` still reports a status to branch protection, which a workflow-level
+  # paths-ignore would not - that would leave docs-only PRs unmergeable.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          # Anything we cannot resolve falls through to building, never to skipping.
+          code=true
+          # release.yml calls this workflow on a tag ref and gates publishing on
+          # the result. A docs-only skip there would hand the release job a
+          # green `tests` status that ran no tests - re-tagging an existing
+          # release commit is enough to reach it - which is the exact hole this
+          # gate exists to close. Tag refs always run the whole suite.
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "tag ref: running the full suite regardless of what changed"
+            exit 0
+          fi
+          base="$BASE_SHA"
+          if [ -z "$base" ]; then
+            base="$BEFORE_SHA"
+          fi
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            merge_base=$(git merge-base "$base" "$GITHUB_SHA" 2>/dev/null || true)
+            if [ -n "$merge_base" ]; then
+              base="$merge_base"
+            fi
+            changed=$(git diff --name-only "$base" "$GITHUB_SHA")
+            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^(docs/|.*\.md$)'; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "non-doc changes present: $code"
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages
+            ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('packages.config', '**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
       - name: Restore packages
         run: nuget restore GW2CraftingHelper.sln
 
-      - name: Build module
-        run: dotnet build GW2CraftingHelper.csproj -p:Platform=x64
+      # The solution, not the module alone: tools/MysticForgeSeeder (the only
+      # producer of ref/mystic_forge_recipes.json) and tools/GW2CraftingHelper.Harness
+      # have no test project, so a project-scoped build compiled neither.
+      #
+      # No -warnaserror here on purpose. The warning gate lives in the project
+      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj, WarningsAsErrors
+      # in the test project - so it applies to a developer's local build too, not
+      # just to CI, and this step inherits it for free. Adding the flag here would
+      # also widen the gate to every project in the solution, including CI-only
+      # restore diagnostics that never appear locally. Note that -warnaserror:CS
+      # specifically would do nothing at all: csc honours WarningsAsErrors only
+      # for explicit codes, verified by reintroducing a CS0108 under the prefix
+      # form and watching the build stay green (see the csproj comment).
+      - name: Build solution
+        run: dotnet build GW2CraftingHelper.sln -p:Platform=x64
 
       - name: Run tests
         run: dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
@@ -44,3 +353,20 @@ jobs:
 
       - name: Run vendor offer updater tests
         run: dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
+
+      # Release|x64 is the configuration release.yml ships from. CI already
+      # reaches it, but only as a side effect: the module test step above pulls
+      # the module in through a ProjectReference pinned with SetPlatform=x64,
+      # so BuildBlishHUDModule runs because a test project happened to ask for
+      # it. That coverage vanishes silently the day SetPlatform changes or the
+      # test project stops referencing the module. Build it by name and assert
+      # the .bhm came out, so the artefact players install is a thing CI checks
+      # on purpose rather than a thing it happens to produce.
+      - name: Build the shipping configuration (Release/x64)
+        run: dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release
+
+      - name: Verify the .bhm was produced
+        shell: bash
+        run: |
+          test -f bin/x64/Release/GW2CraftingHelper.bhm
+          ls -l bin/x64/Release/GW2CraftingHelper.bhm

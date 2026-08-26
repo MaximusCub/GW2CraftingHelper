@@ -10,13 +10,13 @@ namespace GW2CraftingHelper.Services
     /// scrapes, dev-only caches) for where this fits in the offline
     /// seed-generation pipeline.
     /// </summary>
-    public class VendorOfferLoader
+    internal class VendorOfferLoader
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
-            WriteIndented = true
+            WriteIndented = true,
         };
 
         public VendorOfferDataset Load(Stream stream)

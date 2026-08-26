@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Views.Rendering
     /// row.</description></item>
     /// </list>
     ///
-    /// LIFECYCLE (measured, see docs/KNOWN-ISSUES.md "Tooltip facility"):
+    /// LIFECYCLE (measured, see KNOWN-ISSUES #41):
     /// there is exactly ONE rich surface for the whole module, repointed on
     /// hover. <c>Control.Dispose</c> does not dispose the control's
     /// <c>Tooltip</c>, and the Tooltip is not the control's child, so
@@ -124,6 +124,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 source.FallbackText = wrapped;
             }
+
             control.BasicTooltipText = wrapped;
         }
 
@@ -140,6 +141,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Clear(control);
                 return;
             }
+
             Register(control, new TooltipContentSource(content));
         }
 
@@ -157,6 +159,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Clear(control);
                 return;
             }
+
             Register(control, new TooltipContentSource(build));
         }
 
@@ -178,6 +181,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return;
             }
+
             Contents.Remove(control);
             control.Tooltip = null;
             control.BasicTooltipText = null;
@@ -249,6 +253,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 return null;
             }
+
             if (!Contents.TryGetValue(control, out var source))
             {
                 return null;
@@ -267,6 +272,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 // the correct answer, and the log line names the builder
                 // that failed.
                 Logger.Warn(ex, "Rich tooltip content builder threw; falling back to the control's own text");
+
+                // "the tooltip does nothing on that row" is a user-reportable
+                // symptom, so it belongs in the module's own Log tab and not
+                // only in Blish's file log - the Copy button cannot collect
+                // the latter. Hover-paced, not per-frame: a builder runs when
+                // a box is about to be shown, so a broken row costs one line
+                // per hover rather than one per frame.
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "ui",
+                    $"Rich tooltip content builder threw, falling back to the control's own text: {ex.GetType().Name} - {ex.Message}");
                 return TooltipContent.OrText(null, source.FallbackText);
             }
         }

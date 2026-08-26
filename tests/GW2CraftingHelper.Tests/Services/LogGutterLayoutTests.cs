@@ -72,11 +72,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void FullGutterWidth_IsItsOwnFourTerms()
+        public void FullGutterWidth_IsTheTwoBandsAndTheGapBeforeTheMessage()
         {
+            // Resolved pixels rather than the method's own expression
+            // restated: 16 + 227 + 8 + 134.
+            Assert.Equal(385, LogGutterLayout.FullGutterWidth(TimeBand, TagBand));
+
+            // A wider band moves the message column by exactly that much,
+            // and a negative band is clamped rather than shrinking it.
             Assert.Equal(
-                LogGutterLayout.GutterX + TimeBand + LogGutterLayout.TimeToTagGap + TagBand,
-                LogGutterLayout.FullGutterWidth(TimeBand, TagBand));
+                LogGutterLayout.FullGutterWidth(TimeBand, TagBand) + 40,
+                LogGutterLayout.FullGutterWidth(TimeBand, TagBand + 40));
+            Assert.Equal(
+                LogGutterLayout.GutterX + LogGutterLayout.TimeToTagGap,
+                LogGutterLayout.FullGutterWidth(-5, -5));
         }
 
         [Fact]

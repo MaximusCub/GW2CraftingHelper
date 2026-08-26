@@ -7,19 +7,8 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7. Section
-    // builders (continued)" region - the Crafting Steps row list (including
-    // its TimegatedNotice informational rows) and the step-number
-    // rendering. Behavior is unchanged: same row geometry, same
-    // PlanContentHeightMath/PlanRelayoutMath calls, same
-    // LabelHelpers.CreateRowDivider usage (divider math
-    // and its 1px scissor clearance untouched). The only edits inside
-    // the moved bodies are _relayoutActions.Add -> the injected
-    // ISectionRelayoutSink.AddRelayout (a semantics-preserving pass-through -
-    // see ISectionRelayoutSink's doc comment) and CreateTextRow(...) ->
-    // TextRowRenderer.CreateTextRow(..., _sink) (see that class's doc
-    // comment for why it is its own shared file rather than part of this
-    // one - it has two other call sites still living in CraftingPlanView).
+    // The Crafting Steps row list (including its TimegatedNotice
+    // informational rows) and the step-number rendering.
     //
     // CreateCraftStepRow's
     // divider+relayout tail goes through RowRelayoutHelpers.FinishRow -
@@ -37,19 +26,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal CraftStepsSectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by every other section renderer on this pattern -
-            // the sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateCraftStepRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateCraftingStepsBody.
         /// The sublabel column is pinned to the panel edge and the
         /// "Craft Nx Name" run flexes into whatever is left of the row,
         /// ellipsizing with its full name on a tooltip.
@@ -72,11 +52,21 @@ namespace GW2CraftingHelper.Views.Rendering
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 var row = section.Rows[i];
-                if (row.RowType == PlanRowType.TimegatedNotice) continue;
-                if (string.IsNullOrEmpty(row.Sublabel)) continue;
+                if (row.RowType == PlanRowType.TimegatedNotice)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(row.Sublabel))
+                {
+                    continue;
+                }
 
                 int width = (int)System.Math.Ceiling(sublabelFont.MeasureString(row.Sublabel).Width);
-                if (width > maxSublabelWidth) maxSublabelWidth = width;
+                if (width > maxSublabelWidth)
+                {
+                    maxSublabelWidth = width;
+                }
             }
 
             // A TimegatedNotice row (vendor-cap informational
@@ -105,8 +95,6 @@ namespace GW2CraftingHelper.Views.Rendering
             return $"{quantity}x ";
         }
 
-        // Moved verbatim from CraftingPlanView.CreateCraftStepRow. Only
-        // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
         // Left x of the row's text run, and its fixed leading word - both
         // shared with Render()'s pre-scan so the measured extent is exactly
         // what the row lays out.
@@ -135,7 +123,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(badgeSize, badgeSize),
                 Location = new Point(badgeX, badgeY),
                 BackgroundColor = Color.White * 0.08f,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
             // Digits only, so the space-glyph defect that retired
             // 18-regular elsewhere is not the reason this moved - the badge
@@ -154,7 +142,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(badgeX + (badgeSize - numberWidth) / 2, badgeY + (badgeSize - numberHeight) / 2),
-                Parent = rowPanel
+                Parent = rowPanel,
             };
 
             var iconFrame = IconControls.CreateItemIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
@@ -171,7 +159,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = CraftPrefix, Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel
+                    Location = new Point(x, 13), Parent = rowPanel,
                 });
             x += craftLabel.Width;
 
@@ -180,7 +168,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel
+                    Location = new Point(x, 13), Parent = rowPanel,
                 });
             x += qtyLabel.Width;
 
@@ -200,7 +188,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                     ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(nameX, 13), Parent = rowPanel
+                    Location = new Point(nameX, 13), Parent = rowPanel,
                 });
             StampNameTooltip(rowPanel, nameLabel, iconFrame, fullName);
 

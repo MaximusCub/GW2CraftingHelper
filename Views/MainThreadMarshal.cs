@@ -1,5 +1,7 @@
 using System;
+using System.Threading;
 using Blish_HUD;
+using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Views
 {
@@ -26,6 +28,26 @@ namespace GW2CraftingHelper.Views
     {
         private static readonly Logger Logger = Logger.GetLogger(typeof(MainThreadMarshal));
 
+        // True while this class is already reporting a swallowed failure on
+        // this thread. The Log tab rebuilds its rows through
+        // MainThreadMarshal.Run (LogTabContent.RebuildRows), so a rebuild
+        // that throws would otherwise write the entry that schedules the next
+        // rebuild that throws. Same rule Module.cs applies to ModuleLogStore's
+        // own IO failures: the log system's failures go to Blish's Logger,
+        // never back into the log system.
+        [ThreadStatic]
+        private static bool _reportingFailure;
+
+        // Signature of the last failure mirrored into the ring, so a
+        // repeating failure costs one line rather than one per occurrence.
+        // The recursion above is synchronous and the guard closes it; this
+        // closes the ASYNCHRONOUS version of the same loop, where the entry
+        // written here is what schedules the Log tab rebuild that throws
+        // again. Only the bounded ring is deduplicated - Blish's Logger
+        // still records every occurrence, so the repetition itself is not
+        // lost.
+        private static string _lastReportedSignature;
+
         /// <summary>
         /// Queues <paramref name="action"/> to run once on the main thread.
         /// A null action is ignored. Exceptions thrown by
@@ -40,7 +62,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         public static bool Run(Action action)
         {
-            if (action == null) return false;
+            if (action == null)
+            {
+                return false;
+            }
 
             var overlay = GameService.Overlay;
             if (overlay == null)
@@ -62,9 +87,55 @@ namespace GW2CraftingHelper.Views
                 catch (Exception ex)
                 {
                     Logger.Warn(ex, "MainThreadMarshal queued action threw");
+                    ReportSwallowedFailure(ex);
                 }
             });
             return true;
+        }
+
+        /// <summary>
+        /// Mirrors the swallowed exception into the module's own Log tab.
+        /// This is the swallow point for every marshaled UI mutation in the
+        /// module, so the symptoms it converts - "the plan strip froze on a
+        /// phase", "I clicked Generate and nothing happened" - are exactly
+        /// the ones a user reports and cannot diagnose, and Blish's file log
+        /// is not what a bug report contains. Guarded rather than
+        /// unconditional; see <see cref="_reportingFailure"/>.
+        /// </summary>
+        private static void ReportSwallowedFailure(Exception ex)
+        {
+            if (_reportingFailure)
+            {
+                return;
+            }
+
+            _reportingFailure = true;
+            try
+            {
+                string signature = $"{ex.GetType().Name} - {ex.Message}";
+
+                // string.Equals, not ==: the operands are two separately
+                // interpolated strings, so reference equality would never
+                // match and the suppression would never fire.
+                string previous = Interlocked.Exchange(ref _lastReportedSignature, signature);
+                if (string.Equals(previous, signature, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                ModuleLog.Shared.Write(
+                    ModuleLogLevel.Warn,
+                    "ui",
+                    $"A queued main-thread action threw and was swallowed: {signature}");
+            }
+            catch (Exception writeEx)
+            {
+                Logger.Warn(writeEx, "MainThreadMarshal could not record a queued-action failure to the module log");
+            }
+            finally
+            {
+                _reportingFailure = false;
+            }
         }
     }
 }

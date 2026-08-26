@@ -99,6 +99,24 @@ echo "=== Building VendorOfferUpdater (Release) ==="
 dotnet build "$PROJ" -c Release
 echo ""
 
+# --- Pre-refresh snapshot ---
+#
+# git diff on $OUTPUT reports "1 insertion(+), 1 deletion(-)" - the whole
+# 14.8MB payload is one line. Snapshot the baseline before the passes
+# overwrite it so the summary below can report what actually changed.
+BASELINE_SNAPSHOT=""
+cleanup_snapshot() {
+    if [[ -n "$BASELINE_SNAPSHOT" && -f "$BASELINE_SNAPSHOT" ]]; then
+        rm -f "$BASELINE_SNAPSHOT"
+    fi
+}
+trap cleanup_snapshot EXIT
+
+if [[ -f "$OUTPUT" ]]; then
+    BASELINE_SNAPSHOT="$(mktemp)"
+    cp "$OUTPUT" "$BASELINE_SNAPSHOT"
+fi
+
 # --- Pass 1: Wiki scrape ---
 
 if [[ "$PASS2_ONLY" == false ]]; then
@@ -180,6 +198,17 @@ if [[ -f "$OUTPUT" ]]; then
     fi
 else
     echo "WARNING: Output file not found: $OUTPUT" >&2
+fi
+
+# --- Offer diff ---
+
+if [[ -n "$BASELINE_SNAPSHOT" && -f "$BASELINE_SNAPSHOT" && -f "$OUTPUT" ]]; then
+    echo ""
+    echo "=== Offer diff vs the pre-refresh baseline ==="
+    echo "docs/RELEASING.md requires this in the PR body for a data(vendor): commit."
+    echo ""
+    dotnet run --project "$PROJ" -c Release --no-build -- \
+        --diff-summary "$BASELINE_SNAPSHOT" "$OUTPUT"
 fi
 
 echo ""

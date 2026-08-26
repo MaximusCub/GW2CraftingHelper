@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Views.Rendering
     // above it. RecipesColumnMath owns the edge arithmetic (Blish-free,
     // tested); this file only measures the bands it is handed.
     //
-    // Render() calls CTableHeaderRenderer (the shared header, also used by
+    // Render() calls ColumnHeaderRowRenderer (the shared header, also used by
     // Required Disciplines) directly, exactly as DisciplinesSectionRenderer
     // does - see that class's doc comment.
     //
@@ -38,14 +38,6 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal RecipesSectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by every other section renderer on this pattern -
-            // the sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateRecipeRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
@@ -84,9 +76,15 @@ namespace GW2CraftingHelper.Views.Rendering
                 var row = section.Rows[i];
 
                 int statusWidth = MeasureWidth(font, row.StatusTag);
-                if (statusWidth > statusColumnWidth) statusColumnWidth = statusWidth;
+                if (statusWidth > statusColumnWidth)
+                {
+                    statusColumnWidth = statusWidth;
+                }
 
-                if (string.IsNullOrEmpty(row.Sublabel)) continue;
+                if (string.IsNullOrEmpty(row.Sublabel))
+                {
+                    continue;
+                }
 
                 if (!anyDiscipline)
                 {
@@ -95,21 +93,24 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 int disciplineWidth = MeasureWidth(font, row.Sublabel);
-                if (disciplineWidth > disciplineColumnWidth) disciplineColumnWidth = disciplineWidth;
+                if (disciplineWidth > disciplineColumnWidth)
+                {
+                    disciplineColumnWidth = disciplineWidth;
+                }
             }
 
             var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
 
             if (anyDiscipline)
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
                     middleXForWidth: w => scan.EdgesFor(w).DisciplineX);
             }
             else
             {
-                CTableHeaderRenderer.CreateCTableHeaderRow(
+                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink);
             }
 
@@ -222,7 +223,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(NameX, NameY),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
             StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
 
@@ -243,7 +244,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
                         Location = new Point(edges.DisciplineX, NameY),
-                        Parent = rowPanel
+                        Parent = rowPanel,
                     });
             }
 
@@ -259,6 +260,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     statusColor = new Color(150, 200, 150);
                 }
+
                 statusLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.StatusTag, font, statusColor, edges.StatusRightEdge, NameY);
             }
@@ -278,6 +280,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         disciplineLabel.Location = new Point(e.DisciplineX, NameY);
                     }
+
                     if (statusLabel != null)
                     {
                         statusLabel.Location = new Point(

@@ -4,64 +4,33 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// a single,
-    /// class-level structural walk of the ENTIRE object graph a
-    /// deserialized <see cref="PersistedPlan"/> carries, run once at the
+    /// One class-level structural walk of the ENTIRE object graph a
+    /// deserialized <see cref="PersistedPlan"/> carries, run at the
     /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
     /// before the file is accepted at all.
     /// <para>
-    /// Rounds 1-3 each closed one more UNGUARDED NRE crash site reachable
-    /// from a structurally-valid-but-degraded plan.json (a try/catch around
-    /// <c>ApplyRestoredPlan</c>'s vm build, then its live-tab
-    /// <c>RenderPlan</c> call, then <c>Build()</c>'s own render tail) - but
-    /// every one of those fixes guarded an individual RENDER call site, not
-    /// the data itself. Two more unguarded call sites survived all three
-    /// rounds because they are not part of any render pass at all: the
-    /// "Expand All" button and the per-node expand/collapse toggle
-    /// (<c>Views/Rendering/TreeSectionController.cs</c>) both call
-    /// <c>RenderTreeNode</c> directly from a Click handler, on a node that
-    /// was NEVER visited during the guarded initial render because it was
-    /// collapsed by default (<c>PlanContentHeightMath.TreeChildFlowHeight</c>
-    /// returns 0 without recursing for a collapsed node, and
-    /// <c>RenderTreeNode</c> itself only recurses into already-expanded
-    /// children) - so a null entry inside <see cref="CraftingTreeNode.Children"/>
-    /// at depth 2+ (default-collapsed) sails straight through every
-    /// existing try/catch and only throws later, from a click, with no
-    /// catch anywhere nearby. A third, similarly unguarded site was found
-    /// while building this fix: <c>TreeSectionController</c>'s Craft
-    /// All/Buy All buttons call <c>CraftingPlanPipeline.BuildPresetOverrides</c>
-    /// - which walks the WHOLE <see cref="PlanSolveContext.Tree"/>
-    /// (<see cref="RecipeNode"/>/<see cref="RecipeOption"/> graph) - BEFORE
-    /// <c>ApplyOverridesAndResolve</c>'s own try/catch is ever reached.
-    /// Guarding each such site individually, as rounds 1-3 did, has already
-    /// been proven not to converge (every fix so far revealed exactly one
-    /// more unguarded site); this class instead makes the DATA safe once,
-    /// so no render/re-solve call site - guarded or not, today or added
-    /// later - can ever be handed a graph it does not already assume is
-    /// valid.
+    /// Every check below exists because a specific production path
+    /// dereferences that exact field with no null guard, on an assumption
+    /// that holds for every solver-BUILT <see cref="CraftingPlanResult"/>/
+    /// <see cref="PlanSolveContext"/> - those are only ever constructed by
+    /// <see cref="PlanSolver"/>/<see cref="PlanResultBuilder"/>/<see cref="CraftingTreeBuilder"/>.
+    /// A restored plan is the one path that bypasses the solver and hands
+    /// the same types straight from disk into that trusted code, so the
+    /// invariants are re-established here, once, instead of at each call
+    /// site: several of those sites sit outside any try/catch (Expand All
+    /// and the per-node toggle call RenderTreeNode straight from a Click
+    /// handler, on nodes a guarded initial render never visited because
+    /// they were collapsed; Craft All/Buy All walk the whole tree through
+    /// BuildPresetOverrides before ApplyOverridesAndResolve's catch is
+    /// reached). See each check's own inline comment for the site it
+    /// protects.
     /// </para>
     /// <para>
-    /// Every check below exists because a specific, already-identified
-    /// production code path dereferences that exact field with NO per-call
-    /// null guard, on the assumption (true for every solver-BUILT
-    /// <see cref="CraftingPlanResult"/>/<see cref="PlanSolveContext"/>, since
-    /// those are only ever constructed by trusted code - <see cref="PlanSolver"/>/
-    /// <see cref="PlanResultBuilder"/>/<see cref="CraftingTreeBuilder"/> -
-    /// never handed attacker- or corruption-controlled data) that the
-    /// invariant always holds. A restored <see cref="PersistedPlan"/> is the
-    /// ONE path that bypasses the solver entirely and hands these same
-    /// types straight from an on-disk file into that trusted code, so this
-    /// walk exists to re-establish, once, every invariant the solver's own
-    /// construction would otherwise have guaranteed for free. See each
-    /// check's own inline comment for the exact call site it protects.
-    /// </para>
-    /// <para>
-    /// Validation failure is the corrupt-file path: the
-    /// caller throws, which propagates to <see cref="PlanStore.LoadLatest"/>'s
-    /// own try/catch - one Warn log line, then a null return (fresh start).
-    /// Never a partial accept: any single invalid field anywhere in the
-    /// graph rejects the WHOLE file, matching every other tolerance-gate
-    /// check in <see cref="PlanStoreHelpers.DeserializePersistedPlan"/>.
+    /// Validation failure is the corrupt-file path: the caller throws,
+    /// <see cref="PlanStore.LoadLatest"/> catches, logs one Warn and returns
+    /// null (fresh start). Never a partial accept - one invalid field
+    /// rejects the whole file, like every other tolerance gate in
+    /// <see cref="PlanStoreHelpers.DeserializePersistedPlan"/>.
     /// </para>
     /// </summary>
     internal static class PlanStructuralValidator
@@ -90,8 +59,8 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static bool IsStructurallyValid(PersistedPlan plan, out string reason)
         {
-            // VOM design (Section 5.4/6, step 8): PersistedPlan.ValueOwnMaterials
-            // (a non-nullable bool, same shape as the pre-existing UseOwnMaterials/
+            // PersistedPlan.ValueOwnMaterials
+            // (a non-nullable bool, same shape as UseOwnMaterials/
             // PriceBasis above) is intentionally NOT checked here - a plain bool
             // can never produce the null-dereference class of bug this validator
             // exists to catch, so it needs no entry, same as its two siblings.
@@ -117,7 +86,11 @@ namespace GW2CraftingHelper.Services
                 reason = "Plan.Steps is null";
                 return false;
             }
-            if (!NoNullEntries(craftingPlan.Steps, "Plan.Steps", out reason)) return false;
+
+            if (!NoNullEntries(craftingPlan.Steps, "Plan.Steps", out reason))
+            {
+                return false;
+            }
 
             // PlanViewModelBuilder.BuildShoppingListSection/
             // BuildCraftingStepsSection pass these straight into
@@ -125,39 +98,82 @@ namespace GW2CraftingHelper.Services
             // which iterate every line with no per-entry null check.
             foreach (var step in craftingPlan.Steps)
             {
-                if (!NoNullEntries(step.VendorCurrencyCosts, "PlanStep.VendorCurrencyCosts", out reason)) return false;
-                if (!NoNullEntries(step.VendorOfferCurrencyCostLinesPerBatch, "PlanStep.VendorOfferCurrencyCostLinesPerBatch", out reason)) return false;
+                if (!NoNullEntries(step.VendorCurrencyCosts, "PlanStep.VendorCurrencyCosts", out reason))
+                {
+                    return false;
+                }
+
+                if (!NoNullEntries(step.VendorOfferCurrencyCostLinesPerBatch, "PlanStep.VendorOfferCurrencyCostLinesPerBatch", out reason))
+                {
+                    return false;
+                }
             }
 
             // PlanViewModelBuilder.BuildSummarySection/BuildCraftingStepsSection
             // both null-check the LIST before iterating, but dereference
             // every entry (cc.CurrencyId, timegated.ItemId, ...) with no
             // per-entry null check.
-            if (!NoNullEntries(craftingPlan.CurrencyCosts, "Plan.CurrencyCosts", out reason)) return false;
-            if (!NoNullEntries(craftingPlan.TimegatedItems, "Plan.TimegatedItems", out reason)) return false;
+            if (!NoNullEntries(craftingPlan.CurrencyCosts, "Plan.CurrencyCosts", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(craftingPlan.TimegatedItems, "Plan.TimegatedItems", out reason))
+            {
+                return false;
+            }
 
             // PlanViewModelBuilder.BuildUsedMaterialsSection/
             // BuildDisciplinesSection/BuildRecipesSection/BuildCraftingStepsSection
             // all null-check the LIST before iterating, but dereference
             // every entry with no per-entry null check (um.ItemId,
             // disc.Discipline, recipe.Disciplines, ...).
-            if (!NoNullEntries(result.UsedMaterials, "UsedMaterials", out reason)) return false;
-            if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason)) return false;
-            if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason)) return false;
+            if (!NoNullEntries(result.UsedMaterials, "UsedMaterials", out reason))
+            {
+                return false;
+            }
 
-            // Quality-audit B2 (docs/KNOWN-ISSUES.md): these four lists are
+            if (!NoNullEntries(result.RequiredDisciplines, "RequiredDisciplines", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(result.RequiredRecipes, "RequiredRecipes", out reason))
+            {
+                return false;
+            }
+
+            // Quality-audit B2 (KNOWN-ISSUES #53): these four lists are
             // not recomputed on the restore path and had the same per-entry
             // gap as the checks above - BuildNotesSection dereferences each
             // entry unguarded.
-            if (!NoNullEntries(result.CompetencyOpportunities, "CompetencyOpportunities", out reason)) return false;
-            if (!NoNullEntries(result.ExcessCraftOutputs, "ExcessCraftOutputs", out reason)) return false;
-            if (!NoNullEntries(result.RecipeSheetSavingsOpportunities, "RecipeSheetSavingsOpportunities", out reason)) return false;
-            if (!NoNullEntries(result.SeasonalVendorTips, "SeasonalVendorTips", out reason)) return false;
+            if (!NoNullEntries(result.CompetencyOpportunities, "CompetencyOpportunities", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(result.ExcessCraftOutputs, "ExcessCraftOutputs", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(result.RecipeSheetSavingsOpportunities, "RecipeSheetSavingsOpportunities", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(result.SeasonalVendorTips, "SeasonalVendorTips", out reason))
+            {
+                return false;
+            }
 
             // PlanViewModelBuilder.BuildMultiItemTitle dereferences
             // items[0].ItemId with no null check once isMultiItem gates on
             // Count > 1.
-            if (!NoNullEntries(result.RequestedItems, "RequestedItems", out reason)) return false;
+            if (!NoNullEntries(result.RequestedItems, "RequestedItems", out reason))
+            {
+                return false;
+            }
 
             // PlanViewModelBuilder.ResolveName/ResolveIconUrl/ResolveRarity
             // and CraftingTreeBuilder's own copies all call
@@ -165,11 +181,17 @@ namespace GW2CraftingHelper.Services
             // meta.Name/meta.IconUrl/meta.Rarity with no null check on meta
             // itself - a dictionary VALUE of null (distinct from a missing
             // key, which is already handled) would NRE.
-            if (!NoNullValues(result.ItemMetadata, "ItemMetadata", out reason)) return false;
+            if (!NoNullValues(result.ItemMetadata, "ItemMetadata", out reason))
+            {
+                return false;
+            }
 
             // CurrencyDisplayResolver.ResolveName/ResolveIconUrl have the
             // exact same meta-value-null gap as ItemMetadata above.
-            if (!NoNullValues(result.CurrencyMetadata, "CurrencyMetadata", out reason)) return false;
+            if (!NoNullValues(result.CurrencyMetadata, "CurrencyMetadata", out reason))
+            {
+                return false;
+            }
 
             // The primary reported bug: a null entry inside
             // CraftingTreeNode.Children at any depth is invisible to
@@ -187,7 +209,11 @@ namespace GW2CraftingHelper.Services
 
             // Multi-item plans: the same tree, N times over - never
             // touched by PlanViewModelBuilder except by reference either.
-            if (!NoNullEntries(result.MultiItemRoots, "MultiItemRoots", out reason)) return false;
+            if (!NoNullEntries(result.MultiItemRoots, "MultiItemRoots", out reason))
+            {
+                return false;
+            }
+
             if (result.MultiItemRoots != null)
             {
                 for (int i = 0; i < result.MultiItemRoots.Count; i++)
@@ -232,6 +258,7 @@ namespace GW2CraftingHelper.Services
                 reason = $"{path} is null";
                 return false;
             }
+
             if (depth > MaxTreeDepth)
             {
                 reason = $"{path} exceeds max tree depth ({MaxTreeDepth})";
@@ -241,10 +268,17 @@ namespace GW2CraftingHelper.Services
             // TreeSectionController.RenderTreeNode passes this straight into
             // CurrencyDisplayResolver.ResolveAmounts/ResolveTreeNodeUnitAmounts,
             // which iterate every line with no per-entry null check.
-            if (!NoNullEntries(node.VendorCurrencyCosts, $"{path}.VendorCurrencyCosts", out reason)) return false;
+            if (!NoNullEntries(node.VendorCurrencyCosts, $"{path}.VendorCurrencyCosts", out reason))
+            {
+                return false;
+            }
 
             var children = node.Children;
-            if (children == null) return true; // Defensive only - see this method's own doc comment.
+            if (children == null)
+            {
+                return true; // Defensive only - see this method's own doc comment.
+            }
+
             for (int i = 0; i < children.Count; i++)
             {
                 if (!IsValidCraftingTreeNode(children[i], depth + 1, $"{path}.Children[{i}]", out reason))
@@ -252,6 +286,7 @@ namespace GW2CraftingHelper.Services
                     return false;
                 }
             }
+
             return true;
         }
 
@@ -274,7 +309,10 @@ namespace GW2CraftingHelper.Services
             // WHOLE tree, on every single override re-solve (not gated on
             // there being any Craft step) - so Tree must always be a fully
             // valid graph whenever a SolveContext is present at all.
-            if (!IsValidRecipeNode(context.Tree, 0, "SolveContext.Tree", out reason)) return false;
+            if (!IsValidRecipeNode(context.Tree, 0, "SolveContext.Tree", out reason))
+            {
+                return false;
+            }
 
             // PlanSolver.GetBuyCost (called from Evaluate on every node) and
             // CraftingPlanPipeline.CollectPresetOverrides both call
@@ -288,7 +326,11 @@ namespace GW2CraftingHelper.Services
                 reason = "SolveContext.Prices is null";
                 return false;
             }
-            if (!NoNullValues(context.Prices, "SolveContext.Prices", out reason)) return false;
+
+            if (!NoNullValues(context.Prices, "SolveContext.Prices", out reason))
+            {
+                return false;
+            }
 
             // VendorBatchSolver.EvaluateVendorOffers already treats a null
             // VendorOffers DICTIONARY as "no vendor offers" (explicit null
@@ -308,7 +350,11 @@ namespace GW2CraftingHelper.Services
                         reason = "SolveContext.VendorOffers has a null offer list for one item";
                         return false;
                     }
-                    if (!NoNullEntries(kvp.Value, "SolveContext.VendorOffers[...]", out reason)) return false;
+
+                    if (!NoNullEntries(kvp.Value, "SolveContext.VendorOffers[...]", out reason))
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -316,15 +362,25 @@ namespace GW2CraftingHelper.Services
             // have the exact same meta-value-null gap as
             // CraftingPlanResult.ItemMetadata above - reached on every
             // override re-solve, not just the original Generate.
-            if (!NoNullValues(context.Metadata, "SolveContext.Metadata", out reason)) return false;
-            if (!NoNullValues(context.CurrencyMetadata, "SolveContext.CurrencyMetadata", out reason)) return false;
+            if (!NoNullValues(context.Metadata, "SolveContext.Metadata", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullValues(context.CurrencyMetadata, "SolveContext.CurrencyMetadata", out reason))
+            {
+                return false;
+            }
 
             // Carried forward verbatim into the NEXT result.RequestedItems
             // by ResolveWithOverrides (result.RequestedItems =
             // context.RequestedItems) - see the matching check on
             // CraftingPlanResult.RequestedItems above for why a null entry
             // there NREs.
-            if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason)) return false;
+            if (!NoNullEntries(context.RequestedItems, "SolveContext.RequestedItems", out reason))
+            {
+                return false;
+            }
 
             // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
@@ -342,9 +398,12 @@ namespace GW2CraftingHelper.Services
             // ("used.ItemId"/"used.QuantityUsed", also no per-entry check) -
             // both reachable from a plain decision-pill click, not just the
             // Craft All/Buy All presets this doc comment already covers.
-            if (!NoNullEntries(context.UsedMaterials, "SolveContext.UsedMaterials", out reason)) return false;
+            if (!NoNullEntries(context.UsedMaterials, "SolveContext.UsedMaterials", out reason))
+            {
+                return false;
+            }
 
-            // VOM finding #1 fix: UnreducedTree is walked by
+            // UnreducedTree is walked by
             // ResolveWithOverrides' guideSolve (_solver.Solve) and
             // re-reduction (_reducer.Reduce) on EVERY override re-solve of
             // a restored plan whenever it is set (see
@@ -364,7 +423,10 @@ namespace GW2CraftingHelper.Services
             // that re-reduces (see the UnreducedTree check above). A null
             // list itself is fine: AccountItemIndex(null) treats it as "no
             // owned items".
-            if (!NoNullEntries(context.AccountItems, "SolveContext.AccountItems", out reason)) return false;
+            if (!NoNullEntries(context.AccountItems, "SolveContext.AccountItems", out reason))
+            {
+                return false;
+            }
 
             // UnreducedTree and AccountItems are always set together at
             // generation time (both gated on useForceBuyPrePass - see
@@ -404,6 +466,7 @@ namespace GW2CraftingHelper.Services
                 reason = $"{path} is null";
                 return false;
             }
+
             if (depth > MaxTreeDepth)
             {
                 reason = $"{path} exceeds max tree depth ({MaxTreeDepth})";
@@ -440,6 +503,7 @@ namespace GW2CraftingHelper.Services
                     reason = $"{optionPath}.Disciplines is null";
                     return false;
                 }
+
                 if (option.Flags == null)
                 {
                     reason = $"{optionPath}.Flags is null";
@@ -464,6 +528,7 @@ namespace GW2CraftingHelper.Services
                     }
                 }
             }
+
             return true;
         }
 
@@ -478,7 +543,11 @@ namespace GW2CraftingHelper.Services
             where T : class
         {
             reason = null;
-            if (list == null) return true;
+            if (list == null)
+            {
+                return true;
+            }
+
             for (int i = 0; i < list.Count; i++)
             {
                 if (list[i] == null)
@@ -487,6 +556,7 @@ namespace GW2CraftingHelper.Services
                     return false;
                 }
             }
+
             return true;
         }
 
@@ -507,7 +577,11 @@ namespace GW2CraftingHelper.Services
             where TValue : class
         {
             reason = null;
-            if (dict == null) return true;
+            if (dict == null)
+            {
+                return true;
+            }
+
             foreach (var kvp in dict)
             {
                 if (kvp.Value == null)
@@ -516,6 +590,7 @@ namespace GW2CraftingHelper.Services
                     return false;
                 }
             }
+
             return true;
         }
     }

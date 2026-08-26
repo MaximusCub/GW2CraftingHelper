@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
     /// then sat empty until the user pressed Refresh.
     /// </para>
     /// </summary>
-    public static class FirstLoadSnapshotGate
+    internal static class FirstLoadSnapshotGate
     {
         /// <summary>
         /// True on the one tick that should start the fetch. The caller

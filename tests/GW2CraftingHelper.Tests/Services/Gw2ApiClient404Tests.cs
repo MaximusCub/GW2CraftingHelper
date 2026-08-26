@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Gw2PriceApiClient ---
 
         [Fact]
-        public async Task PriceClient_404_ReturnsEmptyList()
+        public async Task PriceClient_404_ReturnsEmptyBatch_WithoutProvingAbsence()
         {
             using (var handler = new StubHandler(HttpStatusCode.NotFound,
                 @"{""text"":""all ids provided are invalid""}"))
@@ -44,7 +44,11 @@ namespace GW2CraftingHelper.Tests.Services
                 var result = await client.GetPricesAsync(
                     new[] { 99999 }, CancellationToken.None);
 
-                Assert.Empty(result);
+                Assert.Empty(result.Entries);
+
+                // The same 404 the endpoint returns when it is simply down,
+                // so it is no evidence that 99999 is untradeable.
+                Assert.False(result.AbsenceProven);
             }
         }
 
@@ -59,10 +63,14 @@ namespace GW2CraftingHelper.Tests.Services
                 var result = await client.GetPricesAsync(
                     new[] { 19684 }, CancellationToken.None);
 
-                Assert.Single(result);
-                Assert.Equal(19684, result[0].Id);
-                Assert.Equal(100, result[0].BuyUnitPrice);
-                Assert.Equal(200, result[0].SellUnitPrice);
+                Assert.Single(result.Entries);
+                Assert.Equal(19684, result.Entries[0].Id);
+                Assert.Equal(100, result.Entries[0].BuyUnitPrice);
+                Assert.Equal(200, result.Entries[0].SellUnitPrice);
+
+                // A parsed 2xx body IS the trading post's full answer for
+                // the batch, so ids it omits are genuinely untradeable.
+                Assert.True(result.AbsenceProven);
             }
         }
 

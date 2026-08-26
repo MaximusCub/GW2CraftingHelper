@@ -8,7 +8,7 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // KNOWN-ISSUES api-degradation F5: Gw2RecipeApiClient previously called
+    // KNOWN-ISSUES #31/api-degradation F5: Gw2RecipeApiClient previously called
     // the classic HttpClient.GetStringAsync(url) overload (no
     // CancellationToken parameter exists for it on net472), silently making
     // its own `ct` parameter a no-op, and never special-cased 404 the way
@@ -58,7 +58,11 @@ namespace GW2CraftingHelper.Tests.Services
                 var client = new Gw2RecipeApiClient(http);
                 var result = await client.SearchByOutputAsync(1, CancellationToken.None);
 
-                Assert.Equal(new[] { 10, 20, 30 }, result);
+                Assert.Equal(new[] { 10, 20, 30 }, result.RecipeIds);
+
+                // A parsed 2xx body IS the search index's full answer, so an
+                // empty one would genuinely mean "no recipe produces this".
+                Assert.True(result.AbsenceProven);
             }
         }
 
@@ -83,7 +87,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task SearchByOutputAsync_404_ReturnsEmptyList()
+        public async Task SearchByOutputAsync_404_ReturnsEmpty_WithoutProvingAbsence()
         {
             // Real GW2 API 404 shape, matching Gw2ApiClient404Tests'
             // sibling coverage for prices/items.
@@ -94,7 +98,11 @@ namespace GW2CraftingHelper.Tests.Services
                 var client = new Gw2RecipeApiClient(http);
                 var result = await client.SearchByOutputAsync(99999, CancellationToken.None);
 
-                Assert.Empty(result);
+                Assert.Empty(result.RecipeIds);
+
+                // The same 404 the endpoint returns when it is simply down,
+                // so it is no evidence that 99999 has no recipe.
+                Assert.False(result.AbsenceProven);
             }
         }
 
@@ -195,7 +203,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
-        // --- ct threading (KNOWN-ISSUES api-degradation F5's core defect) ---
+        // --- ct threading (KNOWN-ISSUES #31/api-degradation F5's core defect) ---
         //
         // A plain token-equality check against the handler's received token
         // is not reliable here: HttpClient.GetAsync(url, ct) links the

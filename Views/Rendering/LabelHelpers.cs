@@ -6,24 +6,12 @@ using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "11. Generic
-    // control/format helpers" region (KNOWN-ISSUES #23 -
-    // CreateRowDivider's divider math and its 1px scissor clearance
-    // constants move byte-identical, unchanged from below) - private
-    // static -> internal static, no logic changes. Callers in
-    // CraftingPlanView now qualify as LabelHelpers.CreateRowDivider /
-    // LabelHelpers.CreateRightAlignedLabel / LabelHelpers.CreateSmallTag /
-    // LabelHelpers.EllipsizeToWidth. This class takes no dependency back on
-    // CraftingPlanView (CreateSmallTag's pill colors are resolved by the
-    // caller and passed in), so
-    // this namespace stays a true leaf with no reverse edge back into
-    // CraftingPlanView.
+    // A leaf: nothing here refers back to CraftingPlanView (CreateSmallTag's
+    // pill colors are resolved by the caller and passed in).
     internal static class LabelHelpers
     {
-        // Only consumer is CreateRowDivider below - moved alongside it from
-        // CraftingPlanView's shared "General" constants (it was declared
-        // next to SectionDividerColor there, which stays put and is used
-        // elsewhere in that file).
+        // Only consumer is CreateRowDivider below. Distinct from
+        // CraftingPlanView's SectionDividerColor, which divides sections.
         private static readonly Color RowDividerColor = new Color(100, 100, 100);
 
         /// <summary>
@@ -81,7 +69,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, rowHeight - 2 - bottomClearance),
                 BackgroundColor = RowDividerColor,
-                Parent = rowPanel
+                Parent = rowPanel,
             };
         }
 
@@ -128,7 +116,10 @@ namespace GW2CraftingHelper.Views.Rendering
         internal static Label WithDescenderClearance(Label label)
         {
             var font = label?.Font;
-            if (font == null) return label;
+            if (font == null)
+            {
+                return label;
+            }
 
             label.VerticalAlignment = VerticalAlignment.Top;
             label.AutoSizeHeight = false;
@@ -149,7 +140,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(rightEdgeX - width, y),
-                Parent = parent
+                Parent = parent,
             });
         }
 
@@ -172,14 +163,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(width, SmallTagHeight),
                 Location = new Point(x, y),
                 BackgroundColor = border,
-                Parent = parent
+                Parent = parent,
             };
             var inner = new Panel()
             {
                 Size = new Point(width - 2, SmallTagHeight - 2),
                 Location = new Point(1, 1),
                 BackgroundColor = fill,
-                Parent = outer
+                Parent = outer,
             };
             new Label()
             {
@@ -193,7 +184,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point((width - 2 - textWidth) / 2, 1),
-                Parent = inner
+                Parent = inner,
             };
 
             return outer;
@@ -210,7 +201,10 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal static void ApplyTagTooltip(Control control, string text)
         {
-            if (control == null) return;
+            if (control == null)
+            {
+                return;
+            }
 
             TooltipFacility.ApplyPlain(control, text);
             if (control is Container container)

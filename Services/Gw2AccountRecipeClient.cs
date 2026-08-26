@@ -7,7 +7,7 @@ using Gw2Sharp.WebApi.V2.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2AccountRecipeClient : IAccountRecipeClient
+    internal class Gw2AccountRecipeClient : IAccountRecipeClient
     {
         private readonly Gw2ApiManager _apiManager;
 

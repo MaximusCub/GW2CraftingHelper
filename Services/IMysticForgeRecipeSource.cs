@@ -2,7 +2,7 @@ using System.IO;
 
 namespace GW2CraftingHelper.Services
 {
-    public interface IMysticForgeRecipeSource
+    internal interface IMysticForgeRecipeSource
     {
         Stream Open();
     }

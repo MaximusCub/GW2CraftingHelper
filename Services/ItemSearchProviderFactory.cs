@@ -5,7 +5,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public static class ItemSearchProviderFactory
+    internal static class ItemSearchProviderFactory
     {
         /// <summary>
         /// Creates an <see cref="IItemSearchProvider"/> from the given seed stream.

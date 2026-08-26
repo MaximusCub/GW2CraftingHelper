@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
     /// see TreeSectionController.RenderTreeNode's captionText parameter.
     /// </para>
     /// </summary>
-    public static class ReceiptCaptionHelper
+    internal static class ReceiptCaptionHelper
     {
         public const string VendorPriceCaption = "Vendor price:";
         public const string CraftReferenceCaption = "If crafted instead:";
@@ -89,14 +89,17 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             if (childIndex == 0)
             {
                 return VendorPriceCaption;
             }
+
             if (childIndex == splitIndex)
             {
                 return CraftReferenceCaption;
             }
+
             return null;
         }
     }

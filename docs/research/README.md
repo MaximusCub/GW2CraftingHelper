@@ -57,14 +57,14 @@ directory exists:
 
 Moved out: `m37-r5-audits.md` (the cross-thread/degradation/thread-safety
 audit findings, KNOWN-ISSUES #31) is a closed point-in-time audit and now
-lives at [`docs/archive/m37-r5-audits.md`](../archive/m37-r5-audits.md).
+lives at [`dev/archive/m37-r5-audits.md`](../../dev/archive/m37-r5-audits.md).
 
 The normative gw2efficiency behavior spec these reports feed into lives one
 level up, at [`docs/gw2e-parity-spec.md`](../gw2e-parity-spec.md); the
 durable "why" these reports produced for the module's own implementation
 lives at [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md). For the full
 resolution history of each numbered item above, see
-[`docs/dev-notes/HISTORY.md`](../dev-notes/HISTORY.md).
+[`dev/dev-notes/HISTORY.md`](../../dev/dev-notes/HISTORY.md).
 
 ## A note on provenance paths
 

@@ -13,7 +13,7 @@ using MonoGame.Extended.BitmapFonts;
 namespace GW2CraftingHelper.Views
 {
     /// <summary>
-    /// The Log tab's search/view pane (d2-log-system.md Section 3):
+    /// The Log tab's search/view pane (dev/proposals/d2-log-system.md Section 3):
     /// level-filter dropdown, text search, follow-tail, copy-to-clipboard,
     /// clear-view, and the confirm-gated destructive delete-log-file
     /// action, backed directly by a ModuleLog's ring buffer.
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
     /// on the module's standing line - columns live, ellipses at drag
     /// settle - being its heaviest text-measurement path.
     /// </summary>
-    public class LogTabContent
+    internal class LogTabContent
     {
         private static readonly Logger Logger = Logger.GetLogger<LogTabContent>();
 
@@ -57,9 +57,8 @@ namespace GW2CraftingHelper.Views
         private const int StatusRowHeight = 26;
 
         // Same band, tier and label y as every plan table's header.
-        private const int ColumnHeaderRowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
-        private const int ColumnHeaderLabelY = PlanContentHeightMath.CTableHeaderLabelY;
-        private const int TopChromeHeight = ToolbarHeight + StatusRowHeight + ColumnHeaderRowHeight;
+        private const int TopChromeHeight =
+            ToolbarHeight + StatusRowHeight + PlanContentHeightMath.ColumnHeaderRowHeight;
 
         // The FlowPanel scrolls, so a row sized to the panel's full width
         // would run under the scrollbar strip.
@@ -116,81 +115,20 @@ namespace GW2CraftingHelper.Views
         // RebuildRows.
         private bool _hasRenderedAnyRow;
 
-        // True once Build's own initial RebuildRows call (see the bottom
-        // of Build) has finished. Originally added (PR #99) to guard
-        // PollForUpdates against a real race: per docs/ARCHITECTURE.md
-        // Section 1, Blish HUD's own WindowBase2.ShowView runs a tab's
-        // Build() via View.DoLoad().ContinueWith(...) - with no
-        // SynchronizationContext installed, that continuation resumes on a
-        // ThreadPool thread, not the main/game thread. Without this guard,
-        // PollForUpdates() (main thread, driven by Module.Update() as soon
-        // as SelectedTab flips to the Log tab) could invoke RebuildRows()
-        // concurrently with Build()'s own tail RebuildRows() call, on the
-        // SAME freshly-created _contentPanel - this produced two stacked
-        // "No log entries yet." placeholders, confirmed live.
-        // <para>
-        // A second path reaches the SAME hazard:
-        // Module.cs's TabChanged handler also calls Refresh() ->
-        // RebuildRows() synchronously on the main thread whenever the Log
-        // tab becomes selected; without this latch, Build()'s
-        // ThreadPool-thread RebuildRows() call
-        // and TabChanged's main-thread RebuildRows() call landed on the
-        // SAME instance at the same time, and two threads concurrently
-        // Enqueue-ing into _renderedRows corrupted its internal array,
-        // crashing with "Destination array was not long enough" inside
-        // Queue&lt;T&gt;.SetCapacity.
-        // </para>
-        // <para>
-        // Fix: Build()'s own tail (the RebuildRows() call plus the write to
-        // this field) is now marshaled onto the main thread via
-        // MainThreadMarshal.Run (see Build()'s own comment) - so it, along
-        // with PollForUpdates() and Refresh() (both main-thread-only
-        // already), can never execute concurrently with anything: a single
-        // thread cannot run two call stacks at the same instant, so the
-        // race is impossible BY CONSTRUCTION, not merely guarded. This
-        // field is KEPT (not removed as obsolete) - it still gates
-        // PollForUpdates(), Refresh(), the level dropdown/search box
-        // ValueChanged/TextChanged handlers, and ClearView() against acting
-        // before Build()'s own queued tail has actually landed, which
-        // avoids a wasted, redundant RebuildRows() pass rather than a crash
-        // now - belt-and-braces, not a safety requirement any more.
-        // volatile is REMOVED: every read and write of this field now
-        // happens on the main thread only (Build()'s write runs inside the
-        // MainThreadMarshal.Run callback), so there is no remaining
-        // cross-thread visibility concern for volatile to address, and
-        // keeping it would misleadingly suggest this field is still
-        // accessed from more than one thread.
-        // </para>
-        // <para>
-        // PRECISE INVARIANT (the claim this fix actually establishes, not a
-        // broader one): <see cref="_renderedRows"/>, <see
-        // cref="_lastSeenVersion"/>, <see cref="_hasRenderedAnyRow"/>,
-        // <see cref="_fullPrefixWidth"/>, <see cref="_lastLayoutWidth"/>, the
-        // Module-owned "Clear View" floor reached via
-        // <see cref="_getClearedBeforeVersion"/>/
-        // <see cref="_setClearedBeforeVersion"/>, this field, and
-        // _contentPanel's Children collection are MAIN-THREAD-ONLY - every
-        // entry point that touches them (Build's marshaled tail,
+        // True once Build's own tail - marshaled onto the main thread via
+        // MainThreadMarshal.Run - has run its initial RebuildRows. Gates
         // PollForUpdates, Refresh, the level dropdown/search box handlers
-        // via RebuildRowsIfBuilt, ClearView, and the container Resized
-        // handler - counting with it the trailing re-fit it defers through
-        // _resizeSettle, which marshals back onto this same thread) runs on
-        // the main thread, and the five of those (every
-        // one except Build's own tail, which IS the thing being awaited)
-        // additionally defer to Build's tail rather than acting while it is
-        // still pending. This is narrower than "every field this class
-        // touches is main-thread-only": the control fields (_toolbarPanel,
-        // _levelDropdown, _searchBox, _followCheckbox, _clearViewButton,
-        // _copyButton, _deleteFileButton, _statusPanel, _statusLabel,
-        // _contentPanel) are still first
-        // PUBLISHED by the rest of Build()'s body on the ThreadPool thread,
-        // same as every Blish view in this module - any main-thread read of
-        // one of them (e.g. CopyToClipboard/SetStatus reading
-        // _statusLabel, which does not touch any of the state above and so
-        // is deliberately NOT gated on this field) must stay behind its
-        // existing null guard (IsLive, _searchBox?, _statusLabel == null)
-        // rather than assume the field is already non-null.
-        // </para>
+        // and ClearView so none of them rebuilds before that tail lands.
+        //
+        // This field is MAIN-THREAD-ONLY, and so are _renderedRows,
+        // _lastSeenVersion, _hasRenderedAnyRow, _fullPrefixWidth,
+        // _lastLayoutWidth, the Module-owned "Clear View" floor reached
+        // through _getClearedBeforeVersion/_setClearedBeforeVersion, and
+        // _contentPanel's Children. The control fields are NOT: the rest of
+        // Build publishes them from a ThreadPool thread, so a main-thread
+        // read of one (CopyToClipboard/SetStatus reading _statusLabel) must
+        // keep its null guard. What single-threading closes is two rebuilds
+        // interleaving - see docs/ARCHITECTURE.md section 1.
         private bool _buildComplete;
 
         // FIFO of every currently-displayed "real" row (never the
@@ -259,10 +197,12 @@ namespace GW2CraftingHelper.Views
         // Moved onto Module itself (Module._logViewClearedBeforeVersion -
         // see that field's own doc comment for the full threading
         // rationale), accessed here through this getter/setter delegate
-        // pair - mirrors TreeSectionController's own constructor-injected
-        // getter/setter pattern for state that outlives a single render
-        // (CraftingPlanView's _currentPlan get/set pair) rather than
-        // introducing a new holder type. ClearView() calls
+        // pair - the same "reach state that outlives a single render
+        // through its owner" shape TreeSectionController uses for
+        // CraftingPlanView's _currentPlan (there as ITreePlanHost.
+        // CurrentPlan; two members is too thin a seam to justify an
+        // interface here) rather than introducing a new holder type.
+        // ClearView() calls
         // _setClearedBeforeVersion; GetFilteredEntries (RebuildRows' own
         // helper) and AppendNewRows call _getClearedBeforeVersion - both
         // only from this class's existing main-thread-only entry points
@@ -290,7 +230,12 @@ namespace GW2CraftingHelper.Views
                 RefitRowTextAfterResizeSettle,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "Log row re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "Log row re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "log",
+                        $"Log row re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void Build(Container container)
@@ -300,25 +245,25 @@ namespace GW2CraftingHelper.Views
             _toolbarPanel = new Panel
             {
                 Size = new Point(w, ToolbarHeight),
-                Parent = container
+                Parent = container,
             };
 
             // Textbox first, then the dropdown that narrows it - the
             // order the Snapshot tab's own search row uses. This row read
             // dropdown-then-textbox, so the module's two search rows were
-            // mirror images of each other (audit batch J, M12).
+            // mirror images of each other.
             _searchBox = new TextBox
             {
                 Size = new Point(LogToolbarLayout.SearchMinWidth, SearchBoxHeight),
                 PlaceholderText = "Search log entries...",
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             _searchBox.TextChanged += (_, __) => RebuildRowsIfBuilt();
 
             _levelDropdown = new Dropdown
             {
                 Size = new Point(LevelDropdownWidth, LevelDropdownHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             _levelDropdown.Items.Add("All");
             _levelDropdown.Items.Add("Error+");
@@ -333,14 +278,14 @@ namespace GW2CraftingHelper.Views
                 Text = "Follow",
                 Checked = true, // d2 Section 3 default (ON)
                 Size = new Point(FollowCheckboxWidth, FollowCheckboxHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
 
             _clearViewButton = new FeedbackButton
             {
                 Text = "Clear View",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             TooltipFacility.ApplyPlain(
                 _clearViewButton,
@@ -351,7 +296,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Copy",
                 Size = new Point(ButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             _copyButton.Click += (_, __) => CopyToClipboard();
 
@@ -359,7 +304,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = "Delete Log File",
                 Size = new Point(DeleteButtonWidth, UiMetrics.ButtonHeight),
-                Parent = _toolbarPanel
+                Parent = _toolbarPanel,
             };
             TooltipFacility.ApplyPlain(
                 _deleteFileButton,
@@ -370,7 +315,7 @@ namespace GW2CraftingHelper.Views
             {
                 Size = new Point(w, StatusRowHeight),
                 Location = new Point(0, ToolbarHeight),
-                Parent = container
+                Parent = container,
             };
 
             // Explicit width, not AutoSizeWidth: a long failure string used
@@ -385,7 +330,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = StatusColor,
                 Location = new Point(LogToolbarLayout.Inset, 2),
-                Parent = _statusPanel
+                Parent = _statusPanel,
             };
 
             BuildColumnHeader(container, w);
@@ -396,7 +341,7 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(0, TopChromeHeight),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = container
+                Parent = container,
             };
 
             PositionToolbar(w);
@@ -406,7 +351,7 @@ namespace GW2CraftingHelper.Views
                 int newWidth = container.ContentRegion.Width;
                 _toolbarPanel.Size = new Point(newWidth, ToolbarHeight);
                 _statusPanel.Size = new Point(newWidth, StatusRowHeight);
-                _columnHeaderPanel.Size = new Point(newWidth, ColumnHeaderRowHeight);
+                _columnHeaderPanel.Size = new Point(newWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
                 _contentPanel.Size = new Point(newWidth, container.ContentRegion.Height - TopChromeHeight);
                 PositionToolbar(newWidth);
 
@@ -415,7 +360,7 @@ namespace GW2CraftingHelper.Views
                 RefitRows();
             };
 
-            // FIELD CRASH (docs/KNOWN-ISSUES.md): Build() itself
+            // FIELD CRASH (KNOWN-ISSUES #36): Build() itself
             // runs on a ThreadPool thread (see _buildComplete's own doc
             // comment for the DoLoad().ContinueWith(...) pattern), so
             // calling RebuildRows() directly here raced against Module.cs's
@@ -753,6 +698,7 @@ namespace GW2CraftingHelper.Views
             {
                 _statusLabel.Text = shown;
             }
+
             TooltipFacility.ApplyPlain(
                 _statusLabel,
                 string.Equals(shown, _statusFullText, StringComparison.Ordinal) ? null : _statusFullText);
@@ -779,6 +725,7 @@ namespace GW2CraftingHelper.Views
             {
                 child.Dispose();
             }
+
             _renderedRows.Clear();
 
             var result = GetFilteredEntries();
@@ -815,7 +762,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeHeight = true,
                     Location = new Point(8, 8),
                     TextColor = EmptyStateColor,
-                    Parent = _contentPanel
+                    Parent = _contentPanel,
                 };
             }
             else if (_followCheckbox != null && _followCheckbox.Checked)
@@ -1006,10 +953,10 @@ namespace GW2CraftingHelper.Views
         {
             _columnHeaderPanel = new Panel
             {
-                Size = new Point(width, ColumnHeaderRowHeight),
+                Size = new Point(width, PlanContentHeightMath.ColumnHeaderRowHeight),
                 Location = new Point(0, ToolbarHeight + StatusRowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = container
+                Parent = container,
             };
 
             new Label
@@ -1019,8 +966,8 @@ namespace GW2CraftingHelper.Views
                 Text = "Time",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel,
             };
 
             _tagHeaderLabel = new Label
@@ -1030,8 +977,8 @@ namespace GW2CraftingHelper.Views
                 Text = TagHeaderText,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel,
             };
 
             _messageHeaderLabel = new Label
@@ -1041,8 +988,8 @@ namespace GW2CraftingHelper.Views
                 Text = "Message",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(LogGutterLayout.GutterX, ColumnHeaderLabelY),
-                Parent = _columnHeaderPanel
+                Location = new Point(LogGutterLayout.GutterX, PlanContentHeightMath.ColumnHeaderLabelY),
+                Parent = _columnHeaderPanel,
             };
         }
 
@@ -1062,11 +1009,12 @@ namespace GW2CraftingHelper.Views
 
             if (_tagHeaderLabel != null)
             {
-                _tagHeaderLabel.Location = new Point(bands.TagX, ColumnHeaderLabelY);
+                _tagHeaderLabel.Location = new Point(bands.TagX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
+
             if (_messageHeaderLabel != null)
             {
-                _messageHeaderLabel.Location = new Point(bands.MessageX, ColumnHeaderLabelY);
+                _messageHeaderLabel.Location = new Point(bands.MessageX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
             return new RowMetrics
@@ -1077,7 +1025,7 @@ namespace GW2CraftingHelper.Views
                 // the panel clips its children, so a row shorter than its
                 // own text would cut the text off rather than overflow.
                 RowHeight = Measure(font, "Ag").Height + 2,
-                Bands = bands
+                Bands = bands,
             };
         }
 
@@ -1129,6 +1077,7 @@ namespace GW2CraftingHelper.Views
             {
                 _tagHeaderWidth = Measure(TableHeaderStyle.Font, TagHeaderText).Width;
             }
+
             return _tagHeaderWidth;
         }
 
@@ -1140,7 +1089,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private bool RaiseTagHighWaterMark(string tag)
         {
-            if (string.IsNullOrEmpty(tag)) return false;
+            if (string.IsNullOrEmpty(tag))
+            {
+                return false;
+            }
 
             // Memoised: a full rebuild walks up to the ring's whole 2000
             // entries on every filter keystroke, and the module writes about
@@ -1151,7 +1103,10 @@ namespace GW2CraftingHelper.Views
                 _tagWidths[tag] = width;
             }
 
-            if (width <= _widestRenderedTagWidth) return false;
+            if (width <= _widestRenderedTagWidth)
+            {
+                return false;
+            }
 
             _widestRenderedTagWidth = width;
             return true;
@@ -1192,7 +1147,7 @@ namespace GW2CraftingHelper.Views
                 FullTime = LogLineFormat.Time(entry),
                 FullTag = FormatTag(entry.Tag),
                 FullMessage = LogLineFormat.Message(entry),
-                FullLine = TooltipTextFormat.Wrap(line)
+                FullLine = TooltipTextFormat.Wrap(line),
             };
 
             row.Panel = new Panel
@@ -1200,7 +1155,7 @@ namespace GW2CraftingHelper.Views
                 // Sized before it is parented so the flow panel does not
                 // see a zero-sized child first.
                 Size = new Point(metrics.RowWidth, metrics.RowHeight),
-                Parent = _contentPanel
+                Parent = _contentPanel,
             };
 
             row.TimeLabel = new Label
@@ -1209,7 +1164,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.TagLabel = new Label
@@ -1218,7 +1173,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor * PrefixDimFactor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             row.MessageLabel = new Label
@@ -1227,7 +1182,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = levelColor,
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             ApplyRowLayout(row, metrics, measureText: true);
@@ -1295,7 +1250,7 @@ namespace GW2CraftingHelper.Views
             // Blish resolves a tooltip on the control under the mouse and
             // does not bubble to the parent, so both Labels need it as well
             // as the row Panel - the swallowed-hover class already fixed in
-            // ShoppingListSectionRenderer (docs/KNOWN-ISSUES.md).
+            // ShoppingListSectionRenderer (KNOWN-ISSUES #57).
             bool shortened =
                 !string.Equals(timeText, row.FullTime, StringComparison.Ordinal) ||
                 !string.Equals(tagText, row.FullTag, StringComparison.Ordinal) ||

@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2RecipeApiClient : IRecipeApiClient
+    internal class Gw2RecipeApiClient : IRecipeApiClient
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
             _http = http;
         }
 
-        public async Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public async Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
             // Even with the schema version pinned, upstream's search
             // index has its own gap: some recipes exist and are fetchable
@@ -40,9 +40,13 @@ namespace GW2CraftingHelper.Services
             string json = await GetJsonAsync(url, ct);
             if (json == null)
             {
-                return new List<int>();
+                // Empty, but NOT proof of absence - see
+                // RecipeSearchResult.AbsenceProven.
+                return new RecipeSearchResult(new List<int>(), absenceProven: false);
             }
-            return JsonConvert.DeserializeObject<List<int>>(json);
+
+            return new RecipeSearchResult(
+                JsonConvert.DeserializeObject<List<int>>(json), absenceProven: true);
         }
 
         public async Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
@@ -53,6 +57,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             return ParseRecipe(json);
         }
 
@@ -87,7 +92,7 @@ namespace GW2CraftingHelper.Services
                 Id = obj.Value<int>("id"),
                 OutputItemId = obj.Value<int>("output_item_id"),
                 OutputItemCount = obj.Value<int>("output_item_count"),
-                MinRating = obj.Value<int?>("min_rating") ?? 0
+                MinRating = obj.Value<int?>("min_rating") ?? 0,
             };
 
             var disciplines = obj["disciplines"];
@@ -136,7 +141,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = ing.Value<string>("type") ?? "Item",
                         Id = id.Value,
-                        Count = count.Value
+                        Count = count.Value,
                     });
                 }
             }

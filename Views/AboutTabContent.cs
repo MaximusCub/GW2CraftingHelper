@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Views
     /// package reference for a two-field, display-only read.
     /// </para>
     /// </summary>
-    public class AboutTabContent
+    internal class AboutTabContent
     {
         private static readonly Logger Logger = Logger.GetLogger<AboutTabContent>();
 
@@ -58,7 +58,7 @@ namespace GW2CraftingHelper.Views
         // manifest.json" for the source URL, "Not listed in manifest.json"
         // for the author - so one screen answered the same question three
         // ways, and two of the three named an implementation detail the
-        // reader has no way to act on (audit batch J, L7).
+        // reader has no way to act on.
         private const string NotAvailableText = "Not available";
         private const string BlishHudDependencyNamespace = "bh.blishhud";
 
@@ -99,7 +99,7 @@ namespace GW2CraftingHelper.Views
         // Every horizontal constant on this tab comes from AboutLayoutMath,
         // which derives them from the plan tables' own pinned-right-edge
         // rule and from the reading measure it declares.
-        private const int Inset = AboutLayoutMath.Inset;
+        private const int Inset = AboutLayoutMath.AboutInset;
         private const int RowHeight = 30;
         private const int RowLabelY = 7;
         private const int RowInputY = 3;
@@ -216,7 +216,12 @@ namespace GW2CraftingHelper.Views
                 RefitTextAfterResizeSettle,
                 MainThreadMarshal.Run,
                 ResizeSettleDebounce.DefaultSettleMs,
-                ex => Logger.Warn(ex, "About text re-fit wait failed"));
+                ex =>
+                {
+                    Logger.Warn(ex, "About text re-fit wait failed");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "about",
+                        $"About text re-fit wait failed: {ex.GetType().Name} - {ex.Message}");
+                });
         }
 
         public void Build(Container container)
@@ -235,13 +240,13 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(container.ContentRegion.Width, container.ContentRegion.Height),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 CanScroll = true,
-                Parent = container
+                Parent = container,
             };
 
             _documentPanel = new Panel()
             {
                 Size = new Point(ContentWidth(container), 0),
-                Parent = _rootPanel
+                Parent = _rootPanel,
             };
 
             BuildHeader(info);
@@ -257,9 +262,9 @@ namespace GW2CraftingHelper.Views
             // Trailing colons dropped from all six: inside a two-column
             // table with a rule, a colon on every label is punctuation doing
             // a column's job.
-            AddFactRow("Source", string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, copyable: true);
-            AddFactRow("Author", info.AuthorDisplay ?? NotAvailableText);
-            AddFactRow("Built with", $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}");
+            AddFactRow(AboutLayoutMath.SourceLabel, string.IsNullOrWhiteSpace(info.Url) ? NotAvailableText : info.Url, copyable: true);
+            AddFactRow(AboutLayoutMath.AuthorLabel, info.AuthorDisplay ?? NotAvailableText);
+            AddFactRow(AboutLayoutMath.BuiltWithLabel, $"Blish HUD {info.BlishVersionRange ?? FallbackBlishHudVersionRange}");
 
             // "License" (this project's own license) and the Blish HUD
             // credit are two separate, differently-sourced rows and are
@@ -268,9 +273,9 @@ namespace GW2CraftingHelper.Views
             // already-verified Blish HUD MIT-license credit line, carried
             // over unchanged. Do not collapse these into one row or drop
             // either without updating this comment.
-            AddFactRow("License", "MIT (see LICENSE in the repo)");
-            AddFactRow("Credits", BlishHudCreditLine, copyable: true);
-            AddFactRow("Data directory", string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, copyable: true);
+            AddFactRow(AboutLayoutMath.LicenseLabel, "MIT (see LICENSE in the repo)");
+            AddFactRow(AboutLayoutMath.CreditsLabel, BlishHudCreditLine, copyable: true);
+            AddFactRow(AboutLayoutMath.DataDirectoryLabel, string.IsNullOrWhiteSpace(_dataDirectoryPath) ? NotAvailableText : _dataDirectoryPath, copyable: true);
 
             CreateProseBlock("Disclaimer", ArenaNetDisclaimerText);
             CreateProseBlock("gw2efficiency", Gw2EfficiencyCreditText);
@@ -319,7 +324,7 @@ namespace GW2CraftingHelper.Views
             _headerPanel = new Panel()
             {
                 Size = new Point(AboutLayoutMath.FactsMinWidth, HeaderRowHeight),
-                Parent = _documentPanel
+                Parent = _documentPanel,
             };
 
             if (_moduleIconTexture != null)
@@ -331,7 +336,7 @@ namespace GW2CraftingHelper.Views
                     Texture = new AsyncTexture2D(_moduleIconTexture),
                     Size = new Point(IconSize, IconSize),
                     Location = new Point(Inset, (HeaderRowHeight - IconSize) / 2),
-                    Parent = _headerPanel
+                    Parent = _headerPanel,
                 };
             }
 
@@ -342,7 +347,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, HeaderTitleY),
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
 
             _versionLabel = new Label()
@@ -353,7 +358,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
                 Location = new Point(Inset, HeaderTitleY),
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
 
             _headerRule = new Panel()
@@ -361,7 +366,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(AboutLayoutMath.FactsMinWidth, 2),
                 Location = new Point(0, HeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = _headerPanel
+                Parent = _headerPanel,
             };
         }
 
@@ -373,8 +378,8 @@ namespace GW2CraftingHelper.Views
                 Panel = new Panel()
                 {
                     Size = new Point(AboutLayoutMath.FactsMinWidth, SectionHeaderRowHeight),
-                    Parent = _documentPanel
-                }
+                    Parent = _documentPanel,
+                },
             };
 
             block.TitleLabel = new Label()
@@ -384,7 +389,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, SectionHeaderTitleY),
-                Parent = block.Panel
+                Parent = block.Panel,
             };
 
             // These two headings were the only SectionTitle bands in the
@@ -394,7 +399,7 @@ namespace GW2CraftingHelper.Views
                 Size = new Point(AboutLayoutMath.FactsMinWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
                 BackgroundColor = SectionDividerColor,
-                Parent = block.Panel
+                Parent = block.Panel,
             };
 
             if (body != null)
@@ -415,7 +420,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
                 TextColor = InfoTextColor,
-                Parent = parent
+                Parent = parent,
             };
         }
 
@@ -428,8 +433,8 @@ namespace GW2CraftingHelper.Views
                 Panel = new Panel()
                 {
                     Size = new Point(AboutLayoutMath.FactsMinWidth, RowHeight),
-                    Parent = _documentPanel
-                }
+                    Parent = _documentPanel,
+                },
             };
 
             row.LabelControl = new Label()
@@ -439,7 +444,7 @@ namespace GW2CraftingHelper.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, RowLabelY),
-                Parent = row.Panel
+                Parent = row.Panel,
             };
 
             if (copyable)
@@ -458,7 +463,7 @@ namespace GW2CraftingHelper.Views
                     Text = value,
                     Size = new Point(AboutLayoutMath.ValueFloor, InputHeight),
                     Location = new Point(Inset, RowInputY),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 }.ReleaseOnDispose().ReleaseOnEnter();
             }
             else
@@ -471,7 +476,7 @@ namespace GW2CraftingHelper.Views
                     AutoSizeHeight = true,
                     TextColor = InfoTextColor,
                     Location = new Point(Inset, RowLabelY),
-                    Parent = row.Panel
+                    Parent = row.Panel,
                 };
             }
 
@@ -498,7 +503,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void Relayout(int panelWidth)
         {
-            if (panelWidth == _panelWidth) return;
+            if (panelWidth == _panelWidth)
+            {
+                return;
+            }
 
             ApplyLayout(panelWidth, measureText: false);
             _resizeSettle.Schedule();
@@ -511,7 +519,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void RefitTextAfterResizeSettle()
         {
-            if (!_buildComplete || _panelWidth <= 0) return;
+            if (!_buildComplete || _panelWidth <= 0)
+            {
+                return;
+            }
 
             ApplyLayout(_panelWidth, measureText: true);
         }
@@ -525,7 +536,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ApplyLayout(int panelWidth, bool measureText)
         {
-            if (_documentPanel == null || panelWidth <= 0) return;
+            if (_documentPanel == null || panelWidth <= 0)
+            {
+                return;
+            }
 
             _panelWidth = panelWidth;
             _documentPanel.Width = panelWidth;
@@ -554,7 +568,11 @@ namespace GW2CraftingHelper.Views
 
             for (int i = 0; i < _proseBlocks.Count; i++)
             {
-                if (i > 0) rightY += BlockGap;
+                if (i > 0)
+                {
+                    rightY += BlockGap;
+                }
+
                 rightY = LayoutProseBlock(_proseBlocks[i], rightX, rightY, columnWidth, measureText);
             }
 
@@ -591,7 +609,10 @@ namespace GW2CraftingHelper.Views
             foreach (var row in _factRows)
             {
                 int width = (int)Math.Ceiling(font.MeasureString(row.LabelText).Width);
-                if (width > labelBand) labelBand = width;
+                if (width > labelBand)
+                {
+                    labelBand = width;
+                }
             }
 
             int valueX = AboutLayoutMath.ValueX(labelBand);
@@ -621,6 +642,7 @@ namespace GW2CraftingHelper.Views
                     {
                         row.ValueLabel.Text = shown;
                     }
+
                     string full = string.Equals(shown, row.ValueText, StringComparison.Ordinal)
                         ? null
                         : row.ValueText;
@@ -657,7 +679,6 @@ namespace GW2CraftingHelper.Views
         // section rhythm cannot drift.
         private const int TitleToContentGap = SettingsFormLayout.TitleToContentGap;
 
-
         /// <summary>
         /// Wraps one paragraph into an already-created label and returns the
         /// height it took: one <see cref="ProseLineHeight"/> row per physical
@@ -681,6 +702,7 @@ namespace GW2CraftingHelper.Views
                 {
                     label.Text = joined;
                 }
+
                 label.Size = new Point(budget, wrapped.Lines.Count * ProseLineHeight);
 
                 TooltipFacility.ApplyPlain(label, wrapped.Truncated ? text : null);
@@ -704,6 +726,10 @@ namespace GW2CraftingHelper.Views
             public string BlishVersionRange;
         }
 
+        // CS0649 (never assigned) is wrong about the two DTOs below: every field
+        // is written by reflection, by the JsonConvert.DeserializeObject call in
+        // ReadFromManifestJsonFallback, which the compiler cannot see.
+#pragma warning disable CS0649
         private class ManifestFallbackContributorDto
         {
             [JsonProperty("name")]
@@ -733,6 +759,7 @@ namespace GW2CraftingHelper.Views
             [JsonProperty("dependencies")]
             public Dictionary<string, string> Dependencies;
         }
+#pragma warning restore CS0649
 
         private AboutInfo LoadAboutInfo()
         {
@@ -762,7 +789,7 @@ namespace GW2CraftingHelper.Views
                     Description = manifest.Description ?? "",
                     Url = manifest.Url ?? "",
                     AuthorDisplay = ResolveAuthorDisplay(manifest.Author, manifest.Contributors),
-                    BlishVersionRange = ReadBlishHudDependencyRange(manifest.Dependencies)
+                    BlishVersionRange = ReadBlishHudDependencyRange(manifest.Dependencies),
                 };
             }
             catch (Exception ex)
@@ -903,7 +930,7 @@ namespace GW2CraftingHelper.Views
                             Description = dto.Description ?? "",
                             Url = dto.Url ?? "",
                             AuthorDisplay = authorDisplay,
-                            BlishVersionRange = blishRange
+                            BlishVersionRange = blishRange,
                         };
                     }
                 }
@@ -964,7 +991,7 @@ namespace GW2CraftingHelper.Views
                 Description = "",
                 Url = "",
                 AuthorDisplay = null,
-                BlishVersionRange = null
+                BlishVersionRange = null,
             };
         }
     }

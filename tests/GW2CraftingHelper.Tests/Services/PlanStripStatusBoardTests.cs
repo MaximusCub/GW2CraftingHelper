@@ -371,7 +371,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void Snapshot_UnderConcurrentWriters_NeverThrowsAndEndsConsistent()
+        public async Task Snapshot_UnderConcurrentWriters_NeverThrowsAndEndsConsistent()
         {
             // Not a race-detection test (the lock makes torn reads
             // structurally impossible - see the class's own doc comment) -
@@ -394,7 +394,7 @@ namespace GW2CraftingHelper.Tests.Services
                 tasks.Add(Task.Run(() => board.Snapshot()));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks);
             board.Finish(1, "Plan generated - Aug 8, 2026 3:00 PM");
 
             var snapshot = board.Snapshot();

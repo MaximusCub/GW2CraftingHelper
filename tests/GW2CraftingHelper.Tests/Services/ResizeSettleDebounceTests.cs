@@ -1,136 +1,260 @@
 using System;
-using System.Diagnostics;
-using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using GW2CraftingHelper.Services;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
+    /// <summary>
+    /// Every settle-window test here drives a MANUAL clock through the
+    /// debounce's utcNow/delay seams. The test's delay implementation does
+    /// not sleep: it moves the fake clock to the wait's deadline and returns
+    /// an already-completed task, so the whole settle loop runs inline on
+    /// the test thread and the callback has either fired or not by the time
+    /// Schedule() returns. Nothing here polls, sleeps, or measures a real
+    /// duration.
+    /// <para>
+    /// This replaces a file that carried its own record of two GitHub-runner
+    /// races and a tolerance halved to absorb Windows' ~15ms clock
+    /// resolution. Only the last test still uses the real Task.Delay, and it
+    /// asserts an event, never an interval.
+    /// </para>
+    /// </summary>
     public class ResizeSettleDebounceTests
     {
         private const int SettleMs = 60;
-        private const int WaitMs = 3000;
 
-        [Fact]
-        public async Task BurstOfResizeEventsRunsTheCallbackOnce()
+        /// <summary>
+        /// Fake clock. Time moves only when the debounce asks to wait or a
+        /// test explicitly advances it, so "the window elapsed" and "the
+        /// waiter woke" are the same event and never two racing ones.
+        /// </summary>
+        private sealed class ManualClock
         {
-            int runs = 0;
-            var debounce = new ResizeSettleDebounce(
-                () => Interlocked.Increment(ref runs), RunInline, SettleMs, null);
+            private DateTime _now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-            for (int i = 0; i < 200; i++)
+            public readonly List<int> RequestedWaits = new List<int>();
+
+            public DateTime UtcNow => _now;
+
+            public double ElapsedMs =>
+                (_now - new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+
+            /// <summary>Runs before the clock advances, i.e. while the
+            /// waiter is notionally asleep - where a resize event landing
+            /// mid-window belongs.</summary>
+            public Action<int> DuringWait { get; set; }
+
+            /// <summary>
+            /// Advances to the DEADLINE, not by the duration: whatever the
+            /// hook consumed while the waiter was asleep counts against the
+            /// wait, exactly as real elapsed time would.
+            /// </summary>
+            public Task Delay(int ms)
             {
-                debounce.Schedule();
+                DateTime deadline = _now.AddMilliseconds(ms);
+                RequestedWaits.Add(ms);
+                DuringWait?.Invoke(RequestedWaits.Count);
+                if (_now < deadline)
+                {
+                    _now = deadline;
+                }
+
+                return Task.FromResult(true);
             }
 
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref runs) > 0, WaitMs));
-            await Task.Delay(SettleMs * 3);
-            Assert.Equal(1, Volatile.Read(ref runs));
+            public void Advance(int ms)
+            {
+                _now = _now.AddMilliseconds(ms);
+            }
         }
 
-        [Fact]
-        public async Task TheCallbackTrailsTheLastEventByTheSettleWindow()
+        private static ResizeSettleDebounce Build(
+            ManualClock clock, Action onSettled, Func<Action, bool> marshal = null)
         {
-            var clock = Stopwatch.StartNew();
-            long runAtMs = -1;
-            long lastEventMs = 0;
-
-            var debounce = new ResizeSettleDebounce(
-                () => Volatile.Write(ref runAtMs, clock.ElapsedMilliseconds),
-                RunInline,
+            return new ResizeSettleDebounce(
+                onSettled,
+                marshal ?? RunInline,
                 SettleMs,
-                null);
+                null,
+                () => clock.UtcNow,
+                clock.Delay);
+        }
 
-            // Re-arm a few times, then QUIESCE before measuring. Two
-            // races had to go, both seen on GitHub runners 2026-08-25:
-            // scheduling and stamping in the same loop iteration let a
-            // stalled Task.Delay record an event AFTER the callback had
-            // already run, and simply waiting for "runAtMs >= 0" returned
-            // a value written during the burst rather than the one this
-            // test is about. So the burst is allowed to finish, its
-            // result is discarded, and only then is a single event timed.
-            for (int i = 0; i < 4; i++)
+        [Fact]
+        public void ABurstOfResizeEventsRunsTheCallbackOnce()
+        {
+            var clock = new ManualClock();
+            int runs = 0;
+            var debounce = Build(clock, () => runs++);
+
+            // A 199ms drag: 200 resize events, one per millisecond, all of
+            // them landing while the first waiter is asleep. That is the
+            // shape the debounce exists for.
+            clock.DuringWait = waitNumber =>
             {
-                debounce.Schedule();
-                await Task.Delay(SettleMs / 4);
-            }
+                if (waitNumber != 1)
+                {
+                    return;
+                }
 
-            await Task.Delay(SettleMs * 4);
-            Volatile.Write(ref runAtMs, -1);
-
-            // Stamped BEFORE the final Schedule, so scheduling jitter can
-            // only ever lengthen the measured trail, never shorten it.
-            lastEventMs = clock.ElapsedMilliseconds;
-            debounce.Schedule();
-
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref runAtMs) >= 0, WaitMs));
-
-            // Floored at half the window rather than the whole of it: the
-            // debounce stamps DateTime.UtcNow, whose Windows resolution is
-            // ~15ms, so its idea of "now" can trail this Stopwatch's. Half
-            // the window still separates a trailing callback from one that
-            // fired on the event itself, which is the property under test.
-            long trailedMs = Volatile.Read(ref runAtMs) - lastEventMs;
-            Assert.True(
-                trailedMs >= SettleMs / 2,
-                $"ran {trailedMs}ms after the last event, inside the {SettleMs}ms settle window");
-        }
-
-        [Fact]
-        public async Task ASecondDragArmsAgain()
-        {
-            int runs = 0;
-            var debounce = new ResizeSettleDebounce(
-                () => Interlocked.Increment(ref runs), RunInline, SettleMs, null);
+                for (int i = 0; i < 199; i++)
+                {
+                    clock.Advance(1);
+                    debounce.Schedule();
+                }
+            };
 
             debounce.Schedule();
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref runs) == 1, WaitMs));
 
-            debounce.Schedule();
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref runs) == 2, WaitMs));
-        }
-
-        [Fact]
-        public async Task CancelDropsTheArmedCallbackAndRefusesFurtherArming()
-        {
-            int runs = 0;
-            var debounce = new ResizeSettleDebounce(
-                () => Interlocked.Increment(ref runs), RunInline, SettleMs, null);
-
-            debounce.Schedule();
-            debounce.Cancel();
-            debounce.Schedule();
-
-            await Task.Delay(SettleMs * 5);
-            Assert.Equal(0, Volatile.Read(ref runs));
+            Assert.Equal(1, runs);
             Assert.False(debounce.Pending);
+
+            // Two waits, not two hundred: the drag re-arms the one waiter
+            // rather than queueing a callback per event.
+            Assert.Equal(new[] { SettleMs, SettleMs }, clock.RequestedWaits);
+            Assert.Equal(199 + SettleMs, clock.ElapsedMs);
         }
 
         [Fact]
-        public async Task ADroppedMarshalReleasesTheSlotSoALaterDragStillRuns()
+        public void TheCallbackTrailsTheLASTEventByTheWholeSettleWindow()
         {
+            var clock = new ManualClock();
+            double lastEventAtMs = -1;
+            double ranAtMs = -1;
+            var debounce = Build(clock, () => ranAtMs = clock.ElapsedMs);
+
+            // Halfway through the first window a second resize event lands.
+            // The waiter must re-arm against IT, not fire on the original
+            // stamp - the whole point of a trailing debounce.
+            clock.DuringWait = waitNumber =>
+            {
+                if (waitNumber != 1)
+                {
+                    return;
+                }
+
+                clock.Advance(SettleMs / 2);
+                lastEventAtMs = clock.ElapsedMs;
+                debounce.Schedule();
+            };
+
+            debounce.Schedule();
+
+            // Exactly two waits: the original window, then the remainder
+            // measured from the second event.
+            Assert.Equal(new[] { SettleMs, SettleMs / 2 }, clock.RequestedWaits);
+            Assert.Equal(SettleMs, ranAtMs - lastEventAtMs);
+        }
+
+        [Fact]
+        public void TheCallbackDoesNotRunWhileTheWindowIsStillOpen()
+        {
+            var clock = new ManualClock();
+            int runs = 0;
+            var debounce = Build(clock, () => runs++);
+
+            // Time is frozen one millisecond short of the window. The
+            // waiter's only continuation is the delay it just asked for, so
+            // "has not run yet" is a fact here, not a race lost.
+            clock.DuringWait = _ =>
+            {
+                clock.Advance(SettleMs - 1);
+                Assert.Equal(0, runs);
+                Assert.True(debounce.Pending);
+            };
+
+            debounce.Schedule();
+
+            Assert.Equal(1, runs);
+        }
+
+        [Fact]
+        public void ASecondDragArmsAgain()
+        {
+            var clock = new ManualClock();
+            int runs = 0;
+            var debounce = Build(clock, () => runs++);
+
+            debounce.Schedule();
+            Assert.Equal(1, runs);
+
+            debounce.Schedule();
+            Assert.Equal(2, runs);
+            Assert.Equal(new[] { SettleMs, SettleMs }, clock.RequestedWaits);
+        }
+
+        [Fact]
+        public void CancelDropsTheArmedCallbackAndRefusesFurtherArming()
+        {
+            var clock = new ManualClock();
+            int runs = 0;
+            var debounce = Build(clock, () => runs++);
+
+            // Cancel lands while the window is open, which is the teardown
+            // case: a view disposing its control tree mid-drag.
+            clock.DuringWait = _ => debounce.Cancel();
+
+            debounce.Schedule();
+            Assert.Equal(0, runs);
+            Assert.False(debounce.Pending);
+
+            debounce.Schedule();
+            Assert.Equal(0, runs);
+            Assert.False(debounce.Pending);
+            Assert.Single(clock.RequestedWaits);
+        }
+
+        [Fact]
+        public void ADroppedMarshalReleasesTheSlotSoALaterDragStillRuns()
+        {
+            var clock = new ManualClock();
             int runs = 0;
             bool marshalWorks = false;
 
-            var debounce = new ResizeSettleDebounce(
-                () => Interlocked.Increment(ref runs),
+            var debounce = Build(
+                clock,
+                () => runs++,
                 action =>
                 {
-                    if (!Volatile.Read(ref marshalWorks)) return false;
+                    if (!marshalWorks)
+                    {
+                        return false;
+                    }
+
                     action();
                     return true;
-                },
+                });
+
+            debounce.Schedule();
+            Assert.False(debounce.Pending);
+            Assert.Equal(0, runs);
+
+            marshalWorks = true;
+            debounce.Schedule();
+            Assert.Equal(1, runs);
+        }
+
+        [Fact]
+        public void AThrowingMarshalIsReportedAndReleasesTheSlot()
+        {
+            var clock = new ManualClock();
+            Exception reported = null;
+            var boom = new InvalidOperationException("marshal exploded");
+
+            var debounce = new ResizeSettleDebounce(
+                () => { },
+                _ => throw boom,
                 SettleMs,
-                null);
+                ex => reported = ex,
+                () => clock.UtcNow,
+                clock.Delay);
 
             debounce.Schedule();
-            Assert.True(await WaitForAsync(() => !debounce.Pending, WaitMs));
-            Assert.Equal(0, Volatile.Read(ref runs));
 
-            Volatile.Write(ref marshalWorks, true);
-            debounce.Schedule();
-            Assert.True(await WaitForAsync(() => Volatile.Read(ref runs) == 1, WaitMs));
+            Assert.Same(boom, reported);
+            Assert.False(debounce.Pending);
         }
 
         [Fact]
@@ -150,21 +274,29 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(ResizeSettleDebounce.DefaultSettleMs, debounce.SettleMs);
         }
 
+        [Fact]
+        public async Task TheProductionWiringRunsTheCallbackWithNoSeamsSupplied()
+        {
+            // The one test on the real DateTime.UtcNow and the real
+            // Task.Delay, because every other test above stubs both and
+            // something has to prove the default wiring is connected. It
+            // asserts an EVENT, never an interval, so no runner speed can
+            // change its verdict; the timeout only turns a hang into a
+            // failure.
+            var ran = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var debounce = new ResizeSettleDebounce(
+                () => ran.TrySetResult(true), RunInline, 1, null);
+
+            debounce.Schedule();
+
+            Task finished = await Task.WhenAny(ran.Task, Task.Delay(30000));
+            Assert.Same(ran.Task, finished);
+        }
+
         private static bool RunInline(Action action)
         {
             action();
             return true;
-        }
-
-        private static async Task<bool> WaitForAsync(Func<bool> condition, int timeoutMs)
-        {
-            var clock = Stopwatch.StartNew();
-            while (clock.ElapsedMilliseconds < timeoutMs)
-            {
-                if (condition()) return true;
-                await Task.Delay(5);
-            }
-            return condition();
         }
     }
 }

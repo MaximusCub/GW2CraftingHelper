@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// unknown text is a silent one.
     /// </para>
     /// </summary>
-    public static class ItemDescriptionSanitizer
+    internal static class ItemDescriptionSanitizer
     {
         private static readonly IReadOnlyList<TooltipSpan> NoSpans = new List<TooltipSpan>();
 
@@ -39,11 +39,13 @@ namespace GW2CraftingHelper.Services
             {
                 return "";
             }
+
             var sb = new StringBuilder();
             foreach (var span in spans)
             {
                 sb.Append(span.Text);
             }
+
             return sb.ToString();
         }
 
@@ -173,6 +175,7 @@ namespace GW2CraftingHelper.Services
                     spans[0] = spans[0].WithText(trimmed);
                     break;
                 }
+
                 spans.RemoveAt(0);
             }
 
@@ -185,6 +188,7 @@ namespace GW2CraftingHelper.Services
                     spans[last] = spans[last].WithText(trimmed);
                     break;
                 }
+
                 spans.RemoveAt(last);
             }
 

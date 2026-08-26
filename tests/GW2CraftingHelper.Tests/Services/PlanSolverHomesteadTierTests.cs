@@ -42,7 +42,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Metal Forge Iron Ore, matching the wiki-verified conversion
             // table exactly: tier0 4->2, tier1 2->2, tier2 1->1 (docs/
-            // research/m37-r1-homestead.md Section 2.2). Iron ore costs 1
+            // docs/research/m37-r1-homestead.md Section 2.2). Iron ore costs 1
             // coin each; tier2's 1-ore rate is far cheaper per unit of
             // output than tier0's 4-ore rate. Default (no homesteadTiers
             // argument -> HomesteadEfficiencyTiers.Default, tier 0 for

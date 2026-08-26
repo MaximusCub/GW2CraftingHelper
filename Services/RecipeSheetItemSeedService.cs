@@ -19,21 +19,25 @@ namespace GW2CraftingHelper.Services
     /// Without this loader, Module.cs had no way to populate
     /// recipeSheetItemIdByRecipeId at all - the calculator's own gate on a
     /// non-empty map meant the feature could never fire for a real plan
-    /// (docs/KNOWN-ISSUES.md RECIPE-SHEET SAVINGS entry).
+    /// (KNOWN-ISSUES #49).
     /// </summary>
-    public static class RecipeSheetItemSeedService
+    internal static class RecipeSheetItemSeedService
     {
         private class RecipeSheetItemEnvelope
         {
             public int SchemaVersion { get; set; }
+
             public string GeneratedAt { get; set; }
+
             public string Source { get; set; }
+
             public List<RecipeSheetItemEntry> Items { get; set; }
         }
 
         private class RecipeSheetItemEntry
         {
             public int RecipeId { get; set; }
+
             public int SheetItemId { get; set; }
 
             // Sheet/crafted item name, discipline, minRating, note,
@@ -62,10 +66,12 @@ namespace GW2CraftingHelper.Services
                     // DailyCooldownItemService.Load.
                     continue;
                 }
+
                 // Last-write-wins on duplicate recipe ids, matching
                 // DailyCooldownItemService/AcquisitionHintService.
                 result[entry.RecipeId] = entry.SheetItemId;
             }
+
             return result;
         }
     }

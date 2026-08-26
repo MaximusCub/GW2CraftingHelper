@@ -8,7 +8,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public class ItemMetadataService
+    internal class ItemMetadataService
     {
         private const int BatchSize = 200;
 
@@ -22,6 +22,20 @@ namespace GW2CraftingHelper.Services
         // player can look up by hand in one session (a few MB even at
         // 10,000 distinct items), so this mirrors CurrencyMetadataService's
         // own unbounded cache rather than TradingPostService's TTL pattern.
+        //
+        // LOCKED, like every sibling service's cache (TradingPostService's
+        // _cacheLock, RecipeService's _cacheGate, CurrencyMetadataService's
+        // _cacheLock). One ItemMetadataService instance is shared by every
+        // plan generation in a session, and the generate path is re-entrant:
+        // "Use Own Materials" stays clickable while a generation runs and its
+        // confirm callback starts another one, so two GetMetadataAsync calls
+        // can be inside this class at once. An earlier comment here claimed
+        // the opposite and left both collections unguarded; concurrent writes
+        // to a .NET Framework Dictionary/HashSet do not merely lose entries,
+        // they throw out of a racing resize or spin Insert forever - a
+        // 100%-CPU freeze of the host game. See
+        // ItemMetadataServiceConcurrencyTests, which fails without this gate.
+        private readonly object _cacheLock = new object();
         private readonly Dictionary<int, ItemMetadata> _cache = new Dictionary<int, ItemMetadata>();
         private readonly Dictionary<int, ItemNameEntry> _seedById;
 
@@ -31,11 +45,11 @@ namespace GW2CraftingHelper.Services
         // reachable from PersistedPlan and guarded against its schema
         // version; see ItemStatBlock's own doc comment.
         //
-        // LOCKED, unlike _cache, and only this one: _cache is read back
-        // inside GetMetadataAsync and handed to callers as a fresh
-        // dictionary, whereas stat blocks are read straight out of here by
-        // the UI thread at render time (a tree row's tooltip) while a
-        // background generation may be writing the next plan's items in.
+        // Its own gate rather than _cacheLock: stat blocks are read straight
+        // out of here by the UI thread at render time (a tree row's tooltip)
+        // while a background generation writes the next plan's items in, so
+        // this lock is taken on the hover path and must not queue behind a
+        // generation's metadata bookkeeping.
         private readonly object _statBlocksLock = new object();
         private readonly Dictionary<int, ItemStatBlock> _statBlocks = new Dictionary<int, ItemStatBlock>();
 
@@ -65,15 +79,22 @@ namespace GW2CraftingHelper.Services
             var uniqueIds = new HashSet<int>(itemIds);
             var toFetch = new List<int>();
 
-            foreach (var id in uniqueIds)
+            // Every _cache/_knownMissing touch in this method takes
+            // _cacheLock, and none of them spans an await - the batch loops
+            // below deliberately sit outside the lock so a network round trip
+            // never holds it.
+            lock (_cacheLock)
             {
-                if (!_cache.ContainsKey(id) && !_knownMissing.Contains(id))
+                foreach (var id in uniqueIds)
                 {
-                    toFetch.Add(id);
+                    if (!_cache.ContainsKey(id) && !_knownMissing.Contains(id))
+                    {
+                        toFetch.Add(id);
+                    }
                 }
             }
 
-            // KNOWN-ISSUES api-degradation F3: a single hard-failing batch
+            // KNOWN-ISSUES #31/api-degradation F3: a single hard-failing batch
             // must degrade to "treat this batch's ids as missing, fall
             // through to the retry wave/seed fallback below" instead of
             // aborting GetMetadataAsync entirely - mirroring the retry
@@ -109,7 +130,12 @@ namespace GW2CraftingHelper.Services
             // The items endpoint can return partial results (206) or drop
             // ids transiently; retry just the stragglers once so a single
             // flaky response does not leave permanent icon/name holes.
-            var missing = toFetch.Where(id => !_cache.ContainsKey(id)).ToList();
+            List<int> missing;
+            lock (_cacheLock)
+            {
+                missing = toFetch.Where(id => !_cache.ContainsKey(id)).ToList();
+            }
+
             if (missing.Count > 0)
             {
                 for (int i = 0; i < missing.Count; i += BatchSize)
@@ -131,32 +157,38 @@ namespace GW2CraftingHelper.Services
                 // Ids still missing after the retry wave are treated as
                 // genuinely absent from the API for the rest of this
                 // service's lifetime.
-                foreach (var id in missing)
+                lock (_cacheLock)
                 {
-                    if (!_cache.ContainsKey(id))
+                    foreach (var id in missing)
                     {
-                        _knownMissing.Add(id);
+                        if (!_cache.ContainsKey(id))
+                        {
+                            _knownMissing.Add(id);
+                        }
                     }
                 }
             }
 
             var result = new Dictionary<int, ItemMetadata>();
-            foreach (var id in uniqueIds)
+            lock (_cacheLock)
             {
-                if (_cache.TryGetValue(id, out var meta))
+                foreach (var id in uniqueIds)
                 {
-                    result[id] = meta;
-                }
-                else if (_seedById != null && _seedById.TryGetValue(id, out var seed))
-                {
-                    // Last resort: bundled seed name/icon (no rarity). Not
-                    // inserted into _cache so a later call retries the API.
-                    result[id] = new ItemMetadata
+                    if (_cache.TryGetValue(id, out var meta))
                     {
-                        ItemId = id,
-                        Name = seed.Name,
-                        IconUrl = seed.Icon
-                    };
+                        result[id] = meta;
+                    }
+                    else if (_seedById != null && _seedById.TryGetValue(id, out var seed))
+                    {
+                        // Last resort: bundled seed name/icon (no rarity). Not
+                        // inserted into _cache so a later call retries the API.
+                        result[id] = new ItemMetadata
+                        {
+                            ItemId = id,
+                            Name = seed.Name,
+                            IconUrl = seed.Icon,
+                        };
+                    }
                 }
             }
 
@@ -173,7 +205,7 @@ namespace GW2CraftingHelper.Services
         /// Null is the normal answer for a plan restored from disk (nothing
         /// re-fetched its items), and callers must degrade to their
         /// pre-existing tooltip rather than showing an empty box - see
-        /// docs/KNOWN-ISSUES.md, "Item stat tooltips".
+        /// KNOWN-ISSUES #40.
         /// </para>
         /// </summary>
         public ItemStatBlock GetCachedStatBlock(int itemId)
@@ -190,13 +222,12 @@ namespace GW2CraftingHelper.Services
         /// runs so its rows can show item tooltips at all (Q13). Returns
         /// how many blocks it added.
         /// <para>
-        /// Deliberately NOT <see cref="GetMetadataAsync"/>: that method
-        /// writes the unlocked <c>_cache</c> and <c>_knownMissing</c>,
-        /// which only the plan-generation path touches, and a restore-time
-        /// top-up racing a Generate would then be two threads writing one
-        /// Dictionary. This path writes only the locked stat table, which
-        /// is already designed for a background writer and a UI-thread
-        /// reader.
+        /// Deliberately NOT <see cref="GetMetadataAsync"/>: that method also
+        /// fills the metadata cache and the negative cache, and a restore-time
+        /// top-up has no business making a plan's items look freshly resolved
+        /// or negative-caching an id the plan never asked for. Both caches are
+        /// gated by <c>_cacheLock</c>, so calling it here would be safe - it
+        /// would just do the wrong thing.
         /// </para>
         /// <para>
         /// Best effort by design: a failing batch is skipped, not thrown -
@@ -246,10 +277,12 @@ namespace GW2CraftingHelper.Services
                     {
                         continue;
                     }
+
                     lock (_statBlocksLock)
                     {
                         _statBlocks[entry.Id] = statBlock;
                     }
+
                     filled++;
                 }
             }
@@ -278,14 +311,16 @@ namespace GW2CraftingHelper.Services
                     Name = entry.Name,
                     IconUrl = entry.Icon,
                     Rarity = entry.Rarity,
-                    // design-plan-notes.md (Notes section, excess/reclaim
-                    // account-bound exclusion): null-tolerant even though
+                    // Null-tolerant even though
                     // the production Gw2ItemApiClient parser never returns
                     // a null Flags list - a test fixture or future client
                     // implementation might.
-                    IsAccountBound = entry.Flags != null && entry.Flags.Contains("AccountBound")
+                    IsAccountBound = entry.Flags != null && entry.Flags.Contains("AccountBound"),
                 };
-                _cache[entry.Id] = meta;
+                lock (_cacheLock)
+                {
+                    _cache[entry.Id] = meta;
+                }
             }
         }
     }

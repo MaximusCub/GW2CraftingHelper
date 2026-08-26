@@ -323,7 +323,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void MultiItemRequest_UnsellableRootPresent_ProfitBandMiddleTileDivergesFromCostBand()
         {
             // Pins the exact scenario BuildProfitFormulaBand's
-            // own doc comment (and docs/KNOWN-ISSUES.md's W4A entry, item 2)
+            // own doc comment (and KNOWN-ISSUES #46, item 2)
             // describes but that no running test previously modeled - a
             // batch with an unsellable requested root, where
             // SellSideEconomics.ApplyBatchSellSideEconomics subtracts only

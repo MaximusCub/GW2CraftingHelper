@@ -21,8 +21,11 @@ When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths*
 
 ## Build & Test
 
+- Restore (fresh clone only, but MANDATORY there): `nuget restore GW2CraftingHelper.sln`
+  - `packages/` is gitignored and this is a classic `packages.config` project, so nothing is on disk until `nuget.exe` restores it. **`dotnet restore` does NOT do this** - it and `dotnet msbuild -t:restore` both print "Nothing to do. None of the projects specified contain packages to restore." and leave the build failing on `The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets`. Get `nuget.exe` from <https://www.nuget.org/downloads>. Windows-only build; CI runs `windows-latest`.
 - Build: `<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
-- Tests: `<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+- Tests: `<dotnet> test GW2CraftingHelper.sln`
+  - There are THREE test projects and CI runs all three (`tests/GW2CraftingHelper.Tests`, `tests/GW2CraftingHelper.RecipeSeeder.Tests`, `tests/VendorOfferUpdater.Tests`). Testing only the first misses the golden-vector suite that pins `tools/VendorOfferUpdater/VendorOfferHasher.cs` (the `offerId` contract for `ref/vendor_offers.json`) against `tests/shared/vendor_offer_hasher_vectors.json`. The first two target `net48`, the third `net8.0`.
 - `<dotnet>` refers to whichever dotnet path resolved above
 - `.csproj` uses explicit `<Compile Include>` - new `.cs` files must be registered
 - Changes must be incremental with logical git commits
@@ -37,6 +40,8 @@ When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths*
 - Keep edits focused and minimal
 - Avoid unrelated refactors or formatting churn
 - Follow existing patterns in neighboring files before introducing new structure
+- **Comments state what the code cannot:** A comment survives only if it carries something a reader cannot get from the code in front of them plus one `git log -S` - an external fact (vendor binary behaviour, a Windows constant, a GW2 API quirk), a measurement, a derivation, or an invariant a caller can violate. Refactor provenance ("moved verbatim out of X", "no logic changes"), review rebuttals ("deliberate, not an oversight"), bug-discovery narratives and session-local jargon ("per the brief", "directive B", milestone codes like `M33 C2b`) go in the commit message or in `docs/`, never in the source - and never in a runtime string. Keep contiguous comment blocks to roughly 12 lines; past that, leave the caller-facing invariant inline and move the narrative to a `docs/ARCHITECTURE.md` section the comment points at. State a rule once and point at it from the other sites; do not restate it, and never claim a comment "mirrors X exactly" - nothing enforces that.
+- **Cite docs by repo-relative path:** a `.md` name in a `.cs` comment must resolve against the tree (`dev/proposals/d2-log-system.md`, not `d2-log-system.md`). CI fails the build on a citation that resolves nowhere.
 - **ASCII-only in source (.cs):** Source files must contain only ASCII characters (U+0000-U+007F). Do not paste raw Unicode into code, comments, or string literals. If Unicode must be shown at runtime (UI glyphs, item names, etc.), represent it using escapes (e.g., `"\u25BC"` / `"\u25B6"`) or data returned by the GW2 API.
 - **No em-dashes in source or config:** Never use em-dash (`\u2014`) in source code, comments, string literals, config files, test code, or any non-user-facing text unless specifically required. Use a plain ASCII hyphen (`-`) or double-hyphen (`--`) instead. Em-dashes are only acceptable in correctly-encoded user presentation layers (e.g., UI text rendered via BlishHUD controls).
 
@@ -277,9 +282,11 @@ All review happens via GitHub Pull Requests.
 Run (using the resolved `<dotnet>` from **Tool Paths**):
 
 `<dotnet> build GW2CraftingHelper.csproj -p:Platform=x64`
-`<dotnet> test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj`
+`<dotnet> test GW2CraftingHelper.sln`
 
-Both must pass before PR creation.
+Both must pass before PR creation. The solution-level test run is what
+matches CI; see **Build & Test** above for why the single-project command
+is not enough.
 
 ## Commit & Push
 
@@ -297,30 +304,15 @@ Use:
 
 `<gh> pr create --base master --head <milestone-branch> --title "<concise milestone title>" --body-file <tempfile>`
 
-### Required PR Body Template
+where `<tempfile>` is `.github/PULL_REQUEST_TEMPLATE.md` with every section filled in.
 
-```
-## Milestone Goal
-Brief description of what this milestone accomplishes.
+### Required PR Body
 
-## What Changed
-High-level summary grouped logically (not per-file noise).
-
-## Validation Performed
-- Build command run and result
-- Test command run and result
-- Manual validation steps (if applicable)
-
-## Repo Invariants Checklist
-- [ ] No Blish HUD references added to tests
-- [ ] Tests exercise real production paths
-- [ ] No fake file I/O tests introduced
-- [ ] Pricing logic preserves multi-source correctness
-- [ ] IDs remain internal-only (not displayed)
-
-## Risks / Follow-ups
-Known tradeoffs, edge cases, or future improvements.
-```
+Fill in `.github/PULL_REQUEST_TEMPLATE.md` - that file is the only PR body
+template, for agents and humans alike, and `gh pr create` picks it up
+automatically when no `--body`/`--body-file` is passed. Do not restate it
+here: an inline copy drifted from it once already and silently dropped the
+ASCII-only/no-em-dash row from the invariants checklist.
 
 If a PR already exists:
 - Push additional commits to the same branch.

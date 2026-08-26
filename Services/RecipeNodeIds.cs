@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// pre-assigned (non-contiguous, but still tree-unique) ids instead of
     /// renumbering from scratch over the pruned tree's smaller shape.
     /// </summary>
-    public static class RecipeNodeIds
+    internal static class RecipeNodeIds
     {
         public static void Assign(RecipeNode root)
         {

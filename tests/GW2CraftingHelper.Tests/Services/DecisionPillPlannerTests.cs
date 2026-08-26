@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (m3-display-
-    /// decision-map.md's decision -> pill table) plus the HAVE/CURRENCY
+    /// Full CanCraft/CanBuyTp/CanBuyVendor combination matrix (the
+    /// decision -> pill table) plus the HAVE/CURRENCY
     /// short-circuits, exercising the real DecisionPillPlanner.BuildPillSpecs
     /// production code - KNOWN-ISSUES #18. Also covers:
     /// the non-interactive "HAVE N/M NEEDED" annotation and the interactive
@@ -94,7 +95,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ignorePill.Source); // toggled via node identity, not an AcquisitionSource
         }
 
-        // KNOWN-ISSUES 20.4: a node can be BOTH
+        // KNOWN-ISSUES #20.4: a node can be BOTH
         // manually ignored AND carry a nonzero OwnedQuantityUsed from an
         // earlier real reduction - CraftingTreeBuilder.BuildNode sets
         // OwnedQuantityUsed unconditionally BEFORE its IsIgnored early
@@ -331,11 +332,12 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Two feasible sources: multi-pill, selected == node.Decision ---
 
         [Theory]
-        [InlineData(CraftingDecision.BuyFromTp, "TP", "VENDOR")]
-        [InlineData(CraftingDecision.BuyFromVendor, "VENDOR", "TP")]
+        [InlineData(nameof(CraftingDecision.BuyFromTp), "TP", "VENDOR")]
+        [InlineData(nameof(CraftingDecision.BuyFromVendor), "VENDOR", "TP")]
         public void TpAndVendor_TwoPills_SelectedMatchesDecision(
-            CraftingDecision decision, string selectedText, string availableText)
+            string decisionName, string selectedText, string availableText)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, canBuyTp: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
@@ -351,11 +353,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(CraftingDecision.Craft, "CRAFT", "TP")]
-        [InlineData(CraftingDecision.BuyFromTp, "TP", "CRAFT")]
+        [InlineData(nameof(CraftingDecision.Craft), "CRAFT", "TP")]
+        [InlineData(nameof(CraftingDecision.BuyFromTp), "TP", "CRAFT")]
         public void CraftAndTp_TwoPills_SelectedMatchesDecision(
-            CraftingDecision decision, string selectedText, string availableText)
+            string decisionName, string selectedText, string availableText)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, canCraft: true, canBuyTp: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
@@ -365,11 +368,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(CraftingDecision.Craft, "CRAFT", "VENDOR")]
-        [InlineData(CraftingDecision.BuyFromVendor, "VENDOR", "CRAFT")]
+        [InlineData(nameof(CraftingDecision.Craft), "CRAFT", "VENDOR")]
+        [InlineData(nameof(CraftingDecision.BuyFromVendor), "VENDOR", "CRAFT")]
         public void CraftAndVendor_TwoPills_SelectedMatchesDecision(
-            CraftingDecision decision, string selectedText, string availableText)
+            string decisionName, string selectedText, string availableText)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, canCraft: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
@@ -383,12 +387,13 @@ namespace GW2CraftingHelper.Tests.Services
         // ---
 
         [Theory]
-        [InlineData(CraftingDecision.Craft, "CRAFT")]
-        [InlineData(CraftingDecision.BuyFromTp, "TP")]
-        [InlineData(CraftingDecision.BuyFromVendor, "VENDOR")]
+        [InlineData(nameof(CraftingDecision.Craft), "CRAFT")]
+        [InlineData(nameof(CraftingDecision.BuyFromTp), "TP")]
+        [InlineData(nameof(CraftingDecision.BuyFromVendor), "VENDOR")]
         public void AllThreeFeasible_SelectedPillAlwaysMatchesCommittedSource(
-            CraftingDecision decision, string expectedSelectedText)
+            string decisionName, string expectedSelectedText)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, canCraft: true, canBuyTp: true, canBuyVendor: true);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
@@ -430,13 +435,14 @@ namespace GW2CraftingHelper.Tests.Services
         // comment) ---
 
         [Theory]
-        [InlineData(CraftingDecision.Craft, true, false, false, "CRAFT")]
-        [InlineData(CraftingDecision.BuyFromTp, false, true, false, "TP")]
-        [InlineData(CraftingDecision.BuyFromVendor, false, false, true, "VENDOR")]
-        [InlineData(CraftingDecision.Unknown, false, false, false, "UNKNOWN")]
+        [InlineData(nameof(CraftingDecision.Craft), true, false, false, "CRAFT")]
+        [InlineData(nameof(CraftingDecision.BuyFromTp), false, true, false, "TP")]
+        [InlineData(nameof(CraftingDecision.BuyFromVendor), false, false, true, "VENDOR")]
+        [InlineData(nameof(CraftingDecision.Unknown), false, false, false, "UNKNOWN")]
         public void PartialOwnership_AddsOwnedInfoPill_SourcePillUnchanged(
-            CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor, string expectedSourceText)
+            string decisionName, bool canCraft, bool canBuyTp, bool canBuyVendor, string expectedSourceText)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             // node.Quantity defaults to 1 (Node() helper), so total demand
             // = 4 owned + 1 remaining = 5.
             var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 4);
@@ -464,13 +470,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(CraftingDecision.Craft, true, false, false)]
-        [InlineData(CraftingDecision.BuyFromTp, false, true, false)]
-        [InlineData(CraftingDecision.BuyFromVendor, false, false, true)]
-        [InlineData(CraftingDecision.Unknown, false, false, false)]
+        [InlineData(nameof(CraftingDecision.Craft), true, false, false)]
+        [InlineData(nameof(CraftingDecision.BuyFromTp), false, true, false)]
+        [InlineData(nameof(CraftingDecision.BuyFromVendor), false, false, true)]
+        [InlineData(nameof(CraftingDecision.Unknown), false, false, false)]
         public void NoOwnership_NoOwnedInfoPill(
-            CraftingDecision decision, bool canCraft, bool canBuyTp, bool canBuyVendor)
+            string decisionName, bool canCraft, bool canBuyTp, bool canBuyVendor)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, canCraft, canBuyTp, canBuyVendor, ownedQuantityUsed: 0);
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 

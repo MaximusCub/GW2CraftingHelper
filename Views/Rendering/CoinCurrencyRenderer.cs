@@ -7,22 +7,10 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "10. Coin/currency
-    // value rendering primitives" region - private static -> internal
-    // static, no logic changes. The coin-icon-right-of-number invariant
-    // (repo CLAUDE.md) now lives in this one named place. Callers in
-    // CraftingPlanView repoint through this class name (e.g.
-    // CoinCurrencyRenderer.RenderValueCellRightAligned).
+    // The one place the coin-icon-right-of-number invariant (CLAUDE.md) is
+    // implemented: every coin amount the module draws goes through here.
     internal static class CoinCurrencyRenderer
     {
-        // Plain "12g 34s 56c" text for contexts that cannot render coin
-        // icons (BasicTooltipText has no inline-image support).
-        internal static string FormatCoinText(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
-        }
-
         // --- Coin display helpers ---
         //
         // gw2e's Coins component renders NumberFormat(gold) -> icon ->
@@ -39,7 +27,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // (Blish-free, unit-tested) so the width formulas can be tested without
         // referencing UI code. Everything below that still touches Label/Panel/
         // BitmapFont references CoinSegmentMath's constants/structs directly.
-
         internal static List<CoinSegmentMath.CoinSegmentSpec> BuildCoinSegments(long copper, BitmapFont font)
         {
             // Which units show, and how they are padded, is
@@ -53,30 +40,21 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 AddSegmentSpec(segments, font, CoinSegmentMath.GoldAssetId, goldText);
             }
+
             if (silverText != null)
             {
                 AddSegmentSpec(segments, font, CoinSegmentMath.SilverAssetId, silverText);
             }
+
             AddSegmentSpec(segments, font, CoinSegmentMath.CopperAssetId, copperText);
             return segments;
         }
 
-        // private -> internal: MainView needs to build its own
-        // 3-segment gold/silver/copper spec list (its own show-all/no-
-        // padding formatting - a deliberate MainView behavior, out of this
-        // package's scope to change) without duplicating this measure-
-        // and-wrap one-liner.
-        // NOTE: this is NOT the same precedent as the earlier
-        // GetPillColors private -> internal bump. That bump was reverted
-        // back to private (commit 5c56b2a) specifically to stop
-        // Views/Rendering from depending back on CraftingPlanView and keep
-        // Views/Rendering a true leaf layer; CraftingPlanView.GetPillColors
-        // is private static again on current master. This bump is
-        // different in kind: MainView -> Views/Rendering is a normal
-        // forward consumer dependency (a leaf class exposing a helper to a
-        // caller), not a reverse edge back into CraftingPlanView. Do not
-        // cite this as precedent for adding a reverse
-        // Views/Rendering -> CraftingPlanView dependency.
+        // Internal because MainView builds its own 3-segment
+        // gold/silver/copper spec list (show-all, no padding) and would
+        // otherwise duplicate this measure-and-wrap. MainView ->
+        // Views/Rendering is a forward dependency; the reverse direction
+        // stays closed (docs/ARCHITECTURE.md section 5).
         internal static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);
@@ -166,7 +144,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Controls = controls,
                 TextWidths = widths,
                 IconYOffset = iconYOffset,
-                IconSize = iconSize
+                IconSize = iconSize,
             };
         }
 
@@ -182,7 +160,10 @@ namespace GW2CraftingHelper.Views.Rendering
             float alphaScale, int iconYOffset, bool showShadow, int iconSize)
         {
             Color textColor = GetCoinColor(seg.AssetId);
-            if (alphaScale < 1f) textColor *= alphaScale;
+            if (alphaScale < 1f)
+            {
+                textColor *= alphaScale;
+            }
 
             var label = new Label()
             {
@@ -197,7 +178,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(x, y),
-                Parent = parent
+                Parent = parent,
             };
 
             // Through the icon component, like the currency half of this
@@ -272,7 +253,10 @@ namespace GW2CraftingHelper.Views.Rendering
             IReadOnlyList<CurrencyAmountViewModel> amounts, BitmapFont font)
         {
             var segments = new List<CoinSegmentMath.CurrencySegmentSpec>();
-            if (amounts == null) return segments;
+            if (amounts == null)
+            {
+                return segments;
+            }
 
             foreach (var amount in amounts)
             {
@@ -287,9 +271,10 @@ namespace GW2CraftingHelper.Views.Rendering
                     IconUrl = amount.IconUrl,
                     Text = text,
                     TextWidth = width,
-                    Name = amount.Name
+                    Name = amount.Name,
                 });
             }
+
             return segments;
         }
 
@@ -313,7 +298,10 @@ namespace GW2CraftingHelper.Views.Rendering
             var widths = new int[segments.Count];
             int x = startX;
             Color textColor = new Color(220, 220, 220);
-            if (alphaScale < 1f) textColor *= alphaScale;
+            if (alphaScale < 1f)
+            {
+                textColor *= alphaScale;
+            }
 
             for (int i = 0; i < segments.Count; i++)
             {
@@ -326,7 +314,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(x, y),
-                    Parent = parent
+                    Parent = parent,
                 };
 
                 // A currency icon carries no visible
@@ -427,7 +415,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     CoinSegments = SegmentLayoutHandle.Empty,
                     CurrencySegments = SegmentLayoutHandle.Empty,
-                    DashLabel = dashLabel
+                    DashLabel = dashLabel,
                 };
             }
 
@@ -472,7 +460,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // Everything below reuses the same segment builders, colours and
         // dash fallback as the right-aligned path above; only the x of
         // each already-built segment differs.
-
         private static int SubColumnRightEdge(TreeCostColumnMath.CostSubColumnEdges edges, int assetId)
         {
             switch (assetId)
@@ -508,7 +495,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     CoinSegments = SegmentLayoutHandle.Empty,
                     CurrencySegments = SegmentLayoutHandle.Empty,
-                    DashLabel = dashLabel
+                    DashLabel = dashLabel,
                 };
             }
 
@@ -528,6 +515,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     widths[i] = seg.TextWidth;
                     assetIds[i] = seg.AssetId;
                 }
+
                 coinHandle = new SegmentLayoutHandle { Controls = controls, TextWidths = widths, AssetIds = assetIds };
             }
 

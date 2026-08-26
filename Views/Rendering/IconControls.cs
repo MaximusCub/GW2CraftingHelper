@@ -53,7 +53,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(frameSize, frameSize),
                 Location = new Point(x, y),
                 BackgroundColor = frameColor,
-                Parent = parent
+                Parent = parent,
             };
             CreateUnframedIcon(frame, iconUrl, borderThickness, borderThickness, iconSize, tooltipText);
 
@@ -95,14 +95,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
-                    Parent = parent
+                    Parent = parent,
                 }
                 : new Panel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundTexture = GameService.Content.GetRenderServiceTexture(iconUrl),
-                    Parent = parent
+                    Parent = parent,
                 };
 
             // The bare square reads as a HOLE in the icon column rather
@@ -132,7 +132,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Location = new Point(
                         (size - (int)System.Math.Ceiling(glyphSize.Width)) / 2,
                         (size - (int)System.Math.Ceiling(glyphSize.Height)) / 2),
-                    Parent = icon
+                    Parent = icon,
                 };
             }
 
@@ -148,6 +148,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 TooltipFacility.ApplyPlain(placeholderMark, resolvedTooltip);
             }
+
             return icon;
         }
 
@@ -162,7 +163,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Size = new Point(size, size),
                 Location = new Point(x, y),
                 BackgroundTexture = AsyncTexture2D.FromAssetId(assetId),
-                Parent = parent
+                Parent = parent,
             };
 
             TooltipFacility.ApplyPlain(icon, tooltipText);

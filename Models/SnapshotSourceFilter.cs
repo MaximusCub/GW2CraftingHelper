@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Models
 {
     /// <summary>
     /// Which account-inventory sources the Snapshot tab's search/filter row
-    /// should include (d1-snapshot-about-settings.md Feature 1). The three
+    /// should include (dev/proposals/d1-snapshot-about-settings.md Feature 1). The three
     /// storage locations default to true (show everything), matching the
     /// pre-search-box tab's implicit no-filter behavior.
     /// <para>
@@ -29,11 +29,14 @@ namespace GW2CraftingHelper.Models
     /// themselves are defined).
     /// </para>
     /// </summary>
-    public class SnapshotSourceFilter
+    internal class SnapshotSourceFilter
     {
         public bool Bank { get; set; } = true;
+
         public bool MaterialStorage { get; set; } = true;
+
         public bool SharedInventory { get; set; } = true;
+
         public HashSet<string> UncheckedCharacters { get; set; } = new HashSet<string>(StringComparer.Ordinal);
     }
 }

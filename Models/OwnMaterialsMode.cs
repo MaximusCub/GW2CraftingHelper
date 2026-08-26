@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Models
     /// drove reduction (CraftingPlanPipeline's own gate) - with no
     /// snapshot, this setting is inert regardless of its value.
     /// </summary>
-    public enum OwnMaterialsMode
+    internal enum OwnMaterialsMode
     {
         /// <summary>Owned materials are free; no zero-owned decision pass runs, reduction uses the legacy primary-option heuristic, and profit ignores their opportunity cost.</summary>
         Free = 0,
@@ -38,6 +38,6 @@ namespace GW2CraftingHelper.Models
         /// their instant-sell opportunity cost (net of Trading Post fees);
         /// CraftingProfit is reduced by that amount.
         /// </summary>
-        Valued = 1
+        Valued = 1,
     }
 }

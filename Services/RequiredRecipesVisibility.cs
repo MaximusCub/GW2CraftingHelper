@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
     /// module simply could not check, which is worse than a harmless extra
     /// row.
     /// </summary>
-    public static class RequiredRecipesVisibility
+    internal static class RequiredRecipesVisibility
     {
         private const string LearnedStatusTag = "Learned";
         private const string AutoLearnedStatusTag = "Auto-learned";
@@ -62,6 +62,7 @@ namespace GW2CraftingHelper.Services
                     visible.Add(row);
                 }
             }
+
             return visible;
         }
 
@@ -80,6 +81,7 @@ namespace GW2CraftingHelper.Services
             {
                 return $"Required Recipes (showing {visibleCount} missing of {totalCount})";
             }
+
             return $"Required Recipes ({totalCount})";
         }
 

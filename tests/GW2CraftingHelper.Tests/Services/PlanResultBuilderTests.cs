@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Services
                 expectedOutputCount: null, ingredients);
         }
 
-        // design-plan-notes.md (Notes section, gambling-forge scope):
+        // Gambling-forge scope:
         // expectedOutputCount overload - every pre-existing call site above
         // routes through the 6-arg overload, which passes null (preserving
         // the exact prior behavior: RecipeOption.ExpectedOutputCount left
@@ -545,8 +545,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void ProbabilisticForgeOutputItemIds_MysticCloverStyleYield_PopulatesOutputItemId()
         {
-            // design-plan-notes.md (Notes section, gambling-forge scope):
-            // a MysticForge recipe whose ExpectedOutputCount (2.5) is below
+            // A MysticForge recipe whose ExpectedOutputCount (2.5) is below
             // OutputCount (3) is the documented Mystic-Clover-style
             // fractional-yield signal - see RecipeOption.ExpectedOutputCount's
             // own doc comment.

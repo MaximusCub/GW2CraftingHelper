@@ -7,7 +7,7 @@ using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Tests.Helpers
 {
-    public class InMemoryItemApiClient : IItemApiClient
+    internal class InMemoryItemApiClient : IItemApiClient
     {
         private readonly Dictionary<int, RawItem> _items = new Dictionary<int, RawItem>();
         private readonly List<IReadOnlyList<int>> _calls = new List<IReadOnlyList<int>>();

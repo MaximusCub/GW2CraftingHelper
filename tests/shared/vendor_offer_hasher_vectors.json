@@ -1,7 +1,6 @@
 {
   "schemaVersion": 1,
   "sourceHashers": [
-    "Services/VendorOfferHasher.cs",
     "tools/VendorOfferUpdater/VendorOfferHasher.cs"
   ],
   "vectors": [

@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// (positive value, no coin-keyed entries handled by the caller) so a
     /// value that parses here is always safe to hand to that constructor.
     /// </summary>
-    public static class SettingsInputParser
+    internal static class SettingsInputParser
     {
         /// <summary>
         /// Attempts to parse <paramref name="text"/> as a positive integer
@@ -124,7 +124,7 @@ namespace GW2CraftingHelper.Services
             return true;
         }
 
-        // "Clamp 1-365" for LogRetentionDays (d2-log-system.md Section 5).
+        // "Clamp 1-365" for LogRetentionDays (dev/proposals/d2-log-system.md Section 5).
         private const int MinRetentionDays = 1;
         private const int MaxRetentionDays = 365;
 

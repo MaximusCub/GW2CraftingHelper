@@ -10,11 +10,11 @@ namespace GW2CraftingHelper.Services
     /// thing three hand-rolled copies would disagree about.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class TopRegionLayoutMath
+    internal static class TopRegionLayoutMath
     {
-        public const int RowHeight = 35;
+        public const int TopRegionRowHeight = 35;
         public const int InputRowY = 5;
-        public const int RowGap = 3;
+        public const int TopRegionRowGap = 3;
         /// <summary>
         /// Band the plan tab's status label occupies between the row above
         /// it and the separator rule. 25, not the 23 it was at Body: the
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
         public const int ContentToBottomPad = 5;
 
         /// <summary>
-        /// The Recipe Tree toolbar row. Shorter than RowHeight: it holds
+        /// The Recipe Tree toolbar row. Shorter than TopRegionRowHeight: it holds
         /// 24px buttons and a label, not the input row's text boxes.
         /// </summary>
         public const int TreeToolbarRowHeight = 30;
@@ -46,11 +46,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public static TopRegionLayout Compute(int rowCount, bool treeToolbarVisible)
         {
-            int inputPanelHeight = rowCount * RowHeight;
-            int controlsRowY = InputRowY + inputPanelHeight + RowGap;
-            int treeToolbarRowY = controlsRowY + RowHeight + RowGap;
+            int inputPanelHeight = rowCount * TopRegionRowHeight;
+            int controlsRowY = InputRowY + inputPanelHeight + TopRegionRowGap;
+            int treeToolbarRowY = controlsRowY + TopRegionRowHeight + TopRegionRowGap;
             int statusRowY = treeToolbarVisible
-                ? treeToolbarRowY + TreeToolbarRowHeight + RowGap
+                ? treeToolbarRowY + TreeToolbarRowHeight + TopRegionRowGap
                 : treeToolbarRowY;
             int separatorY = statusRowY + StatusToSeparatorGap;
             int contentY = separatorY + SeparatorToContentGap;
@@ -66,7 +66,7 @@ namespace GW2CraftingHelper.Services
         }
     }
 
-    public readonly struct TopRegionLayout
+    internal readonly struct TopRegionLayout
     {
         public readonly int InputPanelHeight;
         public readonly int ControlsRowY;

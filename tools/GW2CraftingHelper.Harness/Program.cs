@@ -18,9 +18,12 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullRecipeApiClient : IRecipeApiClient
     {
-        public Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+            // Offline mode answers for the endpoint, so its empties are as
+            // final as a 2xx body's - nothing here is a degraded API.
+            return Task.FromResult(
+                new RecipeSearchResult(Array.Empty<int>(), absenceProven: true));
         }
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
@@ -31,10 +34,11 @@ namespace GW2CraftingHelper.Harness
 
     internal class NullPriceApiClient : IPriceApiClient
     {
-        public Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(
+        public Task<PriceBatchResult> GetPricesAsync(
             IReadOnlyList<int> itemIds, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<RawPriceEntry>>(Array.Empty<RawPriceEntry>());
+            return Task.FromResult(
+                new PriceBatchResult(Array.Empty<RawPriceEntry>(), absenceProven: true));
         }
     }
 
@@ -252,6 +256,9 @@ namespace GW2CraftingHelper.Harness
                     recipeOverlay.Load(buildId);
                     if (buildId.HasValue)
                     {
+                        // Load already dropped a mismatched overlay, so the
+                        // stamp lands on whatever survived.
+                        recipeOverlay.SetCurrentBuildId(buildId.Value);
                         recipeSeed.SetCurrentBuildId(buildId.Value);
                     }
                 }
@@ -270,7 +277,7 @@ namespace GW2CraftingHelper.Harness
                     }
                 }
 
-                // Acquisition hints seed (docs/KNOWN-ISSUES.md item 8/17),
+                // Acquisition hints seed (docs/KNOWN-ISSUES #8/#17),
                 // mirroring Module.cs so Unknown-decision nodes carry the
                 // same tooltip/badge data the live module would show.
                 IReadOnlyDictionary<int, AcquisitionHint> acquisitionHints = null;
@@ -411,7 +418,7 @@ namespace GW2CraftingHelper.Harness
         /// solved CraftingTreeNode tree (the decision/pricing the live
         /// module would render), for item-by-item parity
         /// research. Ids are printed freely here - this is a dev-only tool,
-        /// not the module's UI (see docs/KNOWN-ISSUES.md no-displayed-ids
+        /// not the module's UI (see the CLAUDE.md no-displayed-ids
         /// invariant, which only governs runtime UI surfaces).
         /// </summary>
         private static async Task DumpItemTree(

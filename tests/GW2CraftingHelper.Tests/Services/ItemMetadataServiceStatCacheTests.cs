@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -178,6 +179,36 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal("Seeded Thing", metadata[999].Name);
             Assert.Null(service.GetCachedStatBlock(999));
+        }
+
+        /// <summary>
+        /// The restored-plan stat top-up is a background fetch that outlives
+        /// the click that started it, and Module now runs it under the
+        /// module lifetime token rather than CancellationToken.None. Unload
+        /// cancels that token before it disposes the HttpClient every API
+        /// client was built over, so the top-up has to actually stop when it
+        /// is cancelled - not fetch on into disposed objects.
+        /// </summary>
+        [Fact]
+        public async Task WarmStatBlocksStopsWhenItsTokenIsCancelled()
+        {
+            var api = new InMemoryItemApiClient();
+            for (int id = 1; id <= 400; id++)
+            {
+                api.AddItem(Armor(id));
+            }
+
+            var service = new ItemMetadataService(api);
+            using (var cts = new CancellationTokenSource())
+            {
+                cts.Cancel();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => service.WarmStatBlocksAsync(new[] { 1, 2, 3 }, cts.Token));
+            }
+
+            Assert.Empty(api.Calls);
+            Assert.Null(service.GetCachedStatBlock(1));
         }
     }
 }

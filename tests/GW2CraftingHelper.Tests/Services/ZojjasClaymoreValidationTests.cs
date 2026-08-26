@@ -187,107 +187,196 @@ namespace GW2CraftingHelper.Tests.Services
             return (pipeline, accountRecipes);
         }
 
-        [Fact]
-        public async Task NoSnapshot_AllStructuralAssertions()
+        private static async Task<CraftingPlanResult> GenerateAsync()
         {
             var (pipeline, _) = BuildPipeline();
-            var result = await pipeline.GenerateStructuredAsync(
+            return await pipeline.GenerateStructuredAsync(
                 ZojjasClaymore, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
+        }
 
-            // 1. Target identity
-            Assert.Equal(ZojjasClaymore, result.Plan.TargetItemId);
-            Assert.Equal(1, result.Plan.TargetQuantity);
-
-            // 2. Has plan steps
-            Assert.True(result.Plan.Steps.Count > 0);
-
-            // 3. Every Craft step has a RecipeId > 0
-            var craftSteps = result.Plan.Steps
+        private static List<PlanStep> CraftSteps(CraftingPlanResult result)
+        {
+            return result.Plan.Steps
                 .Where(s => s.Source == AcquisitionSource.Craft).ToList();
-            Assert.All(craftSteps, s => Assert.True(s.RecipeId > 0,
-                $"Craft step for item {s.ItemId} has RecipeId {s.RecipeId}"));
+        }
 
-            // 4. Every step has Quantity > 0
-            Assert.All(result.Plan.Steps, s => Assert.True(s.Quantity > 0,
-                $"Step for item {s.ItemId} has Quantity {s.Quantity}"));
-
-            // 5. RequiredDisciplines contains Weaponsmith with MinRating >= 500
-            Assert.Contains(result.RequiredDisciplines,
-                d => d.Discipline == "Weaponsmith" && d.MinRating >= 500);
-
-            // 6. At least 3 RequiredRecipes (Claymore, Blade, Deldrimor;
-            //    Inscription may or may not appear depending on solver)
-            Assert.True(result.RequiredRecipes.Count >= 3,
-                $"Expected >= 3 RequiredRecipes, got {result.RequiredRecipes.Count}");
-
-            // 7. RequiredRecipes contains the root recipe
-            Assert.Contains(result.RequiredRecipes,
-                r => r.OutputItemId == ZojjasClaymore);
-
-            // 8. At least one RequiredRecipe is AutoLearned
-            Assert.Contains(result.RequiredRecipes, r => r.IsAutoLearned);
-
-            // 9. No duplicate RecipeIds in RequiredRecipes
-            var recipeIds = result.RequiredRecipes.Select(r => r.RecipeId).ToList();
-            Assert.Equal(recipeIds.Count, recipeIds.Distinct().Count());
-
-            // 10. Every Craft step's RecipeId appears in RequiredRecipes
-            var requiredRecipeIds = new HashSet<int>(
-                result.RequiredRecipes.Select(r => r.RecipeId));
-            Assert.All(craftSteps, s => Assert.True(
-                requiredRecipeIds.Contains(s.RecipeId),
-                $"Craft step recipe {s.RecipeId} not in RequiredRecipes"));
-
-            // 11. Every RequiredRecipe's OutputItemId appears in some Craft step
-            var craftStepItemIds = new HashSet<int>(craftSteps.Select(s => s.ItemId));
-            Assert.All(result.RequiredRecipes, r => Assert.True(
-                craftStepItemIds.Contains(r.OutputItemId),
-                $"RequiredRecipe {r.RecipeId} output {r.OutputItemId} not in Craft steps"));
-
-            // 12. DebugLog contains "Required disciplines:"
-            Assert.True(result.DebugLog.Count > 0);
-            Assert.Contains(result.DebugLog,
-                line => line.Contains("Required disciplines:"));
-
-            // 13. Bottom-up craft ordering: each ingredient's Craft step
-            //     appears before the consumer's Craft step
-            var craftStepIndex = new Dictionary<int, int>();
+        /// <summary>
+        /// Position of each item's Craft step in the plan. Callers assert
+        /// that the keys they need are present before reading them - the
+        /// ordering checks used to sit inside ContainsKey guards, so a
+        /// solver that stopped emitting the root craft step (the exact
+        /// regression bottom-up ordering exists to catch) ran zero
+        /// assertions and passed.
+        /// </summary>
+        private static Dictionary<int, int> CraftStepIndex(CraftingPlanResult result)
+        {
+            var index = new Dictionary<int, int>();
             for (int i = 0; i < result.Plan.Steps.Count; i++)
             {
                 var step = result.Plan.Steps[i];
                 if (step.Source == AcquisitionSource.Craft)
                 {
-                    craftStepIndex[step.ItemId] = i;
+                    index[step.ItemId] = i;
                 }
             }
 
-            // The root (ZojjasClaymore) must come after its craft-step ingredients
-            if (craftStepIndex.ContainsKey(ZojjasClaymore))
-            {
-                int rootIdx = craftStepIndex[ZojjasClaymore];
-                // Blade is a crafted ingredient of Claymore
-                if (craftStepIndex.ContainsKey(OriGsBlade))
-                {
-                    Assert.True(craftStepIndex[OriGsBlade] < rootIdx,
-                        "Blade craft step should come before Claymore craft step");
-                }
-                // Inscription is a crafted ingredient of Claymore
-                if (craftStepIndex.ContainsKey(Inscription))
-                {
-                    Assert.True(craftStepIndex[Inscription] < rootIdx,
-                        "Inscription craft step should come before Claymore craft step");
-                }
-            }
+            return index;
+        }
 
-            // Deldrimor Steel is a crafted ingredient of Blade
-            if (craftStepIndex.ContainsKey(OriGsBlade)
-                && craftStepIndex.ContainsKey(DeldrimorSteel))
-            {
-                Assert.True(
-                    craftStepIndex[DeldrimorSteel] < craftStepIndex[OriGsBlade],
-                    "Deldrimor Steel craft step should come before Blade craft step");
-            }
+        [Fact]
+        public async Task NoSnapshot_TargetIdentityIsWhatWasAskedFor()
+        {
+            var result = await GenerateAsync();
+
+            Assert.Equal(ZojjasClaymore, result.Plan.TargetItemId);
+            Assert.Equal(1, result.Plan.TargetQuantity);
+        }
+
+        [Fact]
+        public async Task NoSnapshot_PlanHasSteps()
+        {
+            var result = await GenerateAsync();
+
+            Assert.NotEmpty(result.Plan.Steps);
+        }
+
+        [Fact]
+        public async Task NoSnapshot_EveryCraftStepCarriesARecipeId()
+        {
+            var result = await GenerateAsync();
+            var craftSteps = CraftSteps(result);
+
+            Assert.NotEmpty(craftSteps);
+            Assert.All(craftSteps, s => Assert.True(s.RecipeId > 0,
+                $"Craft step for item {s.ItemId} has RecipeId {s.RecipeId}"));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_EveryStepHasAPositiveQuantity()
+        {
+            var result = await GenerateAsync();
+
+            Assert.All(result.Plan.Steps, s => Assert.True(s.Quantity > 0,
+                $"Step for item {s.ItemId} has Quantity {s.Quantity}"));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_RequiresWeaponsmithAtTheRootRecipesRating()
+        {
+            var result = await GenerateAsync();
+
+            var weaponsmith = Assert.Single(result.RequiredDisciplines);
+            Assert.Equal("Weaponsmith", weaponsmith.Discipline);
+            Assert.Equal(500, weaponsmith.MinRating);
+        }
+
+        [Fact]
+        public async Task NoSnapshot_RequiresAllFourRecipesInTheTree()
+        {
+            var result = await GenerateAsync();
+
+            // Was "at least 3, Inscription may or may not appear depending
+            // on solver". It does appear, on every run: the Inscription is
+            // priced above the sum of its ingredients like every other
+            // craftable intermediate here, so the solver crafts it. The set
+            // is pinned rather than hedged.
+            Assert.Equal(
+                new[] { RecipeClaymore, RecipeBlade, RecipeDeldrimor, RecipeInscription },
+                result.RequiredRecipes.Select(r => r.RecipeId).OrderBy(id => id));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_RequiredRecipesIncludeTheRoot()
+        {
+            var result = await GenerateAsync();
+
+            Assert.Contains(result.RequiredRecipes,
+                r => r.OutputItemId == ZojjasClaymore);
+        }
+
+        [Fact]
+        public async Task NoSnapshot_TheThreeAutoLearnedRecipesAreFlaggedAsSuch()
+        {
+            var result = await GenerateAsync();
+
+            Assert.Equal(
+                new[] { RecipeClaymore, RecipeBlade, RecipeDeldrimor },
+                result.RequiredRecipes.Where(r => r.IsAutoLearned)
+                    .Select(r => r.RecipeId).OrderBy(id => id));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_RequiredRecipesHaveNoDuplicates()
+        {
+            var result = await GenerateAsync();
+
+            var recipeIds = result.RequiredRecipes.Select(r => r.RecipeId).ToList();
+            Assert.Equal(recipeIds.Count, recipeIds.Distinct().Count());
+        }
+
+        [Fact]
+        public async Task NoSnapshot_EveryCraftStepsRecipeIsAlsoARequiredRecipe()
+        {
+            var result = await GenerateAsync();
+            var craftSteps = CraftSteps(result);
+            var requiredRecipeIds = new HashSet<int>(
+                result.RequiredRecipes.Select(r => r.RecipeId));
+
+            Assert.NotEmpty(craftSteps);
+            Assert.All(craftSteps, s => Assert.True(
+                requiredRecipeIds.Contains(s.RecipeId),
+                $"Craft step recipe {s.RecipeId} not in RequiredRecipes"));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_EveryRequiredRecipesOutputHasACraftStep()
+        {
+            var result = await GenerateAsync();
+            var craftStepItemIds = new HashSet<int>(CraftSteps(result).Select(s => s.ItemId));
+
+            Assert.NotEmpty(result.RequiredRecipes);
+            Assert.All(result.RequiredRecipes, r => Assert.True(
+                craftStepItemIds.Contains(r.OutputItemId),
+                $"RequiredRecipe {r.RecipeId} output {r.OutputItemId} not in Craft steps"));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_DebugLogNamesTheRequiredDisciplines()
+        {
+            var result = await GenerateAsync();
+
+            Assert.NotEmpty(result.DebugLog);
+            Assert.Contains(result.DebugLog,
+                line => line.Contains("Required disciplines:"));
+        }
+
+        [Fact]
+        public async Task NoSnapshot_CraftOrderingIsBottomUp()
+        {
+            var result = await GenerateAsync();
+            var craftStepIndex = CraftStepIndex(result);
+
+            // Preconditions, asserted rather than guarded: each of these
+            // four craft steps must exist for the ordering below to mean
+            // anything, and their absence is itself the regression.
+            Assert.True(craftStepIndex.ContainsKey(ZojjasClaymore),
+                "solver emitted no craft step for the root");
+            Assert.True(craftStepIndex.ContainsKey(OriGsBlade),
+                "solver emitted no craft step for the Blade");
+            Assert.True(craftStepIndex.ContainsKey(Inscription),
+                "solver emitted no craft step for the Inscription");
+            Assert.True(craftStepIndex.ContainsKey(DeldrimorSteel),
+                "solver emitted no craft step for the Deldrimor Steel");
+
+            int rootIdx = craftStepIndex[ZojjasClaymore];
+
+            Assert.True(craftStepIndex[OriGsBlade] < rootIdx,
+                "Blade craft step should come before Claymore craft step");
+            Assert.True(craftStepIndex[Inscription] < rootIdx,
+                "Inscription craft step should come before Claymore craft step");
+            Assert.True(craftStepIndex[DeldrimorSteel] < craftStepIndex[OriGsBlade],
+                "Deldrimor Steel craft step should come before Blade craft step");
         }
 
         [Fact]

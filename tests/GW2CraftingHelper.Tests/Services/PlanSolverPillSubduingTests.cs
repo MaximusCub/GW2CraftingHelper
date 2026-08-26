@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
 using static GW2CraftingHelper.Tests.Helpers.VendorOfferBuilders;
@@ -158,11 +159,11 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(100, craftPill.SubduingResult.ValueMarginCopper);
             Assert.False(craftPill.SubduingResult.HasNonCoinCost);
 
-            var tooltip = PillSubduingTooltipBuilder.Build(
+            var tooltip = PillSubduingTooltipBuilder.BuildContent(
                 craftPill.SubduingResult,
                 new Dictionary<int, ItemMetadata>(),
                 new Dictionary<int, CurrencyMetadata>());
-            Assert.DoesNotContain("currency values", tooltip);
+            Assert.DoesNotContain("currency values", tooltip.ToPlainText());
 
             var tpPill = specs.Single(s => s.Text == "TP");
             Assert.Equal(PillKind.Selected, tpPill.Kind);

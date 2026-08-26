@@ -254,15 +254,11 @@ namespace GW2CraftingHelper.RecipeSeeder
                 string recipeJson = RecipeCacheSerializer.SerializeRecipes(allRecipes);
                 File.WriteAllText(recipesPath, recipeJson, Encoding.UTF8);
 
-                var manifest = new RecipeSeedManifest
-                {
-                    SeedVersion = 1,
-                    Gw2BuildId = gw2BuildId,
-                    CreatedUtc = DateTime.UtcNow.ToString("o")
-                };
-                string manifestJson =
-                    RecipeCacheSerializer.SerializeManifest(manifest);
-                File.WriteAllText(manifestPath, manifestJson, Encoding.UTF8);
+                // The manifest is written LAST (below), after item_name_seed.json
+                // exists, because it now carries a row count and a SHA-256 for
+                // every seed file this run produced - the numbers the seed tests
+                // check against, so those tests pin what the seeder emitted
+                // rather than a literal somebody typed into a test file.
 
                 // Step 7: Generate item name seed for search provider
                 var craftableItemIds = searchIndex
@@ -287,6 +283,22 @@ namespace GW2CraftingHelper.RecipeSeeder
                     new JsonSerializerOptions { WriteIndented = false });
                 File.WriteAllText(itemNamePath, itemNameJson, Encoding.UTF8);
 
+                var manifest = new RecipeSeedManifest
+                {
+                    SeedVersion = 1,
+                    Gw2BuildId = gw2BuildId,
+                    CreatedUtc = DateTime.UtcNow.ToString("o"),
+                    Files = new List<SeedFileIntegrity>
+                    {
+                        Integrity(recipesPath, allRecipes.Count),
+                        Integrity(searchPath, searchIndex.Count),
+                        Integrity(itemNamePath, itemNames.Count),
+                    },
+                };
+                string manifestJson =
+                    RecipeCacheSerializer.SerializeManifest(manifest);
+                File.WriteAllText(manifestPath, manifestJson, Encoding.UTF8);
+
                 Console.WriteLine();
                 Console.WriteLine($"Written: {searchPath}");
                 Console.WriteLine($"Written: {recipesPath}");
@@ -303,6 +315,22 @@ namespace GW2CraftingHelper.RecipeSeeder
         // version query parameter on the actual outgoing request, mirroring
         // Gw2RecipeApiClientHttpTests' StubHandler coverage of the runtime
         // client's own identical fix.
+        /// <summary>
+        /// Integrity record for a seed file this run just wrote: the row
+        /// count the seeder knows it emitted, and the SHA-256 of the bytes on
+        /// disk. Read the file back rather than hashing the in-memory string,
+        /// so the digest describes what a consumer will actually open.
+        /// </summary>
+        private static SeedFileIntegrity Integrity(string path, int rowCount)
+        {
+            return new SeedFileIntegrity
+            {
+                Name = Path.GetFileName(path),
+                RowCount = rowCount,
+                Sha256 = RecipeCacheSerializer.HashFile(path),
+            };
+        }
+
         internal static async Task<List<int>> FetchAllRecipeIdsAsync(
             HttpClient httpClient)
         {
@@ -418,7 +446,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                             {
                                 Type = ing.TryGetProperty("type", out var t)
                                     ? t.GetString() ?? "Item" : "Item",
-                                // KNOWN-ISSUES recipe-ingestion bug class
+                                // KNOWN-ISSUES #48
                                 //: mirrors
                                 // Gw2RecipeApiClient.ParseRecipe's own "id"-
                                 // with-"item_id"-fallback fix. This one is

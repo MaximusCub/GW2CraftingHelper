@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Services
     /// rather than becoming an unobserved task exception.
     /// </para>
     /// </summary>
-    public static class WikiLinkLauncher
+    internal static class WikiLinkLauncher
     {
         public static void Open(string url)
         {

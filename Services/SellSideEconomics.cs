@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// TargetUnitSellPrice/CraftingProfit/MaterialOpportunityCost), moved
     /// out of CraftingPlanPipeline as a pure,
     /// move-only extraction - same fields, same order, same arithmetic. See
-    /// docs/KNOWN-ISSUES.md #25 for the full design rationale this
+    /// docs/KNOWN-ISSUES #25 for the full design rationale this
     /// class implements (single-item vs batch rollup, its documented
     /// divergences from gw2e's own multi-item economics). Blish-free and
     /// directly unit-testable; CraftingPlanPipeline calls these statics in
@@ -51,10 +51,10 @@ namespace GW2CraftingHelper.Services
 
             // Own-materials opportunity cost (gw2efficiency-style "value own
             // materials"): what selling the owned materials that inventory
-            // reduction consumed would have netted after TP fees. VOM design
-            // (Candidate A) UPDATE: in Valued mode, reduction is now
+            // reduction consumed would have netted after TP fees. In Valued
+            // mode, reduction is
             // decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
-            // guide - see CraftingPlanPipeline's Step 5.5/5.6 doc comments),
+            // guide, built by CraftingPlanPipeline's zero-owned solve),
             // so owned mats are consumed first at zero acquisition cost ONLY
             // along the branch a zero-owned baseline would actually choose
             // to craft - not along every node's primary recipe option
@@ -75,6 +75,7 @@ namespace GW2CraftingHelper.Services
                 {
                     profit -= materialOpportunityCost.Value;
                 }
+
                 result.CraftingProfit = profit;
             }
         }
@@ -218,7 +219,7 @@ namespace GW2CraftingHelper.Services
                 SellableQuantity = sellableQuantity,
                 NetSaleValue = netSaleValue,
                 TargetUnitSellPrice = targetUnitSellPrice,
-                ItemCraftCost = itemCraftCost
+                ItemCraftCost = itemCraftCost,
             };
         }
 
@@ -256,6 +257,7 @@ namespace GW2CraftingHelper.Services
                     sum += TradingPostMath.NetSaleRevenue(matPrice.SellInstant, used.QuantityUsed);
                 }
             }
+
             return sum;
         }
 
@@ -267,7 +269,7 @@ namespace GW2CraftingHelper.Services
         /// fee math and SellInstant/instant-sell revenue basis the
         /// single-item path already uses) and sums the survivors into the
         /// batch-level CraftingPlanResult fields. See
-        /// docs/KNOWN-ISSUES.md #25's FIXED record for the full
+        /// docs/KNOWN-ISSUES #25's FIXED record for the full
         /// design rationale; summary of how this diverges from gw2e's own
         /// multi-item rollup (the `o()` function in the live app bundle -
         /// see docs/research/m37-r2-batch-economics.md Sections 1.2/4.1):
@@ -308,8 +310,8 @@ namespace GW2CraftingHelper.Services
         /// sell price - the batch equivalent of the single-item "no sell
         /// price at all" case.
         ///
-        /// Documented nuance (updated by the decision-guided reduction design -
-        /// Candidate A - decision-invariant reduction): MaterialOpportunityCost
+        /// Documented nuance, under the decision-guided reduction:
+        /// MaterialOpportunityCost
         /// is a SINGLE sum over the batch's whole merged UsedMaterials list
         /// (Reduce still runs on the entire wrapper tree before Solve ever
         /// picks Buy vs Craft per root - see GenerateStructuredMultiAsync's
@@ -397,6 +399,7 @@ namespace GW2CraftingHelper.Services
             {
                 profit -= materialOpportunityCost.Value;
             }
+
             result.CraftingProfit = profit;
         }
     }

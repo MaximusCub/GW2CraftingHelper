@@ -8,7 +8,7 @@ using static GW2CraftingHelper.Tests.Helpers.CraftingPlanResultBuilders;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// design-plan-notes.md (Notes section, competency notes) -
+    /// Plan Notes competency lines:
     /// PlanViewModelBuilder.BuildNotesSection's competency-line assembly,
     /// built on the shared BestCharacterRating helper (extracted from
     /// BuildCharacterAvailabilityText so the Required Disciplines column

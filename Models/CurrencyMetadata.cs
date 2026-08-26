@@ -5,10 +5,12 @@ namespace GW2CraftingHelper.Models
     /// api.guildwars2.com/v2/currencies. Purely presentational - currency
     /// IDs themselves remain internal-only and are never displayed.
     /// </summary>
-    public class CurrencyMetadata
+    internal class CurrencyMetadata
     {
         public int CurrencyId { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
     }
 }

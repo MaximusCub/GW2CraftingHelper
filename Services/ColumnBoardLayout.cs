@@ -4,10 +4,10 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// Packs variable-height blocks into as many equal min-width columns as
-    /// a board can hold (Blish-free, unit-testable). Same min-column-width
-    /// law as <see cref="SnapshotItemGridLayout"/>, with a per-row height
-    /// instead of a uniform one: the Settings tab's four short sections are
-    /// blocks of different heights that must not overlap each other.
+    /// a board can hold (Blish-free, unit-testable). The shared
+    /// <see cref="GridLayout"/> law, with a per-row height instead of a
+    /// uniform one: the Settings tab's four short sections are blocks of
+    /// different heights that must not overlap each other.
     ///
     /// <para>
     /// Row-major reading order, each board row as tall as its tallest
@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// neighbours here changes only by WRAPPING.
     /// </para>
     /// </summary>
-    public static class ColumnBoardLayout
+    internal static class ColumnBoardLayout
     {
         public readonly struct Placement
         {
@@ -41,9 +41,13 @@ namespace GW2CraftingHelper.Services
         public sealed class Board
         {
             public IReadOnlyList<Placement> Blocks { get; }
+
             public int ColumnCount { get; }
+
             public int ColumnWidth { get; }
+
             public int RowCount { get; }
+
             public int Height { get; }
 
             internal Board(
@@ -57,28 +61,19 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        /// <summary>
-        /// As many whole <paramref name="minColumnWidth"/> columns as fit,
-        /// never fewer than one and never more than
-        /// <paramref name="blockCount"/> - a column no row ever puts a block
-        /// in is stranded space by construction, which is the defect this
-        /// class exists to remove.
-        /// </summary>
+        /// <summary>The shared grid law at the caller's
+        /// <paramref name="minColumnWidth"/> (see <see cref="GridLayout"/>),
+        /// capped at <paramref name="blockCount"/>: a column no row ever
+        /// puts a block in is stranded space by construction, which is the
+        /// defect this class exists to remove.</summary>
         public static int ComputeColumnCount(int boardWidth, int minColumnWidth, int blockCount)
         {
-            if (blockCount < 1 || minColumnWidth < 1)
-            {
-                return 1;
-            }
-
-            int columns = boardWidth / minColumnWidth;
-            if (columns < 1) columns = 1;
-            return columns > blockCount ? blockCount : columns;
+            return GridLayout.ColumnCount(boardWidth, minColumnWidth, blockCount);
         }
 
         public static int ComputeColumnWidth(int boardWidth, int columnCount)
         {
-            return boardWidth > 0 && columnCount > 0 ? boardWidth / columnCount : 0;
+            return GridLayout.ColumnWidth(boardWidth, columnCount);
         }
 
         /// <summary>
@@ -95,7 +90,7 @@ namespace GW2CraftingHelper.Services
             int safeRowGap = rowGap > 0 ? rowGap : 0;
 
             var blocks = new Placement[count];
-            int rowCount = count == 0 ? 0 : ((count + columnCount - 1) / columnCount);
+            int rowCount = GridLayout.RowCount(count, columnCount);
             int y = 0;
 
             for (int row = 0; row < rowCount; row++)
@@ -105,18 +100,28 @@ namespace GW2CraftingHelper.Services
                 for (int i = first; i < count && i < first + columnCount; i++)
                 {
                     int height = blockHeights[i] > 0 ? blockHeights[i] : 0;
-                    if (height > rowHeight) rowHeight = height;
+                    if (height > rowHeight)
+                    {
+                        rowHeight = height;
+                    }
                 }
 
                 for (int column = 0; column < columnCount; column++)
                 {
                     int i = first + column;
-                    if (i >= count) break;
+                    if (i >= count)
+                    {
+                        break;
+                    }
+
                     blocks[i] = new Placement(column * columnWidth, y, column, row, columnWidth);
                 }
 
                 y += rowHeight;
-                if (row < rowCount - 1) y += safeRowGap;
+                if (row < rowCount - 1)
+                {
+                    y += safeRowGap;
+                }
             }
 
             return new Board(blocks, columnCount, columnWidth, rowCount, y);

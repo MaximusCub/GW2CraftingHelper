@@ -10,10 +10,9 @@ namespace GW2CraftingHelper.Views.Rendering
     /// draws itself with.
     ///
     /// <para>
-    /// <b>Inventory this replaces</b> (audit batch J, L3, re-taken at this
-    /// HEAD rather than from the audit's own older reading): three styles
-    /// across six tables. Four tables - Required Recipes, Required
-    /// Disciplines, the Recipe Tree (banded by batch D) and the Total Cost
+    /// <b>Inventory this replaces</b> (measured at this HEAD): three
+    /// styles across six tables. Four tables - Required Recipes, Required
+    /// Disciplines, the Recipe Tree and the Total Cost
     /// section's currency table - drew a dark band with DefaultFont14 white
     /// labels at 26px. The Shopping List drew no band, DefaultFont12 in
     /// #999999, at 22px. Used Materials had a right-hand Amount column and
@@ -24,9 +23,8 @@ namespace GW2CraftingHelper.Views.Rendering
     /// <b>The choice, and why.</b> The band wins, on three grounds. It is
     /// what four of the five existing headers already do, so unifying the
     /// other way would have rewritten the majority to match the minority.
-    /// It is the more recent deliberate decision - batch D introduced the
-    /// band for the tree AFTER the Shopping List's lighter treatment
-    /// existed. And it is the one that survives this module's own row
+    /// It is the more recent decision - the tree's band was introduced
+    /// after the Shopping List's lighter treatment existed. And it is the one that survives this module's own row
     /// chrome: every table row already carries a 2px divider and, in most
     /// tables, an icon, so an unbanded header in a lighter grey reads as a
     /// faint first data row rather than as a header, which is exactly the
@@ -53,14 +51,14 @@ namespace GW2CraftingHelper.Views.Rendering
         /// measured at another is how a section's rows drift off their
         /// container.
         /// </summary>
-        internal const int RowHeight = PlanContentHeightMath.CTableHeaderRowHeight;
+        internal const int RowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
 
         /// <summary>
         /// Baseline y of every header label inside the band. Aliased to
         /// the height-math constant for the same reason
         /// <see cref="RowHeight"/> is: the two are one piece of arithmetic.
         /// </summary>
-        internal const int LabelY = PlanContentHeightMath.CTableHeaderLabelY;
+        internal const int LabelY = PlanContentHeightMath.ColumnHeaderLabelY;
 
         /// <summary>
         /// Column headers used to be the same size and weight as the rows

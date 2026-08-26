@@ -39,7 +39,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static string SerializePersistedPlan(PersistedPlan plan)
         {
-            if (plan == null) return null;
+            if (plan == null)
+            {
+                return null;
+            }
+
             return JsonConvert.SerializeObject(plan, Formatting.None);
         }
 
@@ -58,7 +62,10 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static PersistedPlan DeserializePersistedPlan(string json)
         {
-            if (string.IsNullOrWhiteSpace(json)) return null;
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
 
             // MaxDepth raised from Newtonsoft's default 64: a persisted
             // +24 Agony Infusion plan (23 recipe levels, the deepest chain

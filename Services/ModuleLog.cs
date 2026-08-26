@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// Module-wide structured log sink (docs/dev-notes/m38-plan/proposals/
-    /// d2-log-system.md Section 4). Two
+    /// Module-wide structured log sink (dev/proposals/
+    /// dev/proposals/d2-log-system.md Section 4). Two
     /// responsibilities:
     /// <list type="number">
     /// <item>A thread-safe, fixed-capacity in-memory ring buffer, always
@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
     /// read+rewrite trim pass - would stall that exact frame.
     /// </para>
     /// </summary>
-    public class ModuleLog
+    internal class ModuleLog
     {
         public const int DefaultRingCapacity = 2000;
 
@@ -83,7 +83,7 @@ namespace GW2CraftingHelper.Services
 
         // The floor level that reaches the file sink even when
         // DiagnosticsEnabled is false. Hardcoded rather than a settings
-        // knob per docs/dev-notes/m38-plan/proposals/tab-roadmap-proposal.md's
+        // knob per dev/proposals/tab-roadmap-proposal.md's
         // explicit rejection
         // ("LogMinFileLevel as a UI control - hardcode Info floor") - this
         // constant IS that floor. Debug's own file-sink gate below is
@@ -162,7 +162,7 @@ namespace GW2CraftingHelper.Services
 
         // Shared best-effort drain budget for the two callers that need
         // queued writes on disk before they proceed: Module.Unload and
-        // <see cref="DeleteFileAndReset"/>. Short by design - neither may
+        // DeleteFileAndReset. Short by design - neither may
         // hang on a stuck flush.
         internal static readonly TimeSpan FlushDrainBudget = TimeSpan.FromMilliseconds(250);
 
@@ -375,7 +375,7 @@ namespace GW2CraftingHelper.Services
                 TimestampUtc = DateTime.UtcNow,
                 Level = level,
                 Tag = tag,
-                Message = message ?? string.Empty
+                Message = message ?? string.Empty,
             };
 
             lock (_gate)
@@ -474,7 +474,7 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The destructive "clear log file" action (d2-log-system.md
+        /// The destructive "clear log file" action (dev/proposals/d2-log-system.md
         /// Section 7, Open Question 4 - distinct from the Log tab's
         /// view-only Clear): deletes the on-disk file AND clears the
         /// in-memory ring, then writes one Info entry recording the

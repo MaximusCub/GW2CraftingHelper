@@ -229,7 +229,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CurrencyCost_AggregatesBeforeCeiling()
         {
-            // Live repro (m34-m2-live-oddities.md): item 99 needed via 5
+            // Live repro: item 99 needed via 5
             // separate tree occurrences (qty 4, 4, 4, 83, 84 = 179 total),
             // all resolving to the same fallback-tier "3 units of item 99
             // for 3 units of currency 5" offer (no TP price, no recipe,

@@ -150,7 +150,7 @@ namespace VendorOfferUpdater.Tests
         [Fact]
         public void DuplicatePageNameWithinFreshBatch_RefreshedAndUnchangedNotDoubleCounted()
         {
-            // Quality-audit B4 (docs/KNOWN-ISSUES.md): the bug this pins
+            // Quality-audit B4 (KNOWN-ISSUES #53): the bug this pins
             // down - refreshed used to be incremented once per FRESH entry
             // whose key was already in `merged`, and `merged` is the same
             // dictionary the loop writes to on every iteration. Two fresh

@@ -51,6 +51,17 @@ gw2efficiency is never called by the running module). The durable "why" behind
 the trickier pieces of the implementation (scroll/relayout handling, the
 merged vendor-batch math, and so on) is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/README.md`](docs/README.md) indexes the rest - the roadmap, the
+issue tracker, the release protocol, the research notes, and a map of which
+folder holds what. Released versions are listed in
+[`CHANGELOG.md`](CHANGELOG.md); what is and is not planned is in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Underneath that sits the full engineering record - every milestone record,
+the pre-M38 fix-pass diary, the closed audits and the designs that were
+never built - in [`dev/`](dev/README.md). It is dated evidence rather than
+documentation, and it is kept in-repo so a `grep` for a constant finds the
+session that measured it.
 
 ## Screenshots
 
@@ -79,24 +90,30 @@ rarity) with vendor-tagged shopping rows:
   on-disk data directory (useful for attaching `snapshot.json`/`status.json`
   to a bug report).
 
-("Plan History" and "Crafting Ranker" appear as placeholder tabs reserved for
-future work; they have no functional content yet.)
+("Plan History" and "Crafting Ranker" are reserved for future work and have no
+functional content yet, so released builds do not show them. They appear as
+"Coming Soon" placeholder tabs in debug builds only.)
 
 ## Installing
 
-There is currently no published Blish HUD Repo listing or GitHub Release for
-this module (see [`docs/RELEASING.md`](docs/RELEASING.md) for the full state
-of packaging). Until one exists, running it means building from source:
+1. Download `GW2CraftingHelper.bhm` from the
+   [Releases page](https://github.com/MaximusCub/GW2CraftingHelper/releases).
+2. Drop it into your Blish HUD installation's `modules` folder
+   (`Documents\Guild Wars 2\addons\blishhud\modules` in a default install).
+3. Start or reload Blish HUD and enable the module, then authorize an API key
+   with the permissions listed below.
 
-1. Build in Release for `x64`:
-   `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
-2. Locate the produced `.bhm` (e.g. `bin\x64\Release\GW2CraftingHelper.bhm`).
-3. Copy it into your Blish HUD installation's `modules` directory and
-   (re)load Blish HUD.
+Releases are built and published automatically from a `v*` tag by
+[`.github/workflows/release.yml`](.github/workflows/release.yml), from the
+same Release/x64 build a developer would run locally. If the Releases page is
+empty, no tag has been pushed since that workflow landed - build it yourself in
+the meantime, following the build instructions in
+[`CONTRIBUTING.md`](CONTRIBUTING.md) and copying the resulting
+`bin\x64\Release\GW2CraftingHelper.bhm` as in step 2 above.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for prerequisites and
-[`docs/RELEASING.md`](docs/RELEASING.md) for what the `.bhm` packaging step
-does and does not currently cover.
+There is no Blish HUD module-repository listing yet, so the download is manual.
+[`docs/RELEASING.md`](docs/RELEASING.md) records exactly what the packaging
+step does and does not cover.
 
 ### GW2 API key permissions
 
@@ -111,13 +128,65 @@ When Blish HUD prompts you to authorize an API key for this module, it needs:
 
 ## Building from source / contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for build/test prerequisites, project
-structure, and pull request expectations.
+Windows only. The module targets .NET Framework 4.8 inside Blish HUD's XNA
+host, and CI runs on `windows-latest`. From a fresh clone:
 
 ```
+nuget restore GW2CraftingHelper.sln
 dotnet build GW2CraftingHelper.csproj -p:Platform=x64
-dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj
+dotnet test GW2CraftingHelper.sln
 ```
+
+The restore step is not optional, and **`dotnet restore` will not do it**:
+this is a classic `packages.config` project, which only `nuget.exe` restores
+(download it from <https://www.nuget.org/downloads>, or install it with
+`winget install Microsoft.NuGet`). Skipping it fails the build with
+`The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets`, which
+is what a missing restore looks like rather than a broken checkout.
+
+`dotnet test GW2CraftingHelper.sln` runs all three test projects, the same
+set CI runs; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the per-project
+commands, project structure, and pull request expectations.
+
+## How this was built
+
+This module is AI-assisted and human-reviewed, and it says so on purpose: the
+commit history carries `Co-Authored-By` trailers rather than hiding them.
+
+What that is worth depends entirely on the process around it, so here is the
+process, all of it checkable from this repository:
+
+- **Nothing ships untested.** Three test projects - 2,767 for the module plus
+  233 across the seeder and vendor-updater tools (measured 2026-08-25; the
+  badge above is the live answer) - run on every pull request and every push
+  to `master` on
+  [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml),
+  and again inside the [release workflow](.github/workflows/release.yml),
+  which will not publish a tagged build until they pass. That same CI run also
+  builds the shipping `Release|x64` configuration and checks the `.bhm` came
+  out, so the packaging path is exercised before a tag is ever cut rather than
+  for the first time on the file players download.
+  The tests are Blish-free - CI fails the build on a Blish HUD or Gw2Sharp
+  reference under `tests/` - and they run against real production code paths,
+  no contract mirrors and no fake I/O. That second half no machine can check:
+  it is stated as an invariant in [`CONTRIBUTING.md`](CONTRIBUTING.md) and
+  checked by a human at review, on a checklist line every pull request has to
+  tick.
+- **Risky changes are characterized before they are made.** Where a rewrite
+  touches behavior the suite does not already pin, the pinning test is written
+  and committed against the *old* implementation first. The 14.8MB vendor
+  dataset, for instance, is pinned byte-for-byte against the writer that
+  produces it.
+- **UI changes are checked in the running game**, not asserted from a diff, and
+  what was actually observed is recorded.
+- **Every change is adversarially reviewed** against a written checklist in
+  [`CLAUDE.md`](CLAUDE.md) - null inputs, empty collections, cancellation, API
+  failure, race conditions, invariant violations - with findings classified and
+  the blocking ones fixed before the change lands.
+- **The docs record what was measured, not what was intended.**
+  [`docs/RELEASING.md`](docs/RELEASING.md) is explicit that it describes "the
+  current, actual state of packaging and release - not an aspirational process",
+  and [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) keeps the failures.
 
 ## License
 

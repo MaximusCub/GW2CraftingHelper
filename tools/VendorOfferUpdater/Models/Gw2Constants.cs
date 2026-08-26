@@ -8,10 +8,14 @@ namespace VendorOfferUpdater.Models
         public const int CoinCurrencyId = 1;
 
         // The three Homestead Refinement output
-        // materials. Mirrors Models/Gw2Constants.cs's identical constants
-        // in the main app - kept as a separate copy here since this tool
-        // does not reference the main app's assembly (see the existing
-        // duplicated VendorOffer/VendorOfferHasher pattern in this project).
+        // materials. The main app's Models/Gw2Constants.cs declares the
+        // same three ids; that class is much larger and the two have
+        // otherwise diverged. Kept as a separate copy because this tool
+        // does not reference the main app's assembly (net8.0 here, net48
+        // there) - the same reason Models/VendorOffer.cs is duplicated.
+        // These ids come from the GW2 API and do not change; nothing
+        // enforces that the two files agree, and nothing needs to, since
+        // only the hash contract is consequential when it drifts.
         public const int RefinedHomesteadFiberItemId = 102306;
         public const int RefinedHomesteadMetalItemId = 102205;
         public const int RefinedHomesteadWoodItemId = 103049;

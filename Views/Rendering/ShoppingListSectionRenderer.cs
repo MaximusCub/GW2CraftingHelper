@@ -8,19 +8,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Shopping List row list and its header
-    // row. Behavior is unchanged: same row
-    // geometry, same PlanContentHeightMath/PlanRelayoutMath/
-    // ShoppingColumnMath calls, same LabelHelpers.CreateRowDivider usage
-    // (divider math and its 1px scissor clearance
-    // untouched), same CoinCurrencyRenderer usage for the Each/Total cells.
-    // The only edits inside the moved bodies are _relayoutActions.Add ->
-    // the injected ISectionRelayoutSink.AddRelayout, _reellipsisActions.Add
-    // -> ISectionRelayoutSink.AddReellipsis (both semantics-preserving
-    // pass-throughs - see ISectionRelayoutSink's doc comment), and
-    // GetPillColors(...) -> PillColors.GetPillColors(...) (see PillColors'
-    // doc comment for why that helper lives in its own file).
+    // The Shopping List row list and its header row.
     //
     // CreateShoppingRow's
     // icon+ellipsized-name construction and its divider+relayout tail
@@ -60,15 +48,6 @@ namespace GW2CraftingHelper.Views.Rendering
             ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by DisciplinesSectionRenderer/
-            // UsedMaterialsSectionRenderer - the sole production call site
-            // always passes `this` (CraftingPlanView), but a later section
-            // renderer built on this same pattern should fail loud, not
-            // with a deferred NRE inside CreateShoppingRow's first
-            // AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
@@ -92,7 +71,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // same fixed minimums so short/low-value lists don't look cramped -
         // see ShoppingColumnMath (Blish-free, unit-tested arithmetic).
         //
-        // Moved verbatim from CraftingPlanView.CreateShoppingListBody.
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var coinFont = UiFonts.Body;
@@ -131,18 +109,34 @@ namespace GW2CraftingHelper.Views.Rendering
             foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
-                if (eachW > maxEachWidth) maxEachWidth = eachW;
+                if (eachW > maxEachWidth)
+                {
+                    maxEachWidth = eachW;
+                }
 
                 int totalW = CoinCurrencyRenderer.MeasureValueWidth(row.CoinValue, row.CurrencyCosts, coinFont);
-                if (totalW > maxTotalWidth) maxTotalWidth = totalW;
+                if (totalW > maxTotalWidth)
+                {
+                    maxTotalWidth = totalW;
+                }
 
                 int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
-                if (qtyW > maxQtyWidth) maxQtyWidth = qtyW;
+                if (qtyW > maxQtyWidth)
+                {
+                    maxQtyWidth = qtyW;
+                }
 
                 string badge = ShoppingSourceBadge.ForRow(row);
-                if (string.IsNullOrEmpty(badge)) continue;
+                if (string.IsNullOrEmpty(badge))
+                {
+                    continue;
+                }
+
                 int badgeW = LabelHelpers.MeasureSmallTagWidth(badge);
-                if (badgeW > sourceColumnWidth) sourceColumnWidth = badgeW;
+                if (badgeW > sourceColumnWidth)
+                {
+                    sourceColumnWidth = badgeW;
+                }
             }
 
             // The header and every data row derive their build-time edges
@@ -185,9 +179,8 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateShoppingListHeaderRow.
-        // Changes since: _relayoutActions.Add(...) -> _sink.AddRelayout(...),
-        // and the column edges come from the shared pre-scan.
+        // Column edges come from Render()'s shared pre-scan, so the header
+        // lands on the same x as the rows below it.
         private void CreateShoppingListHeaderRow(
             FlowPanel parent, int panelWidth, ColumnScan scan,
             string amountHeaderText, string sourceHeaderText)
@@ -197,13 +190,13 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Size = new Point(panelWidth, TableHeaderStyle.RowHeight),
                 BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent
+                Parent = parent,
             };
             var font = TableHeaderStyle.Font;
             var color = TableHeaderStyle.LabelColor;
 
             // This section builds its own header row rather than going
-            // through CTableHeaderRenderer, so "Item" has to opt into the
+            // through ColumnHeaderRowRenderer, so "Item" has to opt into the
             // same box treatment its Amount/Each/Total siblings get for
             // free from CreateRightAlignedLabel.
             // Each label carries its own sort indicator inside its text, so
@@ -214,7 +207,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 Text = SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)),
                 Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel
+                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel,
             });
             // Left-aligned at the column's x, like the badges under it -
             // the other three right-align off their own bands.
@@ -222,7 +215,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = sourceHeaderText, Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel
+                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel,
             });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, amountHeaderText,
@@ -240,11 +233,11 @@ namespace GW2CraftingHelper.Views.Rendering
             var columns = new[]
             {
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
-                PlanTableColumn.Each, PlanTableColumn.Total
+                PlanTableColumn.Each, PlanTableColumn.Total,
             };
             var texts = new[]
             {
-                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text
+                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text,
             };
 
             // Measured once, and from the strings rather than off the
@@ -319,11 +312,13 @@ namespace GW2CraftingHelper.Views.Rendering
                 TooltipFacility.ApplyRichDeferred(cell.DashLabel, build);
                 return;
             }
+
             foreach (var (label, icon) in cell.CoinSegments.Controls)
             {
                 TooltipFacility.ApplyRichDeferred(label, build);
                 TooltipFacility.ApplyRichDeferred(icon, build);
             }
+
             foreach (var (label, icon) in cell.CurrencySegments.Controls)
             {
                 TooltipFacility.ApplyRichDeferred(label, build);
@@ -331,9 +326,6 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateShoppingRow, then
-        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
-        // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ColumnScan scan, bool isLast)
         {
@@ -379,7 +371,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
-                    Parent = rowPanel
+                    Parent = rowPanel,
                 });
 
             // Each/Total cells: coin-only rows render exactly as before;
@@ -442,6 +434,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
             }
+
             SetValueCellTooltip(eachCell, buildTooltip);
             SetValueCellTooltip(totalCell, buildTooltip);
 
@@ -465,6 +458,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     {
                         tagPanel.Location = new Point(e.SourceX, 9);
                     }
+
                     qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
                     CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
@@ -482,7 +476,11 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         private static void TintUnpricedDash(CoinCurrencyRenderer.ValueCellHandle cell)
         {
-            if (cell?.DashLabel == null) return;
+            if (cell?.DashLabel == null)
+            {
+                return;
+            }
+
             cell.DashLabel.TextColor = ShoppingBadgeColors.UnknownBorder;
         }
     }

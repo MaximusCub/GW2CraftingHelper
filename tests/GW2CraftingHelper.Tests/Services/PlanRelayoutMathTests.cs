@@ -138,7 +138,7 @@ namespace GW2CraftingHelper.Tests.Services
         public void PinnedRightEdge_PlusItsMargin_IsExactlyTheFullPanelWidth()
         {
             // What makes header bands and row dividers full-width for
-            // free: CTableHeaderRenderer.BandWidth and
+            // free: ColumnHeaderRowRenderer.BandWidth and
             // RowRelayoutHelpers.FinishRow both compute
             // "right edge + TableRightMargin".
             foreach (int width in new[] { 500, 1352 })

@@ -16,9 +16,10 @@ namespace GW2CraftingHelper.Tests.Services
     {
         public bool GetRecipeCalled { get; private set; }
 
-        public Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct)
+        public Task<RecipeSearchResult> SearchByOutputAsync(int itemId, CancellationToken ct)
         {
-            return Task.FromResult<IReadOnlyList<int>>(new List<int>());
+            return Task.FromResult(
+                new RecipeSearchResult(new List<int>(), absenceProven: true));
         }
 
         public Task<RawRecipe> GetRecipeAsync(int recipeId, CancellationToken ct)
@@ -72,9 +73,9 @@ namespace GW2CraftingHelper.Tests.Services
             var composite = new CompositeRecipeApiClient(api, MysticForgeRecipeData.Empty);
             var result = await composite.SearchByOutputAsync(100, CancellationToken.None);
 
-            Assert.Equal(2, result.Count);
-            Assert.Equal(10, result[0]);
-            Assert.Equal(11, result[1]);
+            Assert.Equal(2, result.RecipeIds.Count);
+            Assert.Equal(10, result.RecipeIds[0]);
+            Assert.Equal(11, result.RecipeIds[1]);
         }
 
         [Fact]
@@ -86,8 +87,8 @@ namespace GW2CraftingHelper.Tests.Services
             var composite = new CompositeRecipeApiClient(api, mfData);
             var result = await composite.SearchByOutputAsync(100, CancellationToken.None);
 
-            Assert.Single(result);
-            Assert.Equal(-1, result[0]);
+            Assert.Single(result.RecipeIds);
+            Assert.Equal(-1, result.RecipeIds[0]);
         }
 
         [Fact]
@@ -101,9 +102,9 @@ namespace GW2CraftingHelper.Tests.Services
             var composite = new CompositeRecipeApiClient(api, mfData);
             var result = await composite.SearchByOutputAsync(100, CancellationToken.None);
 
-            Assert.Equal(2, result.Count);
-            Assert.Equal(10, result[0]);   // API first
-            Assert.Equal(-1, result[1]);   // MF second
+            Assert.Equal(2, result.RecipeIds.Count);
+            Assert.Equal(10, result.RecipeIds[0]);   // API first
+            Assert.Equal(-1, result.RecipeIds[1]);   // MF second
         }
 
         [Fact]
@@ -119,8 +120,8 @@ namespace GW2CraftingHelper.Tests.Services
             var composite = new CompositeRecipeApiClient(api, mfData);
             var result = await composite.SearchByOutputAsync(100, CancellationToken.None);
 
-            Assert.Single(result);
-            Assert.Equal(-1, result[0]);
+            Assert.Single(result.RecipeIds);
+            Assert.Equal(-1, result.RecipeIds[0]);
         }
 
         [Fact]
@@ -132,7 +133,7 @@ namespace GW2CraftingHelper.Tests.Services
             var composite = new CompositeRecipeApiClient(api, mfData);
             var result = await composite.SearchByOutputAsync(99999, CancellationToken.None);
 
-            Assert.Empty(result);
+            Assert.Empty(result.RecipeIds);
         }
 
         [Fact]

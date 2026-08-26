@@ -22,13 +22,13 @@ namespace GW2CraftingHelper.Services
     /// still exactly one fixed-height row and the DEBUG per-row assert in
     /// NotesSectionRenderer stays the real check.
     /// </summary>
-    public static class NotesSectionLayoutMath
+    internal static class NotesSectionLayoutMath
     {
         /// <summary>Left x of a note line's label.</summary>
         public const int LabelX = 8;
 
         /// <summary>Right-edge padding shared with every other section.</summary>
-        public const int RightPadding = 8;
+        public const int RightPadding = UiSpacing.SectionRightPad;
 
         /// <summary>Gap reserved between the text and a coin cell.</summary>
         public const int CoinGap = 12;
@@ -68,7 +68,10 @@ namespace GW2CraftingHelper.Services
         public static TextWrapMath.WrappedText WrapNote(
             string label, int panelWidth, int coinCellWidth, Func<string, int> measure)
         {
-            if (measure == null) throw new ArgumentNullException(nameof(measure));
+            if (measure == null)
+            {
+                throw new ArgumentNullException(nameof(measure));
+            }
 
             int indentWidth = measure(LineIndent);
             int firstBudget = Clamp(TextBudget(panelWidth, coinCellWidth) - indentWidth);

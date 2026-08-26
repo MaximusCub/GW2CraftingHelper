@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// CurrencyAmountViewModel has no id field at all, only Amount/Name/
     /// IconUrl, so a caller cannot accidentally surface a raw currency id.
     /// </summary>
-    public static class CurrencyDisplayResolver
+    internal static class CurrencyDisplayResolver
     {
         /// <summary>
         /// Prefers the live-fetched currency name when currencyMetadata has
@@ -34,6 +34,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.Name;
             }
+
             return Gw2Constants.ResolveCurrencyName(currencyId);
         }
 
@@ -50,6 +51,7 @@ namespace GW2CraftingHelper.Services
             {
                 return meta.IconUrl;
             }
+
             return null;
         }
 
@@ -104,9 +106,10 @@ namespace GW2CraftingHelper.Services
                     Name = ResolveName(line.Id, currencyMetadata),
                     IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
                     OwnedQuantity = owned,
-                    RawOwnedQuantity = rawOwned
+                    RawOwnedQuantity = rawOwned,
                 });
             }
+
             return result;
         }
 
@@ -128,7 +131,7 @@ namespace GW2CraftingHelper.Services
         /// offers, or a non-vendor row), in which case this returns null
         /// rather than reviving the old misleading average: gw2efficiency
         /// itself never shows a per-unit currency price at all (docs/
-        /// gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
+        /// docs/gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
         /// Each cell is the closer parity choice than guessing.
         ///
         /// When a line's per-batch count does not divide evenly by
@@ -203,9 +206,10 @@ namespace GW2CraftingHelper.Services
                     BundleLabel = evenly ? null : $"{line.Count} for {divisor}",
                     UnitRate = (double)line.Count / divisor,
                     Name = ResolveName(line.Id, currencyMetadata),
-                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata)
+                    IconUrl = ResolveIconUrl(line.Id, currencyMetadata),
                 });
             }
+
             return result;
         }
     }

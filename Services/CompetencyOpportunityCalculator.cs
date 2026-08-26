@@ -69,7 +69,7 @@ namespace GW2CraftingHelper.Services
                     CraftCost = node.CheapestCraftRealCost.Value,
                     DeltaCost = node.SubtreeCost.Value - node.CheapestCraftRealCost.Value,
                     Disciplines = node.CheapestCraftDisciplines,
-                    MinRating = node.CheapestCraftMinRating
+                    MinRating = node.CheapestCraftMinRating,
                 };
             }
 

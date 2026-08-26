@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// focused test files - both helpers are called from every split file,
     /// so they moved here rather than being duplicated per file.
     /// </summary>
-    public static class CraftingPlanResultBuilders
+    internal static class CraftingPlanResultBuilders
     {
         public static CraftingPlanResult MakeResult(
             int targetItemId = 1,
@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // exercises the same "no data" path production code hits
                 // for every legacy/degraded snapshot.
                 CharacterDisciplines = characterDisciplines,
-                // design-plan-notes.md (Notes section): matches
+                // Matches
                 // RequiredDisciplines/RequiredRecipes' own "empty list, not
                 // null" default above - production (ExcessCraftOutputCalculator/
                 // PlanResultBuilder) never leaves either field null once run.

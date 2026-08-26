@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public enum PlanSectionType
+    internal enum PlanSectionType
     {
         Summary,
         UsedMaterials,
@@ -11,8 +11,8 @@ namespace GW2CraftingHelper.Models
         RequiredDisciplines,
         RequiredRecipes,
 
-        // Plan Notes (single flat advisory section, Option 1 of
-        // design-plan-notes.md): excess/reclaim, competency gaps, and the
+        // Plan Notes - ONE flat advisory section carrying every note kind,
+        // not a section per kind: excess/reclaim, competency gaps, and the
         // Mystic-Clover-yield forge-scope caveat, in that fixed order - see
         // PlanViewModelBuilder.BuildNotesSection. Always last (Build()'s
         // section 7) since every note kind is a caveat ABOUT facts shown in
@@ -27,10 +27,10 @@ namespace GW2CraftingHelper.Models
         // PlanViewModel.TreeRoot, not a row list) - used only as a
         // dictionary key so its header expansion persists like every
         // other section's.
-        RecipeTree
+        RecipeTree,
     }
 
-    public enum PlanRowType
+    internal enum PlanRowType
     {
         CurrencyCost,
         UsedMaterial,
@@ -49,38 +49,28 @@ namespace GW2CraftingHelper.Models
         // any other fallback text row.
         TimegatedNotice,
 
-        // A single plain informational line appended to the
-        // Summary/Total Cost section
-        // ONLY for a genuine multi-item batch (2+ requested items),
-        // describing the batch-level Sell value/Profit
-        // rollup - see SellSideEconomics.ApplyBatchSellSideEconomics
-        // and PlanViewModelBuilder.BuildSummarySection.
-        // The rollup has NO craft-vs-buy filter at all
-        // (SellSideEconomics.ApplyBatchSellSideEconomics' own doc comment,
-        // divergence item 1): a bought-but-tradable root
-        // with a live sell price still contributes to the sum. The
-        // Label text is therefore deliberately NOT gw2e's own verbatim
-        // Cost Breakdown banner ("Profit numbers are the sum of all
-        // crafted recipes." - docs/gw2e-parity-spec.md)
-        // - "crafted recipes" would be
-        // inaccurate for a craft-agnostic, tradable-only rollup; see
-        // docs/KNOWN-ISSUES.md #25's divergence record. Rendered via
-        // the same plain-text row pattern as TimegatedNotice.
+        // One plain informational line appended to the Summary/Total Cost
+        // section for a genuine multi-item batch (2+ requested items),
+        // describing the batch-level Sell value/Profit rollup - see
+        // SellSideEconomics.ApplyBatchSellSideEconomics and
+        // PlanViewModelBuilder.BuildSummarySection. That rollup has no
+        // craft-vs-buy filter (a bought-but-tradable root with a live sell
+        // price still contributes), so the Label text does not reuse gw2e's
+        // "Profit numbers are the sum of all crafted recipes." banner
+        // (docs/gw2e-parity-spec.md, and KNOWN-ISSUES #25's divergence
+        // record). Rendered via TimegatedNotice's plain-text row pattern.
         MultiItemNote,
 
         // One tile of the Total Cost section's first formula band -
-        // "Total Materials Value - Your
-        // Materials Used = Actual Cost to Craft". Collapses to a single
-        // "Actual Cost to Craft" tile (one row of this type) only when
-        // there is no materials-used middle term AND the plan has a real
-        // cost to show; a plan whose coin cost and materials-used term
+        // "Total Materials Value - Your Materials Used = Actual Cost to
+        // Craft". Collapses to a single "Actual Cost to Craft" tile only
+        // when there is no materials-used middle term AND the plan has a
+        // real cost to show; a plan whose coin cost and materials-used term
         // are both zero renders all three tiles at 0
-        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule). A
-        // zero produced by unpriceable nodes renders the tiles too, with
-        // PlanViewModelBuilder.UnpricedTileMarker on each Label and the
-        // matching SummaryFootnote row explaining it.
-        // Rendered as an equal-width stat tile, same shape the old
-        // CoinTotal band used - see SummarySectionRenderer.
+        // (PlanViewModelBuilder.BuildCostFormulaBand's collapse rule), as
+        // does a zero produced by unpriceable nodes - those carry
+        // PlanViewModelBuilder.UnpricedTileMarker plus a SummaryFootnote
+        // row. Rendered as an equal-width stat tile by SummarySectionRenderer.
         CostFormulaTile,
 
         // One tile of the Total Cost section's second formula band -
@@ -97,7 +87,7 @@ namespace GW2CraftingHelper.Models
         // one (PlanViewModelBuilder.UnpricedFootnoteText).
         SummaryFootnote,
 
-        // design-plan-notes.md (Notes section, Option 1): the one shared
+        // The one shared
         // row shape for every line in PlanSectionType.Notes - excess/
         // reclaim, competency, and forge-scope lines all use this single
         // member rather than one row type per note kind. Label carries the
@@ -106,29 +96,30 @@ namespace GW2CraftingHelper.Models
         // total line - NotesSectionRenderer draws a right-aligned coin cell
         // only when CoinValue > 0, mirroring CoinCurrencyRenderer's own
         // "hasCoin = copper > 0" convention. Never carries StatusTag/
-        // BadgeText (no pills in this section, per the brief).
-        NoteLine
+        // BadgeText - the Notes section draws no pills.
+        NoteLine,
     }
 
-    public class PlanViewModel
+    internal class PlanViewModel
     {
         public string TargetItemName { get; set; }
+
         public string TargetIconUrl { get; set; }
 
         // GW2 API rarity string; null/empty = unknown (neutral color/border).
         public string TargetRarity { get; set; }
+
         public int TargetQuantity { get; set; }
+
         public List<PlanSectionViewModel> Sections { get; set; } = new List<PlanSectionViewModel>();
+
         public CraftingTreeNode TreeRoot { get; set; }
 
-        // Populated INSTEAD of TreeRoot for a genuine multi-item batch
-        // (2+ requested items) -
-        // one full CraftingTreeNode per requested item, in request order,
-        // mirrors CraftingPlanResult.MultiItemRoots' own doc comment
-        // exactly (the synthetic wrapper root never surfaces here either).
-        // Null for a single-item plan, which continues to populate
-        // TreeRoot as before - CraftingPlanView.RenderPlan branches on
-        // whichever of the two is non-null.
+        // Populated INSTEAD of TreeRoot for a genuine multi-item batch (2+
+        // requested items): one full CraftingTreeNode per requested item, in
+        // request order, with no synthetic wrapper root - see
+        // CraftingPlanResult.MultiItemRoots. Null for a single-item plan;
+        // CraftingPlanView.RenderPlan branches on whichever is non-null.
         public List<CraftingTreeNode> MultiItemRoots { get; set; }
 
         // Passthrough of CraftingPlanResult.CurrencyMetadata (see that
@@ -140,15 +131,13 @@ namespace GW2CraftingHelper.Models
         // resolver's own null-safe fallbacks handle that case.
         public IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadata { get; set; }
 
-        // source-selection-simplification (maintainer-approved redesign,
-        // docs/gw2e-considerations.md): passthrough of CraftingPlanResult.
-        // ItemMetadata, mirroring CurrencyMetadata's own precedent exactly
-        // - lets the recipe-tree renderer resolve a Subdued pill's
-        // StrictDomination item-kind deltas (raw item ids, e.g. Globs of
-        // Ectoplasm) to a display-ready name via PlanViewModelBuilder.
-        // ResolveName at render time, the same "id-only in the pure
-        // layers, resolved only at render" split CurrencyMetadata already
-        // establishes. Null under the same conditions as the source field.
+        // Passthrough of CraftingPlanResult.ItemMetadata, on the same
+        // precedent as CurrencyMetadata above: the recipe-tree renderer
+        // resolves a Subdued pill's StrictDomination item-kind deltas (raw
+        // item ids) to a display-ready name via
+        // PlanViewModelBuilder.ResolveName at render time, keeping ids out
+        // of the pure layers' output. Null under the same conditions as the
+        // source field.
         public IReadOnlyDictionary<int, ItemMetadata> ItemMetadata { get; set; }
 
         // Passthrough of
@@ -178,6 +167,7 @@ namespace GW2CraftingHelper.Models
         // was available - distinct from "0 owned", and the tree renderer
         // must treat it that way (omit the pill entirely, not show HAVE 0).
         public IReadOnlyDictionary<int, long> CurrencyPlanTotals { get; set; }
+
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         // currency-ux-package (Feature 3, maintainer-ratified #21
@@ -196,10 +186,12 @@ namespace GW2CraftingHelper.Models
     /// Used for BuyFromVendor rows/nodes priced wholly or partly in a
     /// non-coin currency (spirit shards, karma, etc.) - KNOWN-ISSUES #16.
     /// </summary>
-    public class CurrencyAmountViewModel
+    internal class CurrencyAmountViewModel
     {
         public long Amount { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
 
         // Non-null only for a fractional-per-unit "Each" amount:
@@ -244,15 +236,18 @@ namespace GW2CraftingHelper.Models
         public int? RawOwnedQuantity { get; set; }
     }
 
-    public class PlanSectionViewModel
+    internal class PlanSectionViewModel
     {
         public PlanSectionType SectionType { get; set; }
+
         public string Title { get; set; }
+
         public List<PlanRowViewModel> Rows { get; set; } = new List<PlanRowViewModel>();
+
         public bool IsDefaultExpanded { get; set; }
     }
 
-    public class PlanRowViewModel
+    internal class PlanRowViewModel
     {
         public PlanRowType RowType { get; set; }
 
@@ -268,19 +263,25 @@ namespace GW2CraftingHelper.Models
         // RowIdIsAnItemId guards on the tree side.
         // Never displayed (repo invariant: ids are internal-only).
         public int ItemId { get; set; }
+
         public string Label { get; set; }
+
         public string Sublabel { get; set; }
+
         public string IconUrl { get; set; }
 
         // GW2 API rarity string; null/empty = unknown (neutral border).
         public string Rarity { get; set; }
+
         public int Quantity { get; set; }
+
         public long CoinValue { get; set; }
 
         // Per-unit price (CoinValue is the row's total for Quantity units).
         // Only populated for shopping rows, which show both a unit-price and
         // a total-price table column.
         public long UnitCoinValue { get; set; }
+
         public string StatusTag { get; set; }
 
         // Wiki-derived acquisition guidance for unknown-source rows,

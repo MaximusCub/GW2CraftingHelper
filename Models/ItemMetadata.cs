@@ -1,16 +1,17 @@
 namespace GW2CraftingHelper.Models
 {
-    public class ItemMetadata
+    internal class ItemMetadata
     {
         public int ItemId { get; set; }
+
         public string Name { get; set; }
+
         public string IconUrl { get; set; }
 
         // GW2 API rarity string (e.g. "Fine", "Exotic"); null/empty = unknown.
         public string Rarity { get; set; }
 
-        // design-plan-notes.md (Notes section, excess/reclaim account-bound
-        // exclusion): true when the GW2 API's /v2/items "flags" array for
+        // True when the GW2 API's /v2/items "flags" array for
         // this item contains "AccountBound" (see RawItem.Flags /
         // ItemMetadataService.FetchBatchIntoCacheAsync). False (never null)
         // when flags data is unavailable (bundled seed fallback entries -

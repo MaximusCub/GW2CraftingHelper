@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// helpers are called from several of the split files, so they moved
     /// here rather than being duplicated per file.
     /// </summary>
-    public static class VendorOfferBuilders
+    internal static class VendorOfferBuilders
     {
         public static VendorOffer CoinVendorOffer(
             int outputItemId, int coinCost, int outputCount = 1, int? dailyCap = null, int? weeklyCap = null,

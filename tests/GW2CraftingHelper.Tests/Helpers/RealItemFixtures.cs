@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// than from a hand-built RawItem that could quietly disagree with what
     /// the API actually sends.
     /// </summary>
-    public static class RealItemFixtures
+    internal static class RealItemFixtures
     {
         private class StubHandler : HttpMessageHandler
         {

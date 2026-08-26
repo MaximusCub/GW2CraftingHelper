@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class MysticForgeRecipeData
+    internal class MysticForgeRecipeData
     {
         private static readonly IReadOnlyList<int> EmptyIds = Array.Empty<int>();
 
@@ -142,6 +142,7 @@ namespace GW2CraftingHelper.Services
                         warnings.Add($"Skipped recipe id={id.Value}: expectedOutputCount must be > 0 when present");
                         continue;
                     }
+
                     expectedOutputCount = parsed.Value;
                 }
 
@@ -172,7 +173,7 @@ namespace GW2CraftingHelper.Services
                     {
                         Type = type,
                         Id = ingId.Value,
-                        Count = count.Value
+                        Count = count.Value,
                     });
                 }
 
@@ -190,7 +191,7 @@ namespace GW2CraftingHelper.Services
                     Ingredients = ingredients,
                     Disciplines = new List<string> { "MysticForge" },
                     MinRating = 0,
-                    Flags = new List<string>()
+                    Flags = new List<string>(),
                 };
 
                 byRecipeId[recipe.Id] = recipe;

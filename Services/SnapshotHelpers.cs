@@ -7,16 +7,6 @@ namespace GW2CraftingHelper.Services
     internal static class SnapshotHelpers
     {
         /// <summary>
-        /// Formats a copper value into the "Xg Ys Zc" display string.
-        /// Negative values are clamped to 0 for display purposes.
-        /// </summary>
-        internal static string FormatCoin(int copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"Coin: {gold}g {silver}s {cop}c";
-        }
-
-        /// <summary>
         /// Splits a wallet entry list into coins (currency ID 1) and remaining wallet entries.
         /// If multiple coin entries exist, their values are summed defensively.
         /// </summary>
@@ -24,14 +14,19 @@ namespace GW2CraftingHelper.Services
             IEnumerable<SnapshotWalletEntry> walletEntries)
         {
             if (walletEntries == null)
+            {
                 return (0, new List<SnapshotWalletEntry>());
+            }
 
             int coinCopper = 0;
             var wallet = new List<SnapshotWalletEntry>();
 
             foreach (var entry in walletEntries)
             {
-                if (entry == null) continue;
+                if (entry == null)
+                {
+                    continue;
+                }
 
                 if (entry.CurrencyId == 1)
                 {
@@ -52,7 +47,11 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static string SerializeSnapshot(AccountSnapshot snapshot)
         {
-            if (snapshot == null) return null;
+            if (snapshot == null)
+            {
+                return null;
+            }
+
             return JsonConvert.SerializeObject(snapshot, Formatting.Indented);
         }
 
@@ -62,7 +61,10 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         internal static AccountSnapshot DeserializeSnapshot(string json)
         {
-            if (string.IsNullOrWhiteSpace(json)) return null;
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
 
             try
             {

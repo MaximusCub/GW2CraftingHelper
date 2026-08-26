@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Which of the two rules caused a pill to be subdued.
     /// </summary>
-    public enum PillSubduingRule
+    internal enum PillSubduingRule
     {
         None,
 
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services
         /// Amalgamated Rift Essence: a vendor trade-in needing the SAME
         /// base cost plus 10 more Globs of Ectoplasm than crafting does).
         /// </summary>
-        StrictDomination
+        StrictDomination,
     }
 
     /// <summary>
@@ -40,10 +40,12 @@ namespace GW2CraftingHelper.Services
     /// currency/item name before ever showing it to the user; this class
     /// (and PillSubduingEvaluator) never format display text.
     /// </summary>
-    public sealed class PillCostDelta
+    internal sealed class PillCostDelta
     {
         public string Kind { get; }
+
         public int Id { get; }
+
         public long Amount { get; }
 
         public PillCostDelta(string kind, int id, long amount)
@@ -54,7 +56,7 @@ namespace GW2CraftingHelper.Services
         }
     }
 
-    public sealed class PillSubduingResult
+    internal sealed class PillSubduingResult
     {
         public static readonly PillSubduingResult None = new PillSubduingResult(PillSubduingRule.None, null, null);
 
@@ -94,7 +96,7 @@ namespace GW2CraftingHelper.Services
     /// reads a CraftingTreeNode, resolves a name, or decides which pill
     /// is Selected.
     /// </summary>
-    public static class PillSubduingEvaluator
+    internal static class PillSubduingEvaluator
     {
         // "Decisive" requires BOTH an absolute floor (non-trivial coin
         // even for a cheap item) AND a relative floor (non-trivial
@@ -118,6 +120,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             // selectedValueCopper is always >= 0 (RawCoin/DecisionValue are
             // never negative); a selected value of exactly 0 (e.g. a
             // free/fully-owned source) makes ANY strictly-positive margin
@@ -128,6 +131,7 @@ namespace GW2CraftingHelper.Services
             {
                 return true;
             }
+
             return marginCopper >= selectedValueCopper * MinDecisiveMarginFraction;
         }
 
@@ -198,6 +202,7 @@ namespace GW2CraftingHelper.Services
             {
                 return null;
             }
+
             if (coinDelta > 0)
             {
                 deltas.Add(new PillCostDelta("Coin", 0, coinDelta));
@@ -221,6 +226,7 @@ namespace GW2CraftingHelper.Services
                 {
                     return null;
                 }
+
                 if (delta > 0)
                 {
                     deltas.Add(new PillCostDelta(kind.Type, kind.Id, delta));
@@ -242,6 +248,7 @@ namespace GW2CraftingHelper.Services
             {
                 return false;
             }
+
             foreach (var line in lines)
             {
                 if (line.Type == "Currency")
@@ -249,6 +256,7 @@ namespace GW2CraftingHelper.Services
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -259,11 +267,13 @@ namespace GW2CraftingHelper.Services
             {
                 return lookup;
             }
+
             foreach (var line in lines)
             {
                 var key = (line.Type, line.Id);
                 lookup[key] = lookup.TryGetValue(key, out int existing) ? existing + line.Count : line.Count;
             }
+
             return lookup;
         }
     }

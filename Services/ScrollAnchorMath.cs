@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// re-find the same element by after a rebuild - a section type, a
     /// solver NodeId - compared by ordinal string equality.
     /// </summary>
-    public readonly struct ScrollAnchorCandidate
+    internal readonly struct ScrollAnchorCandidate
     {
         public readonly string Key;
         public readonly int Top;
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// The element a capture chose to hold still, and where it was when
     /// the capture ran.
     /// </summary>
-    public readonly struct ScrollAnchor
+    internal readonly struct ScrollAnchor
     {
         public readonly string Key;
         public readonly int CapturedTop;
@@ -57,7 +57,7 @@ namespace GW2CraftingHelper.Services
     /// every height change above it.
     /// </para>
     /// </summary>
-    public static class ScrollAnchorMath
+    internal static class ScrollAnchorMath
     {
         /// <summary>
         /// The content-space y whose content should not move: the mouse

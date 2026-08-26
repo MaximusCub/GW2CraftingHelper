@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// success/error MainThreadMarshal.Run callbacks.
     /// <para>See docs/ARCHITECTURE.md section 6.</para>
     /// </summary>
-    public static class StatusUpdateGuard
+    internal static class StatusUpdateGuard
     {
         public static bool ShouldApply(int tickGeneration, int currentGeneration, bool currentGenerationStatusClosed)
         {

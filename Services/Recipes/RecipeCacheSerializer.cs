@@ -7,38 +7,78 @@ using System.Text.Json;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class RecipeSearchSeedData
+    internal class RecipeSearchSeedData
     {
         public int SchemaVersion { get; set; }
+
         public Dictionary<string, List<int>> Searches { get; set; }
     }
 
-    public class RecipeSeedData
+    internal class RecipeSeedData
     {
         public int SchemaVersion { get; set; }
+
         public List<RawRecipe> Recipes { get; set; }
     }
 
-    public class RecipeSeedManifest
+    /// <summary>
+    /// One seed file's integrity record: how many rows the seeder wrote and
+    /// the SHA-256 of the bytes it wrote them as.
+    /// <para>
+    /// This exists so the tests that guard the shipped corpora can pin a
+    /// number the SEEDER produced rather than a literal a contributor typed.
+    /// The old form (Assert.Equal(14966, recipes.Count)) tripped on any
+    /// change but could not tell "the game shipped four new recipes" from
+    /// "the seeder dropped 200 rows and gained 204", and it taught every
+    /// contributor - human or agent - that the way to green a failing seed
+    /// test is to edit the expected number. Against a manifest, a
+    /// hand-edited seed fails and a legitimately reseeded one passes,
+    /// because the count and the digest can only move together.
+    /// </para>
+    /// </summary>
+    internal class SeedFileIntegrity
     {
-        public int SeedVersion { get; set; }
-        public int Gw2BuildId { get; set; }
-        public string CreatedUtc { get; set; }
+        /// <summary>File name, relative to the seed directory.</summary>
+        public string Name { get; set; }
+
+        /// <summary>Rows the seeder wrote into it.</summary>
+        public int RowCount { get; set; }
+
+        /// <summary>Lowercase hex SHA-256 of the file's bytes.</summary>
+        public string Sha256 { get; set; }
     }
 
-    public class RecipeOverlayManifest
+    internal class RecipeSeedManifest
+    {
+        public int SeedVersion { get; set; }
+
+        public int Gw2BuildId { get; set; }
+
+        public string CreatedUtc { get; set; }
+
+        /// <summary>
+        /// Integrity records for the seed files this manifest was written
+        /// beside. Null on manifests written before this field existed -
+        /// staleness detection never reads it, so an old manifest still
+        /// loads.
+        /// </summary>
+        public List<SeedFileIntegrity> Files { get; set; }
+    }
+
+    internal class RecipeOverlayManifest
     {
         public int Gw2BuildId { get; set; }
+
         public string UpdatedUtc { get; set; }
     }
 
-    public static class RecipeCacheSerializer
+    internal static class RecipeCacheSerializer
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true,
-            WriteIndented = true
+            WriteIndented = true,
         };
 
         public static Dictionary<int, IReadOnlyList<int>> LoadSearchSeed(Stream stream)
@@ -68,6 +108,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 result[key] = kvp.Value?.AsReadOnly()
                               ?? (IReadOnlyList<int>)Array.Empty<int>();
             }
+
             return result;
         }
 
@@ -96,6 +137,7 @@ namespace GW2CraftingHelper.Services.Recipes
             {
                 result[recipe.Id] = recipe;
             }
+
             return result;
         }
 
@@ -119,7 +161,7 @@ namespace GW2CraftingHelper.Services.Recipes
             var data = new RecipeSearchSeedData
             {
                 SchemaVersion = 1,
-                Searches = new Dictionary<string, List<int>>()
+                Searches = new Dictionary<string, List<int>>(),
             };
 
             foreach (var kvp in searches.OrderBy(k => k.Key))
@@ -136,7 +178,7 @@ namespace GW2CraftingHelper.Services.Recipes
             var data = new RecipeSeedData
             {
                 SchemaVersion = 1,
-                Recipes = recipes.Values.OrderBy(r => r.Id).ToList()
+                Recipes = recipes.Values.OrderBy(r => r.Id).ToList(),
             };
 
             return JsonSerializer.Serialize(data, Options);
@@ -145,6 +187,27 @@ namespace GW2CraftingHelper.Services.Recipes
         public static string SerializeManifest<T>(T manifest)
         {
             return JsonSerializer.Serialize(manifest, Options);
+        }
+
+        /// <summary>
+        /// Lowercase hex SHA-256 of a file's bytes - the one definition the
+        /// seeders write and the seed tests check against, so neither can
+        /// drift into its own idea of the digest.
+        /// </summary>
+        public static string HashFile(string path)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var stream = File.OpenRead(path))
+            {
+                byte[] digest = sha.ComputeHash(stream);
+                var text = new System.Text.StringBuilder(digest.Length * 2);
+                for (int i = 0; i < digest.Length; i++)
+                {
+                    text.Append(digest[i].ToString("x2", CultureInfo.InvariantCulture));
+                }
+
+                return text.ToString();
+            }
         }
     }
 }

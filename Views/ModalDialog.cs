@@ -9,7 +9,7 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
 {
-    public class ModalDialog : IDisposable
+    internal class ModalDialog : IDisposable
     {
         private const string WindowId = "GW2CraftingHelper_ModalDialog_c4f19a";
 
@@ -101,7 +101,7 @@ namespace GW2CraftingHelper.Views
                 Parent = GameService.Graphics.SpriteScreen,
                 Title = "Confirm",
                 Id = WindowId,
-                TopMost = true
+                TopMost = true,
             };
 
             _window.Moved += OnWindowMoved;
@@ -128,14 +128,18 @@ namespace GW2CraftingHelper.Views
         // abandon the operation. It exists for the callers whose second
         // button is a CHOICE rather than an escape - the Settings tab's
         // unsaved-changes prompt cannot put the user back where they were
-        // (see KNOWN-ISSUES "Settings dirty prompt"), so a button labelled
+        // (see KNOWN-ISSUES #51), so a button labelled
         // "Cancel" there would promise something it does not do.
         // Returns false when another caller's dialog is already on screen,
         // so a caller that arms state for the dialog's lifetime (MainView
         // disables its Snapshot buttons) knows not to arm it.
         public bool Show(string message, Action onConfirm, Action onCancel, string confirmText, string cancelText = "Cancel")
         {
-            if (_isShowing) return false;
+            if (_isShowing)
+            {
+                return false;
+            }
+
             _isShowing = true;
             _onConfirm = onConfirm;
             _onCancel = onCancel;
@@ -175,7 +179,7 @@ namespace GW2CraftingHelper.Views
                 Text = string.Join("\n", wrapped.Lines),
                 Font = font,
                 AutoSizeWidth = true,
-                AutoSizeHeight = true
+                AutoSizeHeight = true,
             };
             messageLabel.Location = new Point(
                 System.Math.Max(0, (ContentWidth - messageLabel.Width) / 2),
@@ -213,7 +217,7 @@ namespace GW2CraftingHelper.Views
                 Text = confirmText,
                 Size = new Point(btnW, ButtonHeight),
                 Location = new Point(btnX, btnY),
-                Parent = _window
+                Parent = _window,
             };
             confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
 
@@ -222,7 +226,7 @@ namespace GW2CraftingHelper.Views
                 Text = cancelLabel,
                 Size = new Point(cancelW, ButtonHeight),
                 Location = new Point(btnX + btnW + btnGap, btnY),
-                Parent = _window
+                Parent = _window,
             };
             cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
 
@@ -271,7 +275,10 @@ namespace GW2CraftingHelper.Views
         /// </summary>
         private void ShowBackdrop()
         {
-            if (_blockedSurface == null) return;
+            if (_blockedSurface == null)
+            {
+                return;
+            }
 
             if (_backdrop == null)
             {
@@ -365,7 +372,10 @@ namespace GW2CraftingHelper.Views
 
         private void OnWindowMoved(object sender, MovedEventArgs e)
         {
-            if (_suppressMoved) return;
+            if (_suppressMoved)
+            {
+                return;
+            }
 
             var screen = GameService.Graphics.SpriteScreen;
             int maxX = Math.Max(0, screen.Width - _window.Width);

@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Services
     /// geometry, generic centering/right-alignment/name-column budgeting).
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class PlanRelayoutMath
+    internal static class PlanRelayoutMath
     {
         /// <summary>
         /// Left edge that centers a contentWidth-wide block inside a
@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Services
         /// Gap every plan table keeps between its right-hand block and the
         /// panel's right edge.
         /// </summary>
-        public const int TableRightMargin = 8;
+        public const int TableRightMargin = UiSpacing.SectionRightPad;
 
         /// <summary>
         /// Right edge of every plan table's right-hand block, at every
@@ -151,10 +151,16 @@ namespace GW2CraftingHelper.Services
             int costRightEdge = pillColX + pillColumnWidth + costColumnWidth;
 
             int nameMaxWidth = pillColX - nameX - 8;
-            if (nameMaxWidth < 20) nameMaxWidth = 20;
+            if (nameMaxWidth < 20)
+            {
+                nameMaxWidth = 20;
+            }
 
             int nameAvailWidth = nameMaxWidth - qtyPrefixWidth;
-            if (nameAvailWidth < 10) nameAvailWidth = 10;
+            if (nameAvailWidth < 10)
+            {
+                nameAvailWidth = 10;
+            }
 
             return new TreeColumnEdges(pillColX, costRightEdge, nameAvailWidth);
         }
@@ -214,9 +220,11 @@ namespace GW2CraftingHelper.Services
                 {
                     break;
                 }
+
                 x += width + gap;
                 count++;
             }
+
             return count;
         }
 
@@ -330,7 +338,10 @@ namespace GW2CraftingHelper.Services
             for (int i = 0; i < 4; i++)
             {
                 int candidateWidth = overflowPillWidthForHidden(hidden);
-                if (candidateWidth < 0) candidateWidth = 0;
+                if (candidateWidth < 0)
+                {
+                    candidateWidth = 0;
+                }
 
                 int fit = ComputeVisiblePillCount(
                     pillWidths, reduction, gap, startX, maxRightEdge - candidateWidth - gap);
@@ -338,7 +349,11 @@ namespace GW2CraftingHelper.Services
 
                 overflowWidth = candidateWidth;
                 visible = fit;
-                if (nextHidden == hidden) break;
+                if (nextHidden == hidden)
+                {
+                    break;
+                }
+
                 hidden = nextHidden;
             }
 
@@ -374,7 +389,11 @@ namespace GW2CraftingHelper.Services
             }
 
             int tileWidth = (panelWidth - totalMargin) / tileCount;
-            if (tileWidth < minTileWidth) tileWidth = minTileWidth;
+            if (tileWidth < minTileWidth)
+            {
+                tileWidth = minTileWidth;
+            }
+
             int rowContentWidth = tileWidth * tileCount;
 
             return new CostTileGeometry(tileWidth, CenterX(panelWidth, rowContentWidth));

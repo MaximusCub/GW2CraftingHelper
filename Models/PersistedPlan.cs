@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Models
     /// on module load, with no network call and no re-solve. See
     /// Services/PlanStore.cs for the store that reads/writes this.
     /// </summary>
-    public class PersistedPlan
+    internal class PersistedPlan
     {
         /// <summary>
         /// Bump whenever the persisted graph's SHAPE changes (a member
@@ -28,6 +28,25 @@ namespace GW2CraftingHelper.Models
         /// </para>
         /// </summary>
         public const int CurrentSchemaVersion = 3;
+
+        /// <summary>
+        /// SHA-256 of the persisted graph's public member signatures, one
+        /// per line, ordinal-sorted - the same list checked in at
+        /// tests/shared/persisted_plan_schema.txt.
+        /// <para>
+        /// It lives here, next to the version it describes, for one reason:
+        /// the snapshot test and the version assertion used to be
+        /// independent, so adding a property anywhere in the graph could be
+        /// made green by editing the test's own expected list alone, with
+        /// <see cref="CurrentSchemaVersion"/> left at its old value - which
+        /// is precisely the unbumped shape change that makes
+        /// PlanStoreHelpers.DeserializePersistedPlan accept a file it can no
+        /// longer read correctly. Changing the graph now forces an edit
+        /// here, one line from the version.
+        /// </para>
+        /// </summary>
+        public const string SchemaShapeHash =
+            "4b81071d80ce7c73fd04145a9d4c3cff5a187d6e89ba80b8e5bb0f3e5c8e8df4";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
@@ -53,10 +72,10 @@ namespace GW2CraftingHelper.Models
         /// generated for, in request order - mirrors
         /// CraftingPlanResult.RequestedItems' own shape, but populated for
         /// every plan (single- or multi-item), not only a genuine
-        /// multi-item batch. Not used to reconstruct the search box/
-        /// quantity inputs on restore (those stay at
-        /// their defaults); persisted for round-trip fidelity of the
-        /// original request only.
+        /// multi-item batch. On restore this reseeds the input strip's
+        /// rows (RestoredRequestInputs.BuildRowSeeds ->
+        /// ItemInputRowStrip.RestoreRows), so Generate Plan re-solves the
+        /// restored request without any retyping.
         /// </summary>
         public IReadOnlyList<PlanRequestItem> RequestItems { get; set; }
 
@@ -67,7 +86,7 @@ namespace GW2CraftingHelper.Models
         public PriceBasis PriceBasis { get; set; }
 
         /// <summary>
-        /// VOM design (Section 5.3): "Value Own Materials" checkbox state
+        /// "Value Own Materials" checkbox state
         /// at generation time - the per-plan session toggle in
         /// Views/CraftingPlanView.cs's controls panel (see its
         /// _valueOwnMaterials field's own doc comment), mirroring <see

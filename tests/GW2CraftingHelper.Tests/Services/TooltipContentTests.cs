@@ -1,19 +1,21 @@
 using System.Linq;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-    // The structured tooltip model. The property that matters most is the
-    // round trip: every composer builds content ONCE, and the plain
-    // BasicTooltipText path must still receive exactly the string it used
-    // to. If ToPlainText ever drifts, the plain and rich paths start
-    // disagreeing about what a tooltip says.
+    // The structured tooltip model - TooltipContentBuilder and
+    // TooltipContent.FromText are the subjects here. Assertions read
+    // through the test-side plain projection (Helpers/
+    // TooltipContentPlainText) because comparing wording is far more
+    // legible than walking spans; what is being pinned is what the builder
+    // PUT in the model, not the projection itself.
     public class TooltipContentTests
     {
         [Fact]
-        public void ToPlainText_CoinSpan_RendersTheCallersOwnPlainText()
+        public void CoinSpan_KeepsTheCallersOwnPlainText()
         {
             var content = new TooltipContentBuilder()
                 .Text("Crafting gold price: ")
@@ -24,7 +26,7 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ToPlainText_DifferentCoinFormatsCoexist()
+        public void DifferentCoinFormatsCoexist()
         {
             // The two composers deliberately format coin differently
             // (always three units vs leading units omitted). The span

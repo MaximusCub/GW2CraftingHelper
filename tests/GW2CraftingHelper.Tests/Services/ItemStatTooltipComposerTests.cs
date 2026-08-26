@@ -231,25 +231,26 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task AFoodsNourishmentLinesAreWhite_NotTheUpgradeBonusBlue()
+        public async Task AFoodsFirstNourishmentLineIsWhiteAndItsTrailingEffectsAreGrey()
         {
-            // Measured on steak.png: its two nourishment bands read
-            // (252,254,253) and (252,255,255), the same white as "Food"
-            // (251,255,252) and "Required Level: 10" (254,254,251) below
-            // them. That line IS details.description, the field this
-            // renders, so the measurement is of this line and not of a
-            // neighbour. The blue is measured on runes and sigils only.
+            // First line white, trailing effect lines grey (~162), measured
+            // on the allspice capture (fidelity-audit F7). Never the
+            // upgrade-bonus blue - that is measured on runes and sigils
+            // only.
             var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.LotusFries);
             var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
             var spans = content.Lines.SelectMany(l => l.Spans).ToArray();
 
-            var effects = spans
-                .Where(s => s.Text == "30% Magic Find" || s.Text == "+70 Condition Damage" ||
+            var first = spans.Single(s => s.Text == "30% Magic Find");
+            Assert.Equal(TooltipSpanRole.Default, first.Role);
+
+            var trailing = spans
+                .Where(s => s.Text == "+70 Condition Damage" ||
                             s.Text == "+10% Experience from Kills")
                 .ToArray();
 
-            Assert.Equal(3, effects.Length);
-            Assert.All(effects, s => Assert.Equal(TooltipSpanRole.Default, s.Role));
+            Assert.Equal(2, trailing.Length);
+            Assert.All(trailing, s => Assert.Equal(TooltipSpanRole.Muted, s.Role));
             Assert.DoesNotContain(spans, s => s.Role == TooltipSpanRole.Bonus);
         }
 
@@ -409,28 +410,74 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task TheIdentityBlockIsWhiteAndTheFlavourRunIsNot()
+        public async Task TheRarityWordCarriesTheRarityColourAndTheRestOfTheIdentityBlockIsWhite()
         {
-            // Measured twice in-game (spec section 1.6): nothing in the
-            // identity block is grey, and the rarity WORD is white even
-            // though the name line carries the rarity colour. The
-            // description's own <c=@flavor> run is the only coloured prose.
+            // Measured on the 2026-08-25 live captures: the rarity word is
+            // drawn in the rarity colour, same as the name line - s07's
+            // "Fine" reads (82,146,240), eq-weapon-full's "Legendary"
+            // (153,51,255), both non-comparison hovers. Every other
+            // identity line stays white; the description's own <c=@flavor>
+            // run is the only coloured prose.
             var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.ZojjasWarfists);
             var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
 
+            var rarityWord = content.Lines
+                .SelectMany(l => l.Spans)
+                .Single(s => s.Text == "Ascended");
+            Assert.Equal(TooltipSpanRole.Rarity, rarityWord.Role);
+            Assert.Equal("Ascended", rarityWord.RarityKey);
+
             var identity = content.Lines
                 .SelectMany(l => l.Spans)
-                .Where(s => s.Text == "Ascended" || s.Text == "Gloves Armor" ||
+                .Where(s => s.Text == "Gloves Armor" ||
                             s.Text == "Heavy" || s.Text == "Account Bound on Use")
                 .ToArray();
 
-            Assert.Equal(4, identity.Length);
+            Assert.Equal(3, identity.Length);
             Assert.All(identity, s => Assert.Equal(TooltipSpanRole.Default, s.Role));
 
             var flavor = content.Lines
                 .SelectMany(l => l.Spans)
                 .Single(s => s.Text.StartsWith("Crafted in the style"));
             Assert.Equal(TooltipSpanRole.Flavor, flavor.Role);
+        }
+
+        [Fact]
+        public void ConsecutiveInfusionSlotsAreEachTheirOwnBlankSeparatedBlock()
+        {
+            // Measured on live/eq-weapon-full.png (2026-08-25): two sigil
+            // blocks and two infusion lines each render blank / block /
+            // blank, never one contiguous run (fidelity-audit F8).
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                ItemId = 1,
+                Name = "Two-Slot Thing",
+                InfusionSlotCount = 2,
+            });
+
+            Assert.Equal(new[]
+            {
+                "Two-Slot Thing",
+                "",
+                "Infusion Slot",
+                "",
+                "Infusion Slot",
+            }, content.ToPlainLines().ToArray());
+        }
+
+        [Fact]
+        public async Task TheHandLineIsMutedGreyNotWhite()
+        {
+            // "(Two-Handed)" measures (160,161,162) on
+            // live/eq-weapon-full.png (2026-08-25, lossless) - the game's
+            // parenthetical grey, not white.
+            var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.Bolt);
+            var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
+
+            var hand = content.Lines
+                .SelectMany(l => l.Spans)
+                .Single(s => s.Text == "(Main Hand)");
+            Assert.Equal(TooltipSpanRole.Muted, hand.Role);
         }
 
         [Fact]

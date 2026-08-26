@@ -13,7 +13,7 @@ using Xunit;
 namespace GW2CraftingHelper.Tests.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES recipe-ingestion bug class: end-to-end
+    /// KNOWN-ISSUES #48: end-to-end
     /// proof, through the REAL production pipeline
     /// (CraftingPlanPipeline -> RecipeService -> PlanSolver ->
     /// CraftingTreeBuilder), that recipe 14025 (Amalgamated Rift Essence ->
@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// JSON shape correctly - not just that RecipeService's in-memory model
     /// can represent it.
     ///
-    /// Also covers the guildupgrade-ingredients fix (docs/KNOWN-ISSUES.md):
+    /// Also covers the guildupgrade-ingredients fix (KNOWN-ISSUES #54):
     /// this same schema-versioning fix incidentally revealed a second,
     /// previously-unmodeled ingredient type ("GuildUpgrade", a Guild
     /// Decoration recipe's claimed-guild-hall-upgrade requirement) through
@@ -185,7 +185,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GuildUpgradeIngredient_NeverPricedAsItemOrCurrency_DisplaysAsUnresolvedGuildUpgrade()
         {
-            // guildupgrade-ingredients fix (docs/KNOWN-ISSUES.md): the
+            // guildupgrade-ingredients fix (KNOWN-ISSUES #54): the
             // versioned schema pinned by the recipe-ingestion fix does not
             // only reveal Currency ingredients - it also folds an
             // UNVERSIONED response's separate top-level "guild_ingredients"
