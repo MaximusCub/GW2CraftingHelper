@@ -296,7 +296,8 @@ namespace GW2CraftingHelper
         private bool _backgroundRefreshSpinnerApplied;
 
         [ImportingConstructor]
-        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters) : base(moduleParameters)
+        public Module([Import("ModuleParameters")] ModuleParameters moduleParameters)
+            : base(moduleParameters)
         {
         }
 
@@ -724,11 +725,11 @@ namespace GW2CraftingHelper
                 itemMetadataService.GetCachedStatBlock
             );
 
+            // The generate callback is always routed through the list
+            // overload - a single-entry list short-circuits to the
+            // single-item method inside the pipeline, so the lambda needs
+            // no single-vs-multi branch of its own.
             _craftingContent = new CraftingPlanView(
-                // Always routed through the list overload - a
-                // single-entry list short-circuits to the single-item
-                // method inside the pipeline, so this lambda needs no
-                // single-vs-multi branch of its own.
                 (items, useOwn, valueOwnMaterials, priceBasis, ct, progress, phaseProgress, requestLabel) =>
                     StartGenerateAsync(
                         items, useOwn, valueOwnMaterials, priceBasis, ct,
