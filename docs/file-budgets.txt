@@ -56,6 +56,9 @@ Models/PlanStatus.cs                                                            
 Models/PlanStep.cs                                                                         40
 Models/PlanViewModel.cs                                                                    387
 Models/PriceBasis.cs                                                                       32
+Models/RankerRowMetrics.cs                                                                 143
+Models/RankerSlotAvailability.cs                                                           59
+Models/RankerWatchlistEntry.cs                                                             44
 Models/RecipeNode.cs                                                                       49
 Models/RecipeOption.cs                                                                     32
 Models/RecipeSheetSavingsOpportunity.cs                                                    64
@@ -74,7 +77,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                               35
 Models/VendorOffer.cs                                                                      57
 Models/VendorOfferDataset.cs                                                               15
-Module.cs                                                                                  1908
+Module.cs                                                                                  1954
 Properties/AssemblyInfo.cs                                                                 12
 Services/AboutLayoutMath.cs                                                                163
 Services/AccountCurrencyIndex.cs                                                           44
@@ -117,7 +120,7 @@ Services/InlineSpinnerLayout.cs                                                 
 Services/InventoryReducer.cs                                                               383
 Services/ItemDescriptionSanitizer.cs                                                       204
 Services/ItemMetadataService.cs                                                            327
-Services/ItemRowRequestBuilder.cs                                                          83
+Services/ItemRowRequestBuilder.cs                                                          92
 Services/ItemRowSelection.cs                                                               199
 Services/ItemRowTooltipComposer.cs                                                         87
 Services/ItemSearchProviderFactory.cs                                                      61
@@ -154,6 +157,13 @@ Services/PlanStripTickDecision.cs                                               
 Services/PlanStructuralValidator.cs                                                        597
 Services/PlanTableSorter.cs                                                                261
 Services/PlanViewModelBuilder.cs                                                           1489
+Services/RankerPriorityCascade.cs                                                          364
+Services/RankerPriorityOrdering.cs                                                         96
+Services/RankerReadinessCalculator.cs                                                      575
+Services/RankerReadinessWeights.cs                                                         55
+Services/RankerRowLayout.cs                                                                217
+Services/RankerStore.cs                                                                    132
+Services/RankerWatchlistLimits.cs                                                          17
 Services/ReceiptCaptionHelper.cs                                                           106
 Services/RecipeClientFactory.cs                                                            66
 Services/RecipeNodeIds.cs                                                                  45
@@ -241,6 +251,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                          2795
 Views/ModalBackdrop.cs                                                                     132
 Views/ModalDialog.cs                                                                       398
+Views/RankerTabContent.cs                                                                  1777
 Views/Rendering/ClickSound.cs                                                              197
 Views/Rendering/CoinCurrencyRenderer.cs                                                    564
 Views/Rendering/ColumnHeaderRowRenderer.cs                                                 184
@@ -260,6 +271,7 @@ Views/Rendering/NotesSectionRenderer.cs                                         
 Views/Rendering/PillColors.cs                                                              125
 Views/Rendering/PlanHeaderRenderer.cs                                                      172
 Views/Rendering/PressFeedback.cs                                                           118
+Views/Rendering/RankerReadinessColors.cs                                                   75
 Views/Rendering/RarityColors.cs                                                            57
 Views/Rendering/RecipesSectionRenderer.cs                                                  332
 Views/Rendering/RichTooltipSurface.cs                                                      515
@@ -423,11 +435,17 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderShoppingListTests.cs 
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs            635
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSublabelTests.cs                264
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSummaryTests.cs                 1181
+tests/GW2CraftingHelper.Tests/Services/RankerCascadeIntegrationTests.cs                    312
+tests/GW2CraftingHelper.Tests/Services/RankerPriorityCascadeTests.cs                       377
+tests/GW2CraftingHelper.Tests/Services/RankerPriorityOrderingTests.cs                      152
+tests/GW2CraftingHelper.Tests/Services/RankerReadinessCalculatorTests.cs                   598
+tests/GW2CraftingHelper.Tests/Services/RankerRowLayoutTests.cs                             219
+tests/GW2CraftingHelper.Tests/Services/RankerStoreTests.cs                                 196
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                        124
 tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                            782
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                         143
 tests/GW2CraftingHelper.Tests/Services/RecipeServiceConcurrencyTests.cs                    226
-tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               947
+tests/GW2CraftingHelper.Tests/Services/RecipeServiceTests.cs                               949
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetItemSeedServiceTests.cs                  145
 tests/GW2CraftingHelper.Tests/Services/RecipeSheetSavingsCalculatorTests.cs                606
 tests/GW2CraftingHelper.Tests/Services/Recipes/ItemNameSeedDataTests.cs                    102
