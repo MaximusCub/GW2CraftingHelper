@@ -409,22 +409,30 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task TheIdentityBlockIsWhiteAndTheFlavourRunIsNot()
+        public async Task TheRarityWordCarriesTheRarityColourAndTheRestOfTheIdentityBlockIsWhite()
         {
-            // Measured twice in-game (spec section 1.6): nothing in the
-            // identity block is grey, and the rarity WORD is white even
-            // though the name line carries the rarity colour. The
-            // description's own <c=@flavor> run is the only coloured prose.
+            // Measured on the 2026-08-25 live captures: the rarity word is
+            // drawn in the rarity colour, same as the name line - s07's
+            // "Fine" reads (82,146,240), eq-weapon-full's "Legendary"
+            // (153,51,255), both non-comparison hovers. Every other
+            // identity line stays white; the description's own <c=@flavor>
+            // run is the only coloured prose.
             var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.ZojjasWarfists);
             var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
 
+            var rarityWord = content.Lines
+                .SelectMany(l => l.Spans)
+                .Single(s => s.Text == "Ascended");
+            Assert.Equal(TooltipSpanRole.Rarity, rarityWord.Role);
+            Assert.Equal("Ascended", rarityWord.RarityKey);
+
             var identity = content.Lines
                 .SelectMany(l => l.Spans)
-                .Where(s => s.Text == "Ascended" || s.Text == "Gloves Armor" ||
+                .Where(s => s.Text == "Gloves Armor" ||
                             s.Text == "Heavy" || s.Text == "Account Bound on Use")
                 .ToArray();
 
-            Assert.Equal(4, identity.Length);
+            Assert.Equal(3, identity.Length);
             Assert.All(identity, s => Assert.Equal(TooltipSpanRole.Default, s.Role));
 
             var flavor = content.Lines

@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// line order the in-game item tooltip uses (spec section 1.6,
     /// KNOWN-ISSUES #42): the icon+name header,
     /// what the item DOES (strength/defense, attributes, granted bonuses),
-    /// its infusion slots, then the white identity block - rarity, type,
+    /// its infusion slots, then the identity block - rarity, type,
     /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
     /// all, unlabelled, the vendor value.
     ///
@@ -306,16 +306,18 @@ namespace GW2CraftingHelper.Services
 
         private static TooltipContent BuildIdentityBlock(ItemStatBlock stats)
         {
-            // Every line here is WHITE in the game - nothing in the
-            // identity block is grey, and the rarity WORD is white even
-            // though the name line above it is not (spec section 1.6,
-            // gaps G4/G5).
             var identity = new TooltipContentBuilder();
 
-            // Basic is suppressed outright, as the game suppresses it (G20).
+            // The rarity word carries the rarity colour, same as the name
+            // line: measured on the 2026-08-25 live captures - s07's "Fine"
+            // reads (82,146,240) and eq-weapon-full's "Legendary"
+            // (153,51,255), both on non-comparison hovers. The 2012-2016
+            // captures behind the old white reading (G5) are superseded;
+            // the game changed. Basic is still suppressed outright, as the
+            // game suppresses it (G20).
             if (!string.IsNullOrEmpty(stats.Rarity) && stats.Rarity != "Basic")
             {
-                identity.Text(stats.Rarity).EndLine();
+                identity.RarityText(stats.Rarity, stats.Rarity).EndLine();
             }
 
             string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
