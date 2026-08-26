@@ -127,26 +127,41 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(TreeRowIdentity.SameRow(parent, childless));
         }
 
-        [Theory]
-        [MemberData(nameof(ChromeTheRefreshDoesNotRedraw))]
-        public void EveryDisplayFactTheRefreshKeeps_IsPartOfIdentity(CraftingTreeNode fresh)
+        // Each of the five below differs from the baseline in exactly one
+        // fact the repaint never re-derives, so accepting it would leave
+        // that fact on screen describing the wrong item.
+
+        [Fact]
+        public void ADifferentItemId_IsPartOfIdentity()
         {
-            // Each case differs from the baseline in exactly one fact the
-            // repaint never re-derives, so accepting it would leave that
-            // fact on screen describing the wrong item.
-            Assert.False(TreeRowIdentity.SameRow(Node(), fresh));
+            Assert.False(TreeRowIdentity.SameRow(Node(), Node(itemId: 43)));
         }
 
-        public static IEnumerable<object[]> ChromeTheRefreshDoesNotRedraw()
+        [Fact]
+        public void ADifferentName_IsPartOfIdentity()
         {
-            yield return new object[] { Node(itemId: 43) };
-            yield return new object[] { Node(name: "Mystic Coin") };
-            yield return new object[] { Node(icon: "coin.png") };
-            yield return new object[] { Node(rarity: "Legendary") };
+            Assert.False(TreeRowIdentity.SameRow(Node(), Node(name: "Mystic Coin")));
+        }
 
+        [Fact]
+        public void ADifferentIcon_IsPartOfIdentity()
+        {
+            Assert.False(TreeRowIdentity.SameRow(Node(), Node(icon: "coin.png")));
+        }
+
+        [Fact]
+        public void ADifferentRarity_IsPartOfIdentity()
+        {
+            Assert.False(TreeRowIdentity.SameRow(Node(), Node(rarity: "Legendary")));
+        }
+
+        [Fact]
+        public void TheCostComponentFlag_IsPartOfIdentity()
+        {
             var component = Node();
             component.IsCostComponent = true;
-            yield return new object[] { component };
+
+            Assert.False(TreeRowIdentity.SameRow(Node(), component));
         }
 
         [Fact]

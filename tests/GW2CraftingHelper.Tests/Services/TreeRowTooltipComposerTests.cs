@@ -279,10 +279,11 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(CraftingDecision.Unknown)]
-        [InlineData(CraftingDecision.GuildUpgrade)]
-        public void AcquisitionHint_UnknownOrGuildUpgrade_IsIncluded(CraftingDecision decision)
+        [InlineData(nameof(CraftingDecision.Unknown))]
+        [InlineData(nameof(CraftingDecision.GuildUpgrade))]
+        public void AcquisitionHint_UnknownOrGuildUpgrade_IsIncluded(string decisionName)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, acquisitionHint: "Purchased from a Karma vendor.");
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();

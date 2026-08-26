@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
+using GW2CraftingHelper.Tests.Helpers;
 using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
@@ -171,12 +172,13 @@ namespace GW2CraftingHelper.Tests.Services
         // Every table header in the plan is now one band of one height -
         // the drift this replaced was three styles across six tables.
         [Theory]
-        [InlineData(PlanSectionType.UsedMaterials)]
-        [InlineData(PlanSectionType.ShoppingList)]
-        [InlineData(PlanSectionType.RequiredDisciplines)]
-        [InlineData(PlanSectionType.RequiredRecipes)]
-        public void EveryHeaderedSection_ReservesTheSameHeaderHeight(PlanSectionType sectionType)
+        [InlineData(nameof(PlanSectionType.UsedMaterials))]
+        [InlineData(nameof(PlanSectionType.ShoppingList))]
+        [InlineData(nameof(PlanSectionType.RequiredDisciplines))]
+        [InlineData(nameof(PlanSectionType.RequiredRecipes))]
+        public void EveryHeaderedSection_ReservesTheSameHeaderHeight(string sectionTypeName)
         {
+            var sectionType = EnumArg.Parse<PlanSectionType>(sectionTypeName);
             Assert.Equal(
                 PlanContentHeightMath.ColumnHeaderRowHeight,
                 PlanContentHeightMath.SectionBodyHeight(sectionType, new List<PlanRowViewModel>()));

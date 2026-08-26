@@ -48,13 +48,14 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(CraftingDecision.BuyFromTp)]
-        [InlineData(CraftingDecision.Have)]
-        [InlineData(CraftingDecision.Currency)]
-        [InlineData(CraftingDecision.GuildUpgrade)]
-        [InlineData(CraftingDecision.Unknown)]
-        public void TryBuildContent_NonCraftNonVendorDecision_ReturnsFalseEvenWithDivergentValues(CraftingDecision decision)
+        [InlineData(nameof(CraftingDecision.BuyFromTp))]
+        [InlineData(nameof(CraftingDecision.Have))]
+        [InlineData(nameof(CraftingDecision.Currency))]
+        [InlineData(nameof(CraftingDecision.GuildUpgrade))]
+        [InlineData(nameof(CraftingDecision.Unknown))]
+        public void TryBuildContent_NonCraftNonVendorDecision_ReturnsFalseEvenWithDivergentValues(string decisionName)
         {
+            var decision = EnumArg.Parse<CraftingDecision>(decisionName);
             var node = Node(decision, subtreeCost: 100, decisionValue: 350);
 
             bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
@@ -139,11 +140,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(TimegatedCapType.Daily, "day")]
-        [InlineData(TimegatedCapType.Weekly, "week")]
-        [InlineData(TimegatedCapType.Seasonal, "season")]
-        public void TryBuildContent_VendorDivergence_CapPeriodTextMatchesCapType(TimegatedCapType capType, string expectedPeriod)
+        [InlineData(nameof(TimegatedCapType.Daily), "day")]
+        [InlineData(nameof(TimegatedCapType.Weekly), "week")]
+        [InlineData(nameof(TimegatedCapType.Seasonal), "season")]
+        public void TryBuildContent_VendorDivergence_CapPeriodTextMatchesCapType(string capTypeName, string expectedPeriod)
         {
+            var capType = EnumArg.Parse<TimegatedCapType>(capTypeName);
             var node = Node(CraftingDecision.BuyFromVendor, itemId: 3, subtreeCost: 0, decisionValue: 100);
             var caps = new Dictionary<int, TimegatedItem>
             {
