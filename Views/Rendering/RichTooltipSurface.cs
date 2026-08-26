@@ -67,11 +67,20 @@ namespace GW2CraftingHelper.Views.Rendering
         /// x=0 of the xyaren capture, whose x=1 is already interior (G2).</summary>
         private static readonly Color BorderColor = new Color(6, 10, 12);
 
-        /// <summary>The light line the game runs immediately inside its
-        /// dark border - the capture shows a pair, not one edge. This
-        /// file's own chrome grey at low alpha: a highlight on the canvas,
-        /// not a second border.</summary>
-        private static readonly Color BevelColor = new Color(166, 175, 174) * 0.22f;
+        /// <summary>
+        /// The game DARKENS inward from its border - it never brightens.
+        /// Inward luminance profiles on all three lossless 2026-08-25 live
+        /// captures (s05/s07/eq-weapon-full) read border ~6-8, then ~9-10,
+        /// then ~16-30, flattening to a ~27-35 interior plateau, with no
+        /// overshoot anywhere. The bright ring the prior wave drew here
+        /// ((166,175,174)*0.22, doubling the brightness of a 1px ring) was
+        /// backwards and is deleted. Blish's own art does the same dimming
+        /// via edge bands at Black*0.5/0.6 (decompiled); these two inset
+        /// rings reproduce that fall-off over the flat fill.
+        /// </summary>
+        private static readonly Color VignetteInset1Color = Color.Black * 0.3f;
+
+        private static readonly Color VignetteInset2Color = Color.Black * 0.15f;
 
         /// <summary>
         /// Every glyph in a game tooltip carries a dark halo (measured at
@@ -178,14 +187,23 @@ namespace GW2CraftingHelper.Views.Rendering
 
             DrawEdges(spriteBatch, pixel, bounds, BorderColor);
 
-            // One pixel inside the border, and only where there is room
-            // for both: at two pixels wide it would overdraw it.
+            // The two-step inward dim band the live edge profiles show,
+            // drawn only where a ring fits without overdrawing the border
+            // or its opposite edge.
             if (bounds.Width > 2 && bounds.Height > 2)
             {
                 DrawEdges(
                     spriteBatch, pixel,
                     new Rectangle(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2),
-                    BevelColor);
+                    VignetteInset1Color);
+            }
+
+            if (bounds.Width > 4 && bounds.Height > 4)
+            {
+                DrawEdges(
+                    spriteBatch, pixel,
+                    new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, bounds.Height - 4),
+                    VignetteInset2Color);
             }
         }
 
