@@ -156,8 +156,8 @@ commit history carries `Co-Authored-By` trailers rather than hiding them.
 What that is worth depends entirely on the process around it, so here is the
 process, all of it checkable from this repository:
 
-- **Nothing ships untested.** Three test projects - 2,767 for the module plus
-  233 across the seeder and vendor-updater tools (measured 2026-08-25; the
+- **Nothing ships untested.** Three test projects - 3,084 for the module plus
+  233 across the seeder and vendor-updater tools (measured 2026-08-26; the
   badge above is the live answer) - run on every pull request and every push
   to `master` on
   [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml),
@@ -177,8 +177,25 @@ process, all of it checkable from this repository:
   and committed against the *old* implementation first. The 14.8MB vendor
   dataset, for instance, is pinned byte-for-byte against the writer that
   produces it.
+- **The build is warning-clean, and the compiler enforces it.**
+  `GW2CraftingHelper.csproj` sets `TreatWarningsAsErrors`, so a build that
+  prints anything failed. The StyleCop rules not yet satisfied are a named
+  list in that file's `<NoWarn>` - 26 rule IDs, each a bounded cleanup job -
+  and [`CONTRIBUTING.md`](CONTRIBUTING.md) states the rule that the list
+  only ever shrinks.
+- **The repo's other rules are enforced by CI, not memory.** The `invariants`
+  job in [`tests.yml`](.github/workflows/tests.yml) fails the build on
+  non-ASCII characters in source, a `.cs` file missing its `<Compile Include>`
+  entry, a doc or comment citing a file that does not exist, a broken
+  relative markdown link, and any source file growing past its pinned line
+  budget ([`docs/file-budgets.txt`](docs/file-budgets.txt) - a ratchet
+  introduced after one decomposed view quietly grew back past its
+  pre-refactor size with nothing watching).
 - **UI changes are checked in the running game**, not asserted from a diff, and
-  what was actually observed is recorded.
+  what was actually observed is recorded: each milestone record under
+  [`dev/records/`](dev/records/) ends in an explicit `Gate:` line - PASS,
+  FAIL, or "not required" with the reason - naming the live desktop session
+  that verified it, and a claim with no gate behind it says so.
 - **Every change is adversarially reviewed** against a written checklist in
   [`CLAUDE.md`](CLAUDE.md) - null inputs, empty collections, cancellation, API
   failure, race conditions, invariant violations - with findings classified and
