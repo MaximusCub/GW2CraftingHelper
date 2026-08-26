@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// solve pass and returns two NodeId sets (see ForceBuyPrePassResult);
     /// never touches reducer or solver state directly.
     /// </summary>
-    public static class OwnedMaterialsForceBuyPrePass
+    internal static class OwnedMaterialsForceBuyPrePass
     {
         // gw2e hardcodes the same 0.85 constant - a standalone
         // approximation reused for parity, not derived from

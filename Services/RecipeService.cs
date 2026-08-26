@@ -8,7 +8,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public class RecipeService
+    internal class RecipeService
     {
         private readonly IRecipeApiClient _api;
         private readonly int _maxConcurrency;

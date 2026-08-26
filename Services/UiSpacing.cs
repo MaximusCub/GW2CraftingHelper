@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// type stays in Views/Rendering/UiMetrics.
     /// </para>
     /// </summary>
-    public static class UiSpacing
+    internal static class UiSpacing
     {
         /// <summary>
         /// Distance from a panel's left edge to the content inside it.

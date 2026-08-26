@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Models
     /// for every LEARNED discipline regardless of Active, mirroring exactly
     /// what GET /v2/characters/:id/crafting returns.
     /// </summary>
-    public class SnapshotCharacterDiscipline
+    internal class SnapshotCharacterDiscipline
     {
         public string CharacterName { get; set; } = "";
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class PlanStep
+    internal class PlanStep
     {
         public int ItemId { get; set; }
 

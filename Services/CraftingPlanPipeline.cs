@@ -9,7 +9,7 @@ using GW2CraftingHelper.Services.Diagnostics;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CraftingPlanPipeline
+    internal class CraftingPlanPipeline
     {
         private readonly RecipeService _recipeService;
         private readonly TradingPostService _tradingPostService;

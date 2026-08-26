@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// exactly where a lone control should.
     /// </para>
     /// </summary>
-    public static class SettingsSaveBarLayout
+    internal static class SettingsSaveBarLayout
     {
         public const int SettingsSaveBarInset = SettingsFormLayout.CellLeftPad;
 

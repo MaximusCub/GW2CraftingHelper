@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2RecipeApiClient : IRecipeApiClient
+    internal class Gw2RecipeApiClient : IRecipeApiClient
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 

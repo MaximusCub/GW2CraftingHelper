@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Services
     /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class PlanContentHeightMath
+    internal static class PlanContentHeightMath
     {
         // --- Section row-height constants (mirrored 1:1 by CraftingPlanView's
         // row builders - CreateUsedMaterialRow, CreateShoppingRow, etc. use

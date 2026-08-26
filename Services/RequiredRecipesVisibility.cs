@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
     /// module simply could not check, which is worse than a harmless extra
     /// row.
     /// </summary>
-    public static class RequiredRecipesVisibility
+    internal static class RequiredRecipesVisibility
     {
         private const string LearnedStatusTag = "Learned";
         private const string AutoLearnedStatusTag = "Auto-learned";

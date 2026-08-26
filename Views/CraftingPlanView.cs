@@ -23,7 +23,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    public class CraftingPlanView : ISectionRelayoutSink
+    internal class CraftingPlanView : ISectionRelayoutSink
     {
         #region General: shared layout constants, colors, top-region geometry & dependencies
 

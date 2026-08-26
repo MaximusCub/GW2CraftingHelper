@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace GW2CraftingHelper.Models
 {
-    public class RecipeNode
+    internal class RecipeNode
     {
         public int Id { get; set; }
 

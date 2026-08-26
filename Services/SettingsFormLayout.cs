@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// here.
     /// </para>
     /// </summary>
-    public static class SettingsFormLayout
+    internal static class SettingsFormLayout
     {
         /// <summary>Left inset inside every board column - the same inset
         /// the section titles sit at.</summary>

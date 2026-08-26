@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
     /// of each fixed-height row this section's new formula-band/currency-
     /// table/footnote shape actually has) lives here.
     /// </summary>
-    public static class SummarySectionLayoutMath
+    internal static class SummarySectionLayoutMath
     {
         /// <summary>
         /// Total height of the redesigned Total Cost section's content

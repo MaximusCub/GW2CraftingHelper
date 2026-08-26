@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>Columns the Snapshot tab's two runs expose - one enum,
     /// because they are the same two columns over different data.</summary>
-    public enum SnapshotTableColumn
+    internal enum SnapshotTableColumn
     {
         Name,
         Amount,
@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// same shape as <see cref="PlanTableSorter"/> (case-insensitive names
     /// included) except in what they return - see <see cref="ItemOrder"/>.
     /// </summary>
-    public static class SnapshotTableSorter
+    internal static class SnapshotTableSorter
     {
         /// <summary>
         /// The sort as a PERMUTATION of the caller's rows: <c>order[i]</c>

@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     /// display-row shape on top of it.
     /// </para>
     /// </summary>
-    public static class SnapshotSearchResultBuilder
+    internal static class SnapshotSearchResultBuilder
     {
         /// <summary>
         /// Shortest query allowed to match a character label. Item and

@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class InventoryReducer
+    internal class InventoryReducer
     {
         public ReducedTreeResult Reduce(
             RecipeNode tree,

@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Services.Diagnostics
     /// before - fully backward compatible.
     /// </para>
     /// </summary>
-    public static class PlanPhaseTimingSummary
+    internal static class PlanPhaseTimingSummary
     {
         // Order matters: this is the emission order of the compact
         // summary, matching PlanPhaseEvent's own BuildingTree ->

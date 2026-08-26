@@ -5,7 +5,7 @@ namespace GW2CraftingHelper.Services
     /// <see cref="PlanStripStatusBoard"/> for its own generation - see
     /// <see cref="PlanStripTickDecision.Decide"/>.
     /// </summary>
-    public enum PlanStripTickAction
+    internal enum PlanStripTickAction
     {
         /// <summary>
         /// This ticker's generation has been superseded by a newer one (or
@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Services
     /// already-live ticks - are both directly testable without any Blish
     /// HUD control in the loop.
     /// </summary>
-    public static class PlanStripTickDecision
+    internal static class PlanStripTickDecision
     {
         public static PlanStripTickAction Decide(PlanStripStatusSnapshot snapshot, int myGen)
         {

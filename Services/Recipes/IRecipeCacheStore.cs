@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class RecipeCacheStats
+    internal class RecipeCacheStats
     {
         private int _searchHits;
         private int _searchMisses;
@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services.Recipes
         public void IncrementRecipeMiss() => Interlocked.Increment(ref _recipeMisses);
     }
 
-    public interface IRecipeCacheStore
+    internal interface IRecipeCacheStore
     {
         IReadOnlyList<int> TryGetSearch(int outputItemId);
 

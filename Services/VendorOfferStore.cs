@@ -7,7 +7,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class VendorOfferStore
+    internal class VendorOfferStore
     {
         private readonly string _overlayPath;
         private readonly VendorOfferLoader _loader;

@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Services
     /// negative X. <see cref="Place"/> keeps Blish's above-when-it-fits
     /// preference and its 36px cursor gap, then clamps all four edges.
     /// </summary>
-    public static class TooltipLayoutMath
+    internal static class TooltipLayoutMath
     {
         /// <summary>
         /// Blish's own <c>Tooltip.MOUSE_VERTICAL_MARGIN</c> (measured).

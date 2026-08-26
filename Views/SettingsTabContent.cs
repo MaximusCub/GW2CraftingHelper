@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Views
     /// defaults (price basis, own materials) remain on the Crafting Plan
     /// tab - only informational text about them is shown here.
     /// </summary>
-    public class SettingsTabContent
+    internal class SettingsTabContent
     {
         // Curated list of common plan currencies: Karma, Laurels, Spirit
         // Shards, the Rift Essence tiers, and Astral Acclaim. The coin

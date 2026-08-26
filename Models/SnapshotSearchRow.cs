@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Models
     /// "Aggregate" checkbox's one-row-per-item-per-source rendering with
     /// this as the only, always-on behavior.
     /// </summary>
-    public class SnapshotSearchRow
+    internal class SnapshotSearchRow
     {
         public int ItemId { get; set; }
 
@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Models
     /// already display names, but the raw "Character:" prefix is an
     /// internal encoding token that must never reach the UI verbatim).
     /// </summary>
-    public class SnapshotSourceCount
+    internal class SnapshotSourceCount
     {
         public string Label { get; set; } = "";
 

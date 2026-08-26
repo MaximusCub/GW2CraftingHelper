@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Services
     /// claims "plan requires"; it states only what
     /// this row's own numbers actually mean.
     /// </summary>
-    public static class ShoppingRowTooltipFormatter
+    internal static class ShoppingRowTooltipFormatter
     {
         /// <summary>
         /// The whole shopping row tooltip as CONTENT rather than as a

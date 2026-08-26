@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// live-measured histogram behind that threshold, and why 120 is
     /// hardcoded here are in docs/ARCHITECTURE.md section 2.
     /// </summary>
-    public static class WheelDeltaSanitizer
+    internal static class WheelDeltaSanitizer
     {
         /// <summary>
         /// See the class doc comment's threshold derivation. Any raw delta

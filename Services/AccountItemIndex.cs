@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class AccountItemIndex
+    internal class AccountItemIndex
     {
         public const string SourceMaterialStorage = "MaterialStorage";
         public const string SourceSharedInventory = "SharedInventory";

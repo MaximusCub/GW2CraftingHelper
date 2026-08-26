@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// baseline, strict-cheaper craft/vendor comparisons, Mystic Clover EV
     /// pricing, force-craft) for the durable rationale.
     /// </summary>
-    public class PlanSolver
+    internal class PlanSolver
     {
         // The vendor-batching sub-engine lives in the injected
         // VendorBatchSolver collaborator; the parameterless constructor

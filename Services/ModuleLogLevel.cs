@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// filter (Error+/Warn+/Info+/Debug+) and for ModuleLog's own file-sink
     /// floor check.
     /// </summary>
-    public enum ModuleLogLevel
+    internal enum ModuleLogLevel
     {
         Debug = 0,
         Info = 1,

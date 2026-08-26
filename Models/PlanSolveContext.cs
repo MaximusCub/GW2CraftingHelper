@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Models
     /// the originating generation. Enables instant per-node override
     /// recomputes in the UI.
     /// </summary>
-    public class PlanSolveContext
+    internal class PlanSolveContext
     {
         public int TargetItemId { get; set; }
 

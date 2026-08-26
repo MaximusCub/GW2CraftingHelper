@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Services
     /// Blish's own Logger only, see Module.cs's wiring.
     /// </para>
     /// </summary>
-    public class ModuleLogStore
+    internal class ModuleLogStore
     {
         private const string FileName = "module_log.jsonl";
 

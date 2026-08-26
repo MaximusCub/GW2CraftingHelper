@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class AccountSnapshot
+    internal class AccountSnapshot
     {
         public DateTime CapturedAt { get; set; }
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class CraftingPlan
+    internal class CraftingPlan
     {
         public int TargetItemId { get; set; }
 

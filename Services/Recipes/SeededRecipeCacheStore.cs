@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class SeededRecipeCacheStore : IRecipeCacheStore
+    internal class SeededRecipeCacheStore : IRecipeCacheStore
     {
         private Dictionary<int, IReadOnlyList<int>> _searches =
             new Dictionary<int, IReadOnlyList<int>>();

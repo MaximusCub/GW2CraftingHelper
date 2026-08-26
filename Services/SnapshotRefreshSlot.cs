@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Services
     /// read the fetch would otherwise have to make.
     /// </para>
     /// </summary>
-    public sealed class SnapshotRefreshSlot
+    internal sealed class SnapshotRefreshSlot
     {
         private int _claimed;
         private CancellationTokenSource _cts;

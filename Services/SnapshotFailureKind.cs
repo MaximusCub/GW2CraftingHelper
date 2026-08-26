@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// between the ApiAccessNotReady walkthrough dialog and a plain
     /// status-label cause for everything else.
     /// </summary>
-    public enum SnapshotFailureKind
+    internal enum SnapshotFailureKind
     {
         /// <summary>
         /// No known pattern matched - the same bare "Refresh failed"

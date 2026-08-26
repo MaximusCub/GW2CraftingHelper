@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// from instead of re-typing them - a change to the minimum has to move
     /// the tests with it.
     /// </summary>
-    public static class WindowSizing
+    internal static class WindowSizing
     {
         /// <summary>
         /// Narrowest window the recipe tree stays readable in. Measured for

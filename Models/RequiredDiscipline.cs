@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class RequiredDiscipline
+    internal class RequiredDiscipline
     {
         public string Discipline { get; set; }
 

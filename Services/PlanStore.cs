@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Services
     /// try/catch below.
     /// </para>
     /// </summary>
-    public class PlanStore
+    internal class PlanStore
     {
         // Gzip's own magic number (RFC 1952 SS2.3.1) - the first two bytes
         // of every gzip member, regardless of what is inside it.

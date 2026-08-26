@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class SnapshotItemEntry
+    internal class SnapshotItemEntry
     {
         public int ItemId { get; set; }
 

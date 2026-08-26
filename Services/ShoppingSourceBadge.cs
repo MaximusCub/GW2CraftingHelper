@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Services
     /// Shopping List does not emit.
     /// </para>
     /// </summary>
-    public static class ShoppingSourceBadge
+    internal static class ShoppingSourceBadge
     {
         public static string ForRow(PlanRowViewModel row)
         {

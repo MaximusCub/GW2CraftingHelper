@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// Classify(Exception) overload below does the same for a bare
     /// exception.
     /// </summary>
-    public static class SnapshotFailureClassifier
+    internal static class SnapshotFailureClassifier
     {
         /// <summary>
         /// Exception type names that mean "the API key this module would

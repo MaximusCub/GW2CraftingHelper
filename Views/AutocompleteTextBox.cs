@@ -3,12 +3,12 @@ using System;
 
 namespace GW2CraftingHelper.Views
 {
-    public class AutocompleteEnterEventArgs : EventArgs
+    internal class AutocompleteEnterEventArgs : EventArgs
     {
         public bool Handled { get; set; }
     }
 
-    public class AutocompleteTextBox : TextBox
+    internal class AutocompleteTextBox : TextBox
     {
         public event EventHandler<int> ArrowPressed;
 

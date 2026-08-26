@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// the tab in one edit.
     /// </para>
     /// </summary>
-    public static class AboutLayoutMath
+    internal static class AboutLayoutMath
     {
         /// <summary>Left gutter of both columns - the module's content
         /// inset.</summary>

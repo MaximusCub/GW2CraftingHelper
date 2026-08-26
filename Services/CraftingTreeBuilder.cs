@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CraftingTreeBuilder
+    internal class CraftingTreeBuilder
     {
         /// <summary>
         /// Build-invariant lookup state threaded through every BuildNode/

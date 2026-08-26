@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Models
     /// CraftingPlanResult.MaterialOpportunityCost - see that field's own
     /// doc comment).
     /// </summary>
-    public class ExcessCraftOutput
+    internal class ExcessCraftOutput
     {
         public int ItemId { get; set; }
 

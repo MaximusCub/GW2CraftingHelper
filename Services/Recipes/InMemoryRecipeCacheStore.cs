@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class InMemoryRecipeCacheStore : IRecipeCacheStore
+    internal class InMemoryRecipeCacheStore : IRecipeCacheStore
     {
         private readonly Dictionary<int, IReadOnlyList<int>> _searches =
             new Dictionary<int, IReadOnlyList<int>>();

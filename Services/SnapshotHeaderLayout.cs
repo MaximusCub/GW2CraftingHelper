@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Services
     /// </para>
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class SnapshotHeaderLayout
+    internal static class SnapshotHeaderLayout
     {
         /// <summary>
         /// Height of the status row beneath the header buttons. MainView

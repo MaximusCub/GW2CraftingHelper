@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// boxes: every pixel belongs to exactly one cell, so no click lands
     /// in a dead strip between two columns.
     /// </summary>
-    public static class HeaderCellMath
+    internal static class HeaderCellMath
     {
         /// <summary>
         /// Where one header label sits inside its band, and - when the

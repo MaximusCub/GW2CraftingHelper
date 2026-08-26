@@ -6,7 +6,7 @@ using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Tests.Helpers
 {
-    public class InMemoryAccountRecipeClient : IAccountRecipeClient
+    internal class InMemoryAccountRecipeClient : IAccountRecipeClient
     {
         private readonly HashSet<int> _learnedRecipes = new HashSet<int>();
         private bool _hasPermission = true;

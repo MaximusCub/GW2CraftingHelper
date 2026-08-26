@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// the caller) is intentional - it keeps this class free of any Blish
     /// dependency rather than threading a bool back out for one call site.
     /// </summary>
-    public static class TreeRowTooltipComposer
+    internal static class TreeRowTooltipComposer
     {
         /// <summary>
         /// A row's item stat block as tooltip content, or empty content

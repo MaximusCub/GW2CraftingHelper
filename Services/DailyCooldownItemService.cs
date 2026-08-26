@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Services
     /// so a bad or missing seed file never blocks module load or produces
     /// an invented cooldown notice.
     /// </summary>
-    public static class DailyCooldownItemService
+    internal static class DailyCooldownItemService
     {
         private class DailyCooldownEnvelope
         {

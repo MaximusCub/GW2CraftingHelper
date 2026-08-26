@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Models
     /// KNOWN-ISSUES #40).
     /// </para>
     /// </summary>
-    public sealed class ItemStatBlock
+    internal sealed class ItemStatBlock
     {
         public int ItemId { get; set; }
 

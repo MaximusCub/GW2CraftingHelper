@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// unknown text is a silent one.
     /// </para>
     /// </summary>
-    public static class ItemDescriptionSanitizer
+    internal static class ItemDescriptionSanitizer
     {
         private static readonly IReadOnlyList<TooltipSpan> NoSpans = new List<TooltipSpan>();
 

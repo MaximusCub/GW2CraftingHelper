@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// LabelHelpers.EllipsizeToWidth is now a thin adapter over
     /// <see cref="Ellipsize"/> so the two paths cannot drift.
     /// </summary>
-    public static class TextWrapMath
+    internal static class TextWrapMath
     {
         public const string Ellipsis = "...";
 

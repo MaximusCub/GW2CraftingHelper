@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
-    public class RawPriceEntry
+    internal class RawPriceEntry
     {
         public int Id { get; set; }
 
@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Services
         public int SellUnitPrice { get; set; }
     }
 
-    public interface IPriceApiClient
+    internal interface IPriceApiClient
     {
         Task<IReadOnlyList<RawPriceEntry>> GetPricesAsync(IReadOnlyList<int> itemIds, CancellationToken ct);
     }

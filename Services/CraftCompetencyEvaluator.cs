@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// CanCraft or a manual override - only whether Craft may win
     /// AUTOMATICALLY.
     /// </summary>
-    public static class CraftCompetencyEvaluator
+    internal static class CraftCompetencyEvaluator
     {
         // Recipe "Disciplines" tags that are informational source facts, not
         // real, player-levelable GW2 crafting disciplines - a recipe

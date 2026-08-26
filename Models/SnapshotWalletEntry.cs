@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class SnapshotWalletEntry
+    internal class SnapshotWalletEntry
     {
         public int CurrencyId { get; set; }
 

@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// Resolves ids to names via the shared resolvers and never surfaces
     /// a raw id (repo invariant).
     /// </summary>
-    public static class PillSubduingTooltipBuilder
+    internal static class PillSubduingTooltipBuilder
     {
         /// <summary>
         /// The tooltip for a subdued pill, or null when there is no reason

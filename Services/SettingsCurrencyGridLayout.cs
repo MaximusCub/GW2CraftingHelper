@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// (SettingsTabContent.AddCurrencyRow / ApplyCurrencyFilter) only copies
     /// the results onto controls.
     /// </summary>
-    public static class SettingsCurrencyGridLayout
+    internal static class SettingsCurrencyGridLayout
     {
         // Horizontal layout of one currency cell. These live here rather
         // than in the view so SettingsCurrencyMinColumnWidth below is derived from the same

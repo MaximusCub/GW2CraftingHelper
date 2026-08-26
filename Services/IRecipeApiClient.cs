@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
-    public class RawIngredient
+    internal class RawIngredient
     {
         public string Type { get; set; }
 
@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
         public int? AchievementBit { get; set; }
     }
 
-    public class RawRecipe
+    internal class RawRecipe
     {
         public int Id { get; set; }
 
@@ -64,7 +64,7 @@ namespace GW2CraftingHelper.Services
         public int? AchievementId { get; set; }
     }
 
-    public interface IRecipeApiClient
+    internal interface IRecipeApiClient
     {
         Task<IReadOnlyList<int>> SearchByOutputAsync(int itemId, CancellationToken ct);
 

@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// module's UI click, kept apart from the Blish-coupled player
     /// (Views/Rendering/ClickSound) so it is covered by Blish-free tests.
     /// </summary>
-    public static class ClickSoundVolume
+    internal static class ClickSoundVolume
     {
         public const int MinPercent = 0;
         public const int MaxPercent = 100;

@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Models
     /// has none either (Section 1.5); see KNOWN-ISSUES #24 for the
     /// deferred divergence option.
     /// </summary>
-    public class HomesteadEfficiencyTiers
+    internal class HomesteadEfficiencyTiers
     {
         /// <summary>Tier 0 for every material. The default when nothing is configured.</summary>
         public static readonly HomesteadEfficiencyTiers Default =

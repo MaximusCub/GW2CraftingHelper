@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class ItemNameEntry
+    internal class ItemNameEntry
     {
         public int Id { get; set; }
 
@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services.Recipes
         public string Icon { get; set; }
     }
 
-    public class ItemNameSeedData
+    internal class ItemNameSeedData
     {
         public IReadOnlyList<ItemNameEntry> Items { get; }
 

@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace GW2CraftingHelper.Services.Diagnostics
 {
-    public static class PlanTimingAnalyzer
+    internal static class PlanTimingAnalyzer
     {
         // Extracted so PlanPhaseTimingSummary can locate exactly where
         // the raw per-step timing lines end within a full DebugLog (raw

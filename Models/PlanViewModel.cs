@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public enum PlanSectionType
+    internal enum PlanSectionType
     {
         Summary,
         UsedMaterials,
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Models
         RecipeTree,
     }
 
-    public enum PlanRowType
+    internal enum PlanRowType
     {
         CurrencyCost,
         UsedMaterial,
@@ -100,7 +100,7 @@ namespace GW2CraftingHelper.Models
         NoteLine,
     }
 
-    public class PlanViewModel
+    internal class PlanViewModel
     {
         public string TargetItemName { get; set; }
 
@@ -186,7 +186,7 @@ namespace GW2CraftingHelper.Models
     /// Used for BuyFromVendor rows/nodes priced wholly or partly in a
     /// non-coin currency (spirit shards, karma, etc.) - KNOWN-ISSUES #16.
     /// </summary>
-    public class CurrencyAmountViewModel
+    internal class CurrencyAmountViewModel
     {
         public long Amount { get; set; }
 
@@ -236,7 +236,7 @@ namespace GW2CraftingHelper.Models
         public int? RawOwnedQuantity { get; set; }
     }
 
-    public class PlanSectionViewModel
+    internal class PlanSectionViewModel
     {
         public PlanSectionType SectionType { get; set; }
 
@@ -247,7 +247,7 @@ namespace GW2CraftingHelper.Models
         public bool IsDefaultExpanded { get; set; }
     }
 
-    public class PlanRowViewModel
+    internal class PlanRowViewModel
     {
         public PlanRowType RowType { get; set; }
 

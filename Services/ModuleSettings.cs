@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class ModuleSettings
+    internal class ModuleSettings
     {
         public SettingEntry<int> ModalDialogX { get; private set; }
 

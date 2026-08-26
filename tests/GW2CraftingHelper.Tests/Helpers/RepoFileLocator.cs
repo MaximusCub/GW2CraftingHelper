@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// was written "mirroring AcquisitionHintServiceTests' FindRepoFile
     /// pattern," i.e. the duplication was already self-acknowledged.
     /// </summary>
-    public static class RepoFileLocator
+    internal static class RepoFileLocator
     {
         /// <summary>
         /// Walks up from the running test assembly's directory looking for

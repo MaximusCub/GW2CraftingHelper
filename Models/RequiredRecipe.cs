@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class RequiredRecipe
+    internal class RequiredRecipe
     {
         public int RecipeId { get; set; }
 

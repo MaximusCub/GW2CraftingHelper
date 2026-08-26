@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// this class only ever asks "is it present".
     /// </para>
     /// </summary>
-    public static class ItemStatTooltipComposer
+    internal static class ItemStatTooltipComposer
     {
         private static readonly IReadOnlyList<ItemAttributeLine> EmptyAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();

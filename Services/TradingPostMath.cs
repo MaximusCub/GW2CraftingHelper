@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Services
     /// the GW2 wiki's Trading Post documentation). Fees must not be applied
     /// per unit: a 250-stack of 1c items nets ~212c, not 0.
     /// </summary>
-    public static class TradingPostMath
+    internal static class TradingPostMath
     {
         public static long ListingFee(long totalValue)
         {

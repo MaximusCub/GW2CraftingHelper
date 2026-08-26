@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// putting them on top of a live click target.
     /// </para>
     /// </summary>
-    public static class TreeToolbarRowLayout
+    internal static class TreeToolbarRowLayout
     {
         /// <summary>Gap between two buttons in the same group.</summary>
         public const int TreeToolbarButtonGap = 4;

@@ -22,7 +22,7 @@ namespace GW2CraftingHelper.Services
     /// still exactly one fixed-height row and the DEBUG per-row assert in
     /// NotesSectionRenderer stays the real check.
     /// </summary>
-    public static class NotesSectionLayoutMath
+    internal static class NotesSectionLayoutMath
     {
         /// <summary>Left x of a note line's label.</summary>
         public const int LabelX = 8;

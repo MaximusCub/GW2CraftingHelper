@@ -59,7 +59,7 @@ namespace GW2CraftingHelper.Models
     /// as a raw ordinal int - inserting a new member anywhere earlier would silently reassign
     /// every later member's on-disk integer and misread old persisted plans.
     /// </summary>
-    public enum CraftingDecision
+    internal enum CraftingDecision
     {
         Craft,
         BuyFromTp,

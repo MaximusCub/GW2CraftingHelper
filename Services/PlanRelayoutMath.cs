@@ -15,7 +15,7 @@ namespace GW2CraftingHelper.Services
     /// geometry, generic centering/right-alignment/name-column budgeting).
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class PlanRelayoutMath
+    internal static class PlanRelayoutMath
     {
         /// <summary>
         /// Left edge that centers a contentWidth-wide block inside a

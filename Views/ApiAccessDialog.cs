@@ -43,7 +43,7 @@ namespace GW2CraftingHelper.Views
     /// every Show() call - no new ModuleSettings entries needed for it.
     /// </para>
     /// </summary>
-    public class ApiAccessDialog : IDisposable
+    internal class ApiAccessDialog : IDisposable
     {
         private const string WindowId = "GW2CraftingHelper_ApiAccessDialog_7d2c31";
 

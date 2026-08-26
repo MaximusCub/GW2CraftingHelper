@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CompositeRecipeApiClient : IRecipeApiClient
+    internal class CompositeRecipeApiClient : IRecipeApiClient
     {
         private readonly IRecipeApiClient _primary;
         private readonly MysticForgeRecipeData _mfData;

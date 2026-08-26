@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// CurrencyAmountViewModel has no id field at all, only Amount/Name/
     /// IconUrl, so a caller cannot accidentally surface a raw currency id.
     /// </summary>
-    public static class CurrencyDisplayResolver
+    internal static class CurrencyDisplayResolver
     {
         /// <summary>
         /// Prefers the live-fetched currency name when currencyMetadata has

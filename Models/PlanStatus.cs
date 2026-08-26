@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class PlanStatus
+    internal class PlanStatus
     {
         public string Message { get; set; }
 

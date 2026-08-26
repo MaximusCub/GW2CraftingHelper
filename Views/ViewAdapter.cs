@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Views
     /// provides additional left/right/bottom padding so view content
     /// does not press against the border chrome.
     /// </summary>
-    public class ViewAdapter : View
+    internal class ViewAdapter : View
     {
         // Match WindowBase2.STANDARD_MARGIN (internal const = 16)
         private const int OUTER_PADDING = 16;

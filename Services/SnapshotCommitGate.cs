@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// completed by the time TryCommit is called, and ClearCache's own work
     /// is all synchronous field/file writes).
     /// </summary>
-    public sealed class SnapshotCommitGate
+    internal sealed class SnapshotCommitGate
     {
         private readonly object _lock = new object();
         private int _epoch;

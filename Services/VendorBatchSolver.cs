@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// declare fields/locals of them.
     /// <para>See docs/ARCHITECTURE.md section 7.</para>
     /// </summary>
-    public class VendorBatchSolver
+    internal class VendorBatchSolver
     {
         // See PlanSolver.Decision.VendorBatch's doc comment.
         internal struct VendorOfferBatch

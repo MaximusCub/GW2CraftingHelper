@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// a real cancellation still propagates as OperationCanceledException,
     /// never wrapped in this type.
     /// </summary>
-    public class SnapshotFetchFailedException : Exception
+    internal class SnapshotFetchFailedException : Exception
     {
         public int FailedSourceCount { get; }
 

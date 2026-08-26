@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// does not need to parse free-form text to know what stage generation
     /// is in.
     /// </summary>
-    public enum PlanPhase
+    internal enum PlanPhase
     {
         BuildingTree,
         FetchingPrices,
@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
     /// behavior change, matching every other optional progress parameter
     /// this pipeline already has.
     /// </summary>
-    public class PlanPhaseEvent
+    internal class PlanPhaseEvent
     {
         public PlanPhase Phase { get; set; }
 

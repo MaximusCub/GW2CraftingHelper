@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// control creation, ...) stays in CoinCurrencyRenderer since it is
     /// genuinely Blish-bound.
     /// </summary>
-    public static class CoinSegmentMath
+    internal static class CoinSegmentMath
     {
         public const int CoinIconSize = 20;
         public const int CoinLabelIconGap = 2;

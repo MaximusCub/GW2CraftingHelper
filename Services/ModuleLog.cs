@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Services
     /// read+rewrite trim pass - would stall that exact frame.
     /// </para>
     /// </summary>
-    public class ModuleLog
+    internal class ModuleLog
     {
         public const int DefaultRingCapacity = 2000;
 

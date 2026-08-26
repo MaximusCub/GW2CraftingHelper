@@ -7,7 +7,7 @@ namespace GW2CraftingHelper.Models
     /// and a short pill/tag label, respectively); SourceUrl and
     /// LastVerified are provenance for maintainers only.
     /// </summary>
-    public class AcquisitionHint
+    internal class AcquisitionHint
     {
         public int ItemId { get; set; }
 

@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// look at the raw file is legible without a lookup table.
     /// </para>
     /// </summary>
-    public class ModuleLogEntry
+    internal class ModuleLogEntry
     {
         [JsonProperty("t")]
         public DateTime TimestampUtc { get; set; }

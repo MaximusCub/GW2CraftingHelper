@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
     /// on the module's standing line - columns live, ellipses at drag
     /// settle - being its heaviest text-measurement path.
     /// </summary>
-    public class LogTabContent
+    internal class LogTabContent
     {
         private static readonly Logger Logger = Logger.GetLogger<LogTabContent>();
 

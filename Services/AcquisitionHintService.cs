@@ -14,7 +14,7 @@ namespace GW2CraftingHelper.Services
     /// too since this is a pure static-data seed with no network fallback
     /// to fall back to).
     /// </summary>
-    public static class AcquisitionHintService
+    internal static class AcquisitionHintService
     {
         private class AcquisitionHintEnvelope
         {

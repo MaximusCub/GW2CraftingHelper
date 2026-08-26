@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// focused test files - both helpers are called from every split file,
     /// so they moved here rather than being duplicated per file.
     /// </summary>
-    public static class CraftingPlanResultBuilders
+    internal static class CraftingPlanResultBuilders
     {
         public static CraftingPlanResult MakeResult(
             int targetItemId = 1,

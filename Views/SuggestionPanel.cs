@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Views
 {
-    public class ItemSelectedEventArgs : EventArgs
+    internal class ItemSelectedEventArgs : EventArgs
     {
         public int ItemId { get; set; }
 
@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Views
         public string IconUrl { get; set; }
     }
 
-    public class SuggestionPanel : IDisposable
+    internal class SuggestionPanel : IDisposable
     {
         private const int MaxResults = 8;
         private const int RowHeight = 28;

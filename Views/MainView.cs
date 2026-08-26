@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Views
     /// bounds how often it runs while the search box is being typed into,
     /// which is where the cancellation/marshal ceremony below comes from.
     /// </summary>
-    public class MainView
+    internal class MainView
     {
         private static readonly Logger Logger = Logger.GetLogger<MainView>();
 

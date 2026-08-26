@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// lookups - it is fetched once with a single "ids=all" request and
     /// cached in memory for every later call.
     /// </summary>
-    public class CurrencyMetadataService
+    internal class CurrencyMetadataService
     {
         private const string Url = "https://api.guildwars2.com/v2/currencies?ids=all";
         private static readonly TimeSpan DefaultFetchTimeout = TimeSpan.FromSeconds(5);

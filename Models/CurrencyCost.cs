@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class CurrencyCost
+    internal class CurrencyCost
     {
         public int CurrencyId { get; set; }
 

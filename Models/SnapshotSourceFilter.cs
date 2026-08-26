@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Models
     /// themselves are defined).
     /// </para>
     /// </summary>
-    public class SnapshotSourceFilter
+    internal class SnapshotSourceFilter
     {
         public bool Bank { get; set; } = true;
 

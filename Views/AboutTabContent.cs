@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Views
     /// package reference for a two-field, display-only read.
     /// </para>
     /// </summary>
-    public class AboutTabContent
+    internal class AboutTabContent
     {
         private static readonly Logger Logger = Logger.GetLogger<AboutTabContent>();
 

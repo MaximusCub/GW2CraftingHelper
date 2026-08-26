@@ -7,7 +7,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class TradingPostService
+    internal class TradingPostService
     {
         private const int BatchSize = 200;
 

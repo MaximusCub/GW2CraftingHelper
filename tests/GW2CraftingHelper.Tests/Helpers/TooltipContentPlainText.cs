@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// <see cref="CoinValues"/>.
     /// </para>
     /// </summary>
-    public static class TooltipContentPlainText
+    internal static class TooltipContentPlainText
     {
         /// <summary>Every line joined by '\n' - one flat string.</summary>
         public static string ToPlainText(this TooltipContent content)

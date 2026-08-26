@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Services
     /// URLs) - see BuildRecipeSheetUrl.
     /// </para>
     /// </summary>
-    public static class WikiLinkBuilder
+    internal static class WikiLinkBuilder
     {
         private const string BaseUrl = "https://wiki.guildwars2.com/wiki/";
         private const string RecipeNamespacePrefix = "Recipe:_";

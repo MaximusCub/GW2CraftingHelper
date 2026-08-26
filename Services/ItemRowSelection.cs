@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// leaves the id behind unless something invalidates it, which is how a
     /// box reading one item could generate a plan for another.
     /// </summary>
-    public static class ItemRowSelection
+    internal static class ItemRowSelection
     {
         /// <summary>Shown when every row is genuinely empty.</summary>
         // Two actions in the order they happen, and the button named
@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Services
     /// How a typed name lined up with the search results it was looked up
     /// against.
     /// </summary>
-    public enum TypedNameMatchKind
+    internal enum TypedNameMatchKind
     {
         /// <summary>Nothing carries exactly that name.</summary>
         None,
@@ -180,7 +180,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// The outcome of <see cref="ItemRowSelection.MatchTypedName"/>.
     /// </summary>
-    public readonly struct TypedNameMatch
+    internal readonly struct TypedNameMatch
     {
         public TypedNameMatch(TypedNameMatchKind kind, ItemSearchResult result)
         {

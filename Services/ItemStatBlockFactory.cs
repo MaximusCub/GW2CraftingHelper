@@ -27,7 +27,7 @@ namespace GW2CraftingHelper.Services
     /// in this feature that would need a /v2/itemstats request. Nothing is guessed here.
     /// </para>
     /// </summary>
-    public static class ItemStatBlockFactory
+    internal static class ItemStatBlockFactory
     {
         private static readonly IReadOnlyList<ItemAttributeLine> NoAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> NoStrings = new List<string>();

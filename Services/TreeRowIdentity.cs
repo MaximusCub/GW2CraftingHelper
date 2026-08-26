@@ -32,7 +32,7 @@ namespace GW2CraftingHelper.Services
     /// states one item and prices another.
     /// </para>
     /// </summary>
-    public static class TreeRowIdentity
+    internal static class TreeRowIdentity
     {
         /// <summary>
         /// True when <paramref name="fresh"/> may be painted into the row

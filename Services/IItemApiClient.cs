@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
-    public class RawItem
+    internal class RawItem
     {
         public int Id { get; set; }
 
@@ -52,7 +52,7 @@ namespace GW2CraftingHelper.Services
     /// therefore nullable or empty here; nothing in this type is inferred
     /// or defaulted to a plausible value.
     /// </summary>
-    public class RawItemDetail
+    internal class RawItemDetail
     {
         /// <summary>details.type - the SUBTYPE ("Gloves", "Sword", "Rune",
         /// "Food"), not the item's top-level type.</summary>
@@ -112,14 +112,14 @@ namespace GW2CraftingHelper.Services
         public string NourishmentDescription { get; set; }
     }
 
-    public class RawItemAttribute
+    internal class RawItemAttribute
     {
         public string Attribute { get; set; }
 
         public int Modifier { get; set; }
     }
 
-    public interface IItemApiClient
+    internal interface IItemApiClient
     {
         Task<IReadOnlyList<RawItem>> GetItemsAsync(IReadOnlyList<int> itemIds, CancellationToken ct);
     }

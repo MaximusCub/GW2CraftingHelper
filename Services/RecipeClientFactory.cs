@@ -2,7 +2,7 @@ using System;
 
 namespace GW2CraftingHelper.Services
 {
-    public static class RecipeClientFactory
+    internal static class RecipeClientFactory
     {
         // Quality-audit B3 (KNOWN-ISSUES #53): mfData.LoadWarnings was
         // collected and never logged, and this catch swallowed the load

@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class ItemMetadata
+    internal class ItemMetadata
     {
         public int ItemId { get; set; }
 

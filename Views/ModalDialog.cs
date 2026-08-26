@@ -9,7 +9,7 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views
 {
-    public class ModalDialog : IDisposable
+    internal class ModalDialog : IDisposable
     {
         private const string WindowId = "GW2CraftingHelper_ModalDialog_c4f19a";
 

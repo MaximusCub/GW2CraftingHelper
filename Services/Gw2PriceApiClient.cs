@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2PriceApiClient : IPriceApiClient
+    internal class Gw2PriceApiClient : IPriceApiClient
     {
         private const string BaseUrl = "https://api.guildwars2.com/v2";
 

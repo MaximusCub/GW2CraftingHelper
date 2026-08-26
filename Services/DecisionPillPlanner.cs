@@ -4,7 +4,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public enum PillKind
+    internal enum PillKind
     {
         Selected,
         Available,
@@ -38,7 +38,7 @@ namespace GW2CraftingHelper.Services
         Subdued,
     }
 
-    public readonly struct PillSpec
+    internal readonly struct PillSpec
     {
         public readonly string Text;
         public readonly AcquisitionSource? Source; // non-null => clickable
@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Services
     /// testable; the view only turns these specs into controls, never
     /// decides which pills exist or which is selected.
     /// </summary>
-    public static class DecisionPillPlanner
+    internal static class DecisionPillPlanner
     {
         // The module-owned source badge texts, shared with
         // ShoppingSourceBadge (the other renderer of a seeded

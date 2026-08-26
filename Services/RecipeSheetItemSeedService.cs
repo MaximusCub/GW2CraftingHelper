@@ -21,7 +21,7 @@ namespace GW2CraftingHelper.Services
     /// non-empty map meant the feature could never fire for a real plan
     /// (KNOWN-ISSUES #49).
     /// </summary>
-    public static class RecipeSheetItemSeedService
+    internal static class RecipeSheetItemSeedService
     {
         private class RecipeSheetItemEnvelope
         {

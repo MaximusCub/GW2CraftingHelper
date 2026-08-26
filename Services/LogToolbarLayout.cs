@@ -12,7 +12,7 @@ namespace GW2CraftingHelper.Services
     /// on one bar. Stated here so it is not re-litigated.
     /// </para>
     /// </summary>
-    public static class LogToolbarLayout
+    internal static class LogToolbarLayout
     {
         public const int Inset = LogGutterLayout.GutterX;
         public const int Gap = 8;

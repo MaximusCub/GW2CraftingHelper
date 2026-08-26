@@ -5,7 +5,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class PlanResultBuilder
+    internal class PlanResultBuilder
     {
         // Disciplines that are informational source tags, not real,
         // player-levelable GW2 crafting disciplines: a recipe carrying one

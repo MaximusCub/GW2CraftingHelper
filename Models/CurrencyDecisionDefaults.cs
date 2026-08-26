@@ -49,7 +49,7 @@ namespace GW2CraftingHelper.Models
     /// matching gw2e exactly - currencies with no entry must stay
     /// blank/unvalued rather than gain an invented rate.
     /// </summary>
-    public static class CurrencyDecisionDefaults
+    internal static class CurrencyDecisionDefaults
     {
         public static readonly IReadOnlyDictionary<int, long> DefaultCopperPerUnit = new Dictionary<int, long>
         {

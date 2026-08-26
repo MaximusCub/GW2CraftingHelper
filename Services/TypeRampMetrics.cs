@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Services
     /// loaded. 22-BOLD is a genuine intermediate.
     /// </para>
     /// </summary>
-    public static class TypeRampMetrics
+    internal static class TypeRampMetrics
     {
         /// <summary>
         /// One font's measured vertical metrics, in the units every layout

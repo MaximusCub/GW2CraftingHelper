@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class VendorOfferDataset
+    internal class VendorOfferDataset
     {
         public int SchemaVersion { get; set; }
 

@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Services
     /// don't look cramped. See ShoppingListSectionRenderer.Render for
     /// the pre-scan that produces maxEachWidth/maxTotalWidth.
     /// </summary>
-    public static class ShoppingColumnMath
+    internal static class ShoppingColumnMath
     {
         public const int TotalMinWidth = 150;
         public const int EachMinWidth = 110;

@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// the callback back on the UI thread, since the continuation after the
     /// delay may resume on a ThreadPool thread.
     /// </summary>
-    public sealed class ResizeSettleDebounce
+    internal sealed class ResizeSettleDebounce
     {
         /// <summary>The module's one settle window.</summary>
         public const int DefaultSettleMs = 150;

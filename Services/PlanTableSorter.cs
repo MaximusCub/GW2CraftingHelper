@@ -8,7 +8,7 @@ namespace GW2CraftingHelper.Services
     /// Columns the Crafting Plan's two sortable tables expose. Used
     /// Materials has Item/Amount only; the Shopping List has all five.
     /// </summary>
-    public enum PlanTableColumn
+    internal enum PlanTableColumn
     {
         Item,
         Amount,
@@ -28,7 +28,7 @@ namespace GW2CraftingHelper.Services
     /// very same instance back, so the default path allocates nothing.
     /// </para>
     /// </summary>
-    public static class PlanTableSorter
+    internal static class PlanTableSorter
     {
         /// <summary>
         /// Rows in the order the given sort state asks for, or

@@ -9,7 +9,7 @@ namespace GW2CraftingHelper.Models
     /// on module load, with no network call and no re-solve. See
     /// Services/PlanStore.cs for the store that reads/writes this.
     /// </summary>
-    public class PersistedPlan
+    internal class PersistedPlan
     {
         /// <summary>
         /// Bump whenever the persisted graph's SHAPE changes (a member

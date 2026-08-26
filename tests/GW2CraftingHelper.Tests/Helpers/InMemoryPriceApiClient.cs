@@ -7,7 +7,7 @@ using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Tests.Helpers
 {
-    public class InMemoryPriceApiClient : IPriceApiClient
+    internal class InMemoryPriceApiClient : IPriceApiClient
     {
         private readonly Dictionary<int, RawPriceEntry> _prices = new Dictionary<int, RawPriceEntry>();
         private readonly List<IReadOnlyList<int>> _calls = new List<IReadOnlyList<int>>();

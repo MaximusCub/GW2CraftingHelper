@@ -6,7 +6,7 @@ using System.Text;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class OverlayRecipeCacheStore : IRecipeCacheStore
+    internal class OverlayRecipeCacheStore : IRecipeCacheStore
     {
         private readonly string _cacheDir;
         private readonly string _searchPath;

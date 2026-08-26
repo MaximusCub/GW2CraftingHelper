@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class VendorOffer
+    internal class VendorOffer
     {
         public string OfferId { get; set; }
 

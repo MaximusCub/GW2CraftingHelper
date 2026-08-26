@@ -10,7 +10,7 @@ using Gw2Sharp.WebApi.V2.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class Gw2AccountSnapshotService
+    internal class Gw2AccountSnapshotService
     {
         private static readonly Logger Logger = Logger.GetLogger<Gw2AccountSnapshotService>();
 

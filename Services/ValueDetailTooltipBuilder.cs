@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
     /// fixed, so a future reader treats this as a known scope limit of the
     /// current solver rollup rather than rediscovering it as a bug.
     /// </summary>
-    public static class ValueDetailTooltipBuilder
+    internal static class ValueDetailTooltipBuilder
     {
         /// <summary>
         /// Attempts to build the value-detail tooltip for <paramref name="node"/>.

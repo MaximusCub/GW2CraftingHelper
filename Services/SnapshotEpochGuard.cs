@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// event this guard needs to detect is "did the user clear the cache
     /// while my fetch was still running".
     /// </summary>
-    public static class SnapshotEpochGuard
+    internal static class SnapshotEpochGuard
     {
         public static bool ShouldCommit(int myEpoch, int currentEpoch)
         {

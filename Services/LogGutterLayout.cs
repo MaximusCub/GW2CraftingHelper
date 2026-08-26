@@ -26,7 +26,7 @@ namespace GW2CraftingHelper.Services
     /// gets right, and they now apply to the SUM of the two bands.
     /// </para>
     /// </summary>
-    public static class LogGutterLayout
+    internal static class LogGutterLayout
     {
         /// <summary>Left gutter the tab's content starts at. Four things on
         /// this tab used to sit at x=0.</summary>

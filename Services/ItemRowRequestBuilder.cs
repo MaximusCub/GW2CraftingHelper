@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// minus the reorder (`moveRecipe`) affordance - see
     /// docs/KNOWN-ISSUES #21 for that deliberate divergence.
     /// </summary>
-    public static class ItemRowRequestBuilder
+    internal static class ItemRowRequestBuilder
     {
         /// <summary>
         /// One input row's already-Blish-free state: the item id selected

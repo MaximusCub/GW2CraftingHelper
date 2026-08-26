@@ -3,7 +3,7 @@ using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
 {
-    public class SolverDecision
+    internal class SolverDecision
     {
         public AcquisitionSource Source { get; internal set; }
 

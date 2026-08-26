@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
     /// write side instead of being re-checked by every caller.
     /// </para>
     /// </summary>
-    public sealed class PlanStripStatusBoard
+    internal sealed class PlanStripStatusBoard
     {
         private readonly object _lock = new object();
 
@@ -273,7 +273,7 @@ namespace GW2CraftingHelper.Services
     /// One consistent read of <see cref="PlanStripStatusBoard"/>'s state -
     /// see <see cref="PlanStripStatusBoard.Snapshot"/>.
     /// </summary>
-    public sealed class PlanStripStatusSnapshot
+    internal sealed class PlanStripStatusSnapshot
     {
         /// <summary>The generation this snapshot describes.</summary>
         public int Sequence { get; }

@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Models
     /// LastVerified are provenance for maintainers only, never rendered.
     /// See ref/daily_cooldown_items.json and DailyCooldownItemService.
     /// </summary>
-    public class DailyCooldownItem
+    internal class DailyCooldownItem
     {
         public int ItemId { get; set; }
 

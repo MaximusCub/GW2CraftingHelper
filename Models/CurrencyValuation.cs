@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Models
     /// effective value is usable for comparison; everything else stays
     /// unvalued and fallback-tier only.
     /// </summary>
-    public class CurrencyValuation
+    internal class CurrencyValuation
     {
         /// <summary>
         /// No user-provided valuations or clears. "None" describes zero

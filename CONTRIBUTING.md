@@ -161,6 +161,21 @@ tag; see `docs/RELEASING.md`.
 ## Code Style
 
 - Allman brace style (opening brace on its own line) for C#.
+- **Everything is `internal` unless Blish HUD itself must see it. Tests reach
+  internals via `InternalsVisibleTo`.** This is a leaf module assembly:
+  nothing on disk links against `GW2CraftingHelper.dll`, and Blish
+  discovers exactly one type from it - the `Module` subclass, found by MEF
+  through its `[Import("ModuleParameters")]` constructor. So `Module` is the
+  only `public` type in the shipped assembly, and a `public` you add
+  anywhere else is a promise to a caller that does not exist.
+  `Properties/AssemblyInfo.cs` grants `InternalsVisibleTo` to the test
+  project and to the two developer tools that reference the module
+  (`GW2CraftingHelper.Harness`, `GW2CraftingHelper.RecipeSeeder`), so
+  `internal` costs nothing in testability or tooling. It buys the compiler's
+  dead-code detection back: an unreferenced `internal` type is a warning,
+  an unreferenced `public` one is silence. Nested members keep whatever
+  accessibility their enclosing type needs; the rule is about top-level
+  types.
 - **ASCII-only in `.cs` source.** Do not paste raw Unicode into code,
   comments, or string literals. If Unicode must be shown at runtime (UI
   glyphs, item names, etc.), use an escape (e.g. `"\u25BC"`) or data

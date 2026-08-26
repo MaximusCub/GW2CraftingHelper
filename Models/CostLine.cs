@@ -1,6 +1,6 @@
 namespace GW2CraftingHelper.Models
 {
-    public class CostLine
+    internal class CostLine
     {
         public string Type { get; set; }
 

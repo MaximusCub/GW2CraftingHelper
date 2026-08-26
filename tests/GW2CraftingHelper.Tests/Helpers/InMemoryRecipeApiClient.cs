@@ -6,7 +6,7 @@ using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Tests.Helpers
 {
-    public class InMemoryRecipeApiClient : IRecipeApiClient
+    internal class InMemoryRecipeApiClient : IRecipeApiClient
     {
         private readonly Dictionary<int, List<int>> _searchResults = new Dictionary<int, List<int>>();
         private readonly Dictionary<int, RawRecipe> _recipes = new Dictionary<int, RawRecipe>();

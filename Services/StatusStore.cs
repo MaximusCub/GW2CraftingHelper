@@ -3,7 +3,7 @@ using System.IO;
 
 namespace GW2CraftingHelper.Services
 {
-    public class StatusStore
+    internal class StatusStore
     {
         private readonly string _filePath;
 

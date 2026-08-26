@@ -7,14 +7,14 @@ using System.Text.Json;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class RecipeSearchSeedData
+    internal class RecipeSearchSeedData
     {
         public int SchemaVersion { get; set; }
 
         public Dictionary<string, List<int>> Searches { get; set; }
     }
 
-    public class RecipeSeedData
+    internal class RecipeSeedData
     {
         public int SchemaVersion { get; set; }
 
@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Services.Recipes
     /// because the count and the digest can only move together.
     /// </para>
     /// </summary>
-    public class SeedFileIntegrity
+    internal class SeedFileIntegrity
     {
         /// <summary>File name, relative to the seed directory.</summary>
         public string Name { get; set; }
@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Services.Recipes
         public string Sha256 { get; set; }
     }
 
-    public class RecipeSeedManifest
+    internal class RecipeSeedManifest
     {
         public int SeedVersion { get; set; }
 
@@ -65,14 +65,14 @@ namespace GW2CraftingHelper.Services.Recipes
         public List<SeedFileIntegrity> Files { get; set; }
     }
 
-    public class RecipeOverlayManifest
+    internal class RecipeOverlayManifest
     {
         public int Gw2BuildId { get; set; }
 
         public string UpdatedUtc { get; set; }
     }
 
-    public static class RecipeCacheSerializer
+    internal static class RecipeCacheSerializer
     {
         private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
         {

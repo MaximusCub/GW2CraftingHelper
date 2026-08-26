@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Services.Recipes
 {
-    public class CompositeRecipeCacheStore : IRecipeCacheStore
+    internal class CompositeRecipeCacheStore : IRecipeCacheStore
     {
         private readonly SeededRecipeCacheStore _seed;
         private readonly OverlayRecipeCacheStore _overlay;

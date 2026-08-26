@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
     /// <summary>
     /// Which of the two rules caused a pill to be subdued.
     /// </summary>
-    public enum PillSubduingRule
+    internal enum PillSubduingRule
     {
         None,
 
@@ -40,7 +40,7 @@ namespace GW2CraftingHelper.Services
     /// currency/item name before ever showing it to the user; this class
     /// (and PillSubduingEvaluator) never format display text.
     /// </summary>
-    public sealed class PillCostDelta
+    internal sealed class PillCostDelta
     {
         public string Kind { get; }
 
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Services
         }
     }
 
-    public sealed class PillSubduingResult
+    internal sealed class PillSubduingResult
     {
         public static readonly PillSubduingResult None = new PillSubduingResult(PillSubduingRule.None, null, null);
 
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Services
     /// reads a CraftingTreeNode, resolves a name, or decides which pill
     /// is Selected.
     /// </summary>
-    public static class PillSubduingEvaluator
+    internal static class PillSubduingEvaluator
     {
         // "Decisive" requires BOTH an absolute floor (non-trivial coin
         // even for a cheap item) AND a relative floor (non-trivial

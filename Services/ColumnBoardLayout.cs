@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// neighbours here changes only by WRAPPING.
     /// </para>
     /// </summary>
-    public static class ColumnBoardLayout
+    internal static class ColumnBoardLayout
     {
         public readonly struct Placement
         {

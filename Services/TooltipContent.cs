@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// composers have one output shape, and the tests that want to assert on
     /// wording flatten it themselves (Tests/Helpers/TooltipContentPlainText).
     /// </summary>
-    public sealed class TooltipContent
+    internal sealed class TooltipContent
     {
         public static readonly TooltipContent Empty = new TooltipContent(new List<TooltipLine>());
 
@@ -112,7 +112,7 @@ namespace GW2CraftingHelper.Services
     }
 
     /// <summary>What a line IS, structurally. Prose unless stated.</summary>
-    public enum TooltipLineKind
+    internal enum TooltipLineKind
     {
         /// <summary>An ordinary prose row, one line height tall.</summary>
         Text,
@@ -122,7 +122,7 @@ namespace GW2CraftingHelper.Services
         Header,
     }
 
-    public sealed class TooltipLine
+    internal sealed class TooltipLine
     {
         private readonly IReadOnlyList<TooltipSpan> _spans;
 
@@ -161,7 +161,7 @@ namespace GW2CraftingHelper.Services
     /// <c>Views/Rendering/RarityColors</c> knows a
     /// <c>Microsoft.Xna.Framework.Color</c>.
     /// </summary>
-    public enum TooltipSpanRole
+    internal enum TooltipSpanRole
     {
         /// <summary>Ordinary tooltip prose.</summary>
         Default,
@@ -218,7 +218,7 @@ namespace GW2CraftingHelper.Services
     /// the caller's own plain rendering, used by the plain tooltip path and
     /// as the width fallback nowhere else.
     /// </summary>
-    public readonly struct TooltipSpan
+    internal readonly struct TooltipSpan
     {
         private TooltipSpan(string text, long coinCopper, bool isCoin, TooltipSpanRole role, string rarityKey)
         {
@@ -286,7 +286,7 @@ namespace GW2CraftingHelper.Services
     /// <see cref="Append"/> and <see cref="Separator"/> instead of the
     /// "\n\n" string concatenation the pill tooltip used to do.
     /// </summary>
-    public sealed class TooltipContentBuilder
+    internal sealed class TooltipContentBuilder
     {
         private readonly List<TooltipLine> _lines = new List<TooltipLine>();
         private List<TooltipSpan> _current;

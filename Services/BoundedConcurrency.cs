@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GW2CraftingHelper.Services
 {
-    public static class BoundedConcurrency
+    internal static class BoundedConcurrency
     {
         public static async Task ForEachAsync<T>(
             IEnumerable<T> items,

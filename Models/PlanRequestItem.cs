@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Models
     /// ingredient quantity its item tree carries under the synthetic
     /// wrapper root.
     /// </summary>
-    public class PlanRequestItem
+    internal class PlanRequestItem
     {
         public int ItemId { get; set; }
 

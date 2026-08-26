@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Services
     /// thing three hand-rolled copies would disagree about.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class TopRegionLayoutMath
+    internal static class TopRegionLayoutMath
     {
         public const int TopRegionRowHeight = 35;
         public const int InputRowY = 5;
@@ -66,7 +66,7 @@ namespace GW2CraftingHelper.Services
         }
     }
 
-    public readonly struct TopRegionLayout
+    internal readonly struct TopRegionLayout
     {
         public readonly int InputPanelHeight;
         public readonly int ControlsRowY;

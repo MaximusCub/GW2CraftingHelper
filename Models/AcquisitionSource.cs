@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Models
     // this type is persisted into plan.json, and a future member reorder
     // must not silently remap an already-persisted plan's decisions.
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum AcquisitionSource
+    internal enum AcquisitionSource
     {
         BuyFromTp,
         Craft,

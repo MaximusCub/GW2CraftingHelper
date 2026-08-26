@@ -19,7 +19,7 @@ namespace GW2CraftingHelper.Services
     /// ModuleLogStore.DeleteAll for the two genuinely destructive
     /// operations this deliberately is not).
     /// </summary>
-    public static class LogViewFloor
+    internal static class LogViewFloor
     {
         public static bool IsVisible(long absoluteIndex, long clearedBeforeVersion)
         {

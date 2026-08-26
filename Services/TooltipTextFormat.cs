@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Services
     /// Views/Rendering - would put a Blish dependency on the seam this class
     /// exists to keep Blish-free.
     /// </summary>
-    public static class TooltipTextFormat
+    internal static class TooltipTextFormat
     {
         /// <summary>
         /// Characters per wrapped line, derived from the one width Blish

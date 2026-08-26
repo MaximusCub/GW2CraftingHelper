@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// as two grids because their row heights differ.
     /// </para>
     /// </summary>
-    public static class SnapshotItemGridLayout
+    internal static class SnapshotItemGridLayout
     {
         /// <summary>
         /// Left edge of a cell's text column: the 32px icon at x=2 plus its

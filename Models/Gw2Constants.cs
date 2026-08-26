@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public static class Gw2Constants
+    internal static class Gw2Constants
     {
         /// <summary>
         /// GW2 wallet currency ID for coins (gold/silver/copper).

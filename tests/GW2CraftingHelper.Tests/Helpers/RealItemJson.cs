@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// byte-identical to what the API returned.
     /// </para>
     /// </summary>
-    public static class RealItemJson
+    internal static class RealItemJson
     {
         public const string ZojjasWarfists =
             "{\"name\":\"Zojja's Warfists\",\"description\":\"<c=@flavor>Crafted in the style of the renowned asuran genius, Zojja.</c>\",\"type\":\"Armor\",\"level\":80,\"rarity\":\"Ascended\",\"vendor_value\":240,\"default_skin\":116,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"HideSuffix\",\"AccountBound\",\"AccountBindOnUse\"],\"restrictions\":[],\"id\":48074,\"chat_link\":\"[&AgHKuwAA]\",\"icon\":\"https://render.guildwars2.com/file/BD20599D290345BE7D98BD270FBE502CF5212654/699217.png\",\"details\":{\"type\":\"Gloves\",\"weight_class\":\"Heavy\",\"defense\":191,\"infusion_slots\":[{\"flags\":[\"Infusion\"]}],\"attribute_adjustment\":134.442,\"infix_upgrade\":{\"id\":161,\"attributes\":[{\"attribute\":\"Power\",\"modifier\":47},{\"attribute\":\"Precision\",\"modifier\":34},{\"attribute\":\"CritDamage\",\"modifier\":34}]},\"secondary_suffix_item_id\":\"\"}}";

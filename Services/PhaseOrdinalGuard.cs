@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Services
     /// ordinal is not strictly greater than the last one actually applied
     /// is stale and must be dropped, regardless of drain order.
     /// </summary>
-    public static class PhaseOrdinalGuard
+    internal static class PhaseOrdinalGuard
     {
         public static bool ShouldApply(int eventPhaseOrdinal, int currentPhaseOrdinal)
         {

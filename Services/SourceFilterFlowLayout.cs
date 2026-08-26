@@ -6,7 +6,7 @@ namespace GW2CraftingHelper.Services
     /// Placement of one cell in a <see cref="SourceFilterFlowLayout"/> run,
     /// relative to the containing row panel's own origin.
     /// </summary>
-    public class FlowCellPlacement
+    internal class FlowCellPlacement
     {
         public int X { get; set; }
 
@@ -17,7 +17,7 @@ namespace GW2CraftingHelper.Services
     /// The full placement run: one <see cref="FlowCellPlacement"/> per input
     /// width, in input order, plus the height the container must reserve.
     /// </summary>
-    public class SourceFilterFlowResult
+    internal class SourceFilterFlowResult
     {
         public List<FlowCellPlacement> Cells { get; } = new List<FlowCellPlacement>();
 
@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Services
     /// construction: callers measure their own label widths and apply the
     /// returned offsets (see Views/MainView.cs).
     /// </summary>
-    public static class SourceFilterFlowLayout
+    internal static class SourceFilterFlowLayout
     {
         /// <summary>
         /// A cell wider than <paramref name="availableWidth"/> still gets

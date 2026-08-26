@@ -34,7 +34,7 @@ namespace GW2CraftingHelper.Services
     /// stability argument, same single pass.
     /// <para>See docs/ARCHITECTURE.md section 4.</para>
     /// </summary>
-    public static class TreeCostColumnMath
+    internal static class TreeCostColumnMath
     {
         /// <summary>
         /// The widest text each denomination's sub-column has to hold this

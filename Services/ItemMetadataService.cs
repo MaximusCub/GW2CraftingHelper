@@ -8,7 +8,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public class ItemMetadataService
+    internal class ItemMetadataService
     {
         private const int BatchSize = 200;
 

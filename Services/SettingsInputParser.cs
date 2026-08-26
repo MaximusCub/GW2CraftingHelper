@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// (positive value, no coin-keyed entries handled by the caller) so a
     /// value that parses here is always safe to hand to that constructor.
     /// </summary>
-    public static class SettingsInputParser
+    internal static class SettingsInputParser
     {
         /// <summary>
         /// Attempts to parse <paramref name="text"/> as a positive integer

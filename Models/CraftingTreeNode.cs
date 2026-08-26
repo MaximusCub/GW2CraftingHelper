@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Models
 {
-    public class CraftingTreeNode
+    internal class CraftingTreeNode
     {
         private IReadOnlyList<CraftingTreeNode> _children = Array.Empty<CraftingTreeNode>();
 

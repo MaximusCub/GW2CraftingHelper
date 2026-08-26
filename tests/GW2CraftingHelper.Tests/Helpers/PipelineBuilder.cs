@@ -24,7 +24,7 @@ namespace GW2CraftingHelper.Tests.Helpers
     /// the split test classes never contend when xUnit runs them in
     /// parallel.
     /// </summary>
-    public sealed class PipelineBuilder
+    internal sealed class PipelineBuilder
     {
         /// <summary>
         /// The in-memory clients this builder wires in. Exposed because a

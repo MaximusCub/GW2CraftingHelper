@@ -8,7 +8,7 @@ using GW2CraftingHelper.Services.Recipes;
 
 namespace GW2CraftingHelper.Services
 {
-    public class CraftableItemSearchProvider : IItemSearchProvider
+    internal class CraftableItemSearchProvider : IItemSearchProvider
     {
         private readonly List<CachedEntry> _entries;
 

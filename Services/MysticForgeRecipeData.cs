@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GW2CraftingHelper.Services
 {
-    public class MysticForgeRecipeData
+    internal class MysticForgeRecipeData
     {
         private static readonly IReadOnlyList<int> EmptyIds = Array.Empty<int>();
 

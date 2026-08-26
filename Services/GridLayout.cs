@@ -29,7 +29,7 @@ namespace GW2CraftingHelper.Services
     /// the union of all three for no behaviour.
     /// </para>
     /// </summary>
-    public static class GridLayout
+    internal static class GridLayout
     {
         /// <summary>
         /// As many whole <paramref name="minColumnWidth"/> columns as fit,
