@@ -84,15 +84,17 @@ rarity) with vendor-tagged shopping rows:
   generate a plan, and interact with the tree.
 - **Log** - the module's own diagnostic log, with a "Copy" button for
   attaching recent log lines to a bug report.
+- **Plan History** - every generated plan, recorded: view a frozen summary,
+  reopen the exact saved plan, or re-solve the same request at today's
+  prices. Rows can be pinned; Settings caps how many are kept.
+- **Crafting Ranker** - a persistent watchlist ranking tracked items by how
+  close each is to craftable, with higher-priority items claiming shared
+  coin, currencies and materials first.
 - **Settings** - price basis, owned-materials toggle default, Homestead
   Refinement efficiency tiers, and diagnostic switches.
 - **About** - module version, author/contributors, source link, and the
   on-disk data directory (useful for attaching `snapshot.json`/`status.json`
   to a bug report).
-
-("Plan History" and "Crafting Ranker" are reserved for future work and have no
-functional content yet, so released builds do not show them. They appear as
-"Coming Soon" placeholder tabs in debug builds only.)
 
 ## Installing
 

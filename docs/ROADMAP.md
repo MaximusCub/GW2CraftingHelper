@@ -48,8 +48,11 @@
   Since 2026-08 the project ships stamped builds to a live Blish HUD
   install: `v0.2.0` (2026-08-23) through `v0.2.4` (2026-08-25, the
   app-wide typography and layout pass), each with a `CHANGELOG.md` entry
-  and a matching git tag pushed to origin (measured 2026-08-25:
-  `git ls-remote --tags origin`) - see [`CHANGELOG.md`](../CHANGELOG.md) and
+  and a matching git tag pushed to origin (measured 2026-08-26:
+  `git ls-remote --tags origin`). `v0.3.0` (the Ranker and Plan History
+  tabs, the recipe-cache staleness rework) is staged - manifest and
+  CHANGELOG bumped, tag not yet pushed, pending the field-test pass -
+  see [`CHANGELOG.md`](../CHANGELOG.md) and
   [`docs/RELEASING.md`](RELEASING.md). Work arrives as one branch per
   milestone, each ending in a live desktop gate; the feedback loop is the
   maintainer field-testing the deployed build. The queue is driven by the
@@ -58,18 +61,13 @@
 
 ## What's not done
 
-- **Plan History** and **Crafting Ranker** exist only as placeholder tabs
-  (they render a "Coming Soon" stub, no functional content). Their tab
-  registration is `#if DEBUG`, so they are not present in released builds -
-  remove the two directives in `Module.cs` when the features land.
-- Further tab feature proposals (deeper snapshot search, plan history,
-  a crafting ranker, and similar ideas) live in-repo at
-  [`dev/proposals/`](../dev/proposals/).
+- Further tab feature proposals (deeper snapshot search and similar
+  ideas) live in-repo at [`dev/proposals/`](../dev/proposals/).
   Being written down does not make them committed roadmap items: `d1`
-  (snapshot/about/settings) is partly implemented, while `d3`
-  (plan history) and `d4` (crafting ranker) back the two placeholder tabs
-  above and are still proposals. Treat any tab beyond the five listed
-  above as unplanned until it actually ships.
+  (snapshot/about/settings) is partly implemented, and `d3` (plan
+  history) and `d4` (crafting ranker) shipped as the Plan History and
+  Crafting Ranker tabs (PRs #190, #185 - staged for v0.3.0). Treat any
+  tab beyond the seven that exist as unplanned until it actually ships.
 - Localization (en/de/fr/es) is deliberately deferred - see the DEFERRED
   list in `docs/KNOWN-ISSUES.md`.
 
