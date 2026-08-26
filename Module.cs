@@ -152,6 +152,7 @@ namespace GW2CraftingHelper
         // Module constructs exactly once.
         private readonly PlanStripStatusBoard _planStripStatusBoard = new PlanStripStatusBoard();
         private VendorOfferStore _vendorOfferStore;
+        private OverlayRecipeCacheStore _recipeOverlay;
         private IItemSearchProvider _itemSearchProvider;
         private Texture2D _moduleIconTexture;
         private Texture2D _cornerIconTexture;
@@ -407,6 +408,7 @@ namespace GW2CraftingHelper
                 RecipeSheetItemSeedService.Load);
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
+            _recipeOverlay = recipeOverlay;
             recipeOverlay.Load(currentGw2BuildId: null);
 
             // Async build ID fetch for overlay invalidation + seed staleness
@@ -1137,6 +1139,11 @@ namespace GW2CraftingHelper
 
             _buildIdCts.Cancel();
             _buildIdCts.Dispose();
+
+            // RecipeService persists off the plan path, so the last plan's
+            // discoveries can still be in memory when the module goes away.
+            // A no-op unless something is actually unwritten.
+            _recipeOverlay?.Flush(force: true);
 
             // The scroll-verify/resize-debounce/wheel-wrap-verify tickers
             // are parented to the SpriteScreen, not this view's control

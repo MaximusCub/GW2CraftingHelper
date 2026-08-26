@@ -16,10 +16,18 @@ namespace GW2CraftingHelper.Services
         private readonly Dictionary<int, IReadOnlyList<int>> _searchCache = new Dictionary<int, IReadOnlyList<int>>();
         private readonly Dictionary<int, RawRecipe> _recipeCache = new Dictionary<int, RawRecipe>();
         private readonly object _cacheGate = new object();
+        private Task _pendingCacheFlush = Task.CompletedTask;
 
         private const int DefaultMaxConcurrency = 4;
 
         public Action<string> OnStatusUpdate { get; set; }
+
+        /// <summary>
+        /// The persist started by the last completed tree build. Completes
+        /// when that write has landed on disk; callers that need the overlay
+        /// durable at a chosen moment wait on this rather than racing it.
+        /// </summary>
+        public Task PendingCacheFlush => Volatile.Read(ref _pendingCacheFlush);
 
         public RecipeService(
             IRecipeApiClient api,
@@ -39,7 +47,7 @@ namespace GW2CraftingHelper.Services
             }
             finally
             {
-                _cacheStore.Flush(force: true);
+                SchedulePersist();
             }
         }
 
@@ -113,8 +121,22 @@ namespace GW2CraftingHelper.Services
             }
             finally
             {
-                _cacheStore.Flush(force: true);
+                SchedulePersist();
             }
+        }
+
+        /// <summary>
+        /// Persists what this build discovered without the caller waiting for
+        /// it. The overlay store rewrites its whole cache to disk, tens of
+        /// milliseconds of file IO that CraftingPlanPipeline would otherwise
+        /// spend inside its tree-build phase, growing with the cache; nothing
+        /// downstream of the build reads those files.
+        /// </summary>
+        private void SchedulePersist()
+        {
+            Volatile.Write(
+                ref _pendingCacheFlush,
+                Task.Run(() => _cacheStore.Flush(force: true)));
         }
 
         /// <summary>

@@ -481,8 +481,12 @@ namespace GW2CraftingHelper.Tests.Services
                 overlay1.SetCurrentBuildId(buildId);
 
                 var api1 = new CountingRecipeApiClient();
-                var tree1 = await new RecipeService(api1, cacheStore: overlay1)
-                    .BuildTreeAsync(100, 1, CancellationToken.None);
+                var session1 = new RecipeService(api1, cacheStore: overlay1);
+                var tree1 = await session1.BuildTreeAsync(100, 1, CancellationToken.None);
+
+                // The persist runs off the build's own path, so the next
+                // session may only read disk once it has landed.
+                await session1.PendingCacheFlush;
 
                 Assert.Empty(tree1.Recipes);
                 Assert.Equal(1, api1.SearchCallCount);
@@ -519,8 +523,10 @@ namespace GW2CraftingHelper.Tests.Services
 
                 var outage = new InMemoryRecipeApiClient();
                 outage.Return404ForSearch.Add(100);
-                var degradedTree = await new RecipeService(outage, cacheStore: overlay1)
+                var degradedSession = new RecipeService(outage, cacheStore: overlay1);
+                var degradedTree = await degradedSession
                     .BuildTreeAsync(100, 1, CancellationToken.None);
+                await degradedSession.PendingCacheFlush;
 
                 // The plan still degrades to a leaf for this run - the
                 // recipes are genuinely unknown - it just leaves no record.

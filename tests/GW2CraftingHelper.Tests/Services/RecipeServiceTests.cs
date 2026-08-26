@@ -854,5 +854,94 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             }
         }
+
+        // Persisting the overlay is file IO the plan pipeline used to spend
+        // inside its timed tree-build phase. The build must hand back its
+        // tree without waiting for the write, and the write must still land.
+        [Fact]
+        public async Task BuildTree_DoesNotWaitForThePersist_ButStillPersists()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                var overlay = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load(currentGw2BuildId: null);
+                overlay.SetCurrentBuildId(buildId);
+
+                var api = new InMemoryRecipeApiClient();
+                api.AddSearchResult(1, 10);
+                api.AddRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                });
+
+                var gated = new GatedFlushStore(overlay);
+                var svc = new RecipeService(api, cacheStore: gated);
+
+                // Opens the gate late as well, so a build that does wait on
+                // the persist fails the assertion below instead of hanging.
+                Task.Delay(System.TimeSpan.FromSeconds(5))
+                    .ContinueWith(t => gated.Release());
+
+                var node = await svc.BuildTreeAsync(1, 1, CancellationToken.None);
+                bool persistedBeforeReturn = gated.FlushCompleted;
+
+                gated.Release();
+                await svc.PendingCacheFlush;
+
+                Assert.False(persistedBeforeReturn);
+                Assert.Single(node.Recipes);
+
+                var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(reloaded.TryGetRecipe(10));
+                Assert.NotNull(reloaded.TryGetSearch(1));
+            }
+        }
+
+        // Every call reaches a real OverlayRecipeCacheStore; the gate only
+        // holds Flush at the door so a test can see whether its caller waits.
+        private sealed class GatedFlushStore : GW2CraftingHelper.Services.Recipes.IRecipeCacheStore
+        {
+            private readonly GW2CraftingHelper.Services.Recipes.IRecipeCacheStore _inner;
+            private readonly TaskCompletionSource<bool> _release =
+                new TaskCompletionSource<bool>();
+            private int _flushCompleted;
+
+            public GatedFlushStore(GW2CraftingHelper.Services.Recipes.IRecipeCacheStore inner)
+            {
+                _inner = inner;
+            }
+
+            public bool FlushCompleted => Volatile.Read(ref _flushCompleted) == 1;
+
+            public void Release() => _release.TrySetResult(true);
+
+            public GW2CraftingHelper.Services.Recipes.RecipeCacheStats Stats => _inner.Stats;
+
+            public IReadOnlyList<int> TryGetSearch(int outputItemId) =>
+                _inner.TryGetSearch(outputItemId);
+
+            public RawRecipe TryGetRecipe(int recipeId) => _inner.TryGetRecipe(recipeId);
+
+            public void PutSearch(int outputItemId, IReadOnlyList<int> recipeIds) =>
+                _inner.PutSearch(outputItemId, recipeIds);
+
+            public void PutRecipe(int recipeId, RawRecipe recipe) =>
+                _inner.PutRecipe(recipeId, recipe);
+
+            public void Flush(bool force = false)
+            {
+                _release.Task.GetAwaiter().GetResult();
+                _inner.Flush(force);
+                Volatile.Write(ref _flushCompleted, 1);
+            }
+        }
     }
 }
