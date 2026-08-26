@@ -294,8 +294,11 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The slot block: its own block between blanks, one line per slot
-        /// so the block's height matches the game's (gap G16).
+        /// The slot lines, each its own blank-separated block: on
+        /// live/eq-weapon-full.png (2026-08-25) two sigils and two
+        /// infusions each render as blank / block / blank, corroborated on
+        /// spire, ascended_comparison LEFT and naptown RIGHT - not one
+        /// contiguous run (gap G16, fidelity-audit F8).
         /// </summary>
         private static TooltipContent BuildInfusionSlots(ItemStatBlock stats)
         {
@@ -308,6 +311,11 @@ namespace GW2CraftingHelper.Services
             // "Unused Infusion Slot" - see KNOWN-ISSUES #42.
             for (int i = 0; i < stats.InfusionSlotCount; i++)
             {
+                if (i > 0)
+                {
+                    slots.Separator();
+                }
+
                 slots.Text("Infusion Slot").EndLine();
             }
 

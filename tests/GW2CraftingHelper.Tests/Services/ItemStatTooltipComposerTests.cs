@@ -443,6 +443,29 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ConsecutiveInfusionSlotsAreEachTheirOwnBlankSeparatedBlock()
+        {
+            // Measured on live/eq-weapon-full.png (2026-08-25): two sigil
+            // blocks and two infusion lines each render blank / block /
+            // blank, never one contiguous run (fidelity-audit F8).
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                ItemId = 1,
+                Name = "Two-Slot Thing",
+                InfusionSlotCount = 2,
+            });
+
+            Assert.Equal(new[]
+            {
+                "Two-Slot Thing",
+                "",
+                "Infusion Slot",
+                "",
+                "Infusion Slot",
+            }, content.ToPlainLines().ToArray());
+        }
+
+        [Fact]
         public async Task TheHandLineIsMutedGreyNotWhite()
         {
             // "(Two-Handed)" measures (160,161,162) on
