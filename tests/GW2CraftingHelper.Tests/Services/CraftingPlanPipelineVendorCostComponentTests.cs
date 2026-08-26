@@ -26,16 +26,13 @@ namespace GW2CraftingHelper.Tests.Services
         private static async Task<(CraftingPlanPipeline Pipeline, CraftingPlanResult Result)> GenerateMixedVendorPlanAsync(
             AccountSnapshot snapshot = null)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - vendor-only, matching the real
             // Amalgamated Rift Essence field case.
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
-            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+            var builder = PipelineBuilder.Create()
+                .WithPrice(42, buyUnitPrice: 10, sellUnitPrice: 20)
+                .WithItem(1, "Amalgamated Rift Essence", "essence.png")
+                .WithItem(42, "Glob of Ectoplasm", "ecto.png")
+                .WithInventoryReducer();
 
             CraftingPlanPipeline pipeline;
             CraftingPlanResult result;
@@ -67,13 +64,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                pipeline = builder.WithVendorOfferStore(store).Build();
 
                 result = await pipeline.GenerateStructuredAsync(1, 2, snapshot, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -232,27 +223,24 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var builder = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(2, buyUnitPrice: 1, sellUnitPrice: 1); // craft is cheap - the baseline winner
-            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
-            itemApi.AddItem(2, "Cheap Ingredient", "cheap.png");
-            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                })
+                .WithPrice(2, buyUnitPrice: 1, sellUnitPrice: 1) // craft is cheap - the baseline winner
+                .WithPrice(42, buyUnitPrice: 10, sellUnitPrice: 20)
+                .WithItem(1, "Amalgamated Rift Essence", "essence.png")
+                .WithItem(2, "Cheap Ingredient", "cheap.png")
+                .WithItem(42, "Glob of Ectoplasm", "ecto.png")
+                .WithInventoryReducer();
 
             // Snapshot has 4 of item 42 in the account - partial coverage
             // of the 10 (5 * requested qty 2) the override's winning offer
@@ -306,13 +294,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                pipeline = builder.WithVendorOfferStore(store).Build();
 
                 result = await pipeline.GenerateStructuredAsync(1, 2, snapshot, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -379,27 +361,24 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_ProducesReferenceBranchWithValidCaptionSplit()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var builder = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(2, buyUnitPrice: 1, sellUnitPrice: 1); // craft is cheap - the baseline winner
-            priceApi.AddPrice(42, buyUnitPrice: 10, sellUnitPrice: 20);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Amalgamated Rift Essence", "essence.png");
-            itemApi.AddItem(2, "Cheap Ingredient", "cheap.png");
-            itemApi.AddItem(42, "Glob of Ectoplasm", "ecto.png");
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                })
+                .WithPrice(2, buyUnitPrice: 1, sellUnitPrice: 1) // craft is cheap - the baseline winner
+                .WithPrice(42, buyUnitPrice: 10, sellUnitPrice: 20)
+                .WithItem(1, "Amalgamated Rift Essence", "essence.png")
+                .WithItem(2, "Cheap Ingredient", "cheap.png")
+                .WithItem(42, "Glob of Ectoplasm", "ecto.png")
+                .WithInventoryReducer();
 
             CraftingPlanPipeline pipeline;
             CraftingPlanResult result;
@@ -425,13 +404,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                pipeline = builder.WithVendorOfferStore(store).Build();
 
                 result = await pipeline.GenerateStructuredAsync(1, 2, null, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -478,36 +451,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_NullSnapshot_ProducesCraftPlanAndPopulatesStructuredFields()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
+            var pipeline = PipelineBuilder.BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 3);
             priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -534,35 +480,28 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_WithSnapshot_ReducesTree()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            // Not SingleRecipeTree: this recipe deliberately carries no
+            // AutoLearned flag.
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 5 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400
+                })
+                .WithPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Ingredient", "i.png")
+                .WithInventoryReducer()
+                .Build();
 
             // Snapshot owns 3 of ingredient (item 2)
             var snapshot = new AccountSnapshot

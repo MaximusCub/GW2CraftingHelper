@@ -113,49 +113,6 @@ namespace GW2CraftingHelper.Tests.Services
         /// </summary>
         private static CraftingPlanPipeline BuildCompetingRecipeOptionsPipeline(out AccountSnapshot snapshot)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            // Both recipe ids must be in the SAME search result so
-            // RecipeService discovers them as competing options on one
-            // node - AddSearchResult(1, 10) alone would give item 1 only
-            // ONE recipe option, defeating the whole point of this fixture.
-            recipeApi.AddSearchResult(1, 10, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 5 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 5 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 30); // option A: 5x30=150
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 20); // option B: 5x20=100 (cheaper)
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient A", "a.png");
-            itemApi.AddItem(3, "Ingredient B", "b.png");
-
             snapshot = new AccountSnapshot
             {
                 Items = new List<SnapshotItemEntry>
@@ -164,12 +121,46 @@ namespace GW2CraftingHelper.Tests.Services
                 }
             };
 
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
+            return PipelineBuilder.Create()
+                // Both recipe ids must be in the SAME search result so
+                // RecipeService discovers them as competing options on one
+                // node - WithSearchResult(1, 10) alone would give item 1 only
+                // ONE recipe option, defeating the whole point of this fixture.
+                .WithSearchResult(1, 10, 20)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 20,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 3, Count = 5 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                .WithPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 30) // option A: 5x30=150
+                .WithPrice(3, buyUnitPrice: 10, sellUnitPrice: 20) // option B: 5x20=100 (cheaper)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Ingredient A", "a.png")
+                .WithItem(3, "Ingredient B", "b.png")
+                .WithInventoryReducer()
+                .Build();
         }
 
         [Fact]

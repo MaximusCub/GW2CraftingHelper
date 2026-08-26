@@ -21,14 +21,12 @@ namespace GW2CraftingHelper.Tests.Services
             // that appears nowhere in the recipe tree was skipped as
             // unpriceable because the cost item's TP price was never
             // fetched, leaving the target as UnknownSource.
-            var recipeApi = new InMemoryRecipeApiClient();
-            // No recipe and no TP price for target item 1
-            var priceApi = new InMemoryPriceApiClient();
-            // Cost item 999 (not in any tree) has a TP price of 2c
-            priceApi.AddPrice(999, buyUnitPrice: 1, sellUnitPrice: 2);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Gifted Item", "g.png");
-            itemApi.AddItem(999, "Cost Token", "t.png");
+            // No recipe and no TP price for target item 1. Cost item 999
+            // (not in any tree) has a TP price of 2c.
+            var builder = PipelineBuilder.Create()
+                .WithPrice(999, buyUnitPrice: 1, sellUnitPrice: 2)
+                .WithItem(1, "Gifted Item", "g.png")
+                .WithItem(999, "Cost Token", "t.png");
 
             using (var tmp = new TempDirectory())
             {
@@ -52,12 +50,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store);
+                var pipeline = builder.WithVendorOfferStore(store).Build();
 
                 var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -109,32 +102,26 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // Recipe outputs 5 per craft; requesting 1 still costs a full
             // craft, so all 5 produced units count as sellable revenue.
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 5,
-                Ingredients = new List<RawIngredient>
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 10000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 5,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                .WithPrice(1, buyUnitPrice: 400, sellUnitPrice: 10000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Ingredient", "i.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -249,44 +236,29 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task DailyCooldownItems_SurvivesGenerateStructuredAsync_AndResolveWithOverridesRoundTrip()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item", "target.png");
-            itemApi.AddItem(2, "Ingredient", "ingredient.png");
-
             var seed = new Dictionary<int, DailyCooldownItem>
             {
                 [2] = new DailyCooldownItem { ItemId = 2, PerDayCap = 1 }
             };
 
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                vendorOfferStore: null,
-                reducer: null,
-                accountRecipeClient: null,
-                currencyMetadataService: null,
-                acquisitionHints: null,
-                moduleLog: null,
-                dailyCooldownItems: seed);
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target Item", "target.png")
+                .WithItem(2, "Ingredient", "ingredient.png")
+                .WithDailyCooldownItems(seed)
+                .Build();
 
             var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -307,50 +279,44 @@ namespace GW2CraftingHelper.Tests.Services
             // Item 1 <- recipe(2) <- recipe(3). Intermediate 2 is cheap to
             // buy, so the best path hides node 3 below a bought node; the
             // Craft All preset must still force-craft both levels.
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithSearchResult(2, 20)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-            var priceApi = new InMemoryPriceApiClient();
-            // Buying 2 (50) beats crafting it (2x100=200); buying 1 (500)
-            // loses to crafting-from-bought-2 (50)
-            priceApi.AddPrice(1, buyUnitPrice: 10, sellUnitPrice: 500);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 50);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Mid", "m.png");
-            itemApi.AddItem(3, "Base", "b.png");
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                    Id = 20,
+                    OutputItemId = 2,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                    },
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400,
+                    Flags = new List<string> { "AutoLearned" }
+                })
+                // Buying 2 (50) beats crafting it (2x100=200); buying 1 (500)
+                // loses to crafting-from-bought-2 (50)
+                .WithPrice(1, buyUnitPrice: 10, sellUnitPrice: 500)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 50)
+                .WithPrice(3, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Mid", "m.png")
+                .WithItem(3, "Base", "b.png")
+                .Build();
 
             var initial = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);

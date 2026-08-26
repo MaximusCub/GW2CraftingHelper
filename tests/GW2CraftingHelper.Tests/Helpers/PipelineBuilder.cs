@@ -196,6 +196,77 @@ namespace GW2CraftingHelper.Tests.Helpers
         }
 
         /// <summary>
+        /// SingleRecipeTree's shape stripped of the discipline, rating and
+        /// AutoLearned metadata, and priced so the craft wins: item 1
+        /// &lt;- recipe 10 &lt;- 3x item 2, with item 1 at 50/1000 and item
+        /// 2 at 10/100. The progress-and-logging fixture - those tests
+        /// assert on phase events and log lines, never on disciplines.
+        /// </summary>
+        public static PipelineBuilder PricedRecipeTreeWithoutDiscipline()
+        {
+            return Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Ingredient", "i.png");
+        }
+
+        /// <summary>
+        /// The suite's canonical two-root tree, for the
+        /// IReadOnlyList&lt;PlanRequestItem&gt; overload: item 1 &lt;-
+        /// recipe 10 &lt;- 1x item 3, item 2 &lt;- recipe 20 &lt;- 1x item
+        /// 4, every one of the four priced so both roots craft. Neither
+        /// recipe carries a discipline or an AutoLearned flag, which is
+        /// what makes both of them "not inherently available" for the
+        /// learned-recipe tests.
+        /// </summary>
+        public static PipelineBuilder TwoRootTree()
+        {
+            return Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 3, Count = 1 }
+                    }
+                })
+                .WithSearchResult(2, 20)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 20,
+                    OutputItemId = 2,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 4, Count = 1 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200)
+                .WithPrice(3, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithPrice(4, buyUnitPrice: 20, sellUnitPrice: 200)
+                .WithItem(1, "Target Item A", "targeta.png")
+                .WithItem(2, "Target Item B", "targetb.png")
+                .WithItem(3, "Ingredient A", "ingredienta.png")
+                .WithItem(4, "Ingredient B", "ingredientb.png");
+        }
+
+        /// <summary>
         /// SingleRecipeTree with 3x the ingredient and no reducer - the
         /// sell-side economics fixture, used from the economics, progress-
         /// logging and advisory-annotation test classes.

@@ -14,32 +14,23 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task SimpleCraftableItem_ProducesPlanWithStepsAndMetadata()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item", "target.png");
-            itemApi.AddItem(2, "Ingredient", "ingredient.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target Item", "target.png")
+                .WithItem(2, "Ingredient", "ingredient.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -54,20 +45,11 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task LeafOnlyItem_ProducesSingleBuyStep()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Copper Ore", "copper.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Copper Ore", "copper.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 5, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -81,35 +63,26 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task AllStepItemIds_HaveMetadataPopulated()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 10000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(3, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Final Item", "final.png");
-            itemApi.AddItem(2, "Part A", "a.png");
-            itemApi.AddItem(3, "Part B", "b.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 10000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithPrice(3, buyUnitPrice: 20, sellUnitPrice: 200)
+                .WithItem(1, "Final Item", "final.png")
+                .WithItem(2, "Part A", "a.png")
+                .WithItem(3, "Part B", "b.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -128,36 +101,27 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_LearnedRecipeFetchFails_DegradesToNull_DoesNotAbortPlan()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item", "target.png");
-            itemApi.AddItem(2, "Ingredient", "ingredient.png");
-
             var accountClient = new InMemoryAccountRecipeClient();
             accountClient.ThrowOnGet = true; // has permission by default, but the fetch itself fails
 
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                accountRecipeClient: accountClient);
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target Item", "target.png")
+                .WithItem(2, "Ingredient", "ingredient.png")
+                .WithAccountRecipeClient(accountClient)
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -187,51 +151,12 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredMultiAsync_LearnedRecipeFetchFails_DegradesToNull_DoesNotAbortPlan()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
-            });
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item A", "targeta.png");
-            itemApi.AddItem(2, "Target Item B", "targetb.png");
-            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
-            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
-
             var accountClient = new InMemoryAccountRecipeClient();
             accountClient.ThrowOnGet = true; // has permission by default, but the fetch itself fails
 
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                accountRecipeClient: accountClient);
+            var pipeline = PipelineBuilder.TwoRootTree()
+                .WithAccountRecipeClient(accountClient)
+                .Build();
 
             var items = new List<PlanRequestItem>
             {
@@ -263,20 +188,10 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task MissingItemMetadata_StillProducesValidPlan()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            // No recipe
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-
-            var itemApi = new InMemoryItemApiClient();
-            // No metadata for item 1
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            // No recipe, and no metadata for item 1.
+            var pipeline = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
@@ -289,17 +204,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task VendorOfferAvailable_SolverUsesIt()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            // No recipe for item 1
-
-            var priceApi = new InMemoryPriceApiClient();
-            // TP price is 500
-            priceApi.AddPrice(1, buyUnitPrice: 500, sellUnitPrice: 5000);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Vendor Item", "vendor.png");
-
-            // Vendor offers 1x item for 100 coin - cheaper than TP
+            // Vendor offers 1x item for 100 coin - cheaper than the 500 TP price.
             using (var tmp = new TempDirectory())
             {
                 var tempDir = tmp.Path;
@@ -322,12 +227,12 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store);
+                // No recipe for item 1
+                var pipeline = PipelineBuilder.Create()
+                    .WithPrice(1, buyUnitPrice: 500, sellUnitPrice: 5000)
+                    .WithItem(1, "Vendor Item", "vendor.png")
+                    .WithVendorOfferStore(store)
+                    .Build();
 
                 var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -349,16 +254,6 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task SeasonalOnlyVendorOffer_ExcludedFromSolve_FallsBackToTp_SurfacesAsTip()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            // No recipe for item 1
-
-            var priceApi = new InMemoryPriceApiClient();
-            // TP price is 500
-            priceApi.AddPrice(1, buyUnitPrice: 500, sellUnitPrice: 500);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Festival Item", "festival.png");
-
             // The ONLY vendor offer for item 1 is a seasonal (Halloween)
             // offer at 100 coin - cheaper than the 500 TP price, so if the
             // exclusion were NOT wired at this solve call site the solver
@@ -386,13 +281,13 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    activeFestivalNames: () => new[] { Gw2Constants.HalloweenFestivalName });
+                // No recipe for item 1
+                var pipeline = PipelineBuilder.Create()
+                    .WithPrice(1, buyUnitPrice: 500, sellUnitPrice: 500)
+                    .WithItem(1, "Festival Item", "festival.png")
+                    .WithVendorOfferStore(store)
+                    .WithActiveFestivalNames(() => new[] { Gw2Constants.HalloweenFestivalName })
+                    .Build();
 
                 var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                     priceBasis: PriceBasis.InstantBuy);
@@ -416,18 +311,12 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task NullVendorStore_PipelineStillWorks()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Item", "icon.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                null);
+            // WithVendorOfferStore is deliberately not called: Build() passes
+            // the null store this test is about.
+            var pipeline = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Item", "icon.png")
+                .Build();
 
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);

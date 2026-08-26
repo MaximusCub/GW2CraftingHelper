@@ -17,36 +17,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_ReportsPhaseEventsInOrderWithSanePayloads()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                },
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
+            var pipeline = PipelineBuilder.BuildOwnMaterialsPipeline(out var priceApi, ingredientCount: 3);
             priceApi.AddPrice(1, buyUnitPrice: 5000, sellUnitPrice: 10000);
             priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi),
-                reducer: new InventoryReducer());
 
             var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
 
@@ -106,47 +79,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredMultiAsync_ReportsPhaseEventsInOrder()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
-            });
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item A", "targeta.png");
-            itemApi.AddItem(2, "Target Item B", "targetb.png");
-            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
-            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.TwoRootTree().Build();
 
             var items = new List<PlanRequestItem>
             {
@@ -178,26 +111,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_List_WritesRichModuleLogEntries_IntoRealTempDirStore()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
+            var builder = PipelineBuilder.PricedRecipeTreeWithoutDiscipline();
 
             using (var tmp = new TempDirectory())
             {
@@ -212,12 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // lines this test asserts on need it.
                 log.DiagnosticsEnabled = true;
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    moduleLog: log);
+                var pipeline = builder.WithModuleLog(log).Build();
 
                 var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
 
@@ -277,41 +186,7 @@ namespace GW2CraftingHelper.Tests.Services
             // ModuleLog + ModuleLogStore in a temp dir, mirroring
             // GenerateStructuredMultiAsync_ReportsPhaseEventsInOrder's own
             // fakes above.
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
-            });
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item A", "targeta.png");
-            itemApi.AddItem(2, "Target Item B", "targetb.png");
-            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
-            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
+            var builder = PipelineBuilder.TwoRootTree();
 
             using (var tmp = new TempDirectory())
             {
@@ -320,12 +195,7 @@ namespace GW2CraftingHelper.Tests.Services
                 log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
                 log.DiagnosticsEnabled = true;
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    moduleLog: log);
+                var pipeline = builder.WithModuleLog(log).Build();
 
                 var items = new List<PlanRequestItem>
                 {
@@ -375,11 +245,9 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_List_NoRequestLabel_FallsBackToItemCountWording()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Item", "icon.png");
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Item", "icon.png");
 
             using (var tmp = new TempDirectory())
             {
@@ -387,12 +255,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var log = new ModuleLog();
                 log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    moduleLog: log);
+                var pipeline = builder.WithModuleLog(log).Build();
 
                 var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
 
@@ -423,26 +286,7 @@ namespace GW2CraftingHelper.Tests.Services
             // appended alongside as "(phases Nms)" - see
             // PlanPhaseTimingSummary.FormatCompactSummary's own doc
             // comment.
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
+            var builder = PipelineBuilder.PricedRecipeTreeWithoutDiscipline();
 
             using (var tmp = new TempDirectory())
             {
@@ -450,12 +294,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var log = new ModuleLog();
                 log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    moduleLog: log);
+                var pipeline = builder.WithModuleLog(log).Build();
 
                 var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
 
@@ -491,11 +330,9 @@ namespace GW2CraftingHelper.Tests.Services
             // search deterministically misses (SearchMisses > SearchHits),
             // which is exactly the condition RecipeService.PreWarmCacheAsync
             // uses to report this message.
-            var recipeApi = new InMemoryRecipeApiClient();
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Item", "icon.png");
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Item", "icon.png");
 
             using (var tmp = new TempDirectory())
             {
@@ -503,12 +340,7 @@ namespace GW2CraftingHelper.Tests.Services
                 var log = new ModuleLog();
                 log.Configure(store, maxFileSizeBytes: 0, onStoreError: null);
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    moduleLog: log);
+                var pipeline = builder.WithModuleLog(log).Build();
 
                 await pipeline.GenerateStructuredAsync(
                     1, 1, null, CancellationToken.None, progress: null,
@@ -531,32 +363,7 @@ namespace GW2CraftingHelper.Tests.Services
             // passes progress: null - it must still surface somewhere live,
             // via PlanPhaseEvent.Detail on the BuildingTree event (see
             // PlanStripTickDecision.FormatPhaseText).
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target", "t.png");
-            itemApi.AddItem(2, "Ingredient", "i.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.PricedRecipeTreeWithoutDiscipline().Build();
 
             var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
 

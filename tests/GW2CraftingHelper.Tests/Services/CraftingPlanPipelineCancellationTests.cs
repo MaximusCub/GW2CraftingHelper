@@ -31,24 +31,17 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_List_SingleItem_CancelledWhilePriceFetchInFlight_PropagatesCancellation()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - simplest leaf-buy tree, so Step 1
             // (build recipe tree) completes synchronously and the pipeline
             // reaches the price fetch immediately.
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Copper Ore", "copper.png");
 
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
             var gate = new TaskCompletionSource<bool>();
-            priceApi.Gate = gate.Task;
+            builder.PriceApi.Gate = gate.Task;
 
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Copper Ore", "copper.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = builder.Build();
 
             var cts = new CancellationTokenSource();
             var items = new List<PlanRequestItem> { new PlanRequestItem { ItemId = 1, Quantity = 1 } };
@@ -75,24 +68,17 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_List_MultiItem_CancelledWhilePriceFetchInFlight_PropagatesCancellation()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipes for items 1/2 - both are simplest leaf-buy trees.
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithPrice(2, buyUnitPrice: 20, sellUnitPrice: 200)
+                .WithItem(1, "Copper Ore", "copper.png")
+                .WithItem(2, "Iron Ore", "iron.png");
 
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            priceApi.AddPrice(2, buyUnitPrice: 20, sellUnitPrice: 200);
             var gate = new TaskCompletionSource<bool>();
-            priceApi.Gate = gate.Task;
+            builder.PriceApi.Gate = gate.Task;
 
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Copper Ore", "copper.png");
-            itemApi.AddItem(2, "Iron Ore", "iron.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = builder.Build();
 
             var cts = new CancellationTokenSource();
             var items = new List<PlanRequestItem>
@@ -124,38 +110,34 @@ namespace GW2CraftingHelper.Tests.Services
             out InMemoryPriceApiClient priceApi,
             out InMemoryItemApiClient itemApi)
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
+            var builder = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithPrice(1, buyUnitPrice: 1, sellUnitPrice: 2)
+                .WithItem(1, "Target", "t.png");
 
-            priceApi = new InMemoryPriceApiClient();
-            itemApi = new InMemoryItemApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 1, sellUnitPrice: 2);
-            itemApi.AddItem(1, "Target", "t.png");
+            priceApi = builder.PriceApi;
+            itemApi = builder.ItemApi;
 
             var ingredients = new List<RawIngredient>(ingredientCount);
             for (int i = 0; i < ingredientCount; i++)
             {
                 int id = 1000 + i;
                 ingredients.Add(new RawIngredient { Type = "Item", Id = id, Count = 1 });
-                priceApi.AddPrice(id, buyUnitPrice: 1, sellUnitPrice: 2);
-                itemApi.AddItem(id, "Ingredient " + id, "i.png");
+                builder.WithPrice(id, buyUnitPrice: 1, sellUnitPrice: 2);
+                builder.WithItem(id, "Ingredient " + id, "i.png");
             }
 
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = ingredients,
-                Disciplines = new List<string> { "Weaponsmith" },
-                MinRating = 400
-            });
-
-            return new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            return builder
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = ingredients,
+                    Disciplines = new List<string> { "Weaponsmith" },
+                    MinRating = 400
+                })
+                .Build();
         }
 
         // KNOWN-ISSUES #31/api-degradation F2: TradingPostService degrades a
@@ -195,21 +177,13 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_AllPriceBatchesFail_AbortsInsteadOfSilentlyDegrading()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - simplest leaf-buy tree.
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Copper Ore", "copper.png");
+            builder.PriceApi.ThrowAlways = true;
 
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-            priceApi.ThrowAlways = true;
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Copper Ore", "copper.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = builder.Build();
 
             await Assert.ThrowsAsync<HttpRequestException>(() =>
                 pipeline.GenerateStructuredAsync(
@@ -244,22 +218,14 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_AllMetadataBatchesFail_AbortsInsteadOfSilentlyDegrading()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
             // No recipe for item 1 - simplest leaf-buy tree, single item
             // metadata batch.
+            var builder = PipelineBuilder.Create()
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 500)
+                .WithItem(1, "Copper Ore", "copper.png");
+            builder.ItemApi.ThrowOnCallNumber = 1; // the sole first-wave batch fails
 
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 500);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Copper Ore", "copper.png");
-            itemApi.ThrowOnCallNumber = 1; // the sole first-wave batch fails
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = builder.Build();
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 pipeline.GenerateStructuredAsync(

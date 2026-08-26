@@ -38,47 +38,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_ListOverload_MultiItem_PopulatesAllFourAdvisoryLists()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
-            });
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item A", "targeta.png");
-            itemApi.AddItem(2, "Target Item B", "targetb.png");
-            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
-            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.TwoRootTree().Build();
 
             var items = new List<PlanRequestItem>
             {
@@ -122,47 +82,7 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task ResolveWithOverrides_MultiItemContext_PopulatesAllFourAdvisoryLists()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
-            });
-            recipeApi.AddSearchResult(2, 20);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 20,
-                OutputItemId = 2,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
-                {
-                    new RawIngredient { Type = "Item", Id = 4, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 60, sellUnitPrice: 1200);
-            priceApi.AddPrice(3, buyUnitPrice: 10, sellUnitPrice: 100);
-            priceApi.AddPrice(4, buyUnitPrice: 20, sellUnitPrice: 200);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item A", "targeta.png");
-            itemApi.AddItem(2, "Target Item B", "targetb.png");
-            itemApi.AddItem(3, "Ingredient A", "ingredienta.png");
-            itemApi.AddItem(4, "Ingredient B", "ingredientb.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+            var pipeline = PipelineBuilder.TwoRootTree().Build();
 
             var items = new List<PlanRequestItem>
             {
@@ -201,32 +121,23 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public async Task GenerateStructuredAsync_ListOverload_SingleItem_RoutesToSingleItemPath_NotMultiItemWrapper()
         {
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(1, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = 1,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000);
-            priceApi.AddPrice(2, buyUnitPrice: 10, sellUnitPrice: 100);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(1, "Target Item", "target.png");
-            itemApi.AddItem(2, "Ingredient", "ingredient.png");
-
-            var pipeline = new CraftingPlanPipeline(
-                new RecipeService(recipeApi),
-                new TradingPostService(priceApi),
-                new PlanSolver(),
-                new ItemMetadataService(itemApi));
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    }
+                })
+                .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
+                .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
+                .WithItem(1, "Target Item", "target.png")
+                .WithItem(2, "Ingredient", "ingredient.png")
+                .Build();
 
             var items = new List<PlanRequestItem>
             {
@@ -261,30 +172,27 @@ namespace GW2CraftingHelper.Tests.Services
             const int VendorOnlyChildItemId = 2; // Philosopher's Stone-style
             const int OrdinaryChildItemId = 3;
 
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(RootItemId, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = RootItemId,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var builder = PipelineBuilder.Create()
+                .WithSearchResult(RootItemId, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            // No TP price for the root or the vendor-only child - craft and
-            // BuyFromVendor are each the only source for their own item.
-            // Ordinary child has a real TP price (craft-cost basis 10/unit).
-            priceApi.AddPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(RootItemId, "Deldrimor Steel Ingot", "root.png");
-            itemApi.AddItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png");
-            itemApi.AddItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png");
+                    Id = 10,
+                    OutputItemId = RootItemId,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
+                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
+                    }
+                })
+                // No TP price for the root or the vendor-only child - craft and
+                // BuyFromVendor are each the only source for their own item.
+                // Ordinary child has a real TP price (craft-cost basis 10/unit).
+                .WithPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20)
+                .WithItem(RootItemId, "Deldrimor Steel Ingot", "root.png")
+                .WithItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png")
+                .WithItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png")
+                .WithInventoryReducer();
 
             using (var tmp = new TempDirectory())
             {
@@ -307,13 +215,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                var pipeline = builder.WithVendorOfferStore(store).Build();
 
                 // Same valuation ModuleSettings.GetEffectiveCurrencyValuation()
                 // returns on a fresh settings state: no user overrides, so only
@@ -375,31 +277,28 @@ namespace GW2CraftingHelper.Tests.Services
             const int VendorOnlyChildItemId = 2;
             const int OrdinaryChildItemId = 3;
 
-            var recipeApi = new InMemoryRecipeApiClient();
-            recipeApi.AddSearchResult(RootItemId, 10);
-            recipeApi.AddRecipe(new RawRecipe
-            {
-                Id = 10,
-                OutputItemId = RootItemId,
-                OutputItemCount = 1,
-                Ingredients = new List<RawIngredient>
+            var builder = PipelineBuilder.Create()
+                .WithSearchResult(RootItemId, 10)
+                .WithRecipe(new RawRecipe
                 {
-                    new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
-                }
-            });
-
-            var priceApi = new InMemoryPriceApiClient();
-            priceApi.AddPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20);
-            // Root ALSO has a (much higher) TP price, so it becomes a
-            // multi-option node and the committed pill is PillKind.Selected
-            // rather than Locked.
-            priceApi.AddPrice(RootItemId, buyUnitPrice: 1000000, sellUnitPrice: 1000000);
-
-            var itemApi = new InMemoryItemApiClient();
-            itemApi.AddItem(RootItemId, "Deldrimor Steel Ingot", "root.png");
-            itemApi.AddItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png");
-            itemApi.AddItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png");
+                    Id = 10,
+                    OutputItemId = RootItemId,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = VendorOnlyChildItemId, Count = 1 },
+                        new RawIngredient { Type = "Item", Id = OrdinaryChildItemId, Count = 2 }
+                    }
+                })
+                .WithPrice(OrdinaryChildItemId, buyUnitPrice: 10, sellUnitPrice: 20)
+                // Root ALSO has a (much higher) TP price, so it becomes a
+                // multi-option node and the committed pill is PillKind.Selected
+                // rather than Locked.
+                .WithPrice(RootItemId, buyUnitPrice: 1000000, sellUnitPrice: 1000000)
+                .WithItem(RootItemId, "Deldrimor Steel Ingot", "root.png")
+                .WithItem(VendorOnlyChildItemId, "Philosopher's Stone", "stone.png")
+                .WithItem(OrdinaryChildItemId, "Ordinary Ingredient", "ingredient.png")
+                .WithInventoryReducer();
 
             using (var tmp = new TempDirectory())
             {
@@ -422,13 +321,7 @@ namespace GW2CraftingHelper.Tests.Services
                     }
                 });
 
-                var pipeline = new CraftingPlanPipeline(
-                    new RecipeService(recipeApi),
-                    new TradingPostService(priceApi),
-                    new PlanSolver(),
-                    new ItemMetadataService(itemApi),
-                    store,
-                    reducer: new InventoryReducer());
+                var pipeline = builder.WithVendorOfferStore(store).Build();
 
                 var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
                 var snapshot = new AccountSnapshot
