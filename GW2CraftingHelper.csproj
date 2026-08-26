@@ -216,6 +216,16 @@
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
+    <Compile Include="Models\RankerWatchlistEntry.cs" />
+    <Compile Include="Models\RankerSlotAvailability.cs" />
+    <Compile Include="Models\RankerRowMetrics.cs" />
+    <Compile Include="Services\RankerStore.cs" />
+    <Compile Include="Services\RankerWatchlistLimits.cs" />
+    <Compile Include="Services\RankerPriorityOrdering.cs" />
+    <Compile Include="Services\RankerPriorityCascade.cs" />
+    <Compile Include="Services\RankerReadinessWeights.cs" />
+    <Compile Include="Services\RankerReadinessCalculator.cs" />
+    <Compile Include="Services\RankerRowLayout.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
     <Compile Include="Views\AboutTabContent.cs" />
     <Compile Include="Views\ViewAdapter.cs" />
