@@ -226,6 +226,8 @@
     <Compile Include="Services\RankerReadinessWeights.cs" />
     <Compile Include="Services\RankerReadinessCalculator.cs" />
     <Compile Include="Services\RankerRowLayout.cs" />
+    <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
+    <Compile Include="Views\RankerTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
     <Compile Include="Views\AboutTabContent.cs" />
     <Compile Include="Views\ViewAdapter.cs" />
