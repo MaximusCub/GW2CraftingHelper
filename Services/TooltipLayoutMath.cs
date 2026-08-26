@@ -54,8 +54,9 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
         /// every existing caller reads the same as every plain tooltip; a
         /// caller with a measured cap of its own - the item tooltip, whose
-        /// in-game boxes are 300-332px wide (gap G24) - passes it and does
-        /// not move the shared constant out from under the rest.
+        /// wrap maximum is derived from live captures (gap G24,
+        /// fidelity-audit section 1.5) - passes it and does not move the
+        /// shared constant out from under the rest.
         /// </summary>
         public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {

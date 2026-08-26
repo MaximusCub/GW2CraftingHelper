@@ -96,13 +96,26 @@ namespace GW2CraftingHelper.Views.Rendering
         private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
 
         /// <summary>
-        /// TOOLTIP-LOCAL, deliberately: the measured in-game boxes are
-        /// 300-332px wide and gw2efficiency caps at 350, while Blish's own
-        /// 500 stays the preferred width for every plain tooltip in the
-        /// module (gap G24). The shared
+        /// TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the preferred
+        /// width for every plain tooltip in the module (gap G24); the shared
         /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
+        /// <para>
+        /// 392 is the game's measured wrap maximum converted into THIS
+        /// surface's measurement space. The game wraps text at 333-347px
+        /// (bracketed by wrapped-vs-unwrapped lines on the 2026-08-25 live
+        /// captures and two native-scale wiki captures, fidelity-audit
+        /// section 1.3), but this surface deliberately renders at
+        /// Menomonia 16 where the game uses ~14 (the module-wide
+        /// readability bump, G25/F9). Re-measuring the live strings through
+        /// Blish's exact chain - <c>MeasureString</c> with the
+        /// <c>LetterSpacing = -1</c> Blish sets on every font - puts
+        /// DefaultFont16 at 1.153x the game's text width, scaling the
+        /// bracket to 384-400; midpoint 392. The old 350 was a game-pixel
+        /// constant applied unscaled to the larger font, which broke prose
+        /// one word earlier than the game on every multi-line description.
+        /// </para>
         /// </summary>
-        private const int MaxContentWidth = 350;
+        private const int MaxContentWidth = 392;
 
         /// <summary>
         /// The game's coin icon is ~0.8x its line height (~13px on a 16px
