@@ -369,6 +369,17 @@ WP-24, WP-25) extracted:
   (`CoinCurrencyRenderer`, `RarityColors`, `IconControls`, `LabelHelpers`)
   also moved to `Views/Rendering/`.
 
+**Dependencies point one way.** `CraftingPlanView` and `MainView` call into
+`Views/Rendering`; nothing in `Views/Rendering` references either. A
+renderer that needs a view-private helper extracts the helper into
+`Views/Rendering` rather than widening the view's surface, and what a
+renderer needs from the view arrives through `ISectionRelayoutSink` or a
+constructor delegate. This was violated once - a `GetPillColors`
+`private -> internal` bump on `CraftingPlanView` - and reverted for this
+reason; the rule is stated here so the revert does not have to be
+re-litigated in each file. `MainView -> Views/Rendering` (e.g.
+`CoinCurrencyRenderer.AddSegmentSpec`) is a forward call and fine.
+
 `TreeSectionController` is constructed once, in `CraftingPlanView`'s own
 constructor (`Views/CraftingPlanView.cs` ~614), and lives as long as the
 view: one owner, one lifetime. That is what lets a pill click re-solve

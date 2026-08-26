@@ -38,14 +38,6 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal RecipesSectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by every other section renderer on this pattern -
-            // the sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateRecipeRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 

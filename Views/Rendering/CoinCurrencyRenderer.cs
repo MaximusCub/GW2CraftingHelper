@@ -7,12 +7,8 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "10. Coin/currency
-    // value rendering primitives" region - private static -> internal
-    // static, no logic changes. The coin-icon-right-of-number invariant
-    // (repo CLAUDE.md) now lives in this one named place. Callers in
-    // CraftingPlanView repoint through this class name (e.g.
-    // CoinCurrencyRenderer.RenderValueCellRightAligned).
+    // The one place the coin-icon-right-of-number invariant (CLAUDE.md) is
+    // implemented: every coin amount the module draws goes through here.
     internal static class CoinCurrencyRenderer
     {
         // Plain "12g 34s 56c" text for contexts that cannot render coin
@@ -62,22 +58,11 @@ namespace GW2CraftingHelper.Views.Rendering
             return segments;
         }
 
-        // private -> internal: MainView needs to build its own
-        // 3-segment gold/silver/copper spec list (its own show-all/no-
-        // padding formatting - a deliberate MainView behavior, out of this
-        // package's scope to change) without duplicating this measure-
-        // and-wrap one-liner.
-        // NOTE: this is NOT the same precedent as the earlier
-        // GetPillColors private -> internal bump. That bump was reverted
-        // back to private (commit 5c56b2a) specifically to stop
-        // Views/Rendering from depending back on CraftingPlanView and keep
-        // Views/Rendering a true leaf layer; CraftingPlanView.GetPillColors
-        // is private static again on current master. This bump is
-        // different in kind: MainView -> Views/Rendering is a normal
-        // forward consumer dependency (a leaf class exposing a helper to a
-        // caller), not a reverse edge back into CraftingPlanView. Do not
-        // cite this as precedent for adding a reverse
-        // Views/Rendering -> CraftingPlanView dependency.
+        // Internal because MainView builds its own 3-segment
+        // gold/silver/copper spec list (show-all, no padding) and would
+        // otherwise duplicate this measure-and-wrap. MainView ->
+        // Views/Rendering is a forward dependency; the reverse direction
+        // stays closed (docs/ARCHITECTURE.md section 5).
         internal static void AddSegmentSpec(List<CoinSegmentMath.CoinSegmentSpec> segments, BitmapFont font, int assetId, string text)
         {
             int width = (int)System.Math.Ceiling(font.MeasureString(text).Width);

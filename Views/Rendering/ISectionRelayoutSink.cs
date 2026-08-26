@@ -7,44 +7,22 @@ namespace GW2CraftingHelper.Views.Rendering
     /// participate in the resize-relayout contract (KNOWN-ISSUES
     /// #13/#19) without holding a reference to the view itself.
     ///
-    /// CraftingPlanView implements this over its existing private
-    /// _relayoutActions/_reellipsisActions registries (see the field
-    /// comment on CraftingPlanView) with ZERO semantic change: both members
-    /// below are a straight pass-through to the same List&lt;Action&lt;int&gt;&gt;.Add
-    /// calls the inline section builders used to make directly. That means
-    /// every invariant that reads those lists - the DEBUG must-register
-    /// check in CreateCollapsibleSection (counts _relayoutActions before/
-    /// after a section body builder runs), the DEBUG scroll-neutral assert
-    /// in ReplayRelayout, and ReplayRelayout/RunReellipsis's own foreach -
-    /// sees a sink-registered closure exactly as it would have seen one
-    /// added inline. A section that forgets to call AddRelayout still trips
-    /// the same "registered no relayout closures" warning it always did.
+    /// Kept to the two registries plus the read-only RelayoutCount and the
+    /// settle-time rebuild request, which concern the same two lists'
+    /// replay. Shared chrome (CreateSectionHeader) and the static
+    /// primitives (LabelHelpers/IconControls/RarityColors/
+    /// CoinCurrencyRenderer) are called directly; a renderer that needs a
+    /// CraftingPlanView-private helper extracts it into Views/Rendering
+    /// rather than reaching back into the view (KNOWN-ISSUES #39). Shared
+    /// row-construction helpers with several callers (TextRowRenderer,
+    /// CTableHeaderRenderer, RowRelayoutHelpers, IconNameRowHelpers) take
+    /// this interface as a method parameter rather than a
+    /// constructor-injected field, since none of them is itself a section
+    /// renderer.
     ///
-    /// Kept to exactly the two registries (plus the read-only
-    /// RelayoutCount and the settle-time rebuild request, both of which
-    /// concern the same two lists' replay) on purpose - a renderer that
-    /// also needs shared
-    /// chrome (e.g. CreateSectionHeader) or a static primitive
-    /// (LabelHelpers/IconControls/RarityColors/CoinCurrencyRenderer) reaches
-    /// those directly; they take no dependency on CraftingPlanView already,
-    /// so they do not belong on this interface. A section renderer that
-    /// needs a CraftingPlanView-private helper should extract the helper to
-    /// its own Views/Rendering class (or into the section renderer itself,
-    /// if it has exactly one call site) rather than reaching back into
-    /// CraftingPlanView, preserving the forward-only Views/Rendering ->
-    /// CraftingPlanView dependency direction (see KNOWN-ISSUES #39).
-    /// Shared row-construction helpers with multiple callers
-    /// (TextRowRenderer, CTableHeaderRenderer, RowRelayoutHelpers,
-    /// IconNameRowHelpers) take this interface as a plain method parameter
-    /// rather than a constructor-injected field, since none of them is
-    /// itself a section renderer.
-    ///
-    /// RelayoutCount exists only because TreeSectionController.
-    /// CreateTreeSection carries the same DEBUG must-register assert as
-    /// CraftingPlanView.CreateCollapsibleSection but is not inside
-    /// CraftingPlanView to read _relayoutActions directly. Kept read-only
-    /// and additive to AddRelayout/AddReellipsis rather than widening
-    /// either of those - this is observation, not registration.
+    /// RelayoutCount is observation, not registration: TreeSectionController
+    /// carries CreateCollapsibleSection's DEBUG must-register assert but
+    /// cannot read _relayoutActions directly.
     /// <para>See docs/ARCHITECTURE.md section 5.</para>
     /// </summary>
     internal interface ISectionRelayoutSink
@@ -89,10 +67,8 @@ namespace GW2CraftingHelper.Views.Rendering
         void RequestRerenderAfterSettle();
 
         /// <summary>
-        /// How many relayout closures are registered right now -
-        /// see the interface doc comment above for why this exists (a
-        /// DEBUG-only must-register assert moved out of CraftingPlanView
-        /// alongside TreeSectionController).
+        /// How many relayout closures are registered right now - read by
+        /// TreeSectionController's DEBUG must-register assert.
         /// </summary>
         int RelayoutCount { get; }
     }

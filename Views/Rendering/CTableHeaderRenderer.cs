@@ -8,12 +8,9 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView.CreateCTableHeaderRow -
-    // private static -> internal static, no logic changes. Each c-table
-    // section renderer (Disciplines/Recipes) owns its own header call
-    // directly inside Render(), mirroring how ShoppingListSectionRenderer
-    // owns CreateShoppingListHeaderRow; CraftingPlanView itself no longer
-    // references the c-table header at all.
+    // Each c-table section renderer (Disciplines/Recipes) calls this from
+    // inside its own Render(), the way ShoppingListSectionRenderer owns
+    // CreateShoppingListHeaderRow.
     //
     // Optional middleLabel/middleX so Required Disciplines
     // can honestly label its per-character availability text with a

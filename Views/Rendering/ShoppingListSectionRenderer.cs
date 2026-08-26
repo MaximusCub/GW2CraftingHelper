@@ -8,19 +8,7 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Shopping List row list and its header
-    // row. Behavior is unchanged: same row
-    // geometry, same PlanContentHeightMath/PlanRelayoutMath/
-    // ShoppingColumnMath calls, same LabelHelpers.CreateRowDivider usage
-    // (divider math and its 1px scissor clearance
-    // untouched), same CoinCurrencyRenderer usage for the Each/Total cells.
-    // The only edits inside the moved bodies are _relayoutActions.Add ->
-    // the injected ISectionRelayoutSink.AddRelayout, _reellipsisActions.Add
-    // -> ISectionRelayoutSink.AddReellipsis (both semantics-preserving
-    // pass-throughs - see ISectionRelayoutSink's doc comment), and
-    // GetPillColors(...) -> PillColors.GetPillColors(...) (see PillColors'
-    // doc comment for why that helper lives in its own file).
+    // The Shopping List row list and its header row.
     //
     // CreateShoppingRow's
     // icon+ellipsized-name construction and its divider+relayout tail
@@ -60,15 +48,6 @@ namespace GW2CraftingHelper.Views.Rendering
             ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by DisciplinesSectionRenderer/
-            // UsedMaterialsSectionRenderer - the sole production call site
-            // always passes `this` (CraftingPlanView), but a later section
-            // renderer built on this same pattern should fail loud, not
-            // with a deferred NRE inside CreateShoppingRow's first
-            // AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
@@ -92,7 +71,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // same fixed minimums so short/low-value lists don't look cramped -
         // see ShoppingColumnMath (Blish-free, unit-tested arithmetic).
         //
-        // Moved verbatim from CraftingPlanView.CreateShoppingListBody.
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var coinFont = UiFonts.Body;
@@ -201,9 +179,8 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateShoppingListHeaderRow.
-        // Changes since: _relayoutActions.Add(...) -> _sink.AddRelayout(...),
-        // and the column edges come from the shared pre-scan.
+        // Column edges come from Render()'s shared pre-scan, so the header
+        // lands on the same x as the rows below it.
         private void CreateShoppingListHeaderRow(
             FlowPanel parent, int panelWidth, ColumnScan scan,
             string amountHeaderText, string sourceHeaderText)
@@ -349,9 +326,6 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.CreateShoppingRow, then
-        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
-        // the class doc comment above) - same geometry, same constants.
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ColumnScan scan, bool isLast)
         {

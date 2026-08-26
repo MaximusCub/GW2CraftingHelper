@@ -3,16 +3,11 @@ using Microsoft.Xna.Framework;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "9. Recipe tree rendering"
-    // region - private static -> internal static, no logic changes.
-    //
-    // GetPillColors lives here (not in either caller) because it is shared
-    // by the Shopping List section's source-tag panel and by
-    // RenderDecisionPills. Do NOT bump GetPillColors private -> internal
-    // on CraftingPlanView instead - that would reintroduce the reverse
-    // Views/Rendering -> CraftingPlanView dependency edge already reverted
-    // once (commit 5c56b2a) for exactly this reason; callers make a
-    // forward call into Views/Rendering, never the other way around.
+    // GetPillColors lives here rather than on either caller because it is
+    // shared by the Shopping List section's source-tag panel and by
+    // RenderDecisionPills. Making it internal on CraftingPlanView instead
+    // would point a Views/Rendering type back at the view; dependencies run
+    // one way (docs/ARCHITECTURE.md section 5).
     internal static class PillColors
     {
         /// <summary>

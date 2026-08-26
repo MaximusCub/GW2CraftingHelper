@@ -6,24 +6,12 @@ using MonoGame.Extended.BitmapFonts;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "11. Generic
-    // control/format helpers" region (KNOWN-ISSUES #23 -
-    // CreateRowDivider's divider math and its 1px scissor clearance
-    // constants move byte-identical, unchanged from below) - private
-    // static -> internal static, no logic changes. Callers in
-    // CraftingPlanView now qualify as LabelHelpers.CreateRowDivider /
-    // LabelHelpers.CreateRightAlignedLabel / LabelHelpers.CreateSmallTag /
-    // LabelHelpers.EllipsizeToWidth. This class takes no dependency back on
-    // CraftingPlanView (CreateSmallTag's pill colors are resolved by the
-    // caller and passed in), so
-    // this namespace stays a true leaf with no reverse edge back into
-    // CraftingPlanView.
+    // A leaf: nothing here refers back to CraftingPlanView (CreateSmallTag's
+    // pill colors are resolved by the caller and passed in).
     internal static class LabelHelpers
     {
-        // Only consumer is CreateRowDivider below - moved alongside it from
-        // CraftingPlanView's shared "General" constants (it was declared
-        // next to SectionDividerColor there, which stays put and is used
-        // elsewhere in that file).
+        // Only consumer is CreateRowDivider below. Distinct from
+        // CraftingPlanView's SectionDividerColor, which divides sections.
         private static readonly Color RowDividerColor = new Color(100, 100, 100);
 
         /// <summary>

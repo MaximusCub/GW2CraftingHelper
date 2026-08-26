@@ -58,12 +58,6 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal NotesSectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention every other
-            // section renderer uses (see DisciplinesSectionRenderer/
-            // UsedMaterialsSectionRenderer's own doc comments) - the sole
-            // production call site always passes `this`
-            // (CraftingPlanView), but a fail-loud guard here beats a
-            // deferred NRE inside the first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 

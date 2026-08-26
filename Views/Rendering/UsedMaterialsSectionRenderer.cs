@@ -7,16 +7,7 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7. Section builders
-    // (continued)" region - the Used Materials row list only. Behavior is
-    // unchanged: same row geometry, same PlanContentHeightMath/
-    // PlanRelayoutMath calls, same LabelHelpers.CreateRowDivider usage
-    // (divider math and its 1px scissor clearance
-    // untouched). The only edit inside the moved bodies is
-    // _relayoutActions.Add -> the injected ISectionRelayoutSink.AddRelayout
-    // and _reellipsisActions.Add -> ISectionRelayoutSink.AddReellipsis, both
-    // semantics-preserving pass-throughs (see ISectionRelayoutSink's doc
-    // comment).
+    // The Used Materials row list.
     //
     // CreateUsedMaterialRow's
     // icon+ellipsized-name construction and its divider+relayout tail
@@ -49,14 +40,6 @@ namespace GW2CraftingHelper.Views.Rendering
             ISectionRelayoutSink sink, TableSortState<PlanTableColumn> sortState, Action onSortChanged,
             Func<int, ItemStatBlock> getItemStatBlock = null)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by DisciplinesSectionRenderer - the
-            // sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateUsedMaterialRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
             _sortState = sortState ?? throw new ArgumentNullException(nameof(sortState));
             _onSortChanged = onSortChanged ?? throw new ArgumentNullException(nameof(onSortChanged));
@@ -70,9 +53,8 @@ namespace GW2CraftingHelper.Views.Rendering
         private const int NameToQtyGap = 12;
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateUsedMaterialsBody,
-        /// then given the one-pass pre-scan every other plan table already
-        /// had: the widest rendered "Nx" string, which is the Amount
+        /// One-pass pre-scan, as every other plan table has: the widest
+        /// rendered "Nx" string, which is the Amount
         /// column's reserved band and therefore the Item column's ellipsis
         /// budget. Data-derived, so it is measured once here and reused by
         /// every row's relayout closure rather than re-measured per resize
@@ -139,9 +121,6 @@ namespace GW2CraftingHelper.Views.Rendering
             _onSortChanged();
         }
 
-        // Moved verbatim from CraftingPlanView.CreateUsedMaterialRow, then
-        // refactored onto IconNameRowHelpers/RowRelayoutHelpers (see
-        // the class doc comment above) - same geometry, same constants.
         private void CreateUsedMaterialRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth,
             int maxQtyWidth, bool isLast)

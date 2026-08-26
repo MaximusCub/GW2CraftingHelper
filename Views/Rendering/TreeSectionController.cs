@@ -10,63 +10,26 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "8. Tree
-    // rendering (state)"/"8. Tree rendering (continued)"/"9. Decision
-    // pills" regions - the Recipe Tree section renderer AND the interactive
-    // override loop it drives (Best Path/Craft All/Buy All presets, the
-    // per-node craft/tp/vendor decision pills, and the Ignore pill), plus
-    // every field that loop owns: TreeNodeState, _treeNodeStates,
-    // _treeRoots/_treeFlow (the current render pass's tree bookkeeping),
-    // _nodeOverrides/_ignoredItemIds/_nodeExpansion (session-persistent
-    // decision/ignore/expansion state), and _lastResult (the
-    // solve context the override loop re-resolves against).
+    // The Recipe Tree section renderer AND the interactive override loop it
+    // drives (Best Path/Craft All/Buy All presets, the per-node
+    // craft/tp/vendor decision pills, the Ignore pill), plus every field
+    // that loop owns: TreeNodeState, _treeNodeStates, _treeRoots/_treeFlow
+    // (this render pass's tree bookkeeping), _nodeOverrides/_ignoredItemIds/
+    // _nodeExpansion (session-persistent decision/ignore/expansion state),
+    // and _lastResult (the solve context the override loop re-resolves
+    // against).
     //
-    // Unlike the six section renderers
-    // extracted before it, this component owns a slice of application
-    // state, not just presentation - the field group above survives across
-    // every local re-solve (a pill click never rebuilds it) and is reset
-    // only once per genuinely new Generate. It also cannot reach several
-    // things it still needs purely through ISectionRelayoutSink, because
-    // those things are NOT relayout registrations: PreserveScrollAcross
-    // (scroll preserve/restore/verify machinery, stays on
-    // CraftingPlanView - see
-    // KNOWN-ISSUES #39), SetStatus, the top-level RenderPlan rebuild
-    // entry point, GetCurrentPanelWidth, the view's own _currentPlan/
-    // _lastDebugLog fields, and CreateSectionHeader (shared chrome every
-    // section uses, including the plain PlanSectionType sections this
-    // package never touches). Each is threaded in as a plain constructor
-    // delegate - the same shape CraftingPlanView's own constructor already
-    // takes generateAsync/resolveOverridesSync in - rather than handing
-    // this class a reference to the view itself, which would reopen the
-    // whole private surface this extraction is meant to shrink.
-    // CreateSectionHeader's return type (SectionHeaderHandle) is a private
-    // nested class of CraftingPlanView, so the delegate unpacks it into a
-    // plain ValueTuple at the one call site inside CraftingPlanView's
-    // constructor instead of widening that type's own accessibility.
-    //
-    // The only other non-move edits, beyond the established this-> _sink
-    // substitution every extracted renderer makes: (1) the DEBUG
-    // must-register assert inside CreateTreeSection used to read
-    // _relayoutActions.Count directly (a private CraftingPlanView field);
-    // it now reads ISectionRelayoutSink.RelayoutCount, added
-    // specifically for that (see the interface's own doc
-    // comment - every other extracted renderer's equivalent assert stays
-    // in CraftingPlanView.CreateCollapsibleSection, which still has direct
-    // field access, so this is the first caller that needed it exposed
-    // through the seam). (2) RenderTreeNode's cost-cell currency
-    // resolution used to read the CraftingPlanView field _currentPlan
-    // directly (_currentPlan?.CurrencyMetadata); it now calls the injected
-    // getCurrentPlan() delegate - same value, since _currentPlan is always
-    // already set to the very view model this render pass is building
-    // before RenderPlan (and therefore CreateTreeSection) ever runs.
-    // (3) CraftingPlanView.RenderPlan's top-of-method reset
-    // (_treeNodeStates.Clear(); _treeRoots = null; _treeFlow = null;) and
-    // TriggerGenerate's fresh-generation reset (_nodeOverrides.Clear();
-    // _ignoredItemIds.Clear(); _nodeExpansion.Clear(); _lastResult =
-    // result;) both moved onto this class as ResetTreeRenderState()/
-    // ResetForNewPlan(result) - the two reset shapes are semantically
-    // different (per-render-pass vs. per-generation - see each method's
-    // own doc comment) so they stay two methods, not one.
+    // Alone among the section renderers this one owns application state,
+    // not just presentation: those fields survive every local re-solve (a
+    // pill click never rebuilds them) and reset only on a genuinely new
+    // Generate. What it needs from the view beyond relayout registration -
+    // PreserveScrollAcross (KNOWN-ISSUES #39), SetStatus, the RenderPlan
+    // rebuild entry point, GetCurrentPanelWidth, the current plan, and
+    // CreateSectionHeader - arrives as constructor delegates rather than a
+    // reference to CraftingPlanView, which would reopen the private surface
+    // this class exists to stay out of. CreateSectionHeader's return type is
+    // private to CraftingPlanView, so the delegate hands back a ValueTuple
+    // instead of widening that type's accessibility.
     //
     // See docs/ARCHITECTURE.md section 5 for the state-ownership
     // rationale and the scroll/resize/wheel controller cut decision.
@@ -387,18 +350,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// per-root header row is needed - gw2e's own "N independent
         /// top-level recipe trees" look falls out for free.
         /// </summary>
-        // Moved verbatim from CraftingPlanView.CreateTreeSection. Edits:
-        // CreateSectionHeader(...) -> the injected createSectionHeader
-        // delegate (unpacked into local headerPanel/treeFlow, ArrowLabel
-        // unused here exactly as it was unused in the original body) -
-        // the suppressToggle argument is passed positionally rather than
-        // named (`suppressToggle: () => ...`) since a plain Func<...>
-        // delegate invocation has no parameter names of its own to match
-        // against, same value either way; _relayoutActions.Add(...) ->
-        // _sink.AddRelayout(...); the DEBUG must-register assert reads
-        // _sink.RelayoutCount instead of _relayoutActions.Count;
-        // PreserveScrollAcross(...) -> _preserveScrollAcross(...);
-        // GetCurrentPanelWidth() -> _getCurrentPanelWidth().
         internal void CreateTreeSection(IReadOnlyList<CraftingTreeNode> treeRoots, int panelWidth)
         {
             _treeNodeStates.Clear();
@@ -671,9 +622,6 @@ namespace GW2CraftingHelper.Views.Rendering
             HoverChainResync.AfterRebuild();
         }
 
-        // Moved verbatim from CraftingPlanView.ApplyPreset. No edits - both
-        // fields/methods it touches (_lastResult, _nodeOverrides,
-        // ApplyOverridesAndResolve) are this class's own.
         private void ApplyPreset(AcquisitionSource source)
         {
             if (_lastResult?.SolveContext == null)
@@ -697,11 +645,6 @@ namespace GW2CraftingHelper.Views.Rendering
         // IsBestPathPreset must come from which
         // control fired this call, not be inferred from the resulting
         // _nodeOverrides count - see StatusText.ForOverrideResolve for why.
-        // Moved verbatim from CraftingPlanView.ApplyOverridesAndResolve.
-        // Edits: _lastDebugLog = ... -> _setLastDebugLog(...); _currentPlan
-        // = vm -> _setCurrentPlan(vm); PreserveScrollAcross(() =>
-        // RenderPlan(vm)) -> _preserveScrollAcross(() => _renderPlan(vm));
-        // SetStatus(...) -> _setStatus(...).
         private void ApplyOverridesAndResolve(bool isBestPathPreset = false)
         {
             // Edit since the move: this used to return silently on a
@@ -864,8 +807,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// toggle, never per frame, so the extra work is not a hot-path
         /// concern.
         /// </summary>
-        // Moved verbatim from CraftingPlanView.RefreshTreeContainerHeights.
-        // Only edit: GetCurrentPanelWidth() -> _getCurrentPanelWidth().
         private void RefreshTreeContainerHeights()
         {
             int panelWidth = _getCurrentPanelWidth();
@@ -884,13 +825,6 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
-        // Moved verbatim from CraftingPlanView.RenderTreeNode. Edits:
-        // _relayoutActions.Add(...) -> _sink.AddRelayout(...);
-        // _reellipsisActions.Add(...) -> _sink.AddReellipsis(...);
-        // _currentPlan?.CurrencyMetadata -> _getCurrentPlan()?.
-        // CurrencyMetadata; PreserveScrollAcross(...) ->
-        // _preserveScrollAcross(...); GetCurrentPanelWidth() ->
-        // _getCurrentPanelWidth().
         // UI-bundle milestone: captionText is the sanctioned tooltip
         // fallback for Feature C (receipt/what-if captions) - see
         // ReceiptCaptionHelper's own doc comment for why a real extra ROW
@@ -1810,11 +1744,6 @@ namespace GW2CraftingHelper.Views.Rendering
         /// window width at which a hidden pill would have fit.
         /// </para>
         /// </summary>
-        // Moved verbatim from CraftingPlanView.RenderDecisionPills. Only
-        // edit: the interactive/ignoreInteractive click handlers write
-        // _nodeOverrides/_ignoredItemIds and call ApplyOverridesAndResolve
-        // - both now this class's own field/method, so the bodies are
-        // unchanged text.
         private void RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed,
             List<Panel> pillPanels)

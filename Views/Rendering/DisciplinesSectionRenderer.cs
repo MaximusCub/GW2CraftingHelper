@@ -8,15 +8,8 @@ using System;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of
-    // CraftingPlanView's "7. Section builders (continued)" region - the
-    // Required Disciplines row list only. Behavior is unchanged: same row
-    // geometry, same PlanContentHeightMath/PlanRelayoutMath calls, same
-    // LabelHelpers.CreateRowDivider usage (divider math
-    // and its 1px scissor clearance untouched). The only edit inside
-    // the moved bodies is _relayoutActions.Add -> the injected
-    // ISectionRelayoutSink.AddRelayout, which is a semantics-preserving
-    // pass-through (see ISectionRelayoutSink's doc comment).
+    // The Required Disciplines row list, plus the c-table header row this
+    // renderer owns directly.
     //
     // The "Discipline"/"Level" column header call (CTableHeaderRenderer,
     // shared with Required Recipes) lives in this class's Render() below;
@@ -38,21 +31,10 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal DisciplinesSectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) - the sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateDisciplineRow's first AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
         /// <summary>
-        /// Moved verbatim from CraftingPlanView.CreateDisciplinesBody's row
-        /// loop, plus the CreateCTableHeaderRow call this renderer now owns
-        /// directly.
-        ///
         /// The per-character-availability column gets a real header: a
         /// per-row X (varying with each discipline name's width) could
         /// never line up with a single header position, fixed here by
@@ -166,9 +148,6 @@ namespace GW2CraftingHelper.Views.Rendering
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
-        // Moved verbatim from CraftingPlanView.CreateDisciplineRow. Only
-        // change: _relayoutActions.Add(...) -> _sink.AddRelayout(...).
-        //
         // The character-availability label sits between the discipline
         // name and the Level column. charX is passed in by Render() as
         // one fixed column X for the whole section (8 + the widest

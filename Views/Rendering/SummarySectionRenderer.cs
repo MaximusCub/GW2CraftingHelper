@@ -9,15 +9,11 @@ using System.Collections.Generic;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
-    // Moved verbatim out of CraftingPlanView's "7.
-    // Section builders (continued)" region - the Summary/Total Cost section.
-    //
-    // The section is two formula-band tile rows (CreateFormulaBand), a
+    // The Summary/Total Cost section: two formula-band tile rows (CreateFormulaBand), a
     // c-table for the plan's non-coin currency costs
-    // (CreateCurrencyTable), the multi-item batch MultiItemNote banner
-    // row (still via
-    // TextRowRenderer), and a new subdued footnote row (CreateFootnoteRow).
-    // Height agreement for this new shape lives in
+    // (CreateCurrencyTable), the multi-item batch MultiItemNote banner row
+    // (via TextRowRenderer), and a subdued footnote row (CreateFootnoteRow).
+    // Height agreement for this shape lives in
     // Services/SummarySectionLayoutMath.BodyHeight, not
     // PlanContentHeightMath (a high-evidence zone, formerly DO-NOT-TOUCH,
     // for this package - see docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - see
@@ -28,15 +24,6 @@ namespace GW2CraftingHelper.Views.Rendering
 
         internal SummarySectionRenderer(ISectionRelayoutSink sink)
         {
-            // Mirrors the constructor-null-guard convention already used
-            // for injected dependencies elsewhere in Views/ (ViewAdapter's
-            // buildAction, SettingsTabContent's settings, FrameTicker's
-            // step) and by every other section renderer on this pattern -
-            // the sole production call site always passes `this`
-            // (CraftingPlanView), but a later section renderer built on
-            // this same pattern should fail loud, not with a deferred NRE
-            // inside CreateFormulaBand's/CreateCurrencyTableRow's first
-            // AddRelayout call.
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 

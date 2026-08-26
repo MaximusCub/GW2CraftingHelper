@@ -345,11 +345,11 @@ namespace GW2CraftingHelper.Views
         private Panel _separator;
         private FlowPanel _contentPanel;
 
-        // Recipe Tree toolbar row. The five buttons used to live in the
-        // tree's section header inside the scroll flow, which meant a long
-        // plan scrolled Collapse All away at exactly the moment it became
-        // useful. They sit in the non-scrolling strip now; the state they
-        // act on stays with TreeSectionController and reaches them through
+        // Recipe Tree toolbar row. The five buttons sit in the
+        // non-scrolling strip, not in the tree's section header inside the
+        // scroll flow, so a long plan cannot scroll Collapse All away at the
+        // moment it becomes useful. The state they act on stays with
+        // TreeSectionController and reaches them through
         // _treeToolbarCommands, republished by every tree render and
         // withdrawn (null) by every render that produces no tree.
         //

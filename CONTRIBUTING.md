@@ -201,6 +201,12 @@ tag; see `docs/RELEASING.md`.
   and SA1602 off. Do not add `<summary>Gets the item id.</summary>` to a
   property called `ItemId`; a prose `//` at the decision point is worth
   more than a doc comment that restates the signature.
+- **Constructor-injected dependencies get a null-guard**
+  (`_sink = sink ?? throw new ArgumentNullException(nameof(sink))`), even
+  where the sole production call site cannot pass null. Every section
+  renderer, `ViewAdapter`, `SettingsTabContent` and `FrameTicker` follow it:
+  without the guard a null surfaces later as a `NullReferenceException`
+  inside a render closure, pointing at the wrong code.
 - Private fields are `_camelCase`; the naming convention is enforced by
   `.editorconfig`, and `GW2CraftingHelper.ruleset` suppresses SA1309 so the
   analyzer does not fight it.
