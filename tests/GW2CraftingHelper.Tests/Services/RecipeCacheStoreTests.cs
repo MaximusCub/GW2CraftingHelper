@@ -402,6 +402,93 @@ namespace GW2CraftingHelper.Tests.Services
             }
         }
 
+        // The overlay caches are written without whitespace; only the
+        // manifest, which is read by hand, stays indented.
+        [Fact]
+        public void Overlay_WritesCachesWithoutIndentation()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load(currentGw2BuildId: null);
+                overlay.SetCurrentBuildId(buildId);
+                overlay.PutSearch(100, new List<int> { 1, 2 });
+                overlay.PutRecipe(1, NewRecipe(1, 100));
+                overlay.Flush(force: true);
+
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+                Assert.DoesNotContain(
+                    "\n", File.ReadAllText(Path.Combine(cacheDir, "search_overlay.json")));
+                Assert.DoesNotContain(
+                    "\n", File.ReadAllText(Path.Combine(cacheDir, "recipes_overlay.json")));
+                Assert.Contains(
+                    "\n", File.ReadAllText(Path.Combine(cacheDir, "overlay_manifest.json")));
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tmp.Path));
+            }
+        }
+
+        // Upgrade path: an overlay left on disk by the indented writer must
+        // still load, or every user's cache is thrown away on the release
+        // that switches the format.
+        [Fact]
+        public void Overlay_ReadsIndentedFilesWrittenByOlderVersion()
+        {
+            using (var tmp = new TempDirectory())
+            {
+                const int buildId = 205780;
+                string cacheDir = Path.Combine(tmp.Path, "recipe_cache");
+                Directory.CreateDirectory(cacheDir);
+
+                var searches = new Dictionary<int, IReadOnlyList<int>>
+                {
+                    { 100, new List<int> { 1 } }
+                };
+                var recipes = new Dictionary<int, RawRecipe>
+                {
+                    { 1, NewRecipe(1, 100) }
+                };
+
+                string searchJson = RecipeCacheSerializer.SerializeSearches(searches);
+                string recipeJson = RecipeCacheSerializer.SerializeRecipes(recipes);
+                Assert.Contains("\n", searchJson);
+                Assert.Contains("\n", recipeJson);
+
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "search_overlay.json"), searchJson, Encoding.UTF8);
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "recipes_overlay.json"), recipeJson, Encoding.UTF8);
+                File.WriteAllText(
+                    Path.Combine(cacheDir, "overlay_manifest.json"),
+                    RecipeCacheSerializer.SerializeManifest(new RecipeOverlayManifest
+                    {
+                        Gw2BuildId = buildId,
+                        UpdatedUtc = DateTime.UtcNow.ToString("o")
+                    }),
+                    Encoding.UTF8);
+
+                var overlay = new OverlayRecipeCacheStore(tmp.Path);
+                overlay.Load(currentGw2BuildId: null);
+                overlay.InvalidateIfStale(buildId);
+
+                var search = overlay.TryGetSearch(100);
+                Assert.NotNull(search);
+                Assert.Equal(1, search[0]);
+                Assert.NotNull(overlay.TryGetRecipe(1));
+
+                // Rewritten compact, still stamped with the same build.
+                overlay.PutSearch(200, new List<int> { 2 });
+                overlay.Flush(force: true);
+                Assert.Equal(buildId, ReadOverlayManifestBuildId(tmp.Path));
+
+                var reloaded = new OverlayRecipeCacheStore(tmp.Path);
+                reloaded.Load(currentGw2BuildId: buildId);
+                Assert.NotNull(reloaded.TryGetSearch(100));
+                Assert.NotNull(reloaded.TryGetSearch(200));
+                Assert.NotNull(reloaded.TryGetRecipe(1));
+            }
+        }
+
         // Load replaces the maps with what disk holds, so entries put before
         // it are gone; a flush afterwards must not resurrect the overlay
         // files Load's build-mismatch branch just deleted, least of all with

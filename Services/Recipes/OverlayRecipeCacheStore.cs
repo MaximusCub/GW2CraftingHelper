@@ -341,19 +341,22 @@ namespace GW2CraftingHelper.Services.Recipes
 
                 if (_searchesDirty)
                 {
-                    string searchJson = RecipeCacheSerializer.SerializeSearches(_searches);
+                    string searchJson = RecipeCacheSerializer
+                        .SerializeSearches(_searches, indented: false);
                     AtomicWrite(_searchPath, searchJson);
                 }
 
                 if (_recipesDirty)
                 {
-                    string recipeJson = RecipeCacheSerializer.SerializeRecipes(_recipes);
+                    string recipeJson = RecipeCacheSerializer
+                        .SerializeRecipes(_recipes, indented: false);
                     AtomicWrite(_recipesPath, recipeJson);
                 }
 
                 // The manifest goes out on every persist, not just a stamp
                 // change: it dates the two files above, and its build id is
                 // what the next launch checks them against.
+                // Indented, unlike them: it is two fields, read by hand.
                 // 0 means "written before the live build id was known"; the
                 // next Load treats it as a mismatch and discards the overlay
                 // once, rather than serving recipes of unknown vintage.

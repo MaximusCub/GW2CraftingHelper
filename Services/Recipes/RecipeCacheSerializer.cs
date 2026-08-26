@@ -41,6 +41,18 @@ namespace GW2CraftingHelper.Services.Recipes
             WriteIndented = true
         };
 
+        // Same schema, no whitespace: halves the bytes the recipe overlay
+        // writes and re-reads. The seed files under ref/ keep Options, they
+        // are committed and reviewed by hand. Reading is unaffected either
+        // way, so an overlay written by either setting still loads.
+        private static readonly JsonSerializerOptions CompactOptions =
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = false
+            };
+
         public static Dictionary<int, IReadOnlyList<int>> LoadSearchSeed(Stream stream)
         {
             if (stream == null)
@@ -114,7 +126,8 @@ namespace GW2CraftingHelper.Services.Recipes
         }
 
         public static string SerializeSearches(
-            IReadOnlyDictionary<int, IReadOnlyList<int>> searches)
+            IReadOnlyDictionary<int, IReadOnlyList<int>> searches,
+            bool indented = true)
         {
             var data = new RecipeSearchSeedData
             {
@@ -128,10 +141,12 @@ namespace GW2CraftingHelper.Services.Recipes
                 data.Searches[key] = new List<int>(kvp.Value);
             }
 
-            return JsonSerializer.Serialize(data, Options);
+            return JsonSerializer.Serialize(data, indented ? Options : CompactOptions);
         }
 
-        public static string SerializeRecipes(IReadOnlyDictionary<int, RawRecipe> recipes)
+        public static string SerializeRecipes(
+            IReadOnlyDictionary<int, RawRecipe> recipes,
+            bool indented = true)
         {
             var data = new RecipeSeedData
             {
@@ -139,7 +154,7 @@ namespace GW2CraftingHelper.Services.Recipes
                 Recipes = recipes.Values.OrderBy(r => r.Id).ToList()
             };
 
-            return JsonSerializer.Serialize(data, Options);
+            return JsonSerializer.Serialize(data, indented ? Options : CompactOptions);
         }
 
         public static string SerializeManifest<T>(T manifest)
