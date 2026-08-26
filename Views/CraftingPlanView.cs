@@ -285,7 +285,11 @@ namespace GW2CraftingHelper.Views
 
         #region Generate orchestration: checkbox-revert suppression and the last debug log
 
-        // Suppress flag for checkbox revert
+        // Suppresses the settings controls' change handlers during a
+        // programmatic write: the own-materials gate/revert writes, and
+        // ApplyRestoredPlan reseeding the checkboxes/dropdown - a restored
+        // plan already reflects those settings, so its writes must neither
+        // open the regenerate confirm nor flag "Settings changed".
         private bool _suppressToggle;
 
         // Debug log from last plan generation
@@ -308,6 +312,7 @@ namespace GW2CraftingHelper.Views
         private Panel _controlsPanel;
         private Checkbox _ownMaterialsCheckbox;
         private Checkbox _valueOwnMaterialsCheckbox;
+        private Dropdown _priceBasisDropdown;
         private StandardButton _generateButton;
         private Label _statusLabel;
 
@@ -753,9 +758,10 @@ namespace GW2CraftingHelper.Views
         /// Generate. Mirrors TriggerGenerate's success-path shape: adopts
         /// <paramref name="result"/> as the override loop's baseline,
         /// restores the user's prior decision-pill overrides
-        /// (RestoreOverrides - required, not optional), resets section
-        /// expansion, rebuilds the view model, and seeds the status board
-        /// with the staleness banner text.
+        /// (RestoreOverrides - required, not optional), reseeds the
+        /// request inputs (rows, checkboxes, price basis) that produced
+        /// the plan, resets section expansion, rebuilds the view model,
+        /// and seeds the status board with the staleness banner text.
         /// <para>
         /// The tab has usually not been Build() yet, in which case only
         /// the state fields are set and Build()'s render tail renders on
@@ -780,12 +786,16 @@ namespace GW2CraftingHelper.Views
             DateTime generatedAt,
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
             IReadOnlyList<int> ignoredItemIds,
-            // "Value Own Materials" checkbox state at the generation
-            // time this plan was persisted - restoring it into the live
-            // checkbox is the whole reason PersistedPlan.ValueOwnMaterials
-            // exists. UseOwnMaterials/PriceBasis have the same gap (their
-            // live controls are not restored) - see KNOWN-ISSUES #58.
-            bool valueOwnMaterials)
+            // The settings and request this plan was generated with, all
+            // restored into their live controls below so Generate Plan
+            // re-solves the restored request with zero retyping - before
+            // requestItems was restored, the input strip stayed at its
+            // defaults and Generate answered "Add at least one item" to a
+            // plan already on screen.
+            bool valueOwnMaterials,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis)
         {
             if (result == null)
             {
@@ -812,14 +822,40 @@ namespace GW2CraftingHelper.Views
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
-            // Restore the checkbox's
-            // backing field AND its displayed Checked state - see this
-            // method's valueOwnMaterials parameter doc comment.
+            // Restore the inputs that produced the plan, not just the
+            // plan: the request rows, both checkboxes and the price-basis
+            // dropdown - backing fields AND displayed control state. The
+            // usual restore runs before Build() (every control still null,
+            // the fields render on first visit); a live tab takes the
+            // guarded writes. The control writes are suppressed
+            // (_suppressToggle, here and inside ApplyOwnMaterialsGate):
+            // these are not user decisions, so they must neither open the
+            // regenerate confirm nor flag "Settings changed" against the
+            // very plan that carries them.
+            _inputRows.RestoreRows(
+                RestoredRequestInputs.BuildRowSeeds(requestItems, result.ItemMetadata));
+
+            // The INTENT field; the gate write below re-resolves it against
+            // _accountDataAvailable, exactly as a user toggle would (a
+            // persisted true with no snapshot yet still shows unchecked
+            // until SetAccountDataAvailable re-applies the gate).
+            _useOwnMaterials = useOwnMaterials;
+            ApplyOwnMaterialsGate();
+
+            _priceBasis = priceBasis;
             _valueOwnMaterials = valueOwnMaterials;
+            _suppressToggle = true;
+            if (_priceBasisDropdown != null)
+            {
+                _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(priceBasis);
+            }
+
             if (_valueOwnMaterialsCheckbox != null)
             {
                 _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
             }
+
+            _suppressToggle = false;
 
             // The stamped half goes through StatusText.Stamp, which owns
             // the module's one timestamp format and its InvariantCulture
@@ -1998,20 +2034,23 @@ namespace GW2CraftingHelper.Views
                 Location = new Point(170, 7),
                 Parent = _controlsPanel,
             };
-            var priceBasisDropdown = new Dropdown()
+            _priceBasisDropdown = new Dropdown()
             {
                 Size = new Point(110, 28),
                 Location = new Point(218, 3),
                 Parent = _controlsPanel,
             };
-            priceBasisDropdown.Items.Add("Instant Buy");
-            priceBasisDropdown.Items.Add("Buy Orders");
-            priceBasisDropdown.SelectedItem = _priceBasis == PriceBasis.BuyOrder
-                ? "Buy Orders"
-                : "Instant Buy";
-            priceBasisDropdown.ValueChanged += (_, e) =>
+            _priceBasisDropdown.Items.Add(PriceBasisDropdownItem(PriceBasis.InstantBuy));
+            _priceBasisDropdown.Items.Add(PriceBasisDropdownItem(PriceBasis.BuyOrder));
+            _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(_priceBasis);
+            _priceBasisDropdown.ValueChanged += (_, e) =>
             {
-                _priceBasis = e.CurrentValue == "Buy Orders"
+                if (_suppressToggle)
+                {
+                    return;
+                }
+
+                _priceBasis = e.CurrentValue == PriceBasisDropdownItem(PriceBasis.BuyOrder)
                     ? PriceBasis.BuyOrder
                     : PriceBasis.InstantBuy;
                 MarkSettingsChanged();
@@ -2041,6 +2080,11 @@ namespace GW2CraftingHelper.Views
                 "Compare recipe options at fresh market prices, as if you owned nothing - may recommend buying materials you already have instead of using them, if a different option is cheaper. Also force-buys materials where buying beats crafting by more than 15%, and deducts owned materials' sell value from Crafting Profit. Off: always uses what you already own first, treated as free.");
             _valueOwnMaterialsCheckbox.CheckedChanged += (_, e) =>
             {
+                if (_suppressToggle)
+                {
+                    return;
+                }
+
                 _valueOwnMaterials = e.Checked;
                 MarkSettingsChanged();
             };
@@ -3255,6 +3299,14 @@ namespace GW2CraftingHelper.Views
 
             _accountDataAvailable = available;
             ApplyOwnMaterialsGate();
+        }
+
+        // The one mapping between PriceBasis values and the dropdown's item
+        // strings - Build's initial selection, its ValueChanged reverse map
+        // and ApplyRestoredPlan's restored selection must never drift.
+        private static string PriceBasisDropdownItem(PriceBasis basis)
+        {
+            return basis == PriceBasis.BuyOrder ? "Buy Orders" : "Instant Buy";
         }
 
         /// <summary>

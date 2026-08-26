@@ -56,7 +56,9 @@ namespace GW2CraftingHelper.Views
 
         // Session-persistent row list, mirroring gw2e's `e.recipes`
         // array. Populated with one empty row on the first Build();
-        // survives every later Build() (tab switch). No file persistence.
+        // survives every later Build() (tab switch). The rows themselves
+        // are never written to disk - a restored plan reseeds them from
+        // its persisted request via RestoreRows.
         private readonly List<ItemRowState> _rows = new List<ItemRowState>();
 
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -94,6 +96,56 @@ namespace GW2CraftingHelper.Views
             {
                 _rows.Add(new ItemRowState());
             }
+        }
+
+        /// <summary>
+        /// Replaces the session row list with the request a restored plan
+        /// was generated for, so a restored session's Generate Plan
+        /// re-solves the same request with zero retyping. A named seed
+        /// leaves exactly the state a suggestion pick leaves behind
+        /// (TypedText mirroring ItemName - see the pick's own TextChanged
+        /// ordering in CreateItemRowControls); an unnamed one keeps the id
+        /// with no text, which SelectionIsStale treats as still-resolved.
+        /// No-op on an empty seed list so a plan persisted without request
+        /// items cannot wipe the strip's default row.
+        /// <para>
+        /// Any live row controls are disposed first, RemoveItemRow-style
+        /// (with Rebuild's own Parent guard against a double-Dispose across
+        /// a tab-switch teardown); the row-count callback then rebuilds
+        /// controls and reflows the top region. On the usual pre-Build()
+        /// restore both halves are no-ops - every control is null and
+        /// ReflowTopRegion bails - and Build() itself renders the new rows.
+        /// </para>
+        /// </summary>
+        internal void RestoreRows(IReadOnlyList<RestoredRequestInputs.RowSeed> seeds)
+        {
+            if (seeds == null || seeds.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var row in _rows)
+            {
+                row.SuggestionPanel?.Dispose();
+                if (row.RowPanel != null && row.RowPanel.Parent != null)
+                {
+                    row.RowPanel.Dispose();
+                }
+            }
+
+            _rows.Clear();
+            foreach (var seed in seeds)
+            {
+                _rows.Add(new ItemRowState
+                {
+                    ItemId = seed.ItemId,
+                    ItemName = seed.ItemName,
+                    TypedText = seed.ItemName,
+                    QuantityText = seed.QuantityText,
+                });
+            }
+
+            _onRowCountChanged();
         }
 
         /// <summary>
@@ -203,10 +255,18 @@ namespace GW2CraftingHelper.Views
             };
             row.RowPanel = rowPanel;
 
+            string text = row.TypedText ?? row.ItemName ?? "";
             var searchBox = new AutocompleteTextBox()
             {
-                PlaceholderText = "Search items...",
-                Text = row.TypedText ?? row.ItemName ?? "",
+                // A restored row can be resolved but nameless (its name
+                // was absent from the restored metadata - see
+                // RestoredRequestInputs). It still solves; the placeholder
+                // just must not claim the box is an empty search, and must
+                // never surface the internal item id.
+                PlaceholderText = row.ItemId.HasValue && text.Length == 0
+                    ? RestoredRequestInputs.UnnamedRowPlaceholder
+                    : "Search items...",
+                Text = text,
                 Size = new Point(200, 28),
                 Location = new Point(0, 3),
                 Parent = rowPanel,

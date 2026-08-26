@@ -141,6 +141,7 @@
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
     <Compile Include="Services\ItemRowSelection.cs" />
+    <Compile Include="Services\RestoredRequestInputs.cs" />
     <Compile Include="Services\IPriceApiClient.cs" />
     <Compile Include="Services\TradingPostService.cs" />
     <Compile Include="Models\AcquisitionSource.cs" />
@@ -261,6 +262,18 @@
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
     <Compile Include="Views\LogTabContent.cs" />
+    <Compile Include="Models\RankerWatchlistEntry.cs" />
+    <Compile Include="Models\RankerSlotAvailability.cs" />
+    <Compile Include="Models\RankerRowMetrics.cs" />
+    <Compile Include="Services\RankerStore.cs" />
+    <Compile Include="Services\RankerWatchlistLimits.cs" />
+    <Compile Include="Services\RankerPriorityOrdering.cs" />
+    <Compile Include="Services\RankerPriorityCascade.cs" />
+    <Compile Include="Services\RankerReadinessWeights.cs" />
+    <Compile Include="Services\RankerReadinessCalculator.cs" />
+    <Compile Include="Services\RankerRowLayout.cs" />
+    <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
+    <Compile Include="Views\RankerTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
     <Compile Include="Views\AboutTabContent.cs" />
     <Compile Include="Views\ViewAdapter.cs" />
