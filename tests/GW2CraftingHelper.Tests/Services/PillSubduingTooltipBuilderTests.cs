@@ -47,7 +47,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var content = PillSubduingTooltipBuilder.BuildContent(result, null, null);
 
-            Assert.Equal("More expensive (3g 0s 0c more)", content.ToPlainText());
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+            Assert.Equal("More expensive (3g 00s 00c more)", content.ToPlainText());
             Assert.DoesNotContain("currency values", content.ToPlainText());
         }
 

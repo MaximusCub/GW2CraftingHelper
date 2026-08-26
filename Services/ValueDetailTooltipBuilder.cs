@@ -123,11 +123,11 @@ namespace GW2CraftingHelper.Services
             }
 
             var builder = new TooltipContentBuilder();
-            builder.Text("Crafting gold price: ").Coin(realGold, FormatCoin(realGold)).EndLine();
-            builder.Text("Currencies: ").Coin(delta, FormatCoin(delta)).EndLine();
+            builder.Text("Crafting gold price: ").Coin(realGold, CoinSegmentMath.GameStyleText(realGold)).EndLine();
+            builder.Text("Currencies: ").Coin(delta, CoinSegmentMath.GameStyleText(delta)).EndLine();
             builder.Text("This is an estimated opportunity cost for the used currencies in the recipe.").EndLine();
             builder.EndLine();
-            builder.Text("Optimization price: ").Coin(decisionTotal, FormatCoin(decisionTotal));
+            builder.Text("Optimization price: ").Coin(decisionTotal, CoinSegmentMath.GameStyleText(decisionTotal));
 
             // Maintainer-ratified #21 resolution: append the winning
             // vendor offer's purchase cap, when this node's item has one -
@@ -154,18 +154,6 @@ namespace GW2CraftingHelper.Services
                 case TimegatedCapType.Seasonal: return "season";
                 default: return "period";
             }
-        }
-
-        // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
-        // plain "Xg Ys Zc" FORMAT rather than referencing it - that class
-        // lives in Views.Rendering and is Blish-coupled, while this class
-        // must stay Blish-free to remain unit-testable (repo invariant).
-        // The split itself is shared via CoinSegmentMath.Split; only the
-        // trivial format string is kept in lockstep in spirit.
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
         }
     }
 }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using GW2CraftingHelper.Models;
 
 namespace GW2CraftingHelper.Services
@@ -96,40 +95,7 @@ namespace GW2CraftingHelper.Services
 
         private static TooltipContentBuilder AppendCoin(TooltipContentBuilder builder, long copper)
         {
-            return builder.Coin(copper, FormatCoin(copper));
-        }
-
-        // Shares CoinSegmentMath.Split with every other coin display site,
-        // but a different output format than ValueDetailTooltipBuilder's
-        // FormatCoin (leading zero units omitted here, always three units
-        // there) - the formats stay deliberately independent.
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-
-            var sb = new StringBuilder();
-            if (gold > 0)
-            {
-                sb.Append(gold).Append('g');
-            }
-
-            if (silver > 0 || gold > 0)
-            {
-                if (sb.Length > 0)
-                {
-                    sb.Append(' ');
-                }
-
-                sb.Append(silver).Append('s');
-            }
-
-            if (sb.Length > 0)
-            {
-                sb.Append(' ');
-            }
-
-            sb.Append(cop).Append('c');
-            return sb.ToString();
+            return builder.Coin(copper, CoinSegmentMath.GameStyleText(copper));
         }
     }
 }

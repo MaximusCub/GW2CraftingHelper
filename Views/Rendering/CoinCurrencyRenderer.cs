@@ -11,14 +11,6 @@ namespace GW2CraftingHelper.Views.Rendering
     // implemented: every coin amount the module draws goes through here.
     internal static class CoinCurrencyRenderer
     {
-        // Plain "12g 34s 56c" text for contexts that cannot render coin
-        // icons (BasicTooltipText has no inline-image support).
-        internal static string FormatCoinText(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
-        }
-
         // --- Coin display helpers ---
         //
         // gw2e's Coins component renders NumberFormat(gold) -> icon ->

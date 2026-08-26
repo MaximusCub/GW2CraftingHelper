@@ -7,16 +7,6 @@ namespace GW2CraftingHelper.Services
     internal static class SnapshotHelpers
     {
         /// <summary>
-        /// Formats a copper value into the "Xg Ys Zc" display string.
-        /// Negative values are clamped to 0 for display purposes.
-        /// </summary>
-        internal static string FormatCoin(int copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"Coin: {gold}g {silver}s {cop}c";
-        }
-
-        /// <summary>
         /// Splits a wallet entry list into coins (currency ID 1) and remaining wallet entries.
         /// If multiple coin entries exist, their values are summed defensively.
         /// </summary>

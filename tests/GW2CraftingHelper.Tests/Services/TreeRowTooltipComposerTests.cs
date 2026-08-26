@@ -111,7 +111,11 @@ namespace GW2CraftingHelper.Tests.Services
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
 
-            Assert.Contains("Unit price: 0g 0s 0c", lines);
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+            Assert.Contains("Unit price: 0c", lines);
         }
 
         [Fact]
@@ -234,7 +238,11 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
             Assert.Equal(
-                new[] { "Unit price: 0g 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+                new[] { "Unit price: 5s 00c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
                 lines);
         }
 
@@ -368,7 +376,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new[]
                 {
                     "Caption line",
-                    "Unit price: 0g 1s 0c",
+                    "Unit price: 1s 00c",
                     "Other trading post price side shown",
                     "Right-click: Open wiki page"
                 },

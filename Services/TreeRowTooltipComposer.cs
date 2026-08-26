@@ -133,7 +133,7 @@ namespace GW2CraftingHelper.Services
                 {
                     extraTooltipLines.Add(TooltipContent.Line(
                         TooltipSpan.FromText("Unit price: "),
-                        TooltipSpan.FromCoin(node.UnitCost.Value, FormatCoin(node.UnitCost.Value))));
+                        TooltipSpan.FromCoin(node.UnitCost.Value, CoinSegmentMath.GameStyleText(node.UnitCost.Value))));
                 }
 
                 if (node.Decision == CraftingDecision.BuyFromVendor && hasCurrencyCosts)
@@ -232,19 +232,6 @@ namespace GW2CraftingHelper.Services
             }
 
             return TooltipContent.FromLines(extraTooltipLines);
-        }
-
-        // Deliberately duplicates CoinCurrencyRenderer.FormatCoinText's
-        // plain "Xg Ys Zc" FORMAT rather than referencing it - that class
-        // lives in Views.Rendering and is Blish-coupled, while this class
-        // must stay Blish-free to remain unit-testable (repo invariant,
-        // same precedent as ValueDetailTooltipBuilder.FormatCoin). The
-        // split itself is shared via CoinSegmentMath.Split; only the
-        // trivial format string is kept in lockstep in spirit.
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.Split(copper);
-            return $"{gold}g {silver}s {cop}c";
         }
     }
 }

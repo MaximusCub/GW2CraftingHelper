@@ -16,30 +16,37 @@ namespace GW2CraftingHelper.Tests.Services
     /// the coin ICONS draw ("10s 05c") all disagree. 100 and 10000 pin the
     /// zero-padding of a trailing unit, and -1 pins the clamp.
     /// </para>
+    ///
+    /// <para>
+    /// All four composers now answer CoinSegmentMath.GameStyleText, so all
+    /// four columns below are the icon spelling. The expectations that
+    /// changed when they were collapsed are marked at their case.
+    /// </para>
     /// </summary>
     public class CoinFormattingTests
     {
+        /// <summary>The one plain coin format, and the strings the coin
+        /// ICONS are drawn beside - the format a user actually reads.
+        /// Every composer below must agree with this table.</summary>
         [Theory]
-        [InlineData(0, "Coin: 0g 0s 0c")]
-        [InlineData(1, "Coin: 0g 0s 1c")]
-        [InlineData(100, "Coin: 0g 1s 0c")]
-        [InlineData(1005, "Coin: 0g 10s 5c")]
-        [InlineData(10000, "Coin: 1g 0s 0c")]
-        [InlineData(1234567, "Coin: 123g 45s 67c")]
-        [InlineData(99, "Coin: 0g 0s 99c")]
-        [InlineData(9999, "Coin: 0g 99s 99c")]
-        [InlineData(10101, "Coin: 1g 1s 1c")]
-        [InlineData(-1, "Coin: 0g 0s 0c")]
-        [InlineData(-99999, "Coin: 0g 0s 0c")]
-        public void FormatCoin_ReturnsExpectedString(int copper, string expected)
+        [InlineData(0, "0c")]
+        [InlineData(1, "1c")]
+        [InlineData(99, "99c")]
+        [InlineData(100, "1s 00c")]
+        [InlineData(1005, "10s 05c")]
+        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(1234567, "123g 45s 67c")]
+        [InlineData(9999, "99s 99c")]
+        [InlineData(10101, "1g 01s 01c")]
+        [InlineData(-1, "0c")]
+        [InlineData(-99999, "0c")]
+        public void GameStyleText(long copper, string expected)
         {
-            string result = SnapshotHelpers.FormatCoin(copper);
-
-            Assert.Equal(expected, result);
+            Assert.Equal(expected, CoinSegmentMath.GameStyleText(copper));
         }
 
-        /// <summary>The strings the coin ICONS are drawn beside - the one
-        /// coin format a user actually reads.</summary>
+        /// <summary>The per-denomination strings GameStyleText and the icon
+        /// path are both built from.</summary>
         [Theory]
         [InlineData(0, null, null, "0")]
         [InlineData(1, null, null, "1")]
@@ -54,15 +61,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal((gold, silver, cop), CoinSegmentMath.FormatSegmentTexts(copper));
         }
 
+        // Changed with the consolidation: this composer used to spell
+        // every amount with all three units, so 1005 read "0g 10s 5c" and
+        // 5 read "0g 0s 5c" while the icons beside it in the same tooltip
+        // read "10s 05c" and "5c". It now answers the icon spelling. The
+        // string is never drawn (ACoinSpansTextChangesNoGeometry below), so
+        // the change is to what the composer MEANS, not to a pixel.
         [Theory]
-        [InlineData(0, "0g 0s 0c")]
-        [InlineData(1, "0g 0s 1c")]
-        [InlineData(99, "0g 0s 99c")]
-        [InlineData(100, "0g 1s 0c")]
-        [InlineData(1005, "0g 10s 5c")]
-        [InlineData(10000, "1g 0s 0c")]
+        [InlineData(0, "0c")]
+        [InlineData(1, "1c")]
+        [InlineData(99, "99c")]
+        [InlineData(100, "1s 00c")]
+        [InlineData(1005, "10s 05c")]
+        [InlineData(10000, "1g 00s 00c")]
         [InlineData(1234567, "123g 45s 67c")]
-        [InlineData(-1, "0g 0s 0c")]
+        [InlineData(-1, "0c")]
         public void TreeRowUnitPrice(long copper, string expected)
         {
             var node = new CraftingTreeNode
@@ -79,15 +92,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Unit price: " + expected, content.ToPlainText());
         }
 
+        // Changed with the consolidation: this composer used to spell
+        // every amount with all three units, so 1005 read "0g 10s 5c" and
+        // 5 read "0g 0s 5c" while the icons beside it in the same tooltip
+        // read "10s 05c" and "5c". It now answers the icon spelling. The
+        // string is never drawn (ACoinSpansTextChangesNoGeometry below), so
+        // the change is to what the composer MEANS, not to a pixel.
         [Theory]
-        [InlineData(0, "0g 0s 0c")]
-        [InlineData(1, "0g 0s 1c")]
-        [InlineData(99, "0g 0s 99c")]
-        [InlineData(100, "0g 1s 0c")]
-        [InlineData(1005, "0g 10s 5c")]
-        [InlineData(10000, "1g 0s 0c")]
+        [InlineData(0, "0c")]
+        [InlineData(1, "1c")]
+        [InlineData(99, "99c")]
+        [InlineData(100, "1s 00c")]
+        [InlineData(1005, "10s 05c")]
+        [InlineData(10000, "1g 00s 00c")]
         [InlineData(1234567, "123g 45s 67c")]
-        [InlineData(-1, "0g 0s 0c")]
+        [InlineData(-1, "0c")]
         public void ValueDetailCraftingGoldPrice(long copper, string expected)
         {
             var node = new CraftingTreeNode
@@ -106,13 +125,16 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Crafting gold price: " + expected, content.ToPlainText());
         }
 
+        // Changed with the consolidation: this composer already omitted
+        // leading all-zero units but never zero-padded a trailing one, so
+        // 1005 read "10s 5c" against the icons' "10s 05c".
         [Theory]
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 0c")]
-        [InlineData(1005, "10s 5c")]
-        [InlineData(10000, "1g 0s 0c")]
+        [InlineData(100, "1s 00c")]
+        [InlineData(1005, "10s 05c")]
+        [InlineData(10000, "1g 00s 00c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(-1, "0c")]
         public void PillSubduingMargin(long copper, string expected)
@@ -124,6 +146,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("More expensive (" + expected + " more)", content.ToPlainText());
         }
 
+        // Unchanged by the consolidation: this was the only composer
+        // already spelling coins the way the icons do, and its own comment
+        // argued that every tooltip must. It is the format the other three
+        // were collapsed onto.
         [Theory]
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]

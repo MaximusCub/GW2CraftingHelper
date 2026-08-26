@@ -424,7 +424,7 @@ namespace GW2CraftingHelper.Services
             }
 
             return new TooltipContentBuilder()
-                .Coin(stats.VendorValue.Value, FormatCoin(stats.VendorValue.Value))
+                .Coin(stats.VendorValue.Value, CoinSegmentMath.GameStyleText(stats.VendorValue.Value))
                 .Build();
         }
 
@@ -513,29 +513,6 @@ namespace GW2CraftingHelper.Services
         private static string FormatCount(int value)
         {
             return value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        // Deliberately duplicates the plain coin FORMAT rather than
-        // referencing CoinCurrencyRenderer - that class is Blish-coupled
-        // and this one must stay Blish-free. The SPLIT and the
-        // leading-zero-unit rule are shared via CoinSegmentMath, so this
-        // plain rendering cannot drift from the icons the rich path draws:
-        // the game prints "10c", never "0g 0s 10c" (gap G14).
-        private static string FormatCoin(long copper)
-        {
-            var (gold, silver, cop) = CoinSegmentMath.FormatSegmentTexts(copper);
-            var sb = new StringBuilder(16);
-            if (gold != null)
-            {
-                sb.Append(gold).Append("g ");
-            }
-
-            if (silver != null)
-            {
-                sb.Append(silver).Append("s ");
-            }
-
-            return sb.Append(cop).Append('c').ToString();
         }
     }
 }

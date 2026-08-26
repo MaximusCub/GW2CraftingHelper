@@ -88,9 +88,13 @@ namespace GW2CraftingHelper.Tests.Services
             bool result = ValueDetailTooltipBuilder.TryBuildContent(node, null, out var content);
 
             Assert.True(result);
-            Assert.Contains("Crafting gold price: 0g 50s 0c", content.ToPlainText());
-            Assert.Contains("Currencies: 2g 50s 0c", content.ToPlainText());
-            Assert.Contains("Optimization price: 3g 0s 0c", content.ToPlainText());
+            // Coin spelling changed with the CoinSegmentMath.GameStyleText
+            // consolidation: every composer now spells a coin amount the
+            // way the icons beside it do (leading all-zero units omitted,
+            // trailing units zero-padded).
+            Assert.Contains("Crafting gold price: 50s 00c", content.ToPlainText());
+            Assert.Contains("Currencies: 2g 50s 00c", content.ToPlainText());
+            Assert.Contains("Optimization price: 3g 00s 00c", content.ToPlainText());
 
             // Unwrapped, and deliberately so: the rich surface this content
             // reaches wraps against a real font at a real pixel width. The

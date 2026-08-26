@@ -259,9 +259,13 @@ namespace GW2CraftingHelper.Tests.Services
                 bool fired = ValueDetailTooltipBuilder.TryBuildContent(root, null, out var tooltip);
 
                 Assert.True(fired, "Value-detail hover must fire for the craft root live pipeline case.");
-                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltip.ToPlainText());
-                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
-                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
+                // Coin spelling changed with the
+                // CoinSegmentMath.GameStyleText consolidation: every
+                // composer now spells a coin amount the way the icons
+                // beside it do.
+                Assert.Contains("Crafting gold price: 1s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 00s 00c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 01s 40c", tooltip.ToPlainText());
             }
         }
 
@@ -361,9 +365,13 @@ namespace GW2CraftingHelper.Tests.Services
                 bool fired = ValueDetailTooltipBuilder.TryBuildContent(root, null, out var tooltip);
 
                 Assert.True(fired, "Value-detail hover must fire when the committed pill is genuinely Selected (2+ options).");
-                Assert.Contains("Crafting gold price: 0g 1s 40c", tooltip.ToPlainText());
-                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
-                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
+                // Coin spelling changed with the
+                // CoinSegmentMath.GameStyleText consolidation: every
+                // composer now spells a coin amount the way the icons
+                // beside it do.
+                Assert.Contains("Crafting gold price: 1s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 00s 00c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 01s 40c", tooltip.ToPlainText());
             }
         }
     }
