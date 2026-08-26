@@ -251,6 +251,8 @@ namespace GW2CraftingHelper.Harness
                 }
 
                 {
+                    recipeOverlay.Load();
+
                     int? buildId = null;
                     if (live && httpClient != null)
                     {
@@ -260,11 +262,9 @@ namespace GW2CraftingHelper.Harness
                         }
                         catch { }
                     }
-                    recipeOverlay.Load(buildId);
+
                     if (buildId.HasValue)
                     {
-                        // Load already dropped a mismatched overlay, so the
-                        // stamp lands on whatever survived.
                         recipeOverlay.SetCurrentBuildId(buildId.Value);
                         recipeSeed.SetCurrentBuildId(buildId.Value);
                     }

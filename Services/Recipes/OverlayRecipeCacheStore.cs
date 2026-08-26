@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -33,17 +32,6 @@ namespace GW2CraftingHelper.Services.Recipes
         private DateTime _lastFlushUtc = DateTime.MinValue;
         private int? _storedBuildId;
 
-        // Recipes persisted by an earlier session are only servable once the
-        // live game build is known to match the build they were cached from.
-        // Module.cs learns that build from an async /v2/build call that lands
-        // seconds after Load, so Load leaves the overlay files on disk UNREAD
-        // and sets this instead; ResolveDeferredLocked below then either
-        // reads them in (builds match) or deletes them (they do not). Until
-        // that happens the maps hold only what THIS session fetched, so a
-        // plan generated in the meantime - or in a whole session whose build
-        // check failed - can never be built from another build's recipes.
-        private bool _deferredDiskLoad;
-
         // See StatusStore's
         // matching field comment.
         private readonly Action<string, Exception> _onError;
@@ -63,27 +51,33 @@ namespace GW2CraftingHelper.Services.Recipes
             _onError = onError;
         }
 
-        public void Load(int? currentGw2BuildId)
+        // POLICY (recipe cache staleness policy): a build-id mismatch never
+        // invalidates anything. Learned positives are served whatever build
+        // they were cached from - measured basis: 13,371/13,371 seed recipes
+        // byte-identical across a 275-build gap - and stored negatives no
+        // longer exist to go stale. The build id in the manifest is
+        // provenance and a verification cheap-out, not a wipe trigger; the
+        // wipe-on-mismatch this store used to do destroyed the overlay at
+        // exactly the moment it became useful (a new build is what makes the
+        // shipped seed stale).
+        public void Load()
         {
             lock (_gate)
             {
-                _deferredDiskLoad = false;
-
-                // Every branch below replaces the maps with what disk holds,
-                // so anything put into them before this call is gone and must
-                // not be flushed back out.
+                // Load replaces the maps with what disk holds, so anything
+                // put into them before this call is gone and must not be
+                // flushed back out.
                 ClearDirtyLocked();
+
+                _searches = new Dictionary<int, IReadOnlyList<int>>();
+                _recipes = new Dictionary<int, RawRecipe>();
+                _storedBuildId = null;
 
                 if (!Directory.Exists(_cacheDir))
                 {
-                    _searches = new Dictionary<int, IReadOnlyList<int>>();
-                    _recipes = new Dictionary<int, RawRecipe>();
-                    _storedBuildId = null;
                     return;
                 }
 
-                // Read manifest to check build ID
-                _storedBuildId = null;
                 if (File.Exists(_manifestPath))
                 {
                     try
@@ -101,85 +95,8 @@ namespace GW2CraftingHelper.Services.Recipes
                     }
                 }
 
-                _searches = new Dictionary<int, IReadOnlyList<int>>();
-                _recipes = new Dictionary<int, RawRecipe>();
-
-                if (!currentGw2BuildId.HasValue)
-                {
-                    // Vintage unproven - see _deferredDiskLoad. A manifest
-                    // alone is enough to defer: its build id is the one
-                    // PersistLocked would otherwise stamp onto entries this
-                    // session fetched under a build nobody has checked.
-                    _deferredDiskLoad = _storedBuildId.HasValue
-                        || File.Exists(_searchPath)
-                        || File.Exists(_recipesPath);
-                    return;
-                }
-
-                if (_storedBuildId.HasValue
-                    && currentGw2BuildId.Value != _storedBuildId.Value)
-                {
-                    Debug.WriteLine(
-                        $"Recipe overlay build mismatch " +
-                        $"(stored={_storedBuildId}, current={currentGw2BuildId}). " +
-                        $"Clearing overlay.");
-                    DeleteOverlayFiles();
-                    _storedBuildId = null;
-                    return;
-                }
-
                 LoadOverlayFilesLocked();
             }
-        }
-
-        public void InvalidateIfStale(int currentGw2BuildId)
-        {
-            lock (_gate)
-            {
-                ResolveDeferredLocked(currentGw2BuildId);
-
-                if (_storedBuildId.HasValue
-                    && _storedBuildId.Value != currentGw2BuildId)
-                {
-                    Debug.WriteLine(
-                        $"Recipe overlay stale " +
-                        $"(stored={_storedBuildId}, current={currentGw2BuildId}). " +
-                        $"Clearing.");
-                    DeleteOverlayFiles();
-                    _searches = new Dictionary<int, IReadOnlyList<int>>();
-                    _recipes = new Dictionary<int, RawRecipe>();
-                    _storedBuildId = null;
-                    ClearDirtyLocked();
-                }
-            }
-        }
-
-        // Settles a deferred load now that the live build is known: reads the
-        // persisted overlay in if it was cached from this same build,
-        // discards it if it was not. Whatever this session has already
-        // fetched is kept either way - those entries are current-build by
-        // construction, and win over a same-key entry off disk.
-        private void ResolveDeferredLocked(int currentGw2BuildId)
-        {
-            if (!_deferredDiskLoad)
-            {
-                return;
-            }
-
-            _deferredDiskLoad = false;
-
-            if (_storedBuildId.HasValue && _storedBuildId.Value == currentGw2BuildId)
-            {
-                LoadOverlayFilesLocked();
-                return;
-            }
-
-            Debug.WriteLine(
-                $"Recipe overlay stale " +
-                $"(stored={_storedBuildId}, current={currentGw2BuildId}). " +
-                $"Discarding unread overlay.");
-            DeleteOverlayFiles();
-            _storedBuildId = null;
         }
 
         private void LoadOverlayFilesLocked()
@@ -230,20 +147,13 @@ namespace GW2CraftingHelper.Services.Recipes
         /// <summary>
         /// Stamps the live game build id onto the overlay, so the manifest
         /// written by the next flush records the build the cached recipes
-        /// came from.
-        /// <para>
-        /// Must be called AFTER <see cref="InvalidateIfStale"/>, which clears
-        /// the stored build when it wipes a stale overlay - an earlier stamp
-        /// would be discarded, the manifest would record 0, and the next
-        /// launch would treat the overlay as stale and delete it again.
-        /// </para>
+        /// came from. Provenance only - a differing stored id restamps, it
+        /// never clears anything.
         /// </summary>
         public void SetCurrentBuildId(int buildId)
         {
             lock (_gate)
             {
-                ResolveDeferredLocked(buildId);
-
                 if (_storedBuildId.HasValue && _storedBuildId.Value == buildId)
                 {
                     return;
@@ -311,16 +221,6 @@ namespace GW2CraftingHelper.Services.Recipes
                     return;
                 }
 
-                // Nothing to write while the live build is still unknown:
-                // this session's entries have no build id to be honestly
-                // stamped with, and persisting them would overwrite an
-                // overlay that has not even been read yet (_deferredDiskLoad).
-                // The dirty flags stay set, so a later resolve still flushes.
-                if (_deferredDiskLoad)
-                {
-                    return;
-                }
-
                 if (!force)
                 {
                     var now = DateTime.UtcNow;
@@ -355,11 +255,10 @@ namespace GW2CraftingHelper.Services.Recipes
                 }
 
                 // The manifest goes out on every persist, not just a stamp
-                // change: it dates the two files above, and its build id is
-                // what the next launch checks them against.
-                // 0 means "written before the live build id was known"; the
-                // next Load treats it as a mismatch and discards the overlay
-                // once, rather than serving recipes of unknown vintage.
+                // change: it dates the two files above and records their
+                // provenance. 0 means "written before the live build id was
+                // known" - the entries are still served; only the vintage
+                // line in the Log tab is poorer for it.
                 var manifest = new RecipeOverlayManifest
                 {
                     Gw2BuildId = _storedBuildId ?? 0,

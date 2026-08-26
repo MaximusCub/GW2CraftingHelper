@@ -801,7 +801,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 const int buildId = 205780;
                 var cacheStore = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
-                cacheStore.Load(currentGw2BuildId: null);
+                cacheStore.Load();
                 cacheStore.SetCurrentBuildId(buildId);
 
                 var api = new InMemoryRecipeApiClient();
@@ -837,7 +837,7 @@ namespace GW2CraftingHelper.Tests.Services
                 cacheStore.Flush(force: true);
 
                 var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
-                reloaded.Load(currentGw2BuildId: buildId);
+                reloaded.Load();
                 var persistedRecipe = reloaded.TryGetRecipe(10);
                 Assert.NotNull(persistedRecipe);
                 Assert.Equal(1, persistedRecipe.OutputItemId);
@@ -865,7 +865,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 const int buildId = 205780;
                 var overlay = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
-                overlay.Load(currentGw2BuildId: null);
+                overlay.Load();
                 overlay.SetCurrentBuildId(buildId);
 
                 var api = new InMemoryRecipeApiClient();
@@ -899,7 +899,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Single(node.Recipes);
 
                 var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
-                reloaded.Load(currentGw2BuildId: buildId);
+                reloaded.Load();
                 Assert.NotNull(reloaded.TryGetRecipe(10));
                 Assert.NotNull(reloaded.TryGetSearch(1));
             }

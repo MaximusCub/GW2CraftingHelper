@@ -32,12 +32,11 @@ namespace GW2CraftingHelper.Services
     /// Reads /v2/build - which game build the API is currently serving.
     /// </summary>
     /// <remarks>
-    /// Retried rather than attempted once: without this id the recipe overlay
-    /// can be neither read nor written for the whole session (see
-    /// OverlayRecipeCacheStore's _deferredDiskLoad), so one slow response at
-    /// launch would silently cost every plan its persistent recipe cache. It
-    /// is a single tiny unauthenticated GET, so a second and third attempt
-    /// cost little and close almost all of that window.
+    /// Retried rather than attempted once: without this id the session's
+    /// learned recipes carry no provenance stamp and the recipe corpus
+    /// cannot be verified against the live build. It is a single tiny
+    /// unauthenticated GET, so a second and third attempt cost little and
+    /// close almost all of that window.
     /// </remarks>
     internal class Gw2BuildApiClient
     {

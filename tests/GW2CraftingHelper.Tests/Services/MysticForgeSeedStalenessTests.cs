@@ -119,7 +119,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(CurrentBuild);
+                overlay.Load();
                 var cacheStore = new CompositeRecipeCacheStore(seed, overlay);
 
                 var api = new InMemoryRecipeApiClient();
@@ -181,7 +181,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 var pipeline = new CraftingPlanPipeline(
                     new RecipeService(new InMemoryRecipeApiClient(),
@@ -264,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
                 var cacheStore = new CompositeRecipeCacheStore(seed, overlay);
 
                 var api = new InMemoryRecipeApiClient();
@@ -352,7 +352,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 // No API rescue available: the live API has no negative
                 // recipe ids and no search hit for a forge-only item.
@@ -376,7 +376,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 var after = await Pipeline(
                     new CompositeRecipeCacheStore(merged, overlay),

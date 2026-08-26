@@ -475,9 +475,11 @@ namespace GW2CraftingHelper
 
             var recipeOverlay = new OverlayRecipeCacheStore(dataDir, onStoreError);
             _recipeOverlay = recipeOverlay;
-            recipeOverlay.Load(currentGw2BuildId: null);
+            recipeOverlay.Load();
 
-            // Async build ID fetch for overlay invalidation + seed staleness
+            // Async build ID fetch: stamps provenance and (once known)
+            // licenses the corpus verification - never a wipe. The overlay
+            // is already loaded and serving above.
             var buildApi = new Gw2BuildApiClient(_httpClient);
             Task.Run(async () =>
             {
@@ -487,27 +489,17 @@ namespace GW2CraftingHelper
 
                     if (!build.BuildId.HasValue)
                     {
-                        // Neither store is told a build, so the persisted
-                        // recipe overlay stays unread AND unwritten for the
-                        // whole session (see
-                        // OverlayRecipeCacheStore._deferredDiskLoad): every
-                        // plan re-fetches its recipes live and the session
-                        // discards what it learned. Warn, not Debug - a user
-                        // whose /v2/build is blocked or slow has no other
-                        // signal that their recipe cache is switched off.
+                        // The cache still serves; only the build stamp and
+                        // the corpus verification are lost this session, so
+                        // recipes a newer build added may render UNKNOWN.
                         string reason = build.LastError == null
                             ? "no response"
                             : $"[{build.LastError.GetType().Name}] {build.LastError.Message}";
-                        Logger.Warn("GW2 build ID unavailable after {0} attempts - the persisted recipe cache is neither read nor written this session: {1}", build.Attempts, reason);
-                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"GW2 build ID unavailable after {build.Attempts} attempts - the persisted recipe cache is neither read nor written this session: {reason}");
+                        Logger.Warn("GW2 build ID unavailable after {0} attempts - recipe data cannot be verified against the live build this session: {1}", build.Attempts, reason);
+                        ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"GW2 build ID unavailable after {build.Attempts} attempts - recipe data cannot be verified against the live build this session: {reason}");
                         return;
                     }
 
-                    // Stamp only after the staleness check: InvalidateIfStale
-                    // clears the overlay's stored build when it wipes, so the
-                    // reverse order would leave the manifest recording 0 and
-                    // the overlay would be deleted again on the next launch.
-                    recipeOverlay.InvalidateIfStale(build.BuildId.Value);
                     recipeOverlay.SetCurrentBuildId(build.BuildId.Value);
                     recipeSeed.SetCurrentBuildId(build.BuildId.Value);
                 }
