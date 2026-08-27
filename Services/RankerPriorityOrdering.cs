@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GW2CraftingHelper.Models;
 
@@ -75,6 +76,92 @@ namespace GW2CraftingHelper.Services
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// Whether cached metrics may still be displayed for the row at
+        /// priorityIndex under the active mode. Two staleness laws in one
+        /// place: a mode toggle stales everything computed under the other
+        /// mode (both directions - toggling back revives the survivors), and
+        /// in Cascade mode a position change stales the row because its
+        /// numbers are a function of its slot. Independent metrics are
+        /// position-free, so only the mode has to match.
+        /// </summary>
+        internal static bool MetricsAreCurrent(
+            RankerRowMetrics metrics, int priorityIndex, RankerMode mode)
+        {
+            if (metrics == null || metrics.Mode != mode)
+            {
+                return false;
+            }
+
+            return mode == RankerMode.Independent || metrics.PriorityIndex == priorityIndex;
+        }
+
+        /// <summary>
+        /// Display order for Independent mode: priority indices sorted so
+        /// the row closest to done is first - finished rows, then measured
+        /// readiness descending, then not-measurable, then rows with no
+        /// current metrics. Ties keep the user's priority order (the sort
+        /// is stable), and the entries list itself is never touched - the
+        /// hand-set order is what Cascade mode restores.
+        /// </summary>
+        internal static List<int> IndependentDisplayOrder(
+            IReadOnlyList<RankerWatchlistEntry> entries,
+            Func<RankerWatchlistEntry, RankerRowMetrics> currentMetricsFor)
+        {
+            var order = new List<int>();
+            if (entries == null)
+            {
+                return order;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                order.Add(i);
+            }
+
+            if (currentMetricsFor == null)
+            {
+                return order;
+            }
+
+            var keys = new double[entries.Count];
+            for (int i = 0; i < entries.Count; i++)
+            {
+                keys[i] = DisplaySortKey(currentMetricsFor(entries[i]));
+            }
+
+            // Stable by construction: the key ties break on the priority
+            // index itself.
+            order.Sort((a, b) =>
+            {
+                int byKey = keys[b].CompareTo(keys[a]);
+                return byKey != 0 ? byKey : a.CompareTo(b);
+            });
+            return order;
+        }
+
+        private static double DisplaySortKey(RankerRowMetrics metrics)
+        {
+            if (metrics == null)
+            {
+                // Not yet calculated: below everything that carries data.
+                return -1.0;
+            }
+
+            switch (metrics.Kind)
+            {
+                case RankerReadinessKind.NothingLeft:
+                    // Finished IS "closest to done".
+                    return 2.0;
+                case RankerReadinessKind.Measured:
+                    return metrics.Readiness;
+                default:
+                    // Not measurable: something is outstanding but nothing
+                    // scoreable - between measured rows and uncalculated ones.
+                    return -0.5;
+            }
         }
 
         /// <summary>

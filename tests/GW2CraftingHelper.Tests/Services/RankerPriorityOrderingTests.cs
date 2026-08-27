@@ -148,5 +148,109 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(RankerPriorityOrdering.NoInvalidation, RankerPriorityOrdering.RemoveAt(entries, index));
             Assert.Equal(new[] { 1, 2, 3, 4 }, Ids(entries));
         }
+
+        // ---------------------------------------------------------------
+        // Metrics currency across mode toggles and reorders
+        // ---------------------------------------------------------------
+        private static RankerRowMetrics Metrics(
+            RankerMode mode, int priorityIndex,
+            RankerReadinessKind kind = RankerReadinessKind.Measured, double readiness = 0.5)
+        {
+            return new RankerRowMetrics
+            {
+                Mode = mode,
+                PriorityIndex = priorityIndex,
+                Kind = kind,
+                Readiness = readiness,
+            };
+        }
+
+        [Fact]
+        public void AModeToggleStalesMetricsFromTheOtherMode_BothDirections()
+        {
+            var cascade = Metrics(RankerMode.Cascade, 0);
+            var independent = Metrics(RankerMode.Independent, 0);
+
+            Assert.True(RankerPriorityOrdering.MetricsAreCurrent(cascade, 0, RankerMode.Cascade));
+            Assert.False(RankerPriorityOrdering.MetricsAreCurrent(cascade, 0, RankerMode.Independent));
+            Assert.True(RankerPriorityOrdering.MetricsAreCurrent(independent, 0, RankerMode.Independent));
+            Assert.False(RankerPriorityOrdering.MetricsAreCurrent(independent, 0, RankerMode.Cascade));
+        }
+
+        [Fact]
+        public void CascadeMetricsAreStaleAtAnyOtherPosition_IndependentOnesAreNot()
+        {
+            // A cascade number is a function of the slot it was computed
+            // for; an independent number is position-free.
+            Assert.False(RankerPriorityOrdering.MetricsAreCurrent(
+                Metrics(RankerMode.Cascade, 1), 2, RankerMode.Cascade));
+            Assert.True(RankerPriorityOrdering.MetricsAreCurrent(
+                Metrics(RankerMode.Independent, 1), 2, RankerMode.Independent));
+        }
+
+        [Fact]
+        public void NullMetricsAreNeverCurrent()
+        {
+            Assert.False(RankerPriorityOrdering.MetricsAreCurrent(null, 0, RankerMode.Cascade));
+            Assert.False(RankerPriorityOrdering.MetricsAreCurrent(null, 0, RankerMode.Independent));
+        }
+
+        // ---------------------------------------------------------------
+        // Independent display order
+        // ---------------------------------------------------------------
+        [Fact]
+        public void IndependentDisplayOrder_PutsTheClosestToDoneFirst()
+        {
+            var entries = Entries(10, 20, 30);
+            var byId = new Dictionary<int, RankerRowMetrics>
+            {
+                [10] = Metrics(RankerMode.Independent, 0, readiness: 0.20),
+                [20] = Metrics(RankerMode.Independent, 1, readiness: 0.90),
+                [30] = Metrics(RankerMode.Independent, 2, readiness: 0.55),
+            };
+
+            var order = RankerPriorityOrdering.IndependentDisplayOrder(
+                entries, e => byId[e.ItemId]);
+
+            Assert.Equal(new List<int> { 1, 2, 0 }, order);
+            // The stored priority order itself is untouched.
+            Assert.Equal(new[] { 10, 20, 30 }, Ids(entries));
+        }
+
+        [Fact]
+        public void FinishedRowsSortAboveMeasured_UnmeasuredSortLast()
+        {
+            var entries = Entries(1, 2, 3, 4);
+            var byId = new Dictionary<int, RankerRowMetrics>
+            {
+                [1] = null, // not yet calculated
+                [2] = Metrics(RankerMode.Independent, 1, RankerReadinessKind.NothingLeft),
+                [3] = Metrics(RankerMode.Independent, 2, readiness: 0.99),
+                [4] = Metrics(RankerMode.Independent, 3, RankerReadinessKind.NotMeasurable),
+            };
+
+            var order = RankerPriorityOrdering.IndependentDisplayOrder(
+                entries, e => byId[e.ItemId]);
+
+            Assert.Equal(new List<int> { 1, 2, 3, 0 }, order);
+        }
+
+        [Fact]
+        public void TiesKeepTheUsersPriorityOrder()
+        {
+            var entries = Entries(5, 6, 7);
+            var order = RankerPriorityOrdering.IndependentDisplayOrder(
+                entries, e => Metrics(RankerMode.Independent, 0, readiness: 0.5));
+
+            Assert.Equal(new List<int> { 0, 1, 2 }, order);
+        }
+
+        [Fact]
+        public void NullEntriesOrResolverDegradeToTheStoredOrder()
+        {
+            Assert.Empty(RankerPriorityOrdering.IndependentDisplayOrder(null, e => null));
+            Assert.Equal(new List<int> { 0, 1 },
+                RankerPriorityOrdering.IndependentDisplayOrder(Entries(1, 2), null));
+        }
     }
 }

@@ -178,6 +178,38 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ComparisonMode_RoundTripsThroughSaveAndLoad()
+        {
+            var store = new RankerStore(_temp.Path);
+            var watchlist = SampleWatchlist();
+            watchlist.Mode = RankerMode.Independent;
+
+            Assert.True(store.Save(watchlist));
+
+            Assert.Equal(RankerMode.Independent, store.Load().Mode);
+        }
+
+        [Fact]
+        public void AFileWrittenBeforeTheModeFieldExisted_LoadsAsCascadeWithItsListIntact()
+        {
+            // The exact shape RankerStore wrote before the Mode field (and
+            // before rarity was ever populated): schema 1, entries only.
+            // Additive field, no schema bump - old lists must load whole.
+            File.WriteAllText(FilePath,
+                "{ \"SchemaVersion\": 1, \"Entries\": [ " +
+                "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\", \"IconUrl\": \"t.png\" } ] }");
+
+            int errors = 0;
+            var loaded = new RankerStore(_temp.Path, (_, __) => errors++).Load();
+
+            Assert.Equal(0, errors);
+            Assert.Equal(RankerMode.Cascade, loaded.Mode);
+            Assert.Single(loaded.Entries);
+            Assert.Equal(30684, loaded.Entries[0].ItemId);
+            Assert.Null(loaded.Entries[0].Rarity);
+        }
+
+        [Fact]
         public void Save_ToAnUnwritablePath_ReportsFailureRatherThanThrowing()
         {
             // A file where the directory should be: every Save path under it

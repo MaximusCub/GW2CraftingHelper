@@ -94,7 +94,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Assert.Equal(RankerReadinessKind.NotMeasurable, metrics.Kind);
                 Assert.Equal(0, metrics.Readiness);
-                Assert.Equal(4, metrics.Gates.Count);
+                Assert.Equal(5, metrics.Gates.Count);
                 Assert.Empty(metrics.CurrencyShortfalls);
                 Assert.Empty(metrics.VendorCappedItems);
                 Assert.Empty(metrics.DisciplineGaps);
@@ -586,6 +586,156 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(RankerReadinessWeights.Currencies, metrics.Gates.First(g => g.Gate == RankerGate.Currencies).Weight);
             Assert.Equal(RankerReadinessWeights.TimeGates, metrics.Gates.First(g => g.Gate == RankerGate.TimeGates).Weight);
             Assert.Equal(RankerReadinessWeights.Disciplines, metrics.Gates.First(g => g.Gate == RankerGate.Disciplines).Weight);
+            Assert.Equal(RankerReadinessWeights.Recipes, metrics.Gates.First(g => g.Gate == RankerGate.Recipes).Weight);
+        }
+
+        // ---------------------------------------------------------------
+        // The recipes gate
+        // ---------------------------------------------------------------
+        private static RequiredRecipe Recipe(bool? isMissing, bool autoLearned = false)
+        {
+            return new RequiredRecipe { RecipeId = 1, OutputItemId = 2, IsMissing = isMissing, IsAutoLearned = autoLearned };
+        }
+
+        [Fact]
+        public void RecipesGate_ScoresKnownOverCheckable()
+        {
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: false),
+                Recipe(isMissing: false),
+                Recipe(isMissing: true),
+                Recipe(isMissing: true),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.True(GateApplies(metrics, RankerGate.Recipes));
+            Assert.Equal(0.5, GateCompletion(metrics, RankerGate.Recipes), 9);
+        }
+
+        [Fact]
+        public void RecipesGate_NeverFabricatesFromAnUncheckedRecipe()
+        {
+            // IsMissing null means the learned-recipes check never ran -
+            // the same never-fabricate rule as the disciplines gate.
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: null),
+                Recipe(isMissing: null),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.False(GateApplies(metrics, RankerGate.Recipes));
+        }
+
+        [Fact]
+        public void RecipesGate_IgnoresAutoLearnedRecipes()
+        {
+            // An auto-learned recipe carries no unlock barrier, so a plan
+            // made only of them has no recipes gate at all.
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: false, autoLearned: true),
+                Recipe(isMissing: true, autoLearned: true),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.False(GateApplies(metrics, RankerGate.Recipes));
+        }
+
+        [Fact]
+        public void AMissingRecipeCapsTheHeadlineBelowOneHundredPercent()
+        {
+            var owned = Result(coin: 0);
+            owned.RequiredRecipes = new List<RequiredRecipe> { Recipe(isMissing: true) };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Equal(RankerReadinessKind.Measured, metrics.Kind);
+            Assert.True(metrics.Readiness < 1.0);
+        }
+
+        // ---------------------------------------------------------------
+        // Vendor purchase caps vs TP liquidity (field issue: Mystic Coin's
+        // "10 per week cap" presented a coin problem as a time gate)
+        // ---------------------------------------------------------------
+        private static CraftingPlanResult WithPrices(CraftingPlanResult result, Dictionary<int, ItemPrice> prices)
+        {
+            result.SolveContext = new PlanSolveContext { Prices = prices };
+            return result;
+        }
+
+        private static List<TimegatedItem> WeeklyCap(int itemId)
+        {
+            return new List<TimegatedItem>
+            {
+                new TimegatedItem { ItemId = itemId, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 16 },
+            };
+        }
+
+        [Fact]
+        public void ATpLiquidItemsVendorCapIsDroppedNotPresentedAsATimeGate()
+        {
+            const int mysticCoinLike = 19976;
+            var owned = WithPrices(
+                Result(coin: 50, vendorCaps: WeeklyCap(mysticCoinLike)),
+                new Dictionary<int, ItemPrice>
+                {
+                    [mysticCoinLike] = new ItemPrice { ItemId = mysticCoinLike, BuyInstant = 100, SellInstant = 120 },
+                });
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            // The remainder above the cap is coin, not time.
+            Assert.Empty(metrics.VendorCappedItems);
+        }
+
+        [Fact]
+        public void AnUnpricedItemsVendorCapSurvivesTheFilter()
+        {
+            const int boundItem = 12345;
+            var owned = WithPrices(
+                Result(coin: 50, vendorCaps: WeeklyCap(boundItem)),
+                new Dictionary<int, ItemPrice>
+                {
+                    // Present but with no live orders on either side.
+                    [boundItem] = new ItemPrice { ItemId = boundItem, BuyInstant = 0, SellInstant = 0 },
+                });
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Single(metrics.VendorCappedItems);
+        }
+
+        [Fact]
+        public void MissingPriceDataKeepsTheCapRatherThanInventingLiquidity()
+        {
+            var owned = Result(coin: 50, vendorCaps: WeeklyCap(777));
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Single(metrics.VendorCappedItems);
+        }
+
+        // ---------------------------------------------------------------
+        // The comparison-mode tag
+        // ---------------------------------------------------------------
+        [Fact]
+        public void MetricsCarryTheModeTheyWereComputedUnder()
+        {
+            var cascade = RankerReadinessCalculator.Compute(
+                Result(coin: 100), Result(coin: 50), Availability(), 0);
+            var independent = RankerReadinessCalculator.Compute(
+                Result(coin: 100), Result(coin: 50), Availability(), 0, RankerMode.Independent);
+
+            Assert.Equal(RankerMode.Cascade, cascade.Mode);
+            Assert.Equal(RankerMode.Independent, independent.Mode);
         }
     }
 }

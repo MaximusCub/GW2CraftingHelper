@@ -295,6 +295,48 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task IndependentModeIgnoresPriorRows_WhereTheCascadeDoesNot()
+        {
+            // The same contention fixture as
+            // TheCascadeChangesTheScore_AndTheContestedMarkerNamesWhy, run
+            // both ways: three held ingredients cover ONE item. In cascade
+            // mode the second row is measured after the first drained them
+            // (0%); in independent mode every row is slot 1 against the
+            // full account, so both read 100% - "which is closest to done
+            // right now?" answered without the queue.
+            var pipeline = BuildFlatPipeline();
+            var baseline = await SolveAsync(pipeline, null);
+            var snapshot = SnapshotHolding(Ingredient, 3, coin: 1000);
+
+            // Cascade: slot 2 sees what slot 1 left behind.
+            var cascade = new RankerPriorityCascade(snapshot);
+            var firstAvailability = cascade.CurrentAvailability;
+            cascade.Consume(await SolveAsync(pipeline, firstAvailability.Snapshot));
+            var cascadeSecondAvailability = cascade.CurrentAvailability;
+            var cascadeSecond = await SolveAsync(pipeline, cascadeSecondAvailability.Snapshot);
+            var cascadeMetrics = RankerReadinessCalculator.Compute(
+                baseline, cascadeSecond, cascadeSecondAvailability, 1, RankerMode.Cascade);
+
+            // Independent: the second row gets the SAME full availability
+            // slot 1 got - no Consume threaded between rows.
+            var untouched = new RankerPriorityCascade(snapshot).CurrentAvailability;
+            var independentSecond = await SolveAsync(pipeline, untouched.Snapshot);
+            var independentMetrics = RankerReadinessCalculator.Compute(
+                baseline, independentSecond, untouched, 1, RankerMode.Independent);
+
+            Assert.Equal("0%", RankerReadinessCalculator.FormatReadiness(cascadeMetrics));
+            Assert.Equal("100%", RankerReadinessCalculator.FormatReadiness(independentMetrics));
+            Assert.True(independentMetrics.Readiness > cascadeMetrics.Readiness);
+
+            // No prior rows means nothing can be contested and no queued
+            // days exist - the row is measured purely on its own.
+            Assert.Equal(0, independentMetrics.ContestedItemCount);
+            Assert.Equal(0, independentMetrics.ContestedCurrencyCount);
+            Assert.Equal(independentMetrics.DaysAlone, independentMetrics.DaysRemaining);
+            Assert.Equal(1, cascadeMetrics.ContestedItemCount);
+        }
+
+        [Fact]
         public async Task TheBaselineSolveIsIndependentOfTheCascade()
         {
             // Why the cascade adds ZERO extra solves: the baseline is
