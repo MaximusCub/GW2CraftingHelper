@@ -91,13 +91,13 @@ jobs:
           # The legacy csproj lists every source file by hand (CONTRIBUTING.md
           # explains why it stays that way). An unregistered .cs compiles nowhere
           # and fails nothing, so the omission is invisible without this check.
-          grep -oP '(?<=<Compile Include=")[^"]+' GW2CraftingHelper.csproj \
+          grep -oP '(?<=<Compile Include=")[^"]+' TaimisToolbench.csproj \
             | tr '\\' '/' | sort > /tmp/compile-list.txt
           git ls-files 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' 'Contracts/*.cs' \
             'Properties/*.cs' 'Module.cs' | sort > /tmp/source-files.txt
           drift=$(comm -3 /tmp/compile-list.txt /tmp/source-files.txt)
           if [ -n "$drift" ]; then
-            echo "GW2CraftingHelper.csproj and disk disagree."
+            echo "TaimisToolbench.csproj and disk disagree."
             echo "Left column: in the csproj but not on disk."
             echo "Right column: on disk but missing a <Compile Include> entry."
             echo "$drift"
@@ -379,14 +379,14 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Restore packages
-        run: nuget restore GW2CraftingHelper.sln
+        run: nuget restore TaimisToolbench.sln
 
       # The solution, not the module alone: tools/MysticForgeSeeder (the only
-      # producer of ref/mystic_forge_recipes.json) and tools/GW2CraftingHelper.Harness
+      # producer of ref/mystic_forge_recipes.json) and tools/TaimisToolbench.Harness
       # have no test project, so a project-scoped build compiled neither.
       #
       # No -warnaserror here on purpose. The warning gate lives in the project
-      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj and, through
+      # files - TreatWarningsAsErrors in TaimisToolbench.csproj and, through
       # the StyleGate.props import, in every test and tool project - so it
       # applies to a developer's local build too, not just to CI, and this
       # step inherits it for free. Adding the flag here would
@@ -396,13 +396,13 @@ jobs:
       # for explicit codes, verified by reintroducing a CS0108 under the prefix
       # form and watching the build stay green (see the csproj comment).
       - name: Build solution
-        run: dotnet build GW2CraftingHelper.sln -p:Platform=x64
+        run: dotnet build TaimisToolbench.sln -p:Platform=x64
 
       - name: Run tests
-        run: dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
+        run: dotnet test tests/TaimisToolbench.Tests/TaimisToolbench.Tests.csproj -c Release
 
       - name: Run recipe seeder tests
-        run: dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
+        run: dotnet test tests/TaimisToolbench.RecipeSeeder.Tests/TaimisToolbench.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
 
       - name: Run vendor offer updater tests
         run: dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
@@ -416,10 +416,10 @@ jobs:
       # the .bhm came out, so the artefact players install is a thing CI checks
       # on purpose rather than a thing it happens to produce.
       - name: Build the shipping configuration (Release/x64)
-        run: dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release
+        run: dotnet build TaimisToolbench.csproj -p:Platform=x64 -c Release
 
       - name: Verify the .bhm was produced
         shell: bash
         run: |
-          test -f bin/x64/Release/GW2CraftingHelper.bhm
-          ls -l bin/x64/Release/GW2CraftingHelper.bhm
+          test -f bin/x64/Release/TaimisToolbench.bhm
+          ls -l bin/x64/Release/TaimisToolbench.bhm
