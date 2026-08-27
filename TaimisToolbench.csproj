@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>GW2CraftingHelper</RootNamespace>
-    <AssemblyName>GW2CraftingHelper</AssemblyName>
+    <RootNamespace>TaimisToolbench</RootNamespace>
+    <AssemblyName>TaimisToolbench</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -21,7 +21,7 @@
          whatever "latest non-preview" the installed csc.exe on a given machine
          resolves to (M38 WP-02 / a6-csharp.md section 10). -->
     <LangVersion>7.3</LangVersion>
-    <CodeAnalysisRuleSet>GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>TaimisToolbench.ruleset</CodeAnalysisRuleSet>
     <!-- The warning ratchet. Every warning is an error; the StyleCop rules
          still outstanding are listed in NoWarn, so the build is green today and
          a NEW warning of any kind - compiler or a StyleCop rule already cleaned
@@ -486,7 +486,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>NuGet packages have not been restored: {0} is missing. Run this from the repository root, then build again: nuget restore GW2CraftingHelper.sln -- note that dotnet restore does NOT restore a packages.config project and will report Nothing to do instead. Get nuget.exe from https://www.nuget.org/downloads (see CONTRIBUTING.md, Prerequisites).</ErrorText>
+      <ErrorText>NuGet packages have not been restored: {0} is missing. Run this from the repository root, then build again: nuget restore TaimisToolbench.sln -- note that dotnet restore does NOT restore a packages.config project and will report Nothing to do instead. Get nuget.exe from https://www.nuget.org/downloads (see CONTRIBUTING.md, Prerequisites).</ErrorText>
     </PropertyGroup>
     <!-- Checked before the restore errors below, because a version bump and a
          missing restore look identical to an Exists() test on a version-pinned

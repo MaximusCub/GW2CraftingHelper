@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RuleSet Name="GW2CraftingHelper style rules" Description="Custom StyleCop.Analyzers severity overrides. Suppresses only the rules that actively fight this codebase's documented, deliberate house style (CONTRIBUTING.md, Code Style); everything else stays at StyleCop's default (warning) severity so drift gets caught for free. See M38 WP-02." ToolsVersion="16.0">
+<RuleSet Name="TaimisToolbench style rules" Description="Custom StyleCop.Analyzers severity overrides. Suppresses only the rules that actively fight this codebase's documented, deliberate house style (CONTRIBUTING.md, Code Style); everything else stays at StyleCop's default (warning) severity so drift gets caught for free. See M38 WP-02." ToolsVersion="16.0">
   <Rules AnalyzerId="StyleCop.Analyzers" RuleNamespace="StyleCop.Analyzers">
     <!-- Doc-mandate rules. An earlier version of this comment claimed the codebase
          documents via prose "//" at decision points rather than <summary> on members.
