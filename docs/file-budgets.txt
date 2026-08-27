@@ -128,7 +128,7 @@ Services/ItemRowTooltipComposer.cs                                              
 Services/ItemSearchProviderFactory.cs                                                      61
 Services/ItemStatBlockFactory.cs                                                           177
 Services/ItemStatMath.cs                                                                   64
-Services/ItemStatTooltipComposer.cs                                                        726
+Services/ItemStatTooltipComposer.cs                                                        731
 Services/JsonSeedReader.cs                                                                 46
 Services/LogGutterLayout.cs                                                                147
 Services/LogLineFormat.cs                                                                  137
