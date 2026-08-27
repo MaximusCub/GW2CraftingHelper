@@ -6,12 +6,15 @@ namespace GW2CraftingHelper.Services
 {
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the
-    /// line order the in-game item tooltip uses (KNOWN-ISSUES #42):
-    /// the icon+name header,
-    /// what the item DOES (strength/defense, attributes, granted bonuses),
-    /// its infusion slots, then the identity block - rarity, type,
-    /// level, DESCRIPTION AND FLAVOUR, then the binding flags - and last of
-    /// all, unlabelled, the vendor value.
+    /// line order the in-game item tooltip uses (KNOWN-ISSUES #42,
+    /// fidelity-audit live3 addendum): the icon+name header, what the item
+    /// DOES (strength/defense, attributes, granted bonuses, or a
+    /// consumable's use prompt and effect block), then - on materials,
+    /// trophies and consumables - the description as its own block, the
+    /// infusion slots, the identity block (rarity word where the game
+    /// shows one, type, level, equipment's description and flavour, the
+    /// binding lines), and last of all, unlabelled and contiguous, the
+    /// vendor value.
     ///
     /// <para>
     /// Blish-free, so the whole line-by-line contract is directly testable
@@ -31,6 +34,13 @@ namespace GW2CraftingHelper.Services
         /// G12). Emitted verbatim rather than approximated.</summary>
         private const string SelectStatsPrompt = "Double-click to select stats.";
 
+        /// <summary>The game's use line on a consumable that carries
+        /// effect data - measured verbatim on live3 soul-pastries (89002,
+        /// Food), candy-corn (36041, Generic) and omnomberry (12452, Food),
+        /// 2026-08-26. Not in the API; the string is the game's own, same
+        /// precedent as <see cref="SelectStatsPrompt"/>.</summary>
+        private const string ConsumePrompt = "Double-click to consume.";
+
         public static TooltipContent BuildContent(ItemStatBlock stats)
         {
             if (stats == null)
@@ -49,27 +59,58 @@ namespace GW2CraftingHelper.Services
 
             var facts = BuildFacts(stats, out bool bodyOpensUnderHeader);
 
+            if (DescriptionLeadsBody(stats))
+            {
+                // Materials, trophies and consumables run EVERYTHING
+                // contiguous under the header - the description (fury,
+                // eyes, almonds, heart, ticket), the consume prompt and
+                // effect block (soul-pastries, omnomberry, candy-corn),
+                // and even a bare identity block (red-festival-lantern's
+                // "Trophy" starts one pitch under its icon) - with exactly
+                // ONE blank in the whole shape: after the description
+                // block, before the type line (candy-corn: effect block ->
+                // description contiguous, then a blank before
+                // "Consumable"; fury/heart/eyes: description then a blank
+                // before what follows). All measured on live3, 2026-08-26.
+                var description = new TooltipContentBuilder();
+                AppendDescription(description, stats);
+                var descriptionBlock = description.Build();
+                var identity = BuildIdentityBlock(stats, includeDescription: false);
+
+                builder.Append(facts);
+                builder.Append(descriptionBlock);
+                if (!identity.IsEmpty)
+                {
+                    if (!descriptionBlock.IsEmpty)
+                    {
+                        builder.Separator();
+                    }
+
+                    builder.Append(identity);
+                }
+
+                builder.Append(BuildVendorValue(stats));
+                return builder.Build();
+            }
+
             // Blocks are collected first and joined with exactly one blank
             // line each, so an empty block never leaves a separator behind
             // and a name-only block never ends on a stray blank row.
             var blocks = new List<TooltipContent>(3);
             AddBlock(blocks, facts);
             AddBlock(blocks, BuildInfusionSlots(stats));
-            AddBlock(blocks, BuildIdentityBlock(stats));
+            AddBlock(blocks, BuildIdentityBlock(stats, includeDescription: true));
 
             for (int i = 0; i < blocks.Count; i++)
             {
                 // Measured, and it splits on what the body OPENS with, not
                 // on combat facts alone. A body that opens with the item's
-                // combat facts or with its nourishment block runs straight
-                // on under the header (steak.png: icon bottom y=37, first
-                // text band y=39; warhelm.jpg: 37 -> 38). One that opens
-                // with the identity block gets a blank first (xyaren.png:
-                // icon bottom y=34, first text band y=53), and so does an
-                // upgrade component, whose bonus lines FWDekker's
-                // UpgradeComponent builder breaks before - inferred, no
-                // unequipped-rune capture exists. Gap G15; the warhelm
-                // divergence this leaves is in KNOWN-ISSUES #42.
+                // combat facts or its effect block runs straight on under
+                // the header (steak.png 37 -> 39). One that opens with the
+                // identity block gets a blank first (xyaren.png: icon
+                // bottom y=34, first text band y=53), and so does an
+                // upgrade component's bonus run (FWDekker; no
+                // unequipped-rune capture exists). Gap G15.
                 if (i > 0 || !bodyOpensUnderHeader)
                 {
                     builder.Separator();
@@ -81,11 +122,18 @@ namespace GW2CraftingHelper.Services
             var value = BuildVendorValue(stats);
             if (!value.IsEmpty)
             {
-                // The value is NOT unconditionally preceded by a blank.
+                // The value ALWAYS runs contiguous under the line above it.
+                // Measured on every capture that shows one: steak.png
+                // (2012), and live3 vials (discipline line -> coin row at
+                // one 16px pitch), fury-scorched, red-festival-lantern,
+                // counterfeit-ticket, sigil-rage and relic-livingcity
+                // (2026-08-26). The old Generic-shape blank came from
+                // FWDekker's <br /> before getValue(), which the vials
+                // capture - a crafting material, exactly Generic's case -
+                // refutes; no capture anywhere shows a blank above a value.
                 // The header rule still owns the case where the value is
-                // the whole body; otherwise the item's own shape decides
-                // (see ValueSitsAfterABlank).
-                if (blocks.Count == 0 ? !bodyOpensUnderHeader : ValueSitsAfterABlank(stats))
+                // the whole body.
+                if (blocks.Count == 0 && !bodyOpensUnderHeader)
                 {
                     builder.Separator();
                 }
@@ -97,68 +145,27 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Whether a blank row sits above the vendor value.
-        /// <para>
-        /// Measured absent on steak.png, the only capture that shows a
-        /// value line at all: its body bands run at a 18px pitch - 39, 57,
-        /// 75 (blank), 93 ("Food"), 111 ("Required Level: 10"), 129 (the
-        /// coin row) - so the value follows the line above it contiguously,
-        /// with row 128 carrying no glyph at all. Of FWDekker's fourteen
-        /// builders only ELEVEN emit a value at all, and nine of those
-        /// eleven emit it with no leading <c>&lt;br /&gt;</c>. The two that
-        /// do not are <c>Generic</c> (its fallback, which is what a
-        /// crafting material, a trait or a key gets) and an
-        /// <c>UpgradeComponent</c> of type Gem.
-        /// </para>
-        /// <para>
-        /// The table is inverted deliberately: a type this module has never
-        /// seen falls to the Generic shape, exactly as it does in the
-        /// replica's own <c>hasOwnProperty</c> fallback. The Generic blank
-        /// itself is INFERRED - no capture of a crafting material's value
-        /// line exists.
-        /// </para>
+        /// The types whose description leads the body instead of sitting
+        /// inside the identity block. Measured on live3 (2026-08-26):
+        /// CraftingMaterial (eyes-of-kormir, almonds - "Ingredient" IS
+        /// 12337's description field), Trophy (fury-scorched,
+        /// heart-of-destroyer, counterfeit-ticket) and Consumable
+        /// (candy-corn, description after the effect block). FWDekker's
+        /// Generic/Trophy/Consumable builders agree. Other non-equipment
+        /// types (Container, Gizmo, MiniPet, Gathering) look the same in
+        /// the replica but have no capture, so they keep the module's
+        /// one-shape identity placement until one exists.
         /// </summary>
-        private static bool ValueSitsAfterABlank(ItemStatBlock stats)
+        private static bool DescriptionLeadsBody(ItemStatBlock stats)
         {
-            if (stats.ItemType == "UpgradeComponent")
-            {
-                return stats.SubType == "Gem";
-            }
-
             switch (stats.ItemType)
             {
-                // The nine builders that emit getValue() contiguously.
-                case "Armor":
-                case "Back":
-                case "Bag":
-                case "Consumable":
-                case "Container":
-                case "Gizmo":
-                case "Trinket":
+                case "CraftingMaterial":
                 case "Trophy":
-                case "Weapon":
-                    return false;
-
-                // GUESS, and the only one in this table. The replica emits
-                // NO value line for these three - Gathering ends on
-                // getLevel() + getFlags(), MiniPet on "Miniature" +
-                // getFlags(), Tool on getDescription() + getFlags() - so it
-                // cannot agree either way, and no capture of one exists.
-                // This module does show their value (a mining pick and a
-                // salvage kit both sell), so a shape has to be picked.
-                // Picked contiguous by nearest body shape: Gathering's
-                // description/level/flags body matches Gizmo's and
-                // Trophy's, Tool's rarity/type/description/flags body
-                // matches Container's and Consumable's, and MiniPet's
-                // description/type/flags body matches Trophy's - all
-                // contiguous. Desktop gate step 6 settles it.
-                case "Gathering":
-                case "MiniPet":
-                case "Tool":
-                    return false;
-
-                default:
+                case "Consumable":
                     return true;
+                default:
+                    return false;
             }
         }
 
@@ -172,14 +179,14 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// What the item does: weapon strength / defense / attributes, then
-        /// the granted bonuses and nourishment that sit contiguously under
-        /// them.
+        /// the granted bonuses, or a consumable's use prompt and effect
+        /// block, sitting contiguously under the header.
         /// <para>
         /// <paramref name="bodyOpensUnderHeader"/> reports whether this
         /// block leads with content the game runs straight on under the
-        /// header - the combat facts, or the nourishment block - as opposed
-        /// to a bonus run, which the game breaks before. It decides the
-        /// header's blank line; see <see cref="BuildContent"/>.
+        /// header - the combat facts, or the consume prompt / effect block
+        /// - as opposed to a bonus run, which the game breaks before. It
+        /// decides the header's blank line; see <see cref="BuildContent"/>.
         /// </para>
         /// </summary>
         private static TooltipContent BuildFacts(ItemStatBlock stats, out bool bodyOpensUnderHeader)
@@ -204,6 +211,7 @@ namespace GW2CraftingHelper.Services
             // Null-tolerant even though ItemStatBlockFactory never leaves
             // these null: ItemStatBlock has public setters, so a future or
             // test-built block might.
+            string buffFlatText = ItemDescriptionSanitizer.Sanitize(stats.BuffDescription);
             foreach (var attribute in stats.Attributes ?? EmptyAttributes)
             {
                 // The API's modifier is already signed for the one
@@ -213,19 +221,19 @@ namespace GW2CraftingHelper.Services
                 string line = $"{sign}{attribute.Value} {attribute.DisplayName}";
                 facts.Text(line).EndLine();
                 hasCombatFacts = true;
-                buffAlreadyShown = buffAlreadyShown || line == stats.BuffDescription;
+                buffAlreadyShown = buffAlreadyShown || line == buffFlatText;
             }
 
             AppendUpgradeEffects(facts, stats, buffAlreadyShown);
 
-            // Only when the nourishment block is what OPENS the body: an
-            // item carrying a bonus run above it opens with the bonus, and
-            // the game breaks before one.
-            bool nourishmentOpensTheBody = facts.IsEmpty;
-            AppendNourishment(facts, stats);
-            nourishmentOpensTheBody = nourishmentOpensTheBody && !facts.IsEmpty;
+            // Only when the effect block is what OPENS the body: an item
+            // carrying a bonus run above it opens with the bonus, and the
+            // game breaks before one.
+            bool effectOpensTheBody = facts.IsEmpty;
+            AppendConsumableEffect(facts, stats);
+            effectOpensTheBody = effectOpensTheBody && !facts.IsEmpty;
 
-            bodyOpensUnderHeader = hasCombatFacts || nourishmentOpensTheBody;
+            bodyOpensUnderHeader = hasCombatFacts || effectOpensTheBody;
             return facts.Build();
         }
 
@@ -240,9 +248,29 @@ namespace GW2CraftingHelper.Services
             // exact match is suppressed: a buff description that summarises
             // several attributes ("+5 Power, +5 Precision") is its own
             // distinct wording and still belongs.
+            //
+            // The buff string carries API markup - a sigil's cooldown is
+            // "<br><c=@reminder>(Cooldown: 20 Seconds)</c>" INSIDE
+            // infix_upgrade.buff.description (measured on 24561) - so it
+            // goes through the sanitizer like a description does, with
+            // unmarked prose promoted to the bonus blue and the reminder
+            // run keeping its own grey, which is exactly the split the
+            // live3 sigil-rage capture shows (blue effect line, grey
+            // "(Cooldown: 20 Seconds)" line under it, 2026-08-26).
             if (!buffAlreadyShown && !string.IsNullOrEmpty(stats.BuffDescription))
             {
-                builder.Styled(stats.BuffDescription, TooltipSpanRole.Bonus).EndLine();
+                var spans = ItemDescriptionSanitizer.SanitizeToSpans(stats.BuffDescription);
+                foreach (var span in spans)
+                {
+                    builder.Styled(
+                        span.Text,
+                        span.Role == TooltipSpanRole.Default ? TooltipSpanRole.Bonus : span.Role);
+                }
+
+                if (spans.Count > 0)
+                {
+                    builder.EndLine();
+                }
             }
 
             // A rune's bonuses are positional - the Nth entry is the bonus
@@ -258,39 +286,113 @@ namespace GW2CraftingHelper.Services
             }
         }
 
-        private static void AppendNourishment(TooltipContentBuilder builder, ItemStatBlock stats)
+        /// <summary>
+        /// The consume prompt and effect block, the way the game draws
+        /// them (measured on live3 soul-pastries / candy-corn / omnomberry,
+        /// 2026-08-26):
+        /// <code>
+        /// Double-click to consume.                       white
+        /// [icon] Nourishment (45 m): +100 Concentration  grey (#AAA)
+        ///        +70 Power                               grey
+        ///        +15% Experience from Kills              grey
+        /// </code>
+        /// The effect NAME (details.name), its duration and its first
+        /// effect line share one line; EVERY line of the block is the
+        /// annotation grey - all three captures saturate at (170,170,170),
+        /// superseding F7's white-first-line split, whose allspice/steak
+        /// evidence was JPEG-era. The effect lines' own +/% prefixes come
+        /// from the API text and are not normalised (omnomberry:
+        /// "30% Magic Find" beside "+10% Experience from Kills").
+        /// <para>
+        /// Ascended food returns details:{type:Food} and nothing else
+        /// (measured on 91805). Silence, not a "no effect data" marker:
+        /// the absence is not itself confusing, and inventing a line would
+        /// be the one thing this module never does.
+        /// </para>
+        /// </summary>
+        private static void AppendConsumableEffect(TooltipContentBuilder builder, ItemStatBlock stats)
         {
-            // The first line is WHITE, the trailing effect lines GREY
-            // (~162): measured on the allspice capture (fidelity-audit F7,
-            // one modern JPEG, but the 162-vs-240 gap is unambiguous). Not
-            // the upgrade-bonus blue in any case - that is measured on
-            // rune and sigil bonuses only.
-            //
-            // Ascended food returns details:{type:Food} and nothing else
-            // (measured on 91805). Silence, not a "no effect data" marker:
-            // the absence is not itself confusing, and inventing a line
-            // would be the one thing this module never does.
-            if (!string.IsNullOrEmpty(stats.NourishmentDescription))
+            string description = string.IsNullOrEmpty(stats.NourishmentDescription)
+                ? null : stats.NourishmentDescription.Replace("\r\n", "\n").Replace('\r', '\n');
+            bool hasDuration = stats.NourishmentDurationMs.HasValue && stats.NourishmentDurationMs.Value > 0;
+
+            if (string.IsNullOrEmpty(stats.EffectName))
             {
-                string description = stats.NourishmentDescription
-                    .Replace("\r\n", "\n").Replace('\r', '\n');
-                int firstBreak = description.IndexOf('\n');
-                if (firstBreak < 0)
+                // No effect name in the details block: the pre-live3 shape,
+                // minus its separate white line - the whole block is grey
+                // now that the game's effect text is measured at #AAA.
+                if (description != null)
                 {
-                    builder.Text(description).EndLine();
+                    builder.Styled(description, TooltipSpanRole.Muted).EndLine();
                 }
-                else
+
+                if (hasDuration)
                 {
-                    builder.Text(description.Substring(0, firstBreak)).EndLine();
                     builder.Styled(
-                        description.Substring(firstBreak + 1), TooltipSpanRole.Muted).EndLine();
+                        "Duration: " + FormatDuration(stats.NourishmentDurationMs.Value),
+                        TooltipSpanRole.Muted).EndLine();
                 }
+
+                return;
             }
 
-            if (stats.NourishmentDurationMs.HasValue && stats.NourishmentDurationMs.Value > 0)
+            // "Double-click to consume." precedes the block, white -
+            // emitted only for a Consumable that actually carries effect
+            // data, so a detail-less consumable (ascended food) and any
+            // future non-consumable type with a named effect invent
+            // nothing.
+            if (stats.ItemType == "Consumable")
             {
-                builder.Text("Duration: " + FormatDuration(stats.NourishmentDurationMs.Value)).EndLine();
+                builder.Text(ConsumePrompt).EndLine();
             }
+
+            var text = new StringBuilder(stats.EffectName.Length + 16);
+            text.Append(stats.EffectName);
+            if (hasDuration)
+            {
+                text.Append(FormatEffectDuration(stats.NourishmentDurationMs.Value));
+            }
+
+            if (description != null)
+            {
+                text.Append(": ").Append(description);
+            }
+
+            string block = text.ToString();
+            if (!string.IsNullOrEmpty(stats.EffectIconUrl))
+            {
+                builder.EffectBlock(stats.EffectIconUrl, block, TooltipSpanRole.Muted);
+            }
+            else
+            {
+                // No icon URL in the data: plain unindented grey lines
+                // rather than an invented placeholder (no capture of an
+                // icon-less effect block exists).
+                builder.Styled(block, TooltipSpanRole.Muted).EndLine();
+            }
+        }
+
+        /// <summary>
+        /// The duration parenthetical joined to the effect name. MEASURED
+        /// (2026-08-26): minutes take a space on both sides of the unit
+        /// AND before the paren - "Nourishment (45 m):" (live3
+        /// soul-pastries) and "Nourishment (30 m):" (omnomberry, its
+        /// name-to-paren gap pixel-identical to soul-pastries' 6px space) -
+        /// while seconds are tight on both - "Sugar Rush(10s):"
+        /// (candy-corn) and "Soul of the Titan(5s):" (relic-livingcity),
+        /// both with a 2px letter-kern gap where the minutes captures show
+        /// 6px. The hour arm extends the minutes style; no capture of an
+        /// hour-long effect exists.
+        /// </summary>
+        private static string FormatEffectDuration(int durationMs)
+        {
+            int totalSeconds = durationMs / 1000;
+            if (totalSeconds < 60 || totalSeconds % 60 != 0)
+            {
+                return $"({totalSeconds}s)";
+            }
+
+            return " (" + FormatDuration(durationMs) + ")";
         }
 
         /// <summary>
@@ -322,7 +424,7 @@ namespace GW2CraftingHelper.Services
             return slots.Build();
         }
 
-        private static TooltipContent BuildIdentityBlock(ItemStatBlock stats)
+        private static TooltipContent BuildIdentityBlock(ItemStatBlock stats, bool includeDescription)
         {
             var identity = new TooltipContentBuilder();
 
@@ -332,13 +434,15 @@ namespace GW2CraftingHelper.Services
             // (153,51,255), both on non-comparison hovers. The 2012-2016
             // captures behind the old white reading (G5) are superseded;
             // the game changed. Basic is still suppressed outright, as the
-            // game suppresses it (G20).
-            if (!string.IsNullOrEmpty(stats.Rarity) && stats.Rarity != "Basic")
+            // game suppresses it (G20) - and so is the WHOLE line on the
+            // types the game shows no rarity word for; see ShowsRarityWord.
+            if (!string.IsNullOrEmpty(stats.Rarity) && stats.Rarity != "Basic"
+                && ShowsRarityWord(stats.ItemType))
             {
                 identity.RarityText(stats.Rarity, stats.Rarity).EndLine();
             }
 
-            string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
+            string type = TypeLine(stats);
             bool isArmor = !string.IsNullOrEmpty(stats.WeightClass);
 
             // Armour is the one shape where the game splits these two: the
@@ -350,9 +454,9 @@ namespace GW2CraftingHelper.Services
                 identity.Text(stats.WeightClass).EndLine();
             }
 
-            if (!string.IsNullOrEmpty(type))
+            if (type != null)
             {
-                identity.Text(SpaceCamelCase(type) + (isArmor ? " Armor" : "")).EndLine();
+                identity.Text(type + (isArmor ? " Armor" : "")).EndLine();
             }
 
             // Grey, not white: "(Two-Handed)" measures (160,161,162) on
@@ -369,12 +473,28 @@ namespace GW2CraftingHelper.Services
                 identity.Text("Damage Type: " + stats.DamageType).EndLine();
             }
 
+            // An upgrade component's description precedes its level line:
+            // the live3 sigil-rage capture runs "Element: Enhancement" and
+            // "Double-click to apply to a weapon." ABOVE "Required Level:
+            // 60" (2026-08-26), and FWDekker's UpgradeComponent builder is
+            // getBuffs + getDescription + getLevel. Equipment keeps the
+            // level first (xyaren G13; live3 wings: "Required Level: 80"
+            // above the flavour).
+            bool descriptionBeforeLevel = stats.ItemType == "UpgradeComponent";
+            if (includeDescription && descriptionBeforeLevel)
+            {
+                AppendDescription(identity, stats);
+            }
+
             if (stats.RequiredLevel > 0)
             {
                 identity.Text($"Required Level: {stats.RequiredLevel}").EndLine();
             }
 
-            AppendDescription(identity, stats);
+            if (includeDescription && !descriptionBeforeLevel)
+            {
+                AppendDescription(identity, stats);
+            }
 
             // Above the binding line, which is where the game puts it (G18).
             if (stats.IsUnique)
@@ -382,9 +502,13 @@ namespace GW2CraftingHelper.Services
                 identity.Text("Unique").EndLine();
             }
 
-            if (!string.IsNullOrEmpty(stats.Binding))
+            // Up to two lines, account dimension then soul dimension, the
+            // order the game stacks them in (live3 relic-livingcity:
+            // "Account Bound" over "Soulbound on Use", 2026-08-26). See
+            // ItemStatBlockFactory.ResolveBindings.
+            foreach (var binding in stats.Bindings ?? EmptyStrings)
             {
-                identity.Text(stats.Binding).EndLine();
+                identity.Text(binding).EndLine();
             }
 
             if (stats.Restrictions != null && stats.Restrictions.Count > 0)
@@ -396,9 +520,75 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The description sits INSIDE the identity block, after the
-        /// type/level lines and before the binding flags - not appended
-        /// after everything as a trailer (gap G13).
+        /// Whether the game gives this type a rarity-word line. MEASURED
+        /// absent (2026-08-26, live3) on CraftingMaterial (vials Rare,
+        /// eyes-of-kormir Masterwork), Trophy (fury-scorched Exotic,
+        /// heart-of-destroyer Exotic, red-festival-lantern Junk) and
+        /// Consumable (soul-pastries Masterwork, omnomberry Fine), and on
+        /// UpgradeComponent (sigil-rage Exotic shows no "Exotic" line);
+        /// MEASURED present on Armor (s07), Weapon (eq-weapon-full), Back
+        /// (wings Ascended) and Relic (relic-livingcity, gold "Exotic").
+        /// The remaining suppressions mirror FWDekker's builders, which
+        /// call getRarity() only in Armor/Back/Tool/Trinket/Weapon -
+        /// INFERRED, no capture. An unknown type shows the word, matching
+        /// the measured Relic default.
+        /// </summary>
+        private static bool ShowsRarityWord(string itemType)
+        {
+            switch (itemType)
+            {
+                case "CraftingMaterial":
+                case "Trophy":
+                case "Consumable":
+                case "UpgradeComponent":
+                case "Bag":
+                case "Container":
+                case "Gathering":
+                case "Gizmo":
+                case "MiniPet":
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        /// <summary>
+        /// The type line, or null for the types the game shows none for.
+        /// MEASURED (2026-08-26, live3): a crafting material has NO type
+        /// line (vials/eyes/almonds - almonds' "Ingredient" is 12337's own
+        /// description field, not a type word); an upgrade component has
+        /// none either (sigil-rage runs buff/cooldown/description straight
+        /// into Required Level); a consumable says "Consumable" - the
+        /// top-level type - never its details.type ("Food" on soul-pastries
+        /// and omnomberry, "Generic" on candy-corn, all three rendered
+        /// "Consumable"); a Back item says "Back Item" (wings; FWDekker
+        /// agrees). Everything else keeps the API's own noun, split at
+        /// camel-case boundaries.
+        /// </summary>
+        private static string TypeLine(ItemStatBlock stats)
+        {
+            switch (stats.ItemType)
+            {
+                case "CraftingMaterial":
+                case "UpgradeComponent":
+                    return null;
+                case "Consumable":
+                    return "Consumable";
+                case "Back":
+                    return "Back Item";
+            }
+
+            string type = !string.IsNullOrEmpty(stats.SubType) ? stats.SubType : stats.ItemType;
+            return string.IsNullOrEmpty(type) ? null : SpaceCamelCase(type);
+        }
+
+        /// <summary>
+        /// The item's description. On equipment it sits INSIDE the
+        /// identity block, after the type/level lines and before the
+        /// binding flags (gap G13, xyaren; live3 wings agrees); on the
+        /// description-leading types it is this same content emitted as
+        /// the body-opening block instead - see
+        /// <see cref="DescriptionLeadsBody"/>.
         /// <para>
         /// The description's own <c>&lt;c=@...&gt;</c> runs decide the
         /// colours: unmarked prose stays white, a flavour run goes teal, an
@@ -436,8 +626,8 @@ namespace GW2CraftingHelper.Services
         /// The vendor value the way the game shows it: unlabelled, alone on
         /// the last line, and absent entirely when the item cannot be sold
         /// (<see cref="ItemStatBlock.VendorValue"/> is null exactly then).
-        /// Gap G14. Whether a blank precedes it is
-        /// <see cref="ValueSitsAfterABlank"/>'s to say.
+        /// Gap G14. It always runs contiguous under the line above it -
+        /// see the measurement note in <see cref="BuildContent"/>.
         /// </summary>
         private static TooltipContent BuildVendorValue(ItemStatBlock stats)
         {

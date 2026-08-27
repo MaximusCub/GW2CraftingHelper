@@ -242,7 +242,7 @@ namespace GW2CraftingHelper.Tests.Services
             // way the icons beside it do (leading all-zero units omitted,
             // trailing units zero-padded).
             Assert.Equal(
-                new[] { "Unit price: 5s 00c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+                new[] { "Unit price: 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
                 lines);
         }
 
@@ -377,7 +377,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new[]
                 {
                     "Caption line",
-                    "Unit price: 1s 00c",
+                    "Unit price: 1s 0c",
                     "Other trading post price side shown",
                     "Right-click: Open wiki page",
                 },
@@ -484,7 +484,12 @@ namespace GW2CraftingHelper.Tests.Services
                 .BuildStatTooltipContent(node, id => CollidingItemStats()).ToPlainLines();
 
             Assert.Equal("Unrelated Item", lines[0]);
-            Assert.Contains("Legendary", lines);
+            // The stat block is present (its type line), but no
+            // "Legendary" rarity WORD: the game shows none on a Trophy
+            // (live3 fury-scorched / heart-of-destroyer, 2026-08-26). The
+            // name line still carries the rarity as its colour role.
+            Assert.Contains("Trophy", lines);
+            Assert.DoesNotContain("Legendary", lines);
         }
 
         [Fact]

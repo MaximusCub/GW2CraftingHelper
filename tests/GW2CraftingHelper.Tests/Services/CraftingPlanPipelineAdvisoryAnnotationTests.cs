@@ -263,8 +263,8 @@ namespace GW2CraftingHelper.Tests.Services
                 // composer now spells a coin amount the way the icons
                 // beside it do.
                 Assert.Contains("Crafting gold price: 1s 40c", tooltip.ToPlainText());
-                Assert.Contains("Currencies: 36g 00s 00c", tooltip.ToPlainText());
-                Assert.Contains("Optimization price: 36g 01s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
             }
         }
 
@@ -369,8 +369,8 @@ namespace GW2CraftingHelper.Tests.Services
                 // composer now spells a coin amount the way the icons
                 // beside it do.
                 Assert.Contains("Crafting gold price: 1s 40c", tooltip.ToPlainText());
-                Assert.Contains("Currencies: 36g 00s 00c", tooltip.ToPlainText());
-                Assert.Contains("Optimization price: 36g 01s 40c", tooltip.ToPlainText());
+                Assert.Contains("Currencies: 36g 0s 0c", tooltip.ToPlainText());
+                Assert.Contains("Optimization price: 36g 1s 40c", tooltip.ToPlainText());
             }
         }
     }

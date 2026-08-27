@@ -13,6 +13,27 @@
 > the line-order map's `<Rarity> white` row are the superseded statements.
 > The white ATTRIBUTE lines, line order, and blank rules were all
 > re-confirmed by the same captures.
+>
+> **Superseded further - 2026-08-26, branch `tooltip-round2`.** Thirteen
+> owner captures (`/mnt/c/Dev/Blish/tooltips/live3/`, audited in the
+> fidelity audit's live3 addendum) overturned more of the below: the
+> whole consumable effect block is grey #AAA, not white-first-line (the
+> round-2 correction #1 and F7 rested on JPEG-era captures); the game
+> folds the duration into a "Nourishment (45 m):" lead-in with an inline
+> effect icon rather than a "Duration:" line; the binding line is TWO
+> independent dimensions (account + soul) and AccountBound reads
+> "Account Bound on Acquire", not the most-specific "on Use"; crafting
+> materials and upgrade components have NO type line and no rarity word
+> (nor do trophies and consumables, which say "Consumable", never
+> "Food"); materials/trophies/consumables lead with their description
+> under the header; the vendor value is contiguous for EVERY shape (the
+> Generic blank and the `ValueSitsAfterABlank` table are refuted -
+> vials measures a material's coin row one pitch under the line above);
+> coin segments are bare digits ("2g 0s 0c", never "00"); the sigil
+> cooldown DOES exist in the API (inside buff.description markup); and
+> the owner's field ruling retired the Menomonia-16 divergence - the
+> tooltip renders at 14 with `MaxContentWidth` 350. The line-order map
+> and desktop-gate steps 3/6/15 below describe the superseded shapes.
 
 ## Tooltip authenticity (tooltip-authenticity)
 

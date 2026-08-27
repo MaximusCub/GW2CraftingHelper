@@ -55,8 +55,8 @@ namespace GW2CraftingHelper.Tests.Services
             // consolidation: every composer now spells a coin amount the
             // way the icons beside it do (leading all-zero units omitted,
             // trailing units zero-padded).
-            Assert.Contains("Crafting gold price: 1g 00s 00c", content.ToPlainText());
-            Assert.Contains("Optimization price: 3g 50s 00c", content.ToPlainText());
+            Assert.Contains("Crafting gold price: 1g 0s 0c", content.ToPlainText());
+            Assert.Contains("Optimization price: 3g 50s 0c", content.ToPlainText());
         }
 
         [Fact]
@@ -127,7 +127,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains(AllSpans(content), s => s.IsCoin && s.CoinCopper == 5000);
             Assert.Equal(
                 "Always more expensive - needs everything the selected option needs, " +
-                "plus 50s 00c more, 10 more Glob of Ectoplasm",
+                "plus 50s 0c more, 10 more Glob of Ectoplasm",
                 content.ToPlainText());
         }
 

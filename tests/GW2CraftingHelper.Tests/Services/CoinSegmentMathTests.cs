@@ -198,7 +198,7 @@ namespace GW2CraftingHelper.Tests.Services
         // drawn) and the recipe tree's cost-column pre-scan (how wide each
         // denomination's sub-column is reserved).
         [Fact]
-        public void FormatSegmentTexts_FullAmount_PadsSilverAndCopperOnce_GoldPrecedesThem()
+        public void FormatSegmentTexts_FullAmount_GoldPrecedesSilverAndCopper()
         {
             var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(412680L);
 
@@ -208,13 +208,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void FormatSegmentTexts_PadsSingleDigitSilverAndCopperUnderGold()
+        public void FormatSegmentTexts_SingleDigitSegmentsStayBareUnderGold()
         {
+            // Bare digits, never zero-padded: the game renders "2g 0s 0c"
+            // (live3 counterfeit-ticket, 20000c) and "2s 0c"
+            // (relic-livingcity, 200c) with single-character zeros; the
+            // non-zero sub-10 case is inferred from those samples.
             var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(10203L);
 
             Assert.Equal("1", gold);
-            Assert.Equal("02", silver);
-            Assert.Equal("03", copper);
+            Assert.Equal("2", silver);
+            Assert.Equal("3", copper);
         }
 
         [Fact]

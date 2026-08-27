@@ -62,7 +62,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.NotNull(block);
             Assert.Equal("Zojja's Warfists", block.Name);
             Assert.Equal(191, block.Defense);
-            Assert.Equal("Account Bound on Use", block.Binding);
+            Assert.Equal(new[] { "Account Bound on Acquire" }, block.Bindings);
             Assert.Equal(240L, block.VendorValue);
             Assert.Equal(
                 new[] { "Power", "Ferocity" },

@@ -12,9 +12,11 @@ namespace GW2CraftingHelper.Tests.Services
     /// <para>
     /// The spread is chosen to separate the formats: 1005 copper is 0 gold,
     /// 10 silver, 5 copper, which is where an always-three-units formatter
-    /// ("0g 10s 5c"), an omit-leading-units one ("10s 5c") and the format
-    /// the coin ICONS draw ("10s 05c") all disagree. 100 and 10000 pin the
-    /// zero-padding of a trailing unit, and -1 pins the clamp.
+    /// ("0g 10s 5c") and the omit-leading-units bare-digit one the game
+    /// itself renders ("10s 5c") disagree. 100 and 10000 pin the BARE
+    /// trailing zeros - the game shows "2g 0s 0c", never "2g 00s 00c"
+    /// (live3 counterfeit-ticket / relic-livingcity, 2026-08-26, which
+    /// retired the old zero-padded icon spelling) - and -1 pins the clamp.
     /// </para>
     ///
     /// <para>
@@ -32,12 +34,12 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 00c")]
-        [InlineData(1005, "10s 05c")]
-        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(100, "1s 0c")]
+        [InlineData(1005, "10s 5c")]
+        [InlineData(10000, "1g 0s 0c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(9999, "99s 99c")]
-        [InlineData(10101, "1g 01s 01c")]
+        [InlineData(10101, "1g 1s 1c")]
         [InlineData(-1, "0c")]
         [InlineData(-99999, "0c")]
         public void GameStyleText(long copper, string expected)
@@ -51,9 +53,9 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(0, null, null, "0")]
         [InlineData(1, null, null, "1")]
         [InlineData(99, null, null, "99")]
-        [InlineData(100, null, "1", "00")]
-        [InlineData(1005, null, "10", "05")]
-        [InlineData(10000, "1", "00", "00")]
+        [InlineData(100, null, "1", "0")]
+        [InlineData(1005, null, "10", "5")]
+        [InlineData(10000, "1", "0", "0")]
         [InlineData(1234567, "123", "45", "67")]
         [InlineData(-1, null, null, "0")]
         public void IconSegmentTexts(long copper, string gold, string silver, string cop)
@@ -62,18 +64,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // Changed with the consolidation: this composer used to spell
-        // every amount with all three units, so 1005 read "0g 10s 5c" and
-        // 5 read "0g 0s 5c" while the icons beside it in the same tooltip
-        // read "10s 05c" and "5c". It now answers the icon spelling. The
-        // string is never drawn (ACoinSpansTextChangesNoGeometry below), so
-        // the change is to what the composer MEANS, not to a pixel.
+        // every amount with all three units ("0g 10s 5c"). It now answers
+        // the shared spelling. The string is never drawn
+        // (ACoinSpansTextChangesNoGeometry below), so the change is to
+        // what the composer MEANS, not to a pixel.
         [Theory]
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 00c")]
-        [InlineData(1005, "10s 05c")]
-        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(100, "1s 0c")]
+        [InlineData(1005, "10s 5c")]
+        [InlineData(10000, "1g 0s 0c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(-1, "0c")]
         public void TreeRowUnitPrice(long copper, string expected)
@@ -93,18 +94,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // Changed with the consolidation: this composer used to spell
-        // every amount with all three units, so 1005 read "0g 10s 5c" and
-        // 5 read "0g 0s 5c" while the icons beside it in the same tooltip
-        // read "10s 05c" and "5c". It now answers the icon spelling. The
-        // string is never drawn (ACoinSpansTextChangesNoGeometry below), so
-        // the change is to what the composer MEANS, not to a pixel.
+        // every amount with all three units ("0g 10s 5c"). It now answers
+        // the shared spelling. The string is never drawn
+        // (ACoinSpansTextChangesNoGeometry below), so the change is to
+        // what the composer MEANS, not to a pixel.
         [Theory]
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 00c")]
-        [InlineData(1005, "10s 05c")]
-        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(100, "1s 0c")]
+        [InlineData(1005, "10s 5c")]
+        [InlineData(10000, "1g 0s 0c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(-1, "0c")]
         public void ValueDetailCraftingGoldPrice(long copper, string expected)
@@ -125,16 +125,16 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Crafting gold price: " + expected, content.ToPlainText());
         }
 
-        // Changed with the consolidation: this composer already omitted
-        // leading all-zero units but never zero-padded a trailing one, so
-        // 1005 read "10s 5c" against the icons' "10s 05c".
+        // This composer always omitted leading all-zero units and never
+        // padded a trailing one - the shape the live3 captures later
+        // measured as the game's own.
         [Theory]
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 00c")]
-        [InlineData(1005, "10s 05c")]
-        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(100, "1s 0c")]
+        [InlineData(1005, "10s 5c")]
+        [InlineData(10000, "1g 0s 0c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(-1, "0c")]
         public void PillSubduingMargin(long copper, string expected)
@@ -154,9 +154,9 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(0, "0c")]
         [InlineData(1, "1c")]
         [InlineData(99, "99c")]
-        [InlineData(100, "1s 00c")]
-        [InlineData(1005, "10s 05c")]
-        [InlineData(10000, "1g 00s 00c")]
+        [InlineData(100, "1s 0c")]
+        [InlineData(1005, "10s 5c")]
+        [InlineData(10000, "1g 0s 0c")]
         [InlineData(1234567, "123g 45s 67c")]
         [InlineData(-1, "0c")]
         public void ItemStatVendorValue(long copper, string expected)
@@ -196,7 +196,7 @@ namespace GW2CraftingHelper.Tests.Services
             }
 
             var threeUnit = LayoutOf("0g 10s 5c");
-            var gameStyle = LayoutOf("10s 05c");
+            var gameStyle = LayoutOf("10s 5c");
             var absurd = LayoutOf("this is not a coin string at all, and it is very long indeed");
 
             Assert.Equal(threeUnit.Width, gameStyle.Width);

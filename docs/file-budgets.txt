@@ -45,7 +45,7 @@ Models/HomesteadEfficiencyTiers.cs                                              
 Models/ItemAttributeLine.cs                                                                20
 Models/ItemMetadata.cs                                                                     23
 Models/ItemPrice.cs                                                                        21
-Models/ItemStatBlock.cs                                                                    114
+Models/ItemStatBlock.cs                                                                    131
 Models/MaterialSourceAllocation.cs                                                         9
 Models/OwnMaterialsMode.cs                                                                 43
 Models/PersistedPlan.cs                                                                    124
@@ -87,7 +87,7 @@ Services/AchievementBitDedupPrePass.cs                                          
 Services/AcquisitionHintService.cs                                                         75
 Services/BoundedConcurrency.cs                                                             51
 Services/ClickSoundVolume.cs                                                               90
-Services/CoinSegmentMath.cs                                                                185
+Services/CoinSegmentMath.cs                                                                190
 Services/ColumnBoardLayout.cs                                                              130
 Services/CompetencyOpportunityCalculator.cs                                                83
 Services/CompositeRecipeApiClient.cs                                                       84
@@ -108,13 +108,13 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GridLayout.cs                                                                     93
 Services/Gw2AccountRecipeClient.cs                                                         30
 Services/Gw2AccountSnapshotService.cs                                                      461
-Services/Gw2ItemApiClient.cs                                                               199
+Services/Gw2ItemApiClient.cs                                                               201
 Services/Gw2PriceApiClient.cs                                                              66
 Services/Gw2RecipeApiClient.cs                                                             203
 Services/GzipJsonFile.cs                                                                   60
 Services/HeaderCellMath.cs                                                                 135
 Services/IAccountRecipeClient.cs                                                           13
-Services/IItemApiClient.cs                                                                 126
+Services/IItemApiClient.cs                                                                 137
 Services/IMysticForgeRecipeSource.cs                                                       9
 Services/IPriceApiClient.cs                                                                47
 Services/IRecipeApiClient.cs                                                               100
@@ -127,9 +127,9 @@ Services/ItemRowRequestBuilder.cs                                               
 Services/ItemRowSelection.cs                                                               199
 Services/ItemRowTooltipComposer.cs                                                         87
 Services/ItemSearchProviderFactory.cs                                                      61
-Services/ItemStatBlockFactory.cs                                                           163
+Services/ItemStatBlockFactory.cs                                                           177
 Services/ItemStatMath.cs                                                                   64
-Services/ItemStatTooltipComposer.cs                                                        541
+Services/ItemStatTooltipComposer.cs                                                        731
 Services/JsonSeedReader.cs                                                                 46
 Services/LogGutterLayout.cs                                                                147
 Services/LogLineFormat.cs                                                                  137
@@ -227,8 +227,8 @@ Services/StatusUpdateGuard.cs                                                   
 Services/SummarySectionLayoutMath.cs                                                       399
 Services/TableSortState.cs                                                                 105
 Services/TextWrapMath.cs                                                                   324
-Services/TooltipContent.cs                                                                 435
-Services/TooltipLayoutMath.cs                                                              401
+Services/TooltipContent.cs                                                                 495
+Services/TooltipLayoutMath.cs                                                              439
 Services/TooltipTextFormat.cs                                                              136
 Services/TopRegionLayoutMath.cs                                                            99
 Services/TradingPostMath.cs                                                                57
@@ -264,7 +264,7 @@ Views/ModalDialog.cs                                                            
 Views/PlanHistoryTabContent.cs                                                             1215
 Views/RankerTabContent.cs                                                                  2112
 Views/Rendering/ClickSound.cs                                                              197
-Views/Rendering/CoinCurrencyRenderer.cs                                                    564
+Views/Rendering/CoinCurrencyRenderer.cs                                                    574
 Views/Rendering/ColumnHeaderRowRenderer.cs                                                 184
 Views/Rendering/CraftStepsSectionRenderer.cs                                               260
 Views/Rendering/DisciplinesSectionRenderer.cs                                              275
@@ -282,9 +282,9 @@ Views/Rendering/NotesSectionRenderer.cs                                         
 Views/Rendering/PillColors.cs                                                              125
 Views/Rendering/PlanHeaderRenderer.cs                                                      176
 Views/Rendering/PressFeedback.cs                                                           118
-Views/Rendering/RarityColors.cs                                                            71
+Views/Rendering/RarityColors.cs                                                            75
 Views/Rendering/RecipesSectionRenderer.cs                                                  332
-Views/Rendering/RichTooltipSurface.cs                                                      557
+Views/Rendering/RichTooltipSurface.cs                                                      613
 Views/Rendering/RankerReadinessColors.cs                                                   75
 Views/Rendering/RowRelayoutHelpers.cs                                                      72
 Views/Rendering/ShoppingBadgeColors.cs                                                     72
@@ -339,7 +339,7 @@ tests/GW2CraftingHelper.Tests/Services/AmalgamatedRiftEssenceIngestionTests.cs  
 tests/GW2CraftingHelper.Tests/Services/BoundedConcurrencyTests.cs                          196
 tests/GW2CraftingHelper.Tests/Services/ClickSoundVolumeTests.cs                            131
 tests/GW2CraftingHelper.Tests/Services/CoinFormattingTests.cs                              211
-tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs                             315
+tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs                             316
 tests/GW2CraftingHelper.Tests/Services/ColumnBoardLayoutTests.cs                           193
 tests/GW2CraftingHelper.Tests/Services/CompetencyOpportunityCalculatorTests.cs             205
 tests/GW2CraftingHelper.Tests/Services/CompositeRecipeApiClientTests.cs                    221
@@ -384,9 +384,9 @@ tests/GW2CraftingHelper.Tests/Services/ItemRowRequestBuilderTests.cs            
 tests/GW2CraftingHelper.Tests/Services/ItemRowSelectionTests.cs                            222
 tests/GW2CraftingHelper.Tests/Services/ItemRowTooltipComposerTests.cs                      98
 tests/GW2CraftingHelper.Tests/Services/ItemSearchProviderFactoryTests.cs                   84
-tests/GW2CraftingHelper.Tests/Services/ItemStatBlockFactoryTests.cs                        169
+tests/GW2CraftingHelper.Tests/Services/ItemStatBlockFactoryTests.cs                        187
 tests/GW2CraftingHelper.Tests/Services/ItemStatMathTests.cs                                74
-tests/GW2CraftingHelper.Tests/Services/ItemStatTooltipComposerTests.cs                     565
+tests/GW2CraftingHelper.Tests/Services/ItemStatTooltipComposerTests.cs                     655
 tests/GW2CraftingHelper.Tests/Services/LayoutConstantCollisionTests.cs                     81
 tests/GW2CraftingHelper.Tests/Services/LogGutterLayoutTests.cs                             188
 tests/GW2CraftingHelper.Tests/Services/LogLineFormatTests.cs                               156
@@ -507,7 +507,7 @@ tests/GW2CraftingHelper.Tests/Services/TableSortStateTests.cs                   
 tests/GW2CraftingHelper.Tests/Services/TextWrapMathTests.cs                                297
 tests/GW2CraftingHelper.Tests/Services/TooltipComposerContentTests.cs                      215
 tests/GW2CraftingHelper.Tests/Services/TooltipContentTests.cs                              152
-tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                           464
+tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                           505
 tests/GW2CraftingHelper.Tests/Services/TooltipSpanRoleTests.cs                             108
 tests/GW2CraftingHelper.Tests/Services/TooltipTextFormatTests.cs                           138
 tests/GW2CraftingHelper.Tests/Services/TopRegionLayoutMathTests.cs                         144
@@ -517,7 +517,7 @@ tests/GW2CraftingHelper.Tests/Services/TreeChipStripLayoutTests.cs              
 tests/GW2CraftingHelper.Tests/Services/TreeCostColumnMathTests.cs                          469
 tests/GW2CraftingHelper.Tests/Services/TreeRowIdentityTests.cs                             246
 tests/GW2CraftingHelper.Tests/Services/TreeRowShapeGoldenTests.cs                          136
-tests/GW2CraftingHelper.Tests/Services/TreeRowTooltipComposerTests.cs                      500
+tests/GW2CraftingHelper.Tests/Services/TreeRowTooltipComposerTests.cs                      505
 tests/GW2CraftingHelper.Tests/Services/TypeRampMetricsTests.cs                             150
 tests/GW2CraftingHelper.Tests/Services/ValueDetailTooltipBuilderTests.cs                   191
 tests/GW2CraftingHelper.Tests/Services/VendorOfferStoreTests.cs                            576

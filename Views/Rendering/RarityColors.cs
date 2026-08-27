@@ -15,9 +15,13 @@ namespace GW2CraftingHelper.Views.Rendering
         //   Ascended   (255, 68, 136)  #F48  live2/q-crystal
         //   Legendary  (153, 51, 255)  #93F  live/eq-weapon-full
         //   Basic      (255, 255, 255) #FFF  live2/f-ore
+        //   Junk       (170, 170, 170) #AAA  live3/red-festival-lantern
+        //                                    (68638, API rarity Junk; 289
+        //                                    ink px, median exactly #AAA)
         // Every measured value is an exact multiple of 17 - GW2 defines the
-        // palette in #RGB hex shorthand. Junk has no live capture yet; its
-        // grey stays inferred rather than guessed to a shorthand.
+        // palette in #RGB hex shorthand. All eight rarities are now
+        // capture-measured; Junk's 2026-08-26 measurement landed on the
+        // value previously inferred.
 
         /// <summary>
         /// Rarity palette for icon borders - the measured live palette
