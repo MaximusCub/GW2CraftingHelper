@@ -226,16 +226,65 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RecipeRowHeight_ExactlyFitsIconFramePlusDivider()
+        public void RecipeRowHeight_ExactlyFitsIconFramePlusDividerPlusClearance()
         {
             // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow
-            // places a 34px rarity-framed icon at y=0
-            // and a bottom-anchored 2px row divider inside rowHeight - the
-            // constant must equal exactly icon + divider (34 + 2 = 36) with
-            // no overlap or slack, locking the fix that closed the
-            // pre-existing overflow KNOWN-ISSUES #23 mis-described as
-            // "several pixels of headroom" for this row.
-            Assert.Equal(36, PlanContentHeightMath.RecipeRowHeight);
+            // places a tier-2 rarity-framed icon at y=0 and a
+            // bottom-anchored 2px row divider inside rowHeight - the
+            // constant must equal exactly icon frame + divider + the one
+            // clearance pixel the scissor simulation demands at this
+            // height (42 + 2 + 1 = 45), with no overlap or slack. The
+            // pre-tier-2 shape (34 + 2 + 0 = 36) needed no clearance; 44
+            // is in the vulnerable class (KNOWN-ISSUES #23 / M36b), so
+            // the pixel is part of the height rather than an overlap of
+            // the icon - see RowDividerScissorSimulationTests.
+            Assert.Equal(
+                ItemIconTiers.BagSidebarIconSize + 2 * PlanContentHeightMath.RowIconBorder
+                    + PlanContentHeightMath.RowDividerHeight
+                    + PlanContentHeightMath.IconRowDividerClearance,
+                PlanContentHeightMath.RecipeRowHeight);
+            Assert.Equal(45, PlanContentHeightMath.RecipeRowHeight);
+        }
+
+        [Fact]
+        public void IconLedRowHeights_ShareTheTierTwoFlushFit()
+        {
+            // Used Materials, Shopping List and Required Recipes rows are
+            // the same flush shape: tier-2 icon frame at y=0, divider
+            // directly beneath, clearance pixel absorbed by the height.
+            Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.UsedMaterialRowHeight);
+            Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.ShoppingRowHeight);
+        }
+
+        [Fact]
+        public void CraftStepRowHeight_InsetsTheTierTwoIconSymmetrically()
+        {
+            // The craft-step icon sits CraftStepIconY below the row top
+            // with the same margin below the frame (5 + 42 + 5 = 52). The
+            // divider then lands at rowHeight - 2 - clearance = 49, 2px
+            // below the icon frame bottom (47) - the same icon-to-divider
+            // gap the pre-tier-2 44px shape had.
+            Assert.Equal(
+                2 * PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize,
+                PlanContentHeightMath.CraftStepRowHeight);
+            Assert.Equal(52, PlanContentHeightMath.CraftStepRowHeight);
+            int dividerTop = PlanContentHeightMath.CraftStepRowHeight
+                - PlanContentHeightMath.RowDividerHeight
+                - PlanContentHeightMath.IconRowDividerClearance;
+            int iconFrameBottom = PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize;
+            Assert.Equal(2, dividerTop - iconFrameBottom);
+        }
+
+        [Fact]
+        public void TreeRowHeight_PadsTheTierTwoIconLikeTheRankersTierOneRows()
+        {
+            // Tree rows draw indent guidelines instead of dividers, so
+            // their height is frame plus 3px each side - the same law
+            // RankerRowLayout.RowHeight states for the tier-1 rows.
+            Assert.Equal(
+                PlanContentHeightMath.RowIconFrameSize + 2 * PlanContentHeightMath.TreeRowIconPad,
+                PlanContentHeightMath.TreeRowHeight);
+            Assert.Equal(48, PlanContentHeightMath.TreeRowHeight);
         }
 
         [Fact]

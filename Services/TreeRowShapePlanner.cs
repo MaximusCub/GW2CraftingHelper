@@ -20,8 +20,12 @@ namespace GW2CraftingHelper.Services
         // PlanRelayoutMath; only the left side below shifts with indent.
         public const int IndentPerDepth = 24;
         public const int CaretColumnWidth = 18;
-        public const int IconSize = 32;
-        public const int IconBorder = 1;
+
+        // Tier 2 of the module's two-tier icon system (owner ruling): tree
+        // rows carry in-game bag-sidebar-sized item art, like every other
+        // row-level icon in the Crafting Plan tab.
+        public const int IconSize = ItemIconTiers.BagSidebarIconSize;
+        public const int IconBorder = PlanContentHeightMath.RowIconBorder;
         public const int IconFrameSize = IconSize + IconBorder * 2;
         public const int NameGap = 6;
 

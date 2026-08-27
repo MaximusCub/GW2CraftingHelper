@@ -1,721 +1,721 @@
 depth|dimmed|children|qty|decision|override|indent|ruleX|iconX|nameX|caret|expanded|qtyPrefix|childDimmed
-0|False|0|0|Craft|none|0|0|18|58|none|True|none|False
-0|False|0|0|Craft|True|0|0|18|58|none|True|none|False
-0|False|0|0|Craft|False|0|0|18|58|none|False|none|False
-0|False|0|0|BuyFromTp|none|0|0|18|58|none|True|none|True
-0|False|0|0|BuyFromTp|True|0|0|18|58|none|True|none|True
-0|False|0|0|BuyFromTp|False|0|0|18|58|none|False|none|True
-0|False|0|0|Have|none|0|0|18|58|none|True|none|True
-0|False|0|0|Have|True|0|0|18|58|none|True|none|True
-0|False|0|0|Have|False|0|0|18|58|none|False|none|True
-0|False|0|0|Currency|none|0|0|18|58|none|True|none|True
-0|False|0|0|Currency|True|0|0|18|58|none|True|none|True
-0|False|0|0|Currency|False|0|0|18|58|none|False|none|True
-0|False|0|1|Craft|none|0|0|18|58|none|True|1x |False
-0|False|0|1|Craft|True|0|0|18|58|none|True|1x |False
-0|False|0|1|Craft|False|0|0|18|58|none|False|1x |False
-0|False|0|1|BuyFromTp|none|0|0|18|58|none|True|1x |True
-0|False|0|1|BuyFromTp|True|0|0|18|58|none|True|1x |True
-0|False|0|1|BuyFromTp|False|0|0|18|58|none|False|1x |True
-0|False|0|1|Have|none|0|0|18|58|none|True|1x |True
-0|False|0|1|Have|True|0|0|18|58|none|True|1x |True
-0|False|0|1|Have|False|0|0|18|58|none|False|1x |True
-0|False|0|1|Currency|none|0|0|18|58|none|True|1x |True
-0|False|0|1|Currency|True|0|0|18|58|none|True|1x |True
-0|False|0|1|Currency|False|0|0|18|58|none|False|1x |True
-0|False|0|12|Craft|none|0|0|18|58|none|True|12x |False
-0|False|0|12|Craft|True|0|0|18|58|none|True|12x |False
-0|False|0|12|Craft|False|0|0|18|58|none|False|12x |False
-0|False|0|12|BuyFromTp|none|0|0|18|58|none|True|12x |True
-0|False|0|12|BuyFromTp|True|0|0|18|58|none|True|12x |True
-0|False|0|12|BuyFromTp|False|0|0|18|58|none|False|12x |True
-0|False|0|12|Have|none|0|0|18|58|none|True|12x |True
-0|False|0|12|Have|True|0|0|18|58|none|True|12x |True
-0|False|0|12|Have|False|0|0|18|58|none|False|12x |True
-0|False|0|12|Currency|none|0|0|18|58|none|True|12x |True
-0|False|0|12|Currency|True|0|0|18|58|none|True|12x |True
-0|False|0|12|Currency|False|0|0|18|58|none|False|12x |True
-0|False|2|0|Craft|none|0|0|18|58|v|True|none|False
-0|False|2|0|Craft|True|0|0|18|58|v|True|none|False
-0|False|2|0|Craft|False|0|0|18|58|>|False|none|False
-0|False|2|0|BuyFromTp|none|0|0|18|58|v|True|none|True
-0|False|2|0|BuyFromTp|True|0|0|18|58|v|True|none|True
-0|False|2|0|BuyFromTp|False|0|0|18|58|>|False|none|True
-0|False|2|0|Have|none|0|0|18|58|v|True|none|True
-0|False|2|0|Have|True|0|0|18|58|v|True|none|True
-0|False|2|0|Have|False|0|0|18|58|>|False|none|True
-0|False|2|0|Currency|none|0|0|18|58|v|True|none|True
-0|False|2|0|Currency|True|0|0|18|58|v|True|none|True
-0|False|2|0|Currency|False|0|0|18|58|>|False|none|True
-0|False|2|1|Craft|none|0|0|18|58|v|True|1x |False
-0|False|2|1|Craft|True|0|0|18|58|v|True|1x |False
-0|False|2|1|Craft|False|0|0|18|58|>|False|1x |False
-0|False|2|1|BuyFromTp|none|0|0|18|58|v|True|1x |True
-0|False|2|1|BuyFromTp|True|0|0|18|58|v|True|1x |True
-0|False|2|1|BuyFromTp|False|0|0|18|58|>|False|1x |True
-0|False|2|1|Have|none|0|0|18|58|v|True|1x |True
-0|False|2|1|Have|True|0|0|18|58|v|True|1x |True
-0|False|2|1|Have|False|0|0|18|58|>|False|1x |True
-0|False|2|1|Currency|none|0|0|18|58|v|True|1x |True
-0|False|2|1|Currency|True|0|0|18|58|v|True|1x |True
-0|False|2|1|Currency|False|0|0|18|58|>|False|1x |True
-0|False|2|12|Craft|none|0|0|18|58|v|True|12x |False
-0|False|2|12|Craft|True|0|0|18|58|v|True|12x |False
-0|False|2|12|Craft|False|0|0|18|58|>|False|12x |False
-0|False|2|12|BuyFromTp|none|0|0|18|58|v|True|12x |True
-0|False|2|12|BuyFromTp|True|0|0|18|58|v|True|12x |True
-0|False|2|12|BuyFromTp|False|0|0|18|58|>|False|12x |True
-0|False|2|12|Have|none|0|0|18|58|v|True|12x |True
-0|False|2|12|Have|True|0|0|18|58|v|True|12x |True
-0|False|2|12|Have|False|0|0|18|58|>|False|12x |True
-0|False|2|12|Currency|none|0|0|18|58|v|True|12x |True
-0|False|2|12|Currency|True|0|0|18|58|v|True|12x |True
-0|False|2|12|Currency|False|0|0|18|58|>|False|12x |True
-0|True|0|0|Craft|none|0|0|18|58|none|False|none|True
-0|True|0|0|Craft|True|0|0|18|58|none|True|none|True
-0|True|0|0|Craft|False|0|0|18|58|none|False|none|True
-0|True|0|0|BuyFromTp|none|0|0|18|58|none|False|none|True
-0|True|0|0|BuyFromTp|True|0|0|18|58|none|True|none|True
-0|True|0|0|BuyFromTp|False|0|0|18|58|none|False|none|True
-0|True|0|0|Have|none|0|0|18|58|none|False|none|True
-0|True|0|0|Have|True|0|0|18|58|none|True|none|True
-0|True|0|0|Have|False|0|0|18|58|none|False|none|True
-0|True|0|0|Currency|none|0|0|18|58|none|False|none|True
-0|True|0|0|Currency|True|0|0|18|58|none|True|none|True
-0|True|0|0|Currency|False|0|0|18|58|none|False|none|True
-0|True|0|1|Craft|none|0|0|18|58|none|False|1x |True
-0|True|0|1|Craft|True|0|0|18|58|none|True|1x |True
-0|True|0|1|Craft|False|0|0|18|58|none|False|1x |True
-0|True|0|1|BuyFromTp|none|0|0|18|58|none|False|1x |True
-0|True|0|1|BuyFromTp|True|0|0|18|58|none|True|1x |True
-0|True|0|1|BuyFromTp|False|0|0|18|58|none|False|1x |True
-0|True|0|1|Have|none|0|0|18|58|none|False|1x |True
-0|True|0|1|Have|True|0|0|18|58|none|True|1x |True
-0|True|0|1|Have|False|0|0|18|58|none|False|1x |True
-0|True|0|1|Currency|none|0|0|18|58|none|False|1x |True
-0|True|0|1|Currency|True|0|0|18|58|none|True|1x |True
-0|True|0|1|Currency|False|0|0|18|58|none|False|1x |True
-0|True|0|12|Craft|none|0|0|18|58|none|False|12x |True
-0|True|0|12|Craft|True|0|0|18|58|none|True|12x |True
-0|True|0|12|Craft|False|0|0|18|58|none|False|12x |True
-0|True|0|12|BuyFromTp|none|0|0|18|58|none|False|12x |True
-0|True|0|12|BuyFromTp|True|0|0|18|58|none|True|12x |True
-0|True|0|12|BuyFromTp|False|0|0|18|58|none|False|12x |True
-0|True|0|12|Have|none|0|0|18|58|none|False|12x |True
-0|True|0|12|Have|True|0|0|18|58|none|True|12x |True
-0|True|0|12|Have|False|0|0|18|58|none|False|12x |True
-0|True|0|12|Currency|none|0|0|18|58|none|False|12x |True
-0|True|0|12|Currency|True|0|0|18|58|none|True|12x |True
-0|True|0|12|Currency|False|0|0|18|58|none|False|12x |True
-0|True|2|0|Craft|none|0|0|18|58|>|False|none|True
-0|True|2|0|Craft|True|0|0|18|58|v|True|none|True
-0|True|2|0|Craft|False|0|0|18|58|>|False|none|True
-0|True|2|0|BuyFromTp|none|0|0|18|58|>|False|none|True
-0|True|2|0|BuyFromTp|True|0|0|18|58|v|True|none|True
-0|True|2|0|BuyFromTp|False|0|0|18|58|>|False|none|True
-0|True|2|0|Have|none|0|0|18|58|>|False|none|True
-0|True|2|0|Have|True|0|0|18|58|v|True|none|True
-0|True|2|0|Have|False|0|0|18|58|>|False|none|True
-0|True|2|0|Currency|none|0|0|18|58|>|False|none|True
-0|True|2|0|Currency|True|0|0|18|58|v|True|none|True
-0|True|2|0|Currency|False|0|0|18|58|>|False|none|True
-0|True|2|1|Craft|none|0|0|18|58|>|False|1x |True
-0|True|2|1|Craft|True|0|0|18|58|v|True|1x |True
-0|True|2|1|Craft|False|0|0|18|58|>|False|1x |True
-0|True|2|1|BuyFromTp|none|0|0|18|58|>|False|1x |True
-0|True|2|1|BuyFromTp|True|0|0|18|58|v|True|1x |True
-0|True|2|1|BuyFromTp|False|0|0|18|58|>|False|1x |True
-0|True|2|1|Have|none|0|0|18|58|>|False|1x |True
-0|True|2|1|Have|True|0|0|18|58|v|True|1x |True
-0|True|2|1|Have|False|0|0|18|58|>|False|1x |True
-0|True|2|1|Currency|none|0|0|18|58|>|False|1x |True
-0|True|2|1|Currency|True|0|0|18|58|v|True|1x |True
-0|True|2|1|Currency|False|0|0|18|58|>|False|1x |True
-0|True|2|12|Craft|none|0|0|18|58|>|False|12x |True
-0|True|2|12|Craft|True|0|0|18|58|v|True|12x |True
-0|True|2|12|Craft|False|0|0|18|58|>|False|12x |True
-0|True|2|12|BuyFromTp|none|0|0|18|58|>|False|12x |True
-0|True|2|12|BuyFromTp|True|0|0|18|58|v|True|12x |True
-0|True|2|12|BuyFromTp|False|0|0|18|58|>|False|12x |True
-0|True|2|12|Have|none|0|0|18|58|>|False|12x |True
-0|True|2|12|Have|True|0|0|18|58|v|True|12x |True
-0|True|2|12|Have|False|0|0|18|58|>|False|12x |True
-0|True|2|12|Currency|none|0|0|18|58|>|False|12x |True
-0|True|2|12|Currency|True|0|0|18|58|v|True|12x |True
-0|True|2|12|Currency|False|0|0|18|58|>|False|12x |True
-1|False|0|0|Craft|none|24|16|42|82|none|True|none|False
-1|False|0|0|Craft|True|24|16|42|82|none|True|none|False
-1|False|0|0|Craft|False|24|16|42|82|none|False|none|False
-1|False|0|0|BuyFromTp|none|24|16|42|82|none|True|none|True
-1|False|0|0|BuyFromTp|True|24|16|42|82|none|True|none|True
-1|False|0|0|BuyFromTp|False|24|16|42|82|none|False|none|True
-1|False|0|0|Have|none|24|16|42|82|none|True|none|True
-1|False|0|0|Have|True|24|16|42|82|none|True|none|True
-1|False|0|0|Have|False|24|16|42|82|none|False|none|True
-1|False|0|0|Currency|none|24|16|42|82|none|True|none|True
-1|False|0|0|Currency|True|24|16|42|82|none|True|none|True
-1|False|0|0|Currency|False|24|16|42|82|none|False|none|True
-1|False|0|1|Craft|none|24|16|42|82|none|True|1x |False
-1|False|0|1|Craft|True|24|16|42|82|none|True|1x |False
-1|False|0|1|Craft|False|24|16|42|82|none|False|1x |False
-1|False|0|1|BuyFromTp|none|24|16|42|82|none|True|1x |True
-1|False|0|1|BuyFromTp|True|24|16|42|82|none|True|1x |True
-1|False|0|1|BuyFromTp|False|24|16|42|82|none|False|1x |True
-1|False|0|1|Have|none|24|16|42|82|none|True|1x |True
-1|False|0|1|Have|True|24|16|42|82|none|True|1x |True
-1|False|0|1|Have|False|24|16|42|82|none|False|1x |True
-1|False|0|1|Currency|none|24|16|42|82|none|True|1x |True
-1|False|0|1|Currency|True|24|16|42|82|none|True|1x |True
-1|False|0|1|Currency|False|24|16|42|82|none|False|1x |True
-1|False|0|12|Craft|none|24|16|42|82|none|True|12x |False
-1|False|0|12|Craft|True|24|16|42|82|none|True|12x |False
-1|False|0|12|Craft|False|24|16|42|82|none|False|12x |False
-1|False|0|12|BuyFromTp|none|24|16|42|82|none|True|12x |True
-1|False|0|12|BuyFromTp|True|24|16|42|82|none|True|12x |True
-1|False|0|12|BuyFromTp|False|24|16|42|82|none|False|12x |True
-1|False|0|12|Have|none|24|16|42|82|none|True|12x |True
-1|False|0|12|Have|True|24|16|42|82|none|True|12x |True
-1|False|0|12|Have|False|24|16|42|82|none|False|12x |True
-1|False|0|12|Currency|none|24|16|42|82|none|True|12x |True
-1|False|0|12|Currency|True|24|16|42|82|none|True|12x |True
-1|False|0|12|Currency|False|24|16|42|82|none|False|12x |True
-1|False|2|0|Craft|none|24|16|42|82|v|True|none|False
-1|False|2|0|Craft|True|24|16|42|82|v|True|none|False
-1|False|2|0|Craft|False|24|16|42|82|>|False|none|False
-1|False|2|0|BuyFromTp|none|24|16|42|82|v|True|none|True
-1|False|2|0|BuyFromTp|True|24|16|42|82|v|True|none|True
-1|False|2|0|BuyFromTp|False|24|16|42|82|>|False|none|True
-1|False|2|0|Have|none|24|16|42|82|v|True|none|True
-1|False|2|0|Have|True|24|16|42|82|v|True|none|True
-1|False|2|0|Have|False|24|16|42|82|>|False|none|True
-1|False|2|0|Currency|none|24|16|42|82|v|True|none|True
-1|False|2|0|Currency|True|24|16|42|82|v|True|none|True
-1|False|2|0|Currency|False|24|16|42|82|>|False|none|True
-1|False|2|1|Craft|none|24|16|42|82|v|True|1x |False
-1|False|2|1|Craft|True|24|16|42|82|v|True|1x |False
-1|False|2|1|Craft|False|24|16|42|82|>|False|1x |False
-1|False|2|1|BuyFromTp|none|24|16|42|82|v|True|1x |True
-1|False|2|1|BuyFromTp|True|24|16|42|82|v|True|1x |True
-1|False|2|1|BuyFromTp|False|24|16|42|82|>|False|1x |True
-1|False|2|1|Have|none|24|16|42|82|v|True|1x |True
-1|False|2|1|Have|True|24|16|42|82|v|True|1x |True
-1|False|2|1|Have|False|24|16|42|82|>|False|1x |True
-1|False|2|1|Currency|none|24|16|42|82|v|True|1x |True
-1|False|2|1|Currency|True|24|16|42|82|v|True|1x |True
-1|False|2|1|Currency|False|24|16|42|82|>|False|1x |True
-1|False|2|12|Craft|none|24|16|42|82|v|True|12x |False
-1|False|2|12|Craft|True|24|16|42|82|v|True|12x |False
-1|False|2|12|Craft|False|24|16|42|82|>|False|12x |False
-1|False|2|12|BuyFromTp|none|24|16|42|82|v|True|12x |True
-1|False|2|12|BuyFromTp|True|24|16|42|82|v|True|12x |True
-1|False|2|12|BuyFromTp|False|24|16|42|82|>|False|12x |True
-1|False|2|12|Have|none|24|16|42|82|v|True|12x |True
-1|False|2|12|Have|True|24|16|42|82|v|True|12x |True
-1|False|2|12|Have|False|24|16|42|82|>|False|12x |True
-1|False|2|12|Currency|none|24|16|42|82|v|True|12x |True
-1|False|2|12|Currency|True|24|16|42|82|v|True|12x |True
-1|False|2|12|Currency|False|24|16|42|82|>|False|12x |True
-1|True|0|0|Craft|none|24|16|42|82|none|False|none|True
-1|True|0|0|Craft|True|24|16|42|82|none|True|none|True
-1|True|0|0|Craft|False|24|16|42|82|none|False|none|True
-1|True|0|0|BuyFromTp|none|24|16|42|82|none|False|none|True
-1|True|0|0|BuyFromTp|True|24|16|42|82|none|True|none|True
-1|True|0|0|BuyFromTp|False|24|16|42|82|none|False|none|True
-1|True|0|0|Have|none|24|16|42|82|none|False|none|True
-1|True|0|0|Have|True|24|16|42|82|none|True|none|True
-1|True|0|0|Have|False|24|16|42|82|none|False|none|True
-1|True|0|0|Currency|none|24|16|42|82|none|False|none|True
-1|True|0|0|Currency|True|24|16|42|82|none|True|none|True
-1|True|0|0|Currency|False|24|16|42|82|none|False|none|True
-1|True|0|1|Craft|none|24|16|42|82|none|False|1x |True
-1|True|0|1|Craft|True|24|16|42|82|none|True|1x |True
-1|True|0|1|Craft|False|24|16|42|82|none|False|1x |True
-1|True|0|1|BuyFromTp|none|24|16|42|82|none|False|1x |True
-1|True|0|1|BuyFromTp|True|24|16|42|82|none|True|1x |True
-1|True|0|1|BuyFromTp|False|24|16|42|82|none|False|1x |True
-1|True|0|1|Have|none|24|16|42|82|none|False|1x |True
-1|True|0|1|Have|True|24|16|42|82|none|True|1x |True
-1|True|0|1|Have|False|24|16|42|82|none|False|1x |True
-1|True|0|1|Currency|none|24|16|42|82|none|False|1x |True
-1|True|0|1|Currency|True|24|16|42|82|none|True|1x |True
-1|True|0|1|Currency|False|24|16|42|82|none|False|1x |True
-1|True|0|12|Craft|none|24|16|42|82|none|False|12x |True
-1|True|0|12|Craft|True|24|16|42|82|none|True|12x |True
-1|True|0|12|Craft|False|24|16|42|82|none|False|12x |True
-1|True|0|12|BuyFromTp|none|24|16|42|82|none|False|12x |True
-1|True|0|12|BuyFromTp|True|24|16|42|82|none|True|12x |True
-1|True|0|12|BuyFromTp|False|24|16|42|82|none|False|12x |True
-1|True|0|12|Have|none|24|16|42|82|none|False|12x |True
-1|True|0|12|Have|True|24|16|42|82|none|True|12x |True
-1|True|0|12|Have|False|24|16|42|82|none|False|12x |True
-1|True|0|12|Currency|none|24|16|42|82|none|False|12x |True
-1|True|0|12|Currency|True|24|16|42|82|none|True|12x |True
-1|True|0|12|Currency|False|24|16|42|82|none|False|12x |True
-1|True|2|0|Craft|none|24|16|42|82|>|False|none|True
-1|True|2|0|Craft|True|24|16|42|82|v|True|none|True
-1|True|2|0|Craft|False|24|16|42|82|>|False|none|True
-1|True|2|0|BuyFromTp|none|24|16|42|82|>|False|none|True
-1|True|2|0|BuyFromTp|True|24|16|42|82|v|True|none|True
-1|True|2|0|BuyFromTp|False|24|16|42|82|>|False|none|True
-1|True|2|0|Have|none|24|16|42|82|>|False|none|True
-1|True|2|0|Have|True|24|16|42|82|v|True|none|True
-1|True|2|0|Have|False|24|16|42|82|>|False|none|True
-1|True|2|0|Currency|none|24|16|42|82|>|False|none|True
-1|True|2|0|Currency|True|24|16|42|82|v|True|none|True
-1|True|2|0|Currency|False|24|16|42|82|>|False|none|True
-1|True|2|1|Craft|none|24|16|42|82|>|False|1x |True
-1|True|2|1|Craft|True|24|16|42|82|v|True|1x |True
-1|True|2|1|Craft|False|24|16|42|82|>|False|1x |True
-1|True|2|1|BuyFromTp|none|24|16|42|82|>|False|1x |True
-1|True|2|1|BuyFromTp|True|24|16|42|82|v|True|1x |True
-1|True|2|1|BuyFromTp|False|24|16|42|82|>|False|1x |True
-1|True|2|1|Have|none|24|16|42|82|>|False|1x |True
-1|True|2|1|Have|True|24|16|42|82|v|True|1x |True
-1|True|2|1|Have|False|24|16|42|82|>|False|1x |True
-1|True|2|1|Currency|none|24|16|42|82|>|False|1x |True
-1|True|2|1|Currency|True|24|16|42|82|v|True|1x |True
-1|True|2|1|Currency|False|24|16|42|82|>|False|1x |True
-1|True|2|12|Craft|none|24|16|42|82|>|False|12x |True
-1|True|2|12|Craft|True|24|16|42|82|v|True|12x |True
-1|True|2|12|Craft|False|24|16|42|82|>|False|12x |True
-1|True|2|12|BuyFromTp|none|24|16|42|82|>|False|12x |True
-1|True|2|12|BuyFromTp|True|24|16|42|82|v|True|12x |True
-1|True|2|12|BuyFromTp|False|24|16|42|82|>|False|12x |True
-1|True|2|12|Have|none|24|16|42|82|>|False|12x |True
-1|True|2|12|Have|True|24|16|42|82|v|True|12x |True
-1|True|2|12|Have|False|24|16|42|82|>|False|12x |True
-1|True|2|12|Currency|none|24|16|42|82|>|False|12x |True
-1|True|2|12|Currency|True|24|16|42|82|v|True|12x |True
-1|True|2|12|Currency|False|24|16|42|82|>|False|12x |True
-2|False|0|0|Craft|none|48|40|66|106|none|False|none|False
-2|False|0|0|Craft|True|48|40|66|106|none|True|none|False
-2|False|0|0|Craft|False|48|40|66|106|none|False|none|False
-2|False|0|0|BuyFromTp|none|48|40|66|106|none|False|none|True
-2|False|0|0|BuyFromTp|True|48|40|66|106|none|True|none|True
-2|False|0|0|BuyFromTp|False|48|40|66|106|none|False|none|True
-2|False|0|0|Have|none|48|40|66|106|none|False|none|True
-2|False|0|0|Have|True|48|40|66|106|none|True|none|True
-2|False|0|0|Have|False|48|40|66|106|none|False|none|True
-2|False|0|0|Currency|none|48|40|66|106|none|False|none|True
-2|False|0|0|Currency|True|48|40|66|106|none|True|none|True
-2|False|0|0|Currency|False|48|40|66|106|none|False|none|True
-2|False|0|1|Craft|none|48|40|66|106|none|False|1x |False
-2|False|0|1|Craft|True|48|40|66|106|none|True|1x |False
-2|False|0|1|Craft|False|48|40|66|106|none|False|1x |False
-2|False|0|1|BuyFromTp|none|48|40|66|106|none|False|1x |True
-2|False|0|1|BuyFromTp|True|48|40|66|106|none|True|1x |True
-2|False|0|1|BuyFromTp|False|48|40|66|106|none|False|1x |True
-2|False|0|1|Have|none|48|40|66|106|none|False|1x |True
-2|False|0|1|Have|True|48|40|66|106|none|True|1x |True
-2|False|0|1|Have|False|48|40|66|106|none|False|1x |True
-2|False|0|1|Currency|none|48|40|66|106|none|False|1x |True
-2|False|0|1|Currency|True|48|40|66|106|none|True|1x |True
-2|False|0|1|Currency|False|48|40|66|106|none|False|1x |True
-2|False|0|12|Craft|none|48|40|66|106|none|False|12x |False
-2|False|0|12|Craft|True|48|40|66|106|none|True|12x |False
-2|False|0|12|Craft|False|48|40|66|106|none|False|12x |False
-2|False|0|12|BuyFromTp|none|48|40|66|106|none|False|12x |True
-2|False|0|12|BuyFromTp|True|48|40|66|106|none|True|12x |True
-2|False|0|12|BuyFromTp|False|48|40|66|106|none|False|12x |True
-2|False|0|12|Have|none|48|40|66|106|none|False|12x |True
-2|False|0|12|Have|True|48|40|66|106|none|True|12x |True
-2|False|0|12|Have|False|48|40|66|106|none|False|12x |True
-2|False|0|12|Currency|none|48|40|66|106|none|False|12x |True
-2|False|0|12|Currency|True|48|40|66|106|none|True|12x |True
-2|False|0|12|Currency|False|48|40|66|106|none|False|12x |True
-2|False|2|0|Craft|none|48|40|66|106|>|False|none|False
-2|False|2|0|Craft|True|48|40|66|106|v|True|none|False
-2|False|2|0|Craft|False|48|40|66|106|>|False|none|False
-2|False|2|0|BuyFromTp|none|48|40|66|106|>|False|none|True
-2|False|2|0|BuyFromTp|True|48|40|66|106|v|True|none|True
-2|False|2|0|BuyFromTp|False|48|40|66|106|>|False|none|True
-2|False|2|0|Have|none|48|40|66|106|>|False|none|True
-2|False|2|0|Have|True|48|40|66|106|v|True|none|True
-2|False|2|0|Have|False|48|40|66|106|>|False|none|True
-2|False|2|0|Currency|none|48|40|66|106|>|False|none|True
-2|False|2|0|Currency|True|48|40|66|106|v|True|none|True
-2|False|2|0|Currency|False|48|40|66|106|>|False|none|True
-2|False|2|1|Craft|none|48|40|66|106|>|False|1x |False
-2|False|2|1|Craft|True|48|40|66|106|v|True|1x |False
-2|False|2|1|Craft|False|48|40|66|106|>|False|1x |False
-2|False|2|1|BuyFromTp|none|48|40|66|106|>|False|1x |True
-2|False|2|1|BuyFromTp|True|48|40|66|106|v|True|1x |True
-2|False|2|1|BuyFromTp|False|48|40|66|106|>|False|1x |True
-2|False|2|1|Have|none|48|40|66|106|>|False|1x |True
-2|False|2|1|Have|True|48|40|66|106|v|True|1x |True
-2|False|2|1|Have|False|48|40|66|106|>|False|1x |True
-2|False|2|1|Currency|none|48|40|66|106|>|False|1x |True
-2|False|2|1|Currency|True|48|40|66|106|v|True|1x |True
-2|False|2|1|Currency|False|48|40|66|106|>|False|1x |True
-2|False|2|12|Craft|none|48|40|66|106|>|False|12x |False
-2|False|2|12|Craft|True|48|40|66|106|v|True|12x |False
-2|False|2|12|Craft|False|48|40|66|106|>|False|12x |False
-2|False|2|12|BuyFromTp|none|48|40|66|106|>|False|12x |True
-2|False|2|12|BuyFromTp|True|48|40|66|106|v|True|12x |True
-2|False|2|12|BuyFromTp|False|48|40|66|106|>|False|12x |True
-2|False|2|12|Have|none|48|40|66|106|>|False|12x |True
-2|False|2|12|Have|True|48|40|66|106|v|True|12x |True
-2|False|2|12|Have|False|48|40|66|106|>|False|12x |True
-2|False|2|12|Currency|none|48|40|66|106|>|False|12x |True
-2|False|2|12|Currency|True|48|40|66|106|v|True|12x |True
-2|False|2|12|Currency|False|48|40|66|106|>|False|12x |True
-2|True|0|0|Craft|none|48|40|66|106|none|False|none|True
-2|True|0|0|Craft|True|48|40|66|106|none|True|none|True
-2|True|0|0|Craft|False|48|40|66|106|none|False|none|True
-2|True|0|0|BuyFromTp|none|48|40|66|106|none|False|none|True
-2|True|0|0|BuyFromTp|True|48|40|66|106|none|True|none|True
-2|True|0|0|BuyFromTp|False|48|40|66|106|none|False|none|True
-2|True|0|0|Have|none|48|40|66|106|none|False|none|True
-2|True|0|0|Have|True|48|40|66|106|none|True|none|True
-2|True|0|0|Have|False|48|40|66|106|none|False|none|True
-2|True|0|0|Currency|none|48|40|66|106|none|False|none|True
-2|True|0|0|Currency|True|48|40|66|106|none|True|none|True
-2|True|0|0|Currency|False|48|40|66|106|none|False|none|True
-2|True|0|1|Craft|none|48|40|66|106|none|False|1x |True
-2|True|0|1|Craft|True|48|40|66|106|none|True|1x |True
-2|True|0|1|Craft|False|48|40|66|106|none|False|1x |True
-2|True|0|1|BuyFromTp|none|48|40|66|106|none|False|1x |True
-2|True|0|1|BuyFromTp|True|48|40|66|106|none|True|1x |True
-2|True|0|1|BuyFromTp|False|48|40|66|106|none|False|1x |True
-2|True|0|1|Have|none|48|40|66|106|none|False|1x |True
-2|True|0|1|Have|True|48|40|66|106|none|True|1x |True
-2|True|0|1|Have|False|48|40|66|106|none|False|1x |True
-2|True|0|1|Currency|none|48|40|66|106|none|False|1x |True
-2|True|0|1|Currency|True|48|40|66|106|none|True|1x |True
-2|True|0|1|Currency|False|48|40|66|106|none|False|1x |True
-2|True|0|12|Craft|none|48|40|66|106|none|False|12x |True
-2|True|0|12|Craft|True|48|40|66|106|none|True|12x |True
-2|True|0|12|Craft|False|48|40|66|106|none|False|12x |True
-2|True|0|12|BuyFromTp|none|48|40|66|106|none|False|12x |True
-2|True|0|12|BuyFromTp|True|48|40|66|106|none|True|12x |True
-2|True|0|12|BuyFromTp|False|48|40|66|106|none|False|12x |True
-2|True|0|12|Have|none|48|40|66|106|none|False|12x |True
-2|True|0|12|Have|True|48|40|66|106|none|True|12x |True
-2|True|0|12|Have|False|48|40|66|106|none|False|12x |True
-2|True|0|12|Currency|none|48|40|66|106|none|False|12x |True
-2|True|0|12|Currency|True|48|40|66|106|none|True|12x |True
-2|True|0|12|Currency|False|48|40|66|106|none|False|12x |True
-2|True|2|0|Craft|none|48|40|66|106|>|False|none|True
-2|True|2|0|Craft|True|48|40|66|106|v|True|none|True
-2|True|2|0|Craft|False|48|40|66|106|>|False|none|True
-2|True|2|0|BuyFromTp|none|48|40|66|106|>|False|none|True
-2|True|2|0|BuyFromTp|True|48|40|66|106|v|True|none|True
-2|True|2|0|BuyFromTp|False|48|40|66|106|>|False|none|True
-2|True|2|0|Have|none|48|40|66|106|>|False|none|True
-2|True|2|0|Have|True|48|40|66|106|v|True|none|True
-2|True|2|0|Have|False|48|40|66|106|>|False|none|True
-2|True|2|0|Currency|none|48|40|66|106|>|False|none|True
-2|True|2|0|Currency|True|48|40|66|106|v|True|none|True
-2|True|2|0|Currency|False|48|40|66|106|>|False|none|True
-2|True|2|1|Craft|none|48|40|66|106|>|False|1x |True
-2|True|2|1|Craft|True|48|40|66|106|v|True|1x |True
-2|True|2|1|Craft|False|48|40|66|106|>|False|1x |True
-2|True|2|1|BuyFromTp|none|48|40|66|106|>|False|1x |True
-2|True|2|1|BuyFromTp|True|48|40|66|106|v|True|1x |True
-2|True|2|1|BuyFromTp|False|48|40|66|106|>|False|1x |True
-2|True|2|1|Have|none|48|40|66|106|>|False|1x |True
-2|True|2|1|Have|True|48|40|66|106|v|True|1x |True
-2|True|2|1|Have|False|48|40|66|106|>|False|1x |True
-2|True|2|1|Currency|none|48|40|66|106|>|False|1x |True
-2|True|2|1|Currency|True|48|40|66|106|v|True|1x |True
-2|True|2|1|Currency|False|48|40|66|106|>|False|1x |True
-2|True|2|12|Craft|none|48|40|66|106|>|False|12x |True
-2|True|2|12|Craft|True|48|40|66|106|v|True|12x |True
-2|True|2|12|Craft|False|48|40|66|106|>|False|12x |True
-2|True|2|12|BuyFromTp|none|48|40|66|106|>|False|12x |True
-2|True|2|12|BuyFromTp|True|48|40|66|106|v|True|12x |True
-2|True|2|12|BuyFromTp|False|48|40|66|106|>|False|12x |True
-2|True|2|12|Have|none|48|40|66|106|>|False|12x |True
-2|True|2|12|Have|True|48|40|66|106|v|True|12x |True
-2|True|2|12|Have|False|48|40|66|106|>|False|12x |True
-2|True|2|12|Currency|none|48|40|66|106|>|False|12x |True
-2|True|2|12|Currency|True|48|40|66|106|v|True|12x |True
-2|True|2|12|Currency|False|48|40|66|106|>|False|12x |True
-3|False|0|0|Craft|none|72|64|90|130|none|False|none|False
-3|False|0|0|Craft|True|72|64|90|130|none|True|none|False
-3|False|0|0|Craft|False|72|64|90|130|none|False|none|False
-3|False|0|0|BuyFromTp|none|72|64|90|130|none|False|none|True
-3|False|0|0|BuyFromTp|True|72|64|90|130|none|True|none|True
-3|False|0|0|BuyFromTp|False|72|64|90|130|none|False|none|True
-3|False|0|0|Have|none|72|64|90|130|none|False|none|True
-3|False|0|0|Have|True|72|64|90|130|none|True|none|True
-3|False|0|0|Have|False|72|64|90|130|none|False|none|True
-3|False|0|0|Currency|none|72|64|90|130|none|False|none|True
-3|False|0|0|Currency|True|72|64|90|130|none|True|none|True
-3|False|0|0|Currency|False|72|64|90|130|none|False|none|True
-3|False|0|1|Craft|none|72|64|90|130|none|False|1x |False
-3|False|0|1|Craft|True|72|64|90|130|none|True|1x |False
-3|False|0|1|Craft|False|72|64|90|130|none|False|1x |False
-3|False|0|1|BuyFromTp|none|72|64|90|130|none|False|1x |True
-3|False|0|1|BuyFromTp|True|72|64|90|130|none|True|1x |True
-3|False|0|1|BuyFromTp|False|72|64|90|130|none|False|1x |True
-3|False|0|1|Have|none|72|64|90|130|none|False|1x |True
-3|False|0|1|Have|True|72|64|90|130|none|True|1x |True
-3|False|0|1|Have|False|72|64|90|130|none|False|1x |True
-3|False|0|1|Currency|none|72|64|90|130|none|False|1x |True
-3|False|0|1|Currency|True|72|64|90|130|none|True|1x |True
-3|False|0|1|Currency|False|72|64|90|130|none|False|1x |True
-3|False|0|12|Craft|none|72|64|90|130|none|False|12x |False
-3|False|0|12|Craft|True|72|64|90|130|none|True|12x |False
-3|False|0|12|Craft|False|72|64|90|130|none|False|12x |False
-3|False|0|12|BuyFromTp|none|72|64|90|130|none|False|12x |True
-3|False|0|12|BuyFromTp|True|72|64|90|130|none|True|12x |True
-3|False|0|12|BuyFromTp|False|72|64|90|130|none|False|12x |True
-3|False|0|12|Have|none|72|64|90|130|none|False|12x |True
-3|False|0|12|Have|True|72|64|90|130|none|True|12x |True
-3|False|0|12|Have|False|72|64|90|130|none|False|12x |True
-3|False|0|12|Currency|none|72|64|90|130|none|False|12x |True
-3|False|0|12|Currency|True|72|64|90|130|none|True|12x |True
-3|False|0|12|Currency|False|72|64|90|130|none|False|12x |True
-3|False|2|0|Craft|none|72|64|90|130|>|False|none|False
-3|False|2|0|Craft|True|72|64|90|130|v|True|none|False
-3|False|2|0|Craft|False|72|64|90|130|>|False|none|False
-3|False|2|0|BuyFromTp|none|72|64|90|130|>|False|none|True
-3|False|2|0|BuyFromTp|True|72|64|90|130|v|True|none|True
-3|False|2|0|BuyFromTp|False|72|64|90|130|>|False|none|True
-3|False|2|0|Have|none|72|64|90|130|>|False|none|True
-3|False|2|0|Have|True|72|64|90|130|v|True|none|True
-3|False|2|0|Have|False|72|64|90|130|>|False|none|True
-3|False|2|0|Currency|none|72|64|90|130|>|False|none|True
-3|False|2|0|Currency|True|72|64|90|130|v|True|none|True
-3|False|2|0|Currency|False|72|64|90|130|>|False|none|True
-3|False|2|1|Craft|none|72|64|90|130|>|False|1x |False
-3|False|2|1|Craft|True|72|64|90|130|v|True|1x |False
-3|False|2|1|Craft|False|72|64|90|130|>|False|1x |False
-3|False|2|1|BuyFromTp|none|72|64|90|130|>|False|1x |True
-3|False|2|1|BuyFromTp|True|72|64|90|130|v|True|1x |True
-3|False|2|1|BuyFromTp|False|72|64|90|130|>|False|1x |True
-3|False|2|1|Have|none|72|64|90|130|>|False|1x |True
-3|False|2|1|Have|True|72|64|90|130|v|True|1x |True
-3|False|2|1|Have|False|72|64|90|130|>|False|1x |True
-3|False|2|1|Currency|none|72|64|90|130|>|False|1x |True
-3|False|2|1|Currency|True|72|64|90|130|v|True|1x |True
-3|False|2|1|Currency|False|72|64|90|130|>|False|1x |True
-3|False|2|12|Craft|none|72|64|90|130|>|False|12x |False
-3|False|2|12|Craft|True|72|64|90|130|v|True|12x |False
-3|False|2|12|Craft|False|72|64|90|130|>|False|12x |False
-3|False|2|12|BuyFromTp|none|72|64|90|130|>|False|12x |True
-3|False|2|12|BuyFromTp|True|72|64|90|130|v|True|12x |True
-3|False|2|12|BuyFromTp|False|72|64|90|130|>|False|12x |True
-3|False|2|12|Have|none|72|64|90|130|>|False|12x |True
-3|False|2|12|Have|True|72|64|90|130|v|True|12x |True
-3|False|2|12|Have|False|72|64|90|130|>|False|12x |True
-3|False|2|12|Currency|none|72|64|90|130|>|False|12x |True
-3|False|2|12|Currency|True|72|64|90|130|v|True|12x |True
-3|False|2|12|Currency|False|72|64|90|130|>|False|12x |True
-3|True|0|0|Craft|none|72|64|90|130|none|False|none|True
-3|True|0|0|Craft|True|72|64|90|130|none|True|none|True
-3|True|0|0|Craft|False|72|64|90|130|none|False|none|True
-3|True|0|0|BuyFromTp|none|72|64|90|130|none|False|none|True
-3|True|0|0|BuyFromTp|True|72|64|90|130|none|True|none|True
-3|True|0|0|BuyFromTp|False|72|64|90|130|none|False|none|True
-3|True|0|0|Have|none|72|64|90|130|none|False|none|True
-3|True|0|0|Have|True|72|64|90|130|none|True|none|True
-3|True|0|0|Have|False|72|64|90|130|none|False|none|True
-3|True|0|0|Currency|none|72|64|90|130|none|False|none|True
-3|True|0|0|Currency|True|72|64|90|130|none|True|none|True
-3|True|0|0|Currency|False|72|64|90|130|none|False|none|True
-3|True|0|1|Craft|none|72|64|90|130|none|False|1x |True
-3|True|0|1|Craft|True|72|64|90|130|none|True|1x |True
-3|True|0|1|Craft|False|72|64|90|130|none|False|1x |True
-3|True|0|1|BuyFromTp|none|72|64|90|130|none|False|1x |True
-3|True|0|1|BuyFromTp|True|72|64|90|130|none|True|1x |True
-3|True|0|1|BuyFromTp|False|72|64|90|130|none|False|1x |True
-3|True|0|1|Have|none|72|64|90|130|none|False|1x |True
-3|True|0|1|Have|True|72|64|90|130|none|True|1x |True
-3|True|0|1|Have|False|72|64|90|130|none|False|1x |True
-3|True|0|1|Currency|none|72|64|90|130|none|False|1x |True
-3|True|0|1|Currency|True|72|64|90|130|none|True|1x |True
-3|True|0|1|Currency|False|72|64|90|130|none|False|1x |True
-3|True|0|12|Craft|none|72|64|90|130|none|False|12x |True
-3|True|0|12|Craft|True|72|64|90|130|none|True|12x |True
-3|True|0|12|Craft|False|72|64|90|130|none|False|12x |True
-3|True|0|12|BuyFromTp|none|72|64|90|130|none|False|12x |True
-3|True|0|12|BuyFromTp|True|72|64|90|130|none|True|12x |True
-3|True|0|12|BuyFromTp|False|72|64|90|130|none|False|12x |True
-3|True|0|12|Have|none|72|64|90|130|none|False|12x |True
-3|True|0|12|Have|True|72|64|90|130|none|True|12x |True
-3|True|0|12|Have|False|72|64|90|130|none|False|12x |True
-3|True|0|12|Currency|none|72|64|90|130|none|False|12x |True
-3|True|0|12|Currency|True|72|64|90|130|none|True|12x |True
-3|True|0|12|Currency|False|72|64|90|130|none|False|12x |True
-3|True|2|0|Craft|none|72|64|90|130|>|False|none|True
-3|True|2|0|Craft|True|72|64|90|130|v|True|none|True
-3|True|2|0|Craft|False|72|64|90|130|>|False|none|True
-3|True|2|0|BuyFromTp|none|72|64|90|130|>|False|none|True
-3|True|2|0|BuyFromTp|True|72|64|90|130|v|True|none|True
-3|True|2|0|BuyFromTp|False|72|64|90|130|>|False|none|True
-3|True|2|0|Have|none|72|64|90|130|>|False|none|True
-3|True|2|0|Have|True|72|64|90|130|v|True|none|True
-3|True|2|0|Have|False|72|64|90|130|>|False|none|True
-3|True|2|0|Currency|none|72|64|90|130|>|False|none|True
-3|True|2|0|Currency|True|72|64|90|130|v|True|none|True
-3|True|2|0|Currency|False|72|64|90|130|>|False|none|True
-3|True|2|1|Craft|none|72|64|90|130|>|False|1x |True
-3|True|2|1|Craft|True|72|64|90|130|v|True|1x |True
-3|True|2|1|Craft|False|72|64|90|130|>|False|1x |True
-3|True|2|1|BuyFromTp|none|72|64|90|130|>|False|1x |True
-3|True|2|1|BuyFromTp|True|72|64|90|130|v|True|1x |True
-3|True|2|1|BuyFromTp|False|72|64|90|130|>|False|1x |True
-3|True|2|1|Have|none|72|64|90|130|>|False|1x |True
-3|True|2|1|Have|True|72|64|90|130|v|True|1x |True
-3|True|2|1|Have|False|72|64|90|130|>|False|1x |True
-3|True|2|1|Currency|none|72|64|90|130|>|False|1x |True
-3|True|2|1|Currency|True|72|64|90|130|v|True|1x |True
-3|True|2|1|Currency|False|72|64|90|130|>|False|1x |True
-3|True|2|12|Craft|none|72|64|90|130|>|False|12x |True
-3|True|2|12|Craft|True|72|64|90|130|v|True|12x |True
-3|True|2|12|Craft|False|72|64|90|130|>|False|12x |True
-3|True|2|12|BuyFromTp|none|72|64|90|130|>|False|12x |True
-3|True|2|12|BuyFromTp|True|72|64|90|130|v|True|12x |True
-3|True|2|12|BuyFromTp|False|72|64|90|130|>|False|12x |True
-3|True|2|12|Have|none|72|64|90|130|>|False|12x |True
-3|True|2|12|Have|True|72|64|90|130|v|True|12x |True
-3|True|2|12|Have|False|72|64|90|130|>|False|12x |True
-3|True|2|12|Currency|none|72|64|90|130|>|False|12x |True
-3|True|2|12|Currency|True|72|64|90|130|v|True|12x |True
-3|True|2|12|Currency|False|72|64|90|130|>|False|12x |True
-4|False|0|0|Craft|none|96|88|114|154|none|False|none|False
-4|False|0|0|Craft|True|96|88|114|154|none|True|none|False
-4|False|0|0|Craft|False|96|88|114|154|none|False|none|False
-4|False|0|0|BuyFromTp|none|96|88|114|154|none|False|none|True
-4|False|0|0|BuyFromTp|True|96|88|114|154|none|True|none|True
-4|False|0|0|BuyFromTp|False|96|88|114|154|none|False|none|True
-4|False|0|0|Have|none|96|88|114|154|none|False|none|True
-4|False|0|0|Have|True|96|88|114|154|none|True|none|True
-4|False|0|0|Have|False|96|88|114|154|none|False|none|True
-4|False|0|0|Currency|none|96|88|114|154|none|False|none|True
-4|False|0|0|Currency|True|96|88|114|154|none|True|none|True
-4|False|0|0|Currency|False|96|88|114|154|none|False|none|True
-4|False|0|1|Craft|none|96|88|114|154|none|False|1x |False
-4|False|0|1|Craft|True|96|88|114|154|none|True|1x |False
-4|False|0|1|Craft|False|96|88|114|154|none|False|1x |False
-4|False|0|1|BuyFromTp|none|96|88|114|154|none|False|1x |True
-4|False|0|1|BuyFromTp|True|96|88|114|154|none|True|1x |True
-4|False|0|1|BuyFromTp|False|96|88|114|154|none|False|1x |True
-4|False|0|1|Have|none|96|88|114|154|none|False|1x |True
-4|False|0|1|Have|True|96|88|114|154|none|True|1x |True
-4|False|0|1|Have|False|96|88|114|154|none|False|1x |True
-4|False|0|1|Currency|none|96|88|114|154|none|False|1x |True
-4|False|0|1|Currency|True|96|88|114|154|none|True|1x |True
-4|False|0|1|Currency|False|96|88|114|154|none|False|1x |True
-4|False|0|12|Craft|none|96|88|114|154|none|False|12x |False
-4|False|0|12|Craft|True|96|88|114|154|none|True|12x |False
-4|False|0|12|Craft|False|96|88|114|154|none|False|12x |False
-4|False|0|12|BuyFromTp|none|96|88|114|154|none|False|12x |True
-4|False|0|12|BuyFromTp|True|96|88|114|154|none|True|12x |True
-4|False|0|12|BuyFromTp|False|96|88|114|154|none|False|12x |True
-4|False|0|12|Have|none|96|88|114|154|none|False|12x |True
-4|False|0|12|Have|True|96|88|114|154|none|True|12x |True
-4|False|0|12|Have|False|96|88|114|154|none|False|12x |True
-4|False|0|12|Currency|none|96|88|114|154|none|False|12x |True
-4|False|0|12|Currency|True|96|88|114|154|none|True|12x |True
-4|False|0|12|Currency|False|96|88|114|154|none|False|12x |True
-4|False|2|0|Craft|none|96|88|114|154|>|False|none|False
-4|False|2|0|Craft|True|96|88|114|154|v|True|none|False
-4|False|2|0|Craft|False|96|88|114|154|>|False|none|False
-4|False|2|0|BuyFromTp|none|96|88|114|154|>|False|none|True
-4|False|2|0|BuyFromTp|True|96|88|114|154|v|True|none|True
-4|False|2|0|BuyFromTp|False|96|88|114|154|>|False|none|True
-4|False|2|0|Have|none|96|88|114|154|>|False|none|True
-4|False|2|0|Have|True|96|88|114|154|v|True|none|True
-4|False|2|0|Have|False|96|88|114|154|>|False|none|True
-4|False|2|0|Currency|none|96|88|114|154|>|False|none|True
-4|False|2|0|Currency|True|96|88|114|154|v|True|none|True
-4|False|2|0|Currency|False|96|88|114|154|>|False|none|True
-4|False|2|1|Craft|none|96|88|114|154|>|False|1x |False
-4|False|2|1|Craft|True|96|88|114|154|v|True|1x |False
-4|False|2|1|Craft|False|96|88|114|154|>|False|1x |False
-4|False|2|1|BuyFromTp|none|96|88|114|154|>|False|1x |True
-4|False|2|1|BuyFromTp|True|96|88|114|154|v|True|1x |True
-4|False|2|1|BuyFromTp|False|96|88|114|154|>|False|1x |True
-4|False|2|1|Have|none|96|88|114|154|>|False|1x |True
-4|False|2|1|Have|True|96|88|114|154|v|True|1x |True
-4|False|2|1|Have|False|96|88|114|154|>|False|1x |True
-4|False|2|1|Currency|none|96|88|114|154|>|False|1x |True
-4|False|2|1|Currency|True|96|88|114|154|v|True|1x |True
-4|False|2|1|Currency|False|96|88|114|154|>|False|1x |True
-4|False|2|12|Craft|none|96|88|114|154|>|False|12x |False
-4|False|2|12|Craft|True|96|88|114|154|v|True|12x |False
-4|False|2|12|Craft|False|96|88|114|154|>|False|12x |False
-4|False|2|12|BuyFromTp|none|96|88|114|154|>|False|12x |True
-4|False|2|12|BuyFromTp|True|96|88|114|154|v|True|12x |True
-4|False|2|12|BuyFromTp|False|96|88|114|154|>|False|12x |True
-4|False|2|12|Have|none|96|88|114|154|>|False|12x |True
-4|False|2|12|Have|True|96|88|114|154|v|True|12x |True
-4|False|2|12|Have|False|96|88|114|154|>|False|12x |True
-4|False|2|12|Currency|none|96|88|114|154|>|False|12x |True
-4|False|2|12|Currency|True|96|88|114|154|v|True|12x |True
-4|False|2|12|Currency|False|96|88|114|154|>|False|12x |True
-4|True|0|0|Craft|none|96|88|114|154|none|False|none|True
-4|True|0|0|Craft|True|96|88|114|154|none|True|none|True
-4|True|0|0|Craft|False|96|88|114|154|none|False|none|True
-4|True|0|0|BuyFromTp|none|96|88|114|154|none|False|none|True
-4|True|0|0|BuyFromTp|True|96|88|114|154|none|True|none|True
-4|True|0|0|BuyFromTp|False|96|88|114|154|none|False|none|True
-4|True|0|0|Have|none|96|88|114|154|none|False|none|True
-4|True|0|0|Have|True|96|88|114|154|none|True|none|True
-4|True|0|0|Have|False|96|88|114|154|none|False|none|True
-4|True|0|0|Currency|none|96|88|114|154|none|False|none|True
-4|True|0|0|Currency|True|96|88|114|154|none|True|none|True
-4|True|0|0|Currency|False|96|88|114|154|none|False|none|True
-4|True|0|1|Craft|none|96|88|114|154|none|False|1x |True
-4|True|0|1|Craft|True|96|88|114|154|none|True|1x |True
-4|True|0|1|Craft|False|96|88|114|154|none|False|1x |True
-4|True|0|1|BuyFromTp|none|96|88|114|154|none|False|1x |True
-4|True|0|1|BuyFromTp|True|96|88|114|154|none|True|1x |True
-4|True|0|1|BuyFromTp|False|96|88|114|154|none|False|1x |True
-4|True|0|1|Have|none|96|88|114|154|none|False|1x |True
-4|True|0|1|Have|True|96|88|114|154|none|True|1x |True
-4|True|0|1|Have|False|96|88|114|154|none|False|1x |True
-4|True|0|1|Currency|none|96|88|114|154|none|False|1x |True
-4|True|0|1|Currency|True|96|88|114|154|none|True|1x |True
-4|True|0|1|Currency|False|96|88|114|154|none|False|1x |True
-4|True|0|12|Craft|none|96|88|114|154|none|False|12x |True
-4|True|0|12|Craft|True|96|88|114|154|none|True|12x |True
-4|True|0|12|Craft|False|96|88|114|154|none|False|12x |True
-4|True|0|12|BuyFromTp|none|96|88|114|154|none|False|12x |True
-4|True|0|12|BuyFromTp|True|96|88|114|154|none|True|12x |True
-4|True|0|12|BuyFromTp|False|96|88|114|154|none|False|12x |True
-4|True|0|12|Have|none|96|88|114|154|none|False|12x |True
-4|True|0|12|Have|True|96|88|114|154|none|True|12x |True
-4|True|0|12|Have|False|96|88|114|154|none|False|12x |True
-4|True|0|12|Currency|none|96|88|114|154|none|False|12x |True
-4|True|0|12|Currency|True|96|88|114|154|none|True|12x |True
-4|True|0|12|Currency|False|96|88|114|154|none|False|12x |True
-4|True|2|0|Craft|none|96|88|114|154|>|False|none|True
-4|True|2|0|Craft|True|96|88|114|154|v|True|none|True
-4|True|2|0|Craft|False|96|88|114|154|>|False|none|True
-4|True|2|0|BuyFromTp|none|96|88|114|154|>|False|none|True
-4|True|2|0|BuyFromTp|True|96|88|114|154|v|True|none|True
-4|True|2|0|BuyFromTp|False|96|88|114|154|>|False|none|True
-4|True|2|0|Have|none|96|88|114|154|>|False|none|True
-4|True|2|0|Have|True|96|88|114|154|v|True|none|True
-4|True|2|0|Have|False|96|88|114|154|>|False|none|True
-4|True|2|0|Currency|none|96|88|114|154|>|False|none|True
-4|True|2|0|Currency|True|96|88|114|154|v|True|none|True
-4|True|2|0|Currency|False|96|88|114|154|>|False|none|True
-4|True|2|1|Craft|none|96|88|114|154|>|False|1x |True
-4|True|2|1|Craft|True|96|88|114|154|v|True|1x |True
-4|True|2|1|Craft|False|96|88|114|154|>|False|1x |True
-4|True|2|1|BuyFromTp|none|96|88|114|154|>|False|1x |True
-4|True|2|1|BuyFromTp|True|96|88|114|154|v|True|1x |True
-4|True|2|1|BuyFromTp|False|96|88|114|154|>|False|1x |True
-4|True|2|1|Have|none|96|88|114|154|>|False|1x |True
-4|True|2|1|Have|True|96|88|114|154|v|True|1x |True
-4|True|2|1|Have|False|96|88|114|154|>|False|1x |True
-4|True|2|1|Currency|none|96|88|114|154|>|False|1x |True
-4|True|2|1|Currency|True|96|88|114|154|v|True|1x |True
-4|True|2|1|Currency|False|96|88|114|154|>|False|1x |True
-4|True|2|12|Craft|none|96|88|114|154|>|False|12x |True
-4|True|2|12|Craft|True|96|88|114|154|v|True|12x |True
-4|True|2|12|Craft|False|96|88|114|154|>|False|12x |True
-4|True|2|12|BuyFromTp|none|96|88|114|154|>|False|12x |True
-4|True|2|12|BuyFromTp|True|96|88|114|154|v|True|12x |True
-4|True|2|12|BuyFromTp|False|96|88|114|154|>|False|12x |True
-4|True|2|12|Have|none|96|88|114|154|>|False|12x |True
-4|True|2|12|Have|True|96|88|114|154|v|True|12x |True
-4|True|2|12|Have|False|96|88|114|154|>|False|12x |True
-4|True|2|12|Currency|none|96|88|114|154|>|False|12x |True
-4|True|2|12|Currency|True|96|88|114|154|v|True|12x |True
-4|True|2|12|Currency|False|96|88|114|154|>|False|12x |True
+0|False|0|0|Craft|none|0|0|18|66|none|True|none|False
+0|False|0|0|Craft|True|0|0|18|66|none|True|none|False
+0|False|0|0|Craft|False|0|0|18|66|none|False|none|False
+0|False|0|0|BuyFromTp|none|0|0|18|66|none|True|none|True
+0|False|0|0|BuyFromTp|True|0|0|18|66|none|True|none|True
+0|False|0|0|BuyFromTp|False|0|0|18|66|none|False|none|True
+0|False|0|0|Have|none|0|0|18|66|none|True|none|True
+0|False|0|0|Have|True|0|0|18|66|none|True|none|True
+0|False|0|0|Have|False|0|0|18|66|none|False|none|True
+0|False|0|0|Currency|none|0|0|18|66|none|True|none|True
+0|False|0|0|Currency|True|0|0|18|66|none|True|none|True
+0|False|0|0|Currency|False|0|0|18|66|none|False|none|True
+0|False|0|1|Craft|none|0|0|18|66|none|True|1x |False
+0|False|0|1|Craft|True|0|0|18|66|none|True|1x |False
+0|False|0|1|Craft|False|0|0|18|66|none|False|1x |False
+0|False|0|1|BuyFromTp|none|0|0|18|66|none|True|1x |True
+0|False|0|1|BuyFromTp|True|0|0|18|66|none|True|1x |True
+0|False|0|1|BuyFromTp|False|0|0|18|66|none|False|1x |True
+0|False|0|1|Have|none|0|0|18|66|none|True|1x |True
+0|False|0|1|Have|True|0|0|18|66|none|True|1x |True
+0|False|0|1|Have|False|0|0|18|66|none|False|1x |True
+0|False|0|1|Currency|none|0|0|18|66|none|True|1x |True
+0|False|0|1|Currency|True|0|0|18|66|none|True|1x |True
+0|False|0|1|Currency|False|0|0|18|66|none|False|1x |True
+0|False|0|12|Craft|none|0|0|18|66|none|True|12x |False
+0|False|0|12|Craft|True|0|0|18|66|none|True|12x |False
+0|False|0|12|Craft|False|0|0|18|66|none|False|12x |False
+0|False|0|12|BuyFromTp|none|0|0|18|66|none|True|12x |True
+0|False|0|12|BuyFromTp|True|0|0|18|66|none|True|12x |True
+0|False|0|12|BuyFromTp|False|0|0|18|66|none|False|12x |True
+0|False|0|12|Have|none|0|0|18|66|none|True|12x |True
+0|False|0|12|Have|True|0|0|18|66|none|True|12x |True
+0|False|0|12|Have|False|0|0|18|66|none|False|12x |True
+0|False|0|12|Currency|none|0|0|18|66|none|True|12x |True
+0|False|0|12|Currency|True|0|0|18|66|none|True|12x |True
+0|False|0|12|Currency|False|0|0|18|66|none|False|12x |True
+0|False|2|0|Craft|none|0|0|18|66|v|True|none|False
+0|False|2|0|Craft|True|0|0|18|66|v|True|none|False
+0|False|2|0|Craft|False|0|0|18|66|>|False|none|False
+0|False|2|0|BuyFromTp|none|0|0|18|66|v|True|none|True
+0|False|2|0|BuyFromTp|True|0|0|18|66|v|True|none|True
+0|False|2|0|BuyFromTp|False|0|0|18|66|>|False|none|True
+0|False|2|0|Have|none|0|0|18|66|v|True|none|True
+0|False|2|0|Have|True|0|0|18|66|v|True|none|True
+0|False|2|0|Have|False|0|0|18|66|>|False|none|True
+0|False|2|0|Currency|none|0|0|18|66|v|True|none|True
+0|False|2|0|Currency|True|0|0|18|66|v|True|none|True
+0|False|2|0|Currency|False|0|0|18|66|>|False|none|True
+0|False|2|1|Craft|none|0|0|18|66|v|True|1x |False
+0|False|2|1|Craft|True|0|0|18|66|v|True|1x |False
+0|False|2|1|Craft|False|0|0|18|66|>|False|1x |False
+0|False|2|1|BuyFromTp|none|0|0|18|66|v|True|1x |True
+0|False|2|1|BuyFromTp|True|0|0|18|66|v|True|1x |True
+0|False|2|1|BuyFromTp|False|0|0|18|66|>|False|1x |True
+0|False|2|1|Have|none|0|0|18|66|v|True|1x |True
+0|False|2|1|Have|True|0|0|18|66|v|True|1x |True
+0|False|2|1|Have|False|0|0|18|66|>|False|1x |True
+0|False|2|1|Currency|none|0|0|18|66|v|True|1x |True
+0|False|2|1|Currency|True|0|0|18|66|v|True|1x |True
+0|False|2|1|Currency|False|0|0|18|66|>|False|1x |True
+0|False|2|12|Craft|none|0|0|18|66|v|True|12x |False
+0|False|2|12|Craft|True|0|0|18|66|v|True|12x |False
+0|False|2|12|Craft|False|0|0|18|66|>|False|12x |False
+0|False|2|12|BuyFromTp|none|0|0|18|66|v|True|12x |True
+0|False|2|12|BuyFromTp|True|0|0|18|66|v|True|12x |True
+0|False|2|12|BuyFromTp|False|0|0|18|66|>|False|12x |True
+0|False|2|12|Have|none|0|0|18|66|v|True|12x |True
+0|False|2|12|Have|True|0|0|18|66|v|True|12x |True
+0|False|2|12|Have|False|0|0|18|66|>|False|12x |True
+0|False|2|12|Currency|none|0|0|18|66|v|True|12x |True
+0|False|2|12|Currency|True|0|0|18|66|v|True|12x |True
+0|False|2|12|Currency|False|0|0|18|66|>|False|12x |True
+0|True|0|0|Craft|none|0|0|18|66|none|False|none|True
+0|True|0|0|Craft|True|0|0|18|66|none|True|none|True
+0|True|0|0|Craft|False|0|0|18|66|none|False|none|True
+0|True|0|0|BuyFromTp|none|0|0|18|66|none|False|none|True
+0|True|0|0|BuyFromTp|True|0|0|18|66|none|True|none|True
+0|True|0|0|BuyFromTp|False|0|0|18|66|none|False|none|True
+0|True|0|0|Have|none|0|0|18|66|none|False|none|True
+0|True|0|0|Have|True|0|0|18|66|none|True|none|True
+0|True|0|0|Have|False|0|0|18|66|none|False|none|True
+0|True|0|0|Currency|none|0|0|18|66|none|False|none|True
+0|True|0|0|Currency|True|0|0|18|66|none|True|none|True
+0|True|0|0|Currency|False|0|0|18|66|none|False|none|True
+0|True|0|1|Craft|none|0|0|18|66|none|False|1x |True
+0|True|0|1|Craft|True|0|0|18|66|none|True|1x |True
+0|True|0|1|Craft|False|0|0|18|66|none|False|1x |True
+0|True|0|1|BuyFromTp|none|0|0|18|66|none|False|1x |True
+0|True|0|1|BuyFromTp|True|0|0|18|66|none|True|1x |True
+0|True|0|1|BuyFromTp|False|0|0|18|66|none|False|1x |True
+0|True|0|1|Have|none|0|0|18|66|none|False|1x |True
+0|True|0|1|Have|True|0|0|18|66|none|True|1x |True
+0|True|0|1|Have|False|0|0|18|66|none|False|1x |True
+0|True|0|1|Currency|none|0|0|18|66|none|False|1x |True
+0|True|0|1|Currency|True|0|0|18|66|none|True|1x |True
+0|True|0|1|Currency|False|0|0|18|66|none|False|1x |True
+0|True|0|12|Craft|none|0|0|18|66|none|False|12x |True
+0|True|0|12|Craft|True|0|0|18|66|none|True|12x |True
+0|True|0|12|Craft|False|0|0|18|66|none|False|12x |True
+0|True|0|12|BuyFromTp|none|0|0|18|66|none|False|12x |True
+0|True|0|12|BuyFromTp|True|0|0|18|66|none|True|12x |True
+0|True|0|12|BuyFromTp|False|0|0|18|66|none|False|12x |True
+0|True|0|12|Have|none|0|0|18|66|none|False|12x |True
+0|True|0|12|Have|True|0|0|18|66|none|True|12x |True
+0|True|0|12|Have|False|0|0|18|66|none|False|12x |True
+0|True|0|12|Currency|none|0|0|18|66|none|False|12x |True
+0|True|0|12|Currency|True|0|0|18|66|none|True|12x |True
+0|True|0|12|Currency|False|0|0|18|66|none|False|12x |True
+0|True|2|0|Craft|none|0|0|18|66|>|False|none|True
+0|True|2|0|Craft|True|0|0|18|66|v|True|none|True
+0|True|2|0|Craft|False|0|0|18|66|>|False|none|True
+0|True|2|0|BuyFromTp|none|0|0|18|66|>|False|none|True
+0|True|2|0|BuyFromTp|True|0|0|18|66|v|True|none|True
+0|True|2|0|BuyFromTp|False|0|0|18|66|>|False|none|True
+0|True|2|0|Have|none|0|0|18|66|>|False|none|True
+0|True|2|0|Have|True|0|0|18|66|v|True|none|True
+0|True|2|0|Have|False|0|0|18|66|>|False|none|True
+0|True|2|0|Currency|none|0|0|18|66|>|False|none|True
+0|True|2|0|Currency|True|0|0|18|66|v|True|none|True
+0|True|2|0|Currency|False|0|0|18|66|>|False|none|True
+0|True|2|1|Craft|none|0|0|18|66|>|False|1x |True
+0|True|2|1|Craft|True|0|0|18|66|v|True|1x |True
+0|True|2|1|Craft|False|0|0|18|66|>|False|1x |True
+0|True|2|1|BuyFromTp|none|0|0|18|66|>|False|1x |True
+0|True|2|1|BuyFromTp|True|0|0|18|66|v|True|1x |True
+0|True|2|1|BuyFromTp|False|0|0|18|66|>|False|1x |True
+0|True|2|1|Have|none|0|0|18|66|>|False|1x |True
+0|True|2|1|Have|True|0|0|18|66|v|True|1x |True
+0|True|2|1|Have|False|0|0|18|66|>|False|1x |True
+0|True|2|1|Currency|none|0|0|18|66|>|False|1x |True
+0|True|2|1|Currency|True|0|0|18|66|v|True|1x |True
+0|True|2|1|Currency|False|0|0|18|66|>|False|1x |True
+0|True|2|12|Craft|none|0|0|18|66|>|False|12x |True
+0|True|2|12|Craft|True|0|0|18|66|v|True|12x |True
+0|True|2|12|Craft|False|0|0|18|66|>|False|12x |True
+0|True|2|12|BuyFromTp|none|0|0|18|66|>|False|12x |True
+0|True|2|12|BuyFromTp|True|0|0|18|66|v|True|12x |True
+0|True|2|12|BuyFromTp|False|0|0|18|66|>|False|12x |True
+0|True|2|12|Have|none|0|0|18|66|>|False|12x |True
+0|True|2|12|Have|True|0|0|18|66|v|True|12x |True
+0|True|2|12|Have|False|0|0|18|66|>|False|12x |True
+0|True|2|12|Currency|none|0|0|18|66|>|False|12x |True
+0|True|2|12|Currency|True|0|0|18|66|v|True|12x |True
+0|True|2|12|Currency|False|0|0|18|66|>|False|12x |True
+1|False|0|0|Craft|none|24|16|42|90|none|True|none|False
+1|False|0|0|Craft|True|24|16|42|90|none|True|none|False
+1|False|0|0|Craft|False|24|16|42|90|none|False|none|False
+1|False|0|0|BuyFromTp|none|24|16|42|90|none|True|none|True
+1|False|0|0|BuyFromTp|True|24|16|42|90|none|True|none|True
+1|False|0|0|BuyFromTp|False|24|16|42|90|none|False|none|True
+1|False|0|0|Have|none|24|16|42|90|none|True|none|True
+1|False|0|0|Have|True|24|16|42|90|none|True|none|True
+1|False|0|0|Have|False|24|16|42|90|none|False|none|True
+1|False|0|0|Currency|none|24|16|42|90|none|True|none|True
+1|False|0|0|Currency|True|24|16|42|90|none|True|none|True
+1|False|0|0|Currency|False|24|16|42|90|none|False|none|True
+1|False|0|1|Craft|none|24|16|42|90|none|True|1x |False
+1|False|0|1|Craft|True|24|16|42|90|none|True|1x |False
+1|False|0|1|Craft|False|24|16|42|90|none|False|1x |False
+1|False|0|1|BuyFromTp|none|24|16|42|90|none|True|1x |True
+1|False|0|1|BuyFromTp|True|24|16|42|90|none|True|1x |True
+1|False|0|1|BuyFromTp|False|24|16|42|90|none|False|1x |True
+1|False|0|1|Have|none|24|16|42|90|none|True|1x |True
+1|False|0|1|Have|True|24|16|42|90|none|True|1x |True
+1|False|0|1|Have|False|24|16|42|90|none|False|1x |True
+1|False|0|1|Currency|none|24|16|42|90|none|True|1x |True
+1|False|0|1|Currency|True|24|16|42|90|none|True|1x |True
+1|False|0|1|Currency|False|24|16|42|90|none|False|1x |True
+1|False|0|12|Craft|none|24|16|42|90|none|True|12x |False
+1|False|0|12|Craft|True|24|16|42|90|none|True|12x |False
+1|False|0|12|Craft|False|24|16|42|90|none|False|12x |False
+1|False|0|12|BuyFromTp|none|24|16|42|90|none|True|12x |True
+1|False|0|12|BuyFromTp|True|24|16|42|90|none|True|12x |True
+1|False|0|12|BuyFromTp|False|24|16|42|90|none|False|12x |True
+1|False|0|12|Have|none|24|16|42|90|none|True|12x |True
+1|False|0|12|Have|True|24|16|42|90|none|True|12x |True
+1|False|0|12|Have|False|24|16|42|90|none|False|12x |True
+1|False|0|12|Currency|none|24|16|42|90|none|True|12x |True
+1|False|0|12|Currency|True|24|16|42|90|none|True|12x |True
+1|False|0|12|Currency|False|24|16|42|90|none|False|12x |True
+1|False|2|0|Craft|none|24|16|42|90|v|True|none|False
+1|False|2|0|Craft|True|24|16|42|90|v|True|none|False
+1|False|2|0|Craft|False|24|16|42|90|>|False|none|False
+1|False|2|0|BuyFromTp|none|24|16|42|90|v|True|none|True
+1|False|2|0|BuyFromTp|True|24|16|42|90|v|True|none|True
+1|False|2|0|BuyFromTp|False|24|16|42|90|>|False|none|True
+1|False|2|0|Have|none|24|16|42|90|v|True|none|True
+1|False|2|0|Have|True|24|16|42|90|v|True|none|True
+1|False|2|0|Have|False|24|16|42|90|>|False|none|True
+1|False|2|0|Currency|none|24|16|42|90|v|True|none|True
+1|False|2|0|Currency|True|24|16|42|90|v|True|none|True
+1|False|2|0|Currency|False|24|16|42|90|>|False|none|True
+1|False|2|1|Craft|none|24|16|42|90|v|True|1x |False
+1|False|2|1|Craft|True|24|16|42|90|v|True|1x |False
+1|False|2|1|Craft|False|24|16|42|90|>|False|1x |False
+1|False|2|1|BuyFromTp|none|24|16|42|90|v|True|1x |True
+1|False|2|1|BuyFromTp|True|24|16|42|90|v|True|1x |True
+1|False|2|1|BuyFromTp|False|24|16|42|90|>|False|1x |True
+1|False|2|1|Have|none|24|16|42|90|v|True|1x |True
+1|False|2|1|Have|True|24|16|42|90|v|True|1x |True
+1|False|2|1|Have|False|24|16|42|90|>|False|1x |True
+1|False|2|1|Currency|none|24|16|42|90|v|True|1x |True
+1|False|2|1|Currency|True|24|16|42|90|v|True|1x |True
+1|False|2|1|Currency|False|24|16|42|90|>|False|1x |True
+1|False|2|12|Craft|none|24|16|42|90|v|True|12x |False
+1|False|2|12|Craft|True|24|16|42|90|v|True|12x |False
+1|False|2|12|Craft|False|24|16|42|90|>|False|12x |False
+1|False|2|12|BuyFromTp|none|24|16|42|90|v|True|12x |True
+1|False|2|12|BuyFromTp|True|24|16|42|90|v|True|12x |True
+1|False|2|12|BuyFromTp|False|24|16|42|90|>|False|12x |True
+1|False|2|12|Have|none|24|16|42|90|v|True|12x |True
+1|False|2|12|Have|True|24|16|42|90|v|True|12x |True
+1|False|2|12|Have|False|24|16|42|90|>|False|12x |True
+1|False|2|12|Currency|none|24|16|42|90|v|True|12x |True
+1|False|2|12|Currency|True|24|16|42|90|v|True|12x |True
+1|False|2|12|Currency|False|24|16|42|90|>|False|12x |True
+1|True|0|0|Craft|none|24|16|42|90|none|False|none|True
+1|True|0|0|Craft|True|24|16|42|90|none|True|none|True
+1|True|0|0|Craft|False|24|16|42|90|none|False|none|True
+1|True|0|0|BuyFromTp|none|24|16|42|90|none|False|none|True
+1|True|0|0|BuyFromTp|True|24|16|42|90|none|True|none|True
+1|True|0|0|BuyFromTp|False|24|16|42|90|none|False|none|True
+1|True|0|0|Have|none|24|16|42|90|none|False|none|True
+1|True|0|0|Have|True|24|16|42|90|none|True|none|True
+1|True|0|0|Have|False|24|16|42|90|none|False|none|True
+1|True|0|0|Currency|none|24|16|42|90|none|False|none|True
+1|True|0|0|Currency|True|24|16|42|90|none|True|none|True
+1|True|0|0|Currency|False|24|16|42|90|none|False|none|True
+1|True|0|1|Craft|none|24|16|42|90|none|False|1x |True
+1|True|0|1|Craft|True|24|16|42|90|none|True|1x |True
+1|True|0|1|Craft|False|24|16|42|90|none|False|1x |True
+1|True|0|1|BuyFromTp|none|24|16|42|90|none|False|1x |True
+1|True|0|1|BuyFromTp|True|24|16|42|90|none|True|1x |True
+1|True|0|1|BuyFromTp|False|24|16|42|90|none|False|1x |True
+1|True|0|1|Have|none|24|16|42|90|none|False|1x |True
+1|True|0|1|Have|True|24|16|42|90|none|True|1x |True
+1|True|0|1|Have|False|24|16|42|90|none|False|1x |True
+1|True|0|1|Currency|none|24|16|42|90|none|False|1x |True
+1|True|0|1|Currency|True|24|16|42|90|none|True|1x |True
+1|True|0|1|Currency|False|24|16|42|90|none|False|1x |True
+1|True|0|12|Craft|none|24|16|42|90|none|False|12x |True
+1|True|0|12|Craft|True|24|16|42|90|none|True|12x |True
+1|True|0|12|Craft|False|24|16|42|90|none|False|12x |True
+1|True|0|12|BuyFromTp|none|24|16|42|90|none|False|12x |True
+1|True|0|12|BuyFromTp|True|24|16|42|90|none|True|12x |True
+1|True|0|12|BuyFromTp|False|24|16|42|90|none|False|12x |True
+1|True|0|12|Have|none|24|16|42|90|none|False|12x |True
+1|True|0|12|Have|True|24|16|42|90|none|True|12x |True
+1|True|0|12|Have|False|24|16|42|90|none|False|12x |True
+1|True|0|12|Currency|none|24|16|42|90|none|False|12x |True
+1|True|0|12|Currency|True|24|16|42|90|none|True|12x |True
+1|True|0|12|Currency|False|24|16|42|90|none|False|12x |True
+1|True|2|0|Craft|none|24|16|42|90|>|False|none|True
+1|True|2|0|Craft|True|24|16|42|90|v|True|none|True
+1|True|2|0|Craft|False|24|16|42|90|>|False|none|True
+1|True|2|0|BuyFromTp|none|24|16|42|90|>|False|none|True
+1|True|2|0|BuyFromTp|True|24|16|42|90|v|True|none|True
+1|True|2|0|BuyFromTp|False|24|16|42|90|>|False|none|True
+1|True|2|0|Have|none|24|16|42|90|>|False|none|True
+1|True|2|0|Have|True|24|16|42|90|v|True|none|True
+1|True|2|0|Have|False|24|16|42|90|>|False|none|True
+1|True|2|0|Currency|none|24|16|42|90|>|False|none|True
+1|True|2|0|Currency|True|24|16|42|90|v|True|none|True
+1|True|2|0|Currency|False|24|16|42|90|>|False|none|True
+1|True|2|1|Craft|none|24|16|42|90|>|False|1x |True
+1|True|2|1|Craft|True|24|16|42|90|v|True|1x |True
+1|True|2|1|Craft|False|24|16|42|90|>|False|1x |True
+1|True|2|1|BuyFromTp|none|24|16|42|90|>|False|1x |True
+1|True|2|1|BuyFromTp|True|24|16|42|90|v|True|1x |True
+1|True|2|1|BuyFromTp|False|24|16|42|90|>|False|1x |True
+1|True|2|1|Have|none|24|16|42|90|>|False|1x |True
+1|True|2|1|Have|True|24|16|42|90|v|True|1x |True
+1|True|2|1|Have|False|24|16|42|90|>|False|1x |True
+1|True|2|1|Currency|none|24|16|42|90|>|False|1x |True
+1|True|2|1|Currency|True|24|16|42|90|v|True|1x |True
+1|True|2|1|Currency|False|24|16|42|90|>|False|1x |True
+1|True|2|12|Craft|none|24|16|42|90|>|False|12x |True
+1|True|2|12|Craft|True|24|16|42|90|v|True|12x |True
+1|True|2|12|Craft|False|24|16|42|90|>|False|12x |True
+1|True|2|12|BuyFromTp|none|24|16|42|90|>|False|12x |True
+1|True|2|12|BuyFromTp|True|24|16|42|90|v|True|12x |True
+1|True|2|12|BuyFromTp|False|24|16|42|90|>|False|12x |True
+1|True|2|12|Have|none|24|16|42|90|>|False|12x |True
+1|True|2|12|Have|True|24|16|42|90|v|True|12x |True
+1|True|2|12|Have|False|24|16|42|90|>|False|12x |True
+1|True|2|12|Currency|none|24|16|42|90|>|False|12x |True
+1|True|2|12|Currency|True|24|16|42|90|v|True|12x |True
+1|True|2|12|Currency|False|24|16|42|90|>|False|12x |True
+2|False|0|0|Craft|none|48|40|66|114|none|False|none|False
+2|False|0|0|Craft|True|48|40|66|114|none|True|none|False
+2|False|0|0|Craft|False|48|40|66|114|none|False|none|False
+2|False|0|0|BuyFromTp|none|48|40|66|114|none|False|none|True
+2|False|0|0|BuyFromTp|True|48|40|66|114|none|True|none|True
+2|False|0|0|BuyFromTp|False|48|40|66|114|none|False|none|True
+2|False|0|0|Have|none|48|40|66|114|none|False|none|True
+2|False|0|0|Have|True|48|40|66|114|none|True|none|True
+2|False|0|0|Have|False|48|40|66|114|none|False|none|True
+2|False|0|0|Currency|none|48|40|66|114|none|False|none|True
+2|False|0|0|Currency|True|48|40|66|114|none|True|none|True
+2|False|0|0|Currency|False|48|40|66|114|none|False|none|True
+2|False|0|1|Craft|none|48|40|66|114|none|False|1x |False
+2|False|0|1|Craft|True|48|40|66|114|none|True|1x |False
+2|False|0|1|Craft|False|48|40|66|114|none|False|1x |False
+2|False|0|1|BuyFromTp|none|48|40|66|114|none|False|1x |True
+2|False|0|1|BuyFromTp|True|48|40|66|114|none|True|1x |True
+2|False|0|1|BuyFromTp|False|48|40|66|114|none|False|1x |True
+2|False|0|1|Have|none|48|40|66|114|none|False|1x |True
+2|False|0|1|Have|True|48|40|66|114|none|True|1x |True
+2|False|0|1|Have|False|48|40|66|114|none|False|1x |True
+2|False|0|1|Currency|none|48|40|66|114|none|False|1x |True
+2|False|0|1|Currency|True|48|40|66|114|none|True|1x |True
+2|False|0|1|Currency|False|48|40|66|114|none|False|1x |True
+2|False|0|12|Craft|none|48|40|66|114|none|False|12x |False
+2|False|0|12|Craft|True|48|40|66|114|none|True|12x |False
+2|False|0|12|Craft|False|48|40|66|114|none|False|12x |False
+2|False|0|12|BuyFromTp|none|48|40|66|114|none|False|12x |True
+2|False|0|12|BuyFromTp|True|48|40|66|114|none|True|12x |True
+2|False|0|12|BuyFromTp|False|48|40|66|114|none|False|12x |True
+2|False|0|12|Have|none|48|40|66|114|none|False|12x |True
+2|False|0|12|Have|True|48|40|66|114|none|True|12x |True
+2|False|0|12|Have|False|48|40|66|114|none|False|12x |True
+2|False|0|12|Currency|none|48|40|66|114|none|False|12x |True
+2|False|0|12|Currency|True|48|40|66|114|none|True|12x |True
+2|False|0|12|Currency|False|48|40|66|114|none|False|12x |True
+2|False|2|0|Craft|none|48|40|66|114|>|False|none|False
+2|False|2|0|Craft|True|48|40|66|114|v|True|none|False
+2|False|2|0|Craft|False|48|40|66|114|>|False|none|False
+2|False|2|0|BuyFromTp|none|48|40|66|114|>|False|none|True
+2|False|2|0|BuyFromTp|True|48|40|66|114|v|True|none|True
+2|False|2|0|BuyFromTp|False|48|40|66|114|>|False|none|True
+2|False|2|0|Have|none|48|40|66|114|>|False|none|True
+2|False|2|0|Have|True|48|40|66|114|v|True|none|True
+2|False|2|0|Have|False|48|40|66|114|>|False|none|True
+2|False|2|0|Currency|none|48|40|66|114|>|False|none|True
+2|False|2|0|Currency|True|48|40|66|114|v|True|none|True
+2|False|2|0|Currency|False|48|40|66|114|>|False|none|True
+2|False|2|1|Craft|none|48|40|66|114|>|False|1x |False
+2|False|2|1|Craft|True|48|40|66|114|v|True|1x |False
+2|False|2|1|Craft|False|48|40|66|114|>|False|1x |False
+2|False|2|1|BuyFromTp|none|48|40|66|114|>|False|1x |True
+2|False|2|1|BuyFromTp|True|48|40|66|114|v|True|1x |True
+2|False|2|1|BuyFromTp|False|48|40|66|114|>|False|1x |True
+2|False|2|1|Have|none|48|40|66|114|>|False|1x |True
+2|False|2|1|Have|True|48|40|66|114|v|True|1x |True
+2|False|2|1|Have|False|48|40|66|114|>|False|1x |True
+2|False|2|1|Currency|none|48|40|66|114|>|False|1x |True
+2|False|2|1|Currency|True|48|40|66|114|v|True|1x |True
+2|False|2|1|Currency|False|48|40|66|114|>|False|1x |True
+2|False|2|12|Craft|none|48|40|66|114|>|False|12x |False
+2|False|2|12|Craft|True|48|40|66|114|v|True|12x |False
+2|False|2|12|Craft|False|48|40|66|114|>|False|12x |False
+2|False|2|12|BuyFromTp|none|48|40|66|114|>|False|12x |True
+2|False|2|12|BuyFromTp|True|48|40|66|114|v|True|12x |True
+2|False|2|12|BuyFromTp|False|48|40|66|114|>|False|12x |True
+2|False|2|12|Have|none|48|40|66|114|>|False|12x |True
+2|False|2|12|Have|True|48|40|66|114|v|True|12x |True
+2|False|2|12|Have|False|48|40|66|114|>|False|12x |True
+2|False|2|12|Currency|none|48|40|66|114|>|False|12x |True
+2|False|2|12|Currency|True|48|40|66|114|v|True|12x |True
+2|False|2|12|Currency|False|48|40|66|114|>|False|12x |True
+2|True|0|0|Craft|none|48|40|66|114|none|False|none|True
+2|True|0|0|Craft|True|48|40|66|114|none|True|none|True
+2|True|0|0|Craft|False|48|40|66|114|none|False|none|True
+2|True|0|0|BuyFromTp|none|48|40|66|114|none|False|none|True
+2|True|0|0|BuyFromTp|True|48|40|66|114|none|True|none|True
+2|True|0|0|BuyFromTp|False|48|40|66|114|none|False|none|True
+2|True|0|0|Have|none|48|40|66|114|none|False|none|True
+2|True|0|0|Have|True|48|40|66|114|none|True|none|True
+2|True|0|0|Have|False|48|40|66|114|none|False|none|True
+2|True|0|0|Currency|none|48|40|66|114|none|False|none|True
+2|True|0|0|Currency|True|48|40|66|114|none|True|none|True
+2|True|0|0|Currency|False|48|40|66|114|none|False|none|True
+2|True|0|1|Craft|none|48|40|66|114|none|False|1x |True
+2|True|0|1|Craft|True|48|40|66|114|none|True|1x |True
+2|True|0|1|Craft|False|48|40|66|114|none|False|1x |True
+2|True|0|1|BuyFromTp|none|48|40|66|114|none|False|1x |True
+2|True|0|1|BuyFromTp|True|48|40|66|114|none|True|1x |True
+2|True|0|1|BuyFromTp|False|48|40|66|114|none|False|1x |True
+2|True|0|1|Have|none|48|40|66|114|none|False|1x |True
+2|True|0|1|Have|True|48|40|66|114|none|True|1x |True
+2|True|0|1|Have|False|48|40|66|114|none|False|1x |True
+2|True|0|1|Currency|none|48|40|66|114|none|False|1x |True
+2|True|0|1|Currency|True|48|40|66|114|none|True|1x |True
+2|True|0|1|Currency|False|48|40|66|114|none|False|1x |True
+2|True|0|12|Craft|none|48|40|66|114|none|False|12x |True
+2|True|0|12|Craft|True|48|40|66|114|none|True|12x |True
+2|True|0|12|Craft|False|48|40|66|114|none|False|12x |True
+2|True|0|12|BuyFromTp|none|48|40|66|114|none|False|12x |True
+2|True|0|12|BuyFromTp|True|48|40|66|114|none|True|12x |True
+2|True|0|12|BuyFromTp|False|48|40|66|114|none|False|12x |True
+2|True|0|12|Have|none|48|40|66|114|none|False|12x |True
+2|True|0|12|Have|True|48|40|66|114|none|True|12x |True
+2|True|0|12|Have|False|48|40|66|114|none|False|12x |True
+2|True|0|12|Currency|none|48|40|66|114|none|False|12x |True
+2|True|0|12|Currency|True|48|40|66|114|none|True|12x |True
+2|True|0|12|Currency|False|48|40|66|114|none|False|12x |True
+2|True|2|0|Craft|none|48|40|66|114|>|False|none|True
+2|True|2|0|Craft|True|48|40|66|114|v|True|none|True
+2|True|2|0|Craft|False|48|40|66|114|>|False|none|True
+2|True|2|0|BuyFromTp|none|48|40|66|114|>|False|none|True
+2|True|2|0|BuyFromTp|True|48|40|66|114|v|True|none|True
+2|True|2|0|BuyFromTp|False|48|40|66|114|>|False|none|True
+2|True|2|0|Have|none|48|40|66|114|>|False|none|True
+2|True|2|0|Have|True|48|40|66|114|v|True|none|True
+2|True|2|0|Have|False|48|40|66|114|>|False|none|True
+2|True|2|0|Currency|none|48|40|66|114|>|False|none|True
+2|True|2|0|Currency|True|48|40|66|114|v|True|none|True
+2|True|2|0|Currency|False|48|40|66|114|>|False|none|True
+2|True|2|1|Craft|none|48|40|66|114|>|False|1x |True
+2|True|2|1|Craft|True|48|40|66|114|v|True|1x |True
+2|True|2|1|Craft|False|48|40|66|114|>|False|1x |True
+2|True|2|1|BuyFromTp|none|48|40|66|114|>|False|1x |True
+2|True|2|1|BuyFromTp|True|48|40|66|114|v|True|1x |True
+2|True|2|1|BuyFromTp|False|48|40|66|114|>|False|1x |True
+2|True|2|1|Have|none|48|40|66|114|>|False|1x |True
+2|True|2|1|Have|True|48|40|66|114|v|True|1x |True
+2|True|2|1|Have|False|48|40|66|114|>|False|1x |True
+2|True|2|1|Currency|none|48|40|66|114|>|False|1x |True
+2|True|2|1|Currency|True|48|40|66|114|v|True|1x |True
+2|True|2|1|Currency|False|48|40|66|114|>|False|1x |True
+2|True|2|12|Craft|none|48|40|66|114|>|False|12x |True
+2|True|2|12|Craft|True|48|40|66|114|v|True|12x |True
+2|True|2|12|Craft|False|48|40|66|114|>|False|12x |True
+2|True|2|12|BuyFromTp|none|48|40|66|114|>|False|12x |True
+2|True|2|12|BuyFromTp|True|48|40|66|114|v|True|12x |True
+2|True|2|12|BuyFromTp|False|48|40|66|114|>|False|12x |True
+2|True|2|12|Have|none|48|40|66|114|>|False|12x |True
+2|True|2|12|Have|True|48|40|66|114|v|True|12x |True
+2|True|2|12|Have|False|48|40|66|114|>|False|12x |True
+2|True|2|12|Currency|none|48|40|66|114|>|False|12x |True
+2|True|2|12|Currency|True|48|40|66|114|v|True|12x |True
+2|True|2|12|Currency|False|48|40|66|114|>|False|12x |True
+3|False|0|0|Craft|none|72|64|90|138|none|False|none|False
+3|False|0|0|Craft|True|72|64|90|138|none|True|none|False
+3|False|0|0|Craft|False|72|64|90|138|none|False|none|False
+3|False|0|0|BuyFromTp|none|72|64|90|138|none|False|none|True
+3|False|0|0|BuyFromTp|True|72|64|90|138|none|True|none|True
+3|False|0|0|BuyFromTp|False|72|64|90|138|none|False|none|True
+3|False|0|0|Have|none|72|64|90|138|none|False|none|True
+3|False|0|0|Have|True|72|64|90|138|none|True|none|True
+3|False|0|0|Have|False|72|64|90|138|none|False|none|True
+3|False|0|0|Currency|none|72|64|90|138|none|False|none|True
+3|False|0|0|Currency|True|72|64|90|138|none|True|none|True
+3|False|0|0|Currency|False|72|64|90|138|none|False|none|True
+3|False|0|1|Craft|none|72|64|90|138|none|False|1x |False
+3|False|0|1|Craft|True|72|64|90|138|none|True|1x |False
+3|False|0|1|Craft|False|72|64|90|138|none|False|1x |False
+3|False|0|1|BuyFromTp|none|72|64|90|138|none|False|1x |True
+3|False|0|1|BuyFromTp|True|72|64|90|138|none|True|1x |True
+3|False|0|1|BuyFromTp|False|72|64|90|138|none|False|1x |True
+3|False|0|1|Have|none|72|64|90|138|none|False|1x |True
+3|False|0|1|Have|True|72|64|90|138|none|True|1x |True
+3|False|0|1|Have|False|72|64|90|138|none|False|1x |True
+3|False|0|1|Currency|none|72|64|90|138|none|False|1x |True
+3|False|0|1|Currency|True|72|64|90|138|none|True|1x |True
+3|False|0|1|Currency|False|72|64|90|138|none|False|1x |True
+3|False|0|12|Craft|none|72|64|90|138|none|False|12x |False
+3|False|0|12|Craft|True|72|64|90|138|none|True|12x |False
+3|False|0|12|Craft|False|72|64|90|138|none|False|12x |False
+3|False|0|12|BuyFromTp|none|72|64|90|138|none|False|12x |True
+3|False|0|12|BuyFromTp|True|72|64|90|138|none|True|12x |True
+3|False|0|12|BuyFromTp|False|72|64|90|138|none|False|12x |True
+3|False|0|12|Have|none|72|64|90|138|none|False|12x |True
+3|False|0|12|Have|True|72|64|90|138|none|True|12x |True
+3|False|0|12|Have|False|72|64|90|138|none|False|12x |True
+3|False|0|12|Currency|none|72|64|90|138|none|False|12x |True
+3|False|0|12|Currency|True|72|64|90|138|none|True|12x |True
+3|False|0|12|Currency|False|72|64|90|138|none|False|12x |True
+3|False|2|0|Craft|none|72|64|90|138|>|False|none|False
+3|False|2|0|Craft|True|72|64|90|138|v|True|none|False
+3|False|2|0|Craft|False|72|64|90|138|>|False|none|False
+3|False|2|0|BuyFromTp|none|72|64|90|138|>|False|none|True
+3|False|2|0|BuyFromTp|True|72|64|90|138|v|True|none|True
+3|False|2|0|BuyFromTp|False|72|64|90|138|>|False|none|True
+3|False|2|0|Have|none|72|64|90|138|>|False|none|True
+3|False|2|0|Have|True|72|64|90|138|v|True|none|True
+3|False|2|0|Have|False|72|64|90|138|>|False|none|True
+3|False|2|0|Currency|none|72|64|90|138|>|False|none|True
+3|False|2|0|Currency|True|72|64|90|138|v|True|none|True
+3|False|2|0|Currency|False|72|64|90|138|>|False|none|True
+3|False|2|1|Craft|none|72|64|90|138|>|False|1x |False
+3|False|2|1|Craft|True|72|64|90|138|v|True|1x |False
+3|False|2|1|Craft|False|72|64|90|138|>|False|1x |False
+3|False|2|1|BuyFromTp|none|72|64|90|138|>|False|1x |True
+3|False|2|1|BuyFromTp|True|72|64|90|138|v|True|1x |True
+3|False|2|1|BuyFromTp|False|72|64|90|138|>|False|1x |True
+3|False|2|1|Have|none|72|64|90|138|>|False|1x |True
+3|False|2|1|Have|True|72|64|90|138|v|True|1x |True
+3|False|2|1|Have|False|72|64|90|138|>|False|1x |True
+3|False|2|1|Currency|none|72|64|90|138|>|False|1x |True
+3|False|2|1|Currency|True|72|64|90|138|v|True|1x |True
+3|False|2|1|Currency|False|72|64|90|138|>|False|1x |True
+3|False|2|12|Craft|none|72|64|90|138|>|False|12x |False
+3|False|2|12|Craft|True|72|64|90|138|v|True|12x |False
+3|False|2|12|Craft|False|72|64|90|138|>|False|12x |False
+3|False|2|12|BuyFromTp|none|72|64|90|138|>|False|12x |True
+3|False|2|12|BuyFromTp|True|72|64|90|138|v|True|12x |True
+3|False|2|12|BuyFromTp|False|72|64|90|138|>|False|12x |True
+3|False|2|12|Have|none|72|64|90|138|>|False|12x |True
+3|False|2|12|Have|True|72|64|90|138|v|True|12x |True
+3|False|2|12|Have|False|72|64|90|138|>|False|12x |True
+3|False|2|12|Currency|none|72|64|90|138|>|False|12x |True
+3|False|2|12|Currency|True|72|64|90|138|v|True|12x |True
+3|False|2|12|Currency|False|72|64|90|138|>|False|12x |True
+3|True|0|0|Craft|none|72|64|90|138|none|False|none|True
+3|True|0|0|Craft|True|72|64|90|138|none|True|none|True
+3|True|0|0|Craft|False|72|64|90|138|none|False|none|True
+3|True|0|0|BuyFromTp|none|72|64|90|138|none|False|none|True
+3|True|0|0|BuyFromTp|True|72|64|90|138|none|True|none|True
+3|True|0|0|BuyFromTp|False|72|64|90|138|none|False|none|True
+3|True|0|0|Have|none|72|64|90|138|none|False|none|True
+3|True|0|0|Have|True|72|64|90|138|none|True|none|True
+3|True|0|0|Have|False|72|64|90|138|none|False|none|True
+3|True|0|0|Currency|none|72|64|90|138|none|False|none|True
+3|True|0|0|Currency|True|72|64|90|138|none|True|none|True
+3|True|0|0|Currency|False|72|64|90|138|none|False|none|True
+3|True|0|1|Craft|none|72|64|90|138|none|False|1x |True
+3|True|0|1|Craft|True|72|64|90|138|none|True|1x |True
+3|True|0|1|Craft|False|72|64|90|138|none|False|1x |True
+3|True|0|1|BuyFromTp|none|72|64|90|138|none|False|1x |True
+3|True|0|1|BuyFromTp|True|72|64|90|138|none|True|1x |True
+3|True|0|1|BuyFromTp|False|72|64|90|138|none|False|1x |True
+3|True|0|1|Have|none|72|64|90|138|none|False|1x |True
+3|True|0|1|Have|True|72|64|90|138|none|True|1x |True
+3|True|0|1|Have|False|72|64|90|138|none|False|1x |True
+3|True|0|1|Currency|none|72|64|90|138|none|False|1x |True
+3|True|0|1|Currency|True|72|64|90|138|none|True|1x |True
+3|True|0|1|Currency|False|72|64|90|138|none|False|1x |True
+3|True|0|12|Craft|none|72|64|90|138|none|False|12x |True
+3|True|0|12|Craft|True|72|64|90|138|none|True|12x |True
+3|True|0|12|Craft|False|72|64|90|138|none|False|12x |True
+3|True|0|12|BuyFromTp|none|72|64|90|138|none|False|12x |True
+3|True|0|12|BuyFromTp|True|72|64|90|138|none|True|12x |True
+3|True|0|12|BuyFromTp|False|72|64|90|138|none|False|12x |True
+3|True|0|12|Have|none|72|64|90|138|none|False|12x |True
+3|True|0|12|Have|True|72|64|90|138|none|True|12x |True
+3|True|0|12|Have|False|72|64|90|138|none|False|12x |True
+3|True|0|12|Currency|none|72|64|90|138|none|False|12x |True
+3|True|0|12|Currency|True|72|64|90|138|none|True|12x |True
+3|True|0|12|Currency|False|72|64|90|138|none|False|12x |True
+3|True|2|0|Craft|none|72|64|90|138|>|False|none|True
+3|True|2|0|Craft|True|72|64|90|138|v|True|none|True
+3|True|2|0|Craft|False|72|64|90|138|>|False|none|True
+3|True|2|0|BuyFromTp|none|72|64|90|138|>|False|none|True
+3|True|2|0|BuyFromTp|True|72|64|90|138|v|True|none|True
+3|True|2|0|BuyFromTp|False|72|64|90|138|>|False|none|True
+3|True|2|0|Have|none|72|64|90|138|>|False|none|True
+3|True|2|0|Have|True|72|64|90|138|v|True|none|True
+3|True|2|0|Have|False|72|64|90|138|>|False|none|True
+3|True|2|0|Currency|none|72|64|90|138|>|False|none|True
+3|True|2|0|Currency|True|72|64|90|138|v|True|none|True
+3|True|2|0|Currency|False|72|64|90|138|>|False|none|True
+3|True|2|1|Craft|none|72|64|90|138|>|False|1x |True
+3|True|2|1|Craft|True|72|64|90|138|v|True|1x |True
+3|True|2|1|Craft|False|72|64|90|138|>|False|1x |True
+3|True|2|1|BuyFromTp|none|72|64|90|138|>|False|1x |True
+3|True|2|1|BuyFromTp|True|72|64|90|138|v|True|1x |True
+3|True|2|1|BuyFromTp|False|72|64|90|138|>|False|1x |True
+3|True|2|1|Have|none|72|64|90|138|>|False|1x |True
+3|True|2|1|Have|True|72|64|90|138|v|True|1x |True
+3|True|2|1|Have|False|72|64|90|138|>|False|1x |True
+3|True|2|1|Currency|none|72|64|90|138|>|False|1x |True
+3|True|2|1|Currency|True|72|64|90|138|v|True|1x |True
+3|True|2|1|Currency|False|72|64|90|138|>|False|1x |True
+3|True|2|12|Craft|none|72|64|90|138|>|False|12x |True
+3|True|2|12|Craft|True|72|64|90|138|v|True|12x |True
+3|True|2|12|Craft|False|72|64|90|138|>|False|12x |True
+3|True|2|12|BuyFromTp|none|72|64|90|138|>|False|12x |True
+3|True|2|12|BuyFromTp|True|72|64|90|138|v|True|12x |True
+3|True|2|12|BuyFromTp|False|72|64|90|138|>|False|12x |True
+3|True|2|12|Have|none|72|64|90|138|>|False|12x |True
+3|True|2|12|Have|True|72|64|90|138|v|True|12x |True
+3|True|2|12|Have|False|72|64|90|138|>|False|12x |True
+3|True|2|12|Currency|none|72|64|90|138|>|False|12x |True
+3|True|2|12|Currency|True|72|64|90|138|v|True|12x |True
+3|True|2|12|Currency|False|72|64|90|138|>|False|12x |True
+4|False|0|0|Craft|none|96|88|114|162|none|False|none|False
+4|False|0|0|Craft|True|96|88|114|162|none|True|none|False
+4|False|0|0|Craft|False|96|88|114|162|none|False|none|False
+4|False|0|0|BuyFromTp|none|96|88|114|162|none|False|none|True
+4|False|0|0|BuyFromTp|True|96|88|114|162|none|True|none|True
+4|False|0|0|BuyFromTp|False|96|88|114|162|none|False|none|True
+4|False|0|0|Have|none|96|88|114|162|none|False|none|True
+4|False|0|0|Have|True|96|88|114|162|none|True|none|True
+4|False|0|0|Have|False|96|88|114|162|none|False|none|True
+4|False|0|0|Currency|none|96|88|114|162|none|False|none|True
+4|False|0|0|Currency|True|96|88|114|162|none|True|none|True
+4|False|0|0|Currency|False|96|88|114|162|none|False|none|True
+4|False|0|1|Craft|none|96|88|114|162|none|False|1x |False
+4|False|0|1|Craft|True|96|88|114|162|none|True|1x |False
+4|False|0|1|Craft|False|96|88|114|162|none|False|1x |False
+4|False|0|1|BuyFromTp|none|96|88|114|162|none|False|1x |True
+4|False|0|1|BuyFromTp|True|96|88|114|162|none|True|1x |True
+4|False|0|1|BuyFromTp|False|96|88|114|162|none|False|1x |True
+4|False|0|1|Have|none|96|88|114|162|none|False|1x |True
+4|False|0|1|Have|True|96|88|114|162|none|True|1x |True
+4|False|0|1|Have|False|96|88|114|162|none|False|1x |True
+4|False|0|1|Currency|none|96|88|114|162|none|False|1x |True
+4|False|0|1|Currency|True|96|88|114|162|none|True|1x |True
+4|False|0|1|Currency|False|96|88|114|162|none|False|1x |True
+4|False|0|12|Craft|none|96|88|114|162|none|False|12x |False
+4|False|0|12|Craft|True|96|88|114|162|none|True|12x |False
+4|False|0|12|Craft|False|96|88|114|162|none|False|12x |False
+4|False|0|12|BuyFromTp|none|96|88|114|162|none|False|12x |True
+4|False|0|12|BuyFromTp|True|96|88|114|162|none|True|12x |True
+4|False|0|12|BuyFromTp|False|96|88|114|162|none|False|12x |True
+4|False|0|12|Have|none|96|88|114|162|none|False|12x |True
+4|False|0|12|Have|True|96|88|114|162|none|True|12x |True
+4|False|0|12|Have|False|96|88|114|162|none|False|12x |True
+4|False|0|12|Currency|none|96|88|114|162|none|False|12x |True
+4|False|0|12|Currency|True|96|88|114|162|none|True|12x |True
+4|False|0|12|Currency|False|96|88|114|162|none|False|12x |True
+4|False|2|0|Craft|none|96|88|114|162|>|False|none|False
+4|False|2|0|Craft|True|96|88|114|162|v|True|none|False
+4|False|2|0|Craft|False|96|88|114|162|>|False|none|False
+4|False|2|0|BuyFromTp|none|96|88|114|162|>|False|none|True
+4|False|2|0|BuyFromTp|True|96|88|114|162|v|True|none|True
+4|False|2|0|BuyFromTp|False|96|88|114|162|>|False|none|True
+4|False|2|0|Have|none|96|88|114|162|>|False|none|True
+4|False|2|0|Have|True|96|88|114|162|v|True|none|True
+4|False|2|0|Have|False|96|88|114|162|>|False|none|True
+4|False|2|0|Currency|none|96|88|114|162|>|False|none|True
+4|False|2|0|Currency|True|96|88|114|162|v|True|none|True
+4|False|2|0|Currency|False|96|88|114|162|>|False|none|True
+4|False|2|1|Craft|none|96|88|114|162|>|False|1x |False
+4|False|2|1|Craft|True|96|88|114|162|v|True|1x |False
+4|False|2|1|Craft|False|96|88|114|162|>|False|1x |False
+4|False|2|1|BuyFromTp|none|96|88|114|162|>|False|1x |True
+4|False|2|1|BuyFromTp|True|96|88|114|162|v|True|1x |True
+4|False|2|1|BuyFromTp|False|96|88|114|162|>|False|1x |True
+4|False|2|1|Have|none|96|88|114|162|>|False|1x |True
+4|False|2|1|Have|True|96|88|114|162|v|True|1x |True
+4|False|2|1|Have|False|96|88|114|162|>|False|1x |True
+4|False|2|1|Currency|none|96|88|114|162|>|False|1x |True
+4|False|2|1|Currency|True|96|88|114|162|v|True|1x |True
+4|False|2|1|Currency|False|96|88|114|162|>|False|1x |True
+4|False|2|12|Craft|none|96|88|114|162|>|False|12x |False
+4|False|2|12|Craft|True|96|88|114|162|v|True|12x |False
+4|False|2|12|Craft|False|96|88|114|162|>|False|12x |False
+4|False|2|12|BuyFromTp|none|96|88|114|162|>|False|12x |True
+4|False|2|12|BuyFromTp|True|96|88|114|162|v|True|12x |True
+4|False|2|12|BuyFromTp|False|96|88|114|162|>|False|12x |True
+4|False|2|12|Have|none|96|88|114|162|>|False|12x |True
+4|False|2|12|Have|True|96|88|114|162|v|True|12x |True
+4|False|2|12|Have|False|96|88|114|162|>|False|12x |True
+4|False|2|12|Currency|none|96|88|114|162|>|False|12x |True
+4|False|2|12|Currency|True|96|88|114|162|v|True|12x |True
+4|False|2|12|Currency|False|96|88|114|162|>|False|12x |True
+4|True|0|0|Craft|none|96|88|114|162|none|False|none|True
+4|True|0|0|Craft|True|96|88|114|162|none|True|none|True
+4|True|0|0|Craft|False|96|88|114|162|none|False|none|True
+4|True|0|0|BuyFromTp|none|96|88|114|162|none|False|none|True
+4|True|0|0|BuyFromTp|True|96|88|114|162|none|True|none|True
+4|True|0|0|BuyFromTp|False|96|88|114|162|none|False|none|True
+4|True|0|0|Have|none|96|88|114|162|none|False|none|True
+4|True|0|0|Have|True|96|88|114|162|none|True|none|True
+4|True|0|0|Have|False|96|88|114|162|none|False|none|True
+4|True|0|0|Currency|none|96|88|114|162|none|False|none|True
+4|True|0|0|Currency|True|96|88|114|162|none|True|none|True
+4|True|0|0|Currency|False|96|88|114|162|none|False|none|True
+4|True|0|1|Craft|none|96|88|114|162|none|False|1x |True
+4|True|0|1|Craft|True|96|88|114|162|none|True|1x |True
+4|True|0|1|Craft|False|96|88|114|162|none|False|1x |True
+4|True|0|1|BuyFromTp|none|96|88|114|162|none|False|1x |True
+4|True|0|1|BuyFromTp|True|96|88|114|162|none|True|1x |True
+4|True|0|1|BuyFromTp|False|96|88|114|162|none|False|1x |True
+4|True|0|1|Have|none|96|88|114|162|none|False|1x |True
+4|True|0|1|Have|True|96|88|114|162|none|True|1x |True
+4|True|0|1|Have|False|96|88|114|162|none|False|1x |True
+4|True|0|1|Currency|none|96|88|114|162|none|False|1x |True
+4|True|0|1|Currency|True|96|88|114|162|none|True|1x |True
+4|True|0|1|Currency|False|96|88|114|162|none|False|1x |True
+4|True|0|12|Craft|none|96|88|114|162|none|False|12x |True
+4|True|0|12|Craft|True|96|88|114|162|none|True|12x |True
+4|True|0|12|Craft|False|96|88|114|162|none|False|12x |True
+4|True|0|12|BuyFromTp|none|96|88|114|162|none|False|12x |True
+4|True|0|12|BuyFromTp|True|96|88|114|162|none|True|12x |True
+4|True|0|12|BuyFromTp|False|96|88|114|162|none|False|12x |True
+4|True|0|12|Have|none|96|88|114|162|none|False|12x |True
+4|True|0|12|Have|True|96|88|114|162|none|True|12x |True
+4|True|0|12|Have|False|96|88|114|162|none|False|12x |True
+4|True|0|12|Currency|none|96|88|114|162|none|False|12x |True
+4|True|0|12|Currency|True|96|88|114|162|none|True|12x |True
+4|True|0|12|Currency|False|96|88|114|162|none|False|12x |True
+4|True|2|0|Craft|none|96|88|114|162|>|False|none|True
+4|True|2|0|Craft|True|96|88|114|162|v|True|none|True
+4|True|2|0|Craft|False|96|88|114|162|>|False|none|True
+4|True|2|0|BuyFromTp|none|96|88|114|162|>|False|none|True
+4|True|2|0|BuyFromTp|True|96|88|114|162|v|True|none|True
+4|True|2|0|BuyFromTp|False|96|88|114|162|>|False|none|True
+4|True|2|0|Have|none|96|88|114|162|>|False|none|True
+4|True|2|0|Have|True|96|88|114|162|v|True|none|True
+4|True|2|0|Have|False|96|88|114|162|>|False|none|True
+4|True|2|0|Currency|none|96|88|114|162|>|False|none|True
+4|True|2|0|Currency|True|96|88|114|162|v|True|none|True
+4|True|2|0|Currency|False|96|88|114|162|>|False|none|True
+4|True|2|1|Craft|none|96|88|114|162|>|False|1x |True
+4|True|2|1|Craft|True|96|88|114|162|v|True|1x |True
+4|True|2|1|Craft|False|96|88|114|162|>|False|1x |True
+4|True|2|1|BuyFromTp|none|96|88|114|162|>|False|1x |True
+4|True|2|1|BuyFromTp|True|96|88|114|162|v|True|1x |True
+4|True|2|1|BuyFromTp|False|96|88|114|162|>|False|1x |True
+4|True|2|1|Have|none|96|88|114|162|>|False|1x |True
+4|True|2|1|Have|True|96|88|114|162|v|True|1x |True
+4|True|2|1|Have|False|96|88|114|162|>|False|1x |True
+4|True|2|1|Currency|none|96|88|114|162|>|False|1x |True
+4|True|2|1|Currency|True|96|88|114|162|v|True|1x |True
+4|True|2|1|Currency|False|96|88|114|162|>|False|1x |True
+4|True|2|12|Craft|none|96|88|114|162|>|False|12x |True
+4|True|2|12|Craft|True|96|88|114|162|v|True|12x |True
+4|True|2|12|Craft|False|96|88|114|162|>|False|12x |True
+4|True|2|12|BuyFromTp|none|96|88|114|162|>|False|12x |True
+4|True|2|12|BuyFromTp|True|96|88|114|162|v|True|12x |True
+4|True|2|12|BuyFromTp|False|96|88|114|162|>|False|12x |True
+4|True|2|12|Have|none|96|88|114|162|>|False|12x |True
+4|True|2|12|Have|True|96|88|114|162|v|True|12x |True
+4|True|2|12|Have|False|96|88|114|162|>|False|12x |True
+4|True|2|12|Currency|none|96|88|114|162|>|False|12x |True
+4|True|2|12|Currency|True|96|88|114|162|v|True|12x |True
+4|True|2|12|Currency|False|96|88|114|162|>|False|12x |True
