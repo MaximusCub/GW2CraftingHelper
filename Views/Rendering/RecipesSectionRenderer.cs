@@ -41,9 +41,10 @@ namespace GW2CraftingHelper.Views.Rendering
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
         }
 
-        // Left x of the name column (past the row's 34px framed icon at
-        // x=8), shared by the header and every row.
-        private const int NameX = 50;
+        // Left x of the name column (past the row's tier-2 framed icon at
+        // x=8, plus an 8px gap), shared by the header and every row.
+        private const int IconX = 8;
+        private const int NameX = IconX + PlanContentHeightMath.RowIconFrameSize + 8;
         private const string RecipeHeaderText = "Recipe";
         private const string StatusHeaderText = "Status";
         private const string DisciplineHeaderText = "Discipline";
@@ -150,9 +151,10 @@ namespace GW2CraftingHelper.Views.Rendering
             return (int)Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
-        // rowHeight 36 = a 34px rarity-framed icon at y=0 plus the 2px
-        // divider: an exact, non-overlapping fit, the same one Used
-        // Materials and the Shopping List already had. There is no second
+        // rowHeight 45 = the tier-2 rarity-framed icon (42) at y=0 plus
+        // the 2px divider plus the clearance pixel the height derivation
+        // absorbs: an exact, non-overlapping fit, the same one Used
+        // Materials and the Shopping List have. There is no second
         // row height any more - the discipline is a column, so no row is
         // two lines tall.
         private void CreateRecipeRow(
@@ -208,7 +210,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 wikiHint = WikiHintText;
             }
 
-            var iconFrame = IconControls.CreateItemIcon(rowPanel, row.IconUrl, row.Rarity, 8, 0);
+            var iconFrame = IconControls.CreateItemIcon(
+                rowPanel, row.IconUrl, row.Rarity, IconX, 0,
+                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
 
             var font = UiFonts.Body;
             string fullName = row.Label ?? "";
@@ -265,14 +269,14 @@ namespace GW2CraftingHelper.Views.Rendering
                     rowPanel, row.StatusTag, font, statusColor, edges.StatusRightEdge, NameY);
             }
 
-            // bottomClearance 0: at 36px this row is on
-            // LabelHelpers.CreateRowDivider's proven-immune list, and its
-            // icon frame is flush-fit with zero slack (0..34, divider
-            // 34..36) - clearance it does not need would put the divider
-            // back under the icon. The 48px variant that took 1px went with
-            // the sublabel line.
+            // IconRowDividerClearance: RecipeRowHeight (45) absorbs the
+            // clearance pixel in its own derivation, so the divider
+            // (42..44) sits exactly flush under the 0..42 icon frame - see
+            // the identical note in CreateUsedMaterialRow and the re-run
+            // simulation behind LabelHelpers.CreateRowDivider.
             RowRelayoutHelpers.FinishRow(
-                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
+                rowPanel, panelWidth, rowHeight, isLast,
+                PlanContentHeightMath.IconRowDividerClearance, _sink,
                 w =>
                 {
                     var e = scan.EdgesFor(w);
@@ -299,7 +303,10 @@ namespace GW2CraftingHelper.Views.Rendering
             });
         }
 
-        private const int NameY = 8;
+        // 12, not the pre-tier-2 8: the icon frame's center moved down 4px
+        // with the 34 -> 42 resize, and the reading line (name, discipline,
+        // status) keeps its offset from that center.
+        private const int NameY = 12;
 
         private const string WikiHintText = "Right-click: Open wiki page";
 

@@ -95,11 +95,20 @@ namespace GW2CraftingHelper.Views.Rendering
             return $"{quantity}x ";
         }
 
-        // Left x of the row's text run, and its fixed leading word - both
+        // Left x of the row's tier-2 icon frame (past the numbered badge),
+        // of the text run after it, and the run's fixed leading word - all
         // shared with Render()'s pre-scan so the measured extent is exactly
         // what the row lays out.
-        private const int TextX = 94; // iconX(52) + frame(34) + gap(8)
+        private const int IconX = 52;
+        private const int TextX = IconX + PlanContentHeightMath.RowIconFrameSize + 8;
         private const string CraftPrefix = "Craft ";
+
+        // Text anchor of the row's reading line. The tier-2 resize grew
+        // the icon frame 34 -> 42, moving its center down 4px; the line
+        // (13 -> 17) and the right-aligned sublabel (16 -> 20) keep their
+        // pre-tier-2 offsets from that center.
+        private const int RowTextY = 17;
+        private const int SublabelY = 20;
 
         // Gap the step name's ellipsis budget keeps between itself and the
         // sublabel band, matching the name-to-column gap every other table
@@ -113,8 +122,10 @@ namespace GW2CraftingHelper.Views.Rendering
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
             const int badgeSize = 36;
             const int badgeX = 8;
-            const int badgeY = 4;
-            const int iconX = 52;
+
+            // Centered in the row, as it was in the 44px shape (which
+            // wrote the same rule as a literal 4).
+            const int badgeY = (rowHeight - badgeSize) / 2;
 
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
@@ -145,7 +156,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = rowPanel,
             };
 
-            var iconFrame = IconControls.CreateItemIcon(rowPanel, row.IconUrl, row.Rarity, iconX, 5);
+            var iconFrame = IconControls.CreateItemIcon(
+                rowPanel, row.IconUrl, row.Rarity, IconX, PlanContentHeightMath.CraftStepIconY,
+                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
 
             var textFont = UiFonts.Body;
             var greyColor = new Color(170, 170, 170);
@@ -159,7 +172,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = CraftPrefix, Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel,
+                    Location = new Point(x, RowTextY), Parent = rowPanel,
                 });
             x += craftLabel.Width;
 
@@ -168,7 +181,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     Text = QtyPrefix(row.Quantity), Font = textFont, TextColor = greyColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(x, 13), Parent = rowPanel,
+                    Location = new Point(x, RowTextY), Parent = rowPanel,
                 });
             x += qtyLabel.Width;
 
@@ -188,7 +201,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     Font = textFont, TextColor = RarityColors.GetRarityNameColor(row.Rarity),
                     ShowShadow = true, ShadowColor = Color.Black * 0.8f,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(nameX, 13), Parent = rowPanel,
+                    Location = new Point(nameX, RowTextY), Parent = rowPanel,
                 });
             StampNameTooltip(rowPanel, nameLabel, iconFrame, fullName);
 
@@ -198,22 +211,25 @@ namespace GW2CraftingHelper.Views.Rendering
                 sublabelLabel = LabelHelpers.CreateRightAlignedLabel(
                     rowPanel, row.Sublabel, UiFonts.Caption,
                     new Color(153, 153, 153),
-                    PlanRelayoutMath.PinnedRightEdge(panelWidth), 16);
+                    PlanRelayoutMath.PinnedRightEdge(panelWidth), SublabelY);
             }
 
-            // M36b: bottomClearance 1 - CraftStepRowHeight (44) is
-            // VULNERABLE to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment): its icon frame bottom
-            // (iconY 5 + 34 = 39) sits 2px clear of the new divider top
-            // (rowHeight-3 = 41), so the 1px shift is free of
-            // icon-clearance side effects.
+            // IconRowDividerClearance - CraftStepRowHeight (52) is in the
+            // Container.Paint round-trip defect's vulnerable class like
+            // the 44px shape before it (see LabelHelpers.CreateRowDivider
+            // and the re-run simulation in
+            // RowDividerScissorSimulationTests): its icon frame bottom
+            // (CraftStepIconY 5 + 42 = 47) sits 2px clear of the divider
+            // top (rowHeight - 3 = 49), so the clearance is free of
+            // icon-overlap side effects.
             //
             // Name/qty labels sit at a fixed x (font-only, not
             // width-dependent - textX never depended on panelWidth); only
             // the row width, its divider, and the right-aligned sublabel
             // need to move.
             RowRelayoutHelpers.FinishRow(
-                rowPanel, panelWidth, rowHeight, isLast, 1, _sink,
+                rowPanel, panelWidth, rowHeight, isLast,
+                PlanContentHeightMath.IconRowDividerClearance, _sink,
                 w =>
                 {
                     if (sublabelLabel != null)
@@ -221,7 +237,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         sublabelLabel.Location = new Point(
                             PlanRelayoutMath.RightAlignedX(
                                 PlanRelayoutMath.PinnedRightEdge(w), sublabelLabel.Width),
-                            16);
+                            SublabelY);
                     }
                 });
             _sink.AddReellipsis(w =>

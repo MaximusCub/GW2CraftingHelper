@@ -658,8 +658,14 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private const int TreeRowHeight = PlanContentHeightMath.TreeRowHeight;
 
-        // Defined in PlanRelayoutMath, which owns the column arithmetic and
-        // the measurement behind the width.
+        // Row-local vertical anchors. The tier-2 icon resize grew the row
+        // 40 -> 48, so the icon frame's center moved down 4px; each anchor
+        // keeps its pre-tier-2 offset from that center (caret/qty/name/cost
+        // 12 -> 16, pills 10 -> 14). The icon itself stays top-padded by
+        // PlanContentHeightMath.TreeRowIconPad, which is the height law's
+        // own term.
+        private const int TreeRowTextY = 16;
+        private const int TreeRowPillY = 14;
         private const int TreePillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private const int TreeCostColumnWidth = 150;
         private const int TreeRightMargin = 8;
@@ -845,7 +851,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     TextColor = arrowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(indent, 12),
+                    Location = new Point(indent, TreeRowTextY),
                     Parent = rowPanel,
                 };
             }
@@ -857,7 +863,7 @@ namespace GW2CraftingHelper.Views.Rendering
             int iconX = shape.IconX;
             Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, node.IconUrl, frameColor, iconX, 3,
+                rowPanel, node.IconUrl, frameColor, iconX, PlanContentHeightMath.TreeRowIconPad,
                 TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconBorder);
             Panel iconScrim = null;
             if (dimmed)
@@ -865,7 +871,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 iconScrim = new Panel()
                 {
                     Size = new Point(TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconSize),
-                    Location = new Point(iconX + TreeRowShapePlanner.IconBorder, 3 + TreeRowShapePlanner.IconBorder),
+                    Location = new Point(
+                        iconX + TreeRowShapePlanner.IconBorder,
+                        PlanContentHeightMath.TreeRowIconPad + TreeRowShapePlanner.IconBorder),
                     BackgroundColor = Color.Black * 0.5f,
                     Parent = rowPanel,
                 };
@@ -956,7 +964,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         TextColor = qtyColor,
                         AutoSizeWidth = true,
                         AutoSizeHeight = true,
-                        Location = new Point(nameX, 12),
+                        Location = new Point(nameX, TreeRowTextY),
                         Parent = rowPanel,
                     });
             }
@@ -971,7 +979,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     ShadowColor = dimmed ? Color.Black * 0.4f : Color.Black * 0.8f,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(nameX + qtyWidth, 12),
+                    Location = new Point(nameX + qtyWidth, TreeRowTextY),
                     Parent = rowPanel,
                 });
             handle.QtyLabel = qtyLabel;
@@ -1011,7 +1019,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // selection - click sets the override and re-solves), or a
             // single locked/HAVE/CURRENCY pill when there is no choice.
             var pillPanels = handle.Pills;
-            RenderDecisionPills(rowPanel, node, pillColX, 10, dimmed, pillPanels);
+            RenderDecisionPills(rowPanel, node, pillColX, TreeRowPillY, dimmed, pillPanels);
 
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
@@ -1257,7 +1265,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     int x = e.PillColX;
                     foreach (var pill in handle.Pills)
                     {
-                        pill.Location = new Point(x, 10);
+                        pill.Location = new Point(x, TreeRowPillY);
                         x += pill.Width + PillGap;
                     }
                 }
@@ -1268,7 +1276,7 @@ namespace GW2CraftingHelper.Views.Rendering
                         handle.CostCell,
                         TreeCostColumnMath.ComputeRowEdges(
                             e.CostRightEdge, handle.ColumnWidths, handle.RowDrawsCurrency),
-                        12);
+                        TreeRowTextY);
                 }
 
                 if (childFlow != null)
@@ -1332,7 +1340,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 handle.RowPanel, node.SubtreeCost.Value, currencyAmounts,
                 TreeCostColumnMath.ComputeRowEdges(
                     costRightEdge, handle.ColumnWidths, handle.RowDrawsCurrency),
-                12, UiFonts.Body, dimmed ? 0.35f : 1f);
+                TreeRowTextY, UiFonts.Body, dimmed ? 0.35f : 1f);
         }
 
         /// <summary>
@@ -1513,7 +1521,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 {
                     handle.QtyLabel.Text = newQtyPrefix;
                     handle.QtyWidth = (int)Math.Ceiling(nameFont.MeasureString(newQtyPrefix).Width);
-                    handle.NameLabel.Location = new Point(handle.NameX + handle.QtyWidth, 12);
+                    handle.NameLabel.Location = new Point(handle.NameX + handle.QtyWidth, TreeRowTextY);
                 }
             }
 
@@ -1530,7 +1538,7 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             DisposePills(handle.Pills);
-            RenderDecisionPills(handle.RowPanel, newNode, edges.PillColX, 10, handle.Dimmed, handle.Pills);
+            RenderDecisionPills(handle.RowPanel, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed, handle.Pills);
 
             DisposeValueCell(handle.CostCell);
             RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);

@@ -46,11 +46,17 @@ namespace GW2CraftingHelper.Views.Rendering
             _getItemStatBlock = getItemStatBlock;
         }
 
-        // Left x of the name column (past the row's 32px icon at x=8), and
-        // the gap the ellipsis budget keeps between the name and the
-        // Amount column.
-        private const int NameX = 50;
+        // Left x of the name column (past the row's tier-2 icon frame at
+        // x=8, plus an 8px gap), and the gap the ellipsis budget keeps
+        // between the name and the Amount column.
+        private const int IconX = 8;
+        private const int NameX = IconX + PlanContentHeightMath.RowIconFrameSize + 8;
         private const int NameToQtyGap = 12;
+
+        // Text anchor of the row's single reading line. The tier-2 resize
+        // grew the icon frame 34 -> 42, moving its center down 4px; the
+        // line keeps its pre-tier-2 offset from that center (9 -> 13).
+        private const int RowTextY = 13;
 
         /// <summary>
         /// One-pass pre-scan, as every other plan table has: the widest
@@ -134,12 +140,10 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
-            // Icon y=0 (was 1) - the 34px icon frame previously left
-            // only 1px of clearance above rowHeight (36), which was exactly
-            // enough for the old 1px divider but would overlap the new 2px
-            // divider's top pixel by 1 row. Moving the icon up by 1 makes
-            // frame height (34) + divider height (2) exactly fill rowHeight
-            // with no overlap.
+            // Icon y=0: the tier-2 frame (42) + divider (2) + the
+            // clearance pixel (1) exactly fill rowHeight (45) with no
+            // overlap - the flush-fit law UsedMaterialRowHeight's own
+            // derivation states.
             // maxQtyWidth, not this row's own qtyWidth: the Amount column
             // is a reserved band right-aligned on the pinned edge, so the
             // name's budget stops at the band's LEFT edge. Budgeting
@@ -147,8 +151,9 @@ namespace GW2CraftingHelper.Views.Rendering
             // column's widest value.
             string fullName = row.Label ?? "";
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
-                qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
+                qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, RowTextY,
+                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
             // Composed at HOVER time, not here: a plan restored from disk
             // fills its stat cache in the background (Q13), and a snapshot
             // taken now could never show what lands after it. It also
@@ -173,7 +178,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     TextColor = new Color(200, 200, 200),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(qtyRightEdge - qtyWidth, 9),
+                    Location = new Point(qtyRightEdge - qtyWidth, RowTextY),
                     Parent = rowPanel,
                 });
             TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
@@ -183,17 +188,20 @@ namespace GW2CraftingHelper.Views.Rendering
             // only re-ellipsized at settle (RunReellipsis) to avoid a
             // MeasureString call per row per tick.
             //
-            // bottomClearance 0 - UsedMaterialRowHeight (36) is
-            // immune to the Container.Paint round-trip defect (see
-            // LabelHelpers.CreateRowDivider's doc comment) and its icon frame is
-            // flush-fit with zero slack; giving it clearance it doesn't
-            // need would reintroduce the icon/divider overlap.
+            // IconRowDividerClearance, not 0: UsedMaterialRowHeight (45)
+            // absorbs the clearance pixel in its own derivation, so the
+            // divider (top = 45 - 2 - 1 = 42) sits exactly flush under the
+            // 0..42 icon frame - no overlap, and the simulation behind
+            // LabelHelpers.CreateRowDivider (re-run at the tier-2 heights,
+            // executable in RowDividerScissorSimulationTests) proves 45
+            // needs the clearance where the old 36 did not.
             RowRelayoutHelpers.FinishRow(
-                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
+                rowPanel, panelWidth, rowHeight, isLast,
+                PlanContentHeightMath.IconRowDividerClearance, _sink,
                 w =>
                 {
                     qtyLabel.Location = new Point(
-                        PlanRelayoutMath.PinnedRightEdge(w) - qtyWidth, 9);
+                        PlanRelayoutMath.PinnedRightEdge(w) - qtyWidth, RowTextY);
                 });
             // The re-ellipsis no longer re-stamps anything: the tooltip
             // builder above reads the label's CURRENT text when the box is

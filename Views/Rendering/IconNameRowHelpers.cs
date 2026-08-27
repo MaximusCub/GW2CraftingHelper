@@ -13,8 +13,10 @@ namespace GW2CraftingHelper.Views.Rendering
     // then PlanRelayoutMath.NameMaxWidthBeforeColumn -> LabelHelpers.
     // EllipsizeToWidth -> a rarity-colored, drop-shadowed name Label at
     // (nameX, nameY) - confirmed identical at every one of those call sites
-    // (same nameX 50, nameY 9, icon (8, 0), NameMaxWidthBeforeColumn
-    // gap 12 - confirmed by constant-by-constant comparison).
+    // (same nameX 58, nameY 13, icon (8, 0) at the tier-2 size,
+    // NameMaxWidthBeforeColumn gap 12 - originally confirmed by
+    // constant-by-constant comparison at the pre-tier-2 50/9, and the two
+    // callers moved to the tier-2 numbers together).
     //
     // Deliberately NOT adopted by CraftStepsSectionRenderer.CreateCraftStepRow,
     // DisciplinesSectionRenderer.CreateDisciplineRow, or
