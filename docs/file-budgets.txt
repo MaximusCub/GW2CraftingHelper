@@ -405,7 +405,7 @@ tests/GW2CraftingHelper.Tests/Services/PhaseOrdinalGuardTests.cs                
 tests/GW2CraftingHelper.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/GW2CraftingHelper.Tests/Services/PillSubduingTooltipBuilderTests.cs               130
 tests/GW2CraftingHelper.Tests/Services/PillTooltipTextComposerTests.cs                  284
-tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    484
+tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    530
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryLabelsTests.cs                         77
@@ -445,8 +445,8 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderMultiItemTests.cs    
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesCompetencyTests.cs      101
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesExcessTests.cs          185
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesForgeScopeTests.cs       53
-tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesRecipeSheetSavingsTests.cs99
-tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesSeasonalVendorTipTests.cs195
+tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesRecipeSheetSavingsTests.cs 99
+tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesSeasonalVendorTipTests.cs 195
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSellEconomicsTests.cs        193
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderShoppingListTests.cs         444
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs         635
@@ -473,6 +473,7 @@ tests/GW2CraftingHelper.Tests/Services/RecipesColumnMathTests.cs                
 tests/GW2CraftingHelper.Tests/Services/RequestLabelFormatterTests.cs                     76
 tests/GW2CraftingHelper.Tests/Services/RequiredRecipesVisibilityTests.cs                144
 tests/GW2CraftingHelper.Tests/Services/ResizeSettleDebounceTests.cs                     302
+tests/GW2CraftingHelper.Tests/Services/RowDividerScissorSimulationTests.cs              252
 tests/GW2CraftingHelper.Tests/Services/ScrollAnchorMathTests.cs                         239
 tests/GW2CraftingHelper.Tests/Services/ScrollMathTests.cs                               104
 tests/GW2CraftingHelper.Tests/Services/SeasonalOfferFilterTests.cs                       86
@@ -516,7 +517,7 @@ tests/GW2CraftingHelper.Tests/Services/TradingPostServiceTests.cs               
 tests/GW2CraftingHelper.Tests/Services/TreeChipStripLayoutTests.cs                      283
 tests/GW2CraftingHelper.Tests/Services/TreeCostColumnMathTests.cs                       469
 tests/GW2CraftingHelper.Tests/Services/TreeRowIdentityTests.cs                          246
-tests/GW2CraftingHelper.Tests/Services/TreeRowShapeGoldenTests.cs                       136
+tests/GW2CraftingHelper.Tests/Services/TreeRowShapeGoldenTests.cs                       145
 tests/GW2CraftingHelper.Tests/Services/TreeRowTooltipComposerTests.cs                   505
 tests/GW2CraftingHelper.Tests/Services/TypeRampMetricsTests.cs                          150
 tests/GW2CraftingHelper.Tests/Services/ValueDetailTooltipBuilderTests.cs                191
