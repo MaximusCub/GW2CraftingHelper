@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Builds the shopping-row tooltip's per-currency HAVE/NEED line(s)

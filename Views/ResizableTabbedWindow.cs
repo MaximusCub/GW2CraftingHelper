@@ -4,7 +4,7 @@ using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// TabbedWindow2 subclass that enforces a minimum window size,

@@ -1,9 +1,9 @@
 using System;
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Loads/saves the generated Crafting Plan tab's content so it

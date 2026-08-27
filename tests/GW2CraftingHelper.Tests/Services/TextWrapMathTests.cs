@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // TextWrapMath is the Blish-free half of the Plan Notes wrapping fix
     // (audit finding M14) and of LabelHelpers.EllipsizeToWidth, which is now

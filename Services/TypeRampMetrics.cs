@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The measured Menomonia glyph metrics behind every vertical constant

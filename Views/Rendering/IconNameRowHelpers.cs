@@ -1,9 +1,9 @@
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // Factors the "icon +
     // ellipsized name label, re-ellipsized on drag-settle" shape that

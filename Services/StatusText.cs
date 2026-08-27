@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal static class StatusText
     {

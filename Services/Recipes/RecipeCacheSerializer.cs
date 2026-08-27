@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace GW2CraftingHelper.Services.Recipes
+namespace TaimisToolbench.Services.Recipes
 {
     internal class RecipeSearchSeedData
     {

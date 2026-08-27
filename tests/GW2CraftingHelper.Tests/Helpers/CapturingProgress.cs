@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Synchronous IProgress implementation that captures all reports to a list.

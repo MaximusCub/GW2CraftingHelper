@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services.Diagnostics;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services.Diagnostics;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class CraftingPlanPipeline
     {

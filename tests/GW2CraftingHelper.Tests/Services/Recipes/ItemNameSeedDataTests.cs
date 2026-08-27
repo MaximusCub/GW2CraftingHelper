@@ -1,12 +1,12 @@
 using System.IO;
 using System.Linq;
 using System.Text;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services.Recipes
+namespace TaimisToolbench.Tests.Services.Recipes
 {
     public class ItemNameSeedDataTests
     {

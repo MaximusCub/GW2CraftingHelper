@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // The restore -> inputs mapping (PersistedPlan -> what the input
     // strip's rows should show). Round-trip tests go through a REAL
@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         public RestoredRequestInputsTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "GW2CraftingHelper_Tests_" + Guid.NewGuid().ToString("N"));
+            _tempDir = Path.Combine(Path.GetTempPath(), "TaimisToolbench_Tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_tempDir);
             _store = new PlanStore(_tempDir);
         }

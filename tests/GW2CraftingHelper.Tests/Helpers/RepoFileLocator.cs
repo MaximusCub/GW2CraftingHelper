@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Locates real repo files (e.g. ref/*.json seed files) from the

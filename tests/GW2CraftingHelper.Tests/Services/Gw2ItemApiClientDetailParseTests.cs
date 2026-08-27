@@ -1,9 +1,9 @@
 using System.Linq;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// Drives the real <see cref="Gw2ItemApiClient"/> parser over verbatim

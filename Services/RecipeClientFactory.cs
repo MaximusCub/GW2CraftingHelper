@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal static class RecipeClientFactory
     {

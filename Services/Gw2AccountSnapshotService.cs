@@ -5,10 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Modules.Managers;
-using GW2CraftingHelper.Models;
 using Gw2Sharp.WebApi.V2.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class Gw2AccountSnapshotService
     {

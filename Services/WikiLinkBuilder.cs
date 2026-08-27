@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure GW2 wiki URL construction (UI-bundle milestone, Feature A -

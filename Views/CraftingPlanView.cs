@@ -1,18 +1,18 @@
-using Blish_HUD;
-using Blish_HUD.Content;
-using Blish_HUD.Controls;
-using Blish_HUD.Input;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
-using Microsoft.Xna.Framework;
-using MonoGame.Extended.BitmapFonts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Blish_HUD;
+using Blish_HUD.Content;
+using Blish_HUD.Controls;
+using Blish_HUD.Input;
+using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
 // The one deliberate use of #region in the codebase - navigation markers
 // for a very large class pending further extraction; scoped to this file
@@ -31,7 +31,7 @@ using System.Threading.Tasks;
 // Anything added here needs a name of its own, not a "(continued)".
 #pragma warning disable SA1124 // Do not use regions
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     internal class CraftingPlanView : ISectionRelayoutSink, ITreePlanHost
     {

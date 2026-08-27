@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Cross-tab control geometry that was being re-picked per construction

@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// opportunity-notes (RECIPE-SHEET SAVINGS) - direct unit tests on
@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         public RecipeSheetSavingsCalculatorTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "GW2CraftingHelper_Tests_" + Guid.NewGuid());
+            _tempDir = Path.Combine(Path.GetTempPath(), "TaimisToolbench_Tests_" + Guid.NewGuid());
             Directory.CreateDirectory(_tempDir);
             _loader = new VendorOfferLoader();
         }

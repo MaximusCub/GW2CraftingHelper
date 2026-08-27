@@ -1,10 +1,10 @@
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// THE item-icon component: every item, currency and search-result icon

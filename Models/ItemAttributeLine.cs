@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// One resolved attribute row of an item's stat block - "+141 Power".

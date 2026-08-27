@@ -1,12 +1,12 @@
+using System;
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
-using System;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // The Required Disciplines row list, plus the column header row this
     // renderer owns directly.

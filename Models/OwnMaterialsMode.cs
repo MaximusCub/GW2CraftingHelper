@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// How the plan values materials the player already owns and that

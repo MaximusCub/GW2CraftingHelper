@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Flattens a <see cref="TooltipContent"/> to plain strings, for tests

@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The module's ONE column-grid law: how many equal columns of a given

@@ -1,6 +1,6 @@
 using Microsoft.Xna.Framework;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     internal static class RarityColors
     {

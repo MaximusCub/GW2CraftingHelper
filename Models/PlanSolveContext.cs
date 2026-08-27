@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Everything needed to re-solve a generated plan locally (no network):

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // Field-tested pain: at CHARACTER SELECT, Blish has not yet
     // resolved the game's Mumble identity, so every account data source

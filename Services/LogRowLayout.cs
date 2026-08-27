@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Column arithmetic for one Log tab row: where the message column

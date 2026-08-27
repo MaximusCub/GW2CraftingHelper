@@ -1,10 +1,10 @@
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // Quality-audit fix (B3): MysticForgeRecipeData.LoadWarnings used to be
     // collected by MysticForgeRecipeData.Load and then discarded - the sole

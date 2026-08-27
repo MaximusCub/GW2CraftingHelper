@@ -1,11 +1,11 @@
+using System.Collections.Generic;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
-using System.Collections.Generic;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // The one place the coin-icon-right-of-number invariant (CLAUDE.md) is
     // implemented: every coin amount the module draws goes through here.

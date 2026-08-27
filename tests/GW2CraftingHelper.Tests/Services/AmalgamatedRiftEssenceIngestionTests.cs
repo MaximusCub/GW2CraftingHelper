@@ -4,13 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// KNOWN-ISSUES #48: end-to-end
@@ -25,7 +25,7 @@ namespace GW2CraftingHelper.Tests.Services
     ///
     /// The seeded recipe row below is the REAL entry now shipped in
     /// ref/recipes_seed.json after re-running
-    /// tools/GW2CraftingHelper.RecipeSeeder (verified byte-for-byte
+    /// tools/TaimisToolbench.RecipeSeeder (verified byte-for-byte
     /// against a live `curl .../v2/recipes/14025?v=` fetch - see
     /// Gw2RecipeApiClientParseTests' own real-JSON test for that capture).
     /// It is loaded through the exact same production deserialization path

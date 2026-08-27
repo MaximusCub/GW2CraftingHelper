@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class ItemMetadataServiceTests
     {
@@ -67,10 +67,10 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var api = new InMemoryItemApiClient();
             api.AddItem(1, "Api Name", "api.png", "Exotic");
-            var seed = new GW2CraftingHelper.Services.Recipes.ItemNameSeedData(
-                new List<GW2CraftingHelper.Services.Recipes.ItemNameEntry>
+            var seed = new TaimisToolbench.Services.Recipes.ItemNameSeedData(
+                new List<TaimisToolbench.Services.Recipes.ItemNameEntry>
                 {
-                    new GW2CraftingHelper.Services.Recipes.ItemNameEntry
+                    new TaimisToolbench.Services.Recipes.ItemNameEntry
                     {
                         Id = 2, Name = "Seed Name", Icon = "seed.png",
                     },

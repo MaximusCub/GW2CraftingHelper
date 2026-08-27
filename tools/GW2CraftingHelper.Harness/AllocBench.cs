@@ -5,10 +5,10 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Harness
+namespace TaimisToolbench.Harness
 {
     /// <summary>
     /// Allocation microbenchmarks for the Blish-free per-interaction paths

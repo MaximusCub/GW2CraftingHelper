@@ -7,13 +7,13 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Blish_HUD.Modules;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The About tab: static,
@@ -52,7 +52,7 @@ namespace GW2CraftingHelper.Views
     {
         private static readonly Logger Logger = Logger.GetLogger<AboutTabContent>();
 
-        private const string ModuleDisplayName = "GW2 Crafting Helper";
+        private const string ModuleDisplayName = "Taimi's Toolbench";
         // The ONE phrasing for a value the module could not resolve.
         // Three lived here - "unknown" for a version, "Not set in
         // manifest.json" for the source URL, "Not listed in manifest.json"
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Views
         // approved this exact wording - ship the literal string as-is, do
         // not derive or reword it.
         private const string ArenaNetDisclaimerText =
-            "GW2 Crafting Helper is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
+            "Taimi's Toolbench is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
 
         // The gw2efficiency design-reference credit. Like
         // ArenaNetDisclaimerText, the maintainer

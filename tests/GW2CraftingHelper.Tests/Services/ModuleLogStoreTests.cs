@@ -1,10 +1,10 @@
 using System;
 using System.IO;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // Real temp-dir file IO,
     // no mocked/fake I/O - same shape as VendorOfferStoreTests/StatusStoreTests.

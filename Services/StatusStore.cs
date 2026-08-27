@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class StatusStore
     {

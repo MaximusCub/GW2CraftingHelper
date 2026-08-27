@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace GW2CraftingHelper.Services.Diagnostics
+namespace TaimisToolbench.Services.Diagnostics
 {
     internal static class PlanTimingAnalyzer
     {

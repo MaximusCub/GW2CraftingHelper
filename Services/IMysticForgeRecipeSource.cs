@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal interface IMysticForgeRecipeSource
     {

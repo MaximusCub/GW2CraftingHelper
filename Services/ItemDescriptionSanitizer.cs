@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Turns a /v2/items "description" into tooltip spans. The API's own

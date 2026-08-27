@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Models
+namespace TaimisToolbench.Tests.Models
 {
     // CurrencyDecisionDefaults is a static
     // curated table, not a service - these tests pin its structural

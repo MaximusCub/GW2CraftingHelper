@@ -1,8 +1,8 @@
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // Three call sites: CreateCollapsibleSection's default fallback case
     // (still inside CraftingPlanView), CraftStepsSectionRenderer's

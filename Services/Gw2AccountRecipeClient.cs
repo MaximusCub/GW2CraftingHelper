@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Blish_HUD.Modules.Managers;
 using Gw2Sharp.WebApi.V2.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class Gw2AccountRecipeClient : IAccountRecipeClient
     {

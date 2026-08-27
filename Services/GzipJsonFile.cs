@@ -2,7 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The module's one gzip container implementation, factored out of

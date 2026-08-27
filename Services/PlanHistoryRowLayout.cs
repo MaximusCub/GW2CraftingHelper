@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure column arithmetic for one Plan History row, in the shape of

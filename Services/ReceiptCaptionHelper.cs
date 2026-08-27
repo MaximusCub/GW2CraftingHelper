@@ -1,6 +1,6 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure "which child index gets which caption" logic for the UI-bundle

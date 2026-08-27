@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Verbatim /v2/items responses, captured from the live GW2 API, for

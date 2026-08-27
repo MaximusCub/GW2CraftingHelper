@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Classifies a raw Blish HUD wheel delta (GameService.Input.Mouse.

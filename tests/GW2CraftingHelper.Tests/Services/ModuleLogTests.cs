@@ -2,11 +2,11 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // ModuleLog is an
     // ordinary instantiable class specifically so tests can construct

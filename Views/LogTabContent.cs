@@ -5,12 +5,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The Log tab's search/view pane (dev/proposals/d2-log-system.md Section 3):

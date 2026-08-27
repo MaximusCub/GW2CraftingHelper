@@ -6,13 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The Plan History tab: a list of previously-generated plans, newest

@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Services.Recipes;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Checks a shipped seed corpus against the manifest its own seeder
@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Tests.Helpers
         };
 
         /// <summary>
-        /// Asserts that a seed file written by tools/GW2CraftingHelper.RecipeSeeder
+        /// Asserts that a seed file written by tools/TaimisToolbench.RecipeSeeder
         /// still has the row count and bytes its manifest records, and that
         /// the caller loaded exactly that many rows out of it.
         /// </summary>
@@ -56,7 +56,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             Assert.True(
                 record != null,
                 "ref/recipe_seed_manifest.json has no integrity record for " + fileName
-                    + ". Re-run tools/GW2CraftingHelper.RecipeSeeder, which writes one "
+                    + ". Re-run tools/TaimisToolbench.RecipeSeeder, which writes one "
                     + "per seed file it produces.");
 
             AssertFileMatches(fileName, record.RowCount, record.Sha256, loadedRowCount);

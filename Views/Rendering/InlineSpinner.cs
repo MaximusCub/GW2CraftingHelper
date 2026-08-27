@@ -1,8 +1,8 @@
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Blish's own module-load spinner, used inline in this module's status

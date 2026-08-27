@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services.Recipes
+namespace TaimisToolbench.Tests.Services.Recipes
 {
     /// <summary>
     /// Regression: the real,
@@ -111,7 +111,7 @@ namespace GW2CraftingHelper.Tests.Services.Recipes
                 // The reseed
                 // that added the rows above silently dropped recipe
                 // -1591's (Mystic Clover) fractional ExpectedOutputCount
-                // (0.31 -> null) - tools/GW2CraftingHelper.RecipeSeeder's
+                // (0.31 -> null) - tools/TaimisToolbench.RecipeSeeder's
                 // MergeMysticForgeRecipes never copied the field from
                 // ref/mystic_forge_recipes.json. RecipeService.
                 // GetRecipeCachedAsync consults this seeded row before ever

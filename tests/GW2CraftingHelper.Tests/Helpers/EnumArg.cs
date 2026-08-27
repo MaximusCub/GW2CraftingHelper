@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Turns a <c>nameof</c> enum-member string from an <c>[InlineData]</c> row
