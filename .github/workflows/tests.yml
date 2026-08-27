@@ -285,6 +285,39 @@ jobs:
           fi
           echo "No out-of-repo spec-section citations in module source."
 
+      - name: Old module name stays gone (rename tripwire)
+        shell: bash
+        run: |
+          # The module was renamed to Taimi's Toolbench before v0.3.0 shipped.
+          # The old name is a unique string, so its absence is checkable: this
+          # step fails on any case-insensitive occurrence of the old one-word
+          # identifier or the old spaced display name, in file contents or in
+          # tracked file names. The patterns are assembled from halves so this
+          # step never matches itself.
+          #
+          # Allowlist, and why each entry earns it:
+          #   CHANGELOG.md    the 0.3.0 rename entry names what changed - that
+          #                   mention is the point of the entry
+          #   dev/            dated point-in-time records, frozen by policy
+          #   docs/research/  same policy (both trees are already excluded
+          #                   from the live-docs path check above)
+          #   CLAUDE.md       PENDING: cites the on-disk clone folder, which
+          #                   renames in the finale (docs/RENAMING.md). Remove
+          #                   this entry in the commit that updates that path.
+          a="Crafting"; b="Helper"
+          allow='^(dev/|docs/research/|CHANGELOG\.md$|CLAUDE\.md$)'
+          hits=$(git ls-files -z | grep -zvE "$allow" \
+            | xargs -0 -r grep -liE "$a$b|$a $b" || true)
+          named=$(git ls-files | grep -vE "$allow" | grep -iE "$a.?$b" || true)
+          if [ -n "$hits$named" ]; then
+            echo "The old module name has crept back in. Rename it, or extend"
+            echo "the documented allowlist in this step if it is history."
+            [ -n "$hits" ] && { echo "content:"; echo "$hits"; }
+            [ -n "$named" ] && { echo "file names:"; echo "$named"; }
+            exit 1
+          fi
+          echo "No stray occurrences of the old module name."
+
       - name: Relative links in tracked markdown resolve
         shell: bash
         run: |
