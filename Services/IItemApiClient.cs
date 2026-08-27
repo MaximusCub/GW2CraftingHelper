@@ -110,6 +110,17 @@ namespace GW2CraftingHelper.Services
         /// Absent on ascended food (measured on 91805), which returns
         /// details:{type:Food} and nothing else.</summary>
         public string NourishmentDescription { get; set; }
+
+        /// <summary>details.name - the consumable effect's own name
+        /// ("Nourishment" on 89002, "Sugar Rush" on 36041). The game
+        /// renders it as the effect block's lead-in.</summary>
+        public string EffectName { get; set; }
+
+        /// <summary>details.icon - the effect's render-service icon URL
+        /// (the apple on food, measured on 89002/12452). Carried so the
+        /// tooltip can draw the game's inline effect icon without a
+        /// second request.</summary>
+        public string EffectIconUrl { get; set; }
     }
 
     internal class RawItemAttribute

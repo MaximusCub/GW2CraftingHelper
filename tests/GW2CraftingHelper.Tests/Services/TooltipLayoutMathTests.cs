@@ -214,7 +214,7 @@ namespace GW2CraftingHelper.Tests.Services
             TooltipLayoutMath.Place(600, 500, 200, 100, 1920, 1080, out int x, out int y);
 
             Assert.Equal(600, x);
-            Assert.Equal(500 - TooltipLayoutMath.CursorGap - 100, y);
+            Assert.Equal(500 - TooltipLayoutMath.CursorGapAbove - 100, y);
         }
 
         [Fact]
@@ -222,7 +222,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             TooltipLayoutMath.Place(600, 40, 200, 100, 1920, 1080, out _, out int y);
 
-            Assert.Equal(40 + TooltipLayoutMath.CursorGap, y);
+            Assert.Equal(40 + TooltipLayoutMath.CursorGapBelow, y);
         }
 
         [Fact]
@@ -237,7 +237,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(y + height <= 1080 - TooltipLayoutMath.ScreenEdgeMargin);
             Assert.True(y >= TooltipLayoutMath.ScreenEdgeMargin);
             // Blish would have produced this, off the bottom edge.
-            Assert.NotEqual(mouseY + TooltipLayoutMath.CursorGap, y);
+            Assert.NotEqual(mouseY + TooltipLayoutMath.CursorGapBelow, y);
         }
 
         [Fact]
@@ -307,6 +307,52 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(layout.Rows[1].IconUrl);
             Assert.Equal(0, layout.Rows[1].Spans[0].X);
             Assert.Equal(54, layout.Height);
+        }
+
+        [Fact]
+        public void EffectRows_AreIndented_OneLinePitchTall_WithTheIconOnTheFirstRowOnly()
+        {
+            // The consumable effect block (live3 soul-pastries /
+            // candy-corn, 2026-08-26): every row of the block is indented
+            // past the inline icon, rows stay one line pitch tall, and the
+            // icon rides the first row only - a wrapped continuation
+            // included.
+            var content = new TooltipContentBuilder()
+                .EffectBlock("apple.png", "aaaa bbbb\ncc", TooltipSpanRole.Muted)
+                .Build();
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth, effectIndent: 31);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.All(layout.Rows, r => Assert.Equal(TooltipLineKind.Effect, r.Kind));
+            Assert.All(layout.Rows, r => Assert.Equal(20, r.Height));
+            Assert.Equal("apple.png", layout.Rows[0].IconUrl);
+            Assert.Null(layout.Rows[1].IconUrl);
+            Assert.Equal(31, layout.Rows[0].Spans[0].X);
+            Assert.Equal(31, layout.Rows[1].Spans[0].X);
+        }
+
+        [Fact]
+        public void AWrappedEffectLineKeepsItsIndentKindAndSingleIcon()
+        {
+            // 31px indent leaves 90px of a 121px budget for text at 10px a
+            // character: "aaaa bbbb" (90) fits, "cccc" wraps, and the
+            // wrapped row is still an indented Effect row with no second
+            // icon.
+            var content = new TooltipContentBuilder()
+                .EffectBlock("apple.png", "aaaa bbbb cccc", TooltipSpanRole.Muted)
+                .Build();
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 121, 20, TenPxPerChar, FixedCoinWidth, effectIndent: 31);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.Equal("aaaa bbbb", RowText(layout.Rows[0]));
+            Assert.Equal("cccc", RowText(layout.Rows[1]));
+            Assert.Equal(TooltipLineKind.Effect, layout.Rows[1].Kind);
+            Assert.Equal(31, layout.Rows[1].Spans[0].X);
+            Assert.Null(layout.Rows[1].IconUrl);
         }
 
         [Fact]

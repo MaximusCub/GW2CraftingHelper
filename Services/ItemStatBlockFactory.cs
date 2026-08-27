@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
                 ItemType = raw.ItemType,
                 RequiredLevel = raw.Level,
                 Restrictions = raw.Restrictions ?? NoStrings,
-                Binding = ResolveBinding(flags),
+                Bindings = ResolveBindings(flags),
                 IsUnique = flags.Contains("Unique"),
                 VendorValue = ResolveVendorValue(raw.VendorValue, flags),
                 Description = raw.Description ?? "",
@@ -71,6 +71,8 @@ namespace GW2CraftingHelper.Services
             block.BuffDescription = detail.BuffDescription;
             block.StatChoiceCount = detail.StatChoiceIds == null ? 0 : detail.StatChoiceIds.Count;
             block.NourishmentDurationMs = detail.NourishmentDurationMs;
+            block.EffectName = detail.EffectName;
+            block.EffectIconUrl = detail.EffectIconUrl;
 
             if (detail.Defense.HasValue && detail.Defense.Value > 0)
             {
@@ -119,35 +121,47 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The one binding line the game shows, not every flag the item
-        /// carries: an ascended armour piece reports AccountBound AND
-        /// AccountBindOnUse (48074), and a soulbinding one reports
-        /// AccountBound AND SoulBindOnUse (68357). Most-specific wins, so
-        /// each renders the state the player actually sees.
+        /// The binding lines the game shows, in its order: the account
+        /// dimension, then the soul dimension. The two are INDEPENDENT,
+        /// not a most-specific ladder - live3/relic-livingcity
+        /// (2026-08-26) shows "Account Bound" and "Soulbound on Use"
+        /// stacked on one item (104938, AccountBound + SoulBindOnUse).
+        /// Within a dimension the stronger flag wins: AccountBound over
+        /// AccountBindOnUse (live3 almonds 12337 and fury-scorched 86967
+        /// both carry BOTH flags and render ONE account line), and
+        /// SoulbindOnAcquire over SoulBindOnUse.
+        /// <para>
+        /// AccountBound reads "Account Bound on Acquire" - the wording of
+        /// the live3 almonds and fury-scorched material hovers. The game
+        /// also shows instance-state wordings for the SAME flags ("Account
+        /// Bound" on an already-bound inventory copy, heart-of-destroyer
+        /// 67017; bare "Soulbound" on red-festival-lantern 68638), but
+        /// which copy the player holds is instance state /v2/items cannot
+        /// carry, so the flag-describing acquisition wording is emitted.
+        /// </para>
         /// </summary>
-        private static string ResolveBinding(HashSet<string> flags)
+        private static IReadOnlyList<string> ResolveBindings(HashSet<string> flags)
         {
-            if (flags.Contains("SoulbindOnAcquire"))
+            List<string> lines = null;
+
+            string account =
+                flags.Contains("AccountBound") ? "Account Bound on Acquire" :
+                flags.Contains("AccountBindOnUse") ? "Account Bound on Use" : null;
+            string soul =
+                flags.Contains("SoulbindOnAcquire") ? "Soulbound on Acquire" :
+                flags.Contains("SoulBindOnUse") ? "Soulbound on Use" : null;
+
+            if (account != null)
             {
-                return "Soulbound on Acquire";
+                (lines = new List<string>(2)).Add(account);
             }
 
-            if (flags.Contains("SoulBindOnUse"))
+            if (soul != null)
             {
-                return "Soulbound on Use";
+                (lines = lines ?? new List<string>(1)).Add(soul);
             }
 
-            if (flags.Contains("AccountBindOnUse"))
-            {
-                return "Account Bound on Use";
-            }
-
-            if (flags.Contains("AccountBound"))
-            {
-                return "Account Bound";
-            }
-
-            return null;
+            return lines ?? (IReadOnlyList<string>)NoStrings;
         }
 
         private static long? ResolveVendorValue(int vendorValue, HashSet<string> flags)

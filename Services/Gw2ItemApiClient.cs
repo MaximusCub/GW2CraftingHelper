@@ -118,6 +118,8 @@ namespace GW2CraftingHelper.Services
                 StatChoiceIds = ReadIntArray(details["stat_choices"] as JArray),
                 NourishmentDurationMs = details.Value<int?>("duration_ms"),
                 NourishmentDescription = details.Value<string>("description"),
+                EffectName = details.Value<string>("name"),
+                EffectIconUrl = details.Value<string>("icon"),
                 InfixAttributes = new List<RawItemAttribute>(),
             };
 
