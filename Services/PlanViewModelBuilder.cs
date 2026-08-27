@@ -106,11 +106,13 @@ namespace GW2CraftingHelper.Services
             }
 
             // 6. Crafting Steps section (only if non-empty, or there is a
-            // timegated notice to show) - last, per gw2e order
-            bool hasTimegatedItems = result.Plan.TimegatedItems != null && result.Plan.TimegatedItems.Count > 0;
-            if (craftSteps.Count > 0 || hasTimegatedItems)
+            // timegated notice to show) - last, per gw2e order. Vendor-cap
+            // notices are pre-filtered so a plan whose only "notice" is a
+            // TP-liquid item's vendor cap gets no notices-only section.
+            var vendorCapNotices = FilterVendorCapNotices(result);
+            if (craftSteps.Count > 0 || vendorCapNotices.Count > 0)
             {
-                vm.Sections.Add(BuildCraftingStepsSection(craftSteps, result));
+                vm.Sections.Add(BuildCraftingStepsSection(craftSteps, vendorCapNotices, result));
             }
 
             // 7. Notes section - only if it has at least one note. Last:
@@ -606,6 +608,52 @@ namespace GW2CraftingHelper.Services
             return byItemId;
         }
 
+        /// <summary>
+        /// Vendor purchase caps that are genuinely a wait, not merely a
+        /// route - same filter as RankerReadinessCalculator's
+        /// FilterVendorCappedItems. The solver only emits a TimegatedItem
+        /// when the plan buys the item from the capped vendor, but a
+        /// TP-listed item (field case: Mystic Coin behind a weekly-capped
+        /// vendor) can cover the remainder with coin - that is a price,
+        /// not a time gate, so no cap notice. A result with no price data
+        /// keeps the notice rather than inventing liquidity. Distinct from
+        /// VendorCapsByItemId, which stays unfiltered: the value-detail
+        /// tooltip states the cap only on a node the plan actually routes
+        /// through that vendor, where the fact remains worth surfacing.
+        /// </summary>
+        private static IReadOnlyList<TimegatedItem> FilterVendorCapNotices(CraftingPlanResult result)
+        {
+            var capped = result.Plan.TimegatedItems;
+            if (capped == null || capped.Count == 0)
+            {
+                return Array.Empty<TimegatedItem>();
+            }
+
+            var prices = result.SolveContext?.Prices;
+            if (prices == null)
+            {
+                return capped;
+            }
+
+            var kept = new List<TimegatedItem>(capped.Count);
+            foreach (var item in capped)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                bool tpLiquid = prices.TryGetValue(item.ItemId, out var price) &&
+                    price != null && (price.BuyInstant > 0 || price.SellInstant > 0);
+                if (!tpLiquid)
+                {
+                    kept.Add(item);
+                }
+            }
+
+            return kept;
+        }
+
         private PlanSectionViewModel BuildUsedMaterialsSection(CraftingPlanResult result)
         {
             var section = new PlanSectionViewModel
@@ -729,7 +777,8 @@ namespace GW2CraftingHelper.Services
         }
 
         private PlanSectionViewModel BuildCraftingStepsSection(
-            List<PlanStep> steps, CraftingPlanResult result)
+            List<PlanStep> steps, IReadOnlyList<TimegatedItem> vendorCapNotices,
+            CraftingPlanResult result)
         {
             var section = new PlanSectionViewModel
             {
@@ -772,36 +821,37 @@ namespace GW2CraftingHelper.Services
 
             // Timegated (vendor purchase cap) notices - caps are surfaced,
             // never solved around. Appended after the real craft steps so
-            // a notices-only section still renders correctly.
-            if (result.Plan.TimegatedItems != null)
+            // a notices-only section still renders correctly. The list
+            // arrives pre-filtered (see FilterVendorCapNotices): a cap on
+            // a TP-liquid item never reaches this loop. The label names
+            // the vendor limit for what it is - same wording as the
+            // Ranker's vendor-cap note (RankerTabContent).
+            foreach (var timegated in vendorCapNotices)
             {
-                foreach (var timegated in result.Plan.TimegatedItems)
+                string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
+
+                // Seasonal uses the noun "Season" (gw2e's Wizard's
+                // Vault wording), keeping the "{CapLabel} limit: N"
+                // shape of Daily/Weekly.
+                string capLabel;
+                if (timegated.CapType == TimegatedCapType.Daily)
                 {
-                    string itemName = ResolveName(timegated.ItemId, result.ItemMetadata);
-
-                    // Seasonal uses the noun "Season" (gw2e's Wizard's
-                    // Vault wording), keeping the "{CapLabel} limit: N"
-                    // shape of Daily/Weekly.
-                    string capLabel;
-                    if (timegated.CapType == TimegatedCapType.Daily)
-                    {
-                        capLabel = "Daily";
-                    }
-                    else if (timegated.CapType == TimegatedCapType.Weekly)
-                    {
-                        capLabel = "Weekly";
-                    }
-                    else
-                    {
-                        capLabel = "Season";
-                    }
-
-                    section.Rows.Add(new PlanRowViewModel
-                    {
-                        RowType = PlanRowType.TimegatedNotice,
-                        Label = $"{itemName} is timegated - {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})",
-                    });
+                    capLabel = "Daily";
                 }
+                else if (timegated.CapType == TimegatedCapType.Weekly)
+                {
+                    capLabel = "Weekly";
+                }
+                else
+                {
+                    capLabel = "Season";
+                }
+
+                section.Rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.TimegatedNotice,
+                    Label = $"{itemName} is timegated - vendor {capLabel} limit: {timegated.CapValue} (plan needs {timegated.NeededCount})",
+                });
             }
 
             // Daily craft-cooldown notices: informational-only pass over
