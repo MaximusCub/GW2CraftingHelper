@@ -48,8 +48,12 @@ namespace GW2CraftingHelper.Views.Rendering
         /// </summary>
         internal void Render(PlanViewModel vm, FlowPanel contentPanel, int panelWidth)
         {
-            const int headerHeight = 56;
-            const int iconSize = 40;
+            // Tier 1 of the two-tier icon system (owner ruling): the plan's
+            // heading item carries in-game bag-slot-sized art, like the
+            // Snapshot grid and the Ranker rows. Header height follows the
+            // 56px frame with 4px of clearance each side.
+            const int headerHeight = 64;
+            const int iconSize = ItemIconTiers.BagSlotIconSize;
             const int iconBorder = 2;
             const int iconPad = 10;
 
@@ -129,7 +133,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // anything lying over the panel wins the hover outright
             // (Control.ActiveControl is the deepest capturing control),
             // the same swallowed-hover class already fixed on tree rows.
-            // The 44px icon is the header's largest target and the most
+            // The 56px icon is the header's largest target and the most
             // natural one to point at.
             var treeRoot = vm.TreeRoot;
             Func<TooltipContent> buildStatContent =
