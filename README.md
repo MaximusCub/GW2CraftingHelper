@@ -80,12 +80,6 @@ shared inventory and every character, with search and source filters:
 
 ![Account snapshot with per-source item locations](docs/images/snapshot.png)
 
-Crafting Ranker - a priority list where each row is measured against what
-the rows above it leave behind; readiness blends materials, currencies,
-time-gated crafts and disciplines:
-
-![Crafting Ranker with readiness scores and per-gate breakdown](docs/images/crafting-ranker.png)
-
 Plan History - every generated plan kept with its cost and date; open a
 saved plan exactly as it was, or re-solve it at today's prices:
 
