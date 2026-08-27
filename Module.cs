@@ -848,25 +848,6 @@ namespace GW2CraftingHelper
                 "Crafting Plan");
             _mainWindow.Tabs.Add(_craftingPlanTab);
 
-            _mainWindow.Tabs.Add(new Tab(
-                AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
-                "Snapshot"));
-
-            _logTab = new Tab(
-                AsyncTexture2D.FromAssetId(156701),
-                () => new ViewAdapter("Log", c =>
-                {
-                    _logContent = new LogTabContent(
-                        ModuleLog.Shared,
-                        _modalDialog,
-                        () => _logViewClearedBeforeVersion,
-                        v => _logViewClearedBeforeVersion = v);
-                    _logContent.Build(c);
-                }),
-                "Log");
-            _mainWindow.Tabs.Add(_logTab);
-
             _planHistoryContent = new PlanHistoryTabContent(
                 SnapshotHistoryEntries,
                 MutateHistoryIndex,
@@ -885,6 +866,11 @@ namespace GW2CraftingHelper
                 "Plan History");
             _mainWindow.Tabs.Add(_planHistoryTab);
 
+            _mainWindow.Tabs.Add(new Tab(
+                AsyncTexture2D.FromAssetId(156699),
+                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
+                "Snapshot"));
+
             _rankerContent = new RankerTabContent(
                 _craftingPipeline,
                 _itemSearchProvider,
@@ -902,6 +888,20 @@ namespace GW2CraftingHelper
                     return new ViewAdapter("Crafting Ranker", c => _rankerContent.Build(c));
                 },
                 "Crafting Ranker"));
+
+            _logTab = new Tab(
+                AsyncTexture2D.FromAssetId(156701),
+                () => new ViewAdapter("Log", c =>
+                {
+                    _logContent = new LogTabContent(
+                        ModuleLog.Shared,
+                        _modalDialog,
+                        () => _logViewClearedBeforeVersion,
+                        v => _logViewClearedBeforeVersion = v);
+                    _logContent.Build(c);
+                }),
+                "Log");
+            _mainWindow.Tabs.Add(_logTab);
 
             _settingsTab = new Tab(
                 AsyncTexture2D.FromAssetId(156736),
