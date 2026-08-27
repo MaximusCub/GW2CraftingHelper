@@ -11,7 +11,7 @@ namespace GW2CraftingHelper.Services
     /// display-ready numbers a Crafting Ranker row shows. Pure and
     /// Blish-free; every edge case is settled here rather than in the view.
     ///
-    /// The headline is a weighted mean of four gate completions, renormalised
+    /// The headline is a weighted mean of five gate completions, renormalised
     /// over the gates that apply to the item (see RankerReadinessWeights).
     /// Nothing is ever converted into anything else: every ratio the model
     /// computes carries the same unit above and below the line, which is what
@@ -26,16 +26,22 @@ namespace GW2CraftingHelper.Services
     {
         /// <summary>
         /// baseline is the snapshot:null solve, owned is the solve against
-        /// this slot's cascade availability. Both under OwnMaterialsMode.Free.
+        /// this slot's availability - the cascade residual in Cascade mode,
+        /// the full account in Independent mode (where the caller passes the
+        /// unconsumed availability, so every claimed set is empty and the
+        /// contested/queued arithmetic below is naturally inert). Both under
+        /// OwnMaterialsMode.Free.
         /// </summary>
         public static RankerRowMetrics Compute(
             CraftingPlanResult baseline,
             CraftingPlanResult owned,
             RankerSlotAvailability availability,
-            int priorityIndex)
+            int priorityIndex,
+            RankerMode mode = RankerMode.Cascade)
         {
             var metrics = new RankerRowMetrics
             {
+                Mode = mode,
                 Kind = RankerReadinessKind.NotMeasurable,
                 Gates = BuildInapplicableGates(),
                 CurrencyShortfalls = Array.Empty<RankerCurrencyShortfall>(),
@@ -52,17 +58,18 @@ namespace GW2CraftingHelper.Services
 
             metrics.BaselineCoinCost = baseline.Plan.TotalCoinCost;
             metrics.RemainingCoinCost = owned.Plan.TotalCoinCost;
-            metrics.VendorCappedItems = owned.Plan.TimegatedItems ?? (IReadOnlyList<TimegatedItem>)Array.Empty<TimegatedItem>();
+            metrics.VendorCappedItems = FilterVendorCappedItems(owned);
 
             var claimedGated = availability?.ClaimedGatedUnits ?? EmptyIntMap;
             var heldCurrency = availability?.Currency ?? EmptyIntMap;
 
-            var gates = new List<RankerGateScore>(4)
+            var gates = new List<RankerGateScore>(5)
             {
                 ScoreMaterials(baseline, owned),
                 ScoreCurrencies(baseline, owned, heldCurrency, metrics),
                 ScoreTimeGates(baseline, owned, claimedGated, metrics),
                 ScoreDisciplines(owned, metrics),
+                ScoreRecipes(owned),
             };
             metrics.Gates = gates;
 
@@ -105,8 +112,8 @@ namespace GW2CraftingHelper.Services
             double readiness = Clamp01(weighted / weightSum);
 
             // A 100% that is not actually finished is the single most
-            // trust-destroying number this tab can print, and with four gates
-            // there are four ways to earn one by rounding.
+            // trust-destroying number this tab can print, and with five gates
+            // there are five ways to earn one by rounding.
             if (anyIncomplete && readiness > 0.99)
             {
                 readiness = 0.99;
@@ -178,6 +185,7 @@ namespace GW2CraftingHelper.Services
                 case RankerGate.Currencies: return "Currencies";
                 case RankerGate.TimeGates: return "Time gates";
                 case RankerGate.Disciplines: return "Disciplines";
+                case RankerGate.Recipes: return "Recipes";
                 default: return "";
             }
         }
@@ -394,6 +402,88 @@ namespace GW2CraftingHelper.Services
             return gate;
         }
 
+        private static RankerGateScore ScoreRecipes(CraftingPlanResult owned)
+        {
+            var gate = NewGate(RankerGate.Recipes);
+
+            var required = owned.RequiredRecipes;
+            if (required == null || required.Count == 0)
+            {
+                return gate;
+            }
+
+            // IsMissing null means the learned-recipes check never ran (no
+            // account recipe data) - same never-fabricate rule as the
+            // disciplines gate's null-characters branch. Auto-learned
+            // recipes carry no unlock barrier and are excluded outright.
+            int counted = 0;
+            int known = 0;
+            foreach (var recipe in required)
+            {
+                if (recipe == null || recipe.IsAutoLearned || !recipe.IsMissing.HasValue)
+                {
+                    continue;
+                }
+
+                counted++;
+                if (!recipe.IsMissing.Value)
+                {
+                    known++;
+                }
+            }
+
+            if (counted == 0)
+            {
+                return gate;
+            }
+
+            gate.Applies = true;
+            gate.Completion = Clamp01((double)known / counted);
+            return gate;
+        }
+
+        /// <summary>
+        /// Vendor purchase caps that are genuinely a wait, not merely a
+        /// route. The solver only emits a TimegatedItem when the plan buys
+        /// the item from the capped vendor, but a TP-listed item (field
+        /// case: Mystic Coin behind a weekly-capped vendor) can cover the
+        /// remainder with coin - that is a price, not a time gate, so no
+        /// cap notice. A result with no price data keeps the notice rather
+        /// than inventing liquidity.
+        /// </summary>
+        private static IReadOnlyList<TimegatedItem> FilterVendorCappedItems(CraftingPlanResult owned)
+        {
+            var capped = owned.Plan.TimegatedItems;
+            if (capped == null || capped.Count == 0)
+            {
+                return Array.Empty<TimegatedItem>();
+            }
+
+            var prices = owned.SolveContext?.Prices;
+            if (prices == null)
+            {
+                return capped;
+            }
+
+            var kept = new List<TimegatedItem>(capped.Count);
+            foreach (var item in capped)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                bool tpLiquid = prices.TryGetValue(item.ItemId, out var price) &&
+                    price != null && (price.BuyInstant > 0 || price.SellInstant > 0);
+                if (!tpLiquid)
+                {
+                    kept.Add(item);
+                }
+            }
+
+            return kept;
+        }
+
         private static void ApplyAffordability(RankerSlotAvailability availability, RankerRowMetrics metrics)
         {
             if (availability?.CoinCopper == null)
@@ -548,12 +638,13 @@ namespace GW2CraftingHelper.Services
 
         private static IReadOnlyList<RankerGateScore> BuildInapplicableGates()
         {
-            return new List<RankerGateScore>(4)
+            return new List<RankerGateScore>(5)
             {
                 NewGate(RankerGate.Materials),
                 NewGate(RankerGate.Currencies),
                 NewGate(RankerGate.TimeGates),
                 NewGate(RankerGate.Disciplines),
+                NewGate(RankerGate.Recipes),
             };
         }
 

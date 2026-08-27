@@ -43,13 +43,41 @@ namespace GW2CraftingHelper.Views
         private const int SearchBoxWidth = 260;
         private const int QuantityBoxWidth = 56;
         private const int AddButtonWidth = 72;
-        private const int RefreshButtonWidth = 132;
+        private const int ModeDropdownWidth = 150;
+        private const int ModeGap = 8;
         private const int BannerHeight = 30;
 
+        // Vertical centring inside the 60px tier-1 main line (see
+        // RankerRowLayout.RowHeight): a Body text line, the rank caption,
+        // the 22px chip, the 28px row buttons and the 54px icon frame.
+        private const int MainLineTextY = 20;
+        private const int MainLineRankY = 22;
+        private const int MainLineChipY = 19;
+        private const int MainLineButtonY = 16;
+        private const int MainLineIconY = 3;
+
+        // Muted grey is reserved for content meant to leave the user's
+        // focus: the footer captions and the empty-state onboarding prose
+        // (matching EmptyPlanStateRenderer). Field test: primary row data at
+        // this grey on the grey window read "as if disabled".
         private static readonly Color DimColor = new Color(150, 150, 150);
+
+        // Primary sub-line data matches the Crafting Plan's currency table
+        // rows, the direct analogue: names in white, figures at 220 grey.
+        private static readonly Color ValueTextColor = new Color(220, 220, 220);
+
         private static readonly Color StatusColor = new Color(200, 200, 200);
         private static readonly Color ErrorColor = new Color(255, 100, 100);
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
+
+        // The affordability chip reuses SummarySectionRenderer's
+        // full-coverage tag colors (PillKind.Selected's darkened green,
+        // 4.21:1 against CreateSmallTag's white label) - the field test
+        // showed white text on RankerReadinessColors' pale #7EBA7E was
+        // unreadable. The readiness TEXT bands keep their own palette; only
+        // the pill chrome borrows the proven badge combination.
+        private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
+        private static readonly Color AffordableChipFill = AffordableChipBorder * 0.15f;
 
         private readonly CraftingPlanPipeline _pipeline;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -57,6 +85,7 @@ namespace GW2CraftingHelper.Views
         private readonly RankerStore _store;
         private readonly Func<AccountSnapshot> _getSnapshot;
         private readonly Func<string> _getActiveCharacterName;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
         private readonly ResizeSettleDebounce _resizeSettle;
 
         private readonly RankerWatchlist _watchlist;
@@ -85,6 +114,9 @@ namespace GW2CraftingHelper.Views
         private TextBox _quantityBox;
         private FeedbackButton _addButton;
         private FeedbackButton _refreshButton;
+        private Label _modeLabel;
+        private Dropdown _modeDropdown;
+        private bool _suppressModeChange;
         private Label _statusLabel;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
@@ -99,16 +131,16 @@ namespace GW2CraftingHelper.Views
         private volatile bool _buildComplete;
         private int _lastLayoutWidth = -1;
 
-        // Table-wide, not per row: the Ready, chip and Days cells all sit to
-        // the LEFT of the coin cell, so letting each row size its own coin
-        // band would put those three columns in a different place on every
-        // row and leave the header labelling nothing.
+        // Table-wide, not per row: the Ready and Days cells sit to the LEFT
+        // of the coin cell, so letting each row size its own coin band
+        // would put those columns in a different place on every row and
+        // leave the header labelling nothing.
         private int _remainingBandWidth;
-        private int _chipBandWidth;
         private int _refreshGeneration;
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
         private bool _firstRefreshDone;
+        private bool _rarityDirty;
         private DateTime? _lastRefreshLocal;
         private string _statusOverride;
         private bool _statusIsError;
@@ -119,7 +151,8 @@ namespace GW2CraftingHelper.Views
             ModuleSettings settings,
             RankerStore store,
             Func<AccountSnapshot> getSnapshot,
-            Func<string> getActiveCharacterName)
+            Func<string> getActiveCharacterName,
+            Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _pipeline = pipeline;
             _itemSearchProvider = itemSearchProvider;
@@ -127,6 +160,7 @@ namespace GW2CraftingHelper.Views
             _store = store;
             _getSnapshot = getSnapshot ?? (() => null);
             _getActiveCharacterName = getActiveCharacterName ?? (() => null);
+            _getItemStatBlock = getItemStatBlock;
             _watchlist = store?.Load() ?? new RankerWatchlist();
 
             _resizeSettle = new ResizeSettleDebounce(
@@ -201,10 +235,12 @@ namespace GW2CraftingHelper.Views
                 RebuildRows();
 
                 // A tab switch during a run rebuilds the chrome from scratch,
-                // so the in-flight state has to be restamped onto it.
+                // so the in-flight state has to be restamped onto it. The
+                // button keeps its fixed "Refresh" label - progress text
+                // belongs to the status band (field bug: status-length text
+                // on the 132px button spilled past its edges).
                 if (_isRefreshing)
                 {
-                    _refreshButton.Text = "Refreshing... (click to cancel)";
                     _spinner.Visible = true;
                     SetControlsEnabled(false);
                 }
@@ -248,6 +284,91 @@ namespace GW2CraftingHelper.Views
         private bool IsLive => _contentPanel != null && _contentPanel.Parent != null;
 
         private List<RankerWatchlistEntry> Entries => _watchlist.Entries;
+
+        private RankerMode Mode => _watchlist.Mode;
+
+        // ---------------------------------------------------------------
+        // Comparison mode
+        // ---------------------------------------------------------------
+        private const string CascadeModeItem = "In priority order";
+        private const string IndependentModeItem = "Each on its own";
+
+        private static string ModeItem(RankerMode mode)
+        {
+            return mode == RankerMode.Independent ? IndependentModeItem : CascadeModeItem;
+        }
+
+        private static string ModeTooltip(RankerMode mode)
+        {
+            return mode == RankerMode.Independent
+                ? "Every row is measured against your full account, ignoring the other rows - which is closest to done right now? Closest sorts to the top; your priority order is kept and restored when you switch back."
+                : "Each row is measured after the rows above it claim your materials, currencies and daily crafts.";
+        }
+
+        /// <summary>
+        /// A mode toggle never re-solves: metrics computed under the other
+        /// mode go stale via MetricsAreCurrent (and revive if the user
+        /// toggles straight back), exactly the staleness a reorder causes.
+        /// </summary>
+        private void OnModeChanged(RankerMode mode)
+        {
+            if (_isRefreshing || mode == _watchlist.Mode)
+            {
+                return;
+            }
+
+            _watchlist.Mode = mode;
+            Persist();
+            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(mode));
+            RebuildRows();
+
+            bool anyStale = false;
+            for (int i = 0; i < Entries.Count; i++)
+            {
+                _metricsByItemId.TryGetValue(Entries[i].ItemId, out var metrics);
+                if (!RankerPriorityOrdering.MetricsAreCurrent(metrics, i, mode))
+                {
+                    anyStale = true;
+                    break;
+                }
+            }
+
+            if (Entries.Count > 0 && anyStale)
+            {
+                SetStatus("Comparison mode changed - press Refresh to recalculate.", isError: false);
+            }
+            else
+            {
+                _statusOverride = null;
+                UpdateStatusLine();
+            }
+        }
+
+        /// <summary>
+        /// Priority indices in the order the table displays them: the
+        /// stored order in Cascade mode, readiness-descending in
+        /// Independent mode. The stored order itself is never touched.
+        /// </summary>
+        private List<int> DisplayOrder()
+        {
+            if (Mode != RankerMode.Independent)
+            {
+                var order = new List<int>(Entries.Count);
+                for (int i = 0; i < Entries.Count; i++)
+                {
+                    order.Add(i);
+                }
+
+                return order;
+            }
+
+            return RankerPriorityOrdering.IndependentDisplayOrder(Entries, entry =>
+            {
+                _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
+                return RankerPriorityOrdering.MetricsAreCurrent(
+                    metrics, Entries.IndexOf(entry), Mode) ? metrics : null;
+            });
+        }
 
         // ---------------------------------------------------------------
         // Chrome
@@ -344,6 +465,43 @@ namespace GW2CraftingHelper.Views
             };
             TooltipFacility.ApplyPlain(_addButton, "Add this item to the bottom of your priority list.");
             _addButton.Click += (_, __) => AddPendingItem();
+
+            // The comparison-mode selector, right-anchored on this row (the
+            // toolbar row below is the status band's full width). Same
+            // labelled-Dropdown shape as the plan tab's "Prices:" control -
+            // the module's established two-way mode switch.
+            _modeLabel = new Label
+            {
+                Font = UiFonts.Body,
+                Text = "Compare:",
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, 10),
+                Parent = _addPanel,
+            };
+            _modeDropdown = new Dropdown
+            {
+                Size = new Point(ModeDropdownWidth, 28),
+                Location = new Point(0, 6),
+                Parent = _addPanel,
+            };
+            _modeDropdown.Items.Add(ModeItem(RankerMode.Cascade));
+            _modeDropdown.Items.Add(ModeItem(RankerMode.Independent));
+            _suppressModeChange = true;
+            _modeDropdown.SelectedItem = ModeItem(Mode);
+            _suppressModeChange = false;
+            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(Mode));
+            _modeDropdown.ValueChanged += (_, e) =>
+            {
+                if (_suppressModeChange)
+                {
+                    return;
+                }
+
+                OnModeChanged(e.CurrentValue == ModeItem(RankerMode.Independent)
+                    ? RankerMode.Independent
+                    : RankerMode.Cascade);
+            };
         }
 
         private void BuildToolbar(Container container, int width)
@@ -371,7 +529,7 @@ namespace GW2CraftingHelper.Views
             _refreshButton = new FeedbackButton
             {
                 Text = "Refresh",
-                Size = new Point(RefreshButtonWidth, UiMetrics.ButtonHeight),
+                Size = new Point(RankerRowLayout.RefreshButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(0, 6),
                 Parent = _toolbarPanel,
             };
@@ -414,13 +572,17 @@ namespace GW2CraftingHelper.Views
             _toolbarPanel.Size = new Point(width, ToolbarHeight);
             _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);
 
-            _refreshButton.Location = new Point(
-                Math.Max(0, barWidth - RefreshButtonWidth), _refreshButton.Location.Y);
-
-            int statusRight = _refreshButton.Location.X - InlineSpinnerLayout.SnapshotStatusSize
-                - 2 * InlineSpinnerLayout.LabelGap;
-            _statusLabel.Width = Math.Max(0, statusRight - RankerRowLayout.Inset);
+            var toolbar = RankerRowLayout.Toolbar(
+                barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap);
+            _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
+            _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
+
+            _modeDropdown.Location = new Point(
+                Math.Max(0, barWidth - ModeDropdownWidth), _modeDropdown.Location.Y);
+            _modeLabel.Location = new Point(
+                Math.Max(0, _modeDropdown.Location.X - ModeGap - _modeLabel.Width),
+                _modeLabel.Location.Y);
 
             PositionColumnHeader(barWidth);
 
@@ -471,8 +633,8 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         private static readonly string[] Captions =
         {
-            "Each item is measured against what the items above it leave behind: higher-priority rows have first claim on your materials, currencies, coin and daily crafts. Move a row up to give it that claim instead.",
-            "Ready blends four separate barriers - materials at buy-order prices, account currencies, time-gated daily crafts and crafting disciplines - and counts only the ones this item actually has. Hover it for the breakdown.",
+            "In priority order, each item is measured against what the items above it leave behind - higher rows have first claim on your materials, currencies, coin and daily crafts. Each on its own measures every item against your full account, ignoring the other rows, and sorts the closest-to-done to the top.",
+            "Ready blends five separate barriers - materials at buy-order prices, account currencies, time-gated daily crafts, crafting disciplines and recipe unlocks - and counts only the ones this item actually has. Hover it for the breakdown.",
         };
 
         private int MeasureCaptionsHeight(int barWidth)
@@ -554,6 +716,7 @@ namespace GW2CraftingHelper.Views
             public FeedbackButton Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
+            public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
             public readonly List<Label> CurrencyNameLabels = new List<Label>();
             public readonly List<string> CurrencyNameFulls = new List<string>();
             public readonly List<Label> CurrencyValueLabels = new List<Label>();
@@ -594,21 +757,21 @@ namespace GW2CraftingHelper.Views
             }
             else
             {
-                for (int i = 0; i < Entries.Count; i++)
+                foreach (int priorityIndex in DisplayOrder())
                 {
-                    _rows.Add(CreateRow(Entries[i], i, barWidth));
+                    _rows.Add(CreateRow(Entries[priorityIndex], priorityIndex, barWidth));
                 }
 
                 // Every row's cells are measured before any is rendered, so
                 // the whole table shares one column geometry.
                 RecomputeBandWidths();
-                for (int i = 0; i < _rows.Count; i++)
+                foreach (var row in _rows)
                 {
-                    RenderRowContent(_rows[i], Entries[i], barWidth);
+                    RenderRowContent(row, Entries[row.Index], barWidth);
                 }
             }
 
-            _refreshButton.Enabled = Entries.Count > 0;
+            _refreshButton.Enabled = !_isRefreshing && Entries.Count > 0;
             TooltipFacility.ApplyPlain(_refreshButton, Entries.Count > 0
                 ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
                 : "Add an item to your list first.");
@@ -638,7 +801,7 @@ namespace GW2CraftingHelper.Views
             {
                 Font = UiFonts.Body,
                 Text = "No account snapshot available - every item will read 0% until you fetch one from the Snapshot tab.",
-                TextColor = DimColor,
+                TextColor = StatusColor,
                 AutoSizeWidth = false,
                 AutoSizeHeight = true,
                 Width = Math.Max(0, barWidth - RankerRowLayout.Inset),
@@ -653,7 +816,7 @@ namespace GW2CraftingHelper.Views
             "",
             "Add the items you are working toward, in the order you want to finish them. The Ranker then answers a question the Crafting Plan tab cannot: given that everything above it already has first claim on your materials, your currencies and your daily crafts, how close is each one really?",
             "",
-            "Every row scores four separate barriers - materials, account currencies, time-gated daily crafts and crafting disciplines - and combines only the ones that item actually has into one Ready percentage you can rank by.",
+            "Every row scores five separate barriers - materials, account currencies, time-gated daily crafts, crafting disciplines and recipe unlocks - and combines only the ones that item actually has into one Ready percentage you can rank by.",
             "",
             "Search above to add your first item, then press Refresh.",
         };
@@ -698,36 +861,29 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Widest coin cell and widest chip across the whole table, so every
-        /// row shares one column geometry and the header labels sit on the
-        /// columns they name. Returns true when either changed.
+        /// Widest coin cell across the whole table, so every row shares one
+        /// column geometry and the header labels sit on the columns they
+        /// name. Returns true when it changed.
         /// </summary>
         private bool RecomputeBandWidths()
         {
             int remaining = MeasureDashWidth();
-            int chip = 0;
             foreach (var row in _rows)
             {
                 if (row.RemainingCellWidth > remaining)
                 {
                     remaining = row.RemainingCellWidth;
                 }
-
-                if (row.ChipWidth > chip)
-                {
-                    chip = row.ChipWidth;
-                }
             }
 
-            bool changed = remaining != _remainingBandWidth || chip != _chipBandWidth;
+            bool changed = remaining != _remainingBandWidth;
             _remainingBandWidth = remaining;
-            _chipBandWidth = chip;
             return changed;
         }
 
         private RankerRowLayout.Bands BandsFor(int barWidth)
         {
-            return RankerRowLayout.Compute(barWidth, _remainingBandWidth, _chipBandWidth);
+            return RankerRowLayout.Compute(barWidth, _remainingBandWidth);
         }
 
         private RenderedRow CreateRow(RankerWatchlistEntry entry, int index, int barWidth)
@@ -739,7 +895,7 @@ namespace GW2CraftingHelper.Views
                 FullName = BuildDisplayName(entry),
             };
             _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
-            row.Metrics = metrics != null && metrics.PriorityIndex == index ? metrics : null;
+            row.Metrics = RankerPriorityOrdering.MetricsAreCurrent(metrics, index, Mode) ? metrics : null;
 
             row.Panel = new Panel
             {
@@ -765,6 +921,7 @@ namespace GW2CraftingHelper.Views
 
             row.GateNameLabels.Clear();
             row.GateValueLabels.Clear();
+            row.CurrencyIconFrames.Clear();
             row.CurrencyNameLabels.Clear();
             row.CurrencyNameFulls.Clear();
             row.CurrencyValueLabels.Clear();
@@ -781,52 +938,63 @@ namespace GW2CraftingHelper.Views
             {
                 Font = UiFonts.Caption,
                 Text = (row.Index + 1).ToString(CultureInfo.InvariantCulture) + ".",
-                TextColor = DimColor,
+                TextColor = ValueTextColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(bands.RankX, 14),
+                Location = new Point(bands.RankX, MainLineRankY),
                 Parent = row.Panel,
             };
 
+            // The chip trails the name inside the name band (see
+            // RankerRowLayout.Compute's comment), so the name's budget
+            // reserves the chip's width first.
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 row.Panel, entry.IconUrl, entry.Rarity,
-                bands.IconX, 5, row.FullName, UiFonts.Body,
-                bands.NameX + bands.NameWidth, 0, 0, bands.NameX, 12);
-            TooltipFacility.ApplyPlain(row.IconName.NameLabel, row.FullName);
-            IconControls.ApplyPlainToIconTree(row.IconName.IconFrame, row.FullName);
+                bands.IconX, MainLineIconY, row.FullName, UiFonts.Body,
+                NameBudgetRightEdge(bands, row.ChipWidth), 0, 0, bands.NameX, MainLineTextY,
+                iconSize: RankerRowLayout.IconSize);
+            ApplyItemTooltip(row, entry);
+
+            if (chipText != null)
+            {
+                ChipColors(metrics, out Color chipBorder, out Color chipFill);
+                row.Chip = LabelHelpers.CreateSmallTag(
+                    row.Panel, chipText, ChipXFor(row), MainLineChipY, chipBorder, chipFill);
+                LabelHelpers.ApplyTagTooltip(row.Chip, ChipTooltip(metrics));
+            }
 
             row.ReadyLabel = new Label
             {
                 Font = UiFonts.Body,
                 Text = metrics == null ? RankerReadinessCalculator.DashText : RankerReadinessCalculator.FormatReadiness(metrics),
-                TextColor = metrics == null || metrics.Kind != RankerReadinessKind.Measured
+                TextColor = metrics == null
                     ? RankerReadinessColors.Neutral
-                    : RankerReadinessColors.ForReadiness(metrics.Readiness),
+                    : metrics.Kind != RankerReadinessKind.Measured
+                        ? ValueTextColor
+                        : RankerReadinessColors.ForReadiness(metrics.Readiness),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 12),
+                Location = new Point(0, MainLineTextY),
                 Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
 
-            if (chipText != null)
-            {
-                row.Chip = LabelHelpers.CreateSmallTag(
-                    row.Panel, chipText, bands.ChipX, 11,
-                    ChipBorderColor(metrics), ChipBorderColor(metrics) * 0.15f);
-                LabelHelpers.ApplyTagTooltip(row.Chip, ChipTooltip(metrics));
-            }
-
+            // Measured absences render at ValueTextColor: the field test
+            // showed the Neutral dash disappearing into the background
+            // under its own column header. Neutral is only for "not yet
+            // calculated".
             row.DaysLabel = new Label
             {
                 Font = UiFonts.Body,
                 Text = metrics == null ? RankerReadinessCalculator.DashText : RankerReadinessCalculator.FormatDays(metrics),
                 TextColor = metrics == null
                     ? RankerReadinessColors.Neutral
-                    : RankerReadinessColors.ForDays(metrics.DaysRemaining),
+                    : metrics.DaysRemaining <= 0
+                        ? ValueTextColor
+                        : RankerReadinessColors.ForDays(metrics.DaysRemaining),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 12),
+                Location = new Point(0, MainLineTextY),
                 Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.DaysLabel, DaysTooltip(metrics));
@@ -841,10 +1009,10 @@ namespace GW2CraftingHelper.Views
                 {
                     Font = UiFonts.Body,
                     Text = RankerReadinessCalculator.DashText,
-                    TextColor = RankerReadinessColors.Neutral,
+                    TextColor = metrics == null ? RankerReadinessColors.Neutral : ValueTextColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, 12),
+                    Location = new Point(0, MainLineTextY),
                     Parent = row.Panel,
                 };
                 TooltipFacility.ApplyPlain(row.RemainingDash, metrics == null
@@ -854,18 +1022,16 @@ namespace GW2CraftingHelper.Views
             else
             {
                 row.RemainingCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, 12, UiFonts.Body);
+                    row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
             }
 
-            row.Up = CreateRowButton(row.Panel, "\u25B2", bands.UpX,
-                "Raise this item's priority. It then has first claim on materials the row above it was using.");
-            row.Down = CreateRowButton(row.Panel, "\u25BC", bands.DownX,
-                "Lower this item's priority.");
+            row.Up = CreateRowButton(row.Panel, "\u25B2", bands.UpX, MoveUpTooltip());
+            row.Down = CreateRowButton(row.Panel, "\u25BC", bands.DownX, MoveDownTooltip());
             row.Remove = CreateRowButton(row.Panel, "\u2715", bands.RemoveX,
                 "Remove this item from your list.");
 
-            row.Up.Enabled = !_isRefreshing && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-            row.Down.Enabled = !_isRefreshing && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
+            row.Up.Enabled = CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
+            row.Down.Enabled = CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
             row.Remove.Enabled = !_isRefreshing;
 
             int rowIndex = row.Index;
@@ -895,7 +1061,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = glyph,
                 Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(x, 8),
+                Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
             TooltipFacility.ApplyPlain(button, tooltip);
@@ -914,7 +1080,7 @@ namespace GW2CraftingHelper.Views
             int line = 0;
 
             // The gate breakdown, justified across the full sub-line band so
-            // the four barriers read as one strip rather than a left-packed
+            // the five barriers read as one strip rather than a left-packed
             // sentence with dead space to its right.
             int gateY = RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight;
             for (int i = 0; i < metrics.Gates.Count && i < RankerRowLayout.GateCellCount; i++)
@@ -924,7 +1090,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Font = UiFonts.Caption,
                     Text = RankerReadinessCalculator.GateLabel(gate.Gate),
-                    TextColor = DimColor,
+                    TextColor = Color.White,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY),
@@ -936,7 +1102,7 @@ namespace GW2CraftingHelper.Views
                     Text = RankerReadinessCalculator.FormatGate(gate),
                     TextColor = gate.Applies
                         ? RankerReadinessColors.ForReadiness(gate.Completion)
-                        : RankerReadinessColors.Neutral,
+                        : ValueTextColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY),
@@ -956,12 +1122,16 @@ namespace GW2CraftingHelper.Views
                 int y = RankerRowLayout.RowHeight
                     + (line + i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.SubLineHeight;
 
-                row.CurrencyNameFulls.Add(CurrencyName(shortfall));
+                string fullName = CurrencyName(shortfall);
+                row.CurrencyNameFulls.Add(fullName);
+                row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
+                    row.Panel, CurrencyIconUrl(shortfall), (string)null,
+                    0, y + 1, RankerRowLayout.CurrencyIconSize, 1, fullName));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
-                    Text = row.CurrencyNameFulls[row.CurrencyNameFulls.Count - 1],
-                    TextColor = DimColor,
+                    Text = fullName,
+                    TextColor = Color.White,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, y),
@@ -971,7 +1141,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Font = UiFonts.Caption,
                     Text = FormatShortfall(shortfall),
-                    TextColor = shortfall.Short > 0 ? DimColor : RankerReadinessColors.ForReadiness(1.0),
+                    TextColor = shortfall.Short > 0 ? ValueTextColor : RankerReadinessColors.ForReadiness(1.0),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, y),
@@ -987,7 +1157,7 @@ namespace GW2CraftingHelper.Views
                 {
                     Font = UiFonts.Caption,
                     Text = note,
-                    TextColor = DimColor,
+                    TextColor = ValueTextColor,
                     AutoSizeWidth = false,
                     AutoSizeHeight = true,
                     Width = Math.Max(0, bands.SubLineWidth),
@@ -1004,45 +1174,44 @@ namespace GW2CraftingHelper.Views
         private void LayoutRow(RenderedRow row, in RankerRowLayout.Bands bands, bool measureText)
         {
             row.Panel.Size = new Point(bands.RowWidth, row.Panel.Height);
-            row.RankLabel.Location = new Point(bands.RankX, 14);
+            row.RankLabel.Location = new Point(bands.RankX, MainLineRankY);
 
             if (measureText)
             {
-                if (IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
-                        bands.NameX + bands.NameWidth, 0, 0))
-                {
-                    TooltipFacility.ApplyPlain(row.IconName.NameLabel, row.FullName);
-                }
+                // The rich deferred tooltip already carries the full name,
+                // so a truncation change needs no re-stamp here.
+                IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
+                    NameBudgetRightEdge(bands, row.ChipWidth), 0, 0);
             }
 
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
             row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), 12);
+                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
 
             if (row.Chip != null)
             {
-                row.Chip.Location = new Point(bands.ChipX, 11);
+                row.Chip.Location = new Point(ChipXFor(row), MainLineChipY);
             }
 
             row.DaysLabel.Location = new Point(
-                Math.Max(0, bands.DaysRightEdge - row.DaysLabel.Width), 12);
+                Math.Max(0, bands.DaysRightEdge - row.DaysLabel.Width), MainLineTextY);
 
             if (row.RemainingDash != null)
             {
                 row.RemainingDash.Location = new Point(
-                    Math.Max(0, bands.RemainingRightEdge - row.RemainingDash.Width), 12);
+                    Math.Max(0, bands.RemainingRightEdge - row.RemainingDash.Width), MainLineTextY);
             }
             else if (row.RemainingCell != null)
             {
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(
-                    row.RemainingCell, bands.RemainingRightEdge, 12);
+                    row.RemainingCell, bands.RemainingRightEdge, MainLineTextY);
             }
 
-            row.Up.Location = new Point(bands.UpX, 8);
-            row.Down.Location = new Point(bands.DownX, 8);
-            row.Remove.Location = new Point(bands.RemoveX, 8);
+            row.Up.Location = new Point(bands.UpX, MainLineButtonY);
+            row.Down.Location = new Point(bands.DownX, MainLineButtonY);
+            row.Remove.Location = new Point(bands.RemoveX, MainLineButtonY);
 
             for (int i = 0; i < row.GateNameLabels.Count; i++)
             {
@@ -1056,16 +1225,20 @@ namespace GW2CraftingHelper.Views
 
             for (int i = 0; i < row.CurrencyNameLabels.Count; i++)
             {
-                // Same rails as the gate strip above, so every sub-line value
-                // in the row right-aligns at the same four x positions.
-                RankerRowLayout.GateCell(bands, i % RankerRowLayout.CurrenciesPerLine,
+                // The currency list's own indented grid - deliberately NOT
+                // the gate rails; see RankerRowLayout.CurrenciesPerLine.
+                RankerRowLayout.CurrencyCell(bands, i % RankerRowLayout.CurrenciesPerLine,
                     out int cellX, out int cellWidth);
 
+                var icon = row.CurrencyIconFrames[i];
                 var name = row.CurrencyNameLabels[i];
                 var value = row.CurrencyValueLabels[i];
-                int valueX = Math.Max(cellX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap);
+                int nameX = cellX + RankerRowLayout.CurrencyIconSize + 2
+                    + RankerRowLayout.CurrencyIconGap;
+                int valueX = Math.Max(nameX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap);
 
-                name.Location = new Point(cellX, name.Location.Y);
+                icon.Location = new Point(cellX, icon.Location.Y);
+                name.Location = new Point(nameX, name.Location.Y);
                 value.Location = new Point(valueX, value.Location.Y);
 
                 if (measureText)
@@ -1074,7 +1247,7 @@ namespace GW2CraftingHelper.Views
                     // cell rather than running under it.
                     string full = row.CurrencyNameFulls[i];
                     string shown = LabelHelpers.EllipsizeToWidth(
-                        UiFonts.Caption, full, Math.Max(0, valueX - cellX - RankerRowLayout.IconGap));
+                        UiFonts.Caption, full, Math.Max(0, valueX - nameX - RankerRowLayout.IconGap));
                     if (!string.Equals(name.Text, shown, StringComparison.Ordinal))
                     {
                         name.Text = shown;
@@ -1165,27 +1338,94 @@ namespace GW2CraftingHelper.Views
                 : "Short " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin);
         }
 
-        private static Color ChipBorderColor(RankerRowMetrics metrics)
+        /// <summary>
+        /// Affordable reuses the module's proven badge combination (the
+        /// decision pills' darkened CRAFT green, already reused by the
+        /// summary's full-coverage "OK" tag); Short takes the shopping
+        /// source tags' recessed Locked plate. Both carry CreateSmallTag's
+        /// white label at field-proven contrast - the pale readiness green
+        /// behind white text was the reported unreadable case.
+        /// </summary>
+        private static void ChipColors(RankerRowMetrics metrics, out Color border, out Color fill)
         {
-            return metrics != null && metrics.AffordableNow
-                ? RankerReadinessColors.ForReadiness(1.0)
-                : RankerReadinessColors.Neutral;
+            if (metrics != null && metrics.AffordableNow)
+            {
+                border = AffordableChipBorder;
+                fill = AffordableChipFill;
+                return;
+            }
+
+            PillColors.GetPillColors(PillKind.Locked, false, out border, out fill);
         }
 
-        private static string ChipTooltip(RankerRowMetrics metrics)
+        /// <summary>Chip x: trailing the name label, inside the name band.</summary>
+        private static int ChipXFor(RenderedRow row)
+        {
+            return row.IconName.NameLabel.Location.X + row.IconName.NameLabel.Width + 8;
+        }
+
+        /// <summary>The name's right budget, with the chip's width reserved out of it.</summary>
+        private static int NameBudgetRightEdge(in RankerRowLayout.Bands bands, int chipWidth)
+        {
+            int rightEdge = bands.NameX + bands.NameWidth;
+            return chipWidth > 0 ? Math.Max(bands.NameX, rightEdge - chipWidth - 8) : rightEdge;
+        }
+
+        /// <summary>
+        /// The standard rich item tooltip on the icon and name, stamped
+        /// deferred so a stat block the session caches later shows without
+        /// a re-render, falling back to the plain full name until then -
+        /// the same shape MainView.ApplyItemRowTooltip established.
+        /// </summary>
+        private void ApplyItemTooltip(RenderedRow row, RankerWatchlistEntry entry)
+        {
+            int itemId = entry.ItemId;
+            string fullName = row.FullName;
+            Func<TooltipContent> build = () => ItemRowTooltipComposer.BuildRowContent(
+                _getItemStatBlock == null || itemId <= 0 ? null : _getItemStatBlock(itemId),
+                fullName,
+                true,
+                (IReadOnlyList<string>)null);
+
+            TooltipFacility.ApplyRichDeferred(row.IconName.NameLabel, build);
+            IconControls.ApplyRichDeferredToIconTree(row.IconName.IconFrame, build);
+        }
+
+        private bool CanReorder => !_isRefreshing && Mode == RankerMode.Cascade;
+
+        private string MoveUpTooltip()
+        {
+            return Mode == RankerMode.Independent
+                ? "Priority order applies in \"" + CascadeModeItem + "\" mode - switch back to change it."
+                : "Raise this item's priority. It then has first claim on materials the row above it was using.";
+        }
+
+        private string MoveDownTooltip()
+        {
+            return Mode == RankerMode.Independent
+                ? "Priority order applies in \"" + CascadeModeItem + "\" mode - switch back to change it."
+                : "Lower this item's priority.";
+        }
+
+        private string ChipTooltip(RankerRowMetrics metrics)
         {
             if (metrics == null)
             {
                 return null;
             }
 
+            bool independent = metrics.Mode == RankerMode.Independent;
             if (metrics.AffordableNow)
             {
-                return "You have enough coin for what is left of this item, after paying for everything above it on the list.";
+                return independent
+                    ? "You have enough coin for what is left of this item, measured against your full account."
+                    : "You have enough coin for what is left of this item, after paying for everything above it on the list.";
             }
 
             return "You are " + CoinSegmentMath.GameStyleText(metrics.ShortfallCoin) +
-                " short of what is left of this item, counting coin that the higher-priority items above it would already have spent.";
+                (independent
+                    ? " short of what is left of this item, measured against your full account."
+                    : " short of what is left of this item, counting coin that the higher-priority items above it would already have spent.");
         }
 
         private static int MeasureDashWidth()
@@ -1196,6 +1436,14 @@ namespace GW2CraftingHelper.Views
         private string CurrencyName(RankerCurrencyShortfall shortfall)
         {
             return CurrencyDisplayResolver.ResolveName(shortfall.CurrencyId, CurrencyMetadataFor(shortfall.CurrencyId));
+        }
+
+        private string CurrencyIconUrl(RankerCurrencyShortfall shortfall)
+        {
+            var metadata = CurrencyMetadataFor(shortfall.CurrencyId);
+            return metadata != null && metadata.TryGetValue(shortfall.CurrencyId, out var entry)
+                ? entry?.IconUrl
+                : null;
         }
 
         private IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadataFor(int currencyId)
@@ -1269,22 +1517,26 @@ namespace GW2CraftingHelper.Views
                     continue;
                 }
 
-                notes.Add(name + ": " + capped.NeededCount.ToString(CultureInfo.InvariantCulture) +
-                    " needed, " + capped.CapValue.ToString(CultureInfo.InvariantCulture) + " per " +
-                    CapWord(capped.CapType) + " cap");
+                // Same wording as the plan tab's TimegatedNotice rows, and
+                // named for what it is - a vendor purchase limit, not an
+                // earning cooldown (the calculator already drops caps on
+                // TP-liquid items, where the cap is coin rather than time).
+                notes.Add(name + " is timegated - vendor " + CapLabel(capped.CapType) +
+                    " limit: " + capped.CapValue.ToString(CultureInfo.InvariantCulture) +
+                    " (plan needs " + capped.NeededCount.ToString(CultureInfo.InvariantCulture) + ")");
                 break;
             }
 
             return notes;
         }
 
-        private static string CapWord(TimegatedCapType capType)
+        private static string CapLabel(TimegatedCapType capType)
         {
             switch (capType)
             {
-                case TimegatedCapType.Daily: return "day";
-                case TimegatedCapType.Weekly: return "week";
-                default: return "season";
+                case TimegatedCapType.Daily: return "Daily";
+                case TimegatedCapType.Weekly: return "Weekly";
+                default: return "Season";
             }
         }
 
@@ -1378,7 +1630,7 @@ namespace GW2CraftingHelper.Views
                 // priority order, and silently moving an item because the user
                 // re-searched it is the surprising outcome.
                 Entries[existing].Quantity = quantity;
-                InvalidateFrom(existing);
+                InvalidateAfterChangeAt(existing);
                 SetStatus($"{Entries[existing].Name} is already on your list - quantity updated to {quantity}.", isError: false);
             }
             else if (Entries.Count >= RankerWatchlistLimits.MaxEntries)
@@ -1412,7 +1664,7 @@ namespace GW2CraftingHelper.Views
 
         private void MoveRow(int index, bool up)
         {
-            if (_isRefreshing)
+            if (!CanReorder)
             {
                 return;
             }
@@ -1444,7 +1696,12 @@ namespace GW2CraftingHelper.Views
             int invalidatedFrom = RankerPriorityOrdering.RemoveAt(Entries, index);
             _metricsByItemId.Remove(removedItemId);
             _lastOwnedResults.Remove(removedItemId);
-            InvalidateFrom(invalidatedFrom);
+            if (Mode == RankerMode.Cascade)
+            {
+                // Independent rows are position-free, so the survivors'
+                // numbers are untouched by a removal.
+                InvalidateFrom(invalidatedFrom);
+            }
 
             Persist();
             RebuildRows();
@@ -1472,6 +1729,23 @@ namespace GW2CraftingHelper.Views
             }
         }
 
+        /// <summary>
+        /// Invalidation after the entry at index changed in place (a
+        /// quantity update): Cascade stales it and everything below it;
+        /// Independent rows are position-free, so only the row itself.
+        /// </summary>
+        private void InvalidateAfterChangeAt(int index)
+        {
+            if (Mode == RankerMode.Cascade)
+            {
+                InvalidateFrom(index);
+            }
+            else if (index >= 0 && index < Entries.Count)
+            {
+                _metricsByItemId.Remove(Entries[index].ItemId);
+            }
+        }
+
         private void Persist()
         {
             if (_store != null && !_store.Save(_watchlist))
@@ -1495,13 +1769,10 @@ namespace GW2CraftingHelper.Views
         // ---------------------------------------------------------------
         private void OnRefreshClicked()
         {
-            if (_isRefreshing)
-            {
-                CancelRefresh();
-                return;
-            }
-
-            if (Entries.Count == 0)
+            // Disabled while a run is in flight (the module's standing
+            // long-run pattern - see the plan tab's Generate button), so no
+            // cancel path hangs off this click.
+            if (_isRefreshing || Entries.Count == 0)
             {
                 return;
             }
@@ -1516,8 +1787,6 @@ namespace GW2CraftingHelper.Views
             _refreshCts = cts;
             _isRefreshing = true;
             SetControlsEnabled(false);
-            _refreshButton.Text = "Refreshing... (click to cancel)";
-            TooltipFacility.ApplyPlain(_refreshButton, "Stop the current refresh. Items already updated keep their results.");
             _spinner.Visible = true;
 
             var entries = Entries.Select(e => new RankerWatchlistEntry
@@ -1529,11 +1798,15 @@ namespace GW2CraftingHelper.Views
                 Rarity = e.Rarity,
             }).ToList();
 
-            Task.Run(() => RunRefreshAsync(entries, myGen, cts.Token));
+            // Read on the main thread; the run keeps this mode even if a
+            // toggle could slip in mid-run.
+            var mode = Mode;
+
+            Task.Run(() => RunRefreshAsync(entries, mode, myGen, cts.Token));
         }
 
         private async Task RunRefreshAsync(
-            List<RankerWatchlistEntry> entries, int myGen, CancellationToken ct)
+            List<RankerWatchlistEntry> entries, RankerMode mode, int myGen, CancellationToken ct)
         {
             int updated = 0;
             string failure = null;
@@ -1549,6 +1822,15 @@ namespace GW2CraftingHelper.Views
                 var homesteadTiers = _settings?.GetHomesteadEfficiencyTiers();
                 var cascade = new RankerPriorityCascade(snapshot);
 
+                // Independent mode is slot 1 semantics for EVERY row: one
+                // unconsumed availability (the full account), no Consume
+                // threading between rows. Still 2N solves either way - the
+                // mode only changes which snapshot the owned solve sees,
+                // which is why toggling stales metrics instead of re-solving.
+                var fullAvailability = mode == RankerMode.Independent
+                    ? cascade.CurrentAvailability
+                    : null;
+
                 for (int i = 0; i < entries.Count; i++)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -1560,7 +1842,7 @@ namespace GW2CraftingHelper.Views
                     int total = entries.Count;
                     MainThreadMarshal.Run(() => ReportProgress(myGen, position, total, name));
 
-                    var availability = cascade.CurrentAvailability;
+                    var availability = fullAvailability ?? cascade.CurrentAvailability;
 
                     var baseline = await _pipeline.GenerateStructuredAsync(
                         entry.ItemId, entry.Quantity, null, ct, null,
@@ -1596,8 +1878,12 @@ namespace GW2CraftingHelper.Views
 
                     ct.ThrowIfCancellationRequested();
 
-                    var metrics = RankerReadinessCalculator.Compute(baseline, owned, availability, slot);
-                    cascade.Consume(owned);
+                    var metrics = RankerReadinessCalculator.Compute(baseline, owned, availability, slot, mode);
+                    if (mode == RankerMode.Cascade)
+                    {
+                        cascade.Consume(owned);
+                    }
+
                     updated++;
 
                     int itemId = entry.ItemId;
@@ -1653,18 +1939,33 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
+            // The solve's metadata knows the rarity the Add-time search
+            // result never carried; adopt it so the name and icon frame
+            // take their rarity colour (persisted once, in FinishRefresh).
+            if (owned?.ItemMetadata != null &&
+                owned.ItemMetadata.TryGetValue(itemId, out var meta) &&
+                !string.IsNullOrEmpty(meta?.Rarity) &&
+                !string.Equals(entry.Rarity, meta.Rarity, StringComparison.Ordinal))
+            {
+                entry.Rarity = meta.Rarity;
+                _rarityDirty = true;
+            }
+
             row.Metrics = metrics;
             MeasureRowCells(row);
 
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             if (RecomputeBandWidths())
             {
-                // A wider coin cell moves the Ready, chip and Days columns for
+                // A wider coin cell moves the Ready and Days columns for
                 // EVERY row, so they all have to follow rather than drifting
                 // out of alignment as results land one at a time.
-                for (int i = 0; i < _rows.Count && i < Entries.Count; i++)
+                foreach (var each in _rows)
                 {
-                    RenderRowContent(_rows[i], Entries[i], barWidth);
+                    if (each.Index < Entries.Count)
+                    {
+                        RenderRowContent(each, Entries[each.Index], barWidth);
+                    }
                 }
 
                 return;
@@ -1684,16 +1985,28 @@ namespace GW2CraftingHelper.Views
             _firstRefreshDone = true;
             _lastRefreshLocal = DateTime.Now;
 
+            if (_rarityDirty)
+            {
+                // Rarity adopted from the run's solves (see ApplyRowMetrics)
+                // is worth keeping across sessions; one save per run.
+                _rarityDirty = false;
+                Persist();
+            }
+
             if (!_buildComplete || !IsLive)
             {
                 return;
             }
 
             _spinner.Visible = false;
-            _refreshButton.Text = "Refresh";
-            TooltipFacility.ApplyPlain(_refreshButton,
-                "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while.");
             SetControlsEnabled(true);
+
+            // Independent mode's display order is the refresh's answer -
+            // re-sort now that the metrics are in.
+            if (Mode == RankerMode.Independent)
+            {
+                RebuildRows();
+            }
 
             if (failure != null)
             {
@@ -1720,10 +2033,13 @@ namespace GW2CraftingHelper.Views
             _addButton.Enabled = enabled && _pendingItemId.HasValue;
             _searchBox.Enabled = enabled;
             _quantityBox.Enabled = enabled;
+            _modeDropdown.Enabled = enabled;
+            _refreshButton.Enabled = enabled && Entries.Count > 0;
             foreach (var row in _rows)
             {
-                row.Up.Enabled = enabled && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-                row.Down.Enabled = enabled && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
+                bool reorder = enabled && Mode == RankerMode.Cascade;
+                row.Up.Enabled = reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
+                row.Down.Enabled = reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
                 row.Remove.Enabled = enabled;
             }
         }

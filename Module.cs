@@ -82,6 +82,11 @@ namespace GW2CraftingHelper
         private RankerStore _rankerStore;
         private RankerTabContent _rankerContent;
 
+        // Carried from BuildViews to BuildTabs so the Ranker's rows serve
+        // the same session stat-cache tooltips the plan and snapshot rows
+        // do. Never a fetch (see ItemMetadataService.GetCachedStatBlock).
+        private Func<int, ItemStatBlock> _getItemStatBlock;
+
         // Plan History: the index is held in memory for the module's
         // lifetime and mutated under _planHistoryLock from two sides -
         // the capture path's ThreadPool continuation
@@ -711,6 +716,7 @@ namespace GW2CraftingHelper
             // for what it does with it.
             _modalDialog = new ModalDialog(_settings, () => _mainWindow);
             _apiAccessDialog = new ApiAccessDialog();
+            _getItemStatBlock = itemMetadataService.GetCachedStatBlock;
 
             _snapshotContent = new MainView(
                 _currentSnapshot,
@@ -885,7 +891,8 @@ namespace GW2CraftingHelper
                 _settings,
                 _rankerStore,
                 () => _currentSnapshot,
-                TryGetActiveCharacterName);
+                TryGetActiveCharacterName,
+                _getItemStatBlock);
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156686),

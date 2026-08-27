@@ -2414,11 +2414,14 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel,
             };
 
-            // The module's one icon component, at the plan rows' 32px art
-            // in a 1px frame. Rarity comes from the session stat cache
-            // because an AccountSnapshot carries none; a miss is neutral.
+            // The module's one icon component, at tier 1 of the two-tier
+            // icon system (owner ruling): in-game bag-slot-sized art in a
+            // 1px frame, filling the 56px item row. Rarity comes from the
+            // session stat cache because an AccountSnapshot carries none; a
+            // miss is neutral.
             string rarity = RarityFor(row.ItemId);
-            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, rarity, 2, 2);
+            var icon = IconControls.CreateItemIcon(
+                rowPanel, row.IconUrl, rarity, 2, 1, ItemIconTiers.BagSlotIconSize);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.

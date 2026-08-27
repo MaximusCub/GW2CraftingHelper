@@ -1,7 +1,30 @@
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace GW2CraftingHelper.Models
 {
+    /// <summary>
+    /// Which question the Crafting Ranker's table answers. Internal (with
+    /// the persisted property below carrying an explicit JsonProperty) so
+    /// the mode does not widen the module's pinned public surface.
+    /// </summary>
+    internal enum RankerMode
+    {
+        /// <summary>
+        /// "Given my order, how close is each item?" - every row is measured
+        /// after the rows above it claim materials, currencies, coin and
+        /// daily crafts (RankerPriorityCascade).
+        /// </summary>
+        Cascade = 0,
+
+        /// <summary>
+        /// "Which is closest to done right now?" - every row is measured
+        /// against the full account, ignoring the other rows, and the table
+        /// displays by readiness. The stored priority order is untouched.
+        /// </summary>
+        Independent = 1,
+    }
+
     /// <summary>
     /// One item on the Crafting Ranker's priority list. Name/IconUrl/Rarity
     /// are denormalized for the same reason SnapshotItemEntry duplicates
@@ -40,5 +63,15 @@ namespace GW2CraftingHelper.Models
         /// cascade walks.
         /// </summary>
         public List<RankerWatchlistEntry> Entries { get; set; } = new List<RankerWatchlistEntry>();
+
+        /// <summary>
+        /// The selected comparison mode. Additive: a file written before the
+        /// field existed deserializes to Cascade, the original behaviour, so
+        /// no schema bump and no list loss. JsonProperty is load-bearing -
+        /// the property is internal (see RankerMode) and Json.NET skips
+        /// non-public members without it.
+        /// </summary>
+        [JsonProperty]
+        internal RankerMode Mode { get; set; }
     }
 }
