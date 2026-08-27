@@ -75,6 +75,11 @@ per-row costs:
 
 ![Crafting plan recipe tree with decision pills](docs/images/plan-recipe-tree.png)
 
+Item tooltips mirror the in-game look - measured from live captures, down
+to the font, the background texture and cursor-adjacent placement:
+
+![GW2-authentic item tooltip on a recipe tree row](docs/images/item-tooltip.png)
+
 Account snapshot - items and currencies across bank, material storage,
 shared inventory and every character, with search and source filters:
 
