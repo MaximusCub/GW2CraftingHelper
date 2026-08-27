@@ -230,6 +230,22 @@ in that same pass - **this gap was closed by item 30 below** (M37 live
 desktop session, 2026-07-22, scanned Required Disciplines directly and
 confirmed the same clean result the simulation predicted).
 
+Tier-2 re-run (2026-08-27, icon-tier2 branch): the owner's icon ruling
+grew the plan tab's icon-led rows to 45px (Used Materials / Shopping /
+Required Recipes) and 52px (Crafting Steps). The M36b simulation was
+re-derived from the decompiled `ScaleBy` floor/ceil semantics, validated
+by reproducing the record above (514/5000 vanish phases for 44px/32px at
+0.897 - the published ~10.2% - and 850/5000 for the then-30px header at
+0.81), then run at the new heights: both are VULNERABLE at clearance 0
+(45px: 18.0% at 0.81 / 7.0% at 0.897; 52px: 10.3% at 0.897) and immune
+at clearance 1 at all four scales. Every icon-led row now passes
+`PlanContentHeightMath.IconRowDividerClearance` (1), with the flush fit
+preserved because the tier-2 heights absorb the clearance pixel in their
+own derivation. The proof is now executable and runs in CI:
+`tests/GW2CraftingHelper.Tests/Services/RowDividerScissorSimulationTests.cs`
+sweeps every shipped (rowHeight, clearance) pair at all four scales and
+fails on any vanish.
+
 ### 39. M38 view-decomposition entries (WP-21 through WP-25)
 
 Numbered late, on 2026-08-25, so `Views/Rendering/ISectionRelayoutSink.cs`

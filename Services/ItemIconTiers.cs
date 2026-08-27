@@ -33,10 +33,13 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// TIER 2 - in-game bag-SIDEBAR size: the Crafting Plan tab's
         /// row-level icons (recipe tree, Used Materials, Required Recipes,
-        /// Shopping List). Not yet applied there: those renderers' 36px
-        /// row heights are load-bearing in the divider-vanishing immunity
-        /// proof (see LabelHelpers.CreateRowDivider), so their resize is a
-        /// follow-up that re-runs that proof per new row height.
+        /// Shopping List, Crafting Steps). The row heights that carry these
+        /// icons are derived from this constant in
+        /// PlanContentHeightMath (RowIconFrameSize and the row-height sums
+        /// built on it), and the divider-vanishing immunity proof was
+        /// re-run at those heights - see LabelHelpers.CreateRowDivider and
+        /// the executable re-derivation in
+        /// tests/.../RowDividerScissorSimulationTests.cs.
         /// </summary>
         public const int BagSidebarIconSize = 40;
     }

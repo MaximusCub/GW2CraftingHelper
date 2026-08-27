@@ -42,12 +42,12 @@ namespace GW2CraftingHelper.Views.Rendering
         /// positive scale s). Whether that 1px shrink actually deletes the
         /// divider depends on rowHeight: simulation across every rowHeight
         /// in this file and all four GW2 UI Size scale factors (0.81 /
-        /// 0.897 / 1.0 / 1.103) shows 44px rows (CraftStepRowHeight) and
-        /// 32px rows (the DisciplineRowHeight of the day) vanish
-        /// completely (0 physical scanlines) at ~10.2% of scroll phases at
-        /// the default scale; 36px rows (UsedMaterialRowHeight,
-        /// ShoppingRowHeight, RecipeRowHeight) are immune at every
-        /// tested scale.
+        /// 0.897 / 1.0 / 1.103) showed the pre-tier-2 44px rows
+        /// (CraftStepRowHeight of the day) and 32px rows (the
+        /// DisciplineRowHeight of the day) vanish completely (0 physical
+        /// scanlines) at ~10.2% of scroll phases at the default scale,
+        /// while the pre-tier-2 36px rows were immune at every tested
+        /// scale.
         ///
         /// Fix: bottomClearance - an extra logical pixel of gap between the
         /// divider and rowHeight, i.e. Location.Y = rowHeight - 2 -
@@ -55,12 +55,24 @@ namespace GW2CraftingHelper.Views.Rendering
         /// inside the worst-case-shrunk clip window, which simulation
         /// confirms is immune (0/5000 vanishes) for every (rowHeight, scale)
         /// pair tested - proven, not just observed clean at one scale.
-        /// Callers pass 1 for the vulnerable 44px/32px row types above and 0
-        /// for the immune 36px row types (CreateUsedMaterialRow,
-        /// CreateShoppingRow, CreateRecipeRow) - those
-        /// three were tuned to a flush icon(0..34) + divider(34..36)
-        /// fit with zero slack, and giving them clearance they don't need
-        /// would reintroduce the icon/divider overlap that fix removed.
+        ///
+        /// Tier-2 re-run (owner icon ruling): the plan tab's icon-led rows
+        /// grew to 45px (Used Materials / Shopping / Required Recipes -
+        /// flush tier-2 frame + divider) and 52px (Crafting Steps), and
+        /// the simulation - re-derived from the decompiled ScaleBy
+        /// floor/ceil semantics and validated by reproducing the numbers
+        /// above - shows BOTH new heights are in the vulnerable class at
+        /// clearance 0 (45: 18.0% of phases at 0.81 / 7.0% at 0.897; 52:
+        /// 10.3% at 0.897) and immune at clearance 1 at all four scales.
+        /// Every icon-led row therefore passes
+        /// PlanContentHeightMath.IconRowDividerClearance (1), and the
+        /// flush fit survives because the tier-2 heights absorb the
+        /// clearance pixel in their own derivation (42 + 2 + 1 = 45 puts
+        /// the divider at 42..44, exactly under the 0..42 icon frame).
+        /// The proof is now executable - RowDividerScissorSimulationTests
+        /// sweeps every shipped (rowHeight, clearance) pair at all four
+        /// scales and fails on any vanish - so a future height change
+        /// re-runs it by construction.
         /// </summary>
         internal static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
         {

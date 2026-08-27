@@ -20,9 +20,12 @@ namespace GW2CraftingHelper.Views.Rendering
         // --- Icon helper ---
 
         /// <summary>
-        /// Item icon inside a rarity-colored frame. Defaults to the tree/row
-        /// size (32px icon, 1px border = 34px overall); the plan header uses
-        /// a larger 40px/2px variant (44px overall, gw2e's .tooltip-item).
+        /// Item icon inside a rarity-colored frame. Defaults to the legacy
+        /// small size (32px icon, 1px border = 34px overall), still used by
+        /// the compact sites outside the two-tier ruling (wallet rows,
+        /// search suggestions, Plan History); the Crafting Plan tab's rows
+        /// pass ItemIconTiers.BagSidebarIconSize and the plan header /
+        /// Snapshot grid / Ranker rows pass ItemIconTiers.BagSlotIconSize.
         /// <paramref name="tooltipText"/> is for an icon whose subject is
         /// not already spelled out beside it; callers wanting the full item
         /// hover stamp it after, via <see cref="ApplyRichToIconTree"/>.
