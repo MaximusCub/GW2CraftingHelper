@@ -1,6 +1,6 @@
 # Known Issues
 
-The issue tracker for GW2 Crafting Helper. It holds three things and
+The issue tracker for Taimi's Toolbench. It holds three things and
 deliberately nothing else:
 
 1. The **[numbered issue catalog](#numbered-issue-catalog)** - every issue
@@ -242,7 +242,7 @@ at clearance 1 at all four scales. Every icon-led row now passes
 `PlanContentHeightMath.IconRowDividerClearance` (1), with the flush fit
 preserved because the tier-2 heights absorb the clearance pixel in their
 own derivation. The proof is now executable and runs in CI:
-`tests/GW2CraftingHelper.Tests/Services/RowDividerScissorSimulationTests.cs`
+`tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs`
 sweeps every shipped (rowHeight, clearance) pair at all four scales and
 fails on any vanish.
 
@@ -558,7 +558,7 @@ the `_buildComplete` keep-vs-remove decision were re-checked against the
 current code during this round and still hold as written.
 
 **Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test suite
-(`tests/GW2CraftingHelper.Tests`) - 1101/1101 passing. VendorOfferUpdater
+(`tests/TaimisToolbench.Tests`) - 1101/1101 passing. VendorOfferUpdater
 suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (re-measured a
 fourth time after the 2026-08-06 comment-correction round above; counts
 unchanged, since that round touches only comments and documentation, none
@@ -916,7 +916,7 @@ genuinely open item, not just the ones originally filed under a
   built: none of the six directories exists, and `Services/` is 141 flat
   files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
   for unrelated reasons. Cut for the reason the plan itself flagged:
-  `GW2CraftingHelper.csproj` lists every file explicitly, so each move is
+  `TaimisToolbench.csproj` lists every file explicitly, so each move is
   also a csproj path edit, and the plan's own sequencing note called out
   high merge-conflict potential against the branches then in flight - which
   kept arriving, so the quiet window never came. The payoff is
