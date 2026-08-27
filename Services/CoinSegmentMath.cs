@@ -67,12 +67,17 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// The exact strings a coin amount renders as, per denomination -
         /// null for a leading all-zero unit that is omitted entirely (a
-        /// sub-1-gold amount starts at silver, un-padded; copper always
-        /// renders, even "0", so a zero total is never a blank cell).
-        /// CoinCurrencyRenderer.BuildCoinSegments builds its specs from
-        /// this, and the recipe tree's cost-column pre-scan measures the
-        /// same strings, so the widths a column reserves can never differ
-        /// from the text that lands in it.
+        /// sub-1-gold amount starts at silver; copper always renders, even
+        /// "0", so a zero total is never a blank cell). No zero-padding
+        /// anywhere: the game renders trailing units as bare digits -
+        /// MEASURED "2g 0s 0c" on live3 counterfeit-ticket (20000 copper)
+        /// and "2s 0c" on relic-livingcity (200 copper), 2026-08-26, where
+        /// the old "D2" would have printed "00". A non-zero sub-10 segment
+        /// ("2s 5c") has no capture; bare digits are INFERRED from the
+        /// zero samples. CoinCurrencyRenderer.BuildCoinSegments builds its
+        /// specs from this, and the recipe tree's cost-column pre-scan
+        /// measures the same strings, so the widths a column reserves can
+        /// never differ from the text that lands in it.
         /// </summary>
         public static (string Gold, string Silver, string Copper) FormatSegmentTexts(long copper)
         {
@@ -83,16 +88,16 @@ namespace GW2CraftingHelper.Services
 
             return (
                 showGold ? gold.ToString() : null,
-                showSilver ? (showGold ? silver.ToString("D2") : silver.ToString()) : null,
-                showSilver ? cop.ToString("D2") : cop.ToString());
+                showSilver ? silver.ToString() : null,
+                cop.ToString());
         }
 
         /// <summary>
         /// A coin amount as one plain string, spelled exactly the way the
-        /// icons spell it: leading all-zero units omitted, a trailing unit
-        /// zero-padded once a larger one precedes it. 1005 copper is
-        /// "10s 05c", never "0g 10s 5c" - the game prints "10c", not
-        /// "0g 0s 10c".
+        /// icons spell it: leading all-zero units omitted, trailing units
+        /// as bare digits. 1005 copper is "10s 5c", never "0g 10s 05c" -
+        /// the game prints "10c", not "0g 0s 10c", and "2g 0s 0c" with
+        /// single zeros (measured, live3 counterfeit-ticket).
         ///
         /// <para>
         /// The module's ONE plain coin format. Four composers used to keep
