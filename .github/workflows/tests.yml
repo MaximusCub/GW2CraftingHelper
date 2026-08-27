@@ -301,11 +301,13 @@ jobs:
           #   dev/            dated point-in-time records, frozen by policy
           #   docs/research/  same policy (both trees are already excluded
           #                   from the live-docs path check above)
+          #   docs/RENAMING.md  the rename runbook names the old identifiers
+          #                   because it is the record of migrating off them
           #   CLAUDE.md       PENDING: cites the on-disk clone folder, which
           #                   renames in the finale (docs/RENAMING.md). Remove
           #                   this entry in the commit that updates that path.
           a="Crafting"; b="Helper"
-          allow='^(dev/|docs/research/|CHANGELOG\.md$|CLAUDE\.md$)'
+          allow='^(dev/|docs/research/|CHANGELOG\.md$|CLAUDE\.md$|docs/RENAMING\.md$)'
           hits=$(git ls-files -z | grep -zvE "$allow" \
             | xargs -0 -r grep -liE "$a$b|$a $b" || true)
           named=$(git ls-files | grep -vE "$allow" | grep -iE "$a.?$b" || true)
