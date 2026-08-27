@@ -85,10 +85,6 @@ saved plan exactly as it was, or re-solve it at today's prices:
 
 ![Plan History with View, Open and Re-solve](docs/images/plan-history.png)
 
-Item tooltips mirror the in-game look, measured from live captures:
-
-![GW2-authentic item tooltip](docs/images/item-tooltip.png)
-
 Used Materials and Shopping List sections (item names colored by GW2
 rarity) with vendor-tagged shopping rows:
 
