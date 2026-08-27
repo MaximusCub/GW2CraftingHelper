@@ -165,7 +165,7 @@ Services/PlanStripStatusBoard.cs                                                
 Services/PlanStripTickDecision.cs                                                          97
 Services/PlanStructuralValidator.cs                                                        597
 Services/PlanTableSorter.cs                                                                261
-Services/PlanViewModelBuilder.cs                                                           1489
+Services/PlanViewModelBuilder.cs                                                           1539
 Services/RankerPriorityCascade.cs                                                          364
 Services/RankerPriorityOrdering.cs                                                         183
 Services/RankerReadinessCalculator.cs                                                      666
@@ -440,7 +440,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanStripTickDecisionTests.cs            
 tests/GW2CraftingHelper.Tests/Services/PlanTableSorterTests.cs                             446
 tests/GW2CraftingHelper.Tests/Services/PlanTimingAnalyzerTests.cs                          90
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderAcquisitionHintsTests.cs        151
-tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderDailyCooldownTests.cs           256
+tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderDailyCooldownTests.cs           290
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderMultiItemTests.cs               399
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesCompetencyTests.cs         101
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesExcessTests.cs             185
@@ -449,7 +449,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesRecipeSheetSavin
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderNotesSeasonalVendorTipTests.cs  195
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSellEconomicsTests.cs           193
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderShoppingListTests.cs            444
-tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs            635
+tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs            784
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSublabelTests.cs                264
 tests/GW2CraftingHelper.Tests/Services/PlanViewModelBuilderSummaryTests.cs                 1181
 tests/GW2CraftingHelper.Tests/Services/RankerCascadeIntegrationTests.cs                    354

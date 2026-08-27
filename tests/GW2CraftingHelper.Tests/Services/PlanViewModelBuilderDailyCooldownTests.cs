@@ -252,5 +252,39 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[2].RowType);
             Assert.Contains("Lump of Mithrillium", section.Rows[2].Label);
         }
+
+        [Fact]
+        public void CraftCooldown_TpLiquidItem_StillNotesAsTimegated()
+        {
+            // Boundary against the vendor-cap liquidity filter (see
+            // PlanViewModelBuilder.FilterVendorCapNotices): a daily craft
+            // cooldown is an EARNING limit - the TP selling the item does
+            // not lift the per-account per-day craft cap, so liquidity
+            // must never suppress this notice family.
+            var meta = MetaFor((46742, "Lump of Mithrillium", "lump.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
+                },
+                dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
+                {
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
+                });
+            result.SolveContext = new PlanSolveContext
+            {
+                Prices = new Dictionary<int, ItemPrice>
+                {
+                    [46742] = new ItemPrice { ItemId = 46742, BuyInstant = 100, SellInstant = 120 },
+                },
+            };
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = section.Rows.Single(r => r.RowType == PlanRowType.TimegatedNotice);
+            Assert.Contains("is timegated - 1 per day per account", notice.Label);
+        }
     }
 }

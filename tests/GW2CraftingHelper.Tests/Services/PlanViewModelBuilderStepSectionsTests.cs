@@ -139,6 +139,164 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.DoesNotContain("Seasonal", notice.Label);
         }
 
+        // --- Vendor caps vs TP liquidity (field issue: an Exordium
+        // plan's "Mystic Coin is timegated - Weekly limit: 10 (plan needs
+        // 366)" implied a 37-week wait for a freely TP-buyable item).
+        // Same filter the Ranker applies in RankerReadinessCalculator's
+        // FilterVendorCappedItems: the remainder above the cap is coin,
+        // not time. ---
+        private static CraftingPlanResult WithPrices(
+            CraftingPlanResult result, Dictionary<int, ItemPrice> prices)
+        {
+            result.SolveContext = new PlanSolveContext { Prices = prices };
+            return result;
+        }
+
+        [Fact]
+        public void TimegatedItems_TpLiquidItem_VendorCapNoticeIsDropped()
+        {
+            const int mysticCoinLike = 19976;
+            var meta = MetaFor((2, "Blade", "blade.png"), (mysticCoinLike, "Mystic Coin", "coin.png"));
+            var result = WithPrices(
+                MakeResult(
+                    metadata: meta,
+                    steps: new List<PlanStep>
+                    {
+                        new PlanStep { ItemId = 2, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 10 },
+                    },
+                    timegatedItems: new List<TimegatedItem>
+                    {
+                        new TimegatedItem { ItemId = mysticCoinLike, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 366 },
+                    }),
+                new Dictionary<int, ItemPrice>
+                {
+                    [mysticCoinLike] = new ItemPrice { ItemId = mysticCoinLike, BuyInstant = 100, SellInstant = 120 },
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var row = Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.CraftStep, row.RowType);
+        }
+
+        [Fact]
+        public void TimegatedItems_TpLiquidOnlyNotice_NoCraftSteps_NoSection()
+        {
+            // The notices-only section exists purely to carry notices; a
+            // plan whose only candidate notice is filtered away must not
+            // render an empty Crafting Steps section.
+            const int mysticCoinLike = 19976;
+            var result = WithPrices(
+                MakeResult(
+                    steps: new List<PlanStep>
+                    {
+                        new PlanStep { ItemId = mysticCoinLike, Quantity = 366, Source = AcquisitionSource.BuyFromVendor },
+                    },
+                    timegatedItems: new List<TimegatedItem>
+                    {
+                        new TimegatedItem { ItemId = mysticCoinLike, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 366 },
+                    }),
+                new Dictionary<int, ItemPrice>
+                {
+                    [mysticCoinLike] = new ItemPrice { ItemId = mysticCoinLike, BuyInstant = 100, SellInstant = 120 },
+                });
+            var vm = _builder.Build(result);
+
+            Assert.DoesNotContain(vm.Sections, s => s.SectionType == PlanSectionType.CraftingSteps);
+        }
+
+        [Fact]
+        public void TimegatedItems_UnpricedItem_KeepsNoticeWithVendorLimitWording()
+        {
+            // Present in the price map but with no live orders on either
+            // side: the cap genuinely delays the plan, and the label names
+            // the constraint for what it is - a vendor purchase limit
+            // (same wording as the Ranker's vendor-cap note).
+            const int boundItem = 12345;
+            var meta = MetaFor((boundItem, "Bound Trophy", "trophy.png"));
+            var result = WithPrices(
+                MakeResult(
+                    metadata: meta,
+                    steps: new List<PlanStep>
+                    {
+                        new PlanStep { ItemId = boundItem, Quantity = 16, Source = AcquisitionSource.BuyFromVendor },
+                    },
+                    timegatedItems: new List<TimegatedItem>
+                    {
+                        new TimegatedItem { ItemId = boundItem, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 16 },
+                    }),
+                new Dictionary<int, ItemPrice>
+                {
+                    [boundItem] = new ItemPrice { ItemId = boundItem, BuyInstant = 0, SellInstant = 0 },
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.TimegatedNotice, notice.RowType);
+            Assert.Equal(
+                "Bound Trophy is timegated - vendor Weekly limit: 10 (plan needs 16)",
+                notice.Label);
+        }
+
+        [Fact]
+        public void TimegatedItems_MissingPriceData_KeepsNoticeRatherThanInventingLiquidity()
+        {
+            // No SolveContext price map at all (MakeResult leaves
+            // SolveContext null): the builder must not assume liquidity.
+            var meta = MetaFor((9, "Obsidian Shard", "shard.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 9, Quantity = 16, Source = AcquisitionSource.BuyFromVendor },
+                },
+                timegatedItems: new List<TimegatedItem>
+                {
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 16 },
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = Assert.Single(section.Rows);
+            Assert.Equal(PlanRowType.TimegatedNotice, notice.RowType);
+        }
+
+        [Fact]
+        public void TimegatedItems_MixedLiquidity_OnlyTheUnpricedItemKeepsItsNotice()
+        {
+            const int liquidItem = 19976;
+            const int boundItem = 12345;
+            var meta = MetaFor(
+                (liquidItem, "Mystic Coin", "coin.png"),
+                (boundItem, "Bound Trophy", "trophy.png"));
+            var result = WithPrices(
+                MakeResult(
+                    metadata: meta,
+                    steps: new List<PlanStep>
+                    {
+                        new PlanStep { ItemId = liquidItem, Quantity = 16, Source = AcquisitionSource.BuyFromVendor },
+                        new PlanStep { ItemId = boundItem, Quantity = 16, Source = AcquisitionSource.BuyFromVendor },
+                    },
+                    timegatedItems: new List<TimegatedItem>
+                    {
+                        new TimegatedItem { ItemId = liquidItem, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 16 },
+                        new TimegatedItem { ItemId = boundItem, CapType = TimegatedCapType.Daily, CapValue = 5, NeededCount = 16 },
+                    }),
+                new Dictionary<int, ItemPrice>
+                {
+                    [liquidItem] = new ItemPrice { ItemId = liquidItem, BuyInstant = 100, SellInstant = 120 },
+                    [boundItem] = new ItemPrice { ItemId = boundItem, BuyInstant = 0, SellInstant = 0 },
+                });
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = Assert.Single(section.Rows, r => r.RowType == PlanRowType.TimegatedNotice);
+            Assert.Contains("Bound Trophy", notice.Label);
+            Assert.Contains("vendor Daily limit: 5", notice.Label);
+            Assert.DoesNotContain(section.Rows, r => r.Label != null && r.Label.Contains("Mystic Coin"));
+        }
+
         // --- Required Disciplines ---
         [Fact]
         public void RequiredDisciplines_MapsCorrectly()
