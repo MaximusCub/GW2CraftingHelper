@@ -14,13 +14,19 @@ namespace GW2CraftingHelper.Services
     public static class RankerRowLayout
     {
         public const int Inset = 16;
-        public const int IconSize = 32;
+
+        // Tier 1 of the module's two-tier icon system (owner ruling): the
+        // Ranker's rows carry in-game bag-slot-sized item art, like the
+        // Snapshot grid and the plan heading.
+        public const int IconSize = ItemIconTiers.BagSlotIconSize;
         public const int IconBorder = 1;
         public const int IconTotal = IconSize + 2 * IconBorder;
         public const int IconGap = 8;
         public const int CellGap = 12;
         public const int ButtonGap = 4;
-        public const int RowHeight = 44;
+
+        // 60: the 54px tier-1 icon frame plus 3px of clearance each side.
+        public const int RowHeight = 60;
         public const int SubLineHeight = 20;
         public const int ButtonWidth = 28;
 
@@ -48,8 +54,8 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int MinRemainingCellWidth = 100;
 
-        /// <summary>The four gate cells of the breakdown sub-line.</summary>
-        public const int GateCellCount = 4;
+        /// <summary>The five gate cells of the breakdown sub-line.</summary>
+        public const int GateCellCount = 5;
 
         /// <summary>Below this the pinned block cannot fit and the name band collapses to zero.</summary>
         public const int MinNameWidth = 40;
@@ -64,9 +70,6 @@ namespace GW2CraftingHelper.Services
 
             /// <summary>Right edge of the right-aligned readiness percentage.</summary>
             public readonly int ReadyRightEdge;
-
-            public readonly int ChipX;
-            public readonly int ChipWidth;
 
             /// <summary>Right edge of the right-aligned days cell.</summary>
             public readonly int DaysRightEdge;
@@ -86,7 +89,7 @@ namespace GW2CraftingHelper.Services
 
             public Bands(
                 int rowWidth, int rankX, int iconX, int nameX, int nameWidth,
-                int readyRightEdge, int chipX, int chipWidth, int daysRightEdge,
+                int readyRightEdge, int daysRightEdge,
                 int remainingRightEdge, int upX, int downX, int removeX,
                 int subLineX, int subLineWidth)
             {
@@ -96,8 +99,6 @@ namespace GW2CraftingHelper.Services
                 NameX = nameX;
                 NameWidth = nameWidth;
                 ReadyRightEdge = readyRightEdge;
-                ChipX = chipX;
-                ChipWidth = chipWidth;
                 DaysRightEdge = daysRightEdge;
                 RemainingRightEdge = remainingRightEdge;
                 UpX = upX;
@@ -111,13 +112,15 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// rowWidth is the SCROLLING panel's width minus
         /// WindowSizing.ScrollbarAllowance, never the container's width.
-        /// chipWidth of 0 removes the chip and its gap entirely.
+        /// The affordability chip is NOT a band here: seated between the
+        /// Ready and Days rails it broke the header-over-column mapping the
+        /// field test flagged, so it now trails the item name inside the
+        /// name band (see the view's chip placement).
         /// </summary>
-        public static Bands Compute(int rowWidth, int remainingCellWidth, int chipWidth)
+        public static Bands Compute(int rowWidth, int remainingCellWidth)
         {
             rowWidth = Math.Max(0, rowWidth);
             remainingCellWidth = Math.Max(MinRemainingCellWidth, remainingCellWidth);
-            chipWidth = Math.Max(0, chipWidth);
 
             int rightEdge = Math.Max(0, rowWidth - Inset);
 
@@ -127,10 +130,7 @@ namespace GW2CraftingHelper.Services
 
             int remainingRightEdge = upX - CellGap;
             int daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
-
-            int chipRightEdge = daysRightEdge - DaysCellWidth - CellGap;
-            int chipX = chipWidth > 0 ? chipRightEdge - chipWidth : chipRightEdge;
-            int readyRightEdge = chipWidth > 0 ? chipX - CellGap : chipRightEdge;
+            int readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
 
             int rankX = Inset;
             int iconX = rankX + RankWidth;
@@ -155,13 +155,13 @@ namespace GW2CraftingHelper.Services
 
             return new Bands(
                 rowWidth, rankX, iconX, nameX, nameWidth,
-                readyRightEdge, chipX, chipWidth, daysRightEdge,
+                readyRightEdge, daysRightEdge,
                 remainingRightEdge, upX, downX, removeX,
                 subLineX, subLineWidth);
         }
 
         /// <summary>
-        /// One cell of the gate-breakdown sub-line. The four cells divide the
+        /// One cell of the gate-breakdown sub-line. The five cells divide the
         /// sub-line's full width evenly so the strip is justified to the panel
         /// rather than left-packed with dead space on the right.
         /// </summary>
@@ -188,15 +188,87 @@ namespace GW2CraftingHelper.Services
             return RowHeight + Math.Max(0, subLineCount) * SubLineHeight;
         }
 
+        /// <summary>Fits the fixed "Refresh" label with clearance; never fed status text.</summary>
+        public const int RefreshButtonWidth = 132;
+
+        public readonly struct ToolbarSlots
+        {
+            /// <summary>Left edge of the right-anchored Refresh button.</summary>
+            public readonly int RefreshX;
+
+            /// <summary>Left edge of the status line's band.</summary>
+            public readonly int StatusX;
+
+            /// <summary>
+            /// Width the status label may fill. Text longer than this is
+            /// ellipsized by the view, never allowed to run under the button.
+            /// </summary>
+            public readonly int StatusWidth;
+
+            public ToolbarSlots(int refreshX, int statusX, int statusWidth)
+            {
+                RefreshX = refreshX;
+                StatusX = statusX;
+                StatusWidth = statusWidth;
+            }
+        }
+
         /// <summary>
-        /// Currency shortfalls sit on the SAME four-column grid as the gate
-        /// breakdown strip (GateCell), one currency per cell, so every value
-        /// in a row's sub-lines shares one set of vertical rails - the live
-        /// desktop gate showed that a second, different grid under the gate
-        /// strip reads as each value finding its own x.
+        /// The toolbar row: one full-width status band on the left, the
+        /// Refresh button pinned right, the inline spinner between them.
+        /// The refresh-progress text renders in the status band and ONLY
+        /// there - the field test showed status-length text stamped onto
+        /// the fixed-width button spilling past its edges.
         /// </summary>
-        public const int CurrenciesPerLine = GateCellCount;
-        public const int MaxCurrencyLines = 2;
+        public static ToolbarSlots Toolbar(int barWidth, int spinnerSize, int labelGap)
+        {
+            int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
+            int statusRight = refreshX - spinnerSize - 2 * labelGap;
+            return new ToolbarSlots(refreshX, Inset, Math.Max(0, statusRight - Inset));
+        }
+
+        /// <summary>
+        /// Currency shortfalls deliberately do NOT share the gate strip's
+        /// rails any more. On the shared grid an entry rendered directly
+        /// under whichever gate column its index landed on ("Ascalonian
+        /// Tear" under Materials, an essence under Disciplines), which the
+        /// field test read as children of unrelated gates. Their own
+        /// indented, icon-led grid makes them parse as one currency list
+        /// owned by the row.
+        /// </summary>
+        public const int CurrenciesPerLine = 3;
+        public const int MaxCurrencyLines = 3;
+
+        /// <summary>Indent of the currency grid under the sub-line band.</summary>
+        public const int CurrencyIndent = 16;
+
+        /// <summary>Inline currency icon edge; +2 border fits the 20px sub-line.</summary>
+        public const int CurrencyIconSize = 16;
+
+        /// <summary>Gap between a currency icon's frame and its name.</summary>
+        public const int CurrencyIconGap = 6;
+
+        /// <summary>
+        /// One cell of the currency grid: CurrenciesPerLine equal cells
+        /// across the indented band, remainder to the last cell, same
+        /// integer-exact rule as GateCell.
+        /// </summary>
+        public static void CurrencyCell(in Bands bands, int index, out int x, out int width)
+        {
+            int bandX = bands.SubLineX + CurrencyIndent;
+            int bandWidth = Math.Max(0, bands.SubLineWidth - CurrencyIndent);
+            if (index < 0 || index >= CurrenciesPerLine || bandWidth <= 0)
+            {
+                x = bandX;
+                width = 0;
+                return;
+            }
+
+            int left = bandX + (int)((long)bandWidth * index / CurrenciesPerLine);
+            int right = bandX + (int)((long)bandWidth * (index + 1) / CurrenciesPerLine);
+            x = left;
+            width = Math.Max(0, right - left);
+        }
 
         /// <summary>
         /// How many currency shortfall sub-lines a row needs. Deliberately

@@ -21,12 +21,13 @@ namespace GW2CraftingHelper.Services
     internal static class SnapshotItemGridLayout
     {
         /// <summary>
-        /// Left edge of a cell's text column: the 32px icon at x=2 plus its
-        /// right gap. Same number MainView's rows have always used; it lives
-        /// here so <see cref="SnapshotMinColumnWidth"/> is derived from the geometry
+        /// Left edge of a cell's text column: the tier-1 bag-slot icon
+        /// frame at x=2 (art + 1px border each side) plus its right gap. It
+        /// lives here, derived from <see cref="ItemIconTiers.BagSlotIconSize"/>,
+        /// so <see cref="SnapshotMinColumnWidth"/> is derived from the geometry
         /// the cells are actually built with and cannot drift from it.
         /// </summary>
-        public const int CellTextX = 40;
+        public const int CellTextX = 2 + ItemIconTiers.BagSlotIconSize + 2 + 6;
 
         /// <summary>Gap kept clear of a cell's right edge.</summary>
         public const int CellTextRightPad = 8;

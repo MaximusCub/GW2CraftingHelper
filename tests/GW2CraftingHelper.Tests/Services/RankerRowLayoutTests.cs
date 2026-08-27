@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
         [MemberData(nameof(RealWidths))]
         public void AtEveryRealWidth_TheNameBandIsPositiveAndClearsTheReadyCell(int rowWidth)
         {
-            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120, chipWidth: 96);
+            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120);
 
             Assert.True(bands.NameWidth > 0);
             Assert.True(bands.NameX + bands.NameWidth <= bands.ReadyRightEdge);
@@ -30,7 +30,7 @@ namespace GW2CraftingHelper.Tests.Services
         [MemberData(nameof(RealWidths))]
         public void AtEveryRealWidth_TheLastButtonEndsExactlyOnTheRowsOneRightEdge(int rowWidth)
         {
-            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120, chipWidth: 96);
+            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120);
 
             Assert.Equal(rowWidth - RankerRowLayout.Inset,
                 bands.RemoveX + RankerRowLayout.ButtonWidth);
@@ -40,25 +40,13 @@ namespace GW2CraftingHelper.Tests.Services
         [MemberData(nameof(RealWidths))]
         public void AtEveryRealWidth_ThePinnedBlockNeverOverlapsLeftToRight(int rowWidth)
         {
-            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120, chipWidth: 96);
+            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120);
 
-            Assert.True(bands.ReadyRightEdge <= bands.ChipX);
-            Assert.True(bands.ChipX + bands.ChipWidth <= bands.DaysRightEdge);
+            Assert.True(bands.ReadyRightEdge <= bands.DaysRightEdge - RankerRowLayout.DaysCellWidth);
             Assert.True(bands.DaysRightEdge <= bands.RemainingRightEdge - 120);
             Assert.True(bands.RemainingRightEdge <= bands.UpX);
             Assert.True(bands.UpX + RankerRowLayout.ButtonWidth <= bands.DownX);
             Assert.True(bands.DownX + RankerRowLayout.ButtonWidth <= bands.RemoveX);
-        }
-
-        [Fact]
-        public void AChiplessRow_ReclaimsTheChipsGapForTheName()
-        {
-            const int rowWidth = 1200;
-            var withChip = RankerRowLayout.Compute(rowWidth, 120, chipWidth: 96);
-            var withoutChip = RankerRowLayout.Compute(rowWidth, 120, chipWidth: 0);
-
-            Assert.Equal(0, withoutChip.ChipWidth);
-            Assert.True(withoutChip.NameWidth > withChip.NameWidth);
         }
 
         [Theory]
@@ -69,18 +57,17 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(300)]
         public void DegenerateWidths_ClampRatherThanEmittingNegativeWidths(int rowWidth)
         {
-            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120, chipWidth: 96);
+            var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120);
 
             Assert.True(bands.NameWidth >= 0);
             Assert.True(bands.SubLineWidth >= 0);
-            Assert.True(bands.ChipWidth >= 0);
         }
 
         [Theory]
         [MemberData(nameof(RealWidths))]
         public void TheGateStripFillsTheSubLineBandExactly(int rowWidth)
         {
-            var bands = RankerRowLayout.Compute(rowWidth, 120, 96);
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
 
             int previousRight = bands.SubLineX;
             for (int i = 0; i < RankerRowLayout.GateCellCount; i++)
@@ -95,13 +82,21 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(bands.SubLineX + bands.SubLineWidth, previousRight);
         }
 
+        [Fact]
+        public void TheGateStripCarriesAllFiveGates()
+        {
+            // Field issue 7: the strip gained a Recipes cell; the cell count
+            // is what the view's render loop truncates against.
+            Assert.Equal(5, RankerRowLayout.GateCellCount);
+        }
+
         [Theory]
         [InlineData(-1)]
         [InlineData(RankerRowLayout.GateCellCount)]
         [InlineData(99)]
         public void GateCell_OutOfRange_ReturnsZeroWidth(int index)
         {
-            var bands = RankerRowLayout.Compute(1200, 120, 96);
+            var bands = RankerRowLayout.Compute(1200, 120);
 
             RankerRowLayout.GateCell(bands, index, out _, out int width);
 
@@ -122,34 +117,61 @@ namespace GW2CraftingHelper.Tests.Services
         [Theory]
         [InlineData(0, 0)]
         [InlineData(1, 1)]
-        [InlineData(4, 1)]
-        [InlineData(5, 2)]
-        [InlineData(8, 2)]
-        [InlineData(9, 2)]
-        public void CurrencyLineCount_IsMonotonicAndCappedAtTwoLines(int currencies, int expected)
+        [InlineData(3, 1)]
+        [InlineData(4, 2)]
+        [InlineData(6, 2)]
+        [InlineData(7, 3)]
+        [InlineData(9, 3)]
+        [InlineData(20, 3)]
+        public void CurrencyLineCount_IsMonotonicAndCappedAtThreeLines(int currencies, int expected)
         {
             Assert.Equal(expected, RankerRowLayout.CurrencyLineCount(currencies));
         }
 
-        [Fact]
-        public void CurrenciesShareTheGateStripsGrid()
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void TheCurrencyGridIsIndentedAndFillsItsOwnBandExactly(int rowWidth)
         {
-            // One set of vertical rails for every sub-line value in a row -
-            // the live desktop gate showed that a second grid under the gate
-            // strip reads as each value finding its own x.
-            Assert.Equal(RankerRowLayout.GateCellCount, RankerRowLayout.CurrenciesPerLine);
+            // Field issue 6: currency entries no longer sit on the gate
+            // rails - their grid starts CurrencyIndent inside the sub-line
+            // band so they read as one owned list, not gate children.
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
+
+            int previousRight = bands.SubLineX + RankerRowLayout.CurrencyIndent;
+            for (int i = 0; i < RankerRowLayout.CurrenciesPerLine; i++)
+            {
+                RankerRowLayout.CurrencyCell(bands, i, out int x, out int width);
+                Assert.Equal(previousRight, x);
+                Assert.True(width > 0);
+                previousRight = x + width;
+            }
+
+            Assert.Equal(bands.SubLineX + bands.SubLineWidth, previousRight);
         }
 
         [Theory]
         [MemberData(nameof(RealWidths))]
-        public void AtEveryRealWidth_ACurrencyNamePlusValueFitsOneGateCell(int rowWidth)
+        public void AtEveryRealWidth_ACurrencyCellFitsIconNameAndValue(int rowWidth)
         {
-            // The reason CurrencyLineCount is deliberately width-independent:
-            // a width-dependent count would change a row's HEIGHT mid-drag.
-            var bands = RankerRowLayout.Compute(rowWidth, 120, 96);
-            RankerRowLayout.GateCell(bands, 0, out _, out int cellWidth);
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
+            RankerRowLayout.CurrencyCell(bands, 0, out _, out int cellWidth);
 
-            Assert.True(cellWidth >= 150);
+            // Icon frame + gap + a usable name run + a right-aligned value.
+            Assert.True(cellWidth >=
+                RankerRowLayout.CurrencyIconSize + 2 + RankerRowLayout.CurrencyIconGap + 150);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(RankerRowLayout.CurrenciesPerLine)]
+        [InlineData(99)]
+        public void CurrencyCell_OutOfRange_ReturnsZeroWidth(int index)
+        {
+            var bands = RankerRowLayout.Compute(1200, 120);
+
+            RankerRowLayout.CurrencyCell(bands, index, out _, out int width);
+
+            Assert.Equal(0, width);
         }
 
         // ---------------------------------------------------------------
@@ -165,7 +187,7 @@ namespace GW2CraftingHelper.Tests.Services
         [InlineData(99)]
         public void TheRemainingBandNeverDropsBelowItsHeaderFloor(int measuredCellWidth)
         {
-            var bands = RankerRowLayout.Compute(1200, measuredCellWidth, 0);
+            var bands = RankerRowLayout.Compute(1200, measuredCellWidth);
 
             Assert.True(bands.RemainingRightEdge - bands.DaysRightEdge
                 >= RankerRowLayout.MinRemainingCellWidth + RankerRowLayout.CellGap);
@@ -174,8 +196,8 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void AWiderMeasuredCellStillBeatsTheFloor()
         {
-            var floored = RankerRowLayout.Compute(1200, 8, 0);
-            var wide = RankerRowLayout.Compute(1200, 180, 0);
+            var floored = RankerRowLayout.Compute(1200, 8);
+            var wide = RankerRowLayout.Compute(1200, 180);
 
             Assert.Equal(RankerRowLayout.MinRemainingCellWidth + RankerRowLayout.CellGap,
                 floored.RemainingRightEdge - floored.DaysRightEdge);
@@ -188,10 +210,9 @@ namespace GW2CraftingHelper.Tests.Services
         public void AnEmptyTablesHeaderCellsDoNotOverlap(int rowWidth)
         {
             // Exactly the shape the desktop gate photographed as
-            // "ReadhyDaining": zero rows, so a dash-width coin band and no
-            // chip. Each right-aligned header must clear the cell to its
-            // left even then.
-            var bands = RankerRowLayout.Compute(rowWidth, 8, 0);
+            // "ReadhyDaining": zero rows, so a dash-width coin band. Each
+            // right-aligned header must clear the cell to its left even then.
+            var bands = RankerRowLayout.Compute(rowWidth, 8);
 
             int readyCellLeft = bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth;
             int daysCellLeft = bands.DaysRightEdge - RankerRowLayout.DaysCellWidth;
@@ -209,10 +230,66 @@ namespace GW2CraftingHelper.Tests.Services
             // The gate's other header collision: ReadyCellWidth existed but
             // nothing subtracted it, so the name band ran under the
             // right-aligned "100%".
-            var bands = RankerRowLayout.Compute(1200, 120, 96);
+            var bands = RankerRowLayout.Compute(1200, 120);
 
             Assert.Equal(bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth - RankerRowLayout.CellGap,
                 bands.NameX + bands.NameWidth);
+        }
+
+        // ---------------------------------------------------------------
+        // The toolbar row - field bug: refresh-progress text stamped onto
+        // the fixed-width button spilled past its edges. The status band
+        // and the button band must never overlap, at any width, with any
+        // progress string.
+        // ---------------------------------------------------------------
+        private const int SpinnerSize = 20;
+        private const int SpinnerGap = 6;
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AtEveryRealWidth_TheStatusBandAndButtonNeverOverlap(int barWidth)
+        {
+            var slots = RankerRowLayout.Toolbar(barWidth, SpinnerSize, SpinnerGap);
+
+            // Status text, its trailing spinner and the gap after it all end
+            // before the button starts.
+            Assert.True(slots.StatusX + slots.StatusWidth + SpinnerGap + SpinnerSize + SpinnerGap
+                <= slots.RefreshX);
+            Assert.Equal(barWidth, slots.RefreshX + RankerRowLayout.RefreshButtonWidth);
+            Assert.Equal(RankerRowLayout.Inset, slots.StatusX);
+            Assert.True(slots.StatusWidth > 0);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void ALongProgressString_EllipsizesInsideTheStatusBand(int barWidth)
+        {
+            // The view feeds status text through TextWrapMath.Ellipsize
+            // against ToolbarSlots.StatusWidth; proven here with the same
+            // Blish-free arithmetic and a synthetic 8px-per-char measure.
+            var slots = RankerRowLayout.Toolbar(barWidth, SpinnerSize, SpinnerGap);
+            string progress = "Refreshing 17 of 25 - The Legendary Item With An Extremely " +
+                "Long Name That Keeps Going. The first refresh of a session downloads " +
+                "recipe data and can take a while, and this string is longer than any band.";
+            System.Func<string, int> measure = s => 8 * (s ?? "").Length;
+
+            string shown = TextWrapMath.Ellipsize(progress, slots.StatusWidth, measure);
+
+            Assert.True(measure(shown) <= slots.StatusWidth);
+            Assert.True(slots.StatusX + measure(shown) + SpinnerGap + SpinnerSize
+                <= slots.RefreshX);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(50)]
+        [InlineData(-10)]
+        public void ToolbarDegenerateWidths_ClampRatherThanGoingNegative(int barWidth)
+        {
+            var slots = RankerRowLayout.Toolbar(barWidth, SpinnerSize, SpinnerGap);
+
+            Assert.True(slots.RefreshX >= 0);
+            Assert.True(slots.StatusWidth >= 0);
         }
     }
 }
