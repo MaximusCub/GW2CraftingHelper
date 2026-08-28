@@ -94,6 +94,17 @@ namespace TaimisToolbench.Views
             return ids.ToArray();
         }
 
+        /// <summary>
+        /// The item ids whose icons this tab draws, for whoever warms the
+        /// item metadata that resolves them (Module). Exposed rather than
+        /// re-derived at the caller so the fetch cannot ask for a different
+        /// set than the grid shows.
+        /// </summary>
+        internal static IReadOnlyList<int> BarterItemIconIds
+        {
+            get { return Array.AsReadOnly(CuratedBarterItemIds); }
+        }
+
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
         private static readonly Color SectionDividerColor = new Color(130, 130, 130);
         private static readonly Color ErrorTextColor = new Color(255, 100, 100);
@@ -232,8 +243,8 @@ namespace TaimisToolbench.Views
             public Panel Cell;
             public Panel Divider;
 
-            // The cell's leading currency icon, built only once this
-            // session's currency metadata has resolved - see
+            // The cell's leading icon, built only once this session's
+            // metadata for this row's own id space has resolved - see
             // EnsureCurrencyRowIcon. Null until then, and null for the whole
             // session when the fetch never succeeds; the cell reserves the
             // band either way, so nothing moves when it appears.
@@ -283,6 +294,13 @@ namespace TaimisToolbench.Views
         // re-opening the tab does not blank the icons until a refetch. Null
         // means "not resolved yet", which is not the same as "no icon".
         private IReadOnlyDictionary<int, CurrencyMetadata> _currencyMetadata;
+
+        // The barter-item half of the same thing, from the module's shared
+        // ItemMetadataService (SetBarterItemMetadata). Held on the same terms
+        // as the currency list above, and separate from it because a GW2
+        // item id and a currency id are different id spaces - see
+        // CurrencyRow.Id.
+        private IReadOnlyDictionary<int, ItemMetadata> _barterItemMetadata;
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
@@ -2151,14 +2169,39 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
+        /// The barter-item twin of <see cref="SetCurrencyMetadata"/>, on the
+        /// same thread and the same terms, fed by the module's shared
+        /// <see cref="ItemMetadataService"/> rather than a second fetch of
+        /// its own.
+        /// </summary>
+        public void SetBarterItemMetadata(IReadOnlyDictionary<int, ItemMetadata> metadata)
+        {
+            if (metadata == null || metadata.Count == 0)
+            {
+                return;
+            }
+
+            _barterItemMetadata = metadata;
+
+            foreach (var row in _rows)
+            {
+                EnsureCurrencyRowIcon(row);
+            }
+        }
+
+        /// <summary>
         /// Builds one cell's currency icon, once the icon is knowable.
         /// <para>
-        /// Nothing is drawn while <see cref="_currencyMetadata"/> is null:
-        /// that is "not fetched yet", not "this currency has no icon", and
-        /// IconControls' empty-slot placeholder states the second. Once the
-        /// list has resolved, every row gets an icon control - a currency
-        /// the list carries with no icon URL of its own then gets that
-        /// placeholder, which is the state it really is in.
+        /// Nothing is drawn while the row's metadata is unresolved: that is
+        /// "not fetched yet", not "this has no icon", and IconControls'
+        /// empty-slot placeholder states the second. Once the currency list
+        /// has resolved, every currency row gets an icon control - a
+        /// currency the list carries with no icon URL of its own then gets
+        /// that placeholder, which is the state it really is in. A barter
+        /// item is held to the id it resolved rather than to the fetch
+        /// having happened, because the item fetch answers per id: an id
+        /// absent from the reply is one nobody has an icon for yet, not one
+        /// the API says has none.
         /// </para>
         /// <para>
         /// The band is reserved by the cell's geometry
@@ -2169,11 +2212,36 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void EnsureCurrencyRowIcon(CurrencyRow row)
         {
-            // A barter-item row has no icon source: the tab holds only the
-            // one /v2/currencies fetch, and item icons would need a second
-            // one for a handful of rows. The cell reserves the band either
-            // way, so an iconless row lines up with its neighbours.
-            if (_currencyMetadata == null || row.Icon != null || row.IsBarterItem)
+            if (row.Icon != null)
+            {
+                return;
+            }
+
+            if (row.IsBarterItem)
+            {
+                ItemMetadata item;
+                if (_barterItemMetadata == null ||
+                    !_barterItemMetadata.TryGetValue(row.Id, out item) ||
+                    item == null)
+                {
+                    return;
+                }
+
+                row.Icon = IconControls.CreateItemIcon(
+                    row.Cell,
+                    item.IconUrl,
+                    // These rows ARE items, unlike their currency
+                    // neighbours, and the rarity came from the same
+                    // /v2/items entry as the icon beside it.
+                    ItemIconFrame.ForRarity(ItemRarityResolution.Normalize(item.Rarity)),
+                    SettingsCurrencyGridLayout.CellIconX,
+                    SettingsCurrencyGridLayout.CellIconY,
+                    ItemIconTier.CurrencyListRow,
+                    ItemIconTooltip.Naming(row.Name));
+                return;
+            }
+
+            if (_currencyMetadata == null)
             {
                 return;
             }

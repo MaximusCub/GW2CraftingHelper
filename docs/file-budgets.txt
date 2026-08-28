@@ -80,7 +80,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             42
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                               2807
+Module.cs                                                                               2856
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -314,7 +314,7 @@ Views/Rendering/GlyphFont.cs                                                    
 Views/Rendering/UiMetrics.cs                                                             47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         209
 Views/ResizableTabbedWindow.cs                                                          213
-Views/SettingsTabContent.cs                                                             2787
+Views/SettingsTabContent.cs                                                             2855
 Views/SuggestionPanel.cs                                                                 495
 Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
