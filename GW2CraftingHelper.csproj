@@ -140,6 +140,8 @@
     <Compile Include="Services\ShoppingColumnMath.cs" />
     <Compile Include="Services\RecipesColumnMath.cs" />
     <Compile Include="Services\TableSortState.cs" />
+    <Compile Include="Services\UiGlyphs.cs" />
+    <Compile Include="Services\GlyphFontDescriptor.cs" />
     <Compile Include="Services\PlanTableSorter.cs" />
     <Compile Include="Services\CoinSegmentMath.cs" />
     <Compile Include="Services\ClickSoundVolume.cs" />
@@ -261,6 +263,7 @@
     <Compile Include="Views\Rendering\SortableHeaderCells.cs" />
     <Compile Include="Views\Rendering\HeaderCellPlan.cs" />
     <Compile Include="Views\Rendering\UiFonts.cs" />
+    <Compile Include="Views\Rendering\GlyphFont.cs" />
     <Compile Include="Views\Rendering\UiMetrics.cs" />
     <Compile Include="Views\Rendering\TextRowRenderer.cs" />
     <Compile Include="Views\Rendering\ColumnHeaderRowRenderer.cs" />

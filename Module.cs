@@ -702,6 +702,49 @@ namespace GW2CraftingHelper
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Emblem texture load failed, reusing the module icon: {ex.GetType().Name} - {ex.Message}");
                 _emblemTexture = _moduleIconTexture;
             }
+
+            LoadGlyphFont();
+        }
+
+        /// <summary>
+        /// Seats the module's own glyph font (ref/glyphs.fnt and its atlas
+        /// page) on <see cref="UiFonts"/>, so a sortable header can carry a
+        /// sort mark that Blish's one text face does not contain.
+        /// <para>
+        /// Falls back rather than failing the load, like the three textures
+        /// above: every seat that draws a glyph degrades to the ASCII it
+        /// replaced (Services.UiGlyphs.AsciiFallback), which is worse
+        /// typography and no lost information. Logged at Warn because a
+        /// missing ref file is a broken install, not a user-visible fault.
+        /// </para>
+        /// </summary>
+        private void LoadGlyphFont()
+        {
+            try
+            {
+                GlyphFontDescriptor descriptor;
+                using (var stream = ContentsManager.GetFileStream("glyphs.fnt"))
+                {
+                    descriptor = GlyphFontDescriptor.Parse(stream);
+                }
+
+                // GetTexture never throws for a missing file - it answers
+                // with ContentService.Textures.Error, whose regions would
+                // draw noise at the glyphs' atlas coordinates. Compare
+                // against it rather than trusting the call.
+                var page = ContentsManager.GetTexture(descriptor.PageFile);
+                if (page == null || page == ContentService.Textures.Error)
+                {
+                    throw new InvalidOperationException(
+                        "glyph atlas '" + descriptor.PageFile + "' did not load.");
+                }
+
+                UiFonts.InstallGlyphs(descriptor, page);
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Glyph font load failed, sort indicators fall back to ASCII: {ex.GetType().Name} - {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -1493,6 +1536,12 @@ namespace GW2CraftingHelper
             // module owns is running against objects the next few lines are
             // about to destroy - the HttpClient most of all.
             _lifetimeCts?.Cancel();
+
+            // The glyph fonts hold TextureRegion2Ds over a Texture2D the
+            // ContentsManager disposes with this module. UiFonts is static,
+            // so a re-enable in the same process would otherwise find them
+            // still pointing at it.
+            UiFonts.ResetGlyphs();
 
             Gw2ApiManager.SubtokenUpdated -= OnSubtokenUpdated;
 
