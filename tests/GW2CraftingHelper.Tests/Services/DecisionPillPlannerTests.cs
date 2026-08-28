@@ -52,12 +52,11 @@ namespace GW2CraftingHelper.Tests.Services
                 IsAchievementBitDeduped = isAchievementBitDeduped,
                 IsCostComponent = isCostComponent,
                 ComponentOwnedQuantity = componentOwnedQuantity,
-                SubtreeCost = subtreeCost
+                SubtreeCost = subtreeCost,
             };
         }
 
         // --- HAVE / CURRENCY short-circuits ---
-
         [Fact]
         public void Have_SingleHavePill_NotInteractive()
         {
@@ -122,7 +121,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- Achievement-bit dedup pill ----
-
         [Fact]
         public void Have_AchievementBitDeduped_SingleCountedElsewherePill_NoPlainHave()
         {
@@ -179,7 +177,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- guildupgrade-ingredients fix ----
-
         [Fact]
         public void GuildUpgrade_SingleLockedPill_NotInteractive()
         {
@@ -213,7 +210,6 @@ namespace GW2CraftingHelper.Tests.Services
         // options.Count == 0 branch below and picking up the interactive
         // IGNORE pill - see CraftingDecision.UnrecognizedIngredient's own
         // doc comment for the full explanation of the bug this closes. ----
-
         [Fact]
         public void UnrecognizedIngredient_SingleLockedPill_NotInteractive()
         {
@@ -245,7 +241,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- (F,F,F): no feasible source at all ---
-
         [Fact]
         public void NoSource_NoBadge_LockedUnknownPill()
         {
@@ -294,7 +289,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Exactly one feasible source: single Locked pill (+ IGNORE) ---
-
         [Fact]
         public void OnlyTp_SingleLockedTpPill()
         {
@@ -330,7 +324,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Two feasible sources: multi-pill, selected == node.Decision ---
-
         [Theory]
         [InlineData(nameof(CraftingDecision.BuyFromTp), "TP", "VENDOR")]
         [InlineData(nameof(CraftingDecision.BuyFromVendor), "VENDOR", "TP")]
@@ -385,7 +378,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- All three feasible: the highlighted pill MUST match the
         // solver's actual committed Source, whichever of the three it is
         // ---
-
         [Theory]
         [InlineData(nameof(CraftingDecision.Craft), "CRAFT")]
         [InlineData(nameof(CraftingDecision.BuyFromTp), "TP")]
@@ -433,7 +425,6 @@ namespace GW2CraftingHelper.Tests.Services
         // the final wording pass moved OWNED away
         // from sitting next to the total - see AppendOwnershipPills' doc
         // comment) ---
-
         [Theory]
         [InlineData(nameof(CraftingDecision.Craft), true, false, false, "CRAFT")]
         [InlineData(nameof(CraftingDecision.BuyFromTp), false, true, false, "TP")]
@@ -505,7 +496,6 @@ namespace GW2CraftingHelper.Tests.Services
         // pill mapping never desyncs from an actual PlanSolver decision,
         // not just a hand-built CraftingTreeNode. ---
         // Leaf comes from Helpers/RecipeNodeBuilders.cs.
-
         [Fact]
         public void RealSolver_TpCheaperThanVendor_TpPillSelected()
         {
@@ -520,10 +510,10 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             OfferId = "v1", OutputItemId = 1, OutputCount = 1,
                             CostLines = new List<CostLine> { new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 200 } },
-                            MerchantName = "Test Vendor", Locations = new List<string>()
-                        }
+                            MerchantName = "Test Vendor", Locations = new List<string>(),
+                        },
                     }
-                }
+                },
             };
 
             var solver = new PlanSolver();
@@ -555,10 +545,10 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             OfferId = "v1", OutputItemId = 1, OutputCount = 1,
                             CostLines = new List<CostLine> { new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 50 } },
-                            MerchantName = "Test Vendor", Locations = new List<string>()
-                        }
+                            MerchantName = "Test Vendor", Locations = new List<string>(),
+                        },
                     }
-                }
+                },
             };
 
             var solver = new PlanSolver();
@@ -596,10 +586,10 @@ namespace GW2CraftingHelper.Tests.Services
                         {
                             OfferId = "v1", OutputItemId = 1, OutputCount = 1,
                             CostLines = new List<CostLine> { new CostLine { Type = "Currency", Id = 23, Count = 500 } },
-                            MerchantName = "Test Vendor", Locations = new List<string>()
-                        }
+                            MerchantName = "Test Vendor", Locations = new List<string>(),
+                        },
                     }
-                }
+                },
             };
 
             var solver = new PlanSolver();
@@ -659,7 +649,6 @@ namespace GW2CraftingHelper.Tests.Services
         // SubtreeCost gold value) unless named "CurrencyType", so they
         // isolate the OWN-badge behavior from the separate CURRENCY-badge
         // behavior covered by its own block further down.
-
         [Fact]
         public void CostComponent_NoOwnership_NoPill()
         {
@@ -748,7 +737,6 @@ namespace GW2CraftingHelper.Tests.Services
         // (currency-type) component shape - explains at a glance why no
         // gold value is shown, gw2efficiency's own grey Currency-badge
         // pattern. ----
-
         [Fact]
         public void CostComponent_CurrencyType_BlankCostCell_ShowsCurrencyBadge()
         {
@@ -787,7 +775,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- currency-ux-package (Feature 2): plan-scope currency pill ---
-
         [Fact]
         public void CostComponent_CurrencyType_WithPlanScopeOwnership_PartialCoverage_AppendsHaveTotalPill()
         {
@@ -970,7 +957,6 @@ namespace GW2CraftingHelper.Tests.Services
         // same predicate to decide which dimmed pills need the "why did
         // nothing happen" tooltip. A pill that answers true here and gets
         // no handler is exactly the dead click that has to be explained.
-
         [Fact]
         public void IsInteractive_SourcePillsAndIgnore_True_SelectedAndAnnotationsFalse()
         {

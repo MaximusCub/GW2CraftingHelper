@@ -212,6 +212,29 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
+        /// A plain relative age - "5m ago", "3h 12m ago", "2d ago" - over
+        /// the same bucket ladder as <see cref="ForSnapshotAgeSuffix"/>,
+        /// for lines whose subject is already named by the sentence around
+        /// it (the Plan History detail panel's cost-delta line). Sub-minute
+        /// ages read "just now"; a negative age (clock skew) is treated as
+        /// zero, matching ForSnapshotAgeSuffix.
+        /// </summary>
+        public static string ForAgeAgo(TimeSpan age)
+        {
+            if (age < TimeSpan.Zero)
+            {
+                age = TimeSpan.Zero;
+            }
+
+            if (age.TotalMinutes < 1)
+            {
+                return "just now";
+            }
+
+            return AgeMagnitude(age) + " ago";
+        }
+
+        /// <summary>
         /// Whether a snapshot of the given age counts as stale against the
         /// caller-supplied threshold. The Snapshot tab's staleness recolor
         /// (Views/MainView.cs) and Module.Update()'s auto-refresh gate both

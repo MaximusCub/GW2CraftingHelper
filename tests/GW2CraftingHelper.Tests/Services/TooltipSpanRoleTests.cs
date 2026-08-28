@@ -65,7 +65,7 @@ namespace GW2CraftingHelper.Tests.Services
             // One "character" is 10px wide, so a 25px row fits two.
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.Line(TooltipSpan.RarityText("aa bb cc", "Exotic"))
+                TooltipContent.Line(TooltipSpan.RarityText("aa bb cc", "Exotic")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 TooltipContent.Line(
                     TooltipSpan.Styled("Cost: ", TooltipSpanRole.Muted),
-                    TooltipSpan.FromCoin(9999, "0g 99s 99c"))
+                    TooltipSpan.FromCoin(9999, "0g 99s 99c")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(

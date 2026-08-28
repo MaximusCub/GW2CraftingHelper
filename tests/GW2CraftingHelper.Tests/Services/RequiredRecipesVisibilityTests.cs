@@ -13,7 +13,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- IsUnlocked ---
-
         [Theory]
         [InlineData("Learned", true)]
         [InlineData("Auto-learned", true)]
@@ -26,7 +25,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ApplyFilter ---
-
         [Fact]
         public void ApplyFilter_HideUnlockedFalse_ReturnsAllRows()
         {
@@ -99,7 +97,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BuildHeaderTitle ---
-
         [Fact]
         public void BuildHeaderTitle_FilterOff_ShowsBareTotal()
         {
@@ -134,7 +131,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- AllUnlockedMessage ---
-
         [Fact]
         public void AllUnlockedMessage_FormatsCount()
         {

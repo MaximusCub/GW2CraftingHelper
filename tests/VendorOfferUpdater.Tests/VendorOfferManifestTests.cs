@@ -58,7 +58,7 @@ namespace VendorOfferUpdater.Tests
                 new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
                 });
             Assert.NotNull(dataset);
 
@@ -80,7 +80,7 @@ namespace VendorOfferUpdater.Tests
             {
                 Source = "gw2wiki-smw",
                 OfferCount = 3,
-                GeneratedAt = "2026-01-01T00:00:00.0000000Z"
+                GeneratedAt = "2026-01-01T00:00:00.0000000Z",
             });
 
             Assert.DoesNotContain("\r", json);

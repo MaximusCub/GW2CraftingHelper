@@ -63,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return () => new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent($@"{{""id"":{buildId}}}")
+                Content = new StringContent($@"{{""id"":{buildId}}}"),
             };
         }
 
@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return () => new HttpResponseMessage(code)
             {
-                Content = new StringContent("")
+                Content = new StringContent(""),
             };
         }
 

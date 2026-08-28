@@ -19,7 +19,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Sell-side economics rows ---
-
         [Fact]
         public void NoSellPrice_NoProfitBandRows()
         {
@@ -73,7 +72,7 @@ namespace GW2CraftingHelper.Tests.Services
                 totalCoinCost: 100,
                 currencyCosts: new List<CurrencyCost>
                 {
-                    new CurrencyCost { CurrencyId = 2, Amount = 50 }
+                    new CurrencyCost { CurrencyId = 2, Amount = 50 },
                 });
             result.NetSaleValue = 340;
             result.CraftingProfit = 240;
@@ -114,7 +113,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Own-materials opportunity cost - the cost band's
         // middle "Your Materials Used" tile, per the collapse rule ---
-
         [Fact]
         public void MaterialOpportunityCostPositive_ExpandsCostBandToThreeTiles()
         {

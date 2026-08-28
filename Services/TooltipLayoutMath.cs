@@ -18,16 +18,34 @@ namespace GW2CraftingHelper.Services
     /// clamps neither result - a tall tooltip placed below the cursor runs
     /// off the BOTTOM of the screen, and the left shift can produce a
     /// negative X. <see cref="Place"/> keeps Blish's above-when-it-fits
-    /// preference and its 36px cursor gap, then clamps all four edges.
+    /// preference - which is also the game's - hugs the cursor from above
+    /// at the measured game gap rather than Blish's uniform 36
+    /// (<see cref="CursorGapAbove"/>), and clamps all four edges.
     /// </summary>
     internal static class TooltipLayoutMath
     {
         /// <summary>
-        /// Blish's own <c>Tooltip.MOUSE_VERTICAL_MARGIN</c> (measured).
-        /// Reproduced rather than reduced: the gap is what keeps a tooltip
-        /// from covering the cursor.
+        /// The gap between the cursor and a box placed ABOVE it. The game
+        /// hugs the cursor here: on every live3 storage hover
+        /// (vials/fury/candy-corn/almonds, 2026-08-26) the box bottom sits
+        /// 3-8px above the hovered slot's TOP edge, with the cursor inside
+        /// the slot below - so the true cursor-to-box gap is small, and
+        /// Blish's uniform 36 (its MOUSE_VERTICAL_MARGIN) is what made a
+        /// bottom-of-window hover read as a detached box. 8 is the
+        /// measured slot-edge bound; the exact cursor pixel is not visible
+        /// in any capture, so the value within [3..8] is INFERRED. Nothing
+        /// above the cursor needs clearing - the cursor sprite hangs
+        /// down-right of its hotspot.
         /// </summary>
-        public const int CursorGap = 36;
+        public const int CursorGapAbove = 8;
+
+        /// <summary>
+        /// The gap between the cursor and a box placed BELOW it - Blish's
+        /// own <c>Tooltip.MOUSE_VERTICAL_MARGIN</c> (measured, decompiled
+        /// 1.3.0), kept: it is what clears the cursor sprite, and no
+        /// capture measures the game's below-placement gap.
+        /// </summary>
+        public const int CursorGapBelow = 36;
 
         /// <summary>Breathing room kept between the box and every screen edge.</summary>
         public const int ScreenEdgeMargin = 4;
@@ -50,13 +68,60 @@ namespace GW2CraftingHelper.Services
         public const int MinContentWidth = 120;
 
         /// <summary>
+        /// The item tooltip's own wrap maximum, in the width units
+        /// <c>BitmapFont.MeasureString</c> reports for the shipped
+        /// Menomonia 14 face with Blish's <c>LetterSpacing = -1</c>.
+        /// <para>
+        /// DERIVED FROM THE GAME'S OWN BREAK DECISIONS rather than from a
+        /// game-pixel cap converted by a scale factor. The earlier 350 came
+        /// from a measured game cap of [345, 347) game px multiplied by a
+        /// MEAN font ratio of 1.014; that mean hides a real per-string
+        /// spread of 0.99x to 1.03x, because LetterSpacing = -1 tightens
+        /// tracking on a face whose glyph boxes are already ~10% wider than
+        /// the game's, so how a given string lands depends on its letter
+        /// count as much as its length. The 2026-08-27 owner A/B - Gift of
+        /// Twilight 19648 hovered in the module and in the game - caught
+        /// the low end of that spread: the game wrapped its description and
+        /// the module did not.
+        /// </para>
+        /// <para>
+        /// Each live capture that wraps a paragraph pins the cap twice: it
+        /// must be at least the width of the line the game KEPT whole, and
+        /// below that line plus the word the game PUSHED down. Measured
+        /// through this face for the whole wrapped corpus (widths in this
+        /// constant's units):
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Gift of Twilight 19648: 282 kept / 338 with "Twilight."
+        /// pushed down; its "Made by combining these items in the Mystic
+        /// Forge:" line, 317, stays whole.</item>
+        /// <item>eyes-of-kormir 83103: 313 kept / 366 with "because";
+        /// 315 kept / 352 with "under".</item>
+        /// <item>heart-of-destroyer 67017: 293 kept / 362 with
+        /// "Bloodstone"; 326 kept / 387 with "Destroyer".</item>
+        /// <item>fury-scorched 86967: 357 kept / 378 with "for" - the ONE
+        /// outlier, see below.</item>
+        /// </list>
+        /// <para>
+        /// Every constraint but fury's intersects at [326, 338); 332 is its
+        /// midpoint, so no decision sits within 6px of flipping. Fury's
+        /// kept line needs a cap of 357+, which would un-wrap Gift of
+        /// Twilight AND eyes' second line, so it loses 1 constraint to 5.
+        /// Fury's own line is the corpus's widest-measuring string in this
+        /// face (1.03x the game) and it will wrap one word early - a
+        /// recorded, measured cost of rendering the game's text at a face
+        /// the game does not ship.
+        /// </para>
+        /// </summary>
+        public const int ItemTooltipMaxContentWidth = 332;
+
+        /// <summary>
         /// The width a tooltip may wrap at on this screen.
         /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
         /// every existing caller reads the same as every plain tooltip; a
-        /// caller with a measured cap of its own - the item tooltip, whose
-        /// wrap maximum is derived from live captures (gap G24,
-        /// fidelity-audit section 1.5) - passes it and does not move the
-        /// shared constant out from under the rest.
+        /// caller with a measured cap of its own - the item tooltip, at
+        /// <see cref="ItemTooltipMaxContentWidth"/> - passes it and does
+        /// not move the shared constant out from under the rest.
         /// </summary>
         public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {
@@ -90,13 +155,15 @@ namespace GW2CraftingHelper.Services
         public sealed class LaidOutRow
         {
             internal LaidOutRow(
-                IReadOnlyList<PlacedSpan> spans, int width, int y, int height, string iconUrl)
+                IReadOnlyList<PlacedSpan> spans, int width, int y, int height, string iconUrl,
+                TooltipLineKind kind = TooltipLineKind.Text)
             {
                 Spans = spans;
                 Width = width;
                 Y = y;
                 Height = height;
                 IconUrl = iconUrl;
+                Kind = kind;
             }
 
             public IReadOnlyList<PlacedSpan> Spans { get; }
@@ -116,9 +183,18 @@ namespace GW2CraftingHelper.Services
 
             /// <summary>
             /// The header icon, on the FIRST row of a header line only - a
-            /// name that wraps must not draw its icon again.
+            /// name that wraps must not draw its icon again. On an
+            /// <see cref="TooltipLineKind.Effect"/> row, the effect's own
+            /// inline icon instead, same first-row-only rule.
             /// </summary>
             public string IconUrl { get; }
+
+            /// <summary>
+            /// The line kind this row renders, continuation rows included -
+            /// how the surface tells a framed 32px header icon from the
+            /// bare ~26px effect icon that shares <see cref="IconUrl"/>.
+            /// </summary>
+            public TooltipLineKind Kind { get; }
         }
 
         public sealed class Layout
@@ -161,7 +237,8 @@ namespace GW2CraftingHelper.Services
             Func<long, int> measureCoin,
             int coinRowHeight = 0,
             int headerRowHeight = 0,
-            int headerIndent = 0)
+            int headerIndent = 0,
+            int effectIndent = 0)
         {
             if (measureText == null)
             {
@@ -190,11 +267,16 @@ namespace GW2CraftingHelper.Services
             foreach (var line in content.Lines)
             {
                 bool isHeader = line.Kind == TooltipLineKind.Header;
+                bool isEffect = line.Kind == TooltipLineKind.Effect;
                 // The name column of a header row starts past the icon,
                 // and a wrapped continuation of it stays in that column.
-                int indent = isHeader ? Math.Max(0, headerIndent) : 0;
+                // An effect row is indented past its inline icon the same
+                // way (measured: the game's effect text column starts
+                // ~31px in, live3 soul-pastries/candy-corn).
+                int indent = isHeader ? Math.Max(0, headerIndent)
+                    : isEffect ? Math.Max(0, effectIndent) : 0;
                 int lineHeight = isHeader ? headerHeight : rowHeight;
-                string iconUrl = isHeader ? line.IconUrl : null;
+                string iconUrl = isHeader || isEffect ? line.IconUrl : null;
 
                 var current = new List<PlacedSpan>();
                 int x = indent;
@@ -203,7 +285,7 @@ namespace GW2CraftingHelper.Services
                 // the icon rides the first row of its line only.
                 void BreakRow()
                 {
-                    rows.Add(new LaidOutRow(current, x, y, lineHeight, iconUrl));
+                    rows.Add(new LaidOutRow(current, x, y, lineHeight, iconUrl, line.Kind));
                     y += lineHeight;
                     // Continuations are ordinary text rows: only the FIRST
                     // row of a header line carries the icon and its height.
@@ -306,8 +388,11 @@ namespace GW2CraftingHelper.Services
         /// box would cross the right edge (Blish's rule), then clamped so
         /// the result cannot be negative (Blish's is not).
         ///
-        /// Vertical: above the cursor when it fits, else below (Blish's
-        /// rule), then clamped to the bottom edge (Blish never clamps it).
+        /// Vertical: above the cursor when it fits - hugging it at the
+        /// measured <see cref="CursorGapAbove"/>, which is the game's own
+        /// preference (every live3 capture grows up from just above the
+        /// cursor) - else below at <see cref="CursorGapBelow"/>, then
+        /// clamped to the bottom edge (Blish never clamps it).
         /// When neither side can hold the box with its cursor gap the box
         /// takes the roomier side and is clamped into the screen - the only
         /// case where it may reach across the cursor, and it needs a
@@ -327,8 +412,8 @@ namespace GW2CraftingHelper.Services
 
             x = ClampAxis(x, width, screenWidth);
 
-            int above = mouseY - CursorGap - height;
-            int below = mouseY + CursorGap;
+            int above = mouseY - CursorGapAbove - height;
+            int below = mouseY + CursorGapBelow;
             if (above >= ScreenEdgeMargin)
             {
                 y = above;
@@ -341,8 +426,8 @@ namespace GW2CraftingHelper.Services
                 return;
             }
 
-            int roomAbove = mouseY - CursorGap - ScreenEdgeMargin;
-            int roomBelow = screenHeight - ScreenEdgeMargin - CursorGap - mouseY;
+            int roomAbove = mouseY - CursorGapAbove - ScreenEdgeMargin;
+            int roomBelow = screenHeight - ScreenEdgeMargin - CursorGapBelow - mouseY;
             y = ClampAxis(roomAbove >= roomBelow ? ScreenEdgeMargin : screenHeight - height, height, screenHeight);
         }
 
@@ -383,8 +468,9 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="boxLength"/> can source starting at
         /// <paramref name="offset"/>: the box length, clamped to what the
         /// texture has left past the offset, never negative. The 942px
-        /// texture leaves 939x938 - a rich tooltip (max content width 392
-        /// plus chrome) never approaches it, so the clamp exists for the
+        /// texture leaves 939x938 - a rich tooltip is
+        /// <see cref="ItemTooltipMaxContentWidth"/> plus chrome at its
+        /// widest and never approaches it, so the clamp exists for the
         /// pathological box, not the common one.
         /// </summary>
         public static int CanvasArtSourceLength(int boxLength, int textureLength, int offset)

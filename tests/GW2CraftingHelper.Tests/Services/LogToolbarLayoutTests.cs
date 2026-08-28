@@ -131,10 +131,10 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Theory]
-        [InlineData(25, 7)]   // Checkbox
-        [InlineData(26, 7)]   // TextBox
-        [InlineData(28, 6)]   // StandardButton
-        [InlineData(30, 5)]   // Dropdown
+        [InlineData(25, 7)] // Checkbox
+        [InlineData(26, 7)] // TextBox
+        [InlineData(28, 6)] // StandardButton
+        [InlineData(30, 5)] // Dropdown
         public void CenteredY_GivesFourControlHeightsOneOpticalCentre(int height, int expected)
         {
             Assert.Equal(expected, LogToolbarLayout.CenteredY(height));

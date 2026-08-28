@@ -29,11 +29,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 }
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1, SourceUrl = "https://wiki.guildwars2.com/wiki/Lump_of_Mithrillium", LastVerified = "2026-08-16" }
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1, SourceUrl = "https://wiki.guildwars2.com/wiki/Lump_of_Mithrillium", LastVerified = "2026-08-16" },
                 });
 
             var vm = _builder.Build(result);
@@ -60,11 +60,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46742, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 7319 }
+                    new PlanStep { ItemId = 46742, Quantity = 1, Source = AcquisitionSource.Craft, RecipeId = 7319 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 }
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
                 });
 
             var vm = _builder.Build(result);
@@ -82,11 +82,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 2, Quantity = 500, Source = AcquisitionSource.Craft, RecipeId = 10 }
+                    new PlanStep { ItemId = 2, Quantity = 500, Source = AcquisitionSource.Craft, RecipeId = 10 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 }
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
                 });
 
             var vm = _builder.Build(result);
@@ -106,7 +106,7 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 }
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
                 },
                 dailyCooldownItems: null);
 
@@ -128,11 +128,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.BuyFromVendor }
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.BuyFromVendor },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 }
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
                 });
 
             var vm = _builder.Build(result);
@@ -160,11 +160,11 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46740, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                    new PlanStep { ItemId = 46740, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46740] = new DailyCooldownItem { ItemId = 46740, PerDayCap = 2 }
+                    [46740] = new DailyCooldownItem { ItemId = 46740, PerDayCap = 2 },
                 });
 
             var vm = _builder.Build(result);
@@ -202,12 +202,12 @@ namespace GW2CraftingHelper.Tests.Services
                 steps: new List<PlanStep>
                 {
                     new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
-                    new PlanStep { ItemId = 46744, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 }
+                    new PlanStep { ItemId = 46744, Quantity = 5, Source = AcquisitionSource.Craft, RecipeId = 99 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
                     [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
-                    [46744] = new DailyCooldownItem { ItemId = 46744, PerDayCap = 2 }
+                    [46744] = new DailyCooldownItem { ItemId = 46744, PerDayCap = 2 },
                 });
 
             var vm = _builder.Build(result);
@@ -231,15 +231,15 @@ namespace GW2CraftingHelper.Tests.Services
                 metadata: meta,
                 steps: new List<PlanStep>
                 {
-                    new PlanStep { ItemId = 46742, Quantity = 10, Source = AcquisitionSource.Craft, RecipeId = 7319 }
+                    new PlanStep { ItemId = 46742, Quantity = 10, Source = AcquisitionSource.Craft, RecipeId = 7319 },
                 },
                 timegatedItems: new List<TimegatedItem>
                 {
-                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 }
+                    new TimegatedItem { ItemId = 9, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 4 },
                 },
                 dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
                 {
-                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 }
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
                 });
 
             var vm = _builder.Build(result);
@@ -251,6 +251,40 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Contains("Obsidian Shard", section.Rows[1].Label);
             Assert.Equal(PlanRowType.TimegatedNotice, section.Rows[2].RowType);
             Assert.Contains("Lump of Mithrillium", section.Rows[2].Label);
+        }
+
+        [Fact]
+        public void CraftCooldown_TpLiquidItem_StillNotesAsTimegated()
+        {
+            // Boundary against the vendor-cap liquidity filter (see
+            // PlanViewModelBuilder.FilterVendorCapNotices): a daily craft
+            // cooldown is an EARNING limit - the TP selling the item does
+            // not lift the per-account per-day craft cap, so liquidity
+            // must never suppress this notice family.
+            var meta = MetaFor((46742, "Lump of Mithrillium", "lump.png"));
+            var result = MakeResult(
+                metadata: meta,
+                steps: new List<PlanStep>
+                {
+                    new PlanStep { ItemId = 46742, Quantity = 30, Source = AcquisitionSource.Craft, RecipeId = 7319 },
+                },
+                dailyCooldownItems: new Dictionary<int, DailyCooldownItem>
+                {
+                    [46742] = new DailyCooldownItem { ItemId = 46742, PerDayCap = 1 },
+                });
+            result.SolveContext = new PlanSolveContext
+            {
+                Prices = new Dictionary<int, ItemPrice>
+                {
+                    [46742] = new ItemPrice { ItemId = 46742, BuyInstant = 100, SellInstant = 120 },
+                },
+            };
+
+            var vm = _builder.Build(result);
+
+            var section = vm.Sections.First(s => s.SectionType == PlanSectionType.CraftingSteps);
+            var notice = section.Rows.Single(r => r.RowType == PlanRowType.TimegatedNotice);
+            Assert.Contains("is timegated - 1 per day per account", notice.Label);
         }
     }
 }

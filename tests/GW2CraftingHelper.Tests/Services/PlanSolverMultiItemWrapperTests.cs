@@ -11,7 +11,6 @@ namespace GW2CraftingHelper.Tests.Services
     {
         // --- Synthetic multi-item wrapper root (gw2e parity) ---
         // WrapperOf lives in Helpers/RecipeNodeBuilders.cs.
-
         [Fact]
         public void WrapperRoot_NeverAppearsAsItsOwnStep_OnlyItemRootsDo()
         {
@@ -22,7 +21,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 100, new ItemPrice { ItemId = 100, BuyInstant = 10 } },
-                { 200, new ItemPrice { ItemId = 200, BuyInstant = 20 } }
+                { 200, new ItemPrice { ItemId = 200, BuyInstant = 20 } },
             };
 
             var result = new PlanSolver().Solve(wrapper, prices, null, PriceBasis.InstantBuy);
@@ -56,7 +55,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 100, new ItemPrice { ItemId = 100, BuyInstant = 100 } },
                 { 101, new ItemPrice { ItemId = 101, BuyInstant = 10 } },
-                { 200, new ItemPrice { ItemId = 200, BuyInstant = 5 } }
+                { 200, new ItemPrice { ItemId = 200, BuyInstant = 5 } },
             };
 
             var result = new PlanSolver().Solve(wrapper, prices, null, PriceBasis.InstantBuy);

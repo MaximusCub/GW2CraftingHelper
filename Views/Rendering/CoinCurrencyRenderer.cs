@@ -216,13 +216,23 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
 
+        // The game's own coin-number tints, MEASURED on live3 (2026-08-26)
+        // as saturating ink peaks - the first modern samples, replacing
+        // constants that only a 2012 capture had ever anchored:
+        // silver #AAA (170,170,170) and copper #B62 (187,102,34) both cap
+        // exactly there on TWO captures each (vials "39s 96c" and
+        // fury-scorched "81s 92c"); gold #DB5 (221,187,85) is a WEAKER
+        // read - one capture (counterfeit-ticket "2g"), 25 ink pixels,
+        // p95 (221,187,88) - but its direction (duller than the old
+        // #FFCC00) matches both zero-padding-era notes, and #DB5 keeps the
+        // exact-shorthand pattern every other measured game colour shows.
         private static Color GetCoinColor(int assetId)
         {
             switch (assetId)
             {
-                case CoinSegmentMath.GoldAssetId: return new Color(255, 204, 0);
-                case CoinSegmentMath.SilverAssetId: return new Color(192, 192, 192);
-                case CoinSegmentMath.CopperAssetId: return new Color(205, 127, 50);
+                case CoinSegmentMath.GoldAssetId: return new Color(221, 187, 85);
+                case CoinSegmentMath.SilverAssetId: return new Color(170, 170, 170);
+                case CoinSegmentMath.CopperAssetId: return new Color(187, 102, 34);
                 default: return Color.White;
             }
         }

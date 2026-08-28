@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Tests.Services
             // consolidation: every composer now spells a coin amount the
             // way the icons beside it do (leading all-zero units omitted,
             // trailing units zero-padded).
-            Assert.Equal("More expensive (3g 00s 00c more)", content.ToPlainText());
+            Assert.Equal("More expensive (3g 0s 0c more)", content.ToPlainText());
             Assert.DoesNotContain("currency values", content.ToPlainText());
         }
 
@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var itemMetadata = new Dictionary<int, ItemMetadata>
             {
-                { 100, new ItemMetadata { ItemId = 100, Name = "Glob of Ectoplasm" } }
+                { 100, new ItemMetadata { ItemId = 100, Name = "Glob of Ectoplasm" } },
             };
             var deltas = new List<PillCostDelta> { new PillCostDelta("Item", 100, 10) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
@@ -87,7 +87,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var currencyMetadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Karma" } }
+                { 23, new CurrencyMetadata { CurrencyId = 23, Name = "Karma" } },
             };
             var deltas = new List<PillCostDelta> { new PillCostDelta("Currency", 23, 500) };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
@@ -113,12 +113,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var itemMetadata = new Dictionary<int, ItemMetadata>
             {
-                { 100, new ItemMetadata { ItemId = 100, Name = "Ecto" } }
+                { 100, new ItemMetadata { ItemId = 100, Name = "Ecto" } },
             };
             var deltas = new List<PillCostDelta>
             {
                 new PillCostDelta("Coin", 0, 50),
-                new PillCostDelta("Item", 100, 3)
+                new PillCostDelta("Item", 100, 3),
             };
             var result = new PillSubduingResult(PillSubduingRule.StrictDomination, null, deltas);
 

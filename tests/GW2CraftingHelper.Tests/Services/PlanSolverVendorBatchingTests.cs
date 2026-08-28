@@ -14,7 +14,6 @@ namespace GW2CraftingHelper.Tests.Services
         // Offers with non-coin currency lines must never win a coin-cost
         // comparison (their coin part alone is not their real price); they may
         // only be used when no coin-priceable option exists.
-
         [Fact]
         public void MixedCurrencyVendor_DoesNotBeatTpPrice()
         {
@@ -23,11 +22,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var solver = new PlanSolver();
 
@@ -45,11 +44,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 10, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 10, 2, 50) } },
             };
             var solver = new PlanSolver();
 
@@ -77,7 +76,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 25, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 25, 2, 50) } },
             };
             var solver = new PlanSolver();
 
@@ -104,9 +103,9 @@ namespace GW2CraftingHelper.Tests.Services
                     1, new List<VendorOffer>
                     {
                         MixedVendorOffer(1, 100, 2, 50),
-                        MixedVendorOffer(1, 50, 2, 500)
+                        MixedVendorOffer(1, 50, 2, 500),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -127,9 +126,9 @@ namespace GW2CraftingHelper.Tests.Services
                     1, new List<VendorOffer>
                     {
                         MixedVendorOffer(1, 100, 2, 90),
-                        MixedVendorOffer(1, 100, 2, 40)
+                        MixedVendorOffer(1, 100, 2, 40),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -154,9 +153,9 @@ namespace GW2CraftingHelper.Tests.Services
                     1, new List<VendorOffer>
                     {
                         MixedVendorOffer(1, 0, 2, 500),
-                        MixedVendorOffer(1, 0, 3, 20)
+                        MixedVendorOffer(1, 0, 3, 20),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -177,7 +176,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 350000) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 350000) } },
             };
             var solver = new PlanSolver();
 
@@ -196,7 +195,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
@@ -204,9 +203,9 @@ namespace GW2CraftingHelper.Tests.Services
                     1, new List<VendorOffer>
                     {
                         CoinVendorOffer(1, 200),
-                        MixedVendorOffer(1, 10, 2, 50)
+                        MixedVendorOffer(1, 10, 2, 50),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -225,7 +224,6 @@ namespace GW2CraftingHelper.Tests.Services
         // summing afterward (the pre-fix shape) overstates the true cost for
         // any item needed via 2+ occurrences and bought via a bulk
         // (OutputCount > 1) offer.
-
         [Fact]
         public void MultiOccurrenceBulkVendorOffer_CurrencyCost_AggregatesBeforeCeiling()
         {
@@ -248,7 +246,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { MixedVendorOffer(99, 0, 5, 3, outputCount: 3) } }
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 0, 5, 3, outputCount: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -281,7 +279,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -332,7 +330,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -368,7 +366,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 5, outputCount: 2) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 5, outputCount: 2) } },
             };
             var solver = new PlanSolver();
 
@@ -413,7 +411,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -468,7 +466,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 3, outputCount: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -536,9 +534,9 @@ namespace GW2CraftingHelper.Tests.Services
                     99, new List<VendorOffer>
                     {
                         CoinVendorOffer(99, 2, outputCount: 1),
-                        CoinVendorOffer(99, 150, outputCount: 100)
+                        CoinVendorOffer(99, 150, outputCount: 100),
                     }
-                }
+                },
             };
             var solver = new PlanSolver();
 
@@ -589,7 +587,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { MixedVendorOffer(99, 150, 2, 100, outputCount: 100) } }
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 150, 2, 100, outputCount: 100) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var solver = new PlanSolver();
@@ -620,6 +618,7 @@ namespace GW2CraftingHelper.Tests.Services
                 leafTotalCostSum += leafDecision.TotalCost.Value;
                 leafComparisonSum += leafDecision.ComparisonValue.Value;
             }
+
             Assert.Equal(150, leafTotalCostSum);
             Assert.Equal(650, leafComparisonSum);
         }
@@ -664,7 +663,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { MixedVendorOffer(99, 6, 7, 10, outputCount: 6) } }
+                { 99, new List<VendorOffer> { MixedVendorOffer(99, 6, 7, 10, outputCount: 6) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 7, 1 } });
             var solver = new PlanSolver();
@@ -717,7 +716,6 @@ namespace GW2CraftingHelper.Tests.Services
         // 1000 * 1 / 2 = 500 exactly for each occurrence, no remainder
         // left to distribute at all - the divergence is now 0, well
         // within the fix's <=1-copper bound for equal quantities.
-
         [Fact]
         public void MultiOccurrenceEqualQuantityBulkVendorOffer_BatchOverrunSharedProportionally()
         {
@@ -727,7 +725,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } },
             };
             var solver = new PlanSolver();
 
@@ -774,7 +772,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } }
+                { 99, new List<VendorOffer> { CoinVendorOffer(99, 1000, outputCount: 100) } },
             };
             var solver = new PlanSolver();
 

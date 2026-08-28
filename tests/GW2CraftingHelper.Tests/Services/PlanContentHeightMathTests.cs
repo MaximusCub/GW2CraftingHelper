@@ -94,22 +94,56 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostTileRow_CaptionBlockEndsAboveTheAmountRun()
+        public void CostTileRow_HoldsItsCaptionGapAndAmountRun()
         {
-            // The band bottom-anchors a coin run (never shorter than the
-            // 20px coin icon) above its own bottom pad; the caption block
-            // is the caption's line box plus the 2px the renderer adds
-            // under it.
-            int captionBlockBottom = PlanContentHeightMath.CostTileCaptionY
+            // The band HANGS its amount run one CostTileLabelToValueGap
+            // under the caption's line box, rather than bottom-anchoring it
+            // above its own pad and letting the leftover decide the gap -
+            // which is what left the profit band's amount 1px under its
+            // caption. The row height has to hold that stack plus the pad.
+            //
+            // AmountRunHeight, not CoinIconSize: the run is as tall as the
+            // taller of its text and its icon, and since the coins moved
+            // onto the 16px wallet BAR tier that is the text. Modelling the
+            // icon here would understate the run by 4px and let a band that
+            // actually overflows pass.
+            int amountY = PlanContentHeightMath.CostTileCaptionY
                 + TypeRampMetrics.ColumnHeaderInk.LineHeight
-                + 2;
-            int amountY = PlanContentHeightMath.CostTileRowHeight
-                - PlanContentHeightMath.CostTileAmountBottomPad
-                - CoinSegmentMath.CoinIconSize;
+                + PlanContentHeightMath.CostTileLabelToValueGap;
 
             Assert.True(
-                amountY >= captionBlockBottom,
-                $"amount run at {amountY} overprints a caption block ending at {captionBlockBottom}");
+                amountY + PlanContentHeightMath.AmountRunHeight
+                    + PlanContentHeightMath.CostTileAmountBottomPad
+                    <= PlanContentHeightMath.CostTileRowHeight,
+                $"an amount run at {amountY} overflows the "
+                    + $"{PlanContentHeightMath.CostTileRowHeight}px band");
+
+            // And the reserve is genuinely the text's, not the icon's - the
+            // regression #202 found and this branch has to keep found.
+            Assert.True(
+                PlanContentHeightMath.AmountRunHeight >= CoinSegmentMath.CoinIconSize,
+                "the amount run must never be reserved shorter than its own coin icon");
+        }
+
+        [Fact]
+        public void CostTileCaptionLineHeight_CoversTheTierTheCaptionIsDrawnAt()
+        {
+            // The reserve is what keeps the hang-under-the-caption model
+            // safe: the renderer measures the real font, so a reserve below
+            // the tier's own line box would let the amount fall out of the
+            // band the height math sized.
+            Assert.True(
+                TypeRampMetrics.ColumnHeaderInk.LineHeight
+                    <= PlanContentHeightMath.CostTileCaptionLineHeight,
+                $"caption line box {TypeRampMetrics.ColumnHeaderInk.LineHeight} exceeds the "
+                    + $"{PlanContentHeightMath.CostTileCaptionLineHeight}px reserve");
+
+            // One 4pt step of slack, no more: under the hang model every
+            // unused pixel of reserve is dead space under the band's box.
+            Assert.Equal(
+                4,
+                PlanContentHeightMath.CostTileCaptionLineHeight
+                    - TypeRampMetrics.ColumnHeaderInk.LineHeight);
         }
 
         private static PlanRowViewModel Row(PlanRowType type, string sublabel = null)
@@ -125,7 +159,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 NodeId = nodeId,
                 Decision = decision,
-                Children = children
+                Children = children,
             };
         }
 
@@ -202,7 +236,7 @@ namespace GW2CraftingHelper.Tests.Services
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CraftStep),
-                Row(PlanRowType.TimegatedNotice)
+                Row(PlanRowType.TimegatedNotice),
             };
             int expected = PlanContentHeightMath.CraftStepRowHeight + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, PlanContentHeightMath.SectionBodyHeight(PlanSectionType.CraftingSteps, rows));
@@ -226,16 +260,65 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RecipeRowHeight_ExactlyFitsIconFramePlusDivider()
+        public void RecipeRowHeight_ExactlyFitsIconFramePlusDividerPlusClearance()
         {
             // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow
-            // places a 34px rarity-framed icon at y=0
-            // and a bottom-anchored 2px row divider inside rowHeight - the
-            // constant must equal exactly icon + divider (34 + 2 = 36) with
-            // no overlap or slack, locking the fix that closed the
-            // pre-existing overflow KNOWN-ISSUES #23 mis-described as
-            // "several pixels of headroom" for this row.
-            Assert.Equal(36, PlanContentHeightMath.RecipeRowHeight);
+            // places a tier-2 rarity-framed icon at y=0 and a
+            // bottom-anchored 2px row divider inside rowHeight - the
+            // constant must equal exactly icon frame + divider + the one
+            // clearance pixel the scissor simulation demands at this
+            // height (42 + 2 + 1 = 45), with no overlap or slack. The
+            // pre-tier-2 shape (34 + 2 + 0 = 36) needed no clearance; 44
+            // is in the vulnerable class (KNOWN-ISSUES #23 / M36b), so
+            // the pixel is part of the height rather than an overlap of
+            // the icon - see RowDividerScissorSimulationTests.
+            Assert.Equal(
+                ItemIconTiers.BagSidebarIconSize + 2 * PlanContentHeightMath.RowIconBorder
+                    + PlanContentHeightMath.RowDividerHeight
+                    + PlanContentHeightMath.IconRowDividerClearance,
+                PlanContentHeightMath.RecipeRowHeight);
+            Assert.Equal(45, PlanContentHeightMath.RecipeRowHeight);
+        }
+
+        [Fact]
+        public void IconLedRowHeights_ShareTheTierTwoFlushFit()
+        {
+            // Used Materials, Shopping List and Required Recipes rows are
+            // the same flush shape: tier-2 icon frame at y=0, divider
+            // directly beneath, clearance pixel absorbed by the height.
+            Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.UsedMaterialRowHeight);
+            Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.ShoppingRowHeight);
+        }
+
+        [Fact]
+        public void CraftStepRowHeight_InsetsTheTierTwoIconSymmetrically()
+        {
+            // The craft-step icon sits CraftStepIconY below the row top
+            // with the same margin below the frame (5 + 42 + 5 = 52). The
+            // divider then lands at rowHeight - 2 - clearance = 49, 2px
+            // below the icon frame bottom (47) - the same icon-to-divider
+            // gap the pre-tier-2 44px shape had.
+            Assert.Equal(
+                2 * PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize,
+                PlanContentHeightMath.CraftStepRowHeight);
+            Assert.Equal(52, PlanContentHeightMath.CraftStepRowHeight);
+            int dividerTop = PlanContentHeightMath.CraftStepRowHeight
+                - PlanContentHeightMath.RowDividerHeight
+                - PlanContentHeightMath.IconRowDividerClearance;
+            int iconFrameBottom = PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize;
+            Assert.Equal(2, dividerTop - iconFrameBottom);
+        }
+
+        [Fact]
+        public void TreeRowHeight_PadsTheTierTwoIconLikeTheRankersTierOneRows()
+        {
+            // Tree rows draw indent guidelines instead of dividers, so
+            // their height is frame plus 3px each side - the same law
+            // RankerRowLayout.RowHeight states for the tier-1 rows.
+            Assert.Equal(
+                PlanContentHeightMath.RowIconFrameSize + 2 * PlanContentHeightMath.TreeRowIconPad,
+                PlanContentHeightMath.TreeRowHeight);
+            Assert.Equal(48, PlanContentHeightMath.TreeRowHeight);
         }
 
         [Fact]
@@ -267,7 +350,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- IsNodeExpanded ---
-
         [Fact]
         public void IsNodeExpanded_OverridePresent_WinsOverDefault()
         {
@@ -294,7 +376,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Tree height ---
-
         [Fact]
         public void TreeNodeHeight_Leaf_IsSingleRow()
         {
@@ -384,7 +465,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- MultiRootTreeFlowHeight ---
-
         [Fact]
         public void MultiRootTreeFlowHeight_NullRoots_IsZero()
         {

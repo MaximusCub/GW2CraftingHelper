@@ -11,9 +11,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineOwnMaterialsTests
     {
         // --- Own-materials valuation ---
-
-
-
         [Fact]
         public async Task Structured_ValuedMode_DeductsMaterialOpportunityCostFromProfit()
         {
@@ -98,15 +95,15 @@ namespace GW2CraftingHelper.Tests.Services
                     Ingredients = new List<RawIngredient>
                     {
                         new RawIngredient { Type = "Item", Id = 2, Count = 5 },
-                        new RawIngredient { Type = "Item", Id = 3, Count = 4 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 4 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100) // sellable, SellInstant=10
-                .WithPrice(3, buyUnitPrice: 0, sellUnitPrice: 50)   // unsellable, SellInstant=0
+                .WithPrice(3, buyUnitPrice: 0, sellUnitPrice: 50) // unsellable, SellInstant=0
                 .WithItem(1, "Target", "t.png")
                 .WithItem(2, "Sellable Ingredient", "i.png")
                 .WithItem(3, "Unsellable Ingredient", "j.png")
@@ -118,8 +115,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Items = new List<SnapshotItemEntry>
                 {
                     new SnapshotItemEntry { ItemId = 2, Count = 5, Source = AccountItemIndex.SourceMaterialStorage },
-                    new SnapshotItemEntry { ItemId = 3, Count = 4, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 3, Count = 4, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             var result = await pipeline.GenerateStructuredAsync(

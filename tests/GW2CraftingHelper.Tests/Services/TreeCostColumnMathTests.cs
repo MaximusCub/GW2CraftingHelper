@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SubtreeCost = subtreeCost,
                 Children = children,
                 VendorCurrencyCosts = vendorCurrencyCosts,
-                IsCostComponent = isCostComponent
+                IsCostComponent = isCostComponent,
             };
         }
 
@@ -51,7 +51,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Scan ---
-
         [Fact]
         public void Scan_NullOrEmptyRoots_IsAllZero()
         {
@@ -149,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             var roots = new List<CraftingTreeNode>
             {
                 Node(1, subtreeCost: 4539L),      // silver/copper only
-                Node(2, subtreeCost: 12340705L)   // 4-character gold
+                Node(2, subtreeCost: 12340705L), // 4-character gold,
             };
 
             Assert.Equal(4, Scan(roots).GoldTextWidth);
@@ -173,10 +172,11 @@ namespace GW2CraftingHelper.Tests.Services
         // Pinned as absolute pixel offsets from the column's right edge
         // rather than recomputed from the same constants the formula
         // reads. Segment width is text + CoinLabelIconGap(2) +
-        // CoinIconSize(20); sub-columns are separated by
-        // CoinSegmentGap(6). A deliberate geometry change re-baselines the
-        // literals here.
-
+        // CoinIconSize(16, = CurrencyIconTiers.WalletBarIconSize);
+        // sub-columns are separated by CoinSegmentGap(6). A deliberate
+        // geometry change re-baselines the literals here - as the move of
+        // the inline coin runs onto the measured wallet bar tier just did,
+        // 20 -> 16.
         [Fact]
         public void ComputeEdges_AllThreeDenominations_StackRightToLeft()
         {
@@ -185,8 +185,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(1000, edges.CurrencyRightEdge);
             Assert.Equal(1000, edges.CopperRightEdge);          // no currency band
-            Assert.Equal(1000 - 42 - 6, edges.SilverRightEdge); // copper: 20+2+20
-            Assert.Equal(1000 - 42 - 6 - 42 - 6, edges.GoldRightEdge);
+            Assert.Equal(1000 - 38 - 6, edges.SilverRightEdge); // copper: 20+2+16
+            Assert.Equal(1000 - 38 - 6 - 38 - 6, edges.GoldRightEdge);
         }
 
         [Fact]
@@ -210,8 +210,8 @@ namespace GW2CraftingHelper.Tests.Services
             var widths = new TreeCostColumnMath.CostColumnWidths(0, 20, 20, 0);
             var edges = TreeCostColumnMath.ComputeEdges(1000, widths);
 
-            Assert.Equal(1000 - 42 - 6, edges.SilverRightEdge);
-            Assert.Equal(42 + 6 + 42, edges.TotalWidth);
+            Assert.Equal(1000 - 38 - 6, edges.SilverRightEdge);
+            Assert.Equal(38 + 6 + 38, edges.TotalWidth);
         }
 
         [Fact]
@@ -341,12 +341,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(0, TreeCostColumnMath.TotalWidth(TreeCostColumnMath.CostColumnWidths.Empty));
 
-            // copper only: 20 + 2 + 20
-            Assert.Equal(42, TreeCostColumnMath.TotalWidth(
+            // copper only: 20 + 2 + 16
+            Assert.Equal(38, TreeCostColumnMath.TotalWidth(
                 new TreeCostColumnMath.CostColumnWidths(0, 0, 20, 0)));
 
-            // gold(52) + gap + silver(42) + gap + copper(42) + gap + currency(88)
-            Assert.Equal(52 + 6 + 42 + 6 + 42 + 6 + 88, TreeCostColumnMath.TotalWidth(
+            // gold(48) + gap + silver(38) + gap + copper(38) + gap + currency(88)
+            Assert.Equal(48 + 6 + 38 + 6 + 38 + 6 + 88, TreeCostColumnMath.TotalWidth(
                 new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88)));
         }
 
@@ -362,7 +362,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ScanColumns name extent (audit batch H: dead gutters) ---
-
         private static CraftingTreeNode NamedNode(
             int nodeId, string name, int quantity = 0, IReadOnlyList<CraftingTreeNode> children = null)
         {
@@ -371,7 +370,7 @@ namespace GW2CraftingHelper.Tests.Services
                 NodeId = nodeId,
                 Name = name,
                 Quantity = quantity,
-                Children = children
+                Children = children,
             };
         }
 
@@ -384,7 +383,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- ScanColumns node count (audit batch J, L2: the Recipe Tree
         // section header's parenthesised count) ---
-
         [Fact]
         public void ScanColumns_NodeCount_CountsEveryNodeAtEveryDepth()
         {
@@ -393,8 +391,8 @@ namespace GW2CraftingHelper.Tests.Services
                 NamedNode(1, "Root", children: new[]
                 {
                     NamedNode(2, "Child", children: new[] { NamedNode(3, "Grandchild") }),
-                    NamedNode(4, "Sibling")
-                })
+                    NamedNode(4, "Sibling"),
+                }),
             };
 
             Assert.Equal(4, ScanTree(roots).NodeCount);
@@ -410,8 +408,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 NamedNode(1, "Root", children: new[]
                 {
-                    NamedNode(2, "Child", children: new[] { NamedNode(3, "Grandchild") })
-                })
+                    NamedNode(2, "Child", children: new[] { NamedNode(3, "Grandchild") }),
+                }),
             };
             var flat = new[] { NamedNode(1, "A"), NamedNode(2, "B"), NamedNode(3, "C") };
 

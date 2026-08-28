@@ -131,7 +131,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Phase = PlanPhase.BuildingTree,
                 DisplayName = "Building recipe tree",
                 Total = null,
-                Detail = "may take several seconds on first run"
+                Detail = "may take several seconds on first run",
             };
 
             Assert.Equal(
@@ -149,7 +149,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Phase = PlanPhase.FetchingPrices,
                 DisplayName = "Fetching prices",
                 Total = 5,
-                Detail = "should not appear"
+                Detail = "should not appear",
             };
 
             Assert.Equal("Fetching prices (5 items)...", PlanStripTickDecision.FormatPhaseText(pe));

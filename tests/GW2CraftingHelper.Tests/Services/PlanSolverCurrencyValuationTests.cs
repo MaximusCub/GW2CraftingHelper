@@ -16,7 +16,6 @@ namespace GW2CraftingHelper.Tests.Services
         // currency lines comparable, but ONLY when every line on the offer
         // has a valuation; the valuation affects comparison only, never the
         // currency amounts reported on the plan.
-
         [Fact]
         public void ValuedCurrencyOffer_BeatsExpensiveTp_AndPlanListsCurrencyCost()
         {
@@ -27,11 +26,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var solver = new PlanSolver();
@@ -56,11 +55,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var solver = new PlanSolver();
 
@@ -81,11 +80,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var solver = new PlanSolver();
@@ -117,14 +116,14 @@ namespace GW2CraftingHelper.Tests.Services
                 CostLines = new List<CostLine>
                 {
                     new CostLine { Type = "Currency", Id = 2, Count = 10 },
-                    new CostLine { Type = "Currency", Id = 3, Count = 1000 }
+                    new CostLine { Type = "Currency", Id = 3, Count = 1000 },
                 },
                 MerchantName = "Mixed Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var solver = new PlanSolver();
@@ -147,7 +146,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var offer = new VendorOffer
             {
@@ -157,14 +156,14 @@ namespace GW2CraftingHelper.Tests.Services
                 CostLines = new List<CostLine>
                 {
                     new CostLine { Type = "Currency", Id = 2, Count = 1 },
-                    new CostLine { Type = "Currency", Id = 3, Count = 1 }
+                    new CostLine { Type = "Currency", Id = 3, Count = 1 },
                 },
                 MerchantName = "Mixed Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
             var solver = new PlanSolver();
@@ -185,16 +184,16 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { 0, AcquisitionSource.BuyFromVendor }
+                { 0, AcquisitionSource.BuyFromVendor },
             };
             var solver = new PlanSolver();
 
@@ -215,7 +214,6 @@ namespace GW2CraftingHelper.Tests.Services
         // comparison value (coin + valued currency), so the karma cost was
         // laundered away and an ancestor could wrongly choose to craft
         // through a valued vendor offer that was actually more expensive.
-
         [Fact]
         public void ValuedVendorDescendant_DoesNotLaunderIntoCraftComparison_TpWinsForAncestor()
         {
@@ -228,11 +226,11 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
             var solver = new PlanSolver();
@@ -258,11 +256,11 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 2000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
             var solver = new PlanSolver();
@@ -283,7 +281,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- currency-ux-package (Feature 3): SolverDecision.ComparisonValue ---
-
         [Fact]
         public void ComparisonValue_RollsUpThroughAncestorCraft_MatchesDecisionOnlyExpectation()
         {
@@ -298,11 +295,11 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 2000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } }
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, 3, 50) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 3, 5 } });
             var solver = new PlanSolver();
@@ -345,7 +342,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // Bought purely with 20 spirit shards per unit - no coin,
                 // no TP price at all for item 2 either, so BuyFromVendor is
                 // the only source and wins outright too.
-                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, SpiritShardCurrencyId, 20) } }
+                { 2, new List<VendorOffer> { MixedVendorOffer(2, 0, SpiritShardCurrencyId, 20) } },
             };
             var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
             var solver = new PlanSolver();
@@ -380,7 +377,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -419,14 +416,14 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new CostLine { Type = "Currency", Id = Gw2Constants.CoinCurrencyId, Count = 100 },
                     new CostLine { Type = "Currency", Id = 2, Count = 50 },
-                    new CostLine { Type = "Currency", Id = 3, Count = 1000 }
+                    new CostLine { Type = "Currency", Id = 3, Count = 1000 },
                 },
                 MerchantName = "Mixed Vendor",
-                Locations = new List<string>()
+                Locations = new List<string>(),
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { offer } }
+                { 1, new List<VendorOffer> { offer } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 1 } });
             var solver = new PlanSolver();

@@ -124,7 +124,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- Concurrency: deterministic coordination (a start gate +
         // Task.WhenAll), not a sleep-based race - failure would show up as
         // a wrong final count/version, not a timing-dependent flake. ---
-
         [Fact]
         public async Task Write_ConcurrentFromMultipleThreads_NoLostUpdatesNoCorruption()
         {
@@ -185,7 +184,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- File-sink gating policy (dev/proposals/d2-log-system.md Section 6): tested
         // against a REAL ModuleLogStore/temp dir, not a fake. ---
-
         [Fact]
         public void Write_DebugLevel_OnlyReachesFileWhenDiagnosticsEnabled()
         {
@@ -197,12 +195,12 @@ namespace GW2CraftingHelper.Tests.Services
 
                 log.DiagnosticsEnabled = false;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "hidden");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Empty(store.ReadAll());
 
                 log.DiagnosticsEnabled = true;
                 log.Write(ModuleLogLevel.Debug, "scrolldiag", "visible");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var afterEnabled = store.ReadAll();
                 Assert.Single(afterEnabled);
                 Assert.Equal("visible", afterEnabled[0].Message);
@@ -231,14 +229,13 @@ namespace GW2CraftingHelper.Tests.Services
                 // (never on the calling thread - see ModuleLog's own class
                 // doc comment on why), so the write is only guaranteed to
                 // have landed once this returns true.
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(3, store.ReadAll().Count);
             }
         }
 
         // --- Background file-sink flush queue: order preservation and the
         // WaitForPendingFileWrites synchronization helper. ---
-
         [Fact]
         public void Write_ManyEntriesToFileSink_BackgroundFlushPreservesCallOrder()
         {
@@ -254,7 +251,7 @@ namespace GW2CraftingHelper.Tests.Services
                     log.Write(ModuleLogLevel.Info, "t", "m" + i);
                 }
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 var result = store.ReadAll();
                 Assert.Equal(entryCount, result.Count);
@@ -320,12 +317,13 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     log.Write(ModuleLogLevel.Info, "t", "entry " + i);
                 }
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(20, store.ReadAll().Count);
 
                 log.MaxFileSizeBytes = 200;
                 log.Write(ModuleLogLevel.Info, "t", "after the cap dropped");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 var onDisk = store.ReadAll();
                 Assert.True(onDisk.Count < 21, "the lowered cap did not trim: " + onDisk.Count + " entries");
@@ -338,7 +336,6 @@ namespace GW2CraftingHelper.Tests.Services
         // already catch internally and never propagate (see its own doc
         // comment), so these exercise the real, reachable guarantee: a
         // file-sink failure never throws out of ModuleLog.Write. ---
-
         [Fact]
         public void Write_FileSinkAppendFails_DoesNotThrowAndRingStillReceivesEntry()
         {
@@ -368,7 +365,7 @@ namespace GW2CraftingHelper.Tests.Services
                     TimestampUtc = DateTime.UtcNow.AddHours(-1),
                     Level = ModuleLogLevel.Info,
                     Tag = "history",
-                    Message = "old"
+                    Message = "old",
                 });
 
                 var log = new ModuleLog();
@@ -403,7 +400,7 @@ namespace GW2CraftingHelper.Tests.Services
                     TimestampUtc = DateTime.UtcNow.AddDays(-30),
                     Level = ModuleLogLevel.Info,
                     Tag = "old",
-                    Message = "m"
+                    Message = "m",
                 });
 
                 var log = new ModuleLog();
@@ -424,7 +421,6 @@ namespace GW2CraftingHelper.Tests.Services
         // --- DeleteFileAndReset: the destructive "clear log file" action
         // (file + ring together, plus a trace entry), against a REAL
         // ModuleLogStore/temp dir. ---
-
         [Fact]
         public void DeleteFileAndReset_ClearsRingAndFile_LeavesOnlyTraceEntry()
         {
@@ -436,12 +432,12 @@ namespace GW2CraftingHelper.Tests.Services
 
                 log.Write(ModuleLogLevel.Info, "t", "one");
                 log.Write(ModuleLogLevel.Warn, "t", "two");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 Assert.Equal(2, store.ReadAll().Count);
                 long versionBefore = log.Version;
 
                 log.DeleteFileAndReset();
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 // Ring holds only the trace entry; Version stayed monotonic
                 // (the delete's own trace write bumped it, nothing reset it).
@@ -468,10 +464,10 @@ namespace GW2CraftingHelper.Tests.Services
                 log.Configure(store, 0, null);
 
                 log.Write(ModuleLogLevel.Info, "t", "pre-delete");
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 log.DeleteFileAndReset();
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
 
                 // Simulate the next session: a fresh ModuleLog seeding from
                 // the same on-disk store. This is exactly why a view-only

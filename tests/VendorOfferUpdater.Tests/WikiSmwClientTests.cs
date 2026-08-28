@@ -22,7 +22,7 @@ namespace VendorOfferUpdater.Tests
                 DelayBetweenRequestsMs = 0,
                 MaxTotalRequests = maxRequests,
                 MaxPrefixDepth = maxPrefixDepth,
-                MaxRuntime = TimeSpan.FromMinutes(5)
+                MaxRuntime = TimeSpan.FromMinutes(5),
             };
         }
 
@@ -35,7 +35,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Parsing tests ------------------------------------------
-
         [Fact]
         public async Task SingleResult_ParsesAllFields()
         {
@@ -184,7 +183,6 @@ namespace VendorOfferUpdater.Tests
         // Astral Acclaim package: "Has seasonal purchase
         // cap" is a distinct SMW property from daily/weekly - live-confirmed
         // exclusively on the Wizard's Vault family of pages.
-
         [Fact]
         public async Task PopulatedSeasonalCap_ParsedOntoResult()
         {
@@ -248,7 +246,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Pagination tests ---------------------------------------
-
         [Fact]
         public async Task Pagination_FollowsContinueOffset()
         {
@@ -304,7 +301,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Partitioning tests -------------------------------------
-
         [Fact]
         public async Task MaxDepthZero_TruncatesPartition()
         {
@@ -372,7 +368,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Safety & cancellation tests ----------------------------
-
         [Fact]
         public async Task MaxTotalRequests_ReturnsPartialWithInterrupted()
         {
@@ -409,7 +404,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Retry test ---------------------------------------------
-
         [Fact]
         public async Task Http429_RetriesAndSucceeds()
         {
@@ -435,7 +429,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- DryRun test --------------------------------------------
-
         [Fact]
         public async Task DryRun_MakesNoHttpRequests()
         {
@@ -445,7 +438,7 @@ namespace VendorOfferUpdater.Tests
             var options = new QueryOptions
             {
                 DryRun = true,
-                DelayBetweenRequestsMs = 0
+                DelayBetweenRequestsMs = 0,
             };
 
             var (results, stats) = await client.QueryVendorItemsAsync(
@@ -456,7 +449,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- Stats tests --------------------------------------------
-
         [Fact]
         public async Task Stats_TracksRequestsAndRows()
         {
@@ -498,7 +490,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- ResolveItemGameIdsAsync tests --------------------------
-
         [Fact]
         public async Task ResolveItemGameIds_SingleBatch()
         {

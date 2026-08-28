@@ -48,7 +48,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = rootBuy } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 60 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 60 } },
             };
         }
 
@@ -136,12 +136,13 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100 } },
             };
             if (rootBuy.HasValue)
             {
                 prices[1] = new ItemPrice { ItemId = 1, BuyInstant = rootBuy.Value };
             }
+
             return prices;
         }
 
@@ -225,7 +226,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } },
                 { 4, new ItemPrice { ItemId = 4, BuyInstant = 50 } },
-                { 5, new ItemPrice { ItemId = 5, BuyInstant = 60 } }
+                { 5, new ItemPrice { ItemId = 5, BuyInstant = 60 } },
             };
             var overrides = new Dictionary<int, AcquisitionSource> { { 0, AcquisitionSource.Craft } };
             var solver = new PlanSolver();
@@ -250,7 +251,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 4, new ItemPrice { ItemId = 4, BuyInstant = 50 } },
-                { 5, new ItemPrice { ItemId = 5, BuyInstant = 60 } }
+                { 5, new ItemPrice { ItemId = 5, BuyInstant = 60 } },
             };
             var solver = new PlanSolver();
 

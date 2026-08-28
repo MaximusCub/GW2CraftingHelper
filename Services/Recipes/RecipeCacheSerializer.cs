@@ -67,7 +67,27 @@ namespace GW2CraftingHelper.Services.Recipes
 
     internal class RecipeOverlayManifest
     {
+        /// <summary>
+        /// 2 since the staleness policy: learned negatives are no longer
+        /// stored and the manifest carries the verification stamp below.
+        /// Deserializes as 0 from a v1 manifest, which never had the field.
+        /// </summary>
+        public int SchemaVersion { get; set; }
+
         public int Gw2BuildId { get; set; }
+
+        /// <summary>
+        /// The game build the corpus was last verified against via the
+        /// /v2/recipes id-list probe; 0 = never verified.
+        /// </summary>
+        public int NegativesVerifiedBuildId { get; set; }
+
+        /// <summary>
+        /// Corpus size at that verification, so a module update swapping
+        /// the shipped seed (or a user deleting recipe_cache/) re-arms the
+        /// probe even when the game build has not moved.
+        /// </summary>
+        public int VerifiedKnownRecipeCount { get; set; }
 
         public string UpdatedUtc { get; set; }
     }
@@ -141,7 +161,8 @@ namespace GW2CraftingHelper.Services.Recipes
             return result;
         }
 
-        public static T LoadManifest<T>(Stream stream) where T : class, new()
+        public static T LoadManifest<T>(Stream stream)
+            where T : class, new()
         {
             if (stream == null)
             {

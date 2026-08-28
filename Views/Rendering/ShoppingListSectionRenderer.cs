@@ -26,8 +26,14 @@ namespace GW2CraftingHelper.Views.Rendering
         // Gap the name's ellipsis budget keeps before the Source column.
         private const int NameToQtyGap = 12;
 
-        // Left x of the name column (past the row's 32px icon at x=8).
-        private const int NameX = 50;
+        // Left x of the name column (past the row's tier-2 icon frame at
+        // x=8, plus an 8px gap).
+        private const int IconX = 8;
+        private const int NameX = IconX + PlanContentHeightMath.RowIconFrameSize + 8;
+
+        // Text anchor of the row's single reading line - see the identical
+        // derivation note on UsedMaterialsSectionRenderer.RowTextY.
+        private const int RowTextY = 13;
 
         private readonly ISectionRelayoutSink _sink;
 
@@ -338,9 +344,9 @@ namespace GW2CraftingHelper.Views.Rendering
             string qtyText = $"{row.Quantity}x";
             int qtyWidth = (int)System.Math.Ceiling(font.MeasureString(qtyText).Width);
 
-            // Icon y=0 (was 1) - see the identical note in
-            // CreateUsedMaterialRow; same 36px rowHeight / 34px icon frame
-            // shape, same 1px shortfall against the new 2px divider.
+            // Icon y=0 - see the identical flush-fit note in
+            // CreateUsedMaterialRow; same 45px rowHeight / tier-2 icon
+            // frame shape.
             //
             // The name's budget stops at the SOURCE column's left edge now,
             // not at the Amount band with this row's own badge width
@@ -349,8 +355,9 @@ namespace GW2CraftingHelper.Views.Rendering
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, 8, 0, fullName, font,
-                edges.SourceX, 0, NameToQtyGap, NameX, 9);
+                rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
+                edges.SourceX, 0, NameToQtyGap, NameX, RowTextY,
+                ItemIconTier.BagSidebar);
             var nameLabel = nameHandle.NameLabel;
 
             string sourceTag = ShoppingSourceBadge.ForRow(row);
@@ -359,7 +366,7 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 ShoppingBadgeColors.For(row.RowType, out Color tagBorder, out Color tagFill);
                 tagPanel = LabelHelpers.CreateSmallTag(
-                    rowPanel, sourceTag, edges.SourceX, 9, tagBorder, tagFill);
+                    rowPanel, sourceTag, edges.SourceX, RowTextY, tagBorder, tagFill);
             }
 
             var qtyLabel = LabelHelpers.WithDescenderClearance(
@@ -370,7 +377,7 @@ namespace GW2CraftingHelper.Views.Rendering
                     TextColor = new Color(200, 200, 200),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(edges.QtyRightEdge - qtyWidth, 9),
+                    Location = new Point(edges.QtyRightEdge - qtyWidth, RowTextY),
                     Parent = rowPanel,
                 });
 
@@ -380,8 +387,8 @@ namespace GW2CraftingHelper.Views.Rendering
             // alongside/instead of coin; a row with neither (genuinely
             // unpriceable - gw2e: "Not sold or crafted") renders a dash,
             // never a blank cell.
-            var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, 9, font);
-            var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, 9, font);
+            var eachCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.UnitCoinValue, row.UnitCurrencyCosts, edges.EachRightEdge, RowTextY, font);
+            var totalCell = CoinCurrencyRenderer.RenderValueCellRightAligned(rowPanel, row.CoinValue, row.CurrencyCosts, edges.TotalRightEdge, RowTextY, font);
 
             // An UNKNOWN row's dash takes the badge's own red, so "no
             // source" and "no price" read as one statement about the row
@@ -445,23 +452,24 @@ namespace GW2CraftingHelper.Views.Rendering
             // settle pass to here when it became a column: its x is
             // width-derived now rather than trailing the name's ellipsis.
             //
-            // M36b: bottomClearance 0 - ShoppingRowHeight (36) is immune to
-            // the Container.Paint round-trip defect (see LabelHelpers.CreateRowDivider's
-            // doc comment) and its icon frame is flush-fit with zero
-            // slack; see the identical note in CreateUsedMaterialRow.
+            // IconRowDividerClearance, not 0 - ShoppingRowHeight (45)
+            // absorbs the clearance pixel in its own derivation, keeping
+            // the divider flush under the icon frame; see the identical
+            // note in CreateUsedMaterialRow.
             RowRelayoutHelpers.FinishRow(
-                rowPanel, panelWidth, rowHeight, isLast, 0, _sink,
+                rowPanel, panelWidth, rowHeight, isLast,
+                PlanContentHeightMath.IconRowDividerClearance, _sink,
                 w =>
                 {
                     var e = scan.EdgesFor(w);
                     if (tagPanel != null)
                     {
-                        tagPanel.Location = new Point(e.SourceX, 9);
+                        tagPanel.Location = new Point(e.SourceX, RowTextY);
                     }
 
-                    qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, 9);
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, 9);
-                    CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, 9);
+                    qtyLabel.Location = new Point(e.QtyRightEdge - qtyWidth, RowTextY);
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(eachCell, e.EachRightEdge, RowTextY);
+                    CoinCurrencyRenderer.RepositionValueCellRightAligned(totalCell, e.TotalRightEdge, RowTextY);
                 });
             // No tooltip re-stamp on settle: the deferred builder reads
             // the label's current text when the box is drawn.

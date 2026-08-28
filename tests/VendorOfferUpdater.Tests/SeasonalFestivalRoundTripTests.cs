@@ -50,7 +50,7 @@ namespace VendorOfferUpdater.Tests
         private static readonly JsonSerializerOptions ReadOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         // The three ORIGINAL hand-tagged Candy Corn Vendor (Weekly) ecto
@@ -107,7 +107,7 @@ namespace VendorOfferUpdater.Tests
                     new[]
                     {
                         "halloween", "dragonbash", "wintersday",
-                        "festivalofthefourwinds", "lunarnewyear", "superadventurefestival"
+                        "festivalofthefourwinds", "lunarnewyear", "superadventurefestival",
                     }));
             // 3 -> 9 on the same full refresh: the scoped run had only
             // reached three of this vendor's rows. The tag itself is what
@@ -129,8 +129,8 @@ namespace VendorOfferUpdater.Tests
                     OutputCount = 1,
                     CostLines = new List<CostLine>(),
                     MerchantName = "Some Unrelated Merchant",
-                    Locations = new List<string>()
-                }
+                    Locations = new List<string>(),
+                },
             };
 
             var result = Program.MergeIntoBaseline(baseline.Offers, fresh);

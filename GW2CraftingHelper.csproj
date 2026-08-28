@@ -53,7 +53,7 @@
          off. Bracing a statement satisfies both, so the fix that clears one
          clears the other. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>SA1005;SA1009;SA1111;SA1114;SA1116;SA1117;SA1118;SA1119;SA1120;SA1122;SA1127;SA1128;SA1201;SA1202;SA1203;SA1204;SA1208;SA1210;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
+    <NoWarn>SA1005;SA1009;SA1111;SA1116;SA1117;SA1118;SA1120;SA1122;SA1201;SA1202;SA1203;SA1204;SA1208;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -98,6 +98,15 @@
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Models\PersistedPlan.cs" />
+    <Compile Include="Models\PlanHistoryEntry.cs" />
+    <Compile Include="Services\GzipJsonFile.cs" />
+    <Compile Include="Services\PlanHistoryStore.cs" />
+    <Compile Include="Services\PlanHistoryBlobStore.cs" />
+    <Compile Include="Services\PlanHistoryDedupKey.cs" />
+    <Compile Include="Services\PlanHistoryRetention.cs" />
+    <Compile Include="Services\PlanHistoryRowLayout.cs" />
+    <Compile Include="Services\PlanHistoryLabels.cs" />
+    <Compile Include="Views\PlanHistoryTabContent.cs" />
     <Compile Include="Services\PlanStore.cs" />
     <Compile Include="Services\PlanStoreHelpers.cs" />
     <Compile Include="Services\PlanStructuralValidator.cs" />
@@ -181,7 +190,10 @@
     <Compile Include="Models\RecipeSheetSavingsOpportunity.cs" />
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
+    <Compile Include="Services\CurrencyIconTiers.cs" />
+    <Compile Include="Services\ItemIconTiers.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\ItemRarityResolution.cs" />
     <Compile Include="Services\ItemStatMath.cs" />
     <Compile Include="Services\ItemDescriptionSanitizer.cs" />
     <Compile Include="Services\ItemStatBlockFactory.cs" />
@@ -352,6 +364,7 @@
     <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\RecipeCacheSerializer.cs" />
+    <Compile Include="Services\Recipes\RecipeCorpusVerifier.cs" />
     <Compile Include="Services\Recipes\SeededRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\OverlayRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\ItemNameSeedData.cs" />

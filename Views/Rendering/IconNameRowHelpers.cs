@@ -13,8 +13,10 @@ namespace GW2CraftingHelper.Views.Rendering
     // then PlanRelayoutMath.NameMaxWidthBeforeColumn -> LabelHelpers.
     // EllipsizeToWidth -> a rarity-colored, drop-shadowed name Label at
     // (nameX, nameY) - confirmed identical at every one of those call sites
-    // (same nameX 50, nameY 9, icon (8, 0), NameMaxWidthBeforeColumn
-    // gap 12 - confirmed by constant-by-constant comparison).
+    // (same nameX 58, nameY 13, icon (8, 0) at the tier-2 size,
+    // NameMaxWidthBeforeColumn gap 12 - originally confirmed by
+    // constant-by-constant comparison at the pre-tier-2 50/9, and the two
+    // callers moved to the tier-2 numbers together).
     //
     // Deliberately NOT adopted by CraftStepsSectionRenderer.CreateCraftStepRow,
     // DisciplinesSectionRenderer.CreateDisciplineRow, or
@@ -68,17 +70,54 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Builds the rarity-framed icon and the ellipsized, rarity-colored,
-        /// drop-shadowed name label immediately to its right. rightEdge/
-        /// qtyWidth/nameGap are threaded straight into
+        /// drop-shadowed name label immediately to its right, at a named
+        /// <see cref="ItemIconTier"/>. rightEdge/qtyWidth/nameGap are
+        /// threaded straight into
         /// PlanRelayoutMath.NameMaxWidthBeforeColumn exactly as each
         /// pre-extraction caller computed them inline (untouched - this
         /// helper does not change that arithmetic, only where it is
         /// called from).
+        /// <para>
+        /// One <paramref name="resolvedRarity"/> feeds BOTH the frame and
+        /// the name colour, so the two cannot disagree. It is what
+        /// <c>ItemRarityResolution.Resolve</c> returned; null is a
+        /// legitimately unknown rarity and renders neutral in both places.
+        /// </para>
+        /// </summary>
+        internal static IconNameHandle CreateIconAndEllipsizedName(
+            Panel rowPanel, string iconUrl, string resolvedRarity, int iconX, int iconY,
+            string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
+            ItemIconTier tier)
+        {
+            return Build(
+                rowPanel, iconUrl, resolvedRarity, iconX, iconY, fullName, font,
+                rightEdge, qtyWidth, nameGap, nameX, nameY,
+                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier));
+        }
+
+        /// <summary>
+        /// The pre-tier signature, kept ONLY so the one row builder still
+        /// owned by an in-flight branch keeps compiling until it migrates:
+        /// Views/RankerTabContent.cs, which passes iconSize and leans on the
+        /// borderThickness default, and becomes ItemIconTier.BagSlot with no
+        /// pixel change. The defaults stay because that call relies on one;
+        /// the tests workflow's named-tier step allow-lists exactly that
+        /// file and this one, which carries the shim.
         /// </summary>
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
             int iconSize = 32, int borderThickness = 1)
+        {
+            return Build(
+                rowPanel, iconUrl, rarity, iconX, iconY, fullName, font,
+                rightEdge, qtyWidth, nameGap, nameX, nameY, iconSize, borderThickness);
+        }
+
+        private static IconNameHandle Build(
+            Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
+            string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
+            int iconSize, int borderThickness)
         {
             var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);

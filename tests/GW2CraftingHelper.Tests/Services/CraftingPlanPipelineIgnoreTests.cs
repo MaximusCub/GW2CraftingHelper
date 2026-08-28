@@ -11,7 +11,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineIgnoreTests
     {
         // --- "Ignore" pill threaded through ResolveWithOverrides ---
-
         [Fact]
         public async Task ResolveWithOverrides_IgnoredItemIds_ZeroesIngredientCost()
         {

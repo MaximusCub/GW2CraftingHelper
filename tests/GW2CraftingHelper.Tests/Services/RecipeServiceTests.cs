@@ -39,8 +39,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = 2, Count = 3 },
-                    new RawIngredient { Type = "Item", Id = 3, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 1 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -78,8 +78,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
             });
 
             // B (item 2) -> recipe 20 -> ingredient C (item 3, leaf)
@@ -91,8 +91,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -125,8 +125,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 2,  // makes 2 per craft
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 4 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 4 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -151,8 +151,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
             });
             api.AddRecipe(new RawRecipe
             {
@@ -161,8 +161,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -186,8 +186,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = 2, Count = 1 },
-                    new RawIngredient { Type = "Currency", Id = 99, Count = 50 }
-                }
+                    new RawIngredient { Type = "Currency", Id = 99, Count = 50 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -227,8 +227,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = 2, Count = 1 },
-                    new RawIngredient { Type = null, Id = 99, Count = 5 }
-                }
+                    new RawIngredient { Type = null, Id = 99, Count = 5 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -266,8 +266,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = 19925, Count = 1 }, // self
                     new RawIngredient { Type = "Item", Id = 19976, Count = 1 }, // Mystic Coin
                     new RawIngredient { Type = "Item", Id = 24335, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = 39090, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 39090, Count = 1 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -316,8 +316,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = tinyClaw, Count = 50 },
                     new RawIngredient { Type = "Item", Id = smallClaw, Count = 1 },
                     new RawIngredient { Type = "Item", Id = dustA, Count = 5 },
-                    new RawIngredient { Type = "Item", Id = philStone, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 1 },
+                },
             });
             api.AddSearchResult(claw, -1593);
             api.AddRecipe(new RawRecipe
@@ -330,8 +330,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = smallClaw, Count = 50 },
                     new RawIngredient { Type = "Item", Id = claw, Count = 1 },
                     new RawIngredient { Type = "Item", Id = dustB, Count = 5 },
-                    new RawIngredient { Type = "Item", Id = philStone, Count = 2 }
-                }
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 2 },
+                },
             });
             api.AddSearchResult(sharpClaw, -1594);
             api.AddRecipe(new RawRecipe
@@ -344,8 +344,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = claw, Count = 50 },
                     new RawIngredient { Type = "Item", Id = sharpClaw, Count = 1 },
                     new RawIngredient { Type = "Item", Id = dustC, Count = 5 },
-                    new RawIngredient { Type = "Item", Id = philStone, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 3 },
+                },
             });
             api.AddSearchResult(largeClaw, -1595);
             api.AddRecipe(new RawRecipe
@@ -358,8 +358,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = sharpClaw, Count = 50 },
                     new RawIngredient { Type = "Item", Id = largeClaw, Count = 1 },
                     new RawIngredient { Type = "Item", Id = dustD, Count = 5 },
-                    new RawIngredient { Type = "Item", Id = philStone, Count = 4 }
-                }
+                    new RawIngredient { Type = "Item", Id = philStone, Count = 4 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -406,8 +406,8 @@ namespace GW2CraftingHelper.Tests.Services
                 ExpectedOutputCount = 0.31,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -440,8 +440,8 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = 19925, Count = 1 }, // Obsidian Shard
                     new RawIngredient { Type = "Item", Id = 19976, Count = 1 }, // Mystic Coin
                     new RawIngredient { Type = "Item", Id = 19721, Count = 1 }, // Glob of Ectoplasm
-                    new RawIngredient { Type = "Item", Id = 20796, Count = 6 }  // Philosopher's Stone
-                }
+                    new RawIngredient { Type = "Item", Id = 20796, Count = 6 }, // Philosopher's Stone,
+                },
             });
 
             var svc = new RecipeService(api);
@@ -475,8 +475,8 @@ namespace GW2CraftingHelper.Tests.Services
                 ExpectedOutputCount = 1e-15,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -505,8 +505,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 5,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
                 // ExpectedOutputCount left null (the common case)
             });
 
@@ -528,8 +528,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 5,  // makes 5 per craft
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -555,9 +555,9 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                 },
-                Disciplines = new List<string> { "Weaponsmith", "Huntsman" }
+                Disciplines = new List<string> { "Weaponsmith", "Huntsman" },
             });
 
             var svc = new RecipeService(api);
@@ -581,11 +581,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                 },
                 Disciplines = new List<string> { "Armorsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var svc = new RecipeService(api);
@@ -609,8 +609,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
                 // No Disciplines, MinRating, or Flags set - use defaults
             });
 
@@ -635,9 +635,9 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                 },
-                Flags = new List<string>()  // empty flags
+                Flags = new List<string>(), // empty flags,
             });
 
             var svc = new RecipeService(api);
@@ -648,7 +648,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Achievement-bit ingredient propagation ---
-
         [Fact]
         public async Task AchievementFields_PropagateFromRawIngredientOntoChildNode()
         {
@@ -663,8 +662,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RawIngredient>
                 {
                     new RawIngredient { Type = "Item", Id = 103886, Count = 1, AchievementId = 8493, AchievementBit = 0 },
-                    new RawIngredient { Type = "Item", Id = 103974, Count = 1, AchievementId = 8493, AchievementBit = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 103974, Count = 1, AchievementId = 8493, AchievementBit = 3 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -692,8 +691,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -706,7 +705,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- BuildMultiItemTreeAsync (gw2e parity, multi-item plans) ---
-
         [Fact]
         public async Task BuildMultiItemTreeAsync_SingleEntry_ReturnsItemTreeUnwrapped_NoSyntheticRoot()
         {
@@ -719,8 +717,8 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 3 },
+                },
             });
 
             var svc = new RecipeService(api);
@@ -747,7 +745,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 3 },
-                new PlanRequestItem { ItemId = 2, Quantity = 7 }
+                new PlanRequestItem { ItemId = 2, Quantity = 7 },
             };
 
             var wrapper = await svc.BuildMultiItemTreeAsync(items, CancellationToken.None);
@@ -801,7 +799,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 const int buildId = 205780;
                 var cacheStore = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
-                cacheStore.Load(currentGw2BuildId: null);
+                cacheStore.Load();
                 cacheStore.SetCurrentBuildId(buildId);
 
                 var api = new InMemoryRecipeApiClient();
@@ -815,8 +813,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 });
                 api.Return404For.Add(11);
 
@@ -837,7 +835,7 @@ namespace GW2CraftingHelper.Tests.Services
                 cacheStore.Flush(force: true);
 
                 var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
-                reloaded.Load(currentGw2BuildId: buildId);
+                reloaded.Load();
                 var persistedRecipe = reloaded.TryGetRecipe(10);
                 Assert.NotNull(persistedRecipe);
                 Assert.Equal(1, persistedRecipe.OutputItemId);
@@ -865,7 +863,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 const int buildId = 205780;
                 var overlay = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
-                overlay.Load(currentGw2BuildId: null);
+                overlay.Load();
                 overlay.SetCurrentBuildId(buildId);
 
                 var api = new InMemoryRecipeApiClient();
@@ -877,8 +875,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
                 });
 
                 var gated = new GatedFlushStore(overlay);
@@ -901,7 +899,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.Single(node.Recipes);
 
                 var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
-                reloaded.Load(currentGw2BuildId: buildId);
+                reloaded.Load();
                 Assert.NotNull(reloaded.TryGetRecipe(10));
                 Assert.NotNull(reloaded.TryGetSearch(1));
             }
@@ -914,6 +912,7 @@ namespace GW2CraftingHelper.Tests.Services
             private readonly GW2CraftingHelper.Services.Recipes.IRecipeCacheStore _inner;
             private readonly TaskCompletionSource<bool> _release =
                 new TaskCompletionSource<bool>();
+
             private int _flushCompleted;
 
             public GatedFlushStore(GW2CraftingHelper.Services.Recipes.IRecipeCacheStore inner)

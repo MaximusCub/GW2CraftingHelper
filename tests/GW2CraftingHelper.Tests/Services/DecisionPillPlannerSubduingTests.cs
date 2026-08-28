@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CanBuyVendor = true,
                 CraftCostBreakdown = craft,
                 BuyFromTpCostBreakdown = tp,
-                BuyFromVendorCostBreakdown = vendor
+                BuyFromVendorCostBreakdown = vendor,
             };
         }
 
@@ -125,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Decision = CraftingDecision.BuyFromTp,
                 CanCraft = true,
                 CanBuyTp = true,
-                CanBuyVendor = true
+                CanBuyVendor = true,
             };
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
@@ -148,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Quantity = 1,
                 Decision = CraftingDecision.Craft,
                 CanCraft = true,
-                CraftCostBreakdown = Breakdown(999, 999)
+                CraftCostBreakdown = Breakdown(999, 999),
             };
 
             var specs = DecisionPillPlanner.BuildPillSpecs(node);

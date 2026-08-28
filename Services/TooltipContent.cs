@@ -120,6 +120,18 @@ namespace GW2CraftingHelper.Services
         /// <summary>The icon+name header row - see
         /// <see cref="TooltipContent.HeaderLine"/>.</summary>
         Header,
+
+        /// <summary>
+        /// A consumable effect-block row: one line pitch tall like prose,
+        /// but indented past the inline effect icon the game draws beside
+        /// the block ("Nourishment (45 m): ..." with the food icon at its
+        /// left - measured on live3 soul-pastries/candy-corn/omnomberry,
+        /// 2026-08-26). The icon rides the first row of the block only,
+        /// via <see cref="TooltipLine.IconUrl"/>, and spans into the rows
+        /// under it; every row of the block carries this kind so the
+        /// indent covers the icon's full height.
+        /// </summary>
+        Effect,
     }
 
     internal sealed class TooltipLine
@@ -149,6 +161,13 @@ namespace GW2CraftingHelper.Services
         /// so the two can never diverge. Null means "this row draws no
         /// icon": the continuation rows of a wrapped header name, and every
         /// prose row.
+        /// <para>
+        /// On a <see cref="TooltipLineKind.Effect"/> row it is instead the
+        /// effect's own inline icon, present on the block's first line
+        /// only and never normalised: an effect block whose API details
+        /// carry no icon is emitted as plain rows by the composer, so an
+        /// Effect row always has a real URL here or null.
+        /// </para>
         /// </summary>
         public string IconUrl { get; }
     }
@@ -172,14 +191,14 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>An upgrade's granted bonus - a rune bonus line, a
         /// sigil or infusion buff. NOT a food's nourishment line, which
-        /// the one capture of one measures white (spec section 1.4,
-        /// steak.png).</summary>
+        /// the one capture of one measures white (KNOWN-ISSUES #42).
+        /// </summary>
         Bonus,
 
         /// <summary>
         /// A bonus tier the wearer has not reached. Reserved and unused:
         /// greying a tier needs the character's equipped count, which is
-        /// instance state /v2/items cannot carry (spec section 3.2). It
+        /// instance state /v2/items cannot carry (KNOWN-ISSUES #42). It
         /// exists so an equipped-aware surface does not have to re-plumb
         /// the role through every composer to get it.
         /// </summary>
@@ -328,6 +347,47 @@ namespace GW2CraftingHelper.Services
             }
 
             _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
+            return this;
+        }
+
+        /// <summary>
+        /// A consumable's effect block: <paramref name="text"/> split on
+        /// hard breaks into <see cref="TooltipLineKind.Effect"/> lines,
+        /// every span carrying <paramref name="role"/>, with
+        /// <paramref name="iconUrl"/> on the FIRST line only - the shape
+        /// the game draws for "Nourishment (45 m): ..." (live3, 2026-08-26).
+        /// Callers with no icon URL emit ordinary text instead; see
+        /// <see cref="TooltipLine.IconUrl"/>.
+        /// </summary>
+        public TooltipContentBuilder EffectBlock(string iconUrl, string text, TooltipSpanRole role)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return this;
+            }
+
+            if (_current != null)
+            {
+                EndLine();
+            }
+
+            string normalized = text.IndexOf('\r') >= 0
+                ? text.Replace("\r\n", "\n").Replace('\r', '\n') : text;
+            bool first = true;
+            foreach (var piece in normalized.Split('\n'))
+            {
+                if (piece.Length == 0)
+                {
+                    continue;
+                }
+
+                _lines.Add(new TooltipLine(
+                    new List<TooltipSpan> { TooltipSpan.Styled(piece, role) },
+                    TooltipLineKind.Effect,
+                    first ? iconUrl : null));
+                first = false;
+            }
+
             return this;
         }
 

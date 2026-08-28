@@ -45,6 +45,16 @@ namespace GW2CraftingHelper.Tests.Helpers
         public const string Sunrise =
             "{\"name\":\"Sunrise\",\"description\":\"<c=@flavor>This weapon is used to craft the legendary greatsword Eternity by combining it in the Mystic Forge with:\\n\u2022 Twilight\\n\u2022 5 Piles of Crystalline Dust\\n\u2022 10 Philosopher's Stones</c>\",\"type\":\"Weapon\",\"level\":80,\"rarity\":\"Legendary\",\"vendor_value\":100000,\"default_skin\":4679,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"HideSuffix\",\"NoSalvage\",\"NoSell\",\"AccountBindOnUse\",\"DeleteWarning\"],\"restrictions\":[],\"id\":30703,\"chat_link\":\"[&AgHvdwAA]\",\"icon\":\"https://render.guildwars2.com/file/EFF16C4F19792627355DC294E6D7093F544921E7/456030.png\",\"details\":{\"type\":\"Greatsword\",\"damage_type\":\"Physical\",\"min_power\":1045,\"max_power\":1155,\"defense\":0,\"infusion_slots\":[{\"flags\":[\"Infusion\"]},{\"flags\":[\"Infusion\"]}],\"attribute_adjustment\":717.024,\"suffix_item_id\":24562,\"stat_choices\":[161,155,159,157,158,160,153,605,700,616,154,156,162,686,559,754,753,799,1026,1067,628,1032,1111,1109,1123,1140,1085,1153,1118,1131,1222,1344,1363,1364,1559,1556,1681,1686,1826],\"secondary_suffix_item_id\":\"\"}}";
 
+        /// <summary>
+        /// The 2026-08-27 owner A/B item: the same tooltip was captured in
+        /// the module and in the live game, so its rendered lines are a
+        /// direct fidelity datum rather than an inference. A Trophy whose
+        /// description carries a hard paragraph break, a bullet list, and
+        /// the AccountBound + AccountBindOnUse flag pair.
+        /// </summary>
+        public const string GiftOfTwilight =
+            "{\"name\":\"Gift of Twilight\",\"description\":\"A gift used to create the legendary greatsword Twilight.\\n\\nMade by combining these items in the Mystic Forge:\\n\u2022 1 Gift of Metal\\n\u2022 1 Gift of Darkness\\n\u2022 100 Icy Runestones\\n\u2022 1 Superior Sigil of Blood\",\"type\":\"Trophy\",\"level\":0,\"rarity\":\"Legendary\",\"vendor_value\":640,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"AccountBound\",\"NoSalvage\",\"AccountBindOnUse\",\"DeleteWarning\"],\"restrictions\":[],\"id\":19648,\"chat_link\":\"[&AgHATAAA]\",\"icon\":\"https://render.guildwars2.com/file/01D07FABAE26C0E5240892B00DA7AF90AB0EA022/455828.png\"}";
+
         public static string Array(params string[] items)
         {
             return "[" + string.Join(",", items) + "]";

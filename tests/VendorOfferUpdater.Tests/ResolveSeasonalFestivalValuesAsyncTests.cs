@@ -92,7 +92,7 @@ namespace VendorOfferUpdater.Tests
             {
                 var firstRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 }
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     firstRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -100,7 +100,7 @@ namespace VendorOfferUpdater.Tests
 
                 var secondRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor2", GameId = 2 }
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor2", GameId = 2 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     secondRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -128,7 +128,7 @@ namespace VendorOfferUpdater.Tests
 
             var results = new List<WikiVendorResult>
             {
-                new WikiVendorResult { PageName = "Miyani#vendor1", GameId = 1 }
+                new WikiVendorResult { PageName = "Miyani#vendor1", GameId = 1 },
             };
 
             string cachePath = TempCachePath();
@@ -163,7 +163,7 @@ namespace VendorOfferUpdater.Tests
 
             var results = new List<WikiVendorResult>
             {
-                new WikiVendorResult { PageName = "Consortium Trader (Fractal Rush)#vendor1", GameId = 1 }
+                new WikiVendorResult { PageName = "Consortium Trader (Fractal Rush)#vendor1", GameId = 1 },
             };
 
             string cachePath = TempCachePath();
@@ -375,7 +375,6 @@ namespace VendorOfferUpdater.Tests
             // Deliberately no mapping for "VendorB" and no queued
             // fallback - FakeHttpHandler throws InvalidOperationException
             // for it, simulating an unanticipated failure mode.
-
             var results = new List<WikiVendorResult>
             {
                 new WikiVendorResult { PageName = "VendorA#vendor1", GameId = 1 },
@@ -427,7 +426,7 @@ namespace VendorOfferUpdater.Tests
             {
                 var firstRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 }
+                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     firstRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -437,7 +436,7 @@ namespace VendorOfferUpdater.Tests
 
                 var secondRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 }
+                    new WikiVendorResult { PageName = "Renamed Vendor#vendor1", GameId = 1 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     secondRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -482,7 +481,7 @@ namespace VendorOfferUpdater.Tests
             };
             var queryScopedResults = new List<WikiVendorResult>
             {
-                wikiResults[0]
+                wikiResults[0],
             };
 
             string cachePath = TempCachePath();
@@ -530,8 +529,8 @@ namespace VendorOfferUpdater.Tests
                     GameId = 1,
                     // Simulates a value that round-tripped in from a prior
                     // run's wiki_vendor_cache.json save.
-                    TemporarySeasonalValue = "Halloween"
-                }
+                    TemporarySeasonalValue = "Halloween",
+                },
             };
 
             string cachePath = TempCachePath();
@@ -655,7 +654,7 @@ namespace VendorOfferUpdater.Tests
 
                 var results = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Redirected Vendor#vendor1", GameId = 1 }
+                    new WikiVendorResult { PageName = "Redirected Vendor#vendor1", GameId = 1 },
                 };
 
                 await Program.ResolveSeasonalFestivalValuesAsync(
@@ -690,7 +689,7 @@ namespace VendorOfferUpdater.Tests
             {
                 var firstRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 }
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor1", GameId = 1 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     firstRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -698,7 +697,7 @@ namespace VendorOfferUpdater.Tests
 
                 var secondRun = new List<WikiVendorResult>
                 {
-                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor2", GameId = 2 }
+                    new WikiVendorResult { PageName = "Dragon Bash Merchant (Weekly)#vendor2", GameId = 2 },
                 };
                 await Program.ResolveSeasonalFestivalValuesAsync(
                     secondRun, client, cachePath, maxSeasonalPages: 10, delayMs: 0, CancellationToken.None);
@@ -716,7 +715,6 @@ namespace VendorOfferUpdater.Tests
         }
 
         // -- StripSubobjectSuffix --------------------------------------
-
         [Theory]
         [InlineData("Candy Corn Vendor (Weekly)#vendor1", "Candy Corn Vendor (Weekly)")]
         [InlineData("Miyani#vendor12", "Miyani")]

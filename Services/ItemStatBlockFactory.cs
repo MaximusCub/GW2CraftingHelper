@@ -50,7 +50,7 @@ namespace GW2CraftingHelper.Services
                 ItemType = raw.ItemType,
                 RequiredLevel = raw.Level,
                 Restrictions = raw.Restrictions ?? NoStrings,
-                Binding = ResolveBinding(flags),
+                Bindings = ResolveBindings(flags),
                 IsUnique = flags.Contains("Unique"),
                 VendorValue = ResolveVendorValue(raw.VendorValue, flags),
                 Description = raw.Description ?? "",
@@ -71,6 +71,8 @@ namespace GW2CraftingHelper.Services
             block.BuffDescription = detail.BuffDescription;
             block.StatChoiceCount = detail.StatChoiceIds == null ? 0 : detail.StatChoiceIds.Count;
             block.NourishmentDurationMs = detail.NourishmentDurationMs;
+            block.EffectName = detail.EffectName;
+            block.EffectIconUrl = detail.EffectIconUrl;
 
             if (detail.Defense.HasValue && detail.Defense.Value > 0)
             {
@@ -119,35 +121,59 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// The one binding line the game shows, not every flag the item
-        /// carries: an ascended armour piece reports AccountBound AND
-        /// AccountBindOnUse (48074), and a soulbinding one reports
-        /// AccountBound AND SoulBindOnUse (68357). Most-specific wins, so
-        /// each renders the state the player actually sees.
+        /// The binding lines the game shows, in its order: the account
+        /// dimension, then the soul dimension. The two are INDEPENDENT,
+        /// not a most-specific ladder - live3/relic-livingcity
+        /// (2026-08-26) shows "Account Bound" and "Soulbound on Use"
+        /// stacked on one item (104938, AccountBound + SoulBindOnUse).
+        /// Within a dimension the stronger flag wins: AccountBound over
+        /// AccountBindOnUse (live3 almonds 12337 and fury-scorched 86967
+        /// both carry BOTH flags and render ONE account line), and
+        /// SoulbindOnAcquire over SoulBindOnUse.
+        /// <para>
+        /// A bind-ON-ACQUIRE flag reads BARE - "Account Bound",
+        /// "Soulbound" - because that is what the game prints on the
+        /// ordinary inventory hover the module's tooltips stand in for.
+        /// MEASURED on five captures carrying such a flag: Gift of
+        /// Twilight 19648 (the 2026-08-27 owner A/B, same item hovered in
+        /// the module and in the game), heart-of-destroyer 67017 and
+        /// holographic-wings 79157 - all AccountBound + AccountBindOnUse,
+        /// all bare "Account Bound" - relic-livingcity 104938
+        /// (AccountBound + SoulBindOnUse, "Account Bound" stacked over
+        /// "Soulbound on Use") and red-festival-lantern 68638
+        /// (SoulbindOnAcquire + SoulBindOnUse, bare "Soulbound"). The
+        /// "on Acquire" wording appears on exactly two captures - almonds
+        /// 12337 and fury-scorched 86967 - and both are MATERIAL STORAGE
+        /// hovers, where the copy shown is not bound to anyone yet. Which
+        /// copy the player is looking at is instance state /v2/items
+        /// cannot carry, so the majority-and-A/B wording wins. A
+        /// bind-on-USE flag keeps its "on Use" tail: the binding has not
+        /// happened yet for any copy, and that is what the relic capture
+        /// shows.
+        /// </para>
         /// </summary>
-        private static string ResolveBinding(HashSet<string> flags)
+        private static IReadOnlyList<string> ResolveBindings(HashSet<string> flags)
         {
-            if (flags.Contains("SoulbindOnAcquire"))
+            List<string> lines = null;
+
+            string account =
+                flags.Contains("AccountBound") ? "Account Bound" :
+                flags.Contains("AccountBindOnUse") ? "Account Bound on Use" : null;
+            string soul =
+                flags.Contains("SoulbindOnAcquire") ? "Soulbound" :
+                flags.Contains("SoulBindOnUse") ? "Soulbound on Use" : null;
+
+            if (account != null)
             {
-                return "Soulbound on Acquire";
+                (lines = new List<string>(2)).Add(account);
             }
 
-            if (flags.Contains("SoulBindOnUse"))
+            if (soul != null)
             {
-                return "Soulbound on Use";
+                (lines = lines ?? new List<string>(1)).Add(soul);
             }
 
-            if (flags.Contains("AccountBindOnUse"))
-            {
-                return "Account Bound on Use";
-            }
-
-            if (flags.Contains("AccountBound"))
-            {
-                return "Account Bound";
-            }
-
-            return null;
+            return lines ?? (IReadOnlyList<string>)NoStrings;
         }
 
         private static long? ResolveVendorValue(int vendorValue, HashSet<string> flags)

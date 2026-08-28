@@ -117,7 +117,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { GiftOfTheSurvivors, offers }
+                { GiftOfTheSurvivors, offers },
             };
 
             var result = new PlanSolver().Solve(

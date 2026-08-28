@@ -45,9 +45,9 @@ namespace GW2CraftingHelper.Tests.Services
                     {
                         ItemId = 2,
                         Count = 4,
-                        Source = AccountItemIndex.SourceMaterialStorage
-                    }
-                }
+                        Source = AccountItemIndex.SourceMaterialStorage,
+                    },
+                },
             };
         }
 
@@ -117,8 +117,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 2, Count = 5, Source = AccountItemIndex.SourceMaterialStorage }
-                }
+                    new SnapshotItemEntry { ItemId = 2, Count = 5, Source = AccountItemIndex.SourceMaterialStorage },
+                },
             };
 
             return PipelineBuilder.Create()
@@ -134,11 +134,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 5 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithRecipe(new RawRecipe
                 {
@@ -147,11 +147,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 5 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 5 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 30) // option A: 5x30=150
@@ -294,7 +294,7 @@ namespace GW2CraftingHelper.Tests.Services
             // beats the automatic pre-pass).
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.Craft }
+                { initial.CraftingTree.NodeId, AcquisitionSource.Craft },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 

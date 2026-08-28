@@ -2,6 +2,7 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
 using GW2CraftingHelper.Contracts;
+using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using System;
@@ -282,10 +283,11 @@ namespace GW2CraftingHelper.Views
                 // carries no rarity, so the frame is the component's own
                 // neutral unknown-rarity grey - never a guessed rarity.
                 // The art is inset rather than the box grown, so the row's
-                // own geometry is exactly what it was.
+                // own geometry is exactly what it was: the SearchSuggestion
+                // tier's frame is IconSize on the nose.
                 IconControls.CreateItemIcon(
-                    row, item.IconUrl, (string)null, 2, (RowHeight - IconSize) / 2,
-                    IconSize - 2, 1);
+                    row, item.IconUrl, ItemIconFrame.UnknownRarity(), 2,
+                    (RowHeight - IconSize) / 2, ItemIconTier.SearchSuggestion);
 
                 // Item name. Centred against the FONT's own line box rather
                 // than a hand-tuned stand-in for it: these rows stack flush

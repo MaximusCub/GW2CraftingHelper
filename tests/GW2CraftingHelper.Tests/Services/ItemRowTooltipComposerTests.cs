@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Mithril Ore",
                 Rarity = "Basic",
                 ItemType = "CraftingMaterial",
-                VendorValue = 7
+                VendorValue = 7,
             };
         }
 
@@ -83,7 +83,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 TooltipContent.Line(
                     TooltipSpan.FromText("Unit price: "),
-                    TooltipSpan.FromCoin(1234, "12s 34c"))
+                    TooltipSpan.FromCoin(1234, "12s 34c")),
             });
 
             var content = ItemRowTooltipComposer.BuildRowContent(

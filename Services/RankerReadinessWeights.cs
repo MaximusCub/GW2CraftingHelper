@@ -3,7 +3,7 @@ using GW2CraftingHelper.Models;
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// The Crafting Ranker's headline is a weighted mean of four gate
+    /// The Crafting Ranker's headline is a weighted mean of five gate
     /// completions, renormalised over the gates that apply to the item. These
     /// are the weights, kept as named constants rather than buried in the
     /// formula so they can be argued with.
@@ -28,6 +28,10 @@ namespace GW2CraftingHelper.Services
     ///    but a short one next to a legendary's materials bill, and usually
     ///    either satisfied already or cheap to satisfy. Non-zero because it is
     ///    real; small because it is short.
+    ///  - A recipe unlock sits on the same substitutability rung as a
+    ///    discipline: a hard wall, but most recipes are purchasable sheets
+    ///    or cheap unlocks, so it takes the disciplines weight rather than
+    ///    inventing a new tier. First call, reviewable like the others.
     ///
     /// Deliberately not a user setting: a user who retunes the weights cannot
     /// compare their own numbers with anyone else's, and the model's
@@ -39,6 +43,7 @@ namespace GW2CraftingHelper.Services
         public const double Materials = 0.35;
         public const double Currencies = 0.20;
         public const double Disciplines = 0.10;
+        public const double Recipes = 0.10;
 
         public static double For(RankerGate gate)
         {
@@ -48,6 +53,7 @@ namespace GW2CraftingHelper.Services
                 case RankerGate.Materials: return Materials;
                 case RankerGate.Currencies: return Currencies;
                 case RankerGate.Disciplines: return Disciplines;
+                case RankerGate.Recipes: return Recipes;
                 default: return 0;
             }
         }

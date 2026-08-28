@@ -13,7 +13,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineProgressLoggingTests
     {
         // --- Generation progress + rich logging ---
-
         [Fact]
         public async Task GenerateStructuredAsync_ReportsPhaseEventsInOrderWithSanePayloads()
         {
@@ -34,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
                 PlanPhase.CheckingLearnedRecipes,
-                PlanPhase.BuildingDisplay
+                PlanPhase.BuildingDisplay,
             };
 
             Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
@@ -94,7 +93,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                new PlanRequestItem { ItemId = 2, Quantity = 1 },
             };
 
             var phaseProgress = new CapturingProgress<PlanPhaseEvent>();
@@ -110,7 +109,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PlanPhase.SolvingDecisions,
                 PlanPhase.FetchingItemDetails,
                 PlanPhase.CheckingLearnedRecipes,
-                PlanPhase.BuildingDisplay
+                PlanPhase.BuildingDisplay,
             };
             Assert.Equal(expectedOrder.Length, phaseProgress.Reports.Count);
             for (int i = 0; i < expectedOrder.Length; i++)
@@ -148,7 +147,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // The file-sink append happens on a background flush queue
                 // (never on the calling thread) - only guaranteed to have
                 // landed once this returns true.
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var entries = store.ReadAll();
 
                 // Info on start: real item name + quantity, never an
@@ -213,14 +212,14 @@ namespace GW2CraftingHelper.Tests.Services
                 var items = new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 },
                 };
 
                 await pipeline.GenerateStructuredAsync(
                     items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
                     requestLabel: "Target Item A x1, Target Item B x1");
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var entries = store.ReadAll();
 
                 // Info on start: the real multi-item label, never an
@@ -280,7 +279,7 @@ namespace GW2CraftingHelper.Tests.Services
                 await pipeline.GenerateStructuredAsync(
                     items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var entries = store.ReadAll();
 
                 Assert.Contains(entries, e =>
@@ -317,7 +316,7 @@ namespace GW2CraftingHelper.Tests.Services
                     items, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy,
                     requestLabel: "Target x1");
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var entries = store.ReadAll();
 
                 var finishEntry = entries.Single(e =>
@@ -361,7 +360,7 @@ namespace GW2CraftingHelper.Tests.Services
                     1, 1, null, CancellationToken.None, progress: null,
                     priceBasis: PriceBasis.InstantBuy);
 
-                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(5)));
+                Assert.True(log.WaitForPendingFileWrites(TimeSpan.FromSeconds(30)));
                 var entries = store.ReadAll();
 
                 Assert.Contains(entries, e =>

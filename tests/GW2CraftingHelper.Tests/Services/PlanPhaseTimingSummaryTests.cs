@@ -60,7 +60,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // be mistaken for a timing line even though this one is
                 // colon-shaped.
                 "No inventory reduction (snapshot not provided)",
-                "Recipe permission not available"
+                "Recipe permission not available",
             };
         }
 
@@ -88,7 +88,7 @@ namespace GW2CraftingHelper.Tests.Services
             var debugLog = new List<string>
             {
                 "Fetch item metadata: 5ms (3 items)",
-                "Fetch learned recipes: 4557ms"
+                "Fetch learned recipes: 4557ms",
             };
 
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(debugLog);
@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Fetch TP prices: 400ms (5 items)",
                 "Solve: 20ms",
                 "Fetch item metadata: 500ms (5 items)",
-                "Build result: 40ms"
+                "Build result: 40ms",
             };
 
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(debugLog);
@@ -171,7 +171,7 @@ namespace GW2CraftingHelper.Tests.Services
             var debugLog = new List<string>
             {
                 "Build recipe tree: 100ms",
-                "Some Future Step: 50ms"
+                "Some Future Step: 50ms",
             };
 
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(debugLog);
@@ -190,7 +190,7 @@ namespace GW2CraftingHelper.Tests.Services
             var debugLog = new List<string>
             {
                 "Build recipe tree: 10ms",
-                "Build result: 5ms"
+                "Build result: 5ms",
             };
 
             string summary = PlanPhaseTimingSummary.FormatCompactSummary(debugLog);

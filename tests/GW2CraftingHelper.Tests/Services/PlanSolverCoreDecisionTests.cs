@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 5);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -61,7 +61,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -92,7 +92,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 200 } },
             };
             var solver = new PlanSolver();
 
@@ -121,7 +121,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 50 } },
             };
             var solver = new PlanSolver();
 
@@ -145,7 +145,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 10000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 5000 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 10 } },
             };
             var solver = new PlanSolver();
 
@@ -175,7 +175,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(99, 50, "Currency")));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -202,7 +202,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var solver = new PlanSolver();
 
@@ -233,7 +233,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100000 } },
                 { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
-                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } }
+                { 3, new ItemPrice { ItemId = 3, BuyInstant = 100000 } },
             };
             var solver = new PlanSolver();
 
@@ -264,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
                     Leaf(2, 1)));
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
                 // Item 2 has no price
             };
             var solver = new PlanSolver();
@@ -306,7 +306,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 // Item 1 and item 2 intentionally have no price.
                 { 3, new ItemPrice { ItemId = 3, BuyInstant = 40 } },
-                { 4, new ItemPrice { ItemId = 4, BuyInstant = 60 } }
+                { 4, new ItemPrice { ItemId = 4, BuyInstant = 60 } },
             };
             var solver = new PlanSolver();
 
@@ -338,7 +338,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 // Item 1 has NO price at all; item 2 is normally priced.
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var solver = new PlanSolver();
 
@@ -372,7 +372,6 @@ namespace GW2CraftingHelper.Tests.Services
         // gw2e: craft/vendor must be STRICTLY cheaper than buy to win; an
         // exact tie resolves to buy at every level ("Vendor beats TP beats
         // Craft" is superseded).
-
         [Fact]
         public void CraftCostTiesBuyPrice_BuyWins()
         {
@@ -380,7 +379,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 100 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -397,11 +396,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 1);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } },
             };
             var solver = new PlanSolver();
 
@@ -423,11 +422,11 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 200) } },
             };
             var solver = new PlanSolver();
 
@@ -447,7 +446,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ever reaches PlanSolver. By the time Evaluate sees an EV recipe's
         // ingredients, their quantities already reflect the full expected
         // cost - PlanSolver must simply sum them, never amortize again.) ---
-
         [Fact]
         public void FractionalExpectedOutput_PreScaledIngredients_CraftCostReconcilesWithBuySteps()
         {
@@ -462,13 +460,13 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 ExpectedOutputCount = 0.5,
                 CraftsNeeded = 2,
-                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) },
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 500 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -500,13 +498,13 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputCount = 1,
                 ExpectedOutputCount = 0.5,
                 CraftsNeeded = 2,
-                Ingredients = new List<RecipeNode> { Leaf(2, 2) }
+                Ingredients = new List<RecipeNode> { Leaf(2, 2) },
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 150 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -526,7 +524,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 100 } },
             };
             var solver = new PlanSolver();
 
@@ -540,7 +538,6 @@ namespace GW2CraftingHelper.Tests.Services
         // a recipe's Currency-type ingredient must feed the craft-vs-buy
         // DECISION value via a caller-supplied valuation, while always
         // contributing zero to the displayed real coin cost ---
-
         [Fact]
         public void CurrencyIngredient_ValuedAndExpensive_TipsDecisionToBuy()
         {
@@ -557,14 +554,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RecipeNode>
                 {
                     Leaf(2, 1),
-                    Leaf(23, 3, "Currency")
-                }
+                    Leaf(23, 3, "Currency"),
+                },
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 200 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 3600 } });
             var solver = new PlanSolver();
@@ -591,14 +588,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RecipeNode>
                 {
                     Leaf(2, 1),
-                    Leaf(23, 3, "Currency")
-                }
+                    Leaf(23, 3, "Currency"),
+                },
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 23, 10 } });
             var solver = new PlanSolver();
@@ -632,14 +629,14 @@ namespace GW2CraftingHelper.Tests.Services
                 Ingredients = new List<RecipeNode>
                 {
                     Leaf(2, 1),
-                    Leaf(23, 3, "Currency")
-                }
+                    Leaf(23, 3, "Currency"),
+                },
             };
             var tree = Craftable(1, 1, evOption);
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 50 } },
             };
             var solver = new PlanSolver();
 

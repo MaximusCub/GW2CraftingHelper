@@ -57,7 +57,10 @@ namespace GW2CraftingHelper.Tests.Services
             // inside the band; it must also END inside it, or it overlaps
             // the separator the label was measured to clear.
             int spinnerTop = (TypeRampMetrics.StatusInk.LineHeight - InlineSpinnerLayout.PlanStripSize) / 2;
-            if (spinnerTop < 0) spinnerTop = 0;
+            if (spinnerTop < 0)
+            {
+                spinnerTop = 0;
+            }
 
             Assert.True(
                 spinnerTop + InlineSpinnerLayout.PlanStripSize <= TopRegionLayoutMath.StatusToSeparatorGap,

@@ -11,6 +11,7 @@ namespace MysticForgeSeeder
     public class WikiIngredientEntry
     {
         public int? Index { get; set; }
+
         public int Quantity { get; set; }
 
         // Always set at construction (ParseIngredientRecord's one object
@@ -23,8 +24,11 @@ namespace MysticForgeSeeder
         // Always set at construction (ParseRecipeResult's one object
         // initializer, guarded by an IsNullOrEmpty check just before it).
         public string OutputName { get; set; } = string.Empty;
+
         public int OutputQuantity { get; set; } = 1;
-        public List<WikiIngredientEntry> Ingredients { get; set; } = new();
+
+        public List<WikiIngredientEntry> Ingredients { get; set; }
+            = new List<WikiIngredientEntry>();
     }
 
     public class WikiRecipeClient
@@ -112,10 +116,12 @@ namespace MysticForgeSeeder
                     {
                         break;
                     }
+
                     if (nextOffset <= offset)
                     {
                         break;
                     }
+
                     offset = nextOffset;
                     await Task.Delay(_delayMs, ct);
                 }
@@ -221,6 +227,7 @@ namespace MysticForgeSeeder
                                         $"    COLLISION: '{canonicalName}' had ID " +
                                         $"{existing}, now {gameId}");
                                 }
+
                                 result[canonicalName] = gameId;
                             }
                         }
@@ -258,6 +265,7 @@ namespace MysticForgeSeeder
                 {
                     fulltext = ft.GetString() ?? pageName;
                 }
+
                 int hashIdx = fulltext.IndexOf('#');
                 outputName = hashIdx >= 0
                     ? fulltext.Substring(0, hashIdx).Trim()
@@ -305,7 +313,7 @@ namespace MysticForgeSeeder
             {
                 OutputName = outputName,
                 OutputQuantity = outputQuantity,
-                Ingredients = ingredients
+                Ingredients = ingredients,
             };
         }
 
@@ -362,7 +370,7 @@ namespace MysticForgeSeeder
             {
                 Index = index,
                 Quantity = quantity,
-                Name = name
+                Name = name,
             };
         }
 
@@ -385,7 +393,7 @@ namespace MysticForgeSeeder
                         {
                             ["action"] = "ask",
                             ["format"] = "json",
-                            ["query"] = query
+                            ["query"] = query,
                         });
 
                     using var response = await _httpClient.PostAsync(
@@ -407,6 +415,7 @@ namespace MysticForgeSeeder
                             cooldownMs = Math.Max(
                                 cooldownMs, (int)d403.TotalMilliseconds);
                         }
+
                         cooldownMs = AddJitter(cooldownMs);
 
                         Console.WriteLine(
@@ -429,6 +438,7 @@ namespace MysticForgeSeeder
                             backoffMs = Math.Max(
                                 backoffMs, (int)delta.TotalMilliseconds);
                         }
+
                         backoffMs = AddJitter(backoffMs);
 
                         Console.WriteLine(
@@ -472,6 +482,7 @@ namespace MysticForgeSeeder
             {
                 return true;
             }
+
             if (el.TryGetDouble(out double d))
             {
                 if (d < int.MinValue || d > int.MaxValue)
@@ -479,15 +490,18 @@ namespace MysticForgeSeeder
                     value = 0;
                     return false;
                 }
+
                 double rounded = Math.Round(d);
                 if (Math.Abs(d - rounded) > 1e-9)
                 {
                     value = 0;
                     return false;
                 }
+
                 value = (int)rounded;
                 return true;
             }
+
             value = 0;
             return false;
         }

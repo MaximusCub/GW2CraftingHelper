@@ -33,7 +33,7 @@ namespace GW2CraftingHelper.Tests.Services
                 PriceSideFellBack = priceSideFellBack,
                 IsCostComponent = isCostComponent,
                 VendorCurrencyCosts = vendorCurrencyCosts,
-                AcquisitionHint = acquisitionHint
+                AcquisitionHint = acquisitionHint,
             };
         }
 
@@ -91,7 +91,7 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
@@ -231,18 +231,18 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
             var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, plan).ToPlainLines();
 
-            Assert.Equal(
             // Coin spelling changed with the CoinSegmentMath.GameStyleText
             // consolidation: every composer now spells a coin amount the
             // way the icons beside it do (leading all-zero units omitted,
             // trailing units zero-padded).
-                new[] { "Unit price: 5s 00c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
+            Assert.Equal(
+                new[] { "Unit price: 5s 0c", "Unit price: 5 Karma", "Right-click: Open wiki page" },
                 lines);
         }
 
@@ -259,7 +259,7 @@ namespace GW2CraftingHelper.Tests.Services
                 vendorCurrencyCosts: currencyCosts);
             var metadata = new Dictionary<int, CurrencyMetadata>
             {
-                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } }
+                { 2, new CurrencyMetadata { CurrencyId = 2, Name = "Karma" } },
             };
             var plan = new PlanViewModel { CurrencyMetadata = metadata };
 
@@ -377,9 +377,9 @@ namespace GW2CraftingHelper.Tests.Services
                 new[]
                 {
                     "Caption line",
-                    "Unit price: 1s 00c",
+                    "Unit price: 1s 0c",
                     "Other trading post price side shown",
-                    "Right-click: Open wiki page"
+                    "Right-click: Open wiki page",
                 },
                 lines);
         }
@@ -394,7 +394,6 @@ namespace GW2CraftingHelper.Tests.Services
         // EvenWhenIdCollides for the same real collision: id 24 is both a
         // vendor-offer outputItemId and the currency "Pristine Fractal
         // Relics".
-
         private const int CollidingId = 24;
 
         private static ItemStatBlock CollidingItemStats()
@@ -405,7 +404,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Unrelated Item",
                 Rarity = "Legendary",
                 ItemType = "Trophy",
-                VendorValue = 1000
+                VendorValue = 1000,
             };
         }
 
@@ -423,7 +422,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Decision = decision,
                 Quantity = 5,
                 IsCostComponent = isCostComponent,
-                SubtreeCost = subtreeCost
+                SubtreeCost = subtreeCost,
             };
         }
 
@@ -485,7 +484,12 @@ namespace GW2CraftingHelper.Tests.Services
                 .BuildStatTooltipContent(node, id => CollidingItemStats()).ToPlainLines();
 
             Assert.Equal("Unrelated Item", lines[0]);
-            Assert.Contains("Legendary", lines);
+            // The stat block is present (its type line), but no
+            // "Legendary" rarity WORD: the game shows none on a Trophy
+            // (live3 fury-scorched / heart-of-destroyer, 2026-08-26). The
+            // name line still carries the rarity as its colour role.
+            Assert.Contains("Trophy", lines);
+            Assert.DoesNotContain("Legendary", lines);
         }
 
         [Fact]

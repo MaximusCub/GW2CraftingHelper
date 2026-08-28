@@ -171,6 +171,7 @@ result.SolveContext.AccountItems[0].Count = 4
 result.SolveContext.AccountItems[0].IconUrl = 
 result.SolveContext.AccountItems[0].ItemId = 2
 result.SolveContext.AccountItems[0].Name = 
+result.SolveContext.AccountItems[0].Rarity = 
 result.SolveContext.AccountItems[0].Source = MaterialStorage
 result.SolveContext.AcquisitionHints = null
 result.SolveContext.ActiveCharacterName = null

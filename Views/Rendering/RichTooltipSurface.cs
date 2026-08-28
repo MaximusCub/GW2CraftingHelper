@@ -120,33 +120,24 @@ namespace GW2CraftingHelper.Views.Rendering
         private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
 
         /// <summary>
-        /// TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the preferred
-        /// width for every plain tooltip in the module (gap G24); the shared
-        /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
-        /// <para>
-        /// 392 is the game's measured wrap maximum converted into THIS
-        /// surface's measurement space. The game wraps text at 333-347px
-        /// (bracketed by wrapped-vs-unwrapped lines on the 2026-08-25 live
-        /// captures and two native-scale wiki captures, fidelity-audit
-        /// section 1.3), but this surface deliberately renders at
-        /// Menomonia 16 where the game uses ~14 (the module-wide
-        /// readability bump, G25/F9). Re-measuring the live strings through
-        /// Blish's exact chain - <c>MeasureString</c> with the
-        /// <c>LetterSpacing = -1</c> Blish sets on every font - puts
-        /// DefaultFont16 at 1.153x the game's text width, scaling the
-        /// bracket to 384-400; midpoint 392. The old 350 was a game-pixel
-        /// constant applied unscaled to the larger font, which broke prose
-        /// one word earlier than the game on every multi-line description.
-        /// </para>
+        /// The inline effect icon beside a consumable's effect block:
+        /// ~26px square with the text column starting ~31px in, both
+        /// measured on live3 soul-pastries (icon columns 21-47, text at 51
+        /// with the content edge at 21) and candy-corn (2026-08-26). Kept
+        /// at the game's absolute size: the tooltip's 14pt face is within
+        /// 1.4% of the game's text scale.
         /// </summary>
-        private const int MaxContentWidth = 392;
+        private const int EffectIconSize = 26;
+
+        private const int EffectTextIndent = 31;
 
         /// <summary>
         /// The game's coin icon is ~0.8x its line height (~13px on a 16px
         /// line, measured on the steak capture) - not the module's shared
         /// 20px table icon, which under the +2pt font wave reads small on
         /// a 22px line and tall on a 16px one. TOOLTIP-LOCAL for the same
-        /// reason as the width above: <c>CoinSegmentMath.CoinIconSize</c>
+        /// reason the item wrap cap is its own constant:
+        /// <c>CoinSegmentMath.CoinIconSize</c>
         /// is the plan tables' constant and stays theirs (gap G22).
         /// </summary>
         private static int CoinIconSizeFor(int lineHeight)
@@ -233,7 +224,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 // A box that outruns the 939x938 the crop can source
-                // (never seen - max content width 392 plus chrome) gets
+                // (never seen - the item cap plus chrome) gets
                 // the fallback tint on the uncovered strips rather than
                 // a stretch: only ever right/bottom, since the crop is
                 // anchored to the box's top-left like the game's.
@@ -352,14 +343,27 @@ namespace GW2CraftingHelper.Views.Rendering
 
         private void BuildContent(TooltipContent content)
         {
-            var font = UiFonts.Body;
+            // Caption (Menomonia 14), NOT the module's Body 16: the game's
+            // tooltip text measures within 1.4% of Menomonia 14 and the
+            // owner's 2026-08-26 field ruling - made against real in-game
+            // tooltips - is to match the game rather than keep the
+            // module-wide +2pt readability bump here (fidelity-audit
+            // section 2, F9 resolved).
+            var font = UiFonts.Caption;
             int lineHeight = font.LineHeight;
             int coinIconSize = CoinIconSizeFor(lineHeight);
 
             DisposeContent();
 
+            // TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the
+            // preferred width for every plain tooltip in the module (gap
+            // G24). The item cap is derived from the game's captured wrap
+            // decisions - see TooltipLayoutMath.ItemTooltipMaxContentWidth,
+            // where it lives so the derivation stays Blish-free and pinned.
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
-                GameService.Graphics.SpriteScreen.Width, ChromeWidth, MaxContentWidth);
+                GameService.Graphics.SpriteScreen.Width,
+                ChromeWidth,
+                TooltipLayoutMath.ItemTooltipMaxContentWidth);
 
             var layout = TooltipLayoutMath.LayoutContent(
                 content, maxWidth, lineHeight,
@@ -371,7 +375,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 // game's 16px pitch is (gap G21).
                 coinRowHeight: System.Math.Max(lineHeight, coinIconSize),
                 headerRowHeight: System.Math.Max(lineHeight, HeaderIconFrameSize),
-                headerIndent: HeaderIconFrameSize + HeaderIconGap);
+                headerIndent: HeaderIconFrameSize + HeaderIconGap,
+                effectIndent: EffectTextIndent);
 
             _contentPanel = new Panel()
             {
@@ -386,9 +391,10 @@ namespace GW2CraftingHelper.Views.Rendering
                 Parent = this,
             };
 
-            foreach (var row in layout.Rows)
+            var rows = layout.Rows;
+            for (int i = 0; i < rows.Count; i++)
             {
-                RenderRow(row, font, lineHeight, coinIconSize);
+                RenderRow(rows, i, font, lineHeight, coinIconSize);
             }
 
             // Sized NOW rather than on the next update tick. The content
@@ -401,21 +407,41 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         private void RenderRow(
-            TooltipLayoutMath.LaidOutRow row, BitmapFont font, int lineHeight, int coinIconSize)
+            IReadOnlyList<TooltipLayoutMath.LaidOutRow> rows, int index,
+            BitmapFont font, int lineHeight, int coinIconSize)
         {
-            if (row.IconUrl != null)
+            var row = rows[index];
+            if (row.IconUrl != null && row.Kind == TooltipLineKind.Effect)
+            {
+                // The effect block's inline icon: bare (the game frames
+                // only the header icon), ~26px spanning into the block's
+                // second row (live3 soul-pastries: the apple runs beside
+                // the first two effect lines). Clamped to the block's own
+                // height so a one-line effect never overhangs the
+                // unindented line under it.
+                int blockBottom = row.Y + row.Height;
+                for (int j = index + 1;
+                    j < rows.Count && rows[j].Kind == TooltipLineKind.Effect; j++)
+                {
+                    blockBottom = rows[j].Y + rows[j].Height;
+                }
+
+                int size = System.Math.Min(EffectIconSize, blockBottom - row.Y);
+                IconControls.CreateUnframedIcon(_contentPanel, row.IconUrl, 0, row.Y, size);
+            }
+            else if (row.IconUrl != null)
             {
                 // The game frames the icon in a 1px light grey (measured
                 // (166,175,174) on the xyaren capture's left edge) rather
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
                 IconControls.CreateItemIcon(
-                    _contentPanel, row.IconUrl, HeaderIconFrameColor,
-                    0, row.Y, HeaderIconSize, HeaderIconBorder);
+                    _contentPanel, row.IconUrl, ItemIconFrame.Explicit(HeaderIconFrameColor),
+                    0, row.Y, ItemIconTier.TooltipHeader);
             }
 
             // The name is centred on the icon, not top-aligned (measured,
-            // spec section 1.2); every other row kind sits at its top.
+            // KNOWN-ISSUES #42); every other row kind sits at its top.
             int textY = row.Y + System.Math.Max(0, (row.Height - lineHeight) / 2);
 
             foreach (var placed in row.Spans)
@@ -499,33 +525,49 @@ namespace GW2CraftingHelper.Views.Rendering
                 case TooltipSpanRole.BonusInactive:
                     return new Color(150, 150, 150);
 
-                // Pale aquamarine, measured off File:User Xyaren
-                // Tooltip.png rows 149-177 (median #B1D7D2). Upright, not
-                // italic - the game does not italicise flavour.
+                // #9ED - MEASURED saturating peak (p95 == max ==
+                // (153,238,221)) on three independent live3 flavour runs:
+                // eyes-of-kormir, heart-of-destroyer and wings, 2026-08-26.
+                // Another exact 3-digit-hex value, like the whole measured
+                // rarity palette. Supersedes xyaren's JPEG-era #B1D7D2
+                // median. Upright, not italic - the game does not
+                // italicise flavour.
                 case TooltipSpanRole.Flavor:
-                    return new Color(170, 210, 205);
+                    return new Color(153, 238, 221);
 
-                // gw2efficiency's .desc-abilitytype (#fea) - inferred, no
-                // in-game capture of an abilitytype run exists.
+                // #FE8 - MEASURED saturating peak (255,238,136) on the
+                // live3 sigil-rage "Element:" run (2026-08-26), replacing
+                // gw2efficiency's inferred #FEA.
                 case TooltipSpanRole.AbilityType:
-                    return new Color(255, 238, 170);
+                    return new Color(255, 238, 136);
 
+                // Warning red: ink medians read (240,2,2) on live3
+                // sigil-rage and q-food2, the same family as the
+                // discipline-level red; full-red constant kept (medians
+                // sit ~15 under peaks on every measured colour).
                 case TooltipSpanRole.Warning:
                     return new Color(255, 0, 0);
 
-                // gw2efficiency's .desc-reminder (#afafaf = 175) - inferred,
-                // and 25 levels per channel lighter than the annotation grey
-                // below, which is measured. Two sources, two constants.
+                // #AAA - MEASURED saturating peak (170,170,170) on the
+                // live3 sigil-rage "(Cooldown: 20 Seconds)" reminder run
+                // (2026-08-26). Same grey as Muted below; the role stays
+                // separate because its source is the API's own <c=@reminder>
+                // markup rather than a composer decision.
                 case TooltipSpanRole.Reminder:
-                    return new Color(175, 175, 175);
+                    return new Color(170, 170, 170);
 
-                // Secondary annotations and parentheticals. Lifted from
-                // 150 (the older #939496 "0/500 in Material Storage"
-                // measurement) to the 2026-08-25 live captures' grey:
-                // "(Two-Handed)" reads (160,161,162) and "(Cooldown: N
-                // Seconds)" (160,161,161) on eq-weapon-full, lossless.
+                // #AAA - the game's annotation grey, MEASURED as a
+                // saturating peak (170,170,170) on live3: the sigil
+                // cooldown, the effect-block text of soul-pastries, and
+                // vials' inactive discipline names all cap there
+                // (2026-08-26). The earlier 160 came from ink MEDIANS of
+                // the same lines (eq-weapon-full's "(Two-Handed)" at
+                // 160-162), which sit under the peak by exactly the edge
+                // blending every measured colour shows. The storage-line
+                // grey is a DIFFERENT, darker value (#999, measured on
+                // vials/candy-corn) that no module line uses today.
                 case TooltipSpanRole.Muted:
-                    return new Color(160, 160, 160);
+                    return new Color(170, 170, 170);
 
                 default:
                     return Color.White;

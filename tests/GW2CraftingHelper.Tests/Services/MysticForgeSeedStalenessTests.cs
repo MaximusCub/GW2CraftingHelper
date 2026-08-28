@@ -51,11 +51,11 @@ namespace GW2CraftingHelper.Tests.Services
                     new RawIngredient { Type = "Item", Id = 107136, Count = 1 },
                     new RawIngredient { Type = "Item", Id = 107201, Count = 1 },
                     new RawIngredient { Type = "Item", Id = 106975, Count = 1 },
-                    new RawIngredient { Type = "Item", Id = 100569, Count = 10 }
+                    new RawIngredient { Type = "Item", Id = 100569, Count = 10 },
                 },
                 Disciplines = new List<string> { "MysticForge" },
                 MinRating = 0,
-                Flags = new List<string>()
+                Flags = new List<string>(),
             };
         }
 
@@ -92,7 +92,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe> { { GiftOfRaysRecipe, GiftOfRaysRawRecipe() } },
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } }
+                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } },
                 },
                 SeedBuild, CurrentBuild);
 
@@ -112,14 +112,14 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe> { { GiftOfRaysRecipe, GiftOfRaysRawRecipe() } },
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } }
+                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } },
                 },
                 SeedBuild, CurrentBuild);
 
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(CurrentBuild);
+                overlay.Load();
                 var cacheStore = new CompositeRecipeCacheStore(seed, overlay);
 
                 var api = new InMemoryRecipeApiClient();
@@ -181,7 +181,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 var pipeline = new CraftingPlanPipeline(
                     new RecipeService(new InMemoryRecipeApiClient(),
@@ -225,6 +225,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 seed.Load(searchStream, recipesStream);
             }
+
             using (var manifestStream = File.OpenRead(manifestPath))
             {
                 seed.LoadManifest(manifestStream);
@@ -254,17 +255,19 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 seed.Load(searchStream, recipesStream);
             }
+
             using (var manifestStream = File.OpenRead(manifestPath))
             {
                 seed.LoadManifest(manifestStream);
             }
+
             seed.SetCurrentBuildId(seed.SeedBuildId.Value + 275);
             Assert.True(seed.SeedIsStale);
 
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
                 var cacheStore = new CompositeRecipeCacheStore(seed, overlay);
 
                 var api = new InMemoryRecipeApiClient();
@@ -294,7 +297,11 @@ namespace GW2CraftingHelper.Tests.Services
             for (int i = 0; i < recipes.Length; i++)
             {
                 var r = recipes[i];
-                if (i > 0) sb.Append(',');
+                if (i > 0)
+                {
+                    sb.Append(',');
+                }
+
                 sb.Append("{\"id\":").Append(r.Id)
                   .Append(",\"outputItemId\":").Append(r.OutputItemId)
                   .Append(",\"outputItemCount\":").Append(r.OutputItemCount)
@@ -302,13 +309,19 @@ namespace GW2CraftingHelper.Tests.Services
                 for (int j = 0; j < r.Ingredients.Count; j++)
                 {
                     var ing = r.Ingredients[j];
-                    if (j > 0) sb.Append(',');
+                    if (j > 0)
+                    {
+                        sb.Append(',');
+                    }
+
                     sb.Append("{\"type\":\"").Append(ing.Type)
                       .Append("\",\"id\":").Append(ing.Id)
                       .Append(",\"count\":").Append(ing.Count).Append('}');
                 }
+
                 sb.Append("]}");
             }
+
             sb.Append("]}");
 
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString())))
@@ -345,14 +358,14 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe>(),
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int>() }
+                    { GiftOfRays, new List<int>() },
                 },
                 SeedBuild, SeedBuild);
 
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 // No API rescue available: the live API has no negative
                 // recipe ids and no search hit for a forge-only item.
@@ -368,7 +381,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe>(),
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int>() }
+                    { GiftOfRays, new List<int>() },
                 },
                 SeedBuild, SeedBuild);
             merged.MergeMysticForgeRecipes(mf);
@@ -376,7 +389,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var temp = new TempDirectory())
             {
                 var overlay = new OverlayRecipeCacheStore(temp.Path);
-                overlay.Load(null);
+                overlay.Load();
 
                 var after = await Pipeline(
                     new CompositeRecipeCacheStore(merged, overlay),
@@ -402,7 +415,7 @@ namespace GW2CraftingHelper.Tests.Services
                     new Dictionary<int, RawRecipe>(),
                     new Dictionary<int, IReadOnlyList<int>>
                     {
-                        { GiftOfRays, new List<int>() }
+                        { GiftOfRays, new List<int>() },
                     },
                     SeedBuild, currentBuild);
                 store.MergeMysticForgeRecipes(mf);
@@ -424,7 +437,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe>(),
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int> { 4242 } }
+                    { GiftOfRays, new List<int> { 4242 } },
                 },
                 SeedBuild, SeedBuild);
 
@@ -444,7 +457,7 @@ namespace GW2CraftingHelper.Tests.Services
                 new Dictionary<int, RawRecipe> { { GiftOfRaysRecipe, GiftOfRaysRawRecipe() } },
                 new Dictionary<int, IReadOnlyList<int>>
                 {
-                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } }
+                    { GiftOfRays, new List<int> { GiftOfRaysRecipe } },
                 },
                 SeedBuild, SeedBuild);
 

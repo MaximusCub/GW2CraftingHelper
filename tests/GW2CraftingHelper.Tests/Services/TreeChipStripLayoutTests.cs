@@ -104,7 +104,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- The negotiation with the right-hand button cluster ---
-
         [Fact]
         public void AStripThatFits_KeepsItsClearButtons()
         {
@@ -171,7 +170,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             WindowSizing.NarrowScreenFloorWidth,
             1024,
-            WindowSizing.MinWindowWidth
+            WindowSizing.MinWindowWidth,
         };
 
         [Theory]
@@ -204,7 +203,6 @@ namespace GW2CraftingHelper.Tests.Services
         // margin, which is a real degradation on screen and an unfalsifiable
         // assertion in here, so that width is covered by the two properties
         // above instead.
-
         [Fact]
         public void BelowTheDesignedFloor_TheClearButtonsAreDroppedFirst()
         {

@@ -633,6 +633,19 @@ consumed by the shipped module at all; they are gitignored rather than
 committed (see `docs/RELEASING.md` for the packaging implication of a
 dev machine still having them on disk locally).
 
+**Staleness policy (recipe cache):** the shipped recipe seed plus the
+runtime overlay under `<dataDir>/recipe_cache/` are kept forever - a game
+build change never invalidates either. Learned negatives are not stored
+at all: "no recipe outputs this item" is derived at lookup time from the
+corpus the module holds, and licensed as exact by a once-per-build
+background probe of the `/v2/recipes` id list that fetches and folds in
+any recipes the corpus lacks. The build id in the overlay manifest is
+provenance and a probe cheap-out, not a wipe trigger; the manual route
+out of a bad overlay is Clear Cache. Where:
+`Services/Recipes/CompositeRecipeCacheStore.cs` (derived negatives),
+`Services/Recipes/RecipeCorpusVerifier.cs` (the probe),
+`Services/Recipes/OverlayRecipeCacheStore.cs` (keep-forever overlay).
+
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
 `Services/Recipes/RecipeCacheSerializer.cs`,
 `Services/Recipes/ItemNameSeedData.cs`; wiki

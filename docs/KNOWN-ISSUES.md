@@ -230,6 +230,22 @@ in that same pass - **this gap was closed by item 30 below** (M37 live
 desktop session, 2026-07-22, scanned Required Disciplines directly and
 confirmed the same clean result the simulation predicted).
 
+Tier-2 re-run (2026-08-27, icon-tier2 branch): the owner's icon ruling
+grew the plan tab's icon-led rows to 45px (Used Materials / Shopping /
+Required Recipes) and 52px (Crafting Steps). The M36b simulation was
+re-derived from the decompiled `ScaleBy` floor/ceil semantics, validated
+by reproducing the record above (514/5000 vanish phases for 44px/32px at
+0.897 - the published ~10.2% - and 850/5000 for the then-30px header at
+0.81), then run at the new heights: both are VULNERABLE at clearance 0
+(45px: 18.0% at 0.81 / 7.0% at 0.897; 52px: 10.3% at 0.897) and immune
+at clearance 1 at all four scales. Every icon-led row now passes
+`PlanContentHeightMath.IconRowDividerClearance` (1), with the flush fit
+preserved because the tier-2 heights absorb the clearance pixel in their
+own derivation. The proof is now executable and runs in CI:
+`tests/GW2CraftingHelper.Tests/Services/RowDividerScissorSimulationTests.cs`
+sweeps every shipped (rowHeight, clearance) pair at all four scales and
+fails on any vanish.
+
 ### 39. M38 view-decomposition entries (WP-21 through WP-25)
 
 Numbered late, on 2026-08-25, so `Views/Rendering/ISectionRelayoutSink.cs`
@@ -632,7 +648,8 @@ the module adds the two edges Blish does not clamp. Full record:
 The pass that made the rich tooltip read as a game tooltip, measured at 3x
 against wiki captures and FWDekker's replica. **This is the referent for
 every `gap G<N>` id in the codebase**: G1-G24 are that record's gap map, and
-they appear in `Services/ItemStatTooltipComposer.cs`,
+they appear in `Services/ItemDescriptionSanitizer.cs`,
+`Services/ItemStatTooltipComposer.cs`,
 `Services/TooltipContent.cs`, `Services/TooltipLayoutMath.cs`,
 `Services/CoinSegmentMath.cs`, `Views/Rendering/RichTooltipSurface.cs`,
 `Views/Rendering/CoinCurrencyRenderer.cs` and `Views/Rendering/RarityColors.cs`.
@@ -823,6 +840,21 @@ re-scrape: thousands of non-festival vendor pages remain untagged, and a
 fresh scrape of any merchant recomputes its offer ids. Gate not yet run
 live. Full record:
 `dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`.
+
+### 64. UI glyphs the shipped font cannot draw
+
+Blish exposes one text face and Menomonia carries 226 codepoints, none of
+them geometric. Five escapes shipped outside that set and drew nothing:
+Plan History's pin toggle (U+25CF / U+25CB - the glyph WAS the whole
+pinned-state model, so pinned and unpinned rows were indistinguishable),
+its delete cross (U+2715), and three in the Ranker. A missing codepoint
+also advances zero pixels, so neither a layout assertion nor a screenshot
+diff catches it. Plan History is fixed here - a Blish `Checkbox` for the
+pin, U+00D7 for the delete - and the class is gated by
+`docs/font-codepoints.txt` plus the "UI glyph escapes exist in the shipped
+font" step in `.github/workflows/tests.yml`. The Ranker's three are waived
+in that step until its own branch lands; the waiver fails the build once
+it goes stale. Full record: `dev/records/glyph-fixes.md`.
 
 ---
 
@@ -1138,3 +1170,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
+  Cited as: glyph-fixes, KNOWN-ISSUES #64.
+  `dev/records/glyph-fixes.md`

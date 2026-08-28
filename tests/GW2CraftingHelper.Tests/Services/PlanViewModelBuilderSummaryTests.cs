@@ -12,7 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
         private readonly PlanViewModelBuilder _builder = new PlanViewModelBuilder();
 
         // --- Empty plan ---
-
         [Fact]
         public void EmptyPlan_ReturnsSummarySectionOnly()
         {
@@ -35,7 +34,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Target item resolution ---
-
         [Fact]
         public void TargetItem_ResolvesNameAndIcon()
         {
@@ -63,7 +61,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var meta = new Dictionary<int, ItemMetadata>
             {
-                [1] = new ItemMetadata { ItemId = 1, Name = "Zojja's Claymore", IconUrl = "c.png", Rarity = "Exotic" }
+                [1] = new ItemMetadata { ItemId = 1, Name = "Zojja's Claymore", IconUrl = "c.png", Rarity = "Exotic" },
             };
             var result = MakeResult(targetItemId: 1, metadata: meta);
             var vm = _builder.Build(result);
@@ -72,7 +70,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Cost formula band (collapse rule + arithmetic) ---
-
         [Fact]
         public void CostBand_NoMaterialsUsed_StillRendersTheWholeFormula()
         {
@@ -182,7 +179,7 @@ namespace GW2CraftingHelper.Tests.Services
                 totalCoinCost: 0,
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 },
                 });
             Assert.Null(result.MaterialOpportunityCost);
 
@@ -203,7 +200,7 @@ namespace GW2CraftingHelper.Tests.Services
                 totalCoinCost: 0,
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 },
                 });
             valued.MaterialOpportunityCost = 0;
             var valuedTiles = _builder.Build(valued).Sections[0].Rows
@@ -225,7 +222,7 @@ namespace GW2CraftingHelper.Tests.Services
                 totalCoinCost: 0,
                 usedMaterials: new List<UsedMaterial>
                 {
-                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 }
+                    new UsedMaterial { ItemId = 7, QuantityUsed = 3 },
                 });
             result.MaterialOpportunityCost = 0;
 
@@ -265,7 +262,7 @@ namespace GW2CraftingHelper.Tests.Services
                 totalCoinCost: 0,
                 currencyCosts: new List<CurrencyCost>
                 {
-                    new CurrencyCost { CurrencyId = 1, Amount = 500 }
+                    new CurrencyCost { CurrencyId = 1, Amount = 500 },
                 });
 
             var vm = _builder.Build(result);
@@ -297,9 +294,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -391,9 +388,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -425,9 +422,9 @@ namespace GW2CraftingHelper.Tests.Services
                         NodeId = 2,
                         Quantity = 1,
                         Decision = CraftingDecision.Have,
-                        IsIgnored = true
-                    }
-                }
+                        IsIgnored = true,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -449,7 +446,7 @@ namespace GW2CraftingHelper.Tests.Services
                 requestedItems: new List<PlanRequestItem>
                 {
                     new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                    new PlanRequestItem { ItemId = 2, Quantity = 1 }
+                    new PlanRequestItem { ItemId = 2, Quantity = 1 },
                 },
                 multiItemRoots: new List<CraftingTreeNode>
                 {
@@ -458,15 +455,15 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 1,
                         NodeId = 1,
                         Quantity = 1,
-                        Decision = CraftingDecision.Have
+                        Decision = CraftingDecision.Have,
                     },
                     new CraftingTreeNode
                     {
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
+                        Decision = CraftingDecision.Unknown,
+                    },
                 });
             result.MaterialOpportunityCost = 0;
 
@@ -502,7 +499,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Profit formula band (presence/absence, arithmetic, sign) ---
-
         [Fact]
         public void ProfitBand_NoSellPrice_Absent()
         {
@@ -535,9 +531,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -573,9 +569,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
 
             var vm = _builder.Build(result);
@@ -710,7 +706,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Currency table rows (alphabetical, Required/Have/Needed) ---
-
         [Fact]
         public void CurrencyTable_RowsSortedAlphabeticallyByName()
         {
@@ -718,7 +713,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new CurrencyCost { CurrencyId = 78, Amount = 250 }, // Fine Rift Essence
                 new CurrencyCost { CurrencyId = 79, Amount = 50 },  // Rare Rift Essence
-                new CurrencyCost { CurrencyId = 80, Amount = 100 }  // Masterwork Rift Essence
+                new CurrencyCost { CurrencyId = 80, Amount = 100 }, // Masterwork Rift Essence,
             });
             var vm = _builder.Build(result);
 
@@ -734,7 +729,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+                new CurrencyCost { CurrencyId = 23, Amount = 50 },
             });
             var vm = _builder.Build(result);
 
@@ -745,14 +740,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- currency-ux-package (Feature 2): plan-scope passthrough for
         // the Recipe Tree's per-leaf currency pill ---
-
         [Fact]
         public void CurrencyPlanTotals_PopulatedFromPlanCurrencyCosts()
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
                 new CurrencyCost { CurrencyId = 2, Amount = 50 },
-                new CurrencyCost { CurrencyId = 23, Amount = 3600 }
+                new CurrencyCost { CurrencyId = 23, Amount = 3600 },
             });
 
             var vm = _builder.Build(result);
@@ -777,7 +771,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 2, Amount = 50 }
+                new CurrencyCost { CurrencyId = 2, Amount = 50 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 10 } };
 
@@ -792,7 +786,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 2, Amount = 50 }
+                new CurrencyCost { CurrencyId = 2, Amount = 50 },
             });
 
             var vm = _builder.Build(result);
@@ -814,7 +808,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 2, Amount = 3_000_000_000L }
+                new CurrencyCost { CurrencyId = 2, Amount = 3_000_000_000L },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 0 } };
 
@@ -833,7 +827,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(timegatedItems: new List<TimegatedItem>
             {
-                new TimegatedItem { ItemId = 5, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 10 }
+                new TimegatedItem { ItemId = 5, CapType = TimegatedCapType.Daily, CapValue = 3, NeededCount = 10 },
             });
 
             var vm = _builder.Build(result);
@@ -862,7 +856,7 @@ namespace GW2CraftingHelper.Tests.Services
             // must show the REAL holding instead.
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+                new CurrencyCost { CurrencyId = 23, Amount = 500 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
 
@@ -878,7 +872,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+                new CurrencyCost { CurrencyId = 23, Amount = 500 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 999999 } };
 
@@ -894,7 +888,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 200 }
+                new CurrencyCost { CurrencyId = 23, Amount = 200 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
 
@@ -910,7 +904,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+                new CurrencyCost { CurrencyId = 23, Amount = 500 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 23, 200 } };
 
@@ -927,7 +921,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+                new CurrencyCost { CurrencyId = 23, Amount = 500 },
             });
 
             var vm = _builder.Build(result);
@@ -943,7 +937,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 500 }
+                new CurrencyCost { CurrencyId = 23, Amount = 500 },
             });
             result.OwnedCurrencyAmounts = new Dictionary<int, int> { { 2, 100 } }; // different currency id
 
@@ -960,7 +954,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 63, Amount = 375 }
+                new CurrencyCost { CurrencyId = 63, Amount = 375 },
             });
             var vm = _builder.Build(result);
 
@@ -974,7 +968,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 99999, Amount = 10 }
+                new CurrencyCost { CurrencyId = 99999, Amount = 10 },
             });
             var vm = _builder.Build(result);
 
@@ -985,13 +979,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Currency icons ---
-
         [Fact]
         public void CurrencyTable_IconUrlFromMetadata_WhenPresent()
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "spirit_shard.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", IconUrl = "spirit_shard.png" },
             };
             var result = MakeResult(
                 currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
@@ -1011,7 +1004,7 @@ namespace GW2CraftingHelper.Tests.Services
             // exactly as it did before icons existed: text-only, no guess.
             var result = MakeResult(currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+                new CurrencyCost { CurrencyId = 23, Amount = 50 },
             });
             var vm = _builder.Build(result);
 
@@ -1027,7 +1020,7 @@ namespace GW2CraftingHelper.Tests.Services
             // contain this particular currency id - still no placeholder.
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" }
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" },
             };
             var result = MakeResult(
                 currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
@@ -1046,7 +1039,7 @@ namespace GW2CraftingHelper.Tests.Services
             // offline table to prove the live-fetched name wins.
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard (Live)", IconUrl = "s.png" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shard (Live)", IconUrl = "s.png" },
             };
             var result = MakeResult(
                 currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 7 } },
@@ -1069,7 +1062,7 @@ namespace GW2CraftingHelper.Tests.Services
             // rather than rendering a blank label or a bogus icon.
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "", IconUrl = "" }
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "", IconUrl = "" },
             };
             var result = MakeResult(
                 currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 23, Amount = 50 } },
@@ -1086,7 +1079,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var currencyMeta = new Dictionary<int, CurrencyMetadata>
             {
-                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" }
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", IconUrl = "karma.png" },
             };
             var result = MakeResult(
                 currencyCosts: new List<CurrencyCost> { new CurrencyCost { CurrencyId = 99999, Amount = 10 } },
@@ -1099,13 +1092,12 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Footnote row ---
-
         [Fact]
         public void Footnote_AlwaysPresentAsLastRow()
         {
             var result = MakeResult(totalCoinCost: 500, currencyCosts: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 23, Amount = 50 }
+                new CurrencyCost { CurrencyId = 23, Amount = 50 },
             });
             var vm = _builder.Build(result);
             var rows = vm.Sections[0].Rows;
@@ -1131,7 +1123,6 @@ namespace GW2CraftingHelper.Tests.Services
         // (not the enum's own default of InstantBuy = 0) so a dropped
         // assignment, which would leave vm.PriceBasis at its own default
         // of InstantBuy, cannot coincidentally satisfy the assertion.
-
         [Fact]
         public void Build_PriceBasisBuyOrder_PassedThroughToViewModel()
         {
@@ -1172,9 +1163,9 @@ namespace GW2CraftingHelper.Tests.Services
                         ItemId = 2,
                         NodeId = 2,
                         Quantity = 1,
-                        Decision = CraftingDecision.Unknown
-                    }
-                }
+                        Decision = CraftingDecision.Unknown,
+                    },
+                },
             };
         }
     }

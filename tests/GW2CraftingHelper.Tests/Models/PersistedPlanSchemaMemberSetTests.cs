@@ -71,7 +71,7 @@ namespace GW2CraftingHelper.Tests.Models
             string actualHash = Sha256(string.Join("\n", CurrentSignatures()));
 
             Assert.True(
-                PersistedPlan.SchemaShapeHash == actualHash,
+                actualHash == PersistedPlan.SchemaShapeHash,
                 "The persisted plan graph's shape changed.\n"
                 + "  expected (PersistedPlan.SchemaShapeHash): " + PersistedPlan.SchemaShapeHash + "\n"
                 + "  actual:                                   " + actualHash + "\n"

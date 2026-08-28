@@ -6,10 +6,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SnapshotSerializationTests
     {
-
         [Fact]
         public void Serialize_Deserialize_RoundTrip()
         {
@@ -19,12 +17,12 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = 500000,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 42, Name = "Test Item", Count = 10, Source = "Bank" }
+                    new SnapshotItemEntry { ItemId = 42, Name = "Test Item", Count = 10, Source = "Bank" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 3000 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 3000 },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -97,8 +95,8 @@ namespace GW2CraftingHelper.Tests.Services
                         Name = "Copper Ore",
                         IconUrl = "https://render.guildwars2.com/file/ABC/123.png",
                         Count = 10,
-                        Source = "Bank"
-                    }
+                        Source = "Bank",
+                    },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
@@ -107,9 +105,9 @@ namespace GW2CraftingHelper.Tests.Services
                         CurrencyId = 2,
                         CurrencyName = "Karma",
                         IconUrl = "https://render.guildwars2.com/file/DEF/456.png",
-                        Value = 5000
-                    }
-                }
+                        Value = 5000,
+                    },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -129,12 +127,12 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = 0,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 1, Name = "X", IconUrl = "", Count = 1, Source = "Bank" }
+                    new SnapshotItemEntry { ItemId = 1, Name = "X", IconUrl = "", Count = 1, Source = "Bank" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Y", IconUrl = "", Value = 1 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Y", IconUrl = "", Value = 1 },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -167,9 +165,70 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", result.Wallet[0].IconUrl);
         }
 
+        // --- Item rarity: captured with the name and icon, so the Snapshot
+        // tab's frames and names no longer depend on whether a plan
+        // happened to touch the item this session. ---
+        [Fact]
+        public void Serialize_Deserialize_ItemRarity_RoundTrips()
+        {
+            var original = new AccountSnapshot
+            {
+                CapturedAt = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 24358,
+                        Name = "Ancient Bone",
+                        Count = 250,
+                        Source = "Material Storage",
+                        Rarity = "Basic",
+                    },
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 19685,
+                        Name = "Orichalcum Ingot",
+                        Count = 10,
+                        Source = "Bank",
+                        Rarity = "Fine",
+                    },
+                },
+            };
+
+            string json = SnapshotHelpers.SerializeSnapshot(original);
+            var result = SnapshotHelpers.DeserializeSnapshot(json);
+
+            Assert.Equal("Basic", result.Items[0].Rarity);
+            Assert.Equal("Fine", result.Items[1].Rarity);
+        }
+
+        [Fact]
+        public void Deserialize_OldJsonMissingItemRarity_LoadsAndResolvesUnknown()
+        {
+            // A snapshot.json written before the field existed: it must load
+            // (no plan/snapshot loss on an additive field), and its rows must
+            // resolve to "unknown" rather than to a wrong colour. The session
+            // stat cache is still allowed to supply one, which is what the
+            // second assertion covers.
+            string oldJson = @"{
+                ""CapturedAt"": ""2025-06-15T12:00:00Z"",
+                ""CoinCopper"": 0,
+                ""Items"": [
+                    { ""ItemId"": 1, ""Name"": ""Old Item"", ""Count"": 5, ""Source"": ""Bank"" }
+                ],
+                ""Wallet"": []
+            }";
+
+            var result = SnapshotHelpers.DeserializeSnapshot(oldJson);
+
+            Assert.NotNull(result);
+            Assert.Equal("", result.Items[0].Rarity);
+            Assert.Null(ItemRarityResolution.Resolve(result.Items[0].Rarity, null));
+            Assert.Equal("Exotic", ItemRarityResolution.Resolve(result.Items[0].Rarity, "Exotic"));
+        }
+
         // --- Per-character discipline display: backward compat for
         // a legacy snapshot.json that predates CharacterDisciplines. ---
-
         [Fact]
         public void Deserialize_OldJsonMissingCharacterDisciplines_ReturnsNull()
         {
@@ -205,8 +264,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Wallet = new List<SnapshotWalletEntry>(),
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Chef", Rating = 300, Active = false }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Chef", Rating = 300, Active = false },
+                },
             };
 
             string json = SnapshotHelpers.SerializeSnapshot(original);
@@ -221,5 +280,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.False(result.CharacterDisciplines[0].Active);
         }
     }
-
 }

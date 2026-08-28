@@ -12,8 +12,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineEconomicsTests
     {
         // --- Sell-side economics ---
-
-
         [Fact]
         public async Task VendorOfferItemCost_OutsideTree_PriceFetchedAndOfferUsed()
         {
@@ -43,11 +41,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Item", Id = 999, Count = 250 }
+                            new CostLine { Type = "Item", Id = 999, Count = 250 },
                         },
                         MerchantName = "Token Vendor",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 var pipeline = builder.WithVendorOfferStore(store).Build();
@@ -111,11 +109,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 5,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithPrice(1, buyUnitPrice: 400, sellUnitPrice: 10000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -150,7 +148,7 @@ namespace GW2CraftingHelper.Tests.Services
             // Force the root to be bought instead
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -185,8 +183,8 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
+                },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(1, 1, snapshot, CancellationToken.None,
@@ -195,7 +193,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -218,7 +216,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -238,7 +236,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var seed = new Dictionary<int, DailyCooldownItem>
             {
-                [2] = new DailyCooldownItem { ItemId = 2, PerDayCap = 1 }
+                [2] = new DailyCooldownItem { ItemId = 2, PerDayCap = 1 },
             };
 
             var pipeline = PipelineBuilder.Create()
@@ -250,8 +248,8 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 3 }
-                    }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 3 },
+                    },
                 })
                 .WithPrice(1, buyUnitPrice: 50, sellUnitPrice: 1000)
                 .WithPrice(2, buyUnitPrice: 10, sellUnitPrice: 100)
@@ -266,7 +264,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             var overrides = new Dictionary<int, AcquisitionSource>
             {
-                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
             };
             var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 
@@ -289,11 +287,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 1 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 .WithRecipe(new RawRecipe
                 {
@@ -302,11 +300,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                        new RawIngredient { Type = "Item", Id = 3, Count = 2 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 })
                 // Buying 2 (50) beats crafting it (2x100=200); buying 1 (500)
                 // loses to crafting-from-bought-2 (50)

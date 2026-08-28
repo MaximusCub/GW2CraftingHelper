@@ -7,10 +7,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SnapshotStoreTests : IDisposable
     {
-
         private readonly string _tempDir;
         private readonly SnapshotStore _store;
 
@@ -23,7 +21,13 @@ namespace GW2CraftingHelper.Tests.Services
 
         public void Dispose()
         {
-            try { Directory.Delete(_tempDir, true); } catch { }
+            try
+            {
+                Directory.Delete(_tempDir, true);
+            }
+            catch
+            {
+            }
         }
 
         private static AccountSnapshot CreateSnapshot(int coinCopper = 0)
@@ -34,12 +38,12 @@ namespace GW2CraftingHelper.Tests.Services
                 CoinCopper = coinCopper,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 1, Name = "Item", Count = 5, Source = "Bank" }
+                    new SnapshotItemEntry { ItemId = 1, Name = "Item", Count = 5, Source = "Bank" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 1000 }
-                }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 1000 },
+                },
             };
         }
 
@@ -97,7 +101,6 @@ namespace GW2CraftingHelper.Tests.Services
         // StatusStore/VendorOfferStore - previously a plain, non-atomic
         // File.WriteAllText (dev/proposals/tab-roadmap-proposal.md Section 2.2's
         // correction). ---
-
         [Fact]
         public void Save_LeavesNoTmpFileBehind()
         {
@@ -119,7 +122,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- onError callback: real IO failure. ---
-
         [Fact]
         public void Save_DirectoryCreationFails_InvokesOnErrorInsteadOfThrowing()
         {
@@ -142,7 +144,6 @@ namespace GW2CraftingHelper.Tests.Services
 
         // --- Per-character discipline display: real SnapshotStore
         // round-trip with the per-character discipline data. ---
-
         [Fact]
         public void Save_Load_RoundTripsCharacterDisciplines()
         {
@@ -151,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
                 new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Huntsman", Rating = 400, Active = false },
-                new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 250, Active = true }
+                new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Weaponsmith", Rating = 250, Active = true },
             };
             _store.Save(snapshot);
 
@@ -191,5 +192,4 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(loaded.CharacterDisciplines);
         }
     }
-
 }

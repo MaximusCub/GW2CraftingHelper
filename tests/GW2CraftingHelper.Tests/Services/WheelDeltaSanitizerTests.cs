@@ -9,13 +9,13 @@ namespace GW2CraftingHelper.Tests.Services
         // user trace (KNOWN-ISSUES #12, reopened): fast multi-notch
         // wheel-UP flicks arrive as (N*120) - 65536 for N=2..8.
         [Theory]
-        [InlineData(-65296, 240)]  // N=2
-        [InlineData(-65176, 360)]  // N=3
-        [InlineData(-65056, 480)]  // N=4
-        [InlineData(-64936, 600)]  // N=5
-        [InlineData(-64816, 720)]  // N=6
-        [InlineData(-64696, 840)]  // N=7
-        [InlineData(-64576, 960)]  // N=8
+        [InlineData(-65296, 240)] // N=2
+        [InlineData(-65176, 360)] // N=3
+        [InlineData(-65056, 480)] // N=4
+        [InlineData(-64936, 600)] // N=5
+        [InlineData(-64816, 720)] // N=6
+        [InlineData(-64696, 840)] // N=7
+        [InlineData(-64576, 960)] // N=8
         public void WrappedUpFlick_ClassifiedAsWrapped_RecoversIntendedPositiveDelta(int raw, int expectedIntended)
         {
             var (isWrapped, intendedDelta) = WheelDeltaSanitizer.Classify(raw);
@@ -147,7 +147,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- SanitizeScrollLines ---
-
         [Theory]
         [InlineData(1)]
         [InlineData(3)]

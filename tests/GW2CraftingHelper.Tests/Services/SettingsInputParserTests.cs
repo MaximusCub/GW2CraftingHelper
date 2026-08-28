@@ -146,7 +146,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseLogMaxSizeMb (log system) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("2", 2)]
@@ -199,7 +198,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseRetentionDays (log system) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("14", 14)]
@@ -251,7 +249,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TryParseRefreshIntervalMinutes (dev/proposals/d1-snapshot-about-settings.md Feature 3) ---
-
         [Theory]
         [InlineData("1", 1)]
         [InlineData("10", 10)]
@@ -301,6 +298,38 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.False(ok);
             Assert.Equal(0, minutes);
+        }
+
+        [Theory]
+        [InlineData("5", 5)]
+        [InlineData("25", 25)]
+        [InlineData("200", 200)]
+        [InlineData(" 25 ", 25)]
+        public void TryParsePlanHistoryMaxEntries_ValidText_ReturnsValue(string text, int expected)
+        {
+            bool ok = SettingsInputParser.TryParsePlanHistoryMaxEntries(text, out int maxEntries);
+
+            Assert.True(ok);
+            Assert.Equal(expected, maxEntries);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("4")]
+        [InlineData("0")]
+        [InlineData("201")]
+        [InlineData("-25")]
+        [InlineData("2.5")]
+        [InlineData("abc")]
+        [InlineData("25 plans")]
+        public void TryParsePlanHistoryMaxEntries_InvalidText_ReturnsFalse(string text)
+        {
+            bool ok = SettingsInputParser.TryParsePlanHistoryMaxEntries(text, out int maxEntries);
+
+            Assert.False(ok);
+            Assert.Equal(0, maxEntries);
         }
     }
 }

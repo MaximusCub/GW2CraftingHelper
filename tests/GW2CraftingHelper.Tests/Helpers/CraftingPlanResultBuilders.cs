@@ -43,7 +43,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                     TotalCoinCost = totalCoinCost,
                     Steps = steps ?? new List<PlanStep>(),
                     CurrencyCosts = currencyCosts ?? new List<CurrencyCost>(),
-                    TimegatedItems = timegatedItems ?? new List<TimegatedItem>()
+                    TimegatedItems = timegatedItems ?? new List<TimegatedItem>(),
                 },
                 ItemMetadata = metadata != null
                     ? metadata
@@ -76,7 +76,7 @@ namespace GW2CraftingHelper.Tests.Helpers
                 // SeasonalVendorTipCalculator) never leaves either field
                 // null once run.
                 RecipeSheetSavingsOpportunities = recipeSheetSavingsOpportunities ?? new List<RecipeSheetSavingsOpportunity>(),
-                SeasonalVendorTips = seasonalVendorTips ?? new List<SeasonalVendorTip>()
+                SeasonalVendorTips = seasonalVendorTips ?? new List<SeasonalVendorTip>(),
             };
         }
 
@@ -87,6 +87,7 @@ namespace GW2CraftingHelper.Tests.Helpers
             {
                 dict[id] = new ItemMetadata { ItemId = id, Name = name, IconUrl = icon };
             }
+
             return dict;
         }
     }

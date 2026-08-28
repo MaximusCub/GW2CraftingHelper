@@ -88,8 +88,13 @@ jobs:
           test -f bin/x64/Release/GW2CraftingHelper.bhm
           ls -l bin/x64/Release/GW2CraftingHelper.bhm
 
+      # A SemVer prerelease tag (any tag with a hyphen, e.g. v0.3.0-rc.1) is
+      # marked as a GitHub prerelease, so a rehearsal of this never-yet-run
+      # workflow does not become the repo's "latest release". The action's
+      # default would publish it as a full release.
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: bin/x64/Release/GW2CraftingHelper.bhm
           body_path: release-notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -165,6 +165,10 @@ namespace GW2CraftingHelper.Views
         // scrollbar. Which mode is live is decided by the flow itself, in
         // ApplyTopRegionLayout - see Services/SnapshotHeaderLayout.
         private const int SearchToFilterGapY = 3;
+        // Caption-driven, not icon-driven: the block holds the caption
+        // label's own line box beside an inline coin run drawn at y=2. The
+        // run is the wallet BAR tier (2 + 16 = 18), so the icons clear this
+        // height with room to spare; it is the caption that sets it.
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;
 
@@ -2414,11 +2418,24 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel,
             };
 
-            // The module's one icon component, at the plan rows' 32px art
-            // in a 1px frame. Rarity comes from the session stat cache
-            // because an AccountSnapshot carries none; a miss is neutral.
-            string rarity = RarityFor(row.ItemId);
-            var icon = IconControls.CreateItemIcon(rowPanel, row.IconUrl, rarity, 2, 2);
+            // The module's one icon component, at tier 1 of the two-tier
+            // icon system (owner ruling): in-game bag-slot-sized art in the
+            // tier's frame, filling the 56px item row.
+            //
+            // ONE resolved rarity feeds the frame below and the name colour
+            // further down. It comes from the snapshot itself first - a
+            // capture records rarity alongside each item's name and icon,
+            // off the same /v2/items response - and falls back to the
+            // session's stat cache only for a snapshot.json written before
+            // captures carried it. Before that field existed the cache was
+            // the ONLY source, and it holds an item only if a plan happened
+            // to touch it this session, which is why an account's whole
+            // item list rendered neutral except for the two or three items
+            // the last plan used.
+            string rarity = ItemRarityResolution.Resolve(row.Rarity, RarityFor(row.ItemId));
+            var icon = IconControls.CreateItemIcon(
+                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity), 2, 1,
+                ItemIconTier.BagSlot);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2582,10 +2599,16 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel,
             };
 
-            // Same component as the item rows; no rarity, so neutral.
+            // Same component as the item rows; no rarity, so neutral by
+            // intent rather than by omission. One row per currency, name and
+            // balance beside its icon: this IS the in-game wallet list, so
+            // the icon takes the list tier, whose art is already inset by the
+            // module's 1px frame so the framed box occupies exactly the
+            // measured 32px window rather than overflowing it to 34.
             var icon = IconControls.CreateItemIcon(
-                rowPanel, entry.IconUrl, (string)null, 2, 2,
-                tooltipText: string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
+                rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
+                ItemIconTier.CurrencyListRow,
+                string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
             // Never display raw currency IDs (repo invariant). Same two
             // columns as the item run above, so one header pair shape

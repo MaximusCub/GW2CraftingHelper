@@ -85,9 +85,26 @@ namespace GW2CraftingHelper.Models
 
         public int? NourishmentDurationMs { get; set; }
 
-        /// <summary>Display wording for the item's strongest binding flag
-        /// ("Soulbound on Use"), or null when the item binds nothing.</summary>
-        public string Binding { get; set; }
+        /// <summary>The consumable effect's own name - details.name
+        /// ("Nourishment", "Sugar Rush") - which leads the game's effect
+        /// block; null when the details block carries none.</summary>
+        public string EffectName { get; set; }
+
+        /// <summary>The effect's icon URL (details.icon), for the inline
+        /// icon the game draws beside the effect block; null when the API
+        /// carries none, in which case no icon is drawn.</summary>
+        public string EffectIconUrl { get; set; }
+
+        /// <summary>
+        /// Display wording for the item's binding flags, one line each in
+        /// render order; empty, never null. Account binding and
+        /// soulbinding are independent dimensions, not a most-specific
+        /// ladder: live3/relic-livingcity (2026-08-26) shows
+        /// "Account Bound" AND "Soulbound on Use" stacked on one item
+        /// (104938, flags AccountBound + SoulBindOnUse), so up to one line
+        /// per dimension is carried.
+        /// </summary>
+        public IReadOnlyList<string> Bindings { get; set; }
 
         /// <summary>Profession/race restrictions; empty, never null.</summary>
         public IReadOnlyList<string> Restrictions { get; set; }

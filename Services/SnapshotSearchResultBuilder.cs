@@ -254,6 +254,12 @@ namespace GW2CraftingHelper.Services
                     ItemId = itemId,
                     Name = name,
                     IconUrl = kvp.Value.IconUrl ?? string.Empty,
+
+                    // From the first entry seen for this id, like Name and
+                    // IconUrl: the same item in a bank slot and on a
+                    // character is the same item, so any of its entries
+                    // carries the same captured rarity.
+                    Rarity = kvp.Value.Rarity ?? string.Empty,
                     TotalCount = total,
                     Breakdown = breakdown,
                 });

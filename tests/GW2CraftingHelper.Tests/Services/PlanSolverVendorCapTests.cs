@@ -17,7 +17,6 @@ namespace GW2CraftingHelper.Tests.Services
         // post-solve "this is timegated" notice, never a tree change. A
         // cap-exceeding offer is still used exactly like an uncapped one;
         // the only observable effect is a CraftingPlan.TimegatedItems entry.
-
         [Fact]
         public void CappedOffer_NeededExceedsCap_StillUsedAsVendor_SurfacesTimegatedNotice()
         {
@@ -29,11 +28,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 25) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 25) } },
             };
             var solver = new PlanSolver();
 
@@ -59,11 +58,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 20);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, dailyCap: 25) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, dailyCap: 25) } },
             };
             var solver = new PlanSolver();
 
@@ -88,7 +87,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -112,7 +111,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, outputCount: 10, dailyCap: 3) } },
             };
             var solver = new PlanSolver();
 
@@ -138,7 +137,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 0) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 0) } },
             };
             var solver = new PlanSolver();
 
@@ -159,11 +158,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 50);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 10 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 25) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 25) } },
             };
             var solver = new PlanSolver();
 
@@ -189,7 +188,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 100, weeklyCap: 1) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, dailyCap: 100, weeklyCap: 1) } },
             };
             var solver = new PlanSolver();
 
@@ -213,7 +212,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } },
             };
             var solver = new PlanSolver();
 
@@ -243,7 +242,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 50, dailyCap: 10) } },
             };
             var solver = new PlanSolver();
 
@@ -264,7 +263,6 @@ namespace GW2CraftingHelper.Tests.Services
         // offer eligibility or re-routes the solver), but checked
         // INDEPENDENTLY of Daily/Weekly rather than folded into the same
         // "pick one" precedence - see the SeasonalAndWeeklyCap test below.
-
         [Fact]
         public void SeasonalCap_NeededExceedsCap_StillUsedAsVendor_SurfacesTimegatedNotice()
         {
@@ -277,11 +275,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 25);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 400 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 400 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 20) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 20) } },
             };
             var solver = new PlanSolver();
 
@@ -308,11 +306,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 10);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, seasonalCap: 20) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 5, seasonalCap: 20) } },
             };
             var solver = new PlanSolver();
 
@@ -334,7 +332,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 0) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, seasonalCap: 0) } },
             };
             var solver = new PlanSolver();
 
@@ -359,7 +357,7 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>();
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 10, seasonalCap: 20) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 1, weeklyCap: 10, seasonalCap: 20) } },
             };
             var solver = new PlanSolver();
 
@@ -391,11 +389,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 30);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { CoinVendorOffer(1, 2, seasonalCap: 5) } }
+                { 1, new List<VendorOffer> { CoinVendorOffer(1, 2, seasonalCap: 5) } },
             };
             var solver = new PlanSolver();
 
@@ -427,11 +425,11 @@ namespace GW2CraftingHelper.Tests.Services
             var tree = Leaf(1, 25);
             var prices = new Dictionary<int, ItemPrice>
             {
-                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } }
+                { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
             };
             var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
             {
-                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 9, seasonalCap: 20) } }
+                { 1, new List<VendorOffer> { MixedVendorOffer(1, 0, 2, 9, seasonalCap: 20) } },
             };
             var valuation = new CurrencyValuation(new Dictionary<int, long> { { 2, 5 } });
             var solver = new PlanSolver();

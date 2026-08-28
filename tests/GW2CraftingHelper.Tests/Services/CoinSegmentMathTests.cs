@@ -53,7 +53,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TotalCoinSegmentsWidth ---
-
         [Fact]
         public void TotalCoinSegmentsWidth_Empty_ReturnsZero()
         {
@@ -69,7 +68,7 @@ namespace GW2CraftingHelper.Tests.Services
             // segmentGap since there is nothing after it.
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>
             {
-                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "56", TextWidth = 18 }
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "56", TextWidth = 18 },
             };
 
             int expected = 18 + LabelIconGap + IconSize;
@@ -86,7 +85,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 new CoinSegmentMath.CoinSegmentSpec { AssetId = 156904, Text = "12", TextWidth = 16 },
                 new CoinSegmentMath.CoinSegmentSpec { AssetId = 156907, Text = "34", TextWidth = 18 },
-                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "56", TextWidth = 18 }
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "56", TextWidth = 18 },
             };
 
             int expected =
@@ -105,7 +104,7 @@ namespace GW2CraftingHelper.Tests.Services
             // the segment away - the icon and its gap still occupy space.
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>
             {
-                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "0", TextWidth = 0 }
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156902, Text = "0", TextWidth = 0 },
             };
 
             int expected = LabelIconGap + IconSize;
@@ -113,7 +112,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- TotalCurrencySegmentsWidth ---
-
         [Fact]
         public void TotalCurrencySegmentsWidth_Empty_ReturnsZero()
         {
@@ -127,7 +125,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var segments = new List<CoinSegmentMath.CurrencySegmentSpec>
             {
-                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "5", TextWidth = 12 }
+                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "5", TextWidth = 12 },
             };
 
             int expected = 12 + LabelIconGap + IconSize;
@@ -138,12 +136,15 @@ namespace GW2CraftingHelper.Tests.Services
         public void TotalCurrencySegmentsWidth_MultipleSegments_GapBetweenNotAfter()
         {
             // Pins the gap arithmetic exactly (1 gap for 2 segments):
-            // 30 + 2 + 20 = 52 for the first, 10 + 2 + 20 = 32 for the
-            // second, plus a single 6px segmentGap between them = 90.
+            // 30 + 2 + 16 = 48 for the first, 10 + 2 + 16 = 28 for the
+            // second, plus a single 6px segmentGap between them = 82.
+            // The 16 is CurrencyIconTiers.WalletBarIconSize, which
+            // CoinIconSize now is - re-baselined from 20 when the inline
+            // runs moved onto the measured wallet bar tier.
             var segments = new List<CoinSegmentMath.CurrencySegmentSpec>
             {
                 new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "karma.png", Text = "1200", TextWidth = 30 },
-                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "3", TextWidth = 10 }
+                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "3", TextWidth = 10 },
             };
 
             int expected =
@@ -151,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
                 (10 + LabelIconGap + IconSize) +
                 SegmentGap;
             Assert.Equal(expected, CoinSegmentMath.TotalCurrencySegmentsWidth(segments));
-            Assert.Equal(90, expected);
+            Assert.Equal(82, expected);
         }
 
         [Fact]
@@ -159,7 +160,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var segments = new List<CoinSegmentMath.CurrencySegmentSpec>
             {
-                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "0", TextWidth = 0 }
+                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "spirit-shard.png", Text = "0", TextWidth = 0 },
             };
 
             int expected = LabelIconGap + IconSize;
@@ -179,12 +180,12 @@ namespace GW2CraftingHelper.Tests.Services
             var coinSegments = new List<CoinSegmentMath.CoinSegmentSpec>
             {
                 new CoinSegmentMath.CoinSegmentSpec { AssetId = 156904, Text = "12", TextWidth = 16 },
-                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156907, Text = "34", TextWidth = 18 }
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = 156907, Text = "34", TextWidth = 18 },
             };
             var currencySegments = new List<CoinSegmentMath.CurrencySegmentSpec>
             {
                 new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "a.png", Text = "12", TextWidth = 16 },
-                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "b.png", Text = "34", TextWidth = 18 }
+                new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "b.png", Text = "34", TextWidth = 18 },
             };
 
             int coinWidth = CoinSegmentMath.TotalCoinSegmentsWidth(coinSegments);
@@ -199,9 +200,8 @@ namespace GW2CraftingHelper.Tests.Services
         // on them agreeing: CoinCurrencyRenderer.BuildCoinSegments (what is
         // drawn) and the recipe tree's cost-column pre-scan (how wide each
         // denomination's sub-column is reserved).
-
         [Fact]
-        public void FormatSegmentTexts_FullAmount_PadsSilverAndCopperOnce_GoldPrecedesThem()
+        public void FormatSegmentTexts_FullAmount_GoldPrecedesSilverAndCopper()
         {
             var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(412680L);
 
@@ -211,13 +211,17 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void FormatSegmentTexts_PadsSingleDigitSilverAndCopperUnderGold()
+        public void FormatSegmentTexts_SingleDigitSegmentsStayBareUnderGold()
         {
+            // Bare digits, never zero-padded: the game renders "2g 0s 0c"
+            // (live3 counterfeit-ticket, 20000c) and "2s 0c"
+            // (relic-livingcity, 200c) with single-character zeros; the
+            // non-zero sub-10 case is inferred from those samples.
             var (gold, silver, copper) = CoinSegmentMath.FormatSegmentTexts(10203L);
 
             Assert.Equal("1", gold);
-            Assert.Equal("02", silver);
-            Assert.Equal("03", copper);
+            Assert.Equal("2", silver);
+            Assert.Equal("3", copper);
         }
 
         [Fact]
@@ -269,7 +273,7 @@ namespace GW2CraftingHelper.Tests.Services
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>
             {
                 new CoinSegmentMath.CoinSegmentSpec { AssetId = CoinSegmentMath.GoldAssetId, Text = "1", TextWidth = 10 },
-                new CoinSegmentMath.CoinSegmentSpec { AssetId = CoinSegmentMath.CopperAssetId, Text = "23", TextWidth = 20 }
+                new CoinSegmentMath.CoinSegmentSpec { AssetId = CoinSegmentMath.CopperAssetId, Text = "23", TextWidth = 20 },
             };
 
             int shared = CoinSegmentMath.TotalCoinSegmentsWidth(segments);
@@ -305,7 +309,7 @@ namespace GW2CraftingHelper.Tests.Services
             // denomination would otherwise ship an unnamed icon.
             foreach (int assetId in new[]
             {
-                CoinSegmentMath.GoldAssetId, CoinSegmentMath.SilverAssetId, CoinSegmentMath.CopperAssetId
+                CoinSegmentMath.GoldAssetId, CoinSegmentMath.SilverAssetId, CoinSegmentMath.CopperAssetId,
             })
             {
                 Assert.False(string.IsNullOrEmpty(CoinSegmentMath.DenominationName(assetId)));

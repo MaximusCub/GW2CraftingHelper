@@ -42,17 +42,67 @@ namespace GW2CraftingHelper.Services
         // row keeps its height only where that ink still clears whatever
         // sits under it (the 2px divider, or the row's own bottom edge).
         //
-        // Unchanged and why: the three 36px rows and TreeRowHeight are
-        // ICON-driven, not text-driven - a 34px rarity frame at y=0 plus a
-        // 2px divider already exceeds the tallest text run in them.
+        // The icon-led rows are ICON-driven, not text-driven: a
+        // RowIconFrameSize rarity frame plus a 2px divider already exceeds
+        // the tallest text run in them, so their heights are derived below
+        // from the frame rather than pinned by ink arithmetic.
         // CraftStepRowHeight's body text was already Font16 before the
         // bump, so only its Font12 -> Font14 sublabel moved, and that
-        // sublabel's new ink (y=16 + 19 = 35) still clears its divider at
-        // 41. The two 28px rows put a single line at y=4 (ink 25) and y=7
-        // (ink 26) with no divider beneath either.
-        public const int UsedMaterialRowHeight = 36;
-        public const int ShoppingRowHeight = 36;
-        public const int CraftStepRowHeight = 44;
+        // sublabel's ink clears its divider with the same margin it had at
+        // the pre-tier-2 heights. The two 28px rows put a single line at
+        // y=4 (ink 25) and y=7 (ink 26) with no divider beneath either.
+
+        // --- Tier-2 icon-row geometry (owner ruling, 2026-08-26): every
+        // row-level item icon in the Crafting Plan tab renders at the
+        // in-game bag-SIDEBAR size, ItemIconTiers.BagSidebarIconSize. ---
+
+        /// <summary>Rarity-frame border of a plan-tab row icon - the
+        /// borderThickness the row builders pass to
+        /// IconControls.CreateItemIcon.</summary>
+        public const int RowIconBorder = 1;
+
+        /// <summary>Overall edge of a plan-tab row's rarity-framed icon:
+        /// tier-2 art plus the frame on both sides (42).</summary>
+        public const int RowIconFrameSize =
+            ItemIconTiers.BagSidebarIconSize + 2 * RowIconBorder;
+
+        /// <summary>Height of the 2px row divider quad
+        /// LabelHelpers.CreateRowDivider draws (2, never 1 - see that
+        /// method's scissor-defect derivation).</summary>
+        public const int RowDividerHeight = 2;
+
+        /// <summary>
+        /// bottomClearance every icon-led table row passes to
+        /// LabelHelpers.CreateRowDivider. 1, not 0: the tier-2 flush-fit
+        /// heights (RowIconFrameSize + RowDividerHeight = 44) are in the
+        /// Container.Paint round-trip defect's vulnerable class, so the
+        /// clearance pixel is part of the height derivation itself - the
+        /// divider sits at rowHeight - 2 - 1 = 42, exactly flush under the
+        /// 0..42 icon frame, and rowHeight absorbs the extra pixel. Proven
+        /// immune at every GW2 UI scale by the executable re-derivation in
+        /// tests/.../RowDividerScissorSimulationTests.cs.
+        /// </summary>
+        public const int IconRowDividerClearance = 1;
+
+        // Flush fit: icon frame at y=0, divider directly under it, plus
+        // the clearance pixel the simulation demands at this height
+        // (42 + 2 + 1 = 45). The pre-tier-2 36px shape (34 + 2 + 0) was
+        // immune without clearance; 44 is not, which is why the clearance
+        // term joined the sum instead of the divider moving up under the
+        // icon.
+        public const int UsedMaterialRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
+        public const int ShoppingRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
+
+        /// <summary>y of the craft-step row's icon frame - the one icon-led
+        /// row whose icon is inset rather than flush, because the numbered
+        /// badge beside it needs breathing room above and below.</summary>
+        public const int CraftStepIconY = 5;
+
+        // Symmetric inset: CraftStepIconY above and below the frame
+        // (5 + 42 + 5 = 52). The divider then lands at rowHeight - 2 -
+        // IconRowDividerClearance = 49, 2px below the icon frame bottom
+        // (47) - the same 2px icon-to-divider gap the 44px shape had.
+        public const int CraftStepRowHeight = 2 * CraftStepIconY + RowIconFrameSize;
 
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
@@ -92,45 +142,129 @@ namespace GW2CraftingHelper.Services
 
         // 36, not 32: this row's two labels sit at y=7 and y=9, whose
         // Font16/Font14 ink (28) landed on the 32px row's divider top (29).
-        // 36 is the height every other single-line table row in this file
-        // already uses, and LabelHelpers.CreateRowDivider's scale
-        // simulation lists it as immune rather than merely clear.
+        // NOT moved to the tier-2 icon-row height: this is the plan tab's
+        // one text-only table row (no item icon), so the owner's icon-size
+        // ruling does not reach it, and 36 is on
+        // LabelHelpers.CreateRowDivider's proven-immune list.
         public const int DisciplineRowHeight = 36;
 
-        // 36 = 34px icon (y=0) + 2px divider, an exact, non-overlapping
-        // fit, mirroring UsedMaterialRowHeight/ShoppingRowHeight.
+        // Same flush fit as UsedMaterialRowHeight/ShoppingRowHeight:
+        // tier-2 icon frame (y=0) + divider + the clearance pixel (45).
         //
         // EVERY recipe row, since the discipline became a column
         // (Services/RecipesColumnMath) rather than a second line under the
         // name. The 48px twin this section used to need for a sublabel row
-        // is gone with the sublabel, so the section is shorter than it was
-        // despite the taller chrome above it.
-        public const int RecipeRowHeight = 36;
+        // is gone with the sublabel.
+        public const int RecipeRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
 
-        // 58, not 56: the cost tiles' captions moved to the ColumnHeader
-        // tier, whose 25px line box puts the caption block's bottom at
-        // CostTileCaptionY 4 + 25 + 2 = 31, one past the y=30 a 56px band
-        // bottom-anchored its 20px coin run at. 58 restores the clearance
-        // (amount y = 58 - 6 - 20 = 32).
-        public const int CostTileRowHeight = 58;
+        // Reserved height of a formula band's amount run: the taller of the
+        // amount text's own line box (Regular16, 20 - TypeRampMetrics) and
+        // the coin icon beside it, which is what SummarySectionRenderer.
+        // AmountBlockHeight measures at render time.
+        //
+        // Spelled as CoinSegmentMath.CoinIconSize alone until the wallet BAR
+        // tier made the icon the SHORTER of the pair: that only ever agreed
+        // with the text by coincidence, and a reserve named after the icon
+        // now under-reserves by 4px.
+        public const int AmountTextLineHeight = 20;
+        public const int AmountRunHeight =
+            CoinSegmentMath.CoinIconSize > AmountTextLineHeight
+                ? CoinSegmentMath.CoinIconSize
+                : AmountTextLineHeight;
 
         // Caption y and amount bottom pad of an UNHIGHLIGHTED formula band
         // (the profit band; a highlighted one uses
         // SummarySectionLayoutMath's box-derived pair instead). Here rather
-        // than with the renderer that draws them because they are the other
-        // two thirds of CostTileRowHeight's arithmetic - the caption's line
-        // box has to end above the amount run the band bottom-anchors.
+        // than with the renderer that draws them because they are two of
+        // CostTileRowHeight's five terms.
         public const int CostTileCaptionY = 4;
         public const int CostTileAmountBottomPad = 6;
+
+        /// <summary>
+        /// The ONE distance between a formula tile's caption line box and
+        /// the top of the amount run under it, in BOTH Total Cost bands
+        /// (the cost band's boxed tiles and the profit band's plain ones).
+        /// <para>
+        /// It used to be a residual rather than a constant: both bands
+        /// BOTTOM-anchored their amount inside a fixed row height, so the
+        /// space under the caption was whatever the height arithmetic left
+        /// over - 1px on the profit band, which the field report called
+        /// cramped ("'Sell Value' and the gold line are a little cramped").
+        /// Anchoring the amount UNDER the caption instead makes the gap
+        /// this number at every band, and the two bands cannot drift apart.
+        /// </para>
+        /// <para>
+        /// 8, from the caption tier's own metrics rather than by eye: a
+        /// label and the value it names read as one group only while the
+        /// space between them stays under about one cap height
+        /// (ColumnHeaderInk.CapHeight is 17), and reads as touching much
+        /// below half of it. 8 is the 4pt-scale step at half that cap
+        /// height. Against ColumnHeaderInk's lowest ink - 26, one past its
+        /// own 25px line box - it leaves 7px of clear air under the
+        /// caption's descenders.
+        /// </para>
+        /// </summary>
+        public const int CostTileLabelToValueGap = 8;
+
+        /// <summary>
+        /// Height a formula band reserves for one caption line.
+        /// Deliberately above what the font measures: the renderer places
+        /// the caption from real font metrics and hangs the amount below
+        /// it, so a reserve under the real line box makes the band clip its
+        /// own amount. 29 = ColumnHeaderInk's measured 25px line box plus
+        /// one 4pt step of slack for a font Blish resolved differently
+        /// than this module measured.
+        /// </summary>
+        public const int CostTileCaptionLineHeight = 29;
+
+        // 67 = 4 caption y + 29 caption line + 8 label-to-value gap + a 20px
+        // amount run + 6 bottom pad. Was 58 while the amount was
+        // BOTTOM-anchored and the gap under the caption was whatever was
+        // left (1px) - see CostTileLabelToValueGap. There is no
+        // CostTileAmountY constant any more for the same reason: the band
+        // hangs its run under the caption it actually measured, so the run's
+        // y is not a constant of the row at all.
+        //
+        // AmountRunHeight, never CoinSegmentMath.CoinIconSize: the run is as
+        // tall as the taller of its text and its icon, and since the coin
+        // runs moved onto the 16px wallet BAR tier that is the text. Naming
+        // the icon here would under-reserve the row by 4px.
+        //
+        // This band carries no divider, so no RowDividerScissorSimulation
+        // pair moves with it.
+        public const int CostTileRowHeight =
+            CostTileCaptionY
+            + CostTileCaptionLineHeight
+            + CostTileLabelToValueGap
+            + AmountRunHeight
+            + CostTileAmountBottomPad;
 
         // The Summary section's COST formula band is no longer a taller
         // twin of this row: its result tile shares the band's one amount
         // font and is highlighted with a tinted box instead, so its height
         // is the box's own geometry - Services/SummarySectionLayoutMath.
         // CostBandHeight. The profit band still uses CostTileRowHeight.
-        public const int CurrencyRowHeight = 28;
+        //
+        // The Summary's currency table mirrors the in-game wallet list, so
+        // its row geometry is measured from the same capture as the icon it
+        // carries: the list's row band is 42px with a 32px icon box centred
+        // in it, i.e. 5px of clearance above and below
+        // (Services/CurrencyIconTiers). Icon-plus-pad, not the old literal
+        // 28, which predated the tier and could not hold a list-tier icon.
+        public const int CurrencyRowIconPad = 5;
+        public const int CurrencyRowHeight =
+            CurrencyIconTiers.WalletListIconSize + (2 * CurrencyRowIconPad);
+
         public const int FallbackTextRowHeight = 28;
-        public const int TreeRowHeight = 40;
+
+        /// <summary>Clearance above and below a tree row's icon frame. The
+        /// tree draws indent guidelines instead of row dividers, so its
+        /// height is frame-plus-breathing-room - the same 3px-each-side law
+        /// the Ranker's tier-1 rows use (RankerRowLayout.RowHeight).</summary>
+        public const int TreeRowIconPad = 3;
+
+        // 42 + 3 + 3 = 48.
+        public const int TreeRowHeight = RowIconFrameSize + 2 * TreeRowIconPad;
 
         /// <summary>
         /// Total height of a collapsible section's AutoSize-replacement

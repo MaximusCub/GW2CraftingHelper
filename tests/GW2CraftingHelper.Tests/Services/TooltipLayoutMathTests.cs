@@ -34,7 +34,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Row breaking ---
-
         [Fact]
         public void LayoutContent_ShortLine_IsOneRowAtOffsetZero()
         {
@@ -90,7 +89,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Coin runs ---
-
         [Fact]
         public void LayoutContent_CoinSpan_KeepsItsCopperValueAndSitsAfterItsLabel()
         {
@@ -183,7 +181,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Max content width ---
-
         [Fact]
         public void MaxContentWidth_RoomySpriteScreen_UsesBlishsOwnPreferredCap()
         {
@@ -209,8 +206,129 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(TooltipLayoutMath.MinContentWidth, TooltipLayoutMath.MaxContentWidth(60, 10));
         }
 
-        // --- Placement (the four-edge clamp) ---
+        // --- The item tooltip's live-derived wrap cap ---
 
+        // Menomonia 14 exactly as the tooltip surface gets it: glyph
+        // metrics read out of the shipped
+        // Content/fonts/menomonia/menomonia-14-regular.xnb for the
+        // characters the A/B strings use, plus Blish's global
+        // LetterSpacing = -1. Measured the way MonoGame.Extended's
+        // BitmapFont.MeasureString does - the pen advances by
+        // XAdvance + LetterSpacing and the reported width is the rightmost
+        // glyph ink - so a wrap asserted here is the wrap the module
+        // renders. Every listed glyph has ink, so no zero-width guard is
+        // needed.
+        private const string Menomonia14Chars = " .:AFMTabcdefghilmnorstuwy";
+
+        private static readonly int[] Menomonia14Advance = new[]
+        {
+            6, 3, 3, 9, 8, 13, 10, 8, 8, 8, 8, 8, 6,
+            8, 8, 4, 4, 13, 8, 8, 5, 7, 6, 8, 13, 8,
+        };
+
+        private static readonly int[] Menomonia14XOffset = new[]
+        {
+            -2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            -1, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        };
+
+        private static readonly int[] Menomonia14Ink = new[]
+        {
+            5, 5, 5, 11, 10, 15, 12, 10, 10, 10, 10, 10, 8,
+            10, 10, 5, 6, 14, 10, 10, 7, 9, 8, 10, 15, 10,
+        };
+
+        private const int BlishLetterSpacing = -1;
+
+        private static int MeasureMenomonia14(string text)
+        {
+            int pen = 0;
+            int width = 0;
+            foreach (char c in text ?? string.Empty)
+            {
+                int i = Menomonia14Chars.IndexOf(c);
+                if (i < 0)
+                {
+                    throw new ArgumentException(
+                        "No metric captured for '" + c + "'.", nameof(text));
+                }
+
+                int right = pen + Menomonia14XOffset[i] + Menomonia14Ink[i];
+                if (right > width)
+                {
+                    width = right;
+                }
+
+                pen += Menomonia14Advance[i] + BlishLetterSpacing;
+            }
+
+            return width;
+        }
+
+        [Fact]
+        public void ItemTooltipWrapCap_SitsInsideTheBracketTheLiveCapturesLeave()
+        {
+            // Every live capture that wraps a paragraph pins the cap from
+            // both sides: at least the width of the line the game KEPT
+            // whole, below that line plus the word it PUSHED down. Through
+            // this face the corpus reads (kept / pushed): Gift of Twilight
+            // 282/338, eyes-of-kormir 313/366 and 315/352,
+            // heart-of-destroyer 293/362 and 326/387, plus Gift of
+            // Twilight's unwrapped 317. Intersection [326, 338).
+            Assert.InRange(TooltipLayoutMath.ItemTooltipMaxContentWidth, 326, 337);
+
+            // The metric arrays are indexed by position in the character
+            // string; a length drift would measure silently wrong rather
+            // than throw.
+            Assert.Equal(Menomonia14Chars.Length, Menomonia14Advance.Length);
+            Assert.Equal(Menomonia14Chars.Length, Menomonia14XOffset.Length);
+            Assert.Equal(Menomonia14Chars.Length, Menomonia14Ink.Length);
+
+            // The two numbers the A/B turns on, so a font or metric change
+            // that moved them could not silently keep the cap valid.
+            Assert.Equal(
+                282, MeasureMenomonia14("A gift used to create the legendary greatsword"));
+            Assert.Equal(
+                338, MeasureMenomonia14("A gift used to create the legendary greatsword Twilight."));
+            Assert.Equal(
+                317, MeasureMenomonia14("Made by combining these items in the Mystic Forge:"));
+        }
+
+        [Fact]
+        public void ItemTooltipWrapCap_BreaksGiftOfTwilightWhereTheGameDoes()
+        {
+            // The 2026-08-27 owner A/B: item 19648 hovered in the module
+            // and in the live game. The game wrapped its description after
+            // "greatsword" and kept the Mystic Forge line whole; at the
+            // former 350 the module fitted the whole description on one
+            // line, which is the discrepancy the capture pair showed.
+            var content = TooltipContent.FromText(
+                "A gift used to create the legendary greatsword Twilight.\n" +
+                "Made by combining these items in the Mystic Forge:");
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content,
+                TooltipLayoutMath.MaxContentWidth(
+                    1920, 10, TooltipLayoutMath.ItemTooltipMaxContentWidth),
+                18,
+                MeasureMenomonia14,
+                _ => 0);
+
+            Assert.Equal(
+                new[]
+                {
+                    "A gift used to create the legendary greatsword",
+                    "Twilight.",
+                    "Made by combining these items in the Mystic Forge:",
+                },
+                layout.Rows.Select(RowText).ToArray());
+
+            // Shrink-wrap to the widest laid-out line, not to the cap -
+            // the sizing rule the live corpus confirms.
+            Assert.Equal(317, layout.Width);
+        }
+
+        // --- Placement (the four-edge clamp) ---
         [Fact]
         public void Place_RoomAboveTheCursor_PrefersAbove()
         {
@@ -218,7 +336,7 @@ namespace GW2CraftingHelper.Tests.Services
             TooltipLayoutMath.Place(600, 500, 200, 100, 1920, 1080, out int x, out int y);
 
             Assert.Equal(600, x);
-            Assert.Equal(500 - TooltipLayoutMath.CursorGap - 100, y);
+            Assert.Equal(500 - TooltipLayoutMath.CursorGapAbove - 100, y);
         }
 
         [Fact]
@@ -226,7 +344,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             TooltipLayoutMath.Place(600, 40, 200, 100, 1920, 1080, out _, out int y);
 
-            Assert.Equal(40 + TooltipLayoutMath.CursorGap, y);
+            Assert.Equal(40 + TooltipLayoutMath.CursorGapBelow, y);
         }
 
         [Fact]
@@ -241,7 +359,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(y + height <= 1080 - TooltipLayoutMath.ScreenEdgeMargin);
             Assert.True(y >= TooltipLayoutMath.ScreenEdgeMargin);
             // Blish would have produced this, off the bottom edge.
-            Assert.NotEqual(mouseY + TooltipLayoutMath.CursorGap, y);
+            Assert.NotEqual(mouseY + TooltipLayoutMath.CursorGapBelow, y);
         }
 
         [Fact]
@@ -285,14 +403,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Header rows and per-row heights (G11, G21) ---
-
         [Fact]
         public void HeaderRow_IsIconTall_IndentedPastTheIcon_AndCarriesItsIcon()
         {
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
-                TooltipContent.TextLine("Weapon Strength: 950 - 1,050")
+                TooltipContent.TextLine("Weapon Strength: 950 - 1,050"),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -315,11 +432,57 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void EffectRows_AreIndented_OneLinePitchTall_WithTheIconOnTheFirstRowOnly()
+        {
+            // The consumable effect block (live3 soul-pastries /
+            // candy-corn, 2026-08-26): every row of the block is indented
+            // past the inline icon, rows stay one line pitch tall, and the
+            // icon rides the first row only - a wrapped continuation
+            // included.
+            var content = new TooltipContentBuilder()
+                .EffectBlock("apple.png", "aaaa bbbb\ncc", TooltipSpanRole.Muted)
+                .Build();
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth, effectIndent: 31);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.All(layout.Rows, r => Assert.Equal(TooltipLineKind.Effect, r.Kind));
+            Assert.All(layout.Rows, r => Assert.Equal(20, r.Height));
+            Assert.Equal("apple.png", layout.Rows[0].IconUrl);
+            Assert.Null(layout.Rows[1].IconUrl);
+            Assert.Equal(31, layout.Rows[0].Spans[0].X);
+            Assert.Equal(31, layout.Rows[1].Spans[0].X);
+        }
+
+        [Fact]
+        public void AWrappedEffectLineKeepsItsIndentKindAndSingleIcon()
+        {
+            // 31px indent leaves 90px of a 121px budget for text at 10px a
+            // character: "aaaa bbbb" (90) fits, "cccc" wraps, and the
+            // wrapped row is still an indented Effect row with no second
+            // icon.
+            var content = new TooltipContentBuilder()
+                .EffectBlock("apple.png", "aaaa bbbb cccc", TooltipSpanRole.Muted)
+                .Build();
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 121, 20, TenPxPerChar, FixedCoinWidth, effectIndent: 31);
+
+            Assert.Equal(2, layout.Rows.Count);
+            Assert.Equal("aaaa bbbb", RowText(layout.Rows[0]));
+            Assert.Equal("cccc", RowText(layout.Rows[1]));
+            Assert.Equal(TooltipLineKind.Effect, layout.Rows[1].Kind);
+            Assert.Equal(31, layout.Rows[1].Spans[0].X);
+            Assert.Null(layout.Rows[1].IconUrl);
+        }
+
+        [Fact]
         public void AWrappedHeaderNameStaysInTheNameColumnAndDrawsOneIcon()
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic")
+                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic"),
             });
 
             // 39px indent + a 70px budget for the name itself.
@@ -353,7 +516,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.HeaderLine(null, "Iconless Thing", "Basic"),
-                TooltipContent.TextLine("Basic")
+                TooltipContent.TextLine("Basic"),
             });
 
             Assert.Equal("", content.Lines[0].IconUrl);
@@ -373,7 +536,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = TooltipContent.FromLines(new[]
             {
                 TooltipContent.TextLine("prose"),
-                TooltipContent.Line(TooltipSpan.FromCoin(240, "2s 40c"))
+                TooltipContent.Line(TooltipSpan.FromCoin(240, "2s 40c")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -393,7 +556,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 TooltipContent.Line(
                     TooltipSpan.FromText("aaaaa"),
-                    TooltipSpan.FromCoin(240, "2s 40c"))
+                    TooltipSpan.FromCoin(240, "2s 40c")),
             });
 
             var layout = TooltipLayoutMath.LayoutContent(
@@ -409,7 +572,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary")
+                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
             });
 
             Assert.Equal("Bolt", content.ToPlainText());

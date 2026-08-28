@@ -7,9 +7,9 @@ namespace GW2CraftingHelper.Tests.Services
     {
         [Theory]
         [InlineData(100, 5)]
-        [InlineData(30, 2)]   // 5% of 30 = 1.5 -> rounds half-up to 2
-        [InlineData(10, 1)]   // below minimum -> 1c floor
-        [InlineData(1, 1)]    // minimum fee applies
+        [InlineData(30, 2)] // 5% of 30 = 1.5 -> rounds half-up to 2
+        [InlineData(10, 1)] // below minimum -> 1c floor
+        [InlineData(1, 1)] // minimum fee applies
         [InlineData(0, 0)]
         [InlineData(-5, 0)]
         public void ListingFee_Cases(long price, long expected)
@@ -19,8 +19,8 @@ namespace GW2CraftingHelper.Tests.Services
 
         [Theory]
         [InlineData(100, 10)]
-        [InlineData(15, 2)]   // 10% of 15 = 1.5 -> rounds half-up to 2
-        [InlineData(5, 1)]    // below minimum -> 1c floor
+        [InlineData(15, 2)] // 10% of 15 = 1.5 -> rounds half-up to 2
+        [InlineData(5, 1)] // below minimum -> 1c floor
         [InlineData(0, 0)]
         public void ExchangeFee_Cases(long price, long expected)
         {

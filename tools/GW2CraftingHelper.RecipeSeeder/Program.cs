@@ -47,6 +47,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                         {
                             outputDir = args[++i];
                         }
+
                         break;
                     case "--force":
                         force = true;
@@ -124,6 +125,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                         list = new List<int>();
                         searchIndex[recipe.OutputItemId] = list;
                     }
+
                     list.Add(recipe.Id);
                 }
 
@@ -419,7 +421,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                         OutputItemId = elem.GetProperty("output_item_id").GetInt32(),
                         OutputItemCount = elem.GetProperty("output_item_count").GetInt32(),
                         MinRating = elem.TryGetProperty("min_rating", out var mr)
-                            ? mr.GetInt32() : 0
+                            ? mr.GetInt32() : 0,
                     };
 
                     if (elem.TryGetProperty("disciplines", out var disc))
@@ -465,7 +467,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                                 Id = ing.TryGetProperty("id", out var idProp)
                                     ? idProp.GetInt32()
                                     : ing.GetProperty("item_id").GetInt32(),
-                                Count = ing.GetProperty("count").GetInt32()
+                                Count = ing.GetProperty("count").GetInt32(),
                             });
                         }
                     }
@@ -538,7 +540,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                                 : (double?)null,
                             Disciplines = new List<string> { "MysticForge" },
                             MinRating = 0,
-                            Flags = new List<string>()
+                            Flags = new List<string>(),
                         };
 
                         foreach (var ing in ingsArr.EnumerateArray())
@@ -554,7 +556,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                             {
                                 Type = ingType.GetString() ?? "Item",
                                 Id = ingId.GetInt32(),
-                                Count = ingCount.GetInt32()
+                                Count = ingCount.GetInt32(),
                             });
                         }
 
@@ -656,7 +658,7 @@ namespace GW2CraftingHelper.RecipeSeeder
                         Name = elem.TryGetProperty("name", out var n)
                             ? n.GetString() ?? "" : "",
                         Icon = elem.TryGetProperty("icon", out var ic)
-                            ? ic.GetString() : null
+                            ? ic.GetString() : null,
                     };
                     if (!string.IsNullOrEmpty(item.Name))
                     {
@@ -664,13 +666,16 @@ namespace GW2CraftingHelper.RecipeSeeder
                     }
                 }
             }
+
             return items;
         }
 
         private class ItemNameInfo
         {
             public int Id { get; set; }
+
             public string Name { get; set; }
+
             public string Icon { get; set; }
         }
 

@@ -69,6 +69,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 store.Load(searchStream, recipeStream);
             }
+
             return store;
         }
 
@@ -92,21 +93,21 @@ namespace GW2CraftingHelper.Tests.Services
                             new RawIngredient { Type = "Currency", Id = Currency78, Count = 250 },
                             new RawIngredient { Type = "Currency", Id = Currency80, Count = 100 },
                             new RawIngredient { Type = "Currency", Id = Currency79, Count = 50 },
-                            new RawIngredient { Type = "Item", Id = GlobEcto, Count = 50 }
+                            new RawIngredient { Type = "Item", Id = GlobEcto, Count = 50 },
                         },
                         Disciplines = new List<string>
                         {
                             "Leatherworker", "Armorsmith", "Chef", "Tailor", "Artificer",
-                            "Weaponsmith", "Scribe", "Huntsman", "Jeweler"
+                            "Weaponsmith", "Scribe", "Huntsman", "Jeweler",
                         },
                         MinRating = 400,
-                        Flags = new List<string> { "LearnedFromItem" }
+                        Flags = new List<string> { "LearnedFromItem" },
                     }
-                }
+                },
             };
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
-                { RiftEssence, new List<int> { RiftEssenceRecipeId } }
+                { RiftEssence, new List<int> { RiftEssenceRecipeId } },
             };
 
             var seededStore = BuildSeededStore(recipes, searches);
@@ -213,17 +214,17 @@ namespace GW2CraftingHelper.Tests.Services
                             new RawIngredient { Type = "Item", Id = 70454, Count = 1 },
                             new RawIngredient { Type = "Item", Id = 24356, Count = 50 },
                             new RawIngredient { Type = "Item", Id = 24350, Count = 50 },
-                            new RawIngredient { Type = "GuildUpgrade", Id = 279, Count = 1 }
+                            new RawIngredient { Type = "GuildUpgrade", Id = 279, Count = 1 },
                         },
                         Disciplines = new List<string> { "Scribe" },
                         MinRating = 100,
-                        Flags = new List<string> { "AutoLearned" }
+                        Flags = new List<string> { "AutoLearned" },
                     }
-                }
+                },
             };
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
-                { 75375, new List<int> { 9917 } }
+                { 75375, new List<int> { 9917 } },
             };
 
             var seededStore = BuildSeededStore(recipes, searches);
@@ -301,17 +302,17 @@ namespace GW2CraftingHelper.Tests.Services
                         Ingredients = new List<RawIngredient>
                         {
                             new RawIngredient { Type = "Item", Id = 70489, Count = 1 },
-                            new RawIngredient { Type = "GuildUpgrade", Id = 829, Count = 5 }
+                            new RawIngredient { Type = "GuildUpgrade", Id = 829, Count = 5 },
                         },
                         Disciplines = new List<string> { "Scribe" },
                         MinRating = 350,
-                        Flags = new List<string> { "AutoLearned" }
+                        Flags = new List<string> { "AutoLearned" },
                     }
-                }
+                },
             };
             var searches = new Dictionary<int, IReadOnlyList<int>>
             {
-                { 80471, new List<int> { 12002 } }
+                { 80471, new List<int> { 12002 } },
             };
 
             var seededStore = BuildSeededStore(recipes, searches);

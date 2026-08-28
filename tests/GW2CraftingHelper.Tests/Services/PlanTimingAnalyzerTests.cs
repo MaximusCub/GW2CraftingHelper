@@ -13,7 +13,7 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = new List<string>
             {
                 "Build tree: 42ms",
-                "Fetch prices: 150ms (10 items)"
+                "Fetch prices: 150ms (10 items)",
             };
 
             var parsed = PlanTimingAnalyzer.Parse(lines);
@@ -36,7 +36,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 "no match",
                 "--- Timing Summary ---",
-                "Required disciplines: Weaponsmith"
+                "Required disciplines: Weaponsmith",
             };
 
             var parsed = PlanTimingAnalyzer.Parse(lines);
@@ -51,7 +51,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 "Phase A: 100ms",
                 "Phase B: 300ms",
-                "Phase C: 200ms"
+                "Phase C: 200ms",
             };
 
             var summary = PlanTimingAnalyzer.Summarize(lines);

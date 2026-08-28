@@ -39,8 +39,8 @@ namespace GW2CraftingHelper.Tests.Services
                 "Gloves Armor",
                 "Required Level: 80",
                 "Crafted in the style of the renowned asuran genius, Zojja.",
-                "Account Bound on Use",
-                "2s 40c"
+                "Account Bound",
+                "2s 40c",
             }, await LinesFor(RealItemJson.ZojjasWarfists));
         }
 
@@ -72,93 +72,89 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task CraftingMaterial_GetsANameRarityTypeValueAndDescription()
+        public async Task CraftingMaterial_LeadsWithItsDescriptionAndShowsNoTypeLine()
         {
-            // No "Basic" line: the game suppresses that rarity word (G20).
+            // The live3 material captures (vials/eyes/almonds, 2026-08-26)
+            // show NO "Crafting Material" type line and no rarity word for
+            // any material rarity; the description runs contiguous under
+            // the header (almonds' "Ingredient" IS 12337's description
+            // field) and the value contiguous under the block above it
+            // (vials: discipline line -> coin row at one 16px pitch).
             Assert.Equal(new[]
             {
                 "Mithril Ore",
-                "",
-                "Crafting Material",
                 "Refine into Ingots.",
-                "",
-                "7c"
+                "7c",
             }, await LinesFor(RealItemJson.MithrilOre));
+        }
+
+        [Fact]
+        public async Task GiftOfTwilight_MatchesTheOwnerABCaptureLineForLine()
+        {
+            // The 2026-08-27 A/B: the owner hovered item 19648 in the
+            // module and in the live game and captured both. The game's box
+            // reads header, description paragraph, blank, forge line, four
+            // bullets, blank, "Trophy", "Account Bound", 6s 40c - and the
+            // bound line is BARE, which is what this capture corrected.
+            // (The game additionally wraps the description after
+            // "greatsword"; that is layout, pinned in
+            // TooltipLayoutMathTests, not composition.)
+            Assert.Equal(new[]
+            {
+                "Gift of Twilight",
+                "A gift used to create the legendary greatsword Twilight.",
+                "",
+                "Made by combining these items in the Mystic Forge:",
+                "\u2022 1 Gift of Metal",
+                "\u2022 1 Gift of Darkness",
+                "\u2022 100 Icy Runestones",
+                "\u2022 1 Superior Sigil of Blood",
+                "",
+                "Trophy",
+                "Account Bound",
+                "6s 40c",
+            }, await LinesFor(RealItemJson.GiftOfTwilight));
         }
 
         [Fact]
         public async Task AConsumablesValueFollowsTheLineAboveItWithNoBlank()
         {
-            // Measured on steak.png, the one capture that shows a value
-            // line: its body bands run 39, 57, 75 (blank), 93 ("Food"),
-            // 111 ("Required Level: 10"), 129 (the coin row) - one 18px
-            // pitch from the level line to the value, row 128 empty.
-            // FWDekker's Consumable builder emits getValue() with no
-            // leading break, as eight of the ten other builders that emit
-            // a value at all do (fourteen builders, eleven getValue()
-            // call sites, two of them behind a break).
+            // Measured on steak.png (2012) and re-confirmed across live3
+            // (2026-08-26): every capture that shows a value line at all -
+            // vials, fury-scorched, red-festival-lantern,
+            // counterfeit-ticket, sigil-rage, relic-livingcity - runs it
+            // contiguous under the line above it.
             var lines = await LinesFor(RealItemJson.CilantroSteak);
 
-            Assert.Equal("Account Bound on Use", lines[lines.Length - 2]);
+            Assert.Equal("Account Bound", lines[lines.Length - 2]);
             Assert.Equal("1s 65c", lines[lines.Length - 1]);
         }
 
-        [Fact]
-        public void ACraftingMaterialKeepsTheBlankAboveItsValue()
-        {
-            // The other side: FWDekker's Generic builder - its fallback,
-            // and what a crafting material, a trait or a key gets - is one
-            // of only two that put a break in front of getValue().
-            // Inferred; no capture of a crafting material's value exists.
-            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
-            {
-                Name = "Mithril Ore",
-                ItemType = "CraftingMaterial",
-                VendorValue = 7
-            }).ToPlainLines();
-
-            Assert.Equal("", lines[lines.Count - 2]);
-            Assert.Equal("7c", lines[lines.Count - 1]);
-        }
-
         [Theory]
+        [InlineData("CraftingMaterial")]
         [InlineData("Gathering")]
         [InlineData("MiniPet")]
         [InlineData("Tool")]
-        public void ATypeTheReplicaGivesNoValueLineIsGuessedContiguous(string itemType)
+        [InlineData("MountSkin")]
+        public void EveryShapesValueRunsContiguousUnderTheLineAboveIt(string itemType)
         {
-            // Pins a GUESS, not a measurement. FWDekker's Gathering,
-            // MiniPet and Tool builders emit no getValue() at all, so
-            // neither shape can claim its agreement and no capture of one
-            // exists. Contiguous is chosen by nearest body shape; see
-            // ValueSitsAfterABlank. Flip this test, not just the table, if
-            // the desktop gate measures a blank.
+            // The old table gave FWDekker's Generic shape (materials,
+            // unknown types) a blank above the value, on the replica's
+            // <br /> before getValue(). The live3 vials capture - a
+            // crafting material, exactly that shape - measures the coin
+            // row ONE 16px pitch under the line above it, and no capture
+            // anywhere shows the blank, so the value is contiguous for
+            // every type (2026-08-26).
             var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Copper Mining Pick",
                 ItemType = itemType,
                 Description = "Used to gather from copper ore.",
-                VendorValue = 7
+                VendorValue = 7,
             }).ToPlainLines();
 
             Assert.NotEqual("", lines[lines.Count - 2]);
             Assert.Equal("7c", lines[lines.Count - 1]);
-        }
-
-        [Fact]
-        public void AnItemTypeThisModuleHasNeverSeenFallsToTheGenericShape()
-        {
-            // The type table is inverted on purpose: the API's vocabulary
-            // grows, and a new type takes the replica's own fallback
-            // rather than silently losing a blank.
-            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
-            {
-                Name = "Some Future Thing",
-                ItemType = "MountSkin",
-                VendorValue = 7
-            }).ToPlainLines();
-
-            Assert.Equal("", lines[lines.Count - 2]);
         }
 
         [Fact]
@@ -168,13 +164,23 @@ namespace GW2CraftingHelper.Tests.Services
 
             // Header, one blank, then all six positional bonuses - the
             // shape FWDekker's UpgradeComponent builder emits and the one
-            // the game shows for an unequipped rune (spec section 3.2).
+            // the game shows for an unequipped rune (KNOWN-ISSUES #42).
             Assert.Equal("Superior Rune of the Scholar", lines[0]);
             Assert.Equal("", lines[1]);
             Assert.Equal("(1): +25 Power", lines[2]);
             Assert.Equal("(6): +125 Ferocity", lines[7]);
-            Assert.Contains("Rune", lines);
             Assert.Equal("65c", lines[lines.Length - 1]);
+
+            // No "Rune" type line and no "Exotic" rarity word: the live3
+            // sigil-rage capture (an Exotic UpgradeComponent) shows
+            // neither, running its description straight into "Required
+            // Level: 60" (2026-08-26; FWDekker's UpgradeComponent builder
+            // agrees). And the description precedes the level line.
+            Assert.DoesNotContain("Rune", lines);
+            Assert.DoesNotContain("Exotic", lines);
+            Assert.True(
+                System.Array.IndexOf(lines, "Double-click to apply to a piece of armor.")
+                    < System.Array.IndexOf(lines, "Required Level: 60"));
         }
 
         [Fact]
@@ -190,6 +196,70 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ASigilsCooldownReminderSplitsOffTheBuffLineAndKeepsItsGrey()
+        {
+            // The cooldown IS in the API - inside
+            // infix_upgrade.buff.description as
+            // "<br><c=@reminder>(Cooldown: 20 Seconds)</c>" (live API,
+            // 24561) - which the old raw emission would have printed as
+            // literal markup in the bonus blue. The live3 sigil-rage
+            // capture shows the split the markup encodes: blue effect
+            // line, grey cooldown line under it (2026-08-26).
+            var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Superior Sigil of Rage",
+                ItemType = "UpgradeComponent",
+                SubType = "Sigil",
+                BuffDescription = "Gain quickness for 3 seconds upon critically hitting a foe. "
+                    + "<br><c=@reminder>(Cooldown: 20 Seconds)</c>",
+            });
+
+            var spans = content.Lines.SelectMany(l => l.Spans).ToArray();
+            var buff = spans.Single(
+                s => s.Text.StartsWith("Gain quickness"));
+            Assert.Equal(TooltipSpanRole.Bonus, buff.Role);
+
+            var cooldown = spans.Single(s => s.Text == "(Cooldown: 20 Seconds)");
+            Assert.Equal(TooltipSpanRole.Reminder, cooldown.Role);
+
+            var lines = content.ToPlainLines();
+            Assert.Equal(
+                lines.IndexOf(lines.Single(l => l.StartsWith("Gain quickness"))) + 1,
+                lines.IndexOf("(Cooldown: 20 Seconds)"));
+        }
+
+        [Fact]
+        public void AConsumableWithBothAnEffectAndADescriptionTakesTheCandyCornShape()
+        {
+            // live3 candy-corn (36041, 2026-08-26): prompt, effect block,
+            // then the item's own description CONTIGUOUS under the effect
+            // block, then the shape's one blank, then "Consumable".
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Piece of Candy Corn",
+                ItemType = "Consumable",
+                SubType = "Generic",
+                EffectName = "Sugar Rush",
+                EffectIconUrl = "https://render.example/sugar.png",
+                NourishmentDurationMs = 10000,
+                NourishmentDescription =
+                    "Movement speed increased by 10%. Stacks duration. Causes sugar crash.",
+                Description = "A sugary, delicious, versatile treat.",
+            }).ToPlainLines();
+
+            Assert.Equal(new[]
+            {
+                "Piece of Candy Corn",
+                "Double-click to consume.",
+                "Sugar Rush(10s): Movement speed increased by 10%. Stacks duration. "
+                    + "Causes sugar crash.",
+                "A sugary, delicious, versatile treat.",
+                "",
+                "Consumable",
+            }, lines.ToArray());
+        }
+
+        [Fact]
         public void BuffDescriptionSurvivesWhenNoAttributeLineAlreadySaysIt()
         {
             // The other half of the de-duplication above: suppression is
@@ -201,9 +271,9 @@ namespace GW2CraftingHelper.Tests.Services
                 Attributes = new[]
                 {
                     new ItemAttributeLine("Power", 5),
-                    new ItemAttributeLine("Precision", 5)
+                    new ItemAttributeLine("Precision", 5),
                 },
-                BuffDescription = "+5 Power, +5 Precision"
+                BuffDescription = "+5 Power, +5 Precision",
             };
 
             var lines = ItemStatTooltipComposer.BuildContent(stats).ToPlainLines().ToArray();
@@ -214,44 +284,86 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task FineFood_ShowsItsNourishmentBlockAndDuration()
+        public async Task FineFood_ShowsThePromptTheEffectBlockAndTheGamesTypeLine()
         {
             var lines = await LinesFor(RealItemJson.LotusFries);
 
-            // No blank under the header: a body that OPENS with the
-            // nourishment block runs straight on, measured on steak.png
-            // (icon bottom y=37, first text band y=39) and matching
-            // FWDekker's Consumable builder, which emits its
-            // getConsumableDescription() with no leading break.
-            Assert.Equal("Cup of Lotus Fries", lines[0]);
-            Assert.Equal("30% Magic Find", lines[1]);
-            Assert.Equal("+70 Condition Damage", lines[2]);
-            Assert.Equal("+10% Experience from Kills", lines[3]);
-            Assert.Equal("Duration: 30 m", lines[4]);
+            // The live3 food shape (soul-pastries, omnomberry,
+            // 2026-08-26): "Double-click to consume." straight under the
+            // header, then the effect block leading with the effect's own
+            // name and its duration folded into a parenthetical - never a
+            // separate "Duration:" line - and the effect block running
+            // CONTIGUOUS into "Consumable" (both captures: one 16px pitch,
+            // no blank). "Consumable" is the top-level type; the game
+            // never shows details.type ("Food").
+            Assert.Equal(new[]
+            {
+                "Cup of Lotus Fries",
+                "Double-click to consume.",
+                "Nourishment (30 m): 30% Magic Find",
+                "+70 Condition Damage",
+                "+10% Experience from Kills",
+                "Consumable",
+                "Required Level: 80",
+            }, lines);
         }
 
         [Fact]
-        public async Task AFoodsFirstNourishmentLineIsWhiteAndItsTrailingEffectsAreGrey()
+        public async Task TheWholeEffectBlockIsGreyAndCarriesItsIconOnTheFirstLineOnly()
         {
-            // First line white, trailing effect lines grey (~162), measured
-            // on the allspice capture (fidelity-audit F7). Never the
-            // upgrade-bonus blue - that is measured on runes and sigils
-            // only.
+            // Every line of the effect block - the "Nourishment (...)"
+            // lead-in included - saturates at the annotation grey
+            // (170,170,170) on all three live3 effect captures
+            // (soul-pastries, candy-corn, omnomberry, 2026-08-26). This
+            // SUPERSEDES F7's white-first-line split, whose evidence was a
+            // 2018 JPEG; the measurement wins. Never the upgrade-bonus
+            // blue. The effect icon (details.icon) rides the block's first
+            // line only.
             var raw = await RealItemFixtures.ParseOneAsync(RealItemJson.LotusFries);
             var content = ItemStatTooltipComposer.BuildContent(ItemStatBlockFactory.Build(raw));
-            var spans = content.Lines.SelectMany(l => l.Spans).ToArray();
 
-            var first = spans.Single(s => s.Text == "30% Magic Find");
-            Assert.Equal(TooltipSpanRole.Default, first.Role);
-
-            var trailing = spans
-                .Where(s => s.Text == "+70 Condition Damage" ||
-                            s.Text == "+10% Experience from Kills")
+            var effectLines = content.Lines
+                .Where(l => l.Kind == TooltipLineKind.Effect)
                 .ToArray();
+            Assert.Equal(3, effectLines.Length);
+            Assert.Equal(
+                "https://render.guildwars2.com/file/779D3F0ABE5B46C09CFC57374DA8CC3A495F291C/436367.png",
+                effectLines[0].IconUrl);
+            Assert.Null(effectLines[1].IconUrl);
+            Assert.Null(effectLines[2].IconUrl);
 
-            Assert.Equal(2, trailing.Length);
-            Assert.All(trailing, s => Assert.Equal(TooltipSpanRole.Muted, s.Role));
-            Assert.DoesNotContain(spans, s => s.Role == TooltipSpanRole.Bonus);
+            var spans = effectLines.SelectMany(l => l.Spans).ToArray();
+            Assert.All(spans, s => Assert.Equal(TooltipSpanRole.Muted, s.Role));
+            Assert.DoesNotContain(
+                content.Lines.SelectMany(l => l.Spans), s => s.Role == TooltipSpanRole.Bonus);
+        }
+
+        [Theory]
+        [InlineData(10000, "Sugar Rush(10s): Zoom")]
+        [InlineData(2700000, "Nourishment (45 m): Zoom")]
+        [InlineData(5400000, "Nourishment (1 h 30 m): Zoom")]
+        public void EffectDurationsAreTightForSecondsAndSpacedForMinutes(
+            int durationMs, string expected)
+        {
+            // Seconds hug the name - "Sugar Rush(10s):" (live3 candy-corn)
+            // and "Soul of the Titan(5s):" (relic-livingcity), both a 2px
+            // kern where the minutes captures show a 6px space - while
+            // minutes take the space on both sides of the unit:
+            // "Nourishment (45 m):" (soul-pastries) and "Nourishment
+            // (30 m):" (omnomberry, pixel-identical gap). The hour form
+            // extends the minutes style; no capture of one exists.
+            string name = durationMs < 60000 ? "Sugar Rush" : "Nourishment";
+            var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
+            {
+                Name = "Treat",
+                ItemType = "Consumable",
+                EffectName = name,
+                NourishmentDurationMs = durationMs,
+                NourishmentDescription = "Zoom",
+            }).ToPlainLines();
+
+            Assert.Contains(expected, lines);
+            Assert.Contains("Double-click to consume.", lines);
         }
 
         [Fact]
@@ -262,7 +374,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = "Superior Rune of the Scholar",
                 ItemType = "UpgradeComponent",
                 SubType = "Rune",
-                UpgradeBonuses = new[] { "+25 Power", "+35 Ferocity" }
+                UpgradeBonuses = new[] { "+25 Power", "+35 Ferocity" },
             });
 
             var bonuses = content.Lines
@@ -284,7 +396,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Toymaker's Bag",
                 Rarity = "Exotic",
-                ItemType = "Back"
+                ItemType = "Back",
             }).ToPlainLines();
 
             Assert.Equal("Toymaker's Bag", lines[0]);
@@ -300,7 +412,7 @@ namespace GW2CraftingHelper.Tests.Services
             var lines = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Timed Snack",
-                NourishmentDurationMs = 1800000
+                NourishmentDurationMs = 1800000,
             }).ToPlainLines();
 
             Assert.Equal("Timed Snack", lines[0]);
@@ -318,7 +430,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Odd Hybrid",
                 BuffDescription = "+5% Damage",
-                NourishmentDurationMs = 1800000
+                NourishmentDurationMs = 1800000,
             }).ToPlainLines();
 
             Assert.Equal("Odd Hybrid", lines[0]);
@@ -334,7 +446,10 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("Cilantro Lime Sous-Vide Steak", lines[0]);
             Assert.DoesNotContain(lines, l => l.StartsWith("Duration"));
             Assert.DoesNotContain(lines, l => l.Contains("No effect"));
-            Assert.Contains("Account Bound on Use", lines);
+            // No effect data means no consume prompt either - the prompt
+            // is only measured beside a populated effect block.
+            Assert.DoesNotContain("Double-click to consume.", lines);
+            Assert.Contains("Account Bound", lines);
         }
 
         [Fact]
@@ -342,6 +457,11 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = await LinesFor(RealItemJson.Rebreather);
 
+            // Both dimensions stack, account line first, and each is
+            // worded the way live3 relic-livingcity shows for this exact
+            // flag pair: bare "Account Bound" over "Soulbound on Use"
+            // (2026-08-26).
+            Assert.Contains("Account Bound", lines);
             Assert.Contains("Soulbound on Use", lines);
             Assert.Contains("Defense: 73", lines);
             Assert.Contains("Double-click to select stats.", lines);
@@ -356,7 +476,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Unique Thing",
                 IsUnique = true,
-                Binding = "Account Bound"
+                Bindings = new[] { "Account Bound" },
             }).ToPlainLines();
 
             Assert.Equal(lines.IndexOf("Unique") + 1, lines.IndexOf("Account Bound"));
@@ -373,7 +493,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Name = "Weapon",
                 ItemType = "Weapon",
-                SubType = subType
+                SubType = subType,
             }).ToPlainLines();
 
             if (expected == null)
@@ -383,6 +503,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.DoesNotContain(lines, l => l.StartsWith("("));
                 return;
             }
+
             Assert.Contains(expected, lines);
         }
 
@@ -430,7 +551,7 @@ namespace GW2CraftingHelper.Tests.Services
             var identity = content.Lines
                 .SelectMany(l => l.Spans)
                 .Where(s => s.Text == "Gloves Armor" ||
-                            s.Text == "Heavy" || s.Text == "Account Bound on Use")
+                            s.Text == "Heavy" || s.Text == "Account Bound")
                 .ToArray();
 
             Assert.Equal(3, identity.Length);
@@ -519,7 +640,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Food",
-                NourishmentDurationMs = durationMs
+                NourishmentDurationMs = durationMs,
             });
 
             Assert.Contains(expected, content.ToPlainLines());
@@ -531,7 +652,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Restricted Thing",
-                Restrictions = new[] { "Guardian", "Warrior" }
+                Restrictions = new[] { "Guardian", "Warrior" },
             });
 
             Assert.Contains("Restricted to: Guardian, Warrior", content.ToPlainLines());
@@ -543,7 +664,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Unrestricted Thing",
-                Restrictions = new string[0]
+                Restrictions = new string[0],
             });
 
             Assert.DoesNotContain(content.ToPlainLines(), l => l.StartsWith("Restricted"));
@@ -555,7 +676,7 @@ namespace GW2CraftingHelper.Tests.Services
             var content = ItemStatTooltipComposer.BuildContent(new ItemStatBlock
             {
                 Name = "Odd",
-                Attributes = new[] { new ItemAttributeLine("Power", -5) }
+                Attributes = new[] { new ItemAttributeLine("Power", -5) },
             });
 
             Assert.Contains("-5 Power", content.ToPlainLines());

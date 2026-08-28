@@ -6,10 +6,8 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Models
 {
-
     public class AccountSnapshotSerializationTests
     {
-
         [Fact]
         public void RoundTrip_PreservesAllFields()
         {
@@ -19,12 +17,12 @@ namespace GW2CraftingHelper.Tests.Models
                 CoinCopper = 1234567,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 100, Name = "Iron Ore", Count = 50, Source = "Bank" },
-                    new SnapshotItemEntry { ItemId = 200, Name = "Gold Ore", Count = 10, Source = "Character:Ranger" }
+                    new SnapshotItemEntry { ItemId = 100, Name = "Iron Ore", Count = 50, Source = "Bank", Rarity = "Basic" },
+                    new SnapshotItemEntry { ItemId = 200, Name = "Gold Ore", Count = 10, Source = "Character:Ranger", Rarity = "Fine" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
-                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 9999 }
+                    new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 9999 },
                 },
                 // This test's name is a
                 // promise ("preserves ALL fields") that CharacterDisciplines
@@ -43,8 +41,8 @@ namespace GW2CraftingHelper.Tests.Models
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
                     new SnapshotCharacterDiscipline { CharacterName = "Anna", Discipline = "Weaponsmith", Rating = 500, Active = true },
-                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = false }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Bob", Discipline = "Chef", Rating = 400, Active = false },
+                },
             };
 
             string json = JsonConvert.SerializeObject(original);
@@ -57,7 +55,9 @@ namespace GW2CraftingHelper.Tests.Models
             Assert.Equal(original.Items[0].Name, deserialized.Items[0].Name);
             Assert.Equal(original.Items[0].Count, deserialized.Items[0].Count);
             Assert.Equal(original.Items[0].Source, deserialized.Items[0].Source);
+            Assert.Equal(original.Items[0].Rarity, deserialized.Items[0].Rarity);
             Assert.Equal(original.Items[1].ItemId, deserialized.Items[1].ItemId);
+            Assert.Equal(original.Items[1].Rarity, deserialized.Items[1].Rarity);
             Assert.Equal(original.Wallet.Count, deserialized.Wallet.Count);
             Assert.Equal(original.Wallet[0].CurrencyId, deserialized.Wallet[0].CurrencyId);
             Assert.Equal(original.Wallet[0].CurrencyName, deserialized.Wallet[0].CurrencyName);
@@ -81,7 +81,7 @@ namespace GW2CraftingHelper.Tests.Models
                 CapturedAt = DateTime.UtcNow,
                 CoinCopper = 0,
                 Items = new List<SnapshotItemEntry>(),
-                Wallet = new List<SnapshotWalletEntry>()
+                Wallet = new List<SnapshotWalletEntry>(),
             };
 
             string json = JsonConvert.SerializeObject(original);
@@ -103,5 +103,4 @@ namespace GW2CraftingHelper.Tests.Models
             Assert.Equal(int.MaxValue, deserialized.CoinCopper);
         }
     }
-
 }

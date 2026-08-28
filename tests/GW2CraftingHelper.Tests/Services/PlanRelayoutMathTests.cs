@@ -6,7 +6,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class PlanRelayoutMathTests
     {
         // --- CenterX ---
-
         [Fact]
         public void CenterX_EvenRemainder_SplitsEqually()
         {
@@ -26,7 +25,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- RightAlignedX ---
-
         [Fact]
         public void RightAlignedX_SubtractsWidthFromEdge()
         {
@@ -43,7 +41,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- NameMaxWidthBeforeColumn ---
-
         [Fact]
         public void NameMaxWidthBeforeColumn_TypicalUsedMaterialsRow()
         {
@@ -67,7 +64,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- HeaderSplitBeforeColumn (the sortable header's hit area) ---
-
         [Fact]
         public void HeaderSplit_SitsInTheGapTheNameColumnStopsAt()
         {
@@ -103,7 +99,6 @@ namespace GW2CraftingHelper.Tests.Services
         // space to the block's right instead of giving it to the name
         // column. Every block is now pinned to the panel edge and the name
         // column is the only one that flexes.
-
         [Fact]
         public void PinnedRightEdge_IsThePanelEdgeLessOneMargin()
         {
@@ -168,7 +163,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeTreeColumnEdges ---
-
         [Fact]
         public void ComputeTreeColumnEdges_TypicalPanelWidth_MatchesManualArithmetic()
         {
@@ -300,9 +294,19 @@ namespace GW2CraftingHelper.Tests.Services
         // one example total: Menomonia's digits are not one width, so the
         // column a plan reserves depends on which digits its total happens
         // to contain. TreeCostColumnMath.SegmentWidth adds
-        // CoinLabelIconGap(2) + CoinIconSize(20) to each of three segments
+        // CoinLabelIconGap(2) + CoinIconSize to each of three segments
         // and CoinSegmentGap(6) sits twice between them, so the column is
-        // the three digit runs' MeasureString widths + 78 of fixed chrome.
+        // the three digit runs' MeasureString widths plus that fixed chrome.
+        //
+        // The chrome was 78 when CoinIconSize was 20; the move onto the
+        // measured wallet BAR tier (CurrencyIconTiers.WalletBarIconSize, 16)
+        // makes it 3 * (2 + 16) + 2 * 6 = 66, so the real worst case is now
+        // 169. The literal below is deliberately NOT lowered: it feeds a
+        // minimum-window-width PROOF, where over-reserving is safe and
+        // under-reserving is not, and holding it fixed keeps the shipped
+        // window minimum where it is rather than moving a user-visible
+        // constant as a side effect of an icon change. The 12px it now
+        // over-reserves is recorded slack, not an unmodelled term.
         // At Font16 '0' advances 10px and inks 12, '2' and '7' advance 10
         // and ink 11, '1' advances 6, and every other digit advances 9 and
         // inks 11. A run's rect is the leading digits' advances plus the
@@ -424,7 +428,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- ComputeCostTileGeometry ---
-
         [Fact]
         public void ComputeCostTileGeometry_TypicalWidth_TilesFillEvenly()
         {
@@ -462,7 +465,6 @@ namespace GW2CraftingHelper.Tests.Services
         // CraftingPlanView.RenderDecisionPills uses this pure helper to
         // decide how many (already width-measured, emission-order) pills
         // to actually render.
-
         [Fact]
         public void ComputeVisiblePillCount_AllPillsFit_ReturnsFullCount()
         {
@@ -607,6 +609,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 used += PlanRelayoutMath.ReducedWidth(widths[i], fit.WidthReduction) + 6;
             }
+
             Assert.True(used + fit.OverflowPillWidth <= 240);
         }
 

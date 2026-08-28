@@ -32,8 +32,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Entries = new List<RankerWatchlistEntry>
                 {
                     new RankerWatchlistEntry { ItemId = 30684, Quantity = 1, Name = "Twilight", IconUrl = "t.png", Rarity = "Legendary" },
-                    new RankerWatchlistEntry { ItemId = 30689, Quantity = 2, Name = "Sunrise", IconUrl = "s.png", Rarity = "Legendary" }
-                }
+                    new RankerWatchlistEntry { ItemId = 30689, Quantity = 2, Name = "Sunrise", IconUrl = "s.png", Rarity = "Legendary" },
+                },
             };
         }
 
@@ -145,8 +145,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     Entries = new List<RankerWatchlistEntry>
                     {
-                        new RankerWatchlistEntry { ItemId = 1000 + i, Quantity = 1, Name = "Item " + i }
-                    }
+                        new RankerWatchlistEntry { ItemId = 1000 + i, Quantity = 1, Name = "Item " + i },
+                    },
                 };
                 store.Save(watchlist);
             });
@@ -166,8 +166,8 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     new RankerWatchlistEntry { ItemId = 0, Quantity = 1, Name = "Bogus" },
                     new RankerWatchlistEntry { ItemId = 42, Quantity = 0, Name = "Real" },
-                    new RankerWatchlistEntry { ItemId = 43, Quantity = -5, Name = "Also real" }
-                }
+                    new RankerWatchlistEntry { ItemId = 43, Quantity = -5, Name = "Also real" },
+                },
             };
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(payload));
 
@@ -175,6 +175,38 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(new[] { 42, 43 }, loaded.Entries.Select(e => e.ItemId).ToArray());
             Assert.All(loaded.Entries, e => Assert.Equal(1, e.Quantity));
+        }
+
+        [Fact]
+        public void ComparisonMode_RoundTripsThroughSaveAndLoad()
+        {
+            var store = new RankerStore(_temp.Path);
+            var watchlist = SampleWatchlist();
+            watchlist.Mode = RankerMode.Independent;
+
+            Assert.True(store.Save(watchlist));
+
+            Assert.Equal(RankerMode.Independent, store.Load().Mode);
+        }
+
+        [Fact]
+        public void AFileWrittenBeforeTheModeFieldExisted_LoadsAsCascadeWithItsListIntact()
+        {
+            // The exact shape RankerStore wrote before the Mode field (and
+            // before rarity was ever populated): schema 1, entries only.
+            // Additive field, no schema bump - old lists must load whole.
+            File.WriteAllText(FilePath,
+                "{ \"SchemaVersion\": 1, \"Entries\": [ " +
+                "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\", \"IconUrl\": \"t.png\" } ] }");
+
+            int errors = 0;
+            var loaded = new RankerStore(_temp.Path, (_, __) => errors++).Load();
+
+            Assert.Equal(0, errors);
+            Assert.Equal(RankerMode.Cascade, loaded.Mode);
+            Assert.Single(loaded.Entries);
+            Assert.Equal(30684, loaded.Entries[0].ItemId);
+            Assert.Null(loaded.Entries[0].Rarity);
         }
 
         [Fact]

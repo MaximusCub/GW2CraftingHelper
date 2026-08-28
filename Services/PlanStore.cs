@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.IO.Compression;
 using System.Text;
 using GW2CraftingHelper.Models;
 
@@ -55,10 +54,6 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     internal class PlanStore
     {
-        // Gzip's own magic number (RFC 1952 SS2.3.1) - the first two bytes
-        // of every gzip member, regardless of what is inside it.
-        private static readonly byte[] GzipMagicNumber = { 0x1F, 0x8B };
-
         private readonly string _filePath;
 
         // See StatusStore's
@@ -100,7 +95,9 @@ namespace GW2CraftingHelper.Services
                 }
 
                 byte[] bytes = File.ReadAllBytes(_filePath);
-                string json = IsGzip(bytes) ? DecompressToJson(bytes) : Encoding.UTF8.GetString(bytes);
+                string json = GzipJsonFile.IsGzip(bytes)
+                    ? GzipJsonFile.DecompressToJson(bytes)
+                    : Encoding.UTF8.GetString(bytes);
                 return Deserialize(json);
             }
             catch (PlanSchemaVersionMismatchException ex)
@@ -135,7 +132,7 @@ namespace GW2CraftingHelper.Services
                     }
 
                     string json = Serialize(plan);
-                    byte[] compressed = Compress(json);
+                    byte[] compressed = GzipJsonFile.Compress(json);
                     string tmpPath = _filePath + ".tmp";
                     File.WriteAllBytes(tmpPath, compressed);
 
@@ -152,48 +149,6 @@ namespace GW2CraftingHelper.Services
             catch (Exception ex)
             {
                 _onError?.Invoke($"Failed to save plan to {_filePath}", ex);
-            }
-        }
-
-        private static bool IsGzip(byte[] bytes)
-        {
-            return bytes.Length >= GzipMagicNumber.Length
-                && bytes[0] == GzipMagicNumber[0]
-                && bytes[1] == GzipMagicNumber[1];
-        }
-
-        private static byte[] Compress(string json)
-        {
-            // Serialize(null plan) returns null (see PlanStoreHelpers.
-            // SerializePersistedPlan's own doc comment). The pre-gzip code
-            // (File.WriteAllText(path, null)) silently wrote a 0-byte file
-            // for that case rather than throwing - preserve that same
-            // "null in, empty/no-op file out" contract here instead of
-            // letting Encoding.UTF8.GetBytes(null) throw ArgumentNullException.
-            byte[] jsonBytes = Encoding.UTF8.GetBytes(json ?? string.Empty);
-            using (var output = new MemoryStream())
-            {
-                // leaveOpen: true - GZipStream's Dispose flushes the final
-                // deflate block/trailer into `output`; disposing it here
-                // (rather than leaking it to the caller) closing `output`
-                // out from under the ToArray() call below would otherwise
-                // throw ObjectDisposedException.
-                using (var gzip = new GZipStream(output, CompressionMode.Compress, leaveOpen: true))
-                {
-                    gzip.Write(jsonBytes, 0, jsonBytes.Length);
-                }
-
-                return output.ToArray();
-            }
-        }
-
-        private static string DecompressToJson(byte[] gzipBytes)
-        {
-            using (var input = new MemoryStream(gzipBytes))
-            using (var gzip = new GZipStream(input, CompressionMode.Decompress))
-            using (var reader = new StreamReader(gzip, Encoding.UTF8))
-            {
-                return reader.ReadToEnd();
             }
         }
 

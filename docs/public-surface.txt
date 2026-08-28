@@ -1,0 +1,21 @@
+# Public top-level types in the module assembly - a ratchet, not a target.
+#
+# Why this file exists: the hygiene pass flipped the module's default from
+# public to internal (249 public top-level types down to 1: Module, the
+# Blish HUD entry point, which must stay public). Days later, one feature
+# branch landed 10 new public top-level types - the Ranker feature set and
+# OwnMaterialsGate - because the convention had no tripwire. CI now counts
+# public top-level type declarations in the module's compiled source
+# (Models/, Services/, Views/, Contracts/, Properties/, Module.cs; tests
+# and tools are out of scope) and fails when the count exceeds the number
+# pinned below.
+#
+# The pinned number is the count measured on the day it was written, not
+# an endorsement: 10 of the 11 should eventually be internal. This number
+# should only fall. Lowering it is the explicit act of a commit that flips
+# types internal; raising it means a new public type, which is a design
+# decision that costs one deliberate line here, in the commit that adds
+# the type, where a reviewer can see it.
+#
+# Format: one integer on the single non-comment line.
+11

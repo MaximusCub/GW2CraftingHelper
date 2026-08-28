@@ -25,14 +25,13 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var response = new HttpResponseMessage(_statusCode)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
                 return Task.FromResult(response);
             }
         }
 
         // --- Gw2PriceApiClient ---
-
         [Fact]
         public async Task PriceClient_404_ReturnsEmptyBatch_WithoutProvingAbsence()
         {
@@ -105,7 +104,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- Gw2ItemApiClient ---
-
         [Fact]
         public async Task ItemClient_404_ReturnsEmptyList()
         {

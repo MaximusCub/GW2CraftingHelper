@@ -38,12 +38,11 @@ namespace GW2CraftingHelper.Tests.Services
                 CanBuyTp = canBuyTp,
                 OwnedQuantityUsed = ownedQuantityUsed,
                 IsIgnored = isIgnored,
-                IsPlanRoot = isPlanRoot
+                IsPlanRoot = isPlanRoot,
             };
         }
 
         // --- Pill suppression on the root ---
-
         [Fact]
         public void Root_MultiSourceNode_KeepsSourcePills_DropsIgnorePill()
         {
@@ -116,7 +115,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- The flag's production write site ---
-
         [Fact]
         public void BuildTree_MarksTheReturnedRootOnly()
         {
@@ -126,13 +124,13 @@ namespace GW2CraftingHelper.Tests.Services
             var prices = new Dictionary<int, ItemPrice>
             {
                 { 1, new ItemPrice { ItemId = 1, BuyInstant = 1000 } },
-                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } }
+                { 2, new ItemPrice { ItemId = 2, BuyInstant = 10 } },
             };
             var solveResult = new PlanSolver().Solve(root, prices, null);
             var metadata = new Dictionary<int, ItemMetadata>
             {
                 { 1, new ItemMetadata { ItemId = 1, Name = "Root", IconUrl = "r.png" } },
-                { 2, new ItemMetadata { ItemId = 2, Name = "Child", IconUrl = "c.png" } }
+                { 2, new ItemMetadata { ItemId = 2, Name = "Child", IconUrl = "c.png" } },
             };
 
             var treeNode = new CraftingTreeBuilder().BuildTree(root, solveResult.Decisions, metadata);
@@ -161,7 +159,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 3, Quantity = 1 }
+                new PlanRequestItem { ItemId = 3, Quantity = 1 },
             };
 
             var result = await pipeline.GenerateStructuredAsync(
@@ -193,7 +191,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
-                new PlanRequestItem { ItemId = 3, Quantity = 1 }
+                new PlanRequestItem { ItemId = 3, Quantity = 1 },
             };
 
             var initial = await pipeline.GenerateStructuredAsync(
@@ -215,7 +213,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- The state root suppression leaves reachable ---
-
         [Fact]
         public async Task AllIngredientsIgnored_RootKeepsNoIgnorePill_AndSummaryShowsFullZeroBand()
         {
@@ -267,7 +264,6 @@ namespace GW2CraftingHelper.Tests.Services
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 10000, sellUnitPrice: 20000);
             // Item 2, the sole ingredient, is deliberately left unpriced.
-
             var result = await pipeline.GenerateStructuredAsync(
                 1, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
 
@@ -321,11 +317,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 3, Count = 2 }
+                    new RawIngredient { Type = "Item", Id = 3, Count = 2 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
             recipeApi.AddSearchResult(3, 20);
             recipeApi.AddRecipe(new RawRecipe
@@ -335,11 +331,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 2 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 2 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var itemApi = new InMemoryItemApiClient();
@@ -369,11 +365,11 @@ namespace GW2CraftingHelper.Tests.Services
                 OutputItemCount = 1,
                 Ingredients = new List<RawIngredient>
                 {
-                    new RawIngredient { Type = "Item", Id = 2, Count = 5 }
+                    new RawIngredient { Type = "Item", Id = 2, Count = 5 },
                 },
                 Disciplines = new List<string> { "Weaponsmith" },
                 MinRating = 400,
-                Flags = new List<string> { "AutoLearned" }
+                Flags = new List<string> { "AutoLearned" },
             });
 
             var itemApi = new InMemoryItemApiClient();
@@ -390,11 +386,11 @@ namespace GW2CraftingHelper.Tests.Services
                     OutputItemCount = 1,
                     Ingredients = new List<RawIngredient>
                     {
-                        new RawIngredient { Type = "Item", Id = 2, Count = 2 }
+                        new RawIngredient { Type = "Item", Id = 2, Count = 2 },
                     },
                     Disciplines = new List<string> { "Weaponsmith" },
                     MinRating = 400,
-                    Flags = new List<string> { "AutoLearned" }
+                    Flags = new List<string> { "AutoLearned" },
                 });
                 itemApi.AddItem(3, "Second Target", "s.png");
             }

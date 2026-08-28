@@ -32,8 +32,10 @@ namespace GW2CraftingHelper.Tests.Helpers
                 {
                     return candidate;
                 }
+
                 dir = dir.Parent;
             }
+
             return null;
         }
     }

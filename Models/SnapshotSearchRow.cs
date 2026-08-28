@@ -20,6 +20,14 @@ namespace GW2CraftingHelper.Models
 
         public string IconUrl { get; set; } = "";
 
+        /// <summary>
+        /// The rarity captured with this item's name and icon, or "" for a
+        /// row read out of a snapshot.json written before snapshots carried
+        /// rarity. The view resolves it against the session's stat cache
+        /// (ItemRarityResolution) rather than reading it raw.
+        /// </summary>
+        public string Rarity { get; set; } = "";
+
         public int TotalCount { get; set; }
 
         public List<SnapshotSourceCount> Breakdown { get; set; } = new List<SnapshotSourceCount>();

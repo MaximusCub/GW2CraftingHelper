@@ -64,6 +64,76 @@ jobs:
             exit 1
           fi
 
+      - name: UI glyph escapes exist in the shipped font
+        shell: bash
+        run: |
+          # The step above forces non-ASCII into \uXXXX escapes. Escaping is
+          # not rendering: Blish ships one text face, and Menomonia carries
+          # 226 codepoints. Anything else draws nothing AND advances zero
+          # pixels, so it is invisible to the eye, to MeasureString and to
+          # every layout assertion the suite has - which is how a pin toggle
+          # whose two states were a filled and a hollow circle shipped with
+          # no visual state at all (KNOWN-ISSUES #64).
+          #
+          # Module source only: tests and tools carry deliberately odd text,
+          # and ref/ is API and wiki data rather than authored strings.
+          # Whole-line comments are skipped, so a comment may still name a
+          # codepoint the font lacks in order to warn about it.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          allowed = set()
+          for line in open('docs/font-codepoints.txt', encoding='utf-8'):
+              line = line.split('#')[0].strip()
+              if line:
+                  allowed.add(int(line, 16))
+
+          # Views/RankerTabContent.cs shipped three of the same broken
+          # glyphs and is being repaired on its own branch; waiving them
+          # here keeps the two changes from colliding. Every waiver is
+          # checked for staleness below, so the day that branch lands this
+          # step fails until the dead entries are deleted.
+          waived = {
+              ('Views/RankerTabContent.cs', 0x25B2),
+              ('Views/RankerTabContent.cs', 0x25BC),
+              ('Views/RankerTabContent.cs', 0x2715),
+          }
+
+          files = subprocess.run(
+              ['git', 'ls-files', 'Models/*.cs', 'Services/*.cs', 'Views/*.cs',
+               'Contracts/*.cs', 'Properties/*.cs', 'Module.cs'],
+              capture_output=True, text=True, check=True).stdout.split()
+          escape = re.compile(r'\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})')
+          bad = []
+          seen = set()
+          for f in files:
+              for n, line in enumerate(open(f, encoding='utf-8'), 1):
+                  if line.lstrip().startswith(('//', '*', '/*')):
+                      continue
+                  for m in escape.finditer(line):
+                      cp = int(m.group(1) or m.group(2), 16)
+                      if cp in allowed:
+                          continue
+                      seen.add((f, cp))
+                      if (f, cp) not in waived:
+                          bad.append(f'{f}:{n}: U+{cp:04X}')
+          if bad:
+              print('UI strings use codepoints the shipped font cannot draw.')
+              print('They will render as nothing at all. Use a codepoint from')
+              print('docs/font-codepoints.txt, a texture, or a drawn primitive:')
+              print('\n'.join(bad))
+              sys.exit(1)
+          stale = sorted(waived - seen)
+          if stale:
+              print('Waivers for glyphs that are no longer in the source.')
+              print('Delete them from this step:')
+              for f, cp in stale:
+                  print(f'  {f} U+{cp:04X}')
+              sys.exit(1)
+          print(f'{len(files)} module sources; every glyph escape is one of the '
+                f'{len(allowed)} the font carries.')
+          PY
+
       - name: Tests stay free of Blish HUD and Gw2Sharp
         shell: bash
         run: |
@@ -233,6 +303,138 @@ jobs:
           fi
           echo "Every budgeted file is within its entry."
 
+      - name: Public surface stays within its pinned count
+        shell: bash
+        run: |
+          # A ratchet, not a metric. docs/public-surface.txt explains itself;
+          # this is the half that has teeth. Written after 10 public types
+          # landed in the weeks after the internal-flip, unnoticed because
+          # the convention was prose-only. Top-level means indented exactly
+          # one namespace level: the module has no file-scoped namespaces
+          # and no tab indentation, so 4 spaces is the committed shape, and
+          # a deeper indent is a nested type inside an internal owner, which
+          # the assembly does not export.
+          pinned=$(grep -v '^#' docs/public-surface.txt | grep -m1 .)
+          decls=$(git ls-files -z 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' \
+              'Contracts/*.cs' 'Properties/*.cs' 'Module.cs' \
+            | xargs -0 -r grep -nE '^    public (sealed |static |abstract |partial )*(class|struct|interface|enum|record|delegate) ' || true)
+          actual=$(printf '%s' "$decls" | grep -c . || true)
+          if [ "$actual" -gt "$pinned" ]; then
+            echo "The module declares $actual public top-level types; the pin is $pinned."
+            echo "The module's default is internal. Make the new type internal, or"
+            echo "raise the pin in docs/public-surface.txt in this same commit and"
+            echo "say in the message why the type earned a public seam."
+            echo "$decls"
+            exit 1
+          fi
+          if [ "$actual" -lt "$pinned" ]; then
+            echo "NOTE: $actual public top-level types, pin is $pinned - lower the pin"
+            echo "in docs/public-surface.txt to bank the reduction."
+          fi
+          echo "Public top-level types: $actual (pin: $pinned)."
+
+      - name: Every item icon renders at a named tier
+        shell: bash
+        run: |
+          # The owner's report: "tons of items in account snapshot dont have
+          # the right color borders... there should be a library call to paint
+          # these icons that everything is using that pushes the standards".
+          # There was one - IconControls.CreateItemIcon - but its size and
+          # border were DEFAULTED parameters, so the standard was opt-in and
+          # eleven call sites each chose their own numbers. The defaults are
+          # gone and the tier is now a required ItemIconTier; this is what
+          # stops the pre-tier overloads growing a twelfth caller while the
+          # four below wait for their branches to land.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          # Each entry is a file that still calls a pre-tier overload, and the
+          # branch that owns it. Removing an entry is the act of the commit
+          # that migrates its call; adding one needs a reason in the message.
+          ALLOWED = {
+              'Views/RankerTabContent.cs': 'the Ranker rarity branch owns this file',
+              'Views/Rendering/IconNameRowHelpers.cs': 'carries the legacy shim for the row builder above',
+          }
+          CALLS = ('IconControls.CreateItemIcon(',
+                   'IconNameRowHelpers.CreateIconAndEllipsizedName(')
+
+          files = subprocess.run(
+              ['git', 'ls-files', 'Models/*.cs', 'Services/*.cs', 'Views/*.cs',
+               'Contracts/*.cs', 'Properties/*.cs', 'Module.cs'],
+              capture_output=True, text=True, check=True).stdout.split()
+
+          def arguments(text, open_paren):
+              # Walk to the matching close paren so a call broken over several
+              # lines is read whole. An unbalanced walk returns None rather
+              # than the rest of the file: the tail would be near-certain to
+              # contain the word ItemIconTier somewhere and would turn this
+              # step into a silent pass.
+              depth, i = 0, open_paren
+              while i < len(text):
+                  if text[i] == '(':
+                      depth += 1
+                  elif text[i] == ')':
+                      depth -= 1
+                      if depth == 0:
+                          return text[open_paren + 1:i]
+                  i += 1
+              return None
+
+          bad, unused = [], []
+          seen = set()
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for marker in CALLS:
+                  for m in re.finditer(re.escape(marker), text):
+                      args = arguments(text, m.end() - 1)
+                      if args is not None and 'ItemIconTier.' in args:
+                          continue
+                      line = text.count('\n', 0, m.start()) + 1
+                      seen.add(f)
+                      if f not in ALLOWED:
+                          bad.append(f'{f}:{line}')
+
+          for path, why in sorted(ALLOWED.items()):
+              if path not in files:
+                  bad.append(f'{path}: allow-listed but not in the tree ({why})')
+              elif path not in seen:
+                  unused.append(f'{path} ({why})')
+
+          if bad:
+              print('These item icons are built without a named ItemIconTier:')
+              print('\n'.join(sorted(bad)))
+              print('Pass a tier from Services/ItemIconTiers.cs. Every framed item icon')
+              print('in the module traces to one; a new size is a new named tier there.')
+              sys.exit(1)
+          if unused:
+              print('NOTE: these files no longer call a pre-tier overload - drop them')
+              print('from this step\'s allow-list to bank the migration:')
+              print('\n'.join(sorted(unused)))
+          print('Every item icon outside the allow-list names its tier.')
+          PY
+
+      - name: Module source cites no out-of-repo spec sections
+        shell: bash
+        run: |
+          # "spec section N.n" citations point at a document that is not in
+          # this repository and never was (KNOWN-ISSUES #42 records the
+          # sweep); the pattern regrew twice after being cleaned because
+          # nothing checked for it. Cite KNOWN-ISSUES or a docs/ file that
+          # actually carries the rationale, or inline the sentence. The
+          # digit keeps legitimate phrasing alive: "the spec", a repo doc's
+          # own "Section 4.3", and the CoinSegmentSpec/pill-spec objects
+          # never match "spec section <digit>".
+          hits=$(git ls-files -z 'Models/*.cs' 'Services/*.cs' 'Views/*.cs' \
+              'Contracts/*.cs' 'Properties/*.cs' 'Module.cs' \
+            | xargs -0 -r grep -niE 'spec section [0-9]' || true)
+          if [ -n "$hits" ]; then
+            echo "Module source cites spec sections of a document this repo does not carry:"
+            echo "$hits"
+            echo "Cite docs/KNOWN-ISSUES.md or a docs/ file by repo path, or inline the fact."
+            exit 1
+          fi
+          echo "No out-of-repo spec-section citations in module source."
+
       - name: Relative links in tracked markdown resolve
         shell: bash
         run: |
@@ -334,9 +536,10 @@ jobs:
       # have no test project, so a project-scoped build compiled neither.
       #
       # No -warnaserror here on purpose. The warning gate lives in the project
-      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj, WarningsAsErrors
-      # in the test project - so it applies to a developer's local build too, not
-      # just to CI, and this step inherits it for free. Adding the flag here would
+      # files - TreatWarningsAsErrors in GW2CraftingHelper.csproj and, through
+      # the StyleGate.props import, in every test and tool project - so it
+      # applies to a developer's local build too, not just to CI, and this
+      # step inherits it for free. Adding the flag here would
       # also widen the gate to every project in the solution, including CI-only
       # restore diagnostics that never appear locally. Note that -warnaserror:CS
       # specifically would do nothing at all: csc honours WarningsAsErrors only

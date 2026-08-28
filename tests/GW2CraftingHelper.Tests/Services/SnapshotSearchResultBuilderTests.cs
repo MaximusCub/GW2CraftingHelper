@@ -7,10 +7,10 @@ using Xunit;
 
 namespace GW2CraftingHelper.Tests.Services
 {
-
     public class SnapshotSearchResultBuilderTests
     {
-        private static SnapshotItemEntry Entry(int itemId, string name, int count, string source, string iconUrl = "")
+        private static SnapshotItemEntry Entry(
+            int itemId, string name, int count, string source, string iconUrl = "", string rarity = "")
         {
             return new SnapshotItemEntry
             {
@@ -18,7 +18,8 @@ namespace GW2CraftingHelper.Tests.Services
                 Name = name,
                 Count = count,
                 Source = source,
-                IconUrl = iconUrl
+                IconUrl = iconUrl,
+                Rarity = rarity,
             };
         }
 
@@ -49,7 +50,6 @@ namespace GW2CraftingHelper.Tests.Services
             SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
 
         // ---- BuildRepresentativeIndex ----
-
         [Fact]
         public void BuildRepresentativeIndex_NullItems_ReturnsEmpty()
         {
@@ -96,7 +96,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, AccountItemIndex.SourceBank),
-                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank)
+                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank),
             };
 
             var result = SnapshotSearchResultBuilder.BuildRepresentativeIndex(items);
@@ -105,7 +105,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- BuildItemRows ----
-
         [Fact]
         public void BuildItemRows_NullItemsById_ReturnsEmpty()
         {
@@ -152,12 +151,49 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void BuildItemRows_CarriesTheCapturedRarityOntoTheRow()
+        {
+            // The row is what the Snapshot tab draws a rarity frame and a
+            // rarity-coloured name from. Dropping the field here is exactly
+            // how the tab rendered a neutral frame for every item the
+            // session's stat cache had never seen.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(24358, "Ancient Bone", 250, AccountItemIndex.SourceMaterialStorage, rarity: "Basic"),
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", new SnapshotSourceFilter(), null);
+
+            Assert.Equal("Basic", Assert.Single(result).Rarity);
+        }
+
+        [Fact]
+        public void BuildItemRows_ItemWithNoCapturedRarity_LeavesTheRowEmptyRatherThanNull()
+        {
+            // A row read out of a pre-rarity snapshot.json. The view resolves
+            // "" through ItemRarityResolution, which reads it as unknown; a
+            // null here would be indistinguishable but is not what the model
+            // promises, and the view's fallback path is the one being kept
+            // alive for exactly these rows.
+            var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 40, AccountItemIndex.SourceBank) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", new SnapshotSourceFilter(), null);
+
+            Assert.Equal("", Assert.Single(result).Rarity);
+            Assert.Null(ItemRarityResolution.Resolve(result[0].Rarity, null));
+        }
+
+        [Fact]
         public void BuildItemRows_ItemAcrossMultipleSources_TotalsAndBreaksDownEachSource()
         {
             var items = new List<SnapshotItemEntry>
             {
                 Entry(100, "Iron Ore", 150, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, "Iron Ore", 100, AccountItemIndex.SourceBank)
+                Entry(100, "Iron Ore", 100, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -179,7 +215,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, AccountItemIndex.SourceBank),
-                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank)
+                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -201,14 +237,13 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- BuildItemRows: character-label search ----
-
         [Fact]
         public void BuildItemRows_SearchText_MatchesCharacterNameCaseInsensitive()
         {
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
-                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank)
+                Entry(2, "Linen Scrap", 5, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -224,7 +259,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
-                Entry(1, "Iron Ore", 500, AccountItemIndex.SourceBank)
+                Entry(1, "Iron Ore", 500, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -279,7 +314,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
-                Entry(1, "Iron Ore", 4, CharSource("Bob"))
+                Entry(1, "Iron Ore", 4, CharSource("Bob")),
             };
             var index = new AccountItemIndex(items);
 
@@ -298,7 +333,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(1, "Iron Ore", 10, CharSource("Zaeed")),
                 Entry(2, "Linen Scrap", 3, CharSource("Zaeed")),
-                Entry(3, "Ancient Wood", 7, CharSource("Bob"))
+                Entry(3, "Ancient Wood", 7, CharSource("Bob")),
             };
             var index = new AccountItemIndex(items);
 
@@ -317,7 +352,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Ore of Zaeed", 10, AccountItemIndex.SourceBank),
-                Entry(2, "Iron Ore", 3, CharSource("Zaeed"))
+                Entry(2, "Iron Ore", 3, CharSource("Zaeed")),
             };
             var index = new AccountItemIndex(items);
 
@@ -339,7 +374,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Aria")),
-                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -358,7 +393,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Aria")),
-                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -379,7 +414,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Aria")),
-                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -397,7 +432,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(1, "Iron Ore", 10, CharSource("Aria")),
-                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank)
+                Entry(2, "Ancient Wood", 7, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -414,7 +449,7 @@ namespace GW2CraftingHelper.Tests.Services
             // character-name search must not start listing them.
             var wallet = new List<SnapshotWalletEntry>
             {
-                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 }
+                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
             };
 
             Assert.Empty(SnapshotSearchResultBuilder.FilterWallet(wallet, "Zaeed"));
@@ -426,7 +461,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(100, "Iron Ore", 150, AccountItemIndex.SourceMaterialStorage),
-                Entry(100, "Iron Ore", 100, AccountItemIndex.SourceBank)
+                Entry(100, "Iron Ore", 100, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
             var filter = new SnapshotSourceFilter { Bank = false };
@@ -452,7 +487,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- BuildItemRows: per-character source filtering ----
-
         [Fact]
         public void BuildItemRows_UncheckedCharacter_HidesOnlyThatCharactersContribution()
         {
@@ -460,7 +494,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, "Iron Ore", 5, CharSource("Alice")),
                 Entry(100, "Iron Ore", 3, CharSource("Bob")),
-                Entry(100, "Iron Ore", 10, AccountItemIndex.SourceBank)
+                Entry(100, "Iron Ore", 10, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
             var filter = Unchecked("Alice");
@@ -482,7 +516,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(100, "Iron Ore", 5, CharSource("Alice")),
-                Entry(100, "Iron Ore", 7, CharSource("Newcomer"))
+                Entry(100, "Iron Ore", 7, CharSource("Newcomer")),
             };
             var index = new AccountItemIndex(items);
             var filter = Unchecked("Alice");
@@ -513,7 +547,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, "Iron Ore", 5, CharSource("Alice")),
                 Entry(100, "Iron Ore", 3, CharSource("Bob")),
-                Entry(100, "Iron Ore", 10, AccountItemIndex.SourceMaterialStorage)
+                Entry(100, "Iron Ore", 10, AccountItemIndex.SourceMaterialStorage),
             };
             var index = new AccountItemIndex(items);
 
@@ -560,7 +594,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(1, "zinc Ore", 1, AccountItemIndex.SourceBank),
                 Entry(2, "Ancient Wood", 1, AccountItemIndex.SourceBank),
-                Entry(3, "bronze Ingot", 1, AccountItemIndex.SourceBank)
+                Entry(3, "bronze Ingot", 1, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -578,7 +612,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(200, "Recipe: Iron Ingot", 1, AccountItemIndex.SourceBank),
-                Entry(100, "Recipe: Iron Ingot", 1, AccountItemIndex.SourceBank)
+                Entry(100, "Recipe: Iron Ingot", 1, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -595,7 +629,7 @@ namespace GW2CraftingHelper.Tests.Services
             var items = new List<SnapshotItemEntry>
             {
                 Entry(100, "Iron Ore", 10, AccountItemIndex.SourceBank),
-                Entry(100, "Iron Ore", 7, AccountItemIndex.SourceBank)
+                Entry(100, "Iron Ore", 7, AccountItemIndex.SourceBank),
             };
             var index = new AccountItemIndex(items);
 
@@ -635,7 +669,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 Entry(100, "Iron Ore", 1, AccountItemIndex.SourceBank),
                 Entry(100, "Iron Ore", 2, AccountItemIndex.SourceSharedInventory),
-                Entry(100, "Iron Ore", 3, CharSource("Zaeed"))
+                Entry(100, "Iron Ore", 3, CharSource("Zaeed")),
             };
             var index = new AccountItemIndex(items);
 
@@ -648,7 +682,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- FilterWallet ----
-
         [Fact]
         public void FilterWallet_Null_ReturnsEmpty()
         {
@@ -661,7 +694,7 @@ namespace GW2CraftingHelper.Tests.Services
             var wallet = new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
-                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 5 }
+                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 5 },
             };
 
             var result = SnapshotSearchResultBuilder.FilterWallet(wallet, "");
@@ -675,7 +708,7 @@ namespace GW2CraftingHelper.Tests.Services
             var wallet = new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
-                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 5 }
+                new SnapshotWalletEntry { CurrencyId = 3, CurrencyName = "Gems", Value = 5 },
             };
 
             var result = SnapshotSearchResultBuilder.FilterWallet(wallet, "KARMA");
@@ -690,7 +723,7 @@ namespace GW2CraftingHelper.Tests.Services
             var wallet = new List<SnapshotWalletEntry>
             {
                 new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
-                null
+                null,
             };
 
             var result = SnapshotSearchResultBuilder.FilterWallet(wallet, "");
@@ -703,7 +736,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var wallet = new List<SnapshotWalletEntry>
             {
-                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 }
+                new SnapshotWalletEntry { CurrencyId = 2, CurrencyName = "Karma", Value = 100 },
             };
 
             var result = SnapshotSearchResultBuilder.FilterWallet(wallet, "gems");
@@ -712,7 +745,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- IsSourceEnabled ----
-
         [Fact]
         public void IsSourceEnabled_NullFilter_AlwaysTrue()
         {
@@ -799,7 +831,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- CollectCharacterNames ----
-
         [Fact]
         public void CollectCharacterNames_NullSnapshot_ReturnsEmpty()
         {
@@ -822,8 +853,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Entry(1, "Iron Ore", 5, AccountItemIndex.SourceBank),
                     Entry(1, "Iron Ore", 5, AccountItemIndex.SourceMaterialStorage),
                     Entry(1, "Iron Ore", 5, CharSource("Zaeed")),
-                    Entry(2, "Linen Scrap", 5, CharSource("Zaeed"))
-                }
+                    Entry(2, "Linen Scrap", 5, CharSource("Zaeed")),
+                },
             };
 
             var result = SnapshotSearchResultBuilder.CollectCharacterNames(snapshot);
@@ -840,8 +871,8 @@ namespace GW2CraftingHelper.Tests.Services
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
                     new SnapshotCharacterDiscipline { CharacterName = "Emptyhands", Discipline = "Chef", Rating = 400 },
-                    new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Armorsmith", Rating = 500 }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "Alice", Discipline = "Armorsmith", Rating = 500 },
+                },
             };
 
             var result = SnapshotSearchResultBuilder.CollectCharacterNames(snapshot);
@@ -856,7 +887,7 @@ namespace GW2CraftingHelper.Tests.Services
             // - an empty character still gets its own checkbox.
             var snapshot = new AccountSnapshot
             {
-                Items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 0, CharSource("Emptyhands")) }
+                Items = new List<SnapshotItemEntry> { Entry(1, "Iron Ore", 0, CharSource("Emptyhands")) },
             };
 
             var result = SnapshotSearchResultBuilder.CollectCharacterNames(snapshot);
@@ -874,8 +905,8 @@ namespace GW2CraftingHelper.Tests.Services
                     Entry(1, "Iron Ore", 1, CharSource("zara")),
                     Entry(1, "Iron Ore", 1, CharSource("Alice")),
                     Entry(1, "Iron Ore", 1, CharSource("Zara")),
-                    Entry(1, "Iron Ore", 1, CharSource("bob"))
-                }
+                    Entry(1, "Iron Ore", 1, CharSource("bob")),
+                },
             };
 
             var result = SnapshotSearchResultBuilder.CollectCharacterNames(snapshot);
@@ -893,13 +924,13 @@ namespace GW2CraftingHelper.Tests.Services
                     null,
                     Entry(1, "Iron Ore", 1, null),
                     Entry(1, "Iron Ore", 1, AccountItemIndex.CharacterSourcePrefix),
-                    Entry(1, "Iron Ore", 1, CharSource("Alice"))
+                    Entry(1, "Iron Ore", 1, CharSource("Alice")),
                 },
                 CharacterDisciplines = new List<SnapshotCharacterDiscipline>
                 {
                     null,
-                    new SnapshotCharacterDiscipline { CharacterName = "", Discipline = "Chef" }
-                }
+                    new SnapshotCharacterDiscipline { CharacterName = "", Discipline = "Chef" },
+                },
             };
 
             var result = SnapshotSearchResultBuilder.CollectCharacterNames(snapshot);
@@ -908,7 +939,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // ---- FormatSourceLabel ----
-
         [Fact]
         public void FormatSourceLabel_NullOrEmpty_ReturnsUnknown()
         {
@@ -943,7 +973,6 @@ namespace GW2CraftingHelper.Tests.Services
         // that hold-back is invisible: the list simply comes back empty.
         // These cases pin the pairing - the hint appears exactly where a
         // second keystroke really would change the result, and nowhere else.
-
         private static readonly List<string> Roster =
             new List<string> { "Zaeed Massani", "Ylva", "Bob" };
 
@@ -959,12 +988,12 @@ namespace GW2CraftingHelper.Tests.Services
             // without the hint an empty list is all the user sees.
             var index = new AccountItemIndex(new List<SnapshotItemEntry>
             {
-                Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+                Entry(1, "Copper Ore", 5, CharSource("Ylva")),
             });
             var rows = SnapshotSearchResultBuilder.BuildItemRows(
                 SnapshotSearchResultBuilder.BuildRepresentativeIndex(new List<SnapshotItemEntry>
                 {
-                    Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+                    Entry(1, "Copper Ore", 5, CharSource("Ylva")),
                 }),
                 index, "y", null, null);
             Assert.Empty(rows);
@@ -974,7 +1003,7 @@ namespace GW2CraftingHelper.Tests.Services
             var twoLetters = SnapshotSearchResultBuilder.BuildItemRows(
                 SnapshotSearchResultBuilder.BuildRepresentativeIndex(new List<SnapshotItemEntry>
                 {
-                    Entry(1, "Copper Ore", 5, CharSource("Ylva"))
+                    Entry(1, "Copper Ore", 5, CharSource("Ylva")),
                 }),
                 index, "yl", null, null);
             Assert.Single(twoLetters);
@@ -1037,5 +1066,4 @@ namespace GW2CraftingHelper.Tests.Services
                     "y", Roster, new HashSet<string>(StringComparer.Ordinal) { "Bob" }));
         }
     }
-
 }

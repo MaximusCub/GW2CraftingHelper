@@ -33,9 +33,15 @@ namespace GW2CraftingHelper.Tests.Services
                 new[] { "Power=47", "Precision=34", "Ferocity=34" },
                 block.Attributes.Select(a => a.DisplayName + "=" + a.Value).ToArray());
 
-            // AccountBound AND AccountBindOnUse are both set; the game
-            // shows the more specific one.
-            Assert.Equal("Account Bound on Use", block.Binding);
+            // AccountBound AND AccountBindOnUse are both set - ONE line,
+            // and the AccountBound flag's wording wins, BARE: the
+            // 2026-08-27 Gift of Twilight A/B (19648, the same flag pair)
+            // shows the game printing "Account Bound" on an ordinary
+            // inventory hover, as do heart-of-destroyer 67017 and
+            // holographic-wings 79157. Neither the on-Use variant the old
+            // most-specific-wins ladder picked, nor the "on Acquire" tail
+            // that only the two material-storage hovers show.
+            Assert.Equal(new[] { "Account Bound" }, block.Bindings);
             Assert.Equal(240L, block.VendorValue);
             Assert.Equal(
                 "Crafted in the style of the renowned asuran genius, Zojja.",
@@ -57,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(block.SubType);
             Assert.Null(block.Defense);
             Assert.Null(block.MinPower);
-            Assert.Null(block.Binding);
+            Assert.Empty(block.Bindings);
             Assert.Empty(block.Attributes);
             Assert.Empty(block.UpgradeBonuses);
             Assert.Equal(0, block.InfusionSlotCount);
@@ -83,12 +89,20 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public async Task SoulbindingItem_ReportsSoulboundEvenThoughAccountBoundIsAlsoFlagged()
+        public async Task SoulbindingItem_StacksItsAccountAndSoulLines()
         {
             var block = ItemStatBlockFactory.Build(
                 await RealItemFixtures.ParseOneAsync(RealItemJson.Rebreather));
 
-            Assert.Equal("Soulbound on Use", block.Binding);
+            // Account binding and soulbinding are independent dimensions
+            // and the game stacks one line per dimension: live3
+            // relic-livingcity (104938, AccountBound + SoulBindOnUse)
+            // shows "Account Bound" over "Soulbound on Use" (2026-08-26).
+            // The Rebreather carries the same pair - and the capture is
+            // the exact wording pair, bare account line and on-Use soul
+            // line, that the module now reproduces character for character.
+            Assert.Equal(
+                new[] { "Account Bound", "Soulbound on Use" }, block.Bindings);
             Assert.Equal(73, block.Defense);
             Assert.Equal(39, block.StatChoiceCount);
             Assert.Null(block.VendorValue);
@@ -104,7 +118,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(6, block.UpgradeBonuses.Count);
             Assert.Equal("+125 Ferocity", block.UpgradeBonuses[5]);
             Assert.Empty(block.Attributes);
-            Assert.Null(block.Binding);
+            Assert.Empty(block.Bindings);
             Assert.Equal(65L, block.VendorValue);
             Assert.Equal(
                 "Element: Brilliance\nDouble-click to apply to a piece of armor.",
@@ -140,7 +154,15 @@ namespace GW2CraftingHelper.Tests.Services
                 await RealItemFixtures.ParseOneAsync(RealItemJson.CilantroSteak));
             Assert.Null(ascended.NourishmentDescription);
             Assert.Null(ascended.NourishmentDurationMs);
-            Assert.Equal("Account Bound on Use", ascended.Binding);
+            Assert.Null(ascended.EffectName);
+            Assert.Equal(new[] { "Account Bound" }, ascended.Bindings);
+
+            // The effect's own name and icon ride the same details block
+            // (live API, 12472) - what the game's effect block leads with.
+            Assert.Equal("Nourishment", fine.EffectName);
+            Assert.Equal(
+                "https://render.guildwars2.com/file/779D3F0ABE5B46C09CFC57374DA8CC3A495F291C/436367.png",
+                fine.EffectIconUrl);
         }
 
         [Fact]
@@ -161,7 +183,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Empty(block.Attributes);
             Assert.Empty(block.UpgradeBonuses);
             Assert.Empty(block.Restrictions);
-            Assert.Null(block.Binding);
+            Assert.Empty(block.Bindings);
             Assert.Null(block.VendorValue);
             Assert.Equal("", ItemDescriptionSanitizer.Sanitize(block.Description));
         }

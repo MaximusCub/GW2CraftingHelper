@@ -13,7 +13,6 @@ namespace GW2CraftingHelper.Tests.Services
     public class CraftingPlanPipelineCurrencyTests
     {
         // --- Currency valuation threading ---
-
         [Fact]
         public async Task GenerateStructuredAsync_CurrencyValuation_ThreadsIntoSolverAndContext()
         {
@@ -32,11 +31,11 @@ namespace GW2CraftingHelper.Tests.Services
                         OutputCount = 1,
                         CostLines = new List<CostLine>
                         {
-                            new CostLine { Type = "Currency", Id = 2, Count = 50 }
+                            new CostLine { Type = "Currency", Id = 2, Count = 50 },
                         },
                         MerchantName = "Karma Vendor",
-                        Locations = new List<string>()
-                    }
+                        Locations = new List<string>(),
+                    },
                 });
 
                 // No recipe for item 1.
@@ -92,7 +91,6 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         // --- currency metadata wired through the pipeline ---
-
         private class StubCurrencyHandler : HttpMessageHandler
         {
             private readonly string _body;
@@ -107,7 +105,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 var response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(_body)
+                    Content = new StringContent(_body),
                 };
                 return Task.FromResult(response);
             }
@@ -162,7 +160,7 @@ namespace GW2CraftingHelper.Tests.Services
 
                 var overrides = new Dictionary<int, AcquisitionSource>
                 {
-                    { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp }
+                    { initial.CraftingTree.NodeId, AcquisitionSource.BuyFromTp },
                 };
                 var resolved = pipeline.ResolveWithOverrides(initial.SolveContext, overrides);
 

@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Services
                 CheapestCraftDisciplines = disciplines ?? new List<string> { "Weaponsmith" },
                 CheapestCraftMinRating = minRating,
                 IsReferenceBranch = isReferenceBranch,
-                Children = children
+                Children = children,
             };
         }
 
@@ -41,7 +41,7 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 ItemId = wrapperItemId,
                 Decision = CraftingDecision.BuyFromTp,
-                Children = children
+                Children = children,
             };
         }
 
@@ -156,7 +156,7 @@ namespace GW2CraftingHelper.Tests.Services
                 ItemId = 3,
                 Decision = CraftingDecision.BuyFromTp,
                 IsReferenceBranch = true,
-                Children = new[] { node }
+                Children = new[] { node },
             };
             var root = WrapAsRoot(1, referenceRoot);
             var result = new CraftingPlanResult { CraftingTree = root };

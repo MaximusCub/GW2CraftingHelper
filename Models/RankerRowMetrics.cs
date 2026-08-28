@@ -16,7 +16,7 @@ namespace GW2CraftingHelper.Models
     }
 
     /// <summary>
-    /// The four independent barriers between the player and a finished item.
+    /// The five independent barriers between the player and a finished item.
     /// Each is measured only against itself, in its own units - the model
     /// never converts one into another, because the GW2 API publishes no rate
     /// between days, currencies and coin and the repo forbids inventing one.
@@ -27,6 +27,7 @@ namespace GW2CraftingHelper.Models
         Currencies,
         TimeGates,
         Disciplines,
+        Recipes,
     }
 
     internal class RankerGateScore
@@ -90,7 +91,7 @@ namespace GW2CraftingHelper.Models
         /// <summary>The headline, 0..1. Meaningful only when Kind is Measured.</summary>
         public double Readiness { get; set; }
 
-        /// <summary>One entry per gate, always all four, in enum order. Never null.</summary>
+        /// <summary>One entry per gate, always all five, in enum order. Never null.</summary>
         public IReadOnlyList<RankerGateScore> Gates { get; set; }
 
         public long RemainingCoinCost { get; set; }
@@ -137,6 +138,14 @@ namespace GW2CraftingHelper.Models
         /// longer matches is showing a number for a slot it does not occupy.
         /// </summary>
         public int PriorityIndex { get; set; }
+
+        /// <summary>
+        /// The comparison mode this was computed under. Cascade numbers are
+        /// meaningless in Independent mode and vice versa, so a mode toggle
+        /// stales metrics exactly as a reorder does - see
+        /// RankerPriorityOrdering.MetricsAreCurrent.
+        /// </summary>
+        public RankerMode Mode { get; set; }
 
         public DateTime ComputedAtUtc { get; set; }
     }

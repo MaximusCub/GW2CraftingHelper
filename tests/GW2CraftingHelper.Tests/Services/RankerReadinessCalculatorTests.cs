@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             return new List<PlanStep>
             {
-                new PlanStep { ItemId = itemId, Quantity = quantity, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = itemId, Quantity = quantity, Source = AcquisitionSource.Craft },
             };
         }
 
@@ -63,7 +63,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Currency = currency ?? new Dictionary<int, int>(),
                 ClaimedGatedUnits = claimedGated ?? new Dictionary<int, int>(),
                 ClaimedItemIds = claimedItems ?? new HashSet<int>(),
-                ClaimedCurrencyIds = claimedCurrencies ?? new HashSet<int>()
+                ClaimedCurrencyIds = claimedCurrencies ?? new HashSet<int>(),
             };
         }
 
@@ -80,7 +80,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Null and degenerate inputs
         // ---------------------------------------------------------------
-
         [Fact]
         public void NullResults_AreNotMeasurableAndNeverThrow()
         {
@@ -90,12 +89,12 @@ namespace GW2CraftingHelper.Tests.Services
             {
                 RankerReadinessCalculator.Compute(null, real, Availability(), 0),
                 RankerReadinessCalculator.Compute(real, null, Availability(), 0),
-                RankerReadinessCalculator.Compute(null, null, Availability(), 0)
+                RankerReadinessCalculator.Compute(null, null, Availability(), 0),
             })
             {
                 Assert.Equal(RankerReadinessKind.NotMeasurable, metrics.Kind);
                 Assert.Equal(0, metrics.Readiness);
-                Assert.Equal(4, metrics.Gates.Count);
+                Assert.Equal(5, metrics.Gates.Count);
                 Assert.Empty(metrics.CurrencyShortfalls);
                 Assert.Empty(metrics.VendorCappedItems);
                 Assert.Empty(metrics.DisciplineGaps);
@@ -158,7 +157,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // The property that keeps the change honest
         // ---------------------------------------------------------------
-
         [Fact]
         public void AnItemWhoseOnlyBarrierIsMaterials_ScoresExactlyTheCoinOnlyFigure()
         {
@@ -196,7 +194,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Never claim done when it is not
         // ---------------------------------------------------------------
-
         [Fact]
         public void NinetyNinePointSixPercent_FloorsToNinetyNine()
         {
@@ -264,7 +261,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Currencies: never priced, only ever compared with themselves
         // ---------------------------------------------------------------
-
         [Fact]
         public void AnUnvaluedCurrencyDragsTheScoreDownRatherThanReadingAsCheap()
         {
@@ -307,7 +303,7 @@ namespace GW2CraftingHelper.Tests.Services
             var costs = new List<CurrencyCost>
             {
                 new CurrencyCost { CurrencyId = 2, Amount = 5000 },
-                new CurrencyCost { CurrencyId = 3, Amount = 10 }
+                new CurrencyCost { CurrencyId = 3, Amount = 10 },
             };
             var availability = Availability(currency: new Dictionary<int, int> { { 2, 5000 } });
 
@@ -323,7 +319,7 @@ namespace GW2CraftingHelper.Tests.Services
             var baseline = Result(coin: 1000);
             var owned = Result(coin: 900, currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 40 }
+                new CurrencyCost { CurrencyId = 29, Amount = 40 },
             });
 
             var metrics = RankerReadinessCalculator.Compute(baseline, owned, Availability(), 0);
@@ -339,7 +335,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Time gates
         // ---------------------------------------------------------------
-
         [Fact]
         public void DaysAcrossDifferentGatedItems_IsTheMaxNotTheSum()
         {
@@ -349,7 +344,7 @@ namespace GW2CraftingHelper.Tests.Services
             var steps = new List<PlanStep>
             {
                 new PlanStep { ItemId = MithrilliumId, Quantity = 20, Source = AcquisitionSource.Craft },
-                new PlanStep { ItemId = ResidueId, Quantity = 12, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = ResidueId, Quantity = 12, Source = AcquisitionSource.Craft },
             };
             var result = Result(steps: steps, cooldowns: cooldowns);
 
@@ -385,7 +380,7 @@ namespace GW2CraftingHelper.Tests.Services
             // incidental festival-vendor offer.
             var vendorCaps = new List<TimegatedItem>
             {
-                new TimegatedItem { ItemId = 19721, CapType = TimegatedCapType.Weekly, CapValue = 1, NeededCount = 86 }
+                new TimegatedItem { ItemId = 19721, CapType = TimegatedCapType.Weekly, CapValue = 1, NeededCount = 86 },
             };
             var baseline = Result(coin: 1000, vendorCaps: vendorCaps);
             var owned = Result(coin: 500, vendorCaps: vendorCaps);
@@ -418,7 +413,7 @@ namespace GW2CraftingHelper.Tests.Services
             var cooldowns = Cooldowns(MithrilliumId);
             var steps = new List<PlanStep>
             {
-                new PlanStep { ItemId = MithrilliumId, Quantity = 40, Source = AcquisitionSource.BuyFromTp }
+                new PlanStep { ItemId = MithrilliumId, Quantity = 40, Source = AcquisitionSource.BuyFromTp },
             };
             var result = Result(steps: steps, cooldowns: cooldowns);
 
@@ -430,7 +425,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Disciplines
         // ---------------------------------------------------------------
-
         [Fact]
         public void WithNoDisciplineDataCaptured_TheGateDoesNotApply()
         {
@@ -476,7 +470,7 @@ namespace GW2CraftingHelper.Tests.Services
                 characters: new List<SnapshotCharacterDiscipline>
                 {
                     new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 400, Active = false },
-                    new SnapshotCharacterDiscipline { CharacterName = "Tems", Discipline = "Huntsman", Rating = 275, Active = true }
+                    new SnapshotCharacterDiscipline { CharacterName = "Tems", Discipline = "Huntsman", Rating = 275, Active = true },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -497,7 +491,7 @@ namespace GW2CraftingHelper.Tests.Services
                 disciplines: new List<RequiredDiscipline> { new RequiredDiscipline { Discipline = "Armorsmith", MinRating = 400 } },
                 characters: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Armorsmith", Rating = 400, Active = false }
+                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Armorsmith", Rating = 400, Active = false },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -513,11 +507,11 @@ namespace GW2CraftingHelper.Tests.Services
                 disciplines: new List<RequiredDiscipline>
                 {
                     new RequiredDiscipline { Discipline = "Huntsman", MinRating = 500 },
-                    new RequiredDiscipline { Discipline = "Leatherworker", MinRating = 400 }
+                    new RequiredDiscipline { Discipline = "Leatherworker", MinRating = 400 },
                 },
                 characters: new List<SnapshotCharacterDiscipline>
                 {
-                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 }
+                    new SnapshotCharacterDiscipline { CharacterName = "Kara", Discipline = "Huntsman", Rating = 500 },
                 });
 
             var metrics = RankerReadinessCalculator.Compute(Result(coin: 1000), owned, Availability(), 0);
@@ -531,7 +525,6 @@ namespace GW2CraftingHelper.Tests.Services
         // ---------------------------------------------------------------
         // Affordability and contention, both cascade-aware
         // ---------------------------------------------------------------
-
         [Fact]
         public void AffordabilityIsMeasuredAgainstCoinLeftAfterHigherPrioritySlots()
         {
@@ -553,12 +546,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var owned = Result(coin: 500, currencies: new List<CurrencyCost>
             {
-                new CurrencyCost { CurrencyId = 29, Amount = 100 }
+                new CurrencyCost { CurrencyId = 29, Amount = 100 },
             });
             owned.Plan.Steps = new List<PlanStep>
             {
                 new PlanStep { ItemId = 111, Quantity = 4, Source = AcquisitionSource.BuyFromTp },
-                new PlanStep { ItemId = 222, Quantity = 2, Source = AcquisitionSource.Craft }
+                new PlanStep { ItemId = 222, Quantity = 2, Source = AcquisitionSource.Craft },
             };
 
             var availability = Availability(
@@ -593,6 +586,156 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(RankerReadinessWeights.Currencies, metrics.Gates.First(g => g.Gate == RankerGate.Currencies).Weight);
             Assert.Equal(RankerReadinessWeights.TimeGates, metrics.Gates.First(g => g.Gate == RankerGate.TimeGates).Weight);
             Assert.Equal(RankerReadinessWeights.Disciplines, metrics.Gates.First(g => g.Gate == RankerGate.Disciplines).Weight);
+            Assert.Equal(RankerReadinessWeights.Recipes, metrics.Gates.First(g => g.Gate == RankerGate.Recipes).Weight);
+        }
+
+        // ---------------------------------------------------------------
+        // The recipes gate
+        // ---------------------------------------------------------------
+        private static RequiredRecipe Recipe(bool? isMissing, bool autoLearned = false)
+        {
+            return new RequiredRecipe { RecipeId = 1, OutputItemId = 2, IsMissing = isMissing, IsAutoLearned = autoLearned };
+        }
+
+        [Fact]
+        public void RecipesGate_ScoresKnownOverCheckable()
+        {
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: false),
+                Recipe(isMissing: false),
+                Recipe(isMissing: true),
+                Recipe(isMissing: true),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.True(GateApplies(metrics, RankerGate.Recipes));
+            Assert.Equal(0.5, GateCompletion(metrics, RankerGate.Recipes), 9);
+        }
+
+        [Fact]
+        public void RecipesGate_NeverFabricatesFromAnUncheckedRecipe()
+        {
+            // IsMissing null means the learned-recipes check never ran -
+            // the same never-fabricate rule as the disciplines gate.
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: null),
+                Recipe(isMissing: null),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.False(GateApplies(metrics, RankerGate.Recipes));
+        }
+
+        [Fact]
+        public void RecipesGate_IgnoresAutoLearnedRecipes()
+        {
+            // An auto-learned recipe carries no unlock barrier, so a plan
+            // made only of them has no recipes gate at all.
+            var owned = Result(coin: 50);
+            owned.RequiredRecipes = new List<RequiredRecipe>
+            {
+                Recipe(isMissing: false, autoLearned: true),
+                Recipe(isMissing: true, autoLearned: true),
+            };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.False(GateApplies(metrics, RankerGate.Recipes));
+        }
+
+        [Fact]
+        public void AMissingRecipeCapsTheHeadlineBelowOneHundredPercent()
+        {
+            var owned = Result(coin: 0);
+            owned.RequiredRecipes = new List<RequiredRecipe> { Recipe(isMissing: true) };
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Equal(RankerReadinessKind.Measured, metrics.Kind);
+            Assert.True(metrics.Readiness < 1.0);
+        }
+
+        // ---------------------------------------------------------------
+        // Vendor purchase caps vs TP liquidity (field issue: Mystic Coin's
+        // "10 per week cap" presented a coin problem as a time gate)
+        // ---------------------------------------------------------------
+        private static CraftingPlanResult WithPrices(CraftingPlanResult result, Dictionary<int, ItemPrice> prices)
+        {
+            result.SolveContext = new PlanSolveContext { Prices = prices };
+            return result;
+        }
+
+        private static List<TimegatedItem> WeeklyCap(int itemId)
+        {
+            return new List<TimegatedItem>
+            {
+                new TimegatedItem { ItemId = itemId, CapType = TimegatedCapType.Weekly, CapValue = 10, NeededCount = 16 },
+            };
+        }
+
+        [Fact]
+        public void ATpLiquidItemsVendorCapIsDroppedNotPresentedAsATimeGate()
+        {
+            const int mysticCoinLike = 19976;
+            var owned = WithPrices(
+                Result(coin: 50, vendorCaps: WeeklyCap(mysticCoinLike)),
+                new Dictionary<int, ItemPrice>
+                {
+                    [mysticCoinLike] = new ItemPrice { ItemId = mysticCoinLike, BuyInstant = 100, SellInstant = 120 },
+                });
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            // The remainder above the cap is coin, not time.
+            Assert.Empty(metrics.VendorCappedItems);
+        }
+
+        [Fact]
+        public void AnUnpricedItemsVendorCapSurvivesTheFilter()
+        {
+            const int boundItem = 12345;
+            var owned = WithPrices(
+                Result(coin: 50, vendorCaps: WeeklyCap(boundItem)),
+                new Dictionary<int, ItemPrice>
+                {
+                    // Present but with no live orders on either side.
+                    [boundItem] = new ItemPrice { ItemId = boundItem, BuyInstant = 0, SellInstant = 0 },
+                });
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Single(metrics.VendorCappedItems);
+        }
+
+        [Fact]
+        public void MissingPriceDataKeepsTheCapRatherThanInventingLiquidity()
+        {
+            var owned = Result(coin: 50, vendorCaps: WeeklyCap(777));
+
+            var metrics = RankerReadinessCalculator.Compute(Result(coin: 100), owned, Availability(), 0);
+
+            Assert.Single(metrics.VendorCappedItems);
+        }
+
+        // ---------------------------------------------------------------
+        // The comparison-mode tag
+        // ---------------------------------------------------------------
+        [Fact]
+        public void MetricsCarryTheModeTheyWereComputedUnder()
+        {
+            var cascade = RankerReadinessCalculator.Compute(
+                Result(coin: 100), Result(coin: 50), Availability(), 0);
+            var independent = RankerReadinessCalculator.Compute(
+                Result(coin: 100), Result(coin: 50), Availability(), 0, RankerMode.Independent);
+
+            Assert.Equal(RankerMode.Cascade, cascade.Mode);
+            Assert.Equal(RankerMode.Independent, independent.Mode);
         }
     }
 }
