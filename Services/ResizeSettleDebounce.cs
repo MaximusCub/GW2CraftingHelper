@@ -115,7 +115,12 @@ namespace TaimisToolbench.Services
                     // Clamped: a stamp landing between the two reads above
                     // can make this negative, which Task.Delay rejects.
                     int remaining = (int)(_settleMs - elapsedMs);
-                    await _delay(remaining > 0 ? remaining : 1);
+
+                    // The callback reaches the UI thread through _marshal, so
+                    // capturing a context only lends this window that
+                    // context's throughput: measured at 32s for a 1ms window
+                    // under a saturated one.
+                    await _delay(remaining > 0 ? remaining : 1).ConfigureAwait(false);
                 }
 
                 if (_cancelled || !_marshal(Invoke))
