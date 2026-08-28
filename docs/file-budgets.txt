@@ -486,7 +486,9 @@ tests/TaimisToolbench.Tests/Services/RecipeServiceTests.cs                      
 tests/TaimisToolbench.Tests/Services/RecipeSheetItemSeedServiceTests.cs               145
 tests/TaimisToolbench.Tests/Services/RecipeSheetSavingsCalculatorTests.cs             607
 tests/TaimisToolbench.Tests/Services/Recipes/ItemNameSeedDataTests.cs                 102
+tests/TaimisToolbench.Tests/Services/Recipes/PriorityRecipeIdsTests.cs                129
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCacheSerializerTests.cs            227
+tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusRefresherTests.cs            659
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusVerifierTests.cs             362
 tests/TaimisToolbench.Tests/Services/Recipes/SeedFinalizeIndexTests.cs                108
 tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                         84
