@@ -182,6 +182,12 @@ namespace TaimisToolbench
         // OnSubtokenUpdated can drop the cached ids: they belong to the
         // account the old subtoken addressed.
         private CachingAccountRecipeClient _accountRecipeClient;
+
+        // Held apart from the pipeline that owns it so the Settings tab's
+        // currency icons can read the same session-cached list the plan
+        // rows do, instead of opening a second one - see
+        // WarmCurrencyMetadataForSettings.
+        private CurrencyMetadataService _currencyMetadataService;
         private PlanStore _planStore;
 
         // Lives here rather than on CraftingPlanView so it survives a
@@ -588,6 +594,8 @@ namespace TaimisToolbench
             _accountRecipeClient = new CachingAccountRecipeClient(
                 new Gw2AccountRecipeClient(Gw2ApiManager));
 
+            _currencyMetadataService = new CurrencyMetadataService(_httpClient);
+
             _craftingPipeline = new CraftingPlanPipeline(
                 recipeService,
                 new TradingPostService(priceApi),
@@ -596,7 +604,7 @@ namespace TaimisToolbench
                 _vendorOfferStore,
                 reducer: new InventoryReducer(),
                 accountRecipeClient: _accountRecipeClient,
-                currencyMetadataService: new CurrencyMetadataService(_httpClient),
+                currencyMetadataService: _currencyMetadataService,
                 acquisitionHints: acquisitionHints,
                 dailyCooldownItems: dailyCooldownItems,
                 recipeSheetItemIdByRecipeId: recipeSheetItemIdByRecipeId,
@@ -817,12 +825,55 @@ namespace TaimisToolbench
             );
 
             _settingsContent = new SettingsTabContent(_settings, _modalDialog);
+            WarmCurrencyMetadataForSettings(lifetimeToken);
 
             // dataDir is threaded in as a parameter and _moduleIconTexture
             // is already loaded (LoadTextures runs first) - trivial
             // plumbing, no new fields needed on Module itself beyond the
             // view instance.
             _aboutContent = new AboutTabContent(this.ModuleParameters, dataDir, _moduleIconTexture);
+        }
+
+        /// <summary>
+        /// Resolves the currency name/icon list once in the background and
+        /// hands it to the Settings tab, whose Currency Valuations rows draw
+        /// a currency icon per row.
+        /// <para>
+        /// Background and never awaited: a fetch on the UI thread would
+        /// stall the frame the tab is built in. The service caches the whole
+        /// list for the session, so this warms the same cache the first plan
+        /// generation would otherwise pay for; a failure costs the icons and
+        /// nothing else (the rows render name-and-value without them), and
+        /// leaves the cache empty so the next plan retries.
+        /// </para>
+        /// </summary>
+        private void WarmCurrencyMetadataForSettings(CancellationToken lifetimeToken)
+        {
+            var service = _currencyMetadataService;
+            var settingsContent = _settingsContent;
+            if (service == null || settingsContent == null)
+            {
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var metadata = await service.GetAllAsync(lifetimeToken);
+                    if (metadata == null || metadata.Count == 0)
+                    {
+                        return;
+                    }
+
+                    MainThreadMarshal.Run(() => settingsContent.SetCurrencyMetadata(metadata));
+                }
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
+                {
+                    // Unloaded mid-fetch: _lifetimeCts is cancelled and
+                    // _httpClient disposed before this task can finish.
+                }
+            });
         }
 
         /// <summary>
