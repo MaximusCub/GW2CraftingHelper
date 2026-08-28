@@ -621,6 +621,25 @@ inventing a new one. The load-bearing rules:
   craft-vs-buy *decision* via an optional per-unit valuation, but never to the
   displayed real coin cost - an unvalued currency never has an invented
   exchange rate.
+- **Barter offers:** a vendor offer's `Item` cost line is money only when
+  that item has a Trading Post price - it is then folded into the offer's
+  real coin cost as before. An item with NO TP price is a *barter line*: an
+  account-bound token whose units are the cost. Measured over
+  `ref/vendor_offers.json` on 2026-08-28, 654 of the 1,032 distinct item
+  ids used as vendor costs have no TP price at all, covering 49% of item
+  cost-line usages, so this is the common case rather than the exotic one.
+  A barter line obeys exactly the same rule a non-coin currency line does:
+  with a valuation it folds into the offer's comparison value (never into
+  the committed coin cost); with none it makes the offer fallback-tier.
+  Either way the offer survives - dropping it reported "no vendor route"
+  for items that are genuinely purchasable, just not with gold. Curated
+  per-item defaults live in `Models/BarterItemDecisionDefaults.cs`, the
+  Item-keyed twin of `CurrencyDecisionDefaults`, and an item with no entry
+  there simply stays unvalued and fallback-only. A committed decision that
+  is paid partly in barter is flagged `VendorHasBarterItemCost` on both
+  `PlanStep` and `CraftingTreeNode`: it is the twin of a non-empty
+  `VendorCurrencyCosts`, and every consumer that reads a coin figure as
+  the whole cost must check both.
 - **Craft/vendor comparability parity:** a recipe with an unvalued
   Currency-type ingredient is fallback-tier - never comparable with a real
   TP/vendor coin price in `PickCheapest` - exactly like a vendor offer

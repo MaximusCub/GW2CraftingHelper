@@ -40,8 +40,9 @@ namespace TaimisToolbench.Services
 
             // The value used to compare this decision against siblings at
             // the parent level: same as TotalCost for TP buys, but a
-            // comparable vendor offer folds in valued non-coin currency
-            // lines, and a comparable craft sums its ingredients'
+            // comparable vendor offer folds in its valued non-coin lines
+            // (currency and barter item alike), and a comparable craft sums
+            // its ingredients'
             // ComparisonValues plus any valued Currency ingredient - never
             // their TotalCost. Keeping this separate from TotalCost stops
             // a valued coin-equivalent from being "laundered" away when an
@@ -71,8 +72,9 @@ namespace TaimisToolbench.Services
             public bool CanBuyVendor;
 
             // True when this committed decision is fallback-tier - an
-            // unvalued currency, GuildUpgrade, or other unpriceable
-            // ingredient type - directly on the chosen recipe/offer, or
+            // unvalued currency or barter item, a GuildUpgrade, or another
+            // unpriceable ingredient type - directly on the chosen
+            // recipe/offer, or
             // transitively via a chosen ingredient's own fallback-tier
             // decision. Without the transitive propagation, an unpriceable
             // cost two Craft levels deep would launder back into a
@@ -590,13 +592,16 @@ namespace TaimisToolbench.Services
                     // ComparisonValue == TotalCost with no valuation folded
                     // in; overwriting it with a partial figure made the
                     // value-detail tooltip render a precise-looking price
-                    // for an offer that was never valued. Consequence: a
-                    // skipped fallback-tier decision keeps its
-                    // pre-correction ComparisonValue, so ComparisonValue ==
-                    // TotalCost need not hold for it after the merged
-                    // correction - a new consumer must not assume it.
+                    // for an offer that was never valued. A VALUED barter
+                    // offer is skipped for the mirror-image reason: its
+                    // valued lines are Item lines, absent from
+                    // step.VendorCurrencyCosts and so contributing nothing
+                    // to the share above. Consequence: a skipped decision
+                    // keeps its pre-correction ComparisonValue, so
+                    // ComparisonValue == TotalCost + share need not hold
+                    // after the merged correction.
                     if (memo.TryGetValue(nodeId, out var decision) && decision.TotalCost.HasValue &&
-                        !decision.HasUnvaluedCurrency)
+                        !decision.HasUnvaluedCurrency && !HasBarterItemCost(decision))
                     {
                         decision.ComparisonValue = decision.TotalCost.Value + currencyShare;
                         memo[nodeId] = decision;
@@ -780,14 +785,14 @@ namespace TaimisToolbench.Services
 
             // Evaluate vendor offers. Coin-only offers (directly or via
             // TP-priced barter) compete in PickCheapest. Offers with
-            // non-coin currency lines compete only when every such
-            // currency has a user-provided valuation; with any unvalued
-            // line the offer is NOT comparable (rating it by its coin part
-            // alone would let a 500k-karma offer beat every coin option)
-            // and is kept only as a fallback when nothing priceable exists
-            // (repo invariant: never invent exchange rates). A winning
-            // offer's non-coin lines are always reported on the plan -
-            // valuation affects comparison, never the displayed cost.
+            // non-coin lines - a wallet currency, or an untradeable barter
+            // item - compete only when every such line has a valuation;
+            // with any unvalued line the offer is NOT comparable (rating it
+            // by its coin part alone would let a 500k-karma offer beat
+            // every coin option) and is kept only as a fallback (repo
+            // invariant: never invent exchange rates). A winning offer's
+            // non-coin lines are always reported on the plan - valuation
+            // affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
 
@@ -1351,11 +1356,37 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// True when a committed vendor decision carries at least one
+        /// BARTER cost line - an untradeable item with no Trading Post
+        /// price, marked by a null VendorItemCostLine.GoldValue.
+        /// </summary>
+        private static bool HasBarterItemCost(Decision decision)
+        {
+            if (decision.VendorItemCosts == null)
+            {
+                return false;
+            }
+
+            foreach (var line in decision.VendorItemCosts)
+            {
+                if (!line.GoldValue.HasValue)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Decomposes a winning-or-fallback vendor offer's already-
         /// evaluated cost fields into a PillSourceCostBreakdown. RawCoin
         /// subtracts each item line's GoldValue back out of coinCost so
         /// the item's raw quantity is what competes in strict-domination
-        /// comparisons, not its TP-valued gold.
+        /// comparisons, not its TP-valued gold. A barter line (null
+        /// GoldValue) contributed nothing to coinCost in the first place,
+        /// so there is nothing to subtract for it - only its raw quantity
+        /// competes, which is exactly the intent for every item line.
         /// </summary>
         private static PillSourceCostBreakdown BuildVendorCostBreakdown(
             long? coinCost, List<CostLine> currencyCosts, List<VendorItemCostLine> itemCosts, long? decisionValue)
@@ -1371,7 +1402,7 @@ namespace TaimisToolbench.Services
             {
                 foreach (var line in itemCosts)
                 {
-                    itemFoldedValue += line.GoldValue;
+                    itemFoldedValue += line.GoldValue ?? 0L;
                     lines.Add(new CostLine { Type = "Item", Id = line.ItemId, Count = line.Quantity });
                 }
             }
@@ -1673,6 +1704,11 @@ namespace TaimisToolbench.Services
                 {
                     existing.VendorCurrencyCosts = _vendorBatchSolver.MergeVendorCurrencyCosts(
                         existing.VendorCurrencyCosts, decision.VendorCurrencyCosts);
+
+                    // One-way ratchet, like the batch Conflict flag above:
+                    // the merged step's coin figure is incomplete as soon
+                    // as ANY occurrence paid partly in barter.
+                    existing.VendorHasBarterItemCost |= HasBarterItemCost(decision);
                 }
             }
             else
@@ -1696,6 +1732,8 @@ namespace TaimisToolbench.Services
                     VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                         ? _vendorBatchSolver.MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
                         : null,
+                    VendorHasBarterItemCost = decision.Source == AcquisitionSource.BuyFromVendor &&
+                        HasBarterItemCost(decision),
                 };
             }
         }

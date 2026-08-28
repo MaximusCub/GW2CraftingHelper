@@ -5,21 +5,25 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// opportunity-notes: small, self-contained coin-valuation helper
-    /// shared by RecipeSheetSavingsCalculator (recipe-sheet vendor offers)
-    /// and SeasonalVendorTipCalculator (seasonal vendor offers) - both need
-    /// to answer "what does this offer's CostLines cost in coin", with the
-    /// exact same "skip rather than guess" posture VendorBatchSolver.
-    /// EvaluateVendorOffers already established for the SOLVER's own offer
-    /// evaluation (DO-NOT-TOUCH, never modified here or by this class):
-    /// a non-coin Currency line, an unpriced/zero-priced Item line, or any
+    /// Small, self-contained coin-valuation helper shared by
+    /// RecipeSheetSavingsCalculator (recipe-sheet vendor offers) and
+    /// SeasonalVendorTipCalculator (seasonal vendor offers) - both need to
+    /// answer "what does this offer's CostLines cost in coin", and both
+    /// keep the strict "skip rather than guess" posture: a non-coin
+    /// Currency line, an unpriced/zero-priced Item line, or any
     /// unrecognized CostLine.Type makes the WHOLE offer unpriceable rather
     /// than silently dropping that one line - repo invariant, "avoid
-    /// invalid currency comparisons". Deliberately much simpler than
-    /// VendorBatchSolver's own evaluation (no batching, no currency
-    /// valuation, no fallback/comparable split) - these two callers only
-    /// ever need a single "is this priceable, and for how much" answer for
-    /// ONE unscaled purchase, never a solver ranking.
+    /// invalid currency comparisons".
+    ///
+    /// Deliberately much simpler than VendorBatchSolver's own evaluation,
+    /// which now DOES route an unpriced Item line into its fallback tier
+    /// rather than discarding the offer (see
+    /// docs/ARCHITECTURE.md section 8). It can: it has a valuation, a
+    /// comparable/fallback split and a place to report non-coin costs.
+    /// These two callers have none of those - each needs a single "is this
+    /// priceable, and for how much" answer for ONE unscaled purchase, and
+    /// nowhere to put an incomparable one - so the strict posture is right
+    /// HERE and the two must not be made to converge.
     /// </summary>
     internal static class CostLineValuation
     {

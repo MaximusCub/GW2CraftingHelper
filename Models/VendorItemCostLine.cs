@@ -1,7 +1,7 @@
 namespace TaimisToolbench.Models
 {
     /// <summary>
-    /// A single TP-valued Item cost
+    /// A single Item cost
     /// line of a winning BuyFromVendor decision, scaled to one tree
     /// occurrence's actual purchase quantity (unitsNeeded already applied -
     /// see VendorBatchSolver.EvaluateVendorOffers). GoldValue is captured
@@ -19,7 +19,14 @@ namespace TaimisToolbench.Models
 
         public int Quantity { get; set; }
 
-        public long GoldValue { get; set; }
+        // Null for a BARTER line: an untradeable item with no TP price,
+        // whose units ARE the cost. Nothing of it was folded into the
+        // parent decision's coin total, so there is no gold figure to
+        // report and a display leaf must render a blank cost cell rather
+        // than a 0 - exactly what a non-coin currency leaf already does.
+        // Any valuation such a line carries is decision-only and must
+        // never reach this field (see Models/BarterItemDecisionDefaults.cs).
+        public long? GoldValue { get; set; }
 
         // true when this
         // line's per-unit TP price (folded into GoldValue above) came from

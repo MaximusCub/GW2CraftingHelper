@@ -192,5 +192,114 @@ namespace TaimisToolbench.Tests.Models
                 Assert.Equal(kvp.Value, copperPerUnit);
             }
         }
+
+        // --- barter-item valuations: the item-keyed twin of every
+        // currency-keyed rule above (see CurrencyValuation's class doc
+        // comment for why they are two tables and not one). ---
+        [Fact]
+        public void Constructor_ZeroItemCopperPerUnit_ThrowsArgumentOutOfRangeException()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new CurrencyValuation(
+                null, null, new Dictionary<int, long> { { 43992, 0 } }));
+        }
+
+        [Fact]
+        public void Constructor_ItemBothValuedAndCleared_ThrowsArgumentException()
+        {
+            Assert.Throws<ArgumentException>(() => new CurrencyValuation(
+                null, null, new Dictionary<int, long> { { 43992, 5 } }, new[] { 43992 }));
+        }
+
+        [Fact]
+        public void Constructor_ItemIdCollidingWithAValuedCurrencyId_IsIndependent()
+        {
+            // Currency 39 is Gaeting Crystal in the wallet; item 39 is an
+            // unrelated item. The two tables must not answer for each other.
+            var valuation = new CurrencyValuation(
+                new Dictionary<int, long> { { 39, 100 } },
+                null,
+                new Dictionary<int, long> { { 39, 7 } });
+
+            Assert.True(valuation.TryGetCopperValue(39, out long currencyValue));
+            Assert.Equal(100, currencyValue);
+            Assert.True(valuation.TryGetItemCopperValue(39, out long itemValue));
+            Assert.Equal(7, itemValue);
+        }
+
+        [Fact]
+        public void TryGetEffectiveItemCopperValue_UserOverride_WinsOverDefault()
+        {
+            // Item 19925 (Obsidian Shard) has a BarterItemDecisionDefaults
+            // entry - an explicit user override must still win.
+            var valuation = new CurrencyValuation(
+                null, null, new Dictionary<int, long> { { 19925, 999 } });
+
+            Assert.True(valuation.TryGetEffectiveItemCopperValue(19925, out long copperPerUnit));
+            Assert.Equal(999, copperPerUnit);
+        }
+
+        [Fact]
+        public void TryGetEffectiveItemCopperValue_NoOverrideNotCleared_FallsThroughToDefault()
+        {
+            Assert.True(CurrencyValuation.None.TryGetEffectiveItemCopperValue(19925, out long copperPerUnit));
+            Assert.Equal(
+                BarterItemDecisionDefaults.Defaults[19925].CopperPerUnit, copperPerUnit);
+        }
+
+        [Fact]
+        public void TryGetEffectiveItemCopperValue_Cleared_NeverFallsThroughToDefault()
+        {
+            var valuation = new CurrencyValuation(null, null, null, new[] { 19925 });
+
+            Assert.False(valuation.TryGetEffectiveItemCopperValue(19925, out long copperPerUnit));
+            Assert.Equal(0, copperPerUnit);
+            Assert.True(valuation.IsItemCleared(19925));
+        }
+
+        [Fact]
+        public void TryGetEffectiveItemCopperValue_BlackLionClaimTicket_HasNoDefault()
+        {
+            // 43992 is the single most-used unpriced barter item in
+            // ref/vendor_offers.json (2,365 offers) and is deliberately
+            // left unvalued - gem-store RNG-chest currency whose gold worth
+            // is personal, the same posture Astral Acclaim already gets.
+            Assert.False(CurrencyValuation.None.TryGetEffectiveItemCopperValue(43992, out long copperPerUnit));
+            Assert.Equal(0, copperPerUnit);
+        }
+
+        [Fact]
+        public void WithDefaults_EveryBarterItemDefaultId_IsPresentInMergedResult()
+        {
+            var merged = CurrencyValuation.WithDefaults(CurrencyValuation.None);
+
+            foreach (var kvp in BarterItemDecisionDefaults.Defaults)
+            {
+                Assert.True(merged.TryGetItemCopperValue(kvp.Key, out long copperPerUnit));
+                Assert.Equal(kvp.Value.CopperPerUnit, copperPerUnit);
+            }
+        }
+
+        [Fact]
+        public void WithDefaults_ClearedItem_HasNoValueInMergedResultAndStaysCleared()
+        {
+            var persisted = new CurrencyValuation(null, null, null, new[] { 19925 });
+
+            var merged = CurrencyValuation.WithDefaults(persisted);
+
+            Assert.False(merged.TryGetItemCopperValue(19925, out _));
+            Assert.True(merged.IsItemCleared(19925));
+        }
+
+        [Fact]
+        public void WithDefaults_ItemOverride_WinsOverDefaultInMergedResult()
+        {
+            var persisted = new CurrencyValuation(
+                null, null, new Dictionary<int, long> { { 19925, 42 } });
+
+            var merged = CurrencyValuation.WithDefaults(persisted);
+
+            Assert.True(merged.TryGetItemCopperValue(19925, out long copperPerUnit));
+            Assert.Equal(42, copperPerUnit);
+        }
     }
 }

@@ -163,6 +163,30 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void StepWithVendorBarterItemCost_NotComparable_NoTip()
+        {
+            // The barter twin of the test above: an untradeable-item cost
+            // leaves VendorCurrencyCosts empty, so a currency-only guard
+            // would compare this step's incomplete UnitCost against a
+            // coin-priced seasonal offer.
+            var step = new PlanStep
+            {
+                ItemId = 19721, Quantity = 10, UnitCost = 100, Source = AcquisitionSource.BuyFromVendor,
+                VendorHasBarterItemCost = true,
+            };
+            var result = MakeResult(step);
+            var offer = HalloweenOffer(19721, 5, 999, 1);
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>> { { 19721, new List<VendorOffer> { offer } } };
+            var prices = new Dictionary<int, ItemPrice> { { 999, new ItemPrice { SellInstant = 50 } } };
+
+            SeasonalVendorTipCalculator.Apply(
+                result, vendorOffers, prices, PriceBasis.BuyOrder,
+                new List<string> { Gw2Constants.HalloweenFestivalName });
+
+            Assert.Empty(result.SeasonalVendorTips);
+        }
+
+        [Fact]
         public void MultipleQualifyingOffers_PicksCheapest()
         {
             // Same shape as the three real seeded ecto offers: three

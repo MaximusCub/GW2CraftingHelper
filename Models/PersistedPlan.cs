@@ -57,17 +57,18 @@ namespace TaimisToolbench.Models
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Last moved by PersistedPlan.RequestSchemaVersion, which is purely
-        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's one-line
-        /// diff):
-        /// Newtonsoft leaves an absent field at its "" initializer, so a
-        /// plan or snapshot written before the field existed still
-        /// deserializes correctly and <see cref="CurrentSchemaVersion"/>
-        /// stays at 3. A bump here now costs a re-solve rather than the
-        /// plan, but it still costs one.
+        /// Last moved by the barter-item valuation work, which is purely
+        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's four-line
+        /// diff): two CurrencyValuation collections, absent from an older
+        /// file and left empty by Newtonsoft, and two bool flags, absent
+        /// and left false - which is what an older plan, written when no
+        /// barter offer could win at all, correctly means. A plan or
+        /// snapshot written before any of them still deserializes and
+        /// <see cref="CurrentSchemaVersion"/> stays at 3. A bump here now
+        /// costs a re-solve rather than the plan, but it still costs one.
         /// </remarks>
         public const string SchemaShapeHash =
-            "2349ee68c01e7d21d1a7af1cdb1b1080ba974bdf76325cbc49cee647cdec9c0e";
+            "175e4a5791f5dc7868a0f36becaad5546b6c9c25de4b700eff0cf93d401a6e33";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why

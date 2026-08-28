@@ -388,6 +388,62 @@ namespace TaimisToolbench.Tests.Services
             Assert.Empty(result.RecipeSheetSavingsOpportunities);
         }
 
+        [Fact]
+        public void VendorBarterItemCostPresent_NotComparable_NoOpportunity()
+        {
+            // A barter-priced vendor node reaches "UnitCost does not
+            // represent the whole cost" by the other route: its cost is an
+            // untradeable item's units, so VendorCurrencyCosts is empty and
+            // a currency-only guard would wave it through.
+            var node = BoughtNodeWithReferenceBranch();
+            node.VendorHasBarterItemCost = true;
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
+        [Fact]
+        public void NestedVendorBarterItemCost_RecursivelyDetected_NoOpportunity()
+        {
+            // The barter twin of NestedVendorCurrencyCosts_... below: the
+            // barter-priced node sits two levels down, so a direct-child
+            // check would count the Craft child's SubtreeCost as pure coin.
+            var barterGrandchild = new CraftingTreeNode
+            {
+                ItemId = 300,
+                Quantity = 1,
+                Decision = CraftingDecision.BuyFromVendor,
+                SubtreeCost = 0,
+                VendorHasBarterItemCost = true,
+            };
+            var craftChild = new CraftingTreeNode
+            {
+                ItemId = 301,
+                Quantity = 1,
+                Decision = CraftingDecision.Craft,
+                SubtreeCost = 1,
+                Children = new List<CraftingTreeNode> { barterGrandchild },
+            };
+            var node = BoughtNodeWithReferenceBranch(extraChildren: new[] { craftChild });
+            var result = new CraftingPlanResult { CraftingTree = node };
+            var store = MakeStore(CoinSheetOffer(500, 200));
+            var sheetMap = new Dictionary<int, int> { { 999, 500 } };
+
+            RecipeSheetSavingsCalculator.Apply(
+                result, learnedRecipeIds: new HashSet<int>(), prices: new Dictionary<int, ItemPrice>(),
+                priceBasis: PriceBasis.BuyOrder, offersForItem: store.GetOffersForItem,
+                recipeSheetItemIdByRecipeId: sheetMap, characterDisciplines: null);
+
+            Assert.Empty(result.RecipeSheetSavingsOpportunities);
+        }
+
         // VendorCurrencyCostsPresent_NotComparable_
         // NoOpportunity above only sets VendorCurrencyCosts on the PARENT
         // fixture's direct BuyFromTp child - it never proves the guard

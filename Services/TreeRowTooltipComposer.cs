@@ -129,7 +129,13 @@ namespace TaimisToolbench.Services
                 // it is genuinely zero AND a currency cost exists to show
                 // instead of it.
                 bool hasCurrencyCosts = node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0;
-                if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasCurrencyCosts))
+
+                // A pure-barter offer reaches the same 0-coin UnitCost by
+                // the other route (its cost is an untradeable item's units,
+                // not a currency), so it must suppress the coin line for
+                // the same reason - see CraftingTreeNode's own doc comment.
+                bool hasNonCoinCosts = hasCurrencyCosts || node.VendorHasBarterItemCost;
+                if (node.UnitCost.HasValue && !(node.UnitCost.Value == 0 && hasNonCoinCosts))
                 {
                     extraTooltipLines.Add(TooltipContent.Line(
                         TooltipSpan.FromText("Unit price: "),

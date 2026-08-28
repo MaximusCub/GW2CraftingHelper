@@ -99,14 +99,14 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void ShippedBarterOffer_WithNoTradingPostPriceForItsCostItems_SolvesToUnknownSource()
+        public void ShippedBarterOffer_WithNoTradingPostPriceForItsCostItems_IsAFallbackVendorRoute()
         {
-            // Why the three Endless Summer gifts read UNKNOWN even though
-            // the module ships a vendor offer for each: VendorBatchSolver
-            // drops a whole offer the moment one "Item" cost line has no TP
-            // price, and these are barter offers paid in account-bound
-            // tokens, which never have one. With no comparable and no
-            // fallback offer left, PlanSolver commits UnknownSource.
+            // A shipped barter offer, end to end: Gift of the Survivors is
+            // bought from Castaway Agnes for three account-bound Endless
+            // Summer tokens plus 500 of a wallet currency, none of which
+            // has a Trading Post price or a curated valuation. The whole
+            // offer used to be dropped and the item read UNKNOWN; it is now
+            // the fallback-tier vendor route it always was in game.
             const int GiftOfTheSurvivors = 106712;
 
             var offers = LoadShippedOffers()
@@ -126,9 +126,17 @@ namespace TaimisToolbench.Tests.Services
                 vendorOffers);
 
             var decision = result.Decisions[0];
-            Assert.Equal(AcquisitionSource.UnknownSource, decision.Source);
-            Assert.False(decision.CanBuyVendor);
-            Assert.Null(decision.TotalCost);
+            Assert.Equal(AcquisitionSource.BuyFromVendor, decision.Source);
+            Assert.True(decision.CanBuyVendor);
+
+            // Fallback tier: nothing on this offer is coin, so nothing is
+            // committed as coin. The three tokens ride on VendorItemCosts
+            // with no gold value, and the wallet currency on
+            // VendorCurrencyCosts, exactly as each is really paid.
+            Assert.Equal(0, decision.TotalCost);
+            Assert.Equal(3, decision.VendorItemCosts.Count);
+            Assert.All(decision.VendorItemCosts, line => Assert.Null(line.GoldValue));
+            Assert.Single(decision.VendorCurrencyCosts);
         }
     }
 }

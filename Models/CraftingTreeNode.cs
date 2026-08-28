@@ -110,6 +110,13 @@ namespace TaimisToolbench.Models
         // names/icons before render.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; set; }
 
+        // True when this BuyFromVendor node's offer is paid partly in an
+        // untradeable barter item. Its twin of VendorCurrencyCosts: both
+        // mean "SubtreeCost/UnitCost do not represent this node's whole
+        // cost", so every consumer that reads a coin figure as complete
+        // must check BOTH (see PlanStep.VendorHasBarterItemCost).
+        public bool VendorHasBarterItemCost { get; set; }
+
         // True only on a node CraftingTreeBuilder.BuildTree returned: the
         // single-item plan's target, or one of a batch's N requested roots
         // (the synthetic multi-item wrapper never becomes a

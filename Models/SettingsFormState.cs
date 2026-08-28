@@ -100,6 +100,20 @@ namespace TaimisToolbench.Models
             return "currency." + currencyId.ToString(CultureInfo.InvariantCulture) + ".ignore";
         }
 
+        // Barter items get their own key prefix, not the currency one: an
+        // item id and a currency id are different id spaces that collide
+        // numerically, and two controls sharing a key would collapse into
+        // one comparison (see AddField's duplicate rejection below).
+        public static string BarterItemAmountKey(int itemId)
+        {
+            return "barterItem." + itemId.ToString(CultureInfo.InvariantCulture) + ".amount";
+        }
+
+        public static string BarterItemIgnoreKey(int itemId)
+        {
+            return "barterItem." + itemId.ToString(CultureInfo.InvariantCulture) + ".ignore";
+        }
+
         public static string HomesteadTierKey(int materialItemId)
         {
             return "homestead." + materialItemId.ToString(CultureInfo.InvariantCulture) + ".tier";

@@ -73,9 +73,11 @@ namespace TaimisToolbench.Services
             // a second, divergent computation), so a display-tree leaf can
             // be built from real, already-computed numbers.
             // BestComparableItemCosts/FallbackItemCosts are the winning
-            // offer's TP-valued Item cost lines, scaled to this
-            // occurrence's unitsNeeded - null when the winning offer had
-            // none. BestComparableHasRawCoin/
+            // offer's Item cost lines, scaled to this occurrence's
+            // unitsNeeded - null when the winning offer had none. A
+            // TP-valued line carries its GoldValue; a barter line's
+            // GoldValue is null, because nothing of it was folded into the
+            // coin total. BestComparableHasRawCoin/
             // FallbackHasRawCoin report only whether the winning offer had a
             // genuine raw coin cost line (Type=="Currency",
             // Id==Gw2Constants.CoinCurrencyId) with Count > 0 - distinct
@@ -117,42 +119,45 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// A Homestead Refinement offer whose tagged tier exceeds
-        /// <paramref name="homesteadTiers"/>' configured tier for that
-        /// material is skipped entirely - the seed carries every
-        /// refinement row unconditionally, so without this gate the solver
-        /// behaves as if every account had every efficiency upgrade.
+        /// Splits vendor offers into two tiers, on the offer's NON-COIN cost
+        /// lines. Two kinds of those obey one rule: a non-coin wallet
+        /// currency line, and a BARTER line - an Item cost line whose item
+        /// has no Trading Post price, which is what an account-bound vendor
+        /// token is. An Item line that DOES have a TP price is money, not a
+        /// barter line: it folds into the offer's real coin cost as before
+        /// and never consults a valuation.
         ///
-        /// Splits vendor offers into two tiers. An offer is COMPARABLE (competes
-        /// with TP/craft coin costs in PickCheapest) when it has no non-coin
-        /// currency lines at all, OR every one of its non-coin currency lines
-        /// has a user-provided valuation (<paramref name="currencyValuation"/>):
-        /// its comparison value is coin part + sum(count * copperPerUnit) over
-        /// those valued lines, reported via
+        /// An offer is COMPARABLE (competes with TP/craft coin costs in
+        /// PickCheapest) when it has no non-coin lines at all, OR every one
+        /// of them has a valuation (<paramref name="currencyValuation"/>):
+        /// its comparison value is coin part + sum(count * copperPerUnit)
+        /// over those valued lines, reported via
         /// <see cref="VendorOfferEvaluation.BestComparableValue"/>.
         /// The winning comparable offer's real coin part and (if any) currency
         /// lines are reported separately via
         /// <see cref="VendorOfferEvaluation.BestComparableCoinCost"/>
         /// and <see cref="VendorOfferEvaluation.BestComparableCurrencyCosts"/> -
         /// the valuation affects comparison only, never the amounts committed
-        /// to the plan.
-        /// An offer with at least one non-coin currency line that has NO
-        /// valuation (including when it is mixed with other, valued lines) is
+        /// to the plan. A barter line's own scaled quantity rides on
+        /// <see cref="VendorOfferEvaluation.BestComparableItemCosts"/> with a
+        /// null GoldValue, for the same reason.
+        ///
+        /// An offer with at least one non-coin line that has NO valuation
+        /// (including when it is mixed with other, valued lines) is
         /// incomparable with coin costs and reported only as a FALLBACK,
         /// ranked by lowest coin part. A fallback coin-part tie is broken by
-        /// unit count only when both offers cost the same single currency (a
-        /// genuine like-for-like comparison); ties across different currencies
-        /// keep the first-listed offer, because ranking across currencies has
-        /// no exchange rate and unit counts of different currencies must never
-        /// be compared.
-        ///
-        /// A DailyCap/WeeklyCap NEVER excludes an offer or affects its
-        /// tier - gw2e only ever surfaces a cap as a post-solve notice,
-        /// never re-routing the tree. Both tiers carry the raw caps
-        /// through so FinalizeVendorBatches can produce the notice once,
-        /// against aggregate demand; SeasonalCap is carried the same way
-        /// and checked independently.
+        /// unit count only when both offers cost the same single non-coin
+        /// line, kind included; ties across different lines keep the
+        /// first-listed offer, because ranking across them has no exchange
+        /// rate and their unit counts must never be compared.
         /// </summary>
+        /// <remarks>
+        /// A DailyCap/WeeklyCap/SeasonalCap NEVER excludes an offer or
+        /// affects its tier - gw2e only ever surfaces a cap as a post-solve
+        /// notice, never re-routing the tree, so both tiers carry the raw
+        /// caps through for FinalizeVendorBatches to check once against
+        /// aggregate demand (docs/ARCHITECTURE.md section 7).
+        /// </remarks>
         internal VendorOfferEvaluation EvaluateVendorOffers(
             RecipeNode node,
             IReadOnlyDictionary<int, ItemPrice> prices,
@@ -168,8 +173,12 @@ namespace TaimisToolbench.Services
             long? fallbackCoinCost = null;
             List<CostLine> fallbackCurrencyCosts = null;
             VendorOfferBatch? fallbackBatch = null;
-            long fallbackCurrencyUnits = 0;
-            int fallbackSingleCurrencyId = -1;
+            // Tie-break state for the fallback tier: the scaled unit count
+            // of the winning offer's single non-coin cost line, and that
+            // line's identity as a (kind, id) pair.
+            long fallbackNonCoinUnits = 0;
+            int fallbackSingleLineId = -1;
+            bool fallbackSingleLineIsBarter = false;
 
             List<VendorItemCostLine> bestComparableItemCosts = null;
             bool bestComparableHasRawCoin = false;
@@ -196,10 +205,13 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
-                // Keyed on OutputItemId, not a merchant-name match:
-                // HomesteadTier is only set on rows the seeding pass
-                // already confirmed are Homestead Refinement, so a string
-                // check here would be redundant work in a hot loop.
+                // The seed carries every Homestead Refinement row
+                // unconditionally, so without this gate the solver behaves
+                // as if every account had every efficiency upgrade. Keyed
+                // on OutputItemId, not a merchant-name match: HomesteadTier
+                // is only set on rows the seeding pass already confirmed
+                // are Homestead Refinement, so a string check here would be
+                // redundant work in a hot loop.
                 if (offer.HomesteadTier.HasValue &&
                     offer.HomesteadTier.Value > homesteadTiers.GetTier(offer.OutputItemId))
                 {
@@ -216,12 +228,13 @@ namespace TaimisToolbench.Services
                 // that only exists because an Item line was folded in.
                 // itemCostRaw is exactly what feeds the coinCost fold
                 // below - captured so a display leaf can be built without
-                // recomputing the multiplication. PriceSideFellBack
-                // is this same line's own
-                // GetUnitPrice out param, carried alongside so the scaled
-                // VendorItemCostLine below can flag it the same way a
-                // plain BuyFromTp node already is.
+                // recomputing the multiplication, with this same line's own
+                // GetUnitPrice PriceSideFellBack out param alongside so the
+                // scaled VendorItemCostLine can flag it the way a plain
+                // BuyFromTp node already is. UnitPrice 0 marks a BARTER
+                // line (see the Item branch below).
                 bool hasRawCoin = false;
+                int barterLineCount = 0;
                 List<(int ItemId, int Count, int UnitPrice, bool PriceSideFellBack)> itemCostRaw = null;
 
                 foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
@@ -298,10 +311,22 @@ namespace TaimisToolbench.Services
                                     .Add((cost.Id, cost.Count, unitPrice, itemPriceSideFellBack));
                             }
                         }
-                        else
+                        else if (cost.Count > 0)
                         {
-                            priceable = false;
-                            break;
+                            // A barter line: an untradeable token (654 of
+                            // the 1,032 item ids used as costs in
+                            // ref/vendor_offers.json have no TP price at
+                            // all, nearly all AccountBound). Its units are
+                            // the cost, so nothing is folded into coinCost
+                            // - it is valued for COMPARISON only, exactly
+                            // like a non-coin currency line, and leaves the
+                            // offer fallback-tier when it has no valuation.
+                            // Discarding the whole offer here instead would
+                            // report "no vendor route" for an item that is
+                            // genuinely purchasable, just not with gold.
+                            barterLineCount++;
+                            (itemCostRaw ?? (itemCostRaw = new List<(int, int, int, bool)>()))
+                                .Add((cost.Id, cost.Count, 0, false));
                         }
                     }
                     else
@@ -335,15 +360,20 @@ namespace TaimisToolbench.Services
 
                 long totalCoinCost = coinCost * unitsNeeded;
 
+                // valuationCopper/allValued are shared with the currency
+                // scaling below: a barter line and a non-coin currency line
+                // are valued by the same rule and land in the same
+                // comparison figure, and both stay vacuously true/zero for
+                // a pure-coin offer. totalBarterUnits feeds the fallback
+                // tie-break only.
+                long valuationCopper = 0;
+                bool allValued = true;
+                long totalBarterUnits = 0;
+
                 // Scale itemCostRaw by the same unitsNeeded factor
                 // totalCoinCost just applied - the same arithmetic, never
-                // a second, potentially-diverging computation. Guarded the
-                // same way the currency scaling guards CostLine.Count: a
-                // scaled quantity too large for
-                // VendorItemCostLine.Quantity (int) skips the offer rather
-                // than truncating it silently.
-                //
-                // The `itemsScalable`/`continue` guard is structurally
+                // a second, potentially-diverging computation. The
+                // `itemsScalable`/`continue` guard is structurally
                 // identical to the pre-existing currency `scalable` guard
                 // below, can only fire above int.MaxValue scaled quantity,
                 // and skips rather than clamps - a clamp is silently wrong.
@@ -361,13 +391,51 @@ namespace TaimisToolbench.Services
                             break;
                         }
 
+                        // A barter line (UnitPrice 0) has NO gold value: its
+                        // cost is its units, and any valuation of it is
+                        // decision-only and must never surface as gold.
+                        // GoldValue's null is what a display leaf renders as
+                        // a blank cost cell, the same way a currency leaf
+                        // already does.
                         scaledItemCosts.Add(new VendorItemCostLine
                         {
                             ItemId = ic.ItemId,
                             Quantity = (int)scaledQty,
-                            GoldValue = (long)ic.Count * unitsNeeded * ic.UnitPrice,
+                            GoldValue = ic.UnitPrice > 0
+                                ? (long)ic.Count * unitsNeeded * ic.UnitPrice
+                                : (long?)null,
                             PriceSideFellBack = ic.PriceSideFellBack,
                         });
+
+                        if (ic.UnitPrice > 0)
+                        {
+                            continue;
+                        }
+
+                        totalBarterUnits += scaledQty;
+                        if (!allValued)
+                        {
+                            continue;
+                        }
+
+                        if (currencyValuation != null &&
+                            currencyValuation.TryGetItemCopperValue(ic.ItemId, out long itemCopperPerUnit))
+                        {
+                            try
+                            {
+                                valuationCopper = checked(valuationCopper + (scaledQty * itemCopperPerUnit));
+                            }
+                            catch (OverflowException)
+                            {
+                                // Absurd valuation input; fall back rather
+                                // than crash or silently misrank offers.
+                                allValued = false;
+                            }
+                        }
+                        else
+                        {
+                            allValued = false;
+                        }
                     }
                 }
 
@@ -377,15 +445,10 @@ namespace TaimisToolbench.Services
                 }
 
                 // Scale and value the non-coin currency lines (no-op for a
-                // pure-coin offer, which has none). allValued stays
-                // vacuously true when there are no non-coin lines, so a
-                // pure-coin offer always lands in the comparable branch
-                // below with valuationCopper == 0 - unchanged from before.
+                // pure-coin offer, which has none).
                 List<CostLine> scaledCurrencyCosts = null;
                 long totalCurrencyUnits = 0;
-                long valuationCopper = 0;
                 bool scalable = true;
-                bool allValued = true;
 
                 if (currencyCosts.Count > 0)
                 {
@@ -472,24 +535,33 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
-                // The offer's single currency id, or -1 when it spans several
-                // currencies (unit counts are then never compared).
-                int singleCurrencyId = currencyCosts.Count == 1 ? currencyCosts[0].Id : -1;
+                // The offer's single non-coin cost line, or -1 when it spans
+                // several (unit counts are then never compared). A currency
+                // id and an item id are different id spaces, so the KIND is
+                // part of the key: a 3-Karma offer and a 3-token offer must
+                // never tie-break against each other.
+                bool singleLineIsBarter = currencyCosts.Count == 0 && barterLineCount == 1;
+                int singleLineId =
+                    currencyCosts.Count + barterLineCount != 1 ? -1 :
+                    singleLineIsBarter ? BarterLineId(itemCostRaw) : currencyCosts[0].Id;
+                long totalNonCoinUnits = totalCurrencyUnits + totalBarterUnits;
 
                 bool better =
                     !fallbackCoinCost.HasValue ||
                     totalCoinCost < fallbackCoinCost.Value ||
                     (totalCoinCost == fallbackCoinCost.Value &&
-                     singleCurrencyId != -1 &&
-                     singleCurrencyId == fallbackSingleCurrencyId &&
-                     totalCurrencyUnits < fallbackCurrencyUnits);
+                     singleLineId != -1 &&
+                     singleLineIsBarter == fallbackSingleLineIsBarter &&
+                     singleLineId == fallbackSingleLineId &&
+                     totalNonCoinUnits < fallbackNonCoinUnits);
 
                 if (better)
                 {
                     fallbackCoinCost = totalCoinCost;
                     fallbackCurrencyCosts = scaledCurrencyCosts;
-                    fallbackCurrencyUnits = totalCurrencyUnits;
-                    fallbackSingleCurrencyId = singleCurrencyId;
+                    fallbackNonCoinUnits = totalNonCoinUnits;
+                    fallbackSingleLineId = singleLineId;
+                    fallbackSingleLineIsBarter = singleLineIsBarter;
                     fallbackItemCosts = scaledItemCosts;
                     fallbackHasRawCoin = hasRawCoin;
                     fallbackBatch = new VendorOfferBatch
@@ -516,6 +588,29 @@ namespace TaimisToolbench.Services
                 bestComparableHasRawCoin,
                 fallbackItemCosts,
                 fallbackHasRawCoin);
+        }
+
+        /// <summary>
+        /// The item id of the one barter (UnitPrice 0) entry in a raw item
+        /// cost list, for the fallback tie-break. Only called once the
+        /// caller has established there is exactly one; -1 otherwise, which
+        /// the tie-break reads as "no like-for-like comparison".
+        /// </summary>
+        private static int BarterLineId(
+            List<(int ItemId, int Count, int UnitPrice, bool PriceSideFellBack)> itemCostRaw)
+        {
+            if (itemCostRaw != null)
+            {
+                foreach (var ic in itemCostRaw)
+                {
+                    if (ic.UnitPrice == 0)
+                    {
+                        return ic.ItemId;
+                    }
+                }
+            }
+
+            return -1;
         }
 
         /// <summary>
