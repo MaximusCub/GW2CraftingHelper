@@ -65,7 +65,7 @@ namespace TaimisToolbench.Tests.Services
         public void BuildRowSeeds_AfterRealStoreRoundTrip_RestoresMultiItemRequestWithQuantities()
         {
             _store.Save(MultiItemPlan());
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             var seeds = RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata);
@@ -85,7 +85,7 @@ namespace TaimisToolbench.Tests.Services
             // wiring slip that fell back to the control's default would
             // pass a default-direction assertion.
             _store.Save(MultiItemPlan());
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             Assert.False(loaded.UseOwnMaterials);
@@ -104,7 +104,7 @@ namespace TaimisToolbench.Tests.Services
                 { 5, new ItemMetadata { ItemId = 5, Name = "   " } },
             };
             _store.Save(plan);
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             var seeds = RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata);

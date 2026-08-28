@@ -25,6 +25,15 @@ namespace TaimisToolbench.Services
     /// drops half the story.
     /// </para>
     /// <para>
+    /// Both verdicts now cost the RESULT and keep the REQUEST, so
+    /// LoadLatest hands back a PersistedPlanLoad rather than a plan: a
+    /// schema bump reseeds the tab's items and settings and asks for one
+    /// Generate, instead of discarding the user's plan. Null still means
+    /// "nothing to restore" and covers the two cases that leave nothing
+    /// worth showing - no file, and a document whose request layer holds
+    /// no items either. See docs/ARCHITECTURE.md section 12.
+    /// </para>
+    /// <para>
     /// Unlike SnapshotStore/StatusStore (whose callers are already
     /// serialized by a higher-level in-flight guard - see Module's own
     /// _refreshInProgress), Save has two genuinely independent call sites
@@ -85,7 +94,7 @@ namespace TaimisToolbench.Services
             _onInfo = onInfo;
         }
 
-        public PersistedPlan LoadLatest()
+        public PersistedPlanLoad LoadLatest()
         {
             try
             {
@@ -98,21 +107,66 @@ namespace TaimisToolbench.Services
                 string json = GzipJsonFile.IsGzip(bytes)
                     ? GzipJsonFile.DecompressToJson(bytes)
                     : Encoding.UTF8.GetString(bytes);
-                return Deserialize(json);
-            }
-            catch (PlanSchemaVersionMismatchException ex)
-            {
-                // Deliberately NOT routed through _onError: nothing failed.
-                // The message already names both versions and says what
-                // happens next, so it needs no "Failed to load" framing.
-                _onInfo?.Invoke(ex.Message);
-                return null;
+                var load = PlanStoreHelpers.LoadPersistedPlanDocument(json);
+                if (load == null || load.HasResult)
+                {
+                    return load;
+                }
+
+                return ReportDiscardedResult(load);
             }
             catch (Exception ex)
             {
                 _onError?.Invoke($"Failed to load plan from {_filePath}", ex);
                 return null;
             }
+        }
+
+        // One log line for a discarded result, on the channel its cause
+        // earns - drift to onInfo, damage to onError, exactly as before.
+        // What changed is the tail: the outcome is no longer always "fresh
+        // start", so the message has to state which of the two it was.
+        private PersistedPlanLoad ReportDiscardedResult(PersistedPlanLoad load)
+        {
+            bool hasRequest = CountsAsRestorableRequest(load.Plan);
+            string outcome = hasRequest
+                ? " Your requested items are restored - press Generate Plan to price them again."
+                : " Nothing else was restorable, so this session starts fresh.";
+
+            if (load.ResultDiscardCause is PlanSchemaVersionMismatchException)
+            {
+                // Deliberately NOT routed through _onError: nothing failed.
+                _onInfo?.Invoke(load.ResultDiscardCause.Message + outcome);
+            }
+            else
+            {
+                _onError?.Invoke(
+                    $"Could not read the saved result in {_filePath}.{outcome}",
+                    load.ResultDiscardCause);
+            }
+
+            return hasRequest ? load : null;
+        }
+
+        // A request of nothing is not a request: an entry with no usable
+        // rows would reseed an empty input strip and replace the tab's own
+        // default row with nothing at all.
+        private static bool CountsAsRestorableRequest(PersistedPlan plan)
+        {
+            if (plan?.RequestItems == null)
+            {
+                return false;
+            }
+
+            foreach (var item in plan.RequestItems)
+            {
+                if (item != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Atomic .tmp+Replace write, matching SnapshotStore/StatusStore/
