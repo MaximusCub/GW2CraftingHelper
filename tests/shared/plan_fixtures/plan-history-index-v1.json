@@ -1,0 +1,43 @@
+{
+  "SchemaVersion": 1,
+  "Entries": [
+    {
+      "EntryId": "0123456789abcdef0123456789abcdef",
+      "CreatedAtUtc": "2026-08-28T09:15:00Z",
+      "LastGeneratedAtUtc": "2026-08-28T09:15:00Z",
+      "Pinned": true,
+      "RequestItems": [
+        {
+          "ItemId": 1,
+          "Quantity": 2
+        }
+      ],
+      "UseOwnMaterials": true,
+      "PriceBasis": "BuyOrder",
+      "ValueOwnMaterials": true,
+      "IgnoredItemIds": [
+        2
+      ],
+      "ItemSummaries": [
+        {
+          "ItemId": 1,
+          "Name": "Target",
+          "IconUrl": "t.png",
+          "Rarity": "Fine",
+          "Quantity": 2
+        }
+      ],
+      "TotalCoinCostAtGeneration": 1234,
+      "OverrideCountAtGeneration": 0,
+      "IgnoredCountAtGeneration": 1,
+      "BlobPresent": true,
+      "BlobSchemaVersion": 3,
+      "CostSamples": [
+        {
+          "TimestampUtc": "2026-08-28T09:15:00Z",
+          "TotalCoinCost": 1234
+        }
+      ]
+    }
+  ]
+}

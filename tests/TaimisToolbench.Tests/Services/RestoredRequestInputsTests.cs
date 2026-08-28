@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
 using Xunit;
@@ -65,7 +67,7 @@ namespace TaimisToolbench.Tests.Services
         public void BuildRowSeeds_AfterRealStoreRoundTrip_RestoresMultiItemRequestWithQuantities()
         {
             _store.Save(MultiItemPlan());
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             var seeds = RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata);
@@ -85,12 +87,74 @@ namespace TaimisToolbench.Tests.Services
             // wiring slip that fell back to the control's default would
             // pass a default-direction assertion.
             _store.Save(MultiItemPlan());
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             Assert.False(loaded.UseOwnMaterials);
             Assert.Equal(PriceBasis.InstantBuy, loaded.PriceBasis);
             Assert.NotEmpty(RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata));
+        }
+
+        [Fact]
+        public void BuildRowSeeds_AfterAResultOnlyLoss_StillNamesEveryRowFromTheRequest()
+        {
+            // The screen this exists for. A schema bump discards the
+            // result, so the ItemMetadata the seeds normally read is gone -
+            // and "Unnamed item x3" on the very screen that is trying to
+            // say nothing was lost reads as breakage. PlanRequestItem.Name
+            // is the request layer's own copy, written at Generate.
+            var plan = MultiItemPlan();
+            plan.RequestItems = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 5, Quantity = 3, Name = "Bolt of Gossamer" },
+                new PlanRequestItem { ItemId = 6, Quantity = 250, Name = "Cured Thick Leather Square" },
+            };
+            _store.Save(plan);
+
+            // Age the file out of this build's result schema, through the
+            // real store: exactly what a user upgrading across a bump has
+            // on disk.
+            string path = Path.Combine(_tempDir, "plan.json");
+            var onDisk = JObject.Parse(GzipJsonFile.DecompressToJson(File.ReadAllBytes(path)));
+            onDisk["SchemaVersion"] = PersistedPlan.CurrentSchemaVersion - 1;
+            File.WriteAllBytes(path, GzipJsonFile.Compress(onDisk.ToString(Formatting.None)));
+
+            var load = _store.LoadLatest();
+
+            Assert.NotNull(load);
+            Assert.False(load.HasResult);
+            Assert.Null(load.Plan.Result);
+
+            // No metadata to read - the null argument is the point.
+            var seeds = RestoredRequestInputs.BuildRowSeeds(load.Plan.RequestItems, null);
+
+            Assert.Equal(
+                new[] { "Bolt of Gossamer", "Cured Thick Leather Square" },
+                seeds.Select(s => s.ItemName));
+            Assert.Equal(new[] { "3", "250" }, seeds.Select(s => s.QuantityText));
+        }
+
+        [Fact]
+        public void BuildRowSeeds_RestoredMetadataWins_WhenBothItAndTheRequestNameAPI()
+        {
+            // The result's metadata is the fresher of the two (an item can
+            // be renamed between the Generate that stamped the request and
+            // the restore), so it is read first and the request's own copy
+            // is the fallback, never an override.
+            var plan = MultiItemPlan();
+            plan.RequestItems = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 5, Quantity = 3, Name = "Stale Name" },
+                new PlanRequestItem { ItemId = 6, Quantity = 250, Name = "Also Stale" },
+            };
+            _store.Save(plan);
+            var loaded = _store.LoadLatest()?.Plan;
+
+            var seeds = RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata);
+
+            Assert.Equal(
+                new[] { "Bolt of Gossamer", "Cured Thick Leather Square" },
+                seeds.Select(s => s.ItemName));
         }
 
         [Fact]
@@ -104,7 +168,7 @@ namespace TaimisToolbench.Tests.Services
                 { 5, new ItemMetadata { ItemId = 5, Name = "   " } },
             };
             _store.Save(plan);
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             var seeds = RestoredRequestInputs.BuildRowSeeds(loaded.RequestItems, loaded.Result.ItemMetadata);

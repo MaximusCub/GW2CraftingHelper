@@ -271,7 +271,7 @@ namespace TaimisToolbench.Tests.Services
 
             _store.Save(Wrap(result, new DateTime(2026, 8, 9, 10, 30, 0, DateTimeKind.Local)));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.NotNull(loaded.Result);
             Assert.NotSame(result, loaded.Result);
@@ -298,7 +298,7 @@ namespace TaimisToolbench.Tests.Services
 
             _store.Save(Wrap(result, DateTime.Now));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded?.Result?.SolveContext);
 
             // Same override, applied to both the original in-memory context
@@ -334,7 +334,7 @@ namespace TaimisToolbench.Tests.Services
             var timestamp = new DateTime(2026, 8, 9, 14, 22, 0, DateTimeKind.Local);
             _store.Save(Wrap(result, timestamp, quantity: 3, useOwn: true, priceBasis: PriceBasis.BuyOrder, valueOwn: false));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.Equal(timestamp, loaded.GeneratedAt);
             Assert.True(loaded.UseOwnMaterials);
@@ -368,7 +368,7 @@ namespace TaimisToolbench.Tests.Services
                 Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } },
             });
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.False(loaded.UseOwnMaterials);
         }
@@ -386,7 +386,7 @@ namespace TaimisToolbench.Tests.Services
                 Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 1 } },
             });
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.Equal(PriceBasis.InstantBuy, loaded.PriceBasis);
         }
@@ -407,7 +407,7 @@ namespace TaimisToolbench.Tests.Services
                 Result = new CraftingPlanResult { Plan = new CraftingPlan { TargetItemId = 5, TargetQuantity = 3 } },
             });
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.Equal(new[] { 5, 6, 7 }, loaded.RequestItems.Select(r => r.ItemId));
             Assert.Equal(new[] { 3, 250, 1 }, loaded.RequestItems.Select(r => r.Quantity));
@@ -437,7 +437,7 @@ namespace TaimisToolbench.Tests.Services
             _store.Save(Wrap(result, generatedAt));
             _store.Save(Wrap(overridden, generatedAt));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.Equal(generatedAt, loaded.GeneratedAt);
             Assert.NotNull(loaded.Result);
@@ -473,7 +473,7 @@ namespace TaimisToolbench.Tests.Services
             var generatedAt = new DateTime(2026, 8, 9, 11, 0, 0, DateTimeKind.Local);
             _store.Save(Wrap(overridden, generatedAt, nodeOverrides: overrides, ignoredItemIds: new List<int>(ignoredItemIds)));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
 
             // The overrides/ignore set round-trip with their exact content -
@@ -524,7 +524,7 @@ namespace TaimisToolbench.Tests.Services
 
             _store.Save(Wrap(result, DateTime.Now));
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.NotNull(loaded.NodeOverrides);
             Assert.Empty(loaded.NodeOverrides);
@@ -535,7 +535,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void LoadLatest_MissingFile_ReturnsNull()
         {
-            Assert.Null(_store.LoadLatest());
+            Assert.Null(_store.LoadLatest()?.Plan);
         }
 
         [Fact]
@@ -552,7 +552,7 @@ namespace TaimisToolbench.Tests.Services
                 capturedException = ex;
             });
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.NotNull(capturedMessage);
@@ -573,7 +573,7 @@ namespace TaimisToolbench.Tests.Services
             string capturedMessage = null;
             var store = new PlanStore(_tempDir, (message, ex) => capturedMessage = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.NotNull(capturedMessage);
@@ -616,7 +616,7 @@ namespace TaimisToolbench.Tests.Services
                 },
                 message => capturedInfo = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.Null(capturedInfo);
@@ -651,7 +651,7 @@ namespace TaimisToolbench.Tests.Services
                 },
                 message => capturedInfo = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.Null(capturedInfo);
@@ -689,7 +689,7 @@ namespace TaimisToolbench.Tests.Services
             var store = new PlanStore(
                 _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.Null(capturedError);
@@ -722,7 +722,7 @@ namespace TaimisToolbench.Tests.Services
             var store = new PlanStore(
                 _tempDir, (message, ex) => capturedError = message, message => capturedInfo = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.Null(capturedError);
@@ -750,7 +750,7 @@ namespace TaimisToolbench.Tests.Services
             string driftInfo = null;
             var driftStore = new PlanStore(
                 _tempDir, (message, ex) => driftError = message, message => driftInfo = message);
-            Assert.Null(driftStore.LoadLatest());
+            Assert.Null(driftStore.LoadLatest()?.Plan);
 
             // Damage: current version, but no Result/Plan at all - a shape
             // that was never a valid plan file at ANY schema version.
@@ -768,7 +768,7 @@ namespace TaimisToolbench.Tests.Services
                     damageException = ex;
                 },
                 message => damageInfo = message);
-            Assert.Null(damageStore.LoadLatest());
+            Assert.Null(damageStore.LoadLatest()?.Plan);
 
             // Distinct severities: each verdict uses one channel and only
             // one, so neither can borrow the other's level.
@@ -829,7 +829,7 @@ namespace TaimisToolbench.Tests.Services
             };
 
             _store.Save(plan);
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.True(loaded.Result.CraftingTree.IsPlanRoot);
             Assert.False(loaded.Result.CraftingTree.Children[0].IsPlanRoot);
@@ -875,7 +875,7 @@ namespace TaimisToolbench.Tests.Services
             };
 
             _store.Save(plan);
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.All(loaded.Result.MultiItemRoots, r => Assert.True(r.IsPlanRoot));
         }
@@ -902,7 +902,7 @@ namespace TaimisToolbench.Tests.Services
             };
 
             _store.Save(plan);
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.NotNull(loaded);
             Assert.Equal(PersistedPlan.CurrentSchemaVersion, loaded.SchemaVersion);
@@ -940,7 +940,7 @@ namespace TaimisToolbench.Tests.Services
                 },
                 message => capturedInfo = message);
 
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
             Assert.Null(loaded);
             Assert.Null(capturedInfo);
@@ -954,7 +954,7 @@ namespace TaimisToolbench.Tests.Services
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllText(filePath, "");
 
-            Assert.Null(_store.LoadLatest());
+            Assert.Null(_store.LoadLatest()?.Plan);
         }
 
         [Fact]
@@ -974,7 +974,7 @@ namespace TaimisToolbench.Tests.Services
             };
             _store.Save(plan);
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.NotSame(plan, loaded);
             Assert.Equal(5, loaded.Result.Plan.TargetItemId);
@@ -1058,7 +1058,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.NotEmpty(initial.SolveContext.ForceBuyOnlyNodeIds);
 
             _store.Save(Wrap(initial, DateTime.Now));
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded?.Result?.SolveContext);
 
             Assert.NotNull(loaded.Result.SolveContext.ForceBuyOnlyNodeIds);
@@ -1108,7 +1108,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.NotEmpty(initial.SolveContext.CompetencyIndependentForceBuyNodeIds);
 
             _store.Save(Wrap(initial, DateTime.Now));
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded?.Result?.SolveContext);
 
             Assert.NotNull(loaded.Result.SolveContext.CompetencyIndependentForceBuyNodeIds);
@@ -1146,7 +1146,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Contains("\"CompetencyIndependentForceBuyNodeIds\":null", json);
 
             _store.Save(Wrap(initial, DateTime.Now));
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.NotNull(loaded?.Result?.SolveContext);
             Assert.Null(loaded.Result.SolveContext.ForceBuyOnlyNodeIds);
@@ -1268,7 +1268,7 @@ namespace TaimisToolbench.Tests.Services
                 var generatedAt = new DateTime(2026, 8, 9, 12, 0, 0, DateTimeKind.Local);
                 _store.Save(Wrap(result, generatedAt, useOwn: true));
 
-                var loaded = _store.LoadLatest();
+                var loaded = _store.LoadLatest()?.Plan;
                 Assert.NotNull(loaded?.Result?.SolveContext);
 
                 // The reloaded result renders identically to the original.
@@ -1391,7 +1391,7 @@ namespace TaimisToolbench.Tests.Services
             };
             _store.Save(plan);
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded?.Result?.SolveContext);
             Assert.Equal(2, loaded.Result.MultiItemRoots.Count);
             Assert.Equal(Gw2Constants.MultiItemWrapperItemId, loaded.Result.SolveContext.Tree.Id);
@@ -1438,7 +1438,11 @@ namespace TaimisToolbench.Tests.Services
         // corrupted at one exact JSON location via Newtonsoft's JObject -
         // proving the validator rejects a file a naive parse/schema check
         // would have accepted, and does so with the required "one Warn log
-        // line, return null" contract (never a partial accept). ---
+        // line, no result handed back" contract (never a partial accept).
+        // The request layer survives every one of these - it is versioned
+        // separately and is never bound against the damaged graph (see
+        // docs/ARCHITECTURE.md section 12) - so what each asserts is that
+        // no RESULT reached the caller, not that nothing did. ---
         private static string SerializeAndCorrupt(PersistedPlan plan, Action<JObject> corrupt)
         {
             string json = PlanStoreHelpers.SerializePersistedPlan(plan);
@@ -1470,7 +1474,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task LoadLatest_NullChildEntryInCraftingTreeAtDepth2_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullChildEntryInCraftingTreeAtDepth2_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var pipeline = BuildDeepPipeline(out _);
             var result = await pipeline.GenerateStructuredAsync(1, 1, null, CancellationToken.None,
@@ -1493,9 +1497,9 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             // Pins this down to PlanStructuralValidator specifically - not
             // the pre-existing Result/Plan/SchemaVersion gate or a plain
@@ -1529,7 +1533,7 @@ namespace TaimisToolbench.Tests.Services
             });
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.NotNull(loaded);
             var leaf = loaded.Result.CraftingTree.Children[0].Children[0];
@@ -1538,7 +1542,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task LoadLatest_NullRecipesListOnSolveContextTreeNode_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullRecipesListOnSolveContextTreeNode_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // Unlike CraftingTreeNode.Children, RecipeNode.Recipes has no
             // null-coalescing setter (a plain auto-property with a "= new
@@ -1563,16 +1567,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullIngredientEntryInSolveContextTree_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullIngredientEntryInSolveContextTree_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // A null RecipeNode ENTRY inside RecipeOption.Ingredients (as
             // opposed to the whole list being null, covered above) -
@@ -1592,16 +1596,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.Tree.Recipes[0].Ingredients[0].Recipes[0].Ingredients[0]", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullSolveContextPrices_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullSolveContextPrices_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // A solve-context COLLECTION nulled (as opposed to a tree
             // shape) - PlanSolver.GetBuyCost/CraftingPlanPipeline.
@@ -1623,16 +1627,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.Prices is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInSolveContextUsedMaterials_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInSolveContextUsedMaterials_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // SolveContext.UsedMaterials is a
             // SEPARATELY serialized copy of the same list as
@@ -1663,16 +1667,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.UsedMaterials[0] is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullRecipesListOnSolveContextUnreducedTree_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullRecipesListOnSolveContextUnreducedTree_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // UnreducedTree is walked by
             // ResolveWithOverrides' guideSolve (_solver.Solve) and
@@ -1701,16 +1705,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.UnreducedTree.Recipes is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInSolveContextAccountItems_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInSolveContextAccountItems_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // AccountItemIndex's constructor (Services/
             // AccountItemIndex.cs) null-checks the LIST but not each entry
@@ -1734,16 +1738,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SolveContext.AccountItems[0] is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_SolveContextUnreducedTreeSetButAccountItemsNull_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_SolveContextUnreducedTreeSetButAccountItemsNull_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // VOM finding #1 bonus fix: UnreducedTree and AccountItems are
             // always populated TOGETHER at generation time (both gated on
@@ -1769,9 +1773,9 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains(
@@ -1780,7 +1784,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInPlanSteps_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInPlanSteps_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             // Plan.Steps is read unconditionally by
             // PlanViewModelBuilder.Build (result.Plan.Steps.Where(...)) - a
@@ -1801,9 +1805,9 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("Plan.Steps[0] is null", lastMessage());
@@ -1828,7 +1832,7 @@ namespace TaimisToolbench.Tests.Services
         // since a fresh single-item fixture never triggers any of these
         // four calculators into producing a real entry. ---
         [Fact]
-        public async Task LoadLatest_NullEntryInCompetencyOpportunities_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInCompetencyOpportunities_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
@@ -1844,16 +1848,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("CompetencyOpportunities[0] is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInExcessCraftOutputs_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInExcessCraftOutputs_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
@@ -1869,16 +1873,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("ExcessCraftOutputs[0] is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInRecipeSheetSavingsOpportunities_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInRecipeSheetSavingsOpportunities_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
@@ -1894,16 +1898,16 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("RecipeSheetSavingsOpportunities[0] is null", lastMessage());
         }
 
         [Fact]
-        public async Task LoadLatest_NullEntryInSeasonalVendorTips_ReturnsNullAndLogsWarnExactlyOnce()
+        public async Task LoadLatest_NullEntryInSeasonalVendorTips_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var pipeline = BuildPipeline(out var priceApi);
             priceApi.AddPrice(1, buyUnitPrice: 400, sellUnitPrice: 1000);
@@ -1919,9 +1923,9 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.Contains("structural validation", lastMessage());
             Assert.Contains("SeasonalVendorTips[0] is null", lastMessage());
@@ -1985,7 +1989,7 @@ namespace TaimisToolbench.Tests.Services
 
             // And the plan itself still round-trips through the compressed
             // container exactly like it did through plain JSON pre-fix.
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             var vmBuilder = new PlanViewModelBuilder();
             Assert.Equal(ToJson(vmBuilder.Build(result)), ToJson(vmBuilder.Build(loaded.Result)));
@@ -2010,7 +2014,7 @@ namespace TaimisToolbench.Tests.Services
             string json = PlanStoreHelpers.SerializePersistedPlan(plan);
             File.WriteAllText(Path.Combine(_tempDir, "plan.json"), json);
 
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.NotNull(loaded);
             var vmBuilder = new PlanViewModelBuilder();
@@ -2018,7 +2022,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void LoadLatest_TruncatedGzipData_ReturnsNullAndLogsWarnExactlyOnce()
+        public void LoadLatest_TruncatedGzipData_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             var plan = new PersistedPlan
             {
@@ -2042,23 +2046,23 @@ namespace TaimisToolbench.Tests.Services
             File.WriteAllBytes(filePath, truncated);
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.NotNull(lastMessage());
         }
 
         [Fact]
-        public void LoadLatest_GzipWrappingInvalidJson_ReturnsNullAndLogsWarnExactlyOnce()
+        public void LoadLatest_GzipWrappingInvalidJson_DiscardsTheResultAndLogsWarnExactlyOnce()
         {
             string filePath = Path.Combine(_tempDir, "plan.json");
             File.WriteAllBytes(filePath, GzipBytes("{ \"Result\": { \"Plan\": { \"Target"));
 
             var store = NewWarnCountingStore(out var warnCount, out var lastMessage);
-            var loaded = store.LoadLatest();
+            var loaded = store.LoadLatest()?.Plan;
 
-            Assert.Null(loaded);
+            Assert.Null(loaded?.Result);
             Assert.Equal(1, warnCount());
             Assert.NotNull(lastMessage());
         }
@@ -2136,7 +2140,7 @@ namespace TaimisToolbench.Tests.Services
             // PlanStructuralValidator's own doc comment): IsValidCraftingTreeNode's
             // recursive Children walk covers these leaves the same as any
             // other node, with no leaf-specific change needed there.
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
             Assert.NotNull(loaded);
             Assert.NotNull(loaded.Result.CraftingTree);
             Assert.Equal(2, loaded.Result.CraftingTree.Children.Count);
@@ -2196,7 +2200,7 @@ namespace TaimisToolbench.Tests.Services
                 depth, 1, null, CancellationToken.None, priceBasis: PriceBasis.InstantBuy);
 
             _store.Save(Wrap(result, new DateTime(2026, 8, 24, 9, 0, 0, DateTimeKind.Local)));
-            var loaded = _store.LoadLatest();
+            var loaded = _store.LoadLatest()?.Plan;
 
             Assert.NotNull(loaded);
             int walked = 0;
@@ -2286,7 +2290,7 @@ namespace TaimisToolbench.Tests.Services
                         // 9 nulls and 8 lost writes - still genuinely
                         // overlapping, but actually sampling the file.
                         Thread.Sleep(1);
-                        var loaded = store.LoadLatest();
+                        var loaded = store.LoadLatest()?.Plan;
                         if (loaded == null)
                         {
                             Interlocked.Increment(ref nullLoads);
@@ -2381,7 +2385,7 @@ namespace TaimisToolbench.Tests.Services
             // The file survives both races intact, and the uncontended write
             // that follows them consumes its own .tmp.
             store.Save(deepPlan);
-            var final = store.LoadLatest();
+            var final = store.LoadLatest()?.Plan;
             Assert.NotNull(final);
             Assert.Equal(7, final.RequestItems.Single().Quantity);
             Assert.Equal(deepDepth, TreeDepth(final.Result.CraftingTree));

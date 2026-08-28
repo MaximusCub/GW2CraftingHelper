@@ -822,40 +822,8 @@ namespace TaimisToolbench.Views
             _currentPlan = vm;
             _planGeneratedAt = generatedAt;
 
-            // Restore the inputs that produced the plan, not just the
-            // plan: the request rows, both checkboxes and the price-basis
-            // dropdown - backing fields AND displayed control state. The
-            // usual restore runs before Build() (every control still null,
-            // the fields render on first visit); a live tab takes the
-            // guarded writes. The control writes are suppressed
-            // (_suppressToggle, here and inside ApplyOwnMaterialsGate):
-            // these are not user decisions, so they must neither open the
-            // regenerate confirm nor flag "Settings changed" against the
-            // very plan that carries them.
-            _inputRows.RestoreRows(
-                RestoredRequestInputs.BuildRowSeeds(requestItems, result.ItemMetadata));
-
-            // The INTENT field; the gate write below re-resolves it against
-            // _accountDataAvailable, exactly as a user toggle would (a
-            // persisted true with no snapshot yet still shows unchecked
-            // until SetAccountDataAvailable re-applies the gate).
-            _useOwnMaterials = useOwnMaterials;
-            ApplyOwnMaterialsGate();
-
-            _priceBasis = priceBasis;
-            _valueOwnMaterials = valueOwnMaterials;
-            _suppressToggle = true;
-            if (_priceBasisDropdown != null)
-            {
-                _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(priceBasis);
-            }
-
-            if (_valueOwnMaterialsCheckbox != null)
-            {
-                _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
-            }
-
-            _suppressToggle = false;
+            RestoreRequestControls(
+                requestItems, result.ItemMetadata, useOwnMaterials, priceBasis, valueOwnMaterials);
 
             // The stamped half goes through StatusText.Stamp, which owns
             // the module's one timestamp format and its InvariantCulture
@@ -889,6 +857,90 @@ namespace TaimisToolbench.Views
             {
                 RollBackFailedPlanRender(ex, "into the live tab");
             }
+        }
+
+        /// <summary>
+        /// The half of <see cref="ApplyRestoredPlan"/> that survives a
+        /// saved plan whose RESULT could not be read - a schema bump, a
+        /// damaged result, a file from a newer build. The request is
+        /// versioned separately and is still on disk, so the tab comes
+        /// back with the user's items, quantities and settings and one
+        /// Generate Plan away from a priced plan. See
+        /// docs/ARCHITECTURE.md section 12.
+        /// <para>
+        /// Renders no plan, touches no per-plan state (no vm, no tree, no
+        /// overrides): there is nothing to render, and a caller that
+        /// mistakes this for a restore would otherwise leave the tab
+        /// claiming a plan it does not have. Row names come from the
+        /// request's own PlanRequestItem.Name, since the result's
+        /// ItemMetadata is by definition not here; a plan written before
+        /// that member existed keeps
+        /// RestoredRequestInputs.UnnamedRowPlaceholder and takes its names
+        /// back on the next Generate.
+        /// </para>
+        /// </summary>
+        public void ApplyRestoredRequest(
+            DateTime generatedAt,
+            IReadOnlyList<PlanRequestItem> requestItems,
+            bool useOwnMaterials,
+            PriceBasis priceBasis,
+            bool valueOwnMaterials)
+        {
+            RestoreRequestControls(requestItems, null, useOwnMaterials, priceBasis, valueOwnMaterials);
+
+            // Same one-trailing-clause shape as the full restore's line,
+            // and it names a button that exists. It says what was kept, not
+            // what was lost: the items ARE back, and the only thing asked
+            // of the user is the click that would have refreshed prices
+            // anyway.
+            _statusBoard.SeedRestored(
+                StatusText.Stamp("Last planned", generatedAt)
+                + " - items restored, Generate Plan to rebuild the plan");
+            RenderFromBoard(_statusBoard.Snapshot());
+        }
+
+        /// <summary>
+        /// Restores the inputs that produced a plan: the request rows,
+        /// both checkboxes and the price-basis dropdown - backing fields
+        /// AND displayed control state. The usual restore runs before
+        /// Build() (every control still null, the fields render on first
+        /// visit); a live tab takes the guarded writes. The control writes
+        /// are suppressed (_suppressToggle, here and inside
+        /// ApplyOwnMaterialsGate): these are not user decisions, so they
+        /// must neither open the regenerate confirm nor flag "Settings
+        /// changed" against the very plan that carries them.
+        /// </summary>
+        private void RestoreRequestControls(
+            IReadOnlyList<PlanRequestItem> requestItems,
+            IReadOnlyDictionary<int, ItemMetadata> itemMetadata,
+            bool useOwnMaterials,
+            PriceBasis priceBasis,
+            bool valueOwnMaterials)
+        {
+            _inputRows.RestoreRows(
+                RestoredRequestInputs.BuildRowSeeds(requestItems, itemMetadata));
+
+            // The INTENT field; the gate write below re-resolves it against
+            // _accountDataAvailable, exactly as a user toggle would (a
+            // persisted true with no snapshot yet still shows unchecked
+            // until SetAccountDataAvailable re-applies the gate).
+            _useOwnMaterials = useOwnMaterials;
+            ApplyOwnMaterialsGate();
+
+            _priceBasis = priceBasis;
+            _valueOwnMaterials = valueOwnMaterials;
+            _suppressToggle = true;
+            if (_priceBasisDropdown != null)
+            {
+                _priceBasisDropdown.SelectedItem = PriceBasisDropdownItem(priceBasis);
+            }
+
+            if (_valueOwnMaterialsCheckbox != null)
+            {
+                _valueOwnMaterialsCheckbox.Checked = valueOwnMaterials;
+            }
+
+            _suppressToggle = false;
         }
 
         /// <summary>
@@ -3636,7 +3688,7 @@ namespace TaimisToolbench.Views
                 }
 
                 row.QuantityText = qty.ToString();
-                rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
+                rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText, row.ItemName));
 
                 // Best-effort "name x quantity[, name x quantity...]"
                 // label (e.g. "Orrax Manifested x1") for the pipeline's rich

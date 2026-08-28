@@ -24,10 +24,18 @@ namespace TaimisToolbench.Services
             public readonly int? ItemId;
             public readonly string QuantityText;
 
-            public RowInput(int? itemId, string quantityText)
+            /// <summary>
+            /// The name the row's own autocomplete already resolved. Null
+            /// is ordinary and costs nothing at solve time - see
+            /// PlanRequestItem.Name for what it is for.
+            /// </summary>
+            public readonly string ItemName;
+
+            public RowInput(int? itemId, string quantityText, string itemName = null)
             {
                 ItemId = itemId;
                 QuantityText = quantityText;
+                ItemName = itemName;
             }
         }
 
@@ -73,6 +81,7 @@ namespace TaimisToolbench.Services
                 {
                     ItemId = row.ItemId.Value,
                     Quantity = NormalizeQuantity(row.QuantityText),
+                    Name = string.IsNullOrWhiteSpace(row.ItemName) ? null : row.ItemName,
                 });
             }
 

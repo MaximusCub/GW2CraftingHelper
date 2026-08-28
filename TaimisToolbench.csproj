@@ -99,6 +99,7 @@
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Models\PersistedPlan.cs" />
+    <Compile Include="Models\PersistedPlanLoad.cs" />
     <Compile Include="Models\PlanHistoryEntry.cs" />
     <Compile Include="Services\GzipJsonFile.cs" />
     <Compile Include="Services\PlanHistoryStore.cs" />

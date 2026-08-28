@@ -8,15 +8,26 @@ namespace TaimisToolbench.Models
     /// everything Module needs to restore the Crafting Plan tab instantly
     /// on module load, with no network call and no re-solve. See
     /// Services/PlanStore.cs for the store that reads/writes this.
+    /// <para>
+    /// The document is one JSON object but TWO independently versioned
+    /// layers: a request layer (what the user asked for) and a result
+    /// layer (what the solver produced). A build that cannot read the
+    /// result layer discards only that layer and still restores the
+    /// request, so a schema bump costs a re-solve rather than the plan.
+    /// docs/ARCHITECTURE.md section 12 states the compatibility contract
+    /// in full and names which member belongs to which layer;
+    /// PlanStoreHelpers.ResultLayerMembers is the executable copy of that
+    /// membership.
+    /// </para>
     /// </summary>
     internal class PersistedPlan
     {
         /// <summary>
-        /// Bump whenever the persisted graph's SHAPE changes (a member
-        /// renamed/removed/retyped anywhere reachable from PersistedPlan)
-        /// - PlanStoreHelpers.DeserializePersistedPlan rejects any file
-        /// whose SchemaVersion does not match exactly, degrading to the
-        /// safe "no restored plan" path instead of a partial render.
+        /// The RESULT layer's version. Bump whenever the persisted graph's
+        /// SHAPE changes (a member renamed/removed/retyped anywhere
+        /// reachable from PersistedPlan) - PlanStoreHelpers rejects any
+        /// result whose SchemaVersion does not match exactly, degrading to
+        /// a request-only restore instead of a partial render.
         /// PersistedPlanSchemaMemberSetTests reflectively guards the
         /// whole graph against an unbumped shape change.
         /// <para>
@@ -46,21 +57,46 @@ namespace TaimisToolbench.Models
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Last moved by SnapshotItemEntry.Rarity, which is purely ADDITIVE
-        /// (see tests/shared/persisted_plan_schema.txt's one-line diff):
+        /// Last moved by PersistedPlan.RequestSchemaVersion, which is purely
+        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's one-line
+        /// diff):
         /// Newtonsoft leaves an absent field at its "" initializer, so a
         /// plan or snapshot written before the field existed still
         /// deserializes correctly and <see cref="CurrentSchemaVersion"/>
-        /// stays at 3. A bump here would cost every saved plan on disk.
+        /// stays at 3. A bump here now costs a re-solve rather than the
+        /// plan, but it still costs one.
         /// </remarks>
         public const string SchemaShapeHash =
-            "76417b936a8017c8f300238dba4d0411da0e2615516e0ecc65b27f0521e09461";
+            "2349ee68c01e7d21d1a7af1cdb1b1080ba974bdf76325cbc49cee647cdec9c0e";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
         /// this deliberately has NO property initializer.
         /// </summary>
         public int SchemaVersion { get; set; }
+
+        /// <summary>
+        /// The REQUEST layer's version, bumped only if a request-layer
+        /// member is renamed, removed or retyped. An ADDITION never bumps
+        /// it: Newtonsoft leaves an absent member at its default, so an
+        /// older file still binds. Bumping this is the one act that can
+        /// still lose a user's saved plan outright, which is why
+        /// docs/ARCHITECTURE.md section 12 asks for the additive route
+        /// first and why the fixture corpus pins every shipped version.
+        /// </summary>
+        public const int CurrentRequestSchemaVersion = 1;
+
+        /// <summary>
+        /// Absent (0) is READ AS 1, the deliberate opposite of
+        /// <see cref="SchemaVersion"/>'s own treatment of 0: every file
+        /// written before this field existed carries exactly the request
+        /// layer that shipped as version 1, so 0 is not an unrecorded
+        /// version here, it is a known one. A value ABOVE
+        /// <see cref="CurrentRequestSchemaVersion"/> is a file from a newer
+        /// build whose request layer this one cannot read, and is the only
+        /// value that makes the whole document unreadable.
+        /// </summary>
+        public int RequestSchemaVersion { get; set; }
 
         /// <summary>
         /// When this plan was originally generated (the same value the

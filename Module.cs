@@ -133,7 +133,7 @@ namespace TaimisToolbench
         // _craftingContent from Update() - same dirty-flag drain shape as
         // _pendingSnapshot/_snapshotDirty. Written once in LoadAsync and
         // drained (never re-armed) the first time Update() sees the flag.
-        private PersistedPlan _pendingPlanRestore;
+        private PersistedPlanLoad _pendingPlanRestore;
         private bool _planRestoreDirty;
 
         // The original request/timestamp behind the most recently
@@ -1404,10 +1404,11 @@ namespace TaimisToolbench
             // is only ever pushed to from Update(), never touched directly
             // here (see Update()'s own "Applying restored plan to view"
             // block). A missing file is silent (LoadLatest returns null,
-            // nothing to restore); an unreadable file already logged inside
-            // PlanStore.LoadLatest (Warn if corrupt, Info if merely written
-            // by another schema version) - either way this is a no-op fresh
-            // start, never a crash.
+            // nothing to restore); an unreadable RESULT already logged
+            // inside PlanStore.LoadLatest (Warn if corrupt, Info if merely
+            // written by another schema version) and comes back as a
+            // request-only load, which restores the user's items without a
+            // plan - never a crash, and never a lost request.
             var loadedPlan = _planStore.LoadLatest();
             if (loadedPlan != null)
             {
@@ -1509,26 +1510,46 @@ namespace TaimisToolbench
                         shouldApplyRestore = !_generateCompletedThisSession;
                         if (shouldApplyRestore)
                         {
-                            _lastPersistedPlanMetadata = new PersistedPlanMetadata(
-                                _pendingPlanRestore.GeneratedAt,
-                                _pendingPlanRestore.RequestItems,
-                                _pendingPlanRestore.UseOwnMaterials,
-                                _pendingPlanRestore.PriceBasis,
-                                _pendingPlanRestore.ValueOwnMaterials);
+                            // Only a restored RESULT publishes this: it is
+                            // what a later override re-solve persists
+                            // against, and there is no result to re-solve
+                            // when only the request came back.
+                            if (_pendingPlanRestore.HasResult)
+                            {
+                                _lastPersistedPlanMetadata = new PersistedPlanMetadata(
+                                    _pendingPlanRestore.Plan.GeneratedAt,
+                                    _pendingPlanRestore.Plan.RequestItems,
+                                    _pendingPlanRestore.Plan.UseOwnMaterials,
+                                    _pendingPlanRestore.Plan.PriceBasis,
+                                    _pendingPlanRestore.Plan.ValueOwnMaterials);
+                            }
                         }
                     }
 
                     if (shouldApplyRestore)
                     {
-                        _craftingContent?.ApplyRestoredPlan(
-                            _pendingPlanRestore.Result,
-                            _pendingPlanRestore.GeneratedAt,
-                            _pendingPlanRestore.NodeOverrides,
-                            _pendingPlanRestore.IgnoredItemIds,
-                            _pendingPlanRestore.ValueOwnMaterials,
-                            _pendingPlanRestore.RequestItems,
-                            _pendingPlanRestore.UseOwnMaterials,
-                            _pendingPlanRestore.PriceBasis);
+                        var restored = _pendingPlanRestore.Plan;
+                        if (_pendingPlanRestore.HasResult)
+                        {
+                            _craftingContent?.ApplyRestoredPlan(
+                                restored.Result,
+                                restored.GeneratedAt,
+                                restored.NodeOverrides,
+                                restored.IgnoredItemIds,
+                                restored.ValueOwnMaterials,
+                                restored.RequestItems,
+                                restored.UseOwnMaterials,
+                                restored.PriceBasis);
+                        }
+                        else
+                        {
+                            _craftingContent?.ApplyRestoredRequest(
+                                restored.GeneratedAt,
+                                restored.RequestItems,
+                                restored.UseOwnMaterials,
+                                restored.PriceBasis,
+                                restored.ValueOwnMaterials);
+                        }
                     }
                 }
             }
@@ -2095,6 +2116,7 @@ namespace TaimisToolbench
                 // Set explicitly, never via a property initializer - see
                 // PersistedPlan.SchemaVersion.
                 SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                RequestSchemaVersion = PersistedPlan.CurrentRequestSchemaVersion,
                 GeneratedAt = generatedAt,
                 RequestItems = requestItems,
                 UseOwnMaterials = useOwnMaterials,
@@ -2191,6 +2213,7 @@ namespace TaimisToolbench
                 // Set explicitly, never via a property initializer - see
                 // PersistedPlan.SchemaVersion.
                 SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                RequestSchemaVersion = PersistedPlan.CurrentRequestSchemaVersion,
                 GeneratedAt = metadata.GeneratedAt,
                 RequestItems = metadata.RequestItems,
                 UseOwnMaterials = metadata.UseOwnMaterials,
@@ -2395,6 +2418,7 @@ namespace TaimisToolbench
                     // Set explicitly, never via a property initializer -
                     // see PersistedPlan.SchemaVersion.
                     SchemaVersion = PersistedPlan.CurrentSchemaVersion,
+                    RequestSchemaVersion = PersistedPlan.CurrentRequestSchemaVersion,
                     GeneratedAt = generatedAt,
                     RequestItems = requestItems,
                     UseOwnMaterials = useOwnMaterials,
@@ -2446,7 +2470,12 @@ namespace TaimisToolbench
             {
                 if (item != null)
                 {
-                    copy.Add(new PlanRequestItem { ItemId = item.ItemId, Quantity = item.Quantity });
+                    copy.Add(new PlanRequestItem
+                    {
+                        ItemId = item.ItemId,
+                        Quantity = item.Quantity,
+                        Name = item.Name,
+                    });
                 }
             }
 

@@ -791,3 +791,90 @@ The atlas covers 8-36 regular and 8-24 plus 36 bold, reached via
 `Services/PlanContentHeightMath.cs` (the band heights those metrics feed).
 [`.impeccable.md`](../.impeccable.md) at the repo root carries the
 tool-facing design summary and points back here.
+
+## 12. Plan persistence compatibility: the request/result split
+
+**The contract.** A plan file written by *any* shipped build must remain
+loadable by *every* later build, with graceful degradation of the parts
+that cannot be read. Concretely, in the order the guarantees weaken:
+
+1. The **request** - the items, quantities, `UseOwnMaterials`,
+   `PriceBasis`, `ValueOwnMaterials` and ignored ids - always survives.
+   It is versioned by `PersistedPlan.RequestSchemaVersion`, and that
+   version has never been bumped.
+2. The **result** - `Result` and `NodeOverrides`, the whole solved tree
+   with its prices, offers and metadata - survives only when
+   `PersistedPlan.SchemaVersion` matches this build exactly. Anything
+   else discards the result and keeps the request.
+3. Nothing is ever *partially* restored. A degraded result is discarded
+   whole; the module never renders half a plan.
+
+What a schema bump costs a user is therefore one click, not their plan:
+the tab comes back with their items and settings, and Generate Plan
+re-solves them at current prices. Before this split, a bump cost every
+saved plan on every user's disk, which is why the version had been left
+stale at 2 for the whole of a ~275-line graph change.
+
+**Why the layers can be read apart.** The document is one JSON object
+with one set of property names - there is no second file and no second
+on-disk shape. `PlanStoreHelpers.DeserializeRequestLayer` binds
+`PersistedPlan` through a contract resolver that marks every member in
+`ResultGraphMembers` as ignored, so Json.NET *skips those tokens without
+binding them to a type at all*. That is the whole trick, and it is why
+the split is not tolerant deserialization: the result graph is not read
+leniently, it is not read.
+
+`NodeOverrides` sits with the result rather than the request because it
+is keyed by solver `NodeId`, which is meaningful only inside the tree
+that produced it. `IgnoredItemIds` is keyed by item id and so belongs
+with the request - the same line `PlanHistoryEntry` already draws
+between its index row and its blob.
+
+**Plan History was already split** along the same line, across two files
+rather than within one: the index row in `plan_history.json` carries the
+request identity, and the expensive result lives in a per-entry blob. A
+`PersistedPlan` bump therefore already discarded blobs and kept rows.
+
+**The index answers the same contract by a different mechanism.** It is a
+*collection*, so its compatibility unit is the row, not a layer - there is
+no cheaper half to fall back to, and a user who loses 200 saved plans is
+no happier than one who loses one. Two things make a row survive:
+
+- `PlanHistoryStore.Load` accepts any file stamped in
+  `[PlanHistoryIndex.MinimumReadableSchemaVersion, CurrentSchemaVersion]`
+  and `Save` restamps it. Exact-match rejection was what made a bump cost
+  the whole history; a range costs nothing, and needs no migration code
+  because there is nothing to migrate.
+- That range is only safe because the row graph is **additive-only**.
+  `PlanHistoryIndex.SchemaShapeHash` is what holds it to that: a rename,
+  removal or retype anywhere reachable from `PlanHistoryIndex` moves the
+  hash and cannot land without editing the line next to both version
+  constants. An addition is free - Newtonsoft leaves an absent member at
+  its default, so every existing row still loads.
+
+`MinimumReadableSchemaVersion` is therefore the single constant in the
+module whose value *is* the amount of user data a release destroys. It is
+1, and it is pinned twice - by `PlanHistorySchemaMemberSetTests` and by
+the CI corpus step - so raising it is a deliberate, reviewed act and never
+a side effect of a merge. A newer-than-current file is still discarded:
+this build cannot know what a later one wrote, which is the same answer
+the plan gives to the same question.
+
+**What enforces it.** `tests/shared/plan_fixtures/` holds one serialized
+plan per shipped schema version and one index per shipped index version,
+captured from the real serializers, plus a hostile fixture whose entire
+result graph has been renamed out from under the loader.
+`tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs`
+loads every one of them through the real `PlanStore`; the "Saved plans
+from older builds still load" step in `.github/workflows/tests.yml`
+checks the corpus is complete. Adding a fixture is one command, described
+in that directory's own `README.md`.
+
+**Where:** `Models/PersistedPlan.cs` (the two versions and which member
+belongs to which layer), `Models/PersistedPlanLoad.cs` (what a read
+returns), `Services/PlanStoreHelpers.cs` (both readers and the resolver),
+`Services/PlanStore.cs` (the two severities and the "nothing restorable"
+case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
+request-only restore), `Models/PlanHistoryEntry.cs` and
+`Services/PlanHistoryStore.cs` (the index's readable range and the
+additive-only row graph behind it).

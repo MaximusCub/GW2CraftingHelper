@@ -46,9 +46,15 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Builds one seed per persisted request item, in request order.
-        /// Names come from the restored result's own ItemMetadata - never
-        /// an API call; redrawing input rows is not worth a network round
-        /// trip. Returns an empty list (never null) when the persisted
+        /// Names come from the restored result's own ItemMetadata, falling
+        /// back to the name the request itself recorded - never an API
+        /// call; redrawing input rows is not worth a network round trip.
+        /// The fallback is what a request-only restore runs on: there the
+        /// result, and so its ItemMetadata, is exactly what could not be
+        /// read (see docs/ARCHITECTURE.md section 12). A plan written
+        /// before PlanRequestItem.Name existed has neither, and keeps
+        /// <see cref="UnnamedRowPlaceholder"/>. Returns an empty list
+        /// (never null) when the persisted
         /// request is null or empty, so a caller keeps its default row
         /// instead of restoring an empty strip. Quantities below 1 seed as
         /// "1", mirroring <see cref="ItemRowRequestBuilder.Build"/>'s own
@@ -77,6 +83,10 @@ namespace TaimisToolbench.Services
                     && !string.IsNullOrWhiteSpace(metadata?.Name))
                 {
                     name = metadata.Name;
+                }
+                else if (!string.IsNullOrWhiteSpace(item.Name))
+                {
+                    name = item.Name;
                 }
 
                 int quantity = item.Quantity < 1 ? 1 : item.Quantity;
