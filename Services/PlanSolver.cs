@@ -40,8 +40,9 @@ namespace TaimisToolbench.Services
 
             // The value used to compare this decision against siblings at
             // the parent level: same as TotalCost for TP buys, but a
-            // comparable vendor offer folds in valued non-coin currency
-            // lines, and a comparable craft sums its ingredients'
+            // comparable vendor offer folds in its valued non-coin lines
+            // (currency and barter item alike), and a comparable craft sums
+            // its ingredients'
             // ComparisonValues plus any valued Currency ingredient - never
             // their TotalCost. Keeping this separate from TotalCost stops
             // a valued coin-equivalent from being "laundered" away when an
@@ -71,8 +72,9 @@ namespace TaimisToolbench.Services
             public bool CanBuyVendor;
 
             // True when this committed decision is fallback-tier - an
-            // unvalued currency, GuildUpgrade, or other unpriceable
-            // ingredient type - directly on the chosen recipe/offer, or
+            // unvalued currency or barter item, a GuildUpgrade, or another
+            // unpriceable ingredient type - directly on the chosen
+            // recipe/offer, or
             // transitively via a chosen ingredient's own fallback-tier
             // decision. Without the transitive propagation, an unpriceable
             // cost two Craft levels deep would launder back into a
@@ -783,14 +785,14 @@ namespace TaimisToolbench.Services
 
             // Evaluate vendor offers. Coin-only offers (directly or via
             // TP-priced barter) compete in PickCheapest. Offers with
-            // non-coin currency lines compete only when every such
-            // currency has a user-provided valuation; with any unvalued
-            // line the offer is NOT comparable (rating it by its coin part
-            // alone would let a 500k-karma offer beat every coin option)
-            // and is kept only as a fallback when nothing priceable exists
-            // (repo invariant: never invent exchange rates). A winning
-            // offer's non-coin lines are always reported on the plan -
-            // valuation affects comparison, never the displayed cost.
+            // non-coin lines - a wallet currency, or an untradeable barter
+            // item - compete only when every such line has a valuation;
+            // with any unvalued line the offer is NOT comparable (rating it
+            // by its coin part alone would let a 500k-karma offer beat
+            // every coin option) and is kept only as a fallback (repo
+            // invariant: never invent exchange rates). A winning offer's
+            // non-coin lines are always reported on the plan - valuation
+            // affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
 

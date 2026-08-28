@@ -27,12 +27,13 @@ namespace TaimisToolbench.Services
         // A later display task threads this into the tree/shopping UI.
         public IReadOnlyList<CostLine> VendorCurrencyCosts { get; internal set; }
 
-        // TP-valued Item cost lines of a winning BuyFromVendor decision,
-        // already scaled to this occurrence's quantity - null for every
-        // other Source or when the offer had no Item lines. Each entry's
+        // Item cost lines of a winning BuyFromVendor decision, already
+        // scaled to this occurrence's quantity - null for every other
+        // Source or when the offer had no Item lines. A TP-valued line's
         // GoldValue is the exact amount already folded into TotalCost, so
         // CraftingTreeBuilder can synthesize component leaves without
-        // recomputing the fold.
+        // recomputing the fold; a barter line's GoldValue is null because
+        // nothing of it was folded in at all.
         public IReadOnlyList<VendorItemCostLine> VendorItemCosts { get; internal set; }
 
         // True only when the winning offer had a genuine raw coin cost

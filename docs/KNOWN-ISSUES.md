@@ -1205,3 +1205,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **First-paint viewport truncation (2026-08-27)** - gate NOT RUN (no live session available on this branch).
   Cited as: KNOWN-ISSUES #65.
   `dev/records/firstpaint-truncation.md`
+- **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
+  Cited as: barter-item-valuation.
+  `dev/records/barter-item-valuation.md`
