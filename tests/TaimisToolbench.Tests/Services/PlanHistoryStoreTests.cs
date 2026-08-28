@@ -143,8 +143,97 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(File.Exists(FilePath));
         }
 
+        // --- Which versions cost the user their history, and which do not.
+        // Exact-match rejection used to empty the whole index on any bump,
+        // so a release that changed the row shape additively would still
+        // have discarded up to 200 saved plans. Load now accepts the range
+        // [MinimumReadableSchemaVersion, CurrentSchemaVersion]; the tests
+        // below are written against those constants rather than literals,
+        // so the day the current version moves they start pinning a genuine
+        // older-file read instead of a boundary that happens to coincide.
+        // See docs/ARCHITECTURE.md section 12. ---
         [Fact]
-        public void SchemaVersionMismatch_ReturnsEmptyIndexAndFiresOnErrorOnce_DoesNotThrow()
+        public void FileAtTheOldestReadableSchemaVersion_KeepsEveryRow()
+        {
+            var store = new PlanHistoryStore(_temp.Path);
+            store.Save(SampleIndex());
+
+            var json = JObject.Parse(File.ReadAllText(FilePath));
+            json["SchemaVersion"] = PlanHistoryIndex.MinimumReadableSchemaVersion;
+            File.WriteAllText(FilePath, json.ToString());
+
+            int errors = 0;
+            var reloaded = new PlanHistoryStore(_temp.Path, (_, __) => errors++).Load();
+
+            Assert.Equal(0, errors);
+            var entry = Assert.Single(reloaded.Entries);
+            Assert.Equal("0123456789abcdef0123456789abcdef", entry.EntryId);
+            Assert.Equal(2, entry.RequestItems.Count);
+        }
+
+        [Fact]
+        public void FileAtTheOldestReadableSchemaVersion_IsRestampedByTheNextSave()
+        {
+            // The self-healing half: an accepted older file does not stay
+            // older. Nothing has to migrate it, because Save always stamps
+            // the current version over whatever it read.
+            var store = new PlanHistoryStore(_temp.Path);
+            store.Save(SampleIndex());
+
+            var json = JObject.Parse(File.ReadAllText(FilePath));
+            json["SchemaVersion"] = PlanHistoryIndex.MinimumReadableSchemaVersion;
+            File.WriteAllText(FilePath, json.ToString());
+
+            var reloaded = new PlanHistoryStore(_temp.Path);
+            var loaded = reloaded.Load();
+            reloaded.Save(loaded);
+
+            var onDisk = JObject.Parse(File.ReadAllText(FilePath));
+            Assert.Equal(
+                PlanHistoryIndex.CurrentSchemaVersion,
+                onDisk.Value<int>("SchemaVersion"));
+            Assert.Single(loaded.Entries);
+        }
+
+        [Fact]
+        public void FileBelowTheOldestReadableSchemaVersion_ReturnsEmptyIndexAndFiresOnErrorOnce()
+        {
+            var store = new PlanHistoryStore(_temp.Path);
+            store.Save(SampleIndex());
+
+            var json = JObject.Parse(File.ReadAllText(FilePath));
+            json["SchemaVersion"] = PlanHistoryIndex.MinimumReadableSchemaVersion - 1;
+            File.WriteAllText(FilePath, json.ToString());
+
+            int errors = 0;
+            var reloaded = new PlanHistoryStore(_temp.Path, (_, __) => errors++).Load();
+
+            Assert.Empty(reloaded.Entries);
+            Assert.Equal(1, errors);
+        }
+
+        [Fact]
+        public void FileFromANewerBuild_ReturnsEmptyIndexAndFiresOnErrorOnce()
+        {
+            // A downgrade. This build cannot know what a newer one wrote,
+            // so it keeps the file on disk and starts empty rather than
+            // reading rows it may misunderstand.
+            var store = new PlanHistoryStore(_temp.Path);
+            store.Save(SampleIndex());
+
+            var json = JObject.Parse(File.ReadAllText(FilePath));
+            json["SchemaVersion"] = PlanHistoryIndex.CurrentSchemaVersion + 1;
+            File.WriteAllText(FilePath, json.ToString());
+
+            int errors = 0;
+            var reloaded = new PlanHistoryStore(_temp.Path, (_, __) => errors++).Load();
+
+            Assert.Empty(reloaded.Entries);
+            Assert.Equal(1, errors);
+        }
+
+        [Fact]
+        public void SchemaVersionFarAboveAnythingShipped_ReturnsEmptyIndexAndFiresOnErrorOnce_DoesNotThrow()
         {
             var store = new PlanHistoryStore(_temp.Path);
             store.Save(SampleIndex());

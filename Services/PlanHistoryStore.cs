@@ -14,11 +14,17 @@ namespace TaimisToolbench.Services
     /// writers (the capture path's ThreadPool continuation and the tab's
     /// main-thread mutations).
     /// <para>
-    /// Schema mismatch is deliberately FORGIVING, unlike PlanStore's
+    /// Schema handling is deliberately FORGIVING, unlike PlanStore's
     /// throw: a corrupt plan.json costs the user one plan, but a thrown
-    /// index load would cost them the whole tab. One Warn through onError,
-    /// then an empty index the next Save overwrites. The bad file is left
-    /// on disk for inspection, never deleted here.
+    /// index load would cost them the whole tab. A file written at any
+    /// version this build still reads
+    /// ([PlanHistoryIndex.MinimumReadableSchemaVersion,
+    /// CurrentSchemaVersion]) loads its rows and is restamped by the next
+    /// Save - silently, because nothing was lost and there is nothing to
+    /// tell the user. Only a version outside that range, or a file that
+    /// will not parse, costs the history: one Warn through onError, then
+    /// an empty index the next Save overwrites. The bad file is left on
+    /// disk for inspection, never deleted here.
     /// </para>
     /// <para>
     /// Serialization is Indented, following RankerStore/SnapshotHelpers'
@@ -42,8 +48,9 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Never null, never throws. A missing file is first run, not a
         /// failure, and does not fire onError. Corrupt JSON or a
-        /// SchemaVersion mismatch fires onError exactly once and returns
-        /// an empty index.
+        /// SchemaVersion this build cannot read fires onError exactly once
+        /// and returns an empty index; a version it CAN read returns the
+        /// rows, whatever version stamped them.
         /// </summary>
         public PlanHistoryIndex Load()
         {
@@ -57,10 +64,17 @@ namespace TaimisToolbench.Services
                 string json = File.ReadAllText(_filePath);
                 var loaded = JsonConvert.DeserializeObject<PlanHistoryIndex>(json);
 
-                if (loaded == null || loaded.SchemaVersion != PlanHistoryIndex.CurrentSchemaVersion)
+                if (loaded == null || !IsReadableVersion(loaded.SchemaVersion))
                 {
+                    // A RANGE, not an equality. Exact-match was what made a
+                    // version bump cost every row a user had: the rows are
+                    // additive-only (PlanHistoryIndex.SchemaShapeHash is
+                    // what holds them to that), so a file stamped at any
+                    // version this build shipped is readable, and Save
+                    // restamps it. Only 0/absent, a negative, or a version
+                    // from a newer build lands here.
                     _onError?.Invoke(
-                        $"Plan history index at {_filePath} is not a version this module can read; starting from an empty history",
+                        $"Plan history index at {_filePath} is schema {loaded?.SchemaVersion.ToString() ?? "unreadable"}, and this module reads {PlanHistoryIndex.MinimumReadableSchemaVersion} to {PlanHistoryIndex.CurrentSchemaVersion}; starting from an empty history",
                         null);
                     return EmptyIndex();
                 }
@@ -125,6 +139,12 @@ namespace TaimisToolbench.Services
                     _onError?.Invoke($"Failed to save the plan history index to {_filePath}", ex);
                 }
             }
+        }
+
+        private static bool IsReadableVersion(int schemaVersion)
+        {
+            return schemaVersion >= PlanHistoryIndex.MinimumReadableSchemaVersion
+                && schemaVersion <= PlanHistoryIndex.CurrentSchemaVersion;
         }
 
         private static PlanHistoryIndex EmptyIndex()

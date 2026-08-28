@@ -51,7 +51,7 @@ Models/OwnMaterialsMode.cs                                                      
 Models/PersistedPlan.cs                                                                 168
 Models/PersistedPlanLoad.cs                                                              49
 Models/PillSourceCostBreakdown.cs                                                        76
-Models/PlanHistoryEntry.cs                                                              106
+Models/PlanHistoryEntry.cs                                                              146
 Models/PlanRequestItem.cs                                                                26
 Models/PlanSolveContext.cs                                                              196
 Models/PlanStatus.cs                                                                     11
@@ -157,7 +157,7 @@ Services/PlanHistoryDedupKey.cs                                                 
 Services/PlanHistoryLabels.cs                                                            82
 Services/PlanHistoryRetention.cs                                                        102
 Services/PlanHistoryRowLayout.cs                                                        263
-Services/PlanHistoryStore.cs                                                            135
+Services/PlanHistoryStore.cs                                                            155
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
 Services/PlanResultBuilder.cs                                                           375
@@ -321,6 +321,7 @@ tests/TaimisToolbench.Tests/Helpers/InMemoryAccountRecipeClient.cs              
 tests/TaimisToolbench.Tests/Helpers/InMemoryItemApiClient.cs                           67
 tests/TaimisToolbench.Tests/Helpers/InMemoryPriceApiClient.cs                          89
 tests/TaimisToolbench.Tests/Helpers/InMemoryRecipeApiClient.cs                        121
+tests/TaimisToolbench.Tests/Helpers/ModelGraphSignatures.cs                           174
 tests/TaimisToolbench.Tests/Helpers/PipelineBuilder.cs                                315
 tests/TaimisToolbench.Tests/Helpers/PlanResultDump.cs                                 192
 tests/TaimisToolbench.Tests/Helpers/RealItemFixtures.cs                                56
@@ -336,7 +337,8 @@ tests/TaimisToolbench.Tests/Models/CurrencyDecisionDefaultsTests.cs             
 tests/TaimisToolbench.Tests/Models/CurrencyValuationTests.cs                          198
 tests/TaimisToolbench.Tests/Models/Gw2ConstantsCurrencyNamesTests.cs                  176
 tests/TaimisToolbench.Tests/Models/HomesteadEfficiencyTiersTests.cs                    97
-tests/TaimisToolbench.Tests/Models/PersistedPlanSchemaMemberSetTests.cs               228
+tests/TaimisToolbench.Tests/Models/PersistedPlanSchemaMemberSetTests.cs                73
+tests/TaimisToolbench.Tests/Models/PlanHistorySchemaMemberSetTests.cs                  87
 tests/TaimisToolbench.Tests/Models/SettingsFormStateTests.cs                          296
 tests/TaimisToolbench.Tests/Services/AboutLayoutMathTests.cs                          209
 tests/TaimisToolbench.Tests/Services/AccountCurrencyIndexTests.cs                      80
@@ -424,7 +426,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                         77
 tests/TaimisToolbench.Tests/Services/PlanHistoryRetentionTests.cs                     139
 tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     339
-tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         234
+tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         323
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
 tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         700
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                       1103
