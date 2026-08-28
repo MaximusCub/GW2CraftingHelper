@@ -45,16 +45,40 @@ labelled otherwise.
    against, and once that id no longer matches the live build every
    negative row in the seed stops counting as a cache hit, putting every
    user on the slow live-API path for their first plan of each session.
-3. Bump `manifest.json`'s `version` (the About tab reads it live). Check
+3. **Consider refreshing the vendor offers, and review what comes back.**
+   One command, from Git Bash at the repo root:
+
+   ```
+   ./tools/refresh-vendor-data.sh
+   ```
+
+   It builds the tool, runs both wiki passes (~15 min, rate-limited),
+   snapshots the baseline first, and ends by printing the `--diff-summary`
+   that the section below requires in the PR body.
+   `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` are gitignored
+   dev-local inputs - absent, the run just re-scrapes from scratch.
+
+   Unlike step 2 this is a judgement call rather than an unconditional
+   step, and the reason is not laziness: the GW2 Wiki is a volunteer
+   service and a full refresh is ~2,000 requests against it, while the
+   dataset only actually moves when a patch adds vendors or an editor
+   corrects a page. Refresh on an expansion or a Wizard's Vault season
+   boundary, not on every point release. Skipping it ships stale data;
+   running it unreviewed can ship *wrong* data, which is worse -
+   `ref/vendor_offer_exclusions.json` exists because a decade-dead vendor
+   row nearly shipped. Read the `added`/`removed`/`repriced` rows before
+   committing. If nothing moved, the report says so and only
+   `ref/vendor_offers_manifest.json` changes.
+4. Bump `manifest.json`'s `version` (the About tab reads it live). Check
    that `manifest.json`'s `description` still matches the GitHub repo
    description - it is the sidebar text, the search-result snippet, and the
    Open Graph card used every time the link is pasted into Discord or
    Reddit, and it is the only sentence most people will ever read.
-4. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
+5. Add the matching `CHANGELOG.md` entry - `## <version> - <date>`, in the
    user-facing voice the existing entries use, not commit-message voice.
    The release workflow uses this section verbatim as the release body and
    fails the build if it is missing.
-5. **Sweep the prose that names a version.** `manifest.json` is not the
+6. **Sweep the prose that names a version.** `manifest.json` is not the
    only place a version number is written down, and the others drift
    silently because nothing reads them: this file (the v0.2.x paragraph at
    the top, the `manifest.json` fields section, the "what a real release
@@ -64,27 +88,27 @@ labelled otherwise.
    any claim you re-checked with `(measured YYYY-MM-DD)` rather than "at
    the time of writing". This step exists because ROADMAP.md and
    RELEASING.md both still said v0.2.3 was newest after v0.2.4 shipped.
-6. **If the plan view changed, refresh `docs/images/`.** The README's
+7. **If the plan view changed, refresh `docs/images/`.** The README's
    screenshots are the only proof a visitor has that the product works.
    They went stale once already: the shots taken 2026-07-23 showed columns
    packed hard left with a wide empty band, which is the exact layout the
    0.2.3 entry in `CHANGELOG.md` describes as removed. Retake against the
    current build at full window width, cropped to whole rows.
-7. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
+8. Clear `bin/` and `obj/`, then build Release/x64 (see the clean-build
    rule in the addendum - it is not optional).
-8. Tag the release commit `v<version>` and push the tag. That triggers
+9. Tag the release commit `v<version>` and push the tag. That triggers
    `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
    publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
    asset is attached.
-9. Copy `bin/x64/Release/TaimisToolbench.bhm` into the live Blish HUD
-   install's `modules` directory and reload Blish HUD.
+10. Copy `bin/x64/Release/TaimisToolbench.bhm` into the live Blish HUD
+    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
 compared with `git diff v0.2.0..v0.2.1`.
 
 ## v0.3.0 first-release runbook (staged 2026-08-26)
 
-The release-prep pass staged protocol steps 3-5 on this branch:
+The release-prep pass staged protocol steps 4-6 on this branch:
 `manifest.json` says `0.3.0`, `CHANGELOG.md` carries the `## 0.3.0`
 section the workflow publishes verbatim, and the version prose is swept.
 What remains after the field-test pass:
@@ -105,7 +129,7 @@ gh run watch
 gh release view v0.3.0
 ```
 
-Protocol step 6 also applies to this release: the plan view's tooltips
+Protocol step 7 also applies to this release: the plan view's tooltips
 changed and two new tabs shipped since the README screenshots were taken.
 
 ### Verified without a tag (2026-08-26)
@@ -190,12 +214,40 @@ dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
     --diff-summary <old vendor_offers.json> <new vendor_offers.json>
 ```
 
-It reports offers added, removed, repriced and retagged, keyed by merchant
-and item rather than by the content hash - see
+It reports offers added, removed, repriced, retagged and rehashed, keyed by
+merchant and item rather than by the content hash - see
 `tools/VendorOfferUpdater/README.md` for why the raw `offerId` set is not
 usable for this. A refresh that changed nothing prints "No offer changed",
 and `ref/vendor_offers.json` will be byte-for-byte unmodified: only
 `ref/vendor_offers_manifest.json` moves. That is the intended no-op signal.
+
+### Why this is not a scheduled workflow
+
+The refresh is one command and needs no secrets, so a nightly job that ran
+it and opened a PR would be easy to write. It is still the wrong shape,
+for a reason about review rather than automation:
+
+- **A wrong row is worse than a stale one.** Stale vendor data prices an
+  item the way it was priced last quarter. A wrong row prices a legendary
+  component from a vendor that has not existed since 2016, and the plan
+  looks equally authoritative either way. The 2026-08-25 refresh scraped
+  exactly such a row off a live wiki page; what stopped it was a human
+  reading `AcquisitionHintSeedVendorAgreementTests`' trip-wire.
+- **The review is the expensive half, and it cannot be scheduled.** The
+  diff summary makes a refresh reviewable, but somebody still has to read
+  the changed rows and decide whether the wiki is right. A bot opening a
+  PR every week trains the reviewer to skim, which converts the one
+  safeguard that has actually caught a bad row into a rubber stamp.
+- **The dependency is a volunteer service.** ~2,000 requests per full run
+  against wiki.guildwars2.com is fine occasionally and rude on a cron.
+
+The recommendation is therefore a **scheduled staleness check, not a
+scheduled refresh**: if anything is automated later, make it a job that
+runs `--diff-summary` between the shipped baseline and a scoped re-scrape
+of a few high-value merchants, and opens an *issue* saying the wiki has
+moved and a refresh is worth considering. That puts a human at the point
+where judgement is actually required and keeps the wiki traffic
+proportionate to the value.
 
 ## How a `.bhm` is actually produced
 

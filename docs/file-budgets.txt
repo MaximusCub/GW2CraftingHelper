@@ -562,7 +562,7 @@ tests/VendorOfferUpdater.Tests/SeasonalFestivalMappingTests.cs                  
 tests/VendorOfferUpdater.Tests/SeasonalFestivalRoundTripTests.cs                        151
 tests/VendorOfferUpdater.Tests/SerializeDatasetGoldenFileTests.cs                       116
 tests/VendorOfferUpdater.Tests/TemporaryTemplateParserTests.cs                          191
-tests/VendorOfferUpdater.Tests/VendorOfferDiffTests.cs                                  237
+tests/VendorOfferUpdater.Tests/VendorOfferDiffTests.cs                                  338
 tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs                     82
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                              100
@@ -583,6 +583,6 @@ tools/VendorOfferUpdater/Program.cs                                             
 tools/VendorOfferUpdater/QueryOptions.cs                                                 17
 tools/VendorOfferUpdater/QueryStats.cs                                                   49
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122
-tools/VendorOfferUpdater/VendorOfferDiff.cs                                             331
+tools/VendorOfferUpdater/VendorOfferDiff.cs                                             435
 tools/VendorOfferUpdater/VendorOfferHasher.cs                                           122
 tools/VendorOfferUpdater/WikiSmwClient.cs                                               808

@@ -30,6 +30,15 @@ namespace VendorOfferUpdater
     /// content is not - a hand-edit, or a row predating a hash-format change -
     /// is reported as a repricing rather than trusted on its id alone.
     /// </para>
+    /// <para>
+    /// The converse also holds and matters more, because a VendorOfferHasher
+    /// hash-format change does it to every row at once: a row whose content is
+    /// unchanged but whose id is not has not been repriced, and is counted as
+    /// rehashed rather than listed. Without that, one such migration reported
+    /// 48,750 of 53,544 rows as repriced, each printing an identical before and
+    /// after, and cross-paired rows differing only in OutputCount into price
+    /// moves that never happened.
+    /// </para>
     /// </summary>
     internal static class VendorOfferDiff
     {
@@ -49,6 +58,14 @@ namespace VendorOfferUpdater
             public List<OfferChange> Repriced { get; } = new List<OfferChange>();
 
             public List<OfferChange> Retagged { get; } = new List<OfferChange>();
+
+            /// <summary>
+            /// Rows that kept their content but changed OfferId. Not an offer
+            /// change, so deliberately outside <see cref="IsEmpty"/>: it is the
+            /// count that explains why a 14.8MB file moved when nothing a
+            /// reviewer cares about did.
+            /// </summary>
+            public int Rehashed { get; set; }
 
             public bool IsEmpty =>
                 Added.Count == 0
@@ -154,11 +171,22 @@ namespace VendorOfferUpdater
                 gone ??= new List<VendorOffer>();
                 came ??= new List<VendorOffer>();
 
-                // Where a merchant sells the same item on several rows, the
-                // pairing between them is arbitrary. Pair positionally and let
-                // the surplus fall through as real additions/removals: the
-                // counts stay exact either way, and the reviewer still sees
-                // every changed row's before and after.
+                // Match content-identical rows off first. A VendorOfferHasher
+                // hash-format change gives every row in the dataset a new
+                // OfferId at once, so without this every row lands here and the
+                // positional pairing below reports the whole dataset as
+                // repriced, printing tens of thousands of "10x item 36041 ->
+                // 10x item 36041" lines. It also stops rows of one
+                // (merchant, item) pair that differ only in OutputCount from
+                // being cross-paired into price moves that never happened.
+                MatchUnchangedByContent(gone, came, result);
+
+                // Whatever is left is a genuine change, but where a merchant
+                // sells the same item on several such rows the pairing between
+                // them is arbitrary. Pair positionally and let the surplus fall
+                // through as real additions/removals: the counts stay exact
+                // either way, and the reviewer still sees every changed row's
+                // before and after.
                 int paired = Math.Min(gone.Count, came.Count);
                 for (int i = 0; i < paired; i++)
                 {
@@ -188,11 +216,15 @@ namespace VendorOfferUpdater
             sb.Append("  removed:  ").AppendLine(result.Removed.Count.ToString(CultureInfo.InvariantCulture));
             sb.Append("  repriced: ").AppendLine(result.Repriced.Count.ToString(CultureInfo.InvariantCulture));
             sb.Append("  retagged: ").AppendLine(result.Retagged.Count.ToString(CultureInfo.InvariantCulture));
+            sb.Append("  rehashed: ").AppendLine(result.Rehashed.ToString(CultureInfo.InvariantCulture));
 
             if (result.IsEmpty)
             {
                 sb.AppendLine();
-                sb.AppendLine("  No offer changed. The datasets are equivalent.");
+                sb.AppendLine(result.Rehashed > 0
+                    ? "  No offer changed. The rehashed rows kept their content and took a new"
+                      + " offerId, so the file moved without a data change."
+                    : "  No offer changed. The datasets are equivalent.");
                 return sb.ToString();
             }
 
@@ -295,6 +327,78 @@ namespace VendorOfferUpdater
             }
 
             return byId;
+        }
+
+        /// <summary>
+        /// Removes from <paramref name="gone"/> and <paramref name="came"/>
+        /// every row that has a counterpart with the identical content key,
+        /// counting each as rehashed and recording a retag where only the
+        /// SeasonalFestival (the one field outside both the hash and the
+        /// content key) differs. Matching is first-come within a content key,
+        /// which is unambiguous because rows sharing one are interchangeable.
+        /// </summary>
+        private static void MatchUnchangedByContent(
+            List<VendorOffer> gone, List<VendorOffer> came, Result result)
+        {
+            if (gone.Count == 0 || came.Count == 0)
+            {
+                return;
+            }
+
+            var cameByContent = new Dictionary<string, Queue<int>>(StringComparer.Ordinal);
+            for (int i = 0; i < came.Count; i++)
+            {
+                string key = Program.ComputeContentKey(came[i]);
+                if (!cameByContent.TryGetValue(key, out var queue))
+                {
+                    queue = new Queue<int>();
+                    cameByContent[key] = queue;
+                }
+
+                queue.Enqueue(i);
+            }
+
+            var goneMatched = new bool[gone.Count];
+            var cameMatched = new bool[came.Count];
+
+            for (int i = 0; i < gone.Count; i++)
+            {
+                string key = Program.ComputeContentKey(gone[i]);
+                if (!cameByContent.TryGetValue(key, out var queue) || queue.Count == 0)
+                {
+                    continue;
+                }
+
+                int j = queue.Dequeue();
+                goneMatched[i] = true;
+                cameMatched[j] = true;
+                result.Rehashed++;
+
+                if (!string.Equals(
+                        gone[i].SeasonalFestival,
+                        came[j].SeasonalFestival,
+                        StringComparison.Ordinal))
+                {
+                    result.Retagged.Add(new OfferChange(gone[i], came[j]));
+                }
+            }
+
+            RemoveMatched(gone, goneMatched);
+            RemoveMatched(came, cameMatched);
+        }
+
+        private static void RemoveMatched(List<VendorOffer> rows, bool[] matched)
+        {
+            int write = 0;
+            for (int read = 0; read < rows.Count; read++)
+            {
+                if (!matched[read])
+                {
+                    rows[write++] = rows[read];
+                }
+            }
+
+            rows.RemoveRange(write, rows.Count - write);
         }
 
         private static Dictionary<PairKey, List<VendorOffer>> GroupByPair(

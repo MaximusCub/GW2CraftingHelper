@@ -105,6 +105,7 @@ dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
   removed:  1
   repriced: 1
   retagged: 1
+  rehashed: 0
 
 --- Repriced (1) ---
   Quartermaster (Drizzlewood Coast) | item 93817 x1 | 1000x currency 58, 200x item 93371, daily cap 1 -> 1999x currency 58, ...
@@ -123,6 +124,20 @@ shows the old and new cost side by side; only rows with no counterpart are
 reported as genuine additions or removals. `seasonalFestival` is the one field
 outside the hash, so a change to it keeps the `offerId` and is reported as a
 retag. Counts in the header are always exact even when a listing is truncated.
+
+The same reasoning runs the other way, and that case is not hypothetical:
+`VendorOfferHasher.ComputeOfferId`'s own comment records that changing the hash
+format gives every row in the dataset a new id at once, with no data change at
+all. Such a row is counted as **rehashed** rather than listed as a repricing.
+Before that distinction existed, the 2026-08-25 refresh's summary reported
+48,750 of 53,544 rows as repriced - each line printing an identical before and
+after - and reported `retagged: 0` for a run that in fact took seasonal tags
+from 57 to 597, because the retags were buried in that false repriced bucket.
+The same pass also matches rows within one (merchant, item) group by content
+first, so a merchant selling the same item at several output counts (the live
+`"Cannibal" | item 67389` rows are x1/x3/x8) can no longer have its rows
+cross-paired into price moves that never happened. Re-run against the same two
+datasets, the report is `repriced: 371, retagged: 492, rehashed: 48379`.
 
 ## Data Files
 
