@@ -992,7 +992,8 @@ namespace TaimisToolbench
                 _rankerStore,
                 () => _currentSnapshot,
                 TryGetActiveCharacterName,
-                _getItemStatBlock);
+                _getItemStatBlock,
+                _warmItemStatsAsync);
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156686),
