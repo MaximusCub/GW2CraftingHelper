@@ -376,6 +376,23 @@ jobs:
 
           bad = []
           checked = 0
+
+          # The one constant in the module whose value IS the amount of user
+          # data a release destroys. PlanHistoryStore reads the range
+          # [MinimumReadableSchemaVersion, CurrentSchemaVersion] and empties
+          # the index outside it, so raising this floor discards every row a
+          # user wrote at a version below it - up to 200 saved plans, with no
+          # prompt and no undo. It is pinned here as well as in
+          # PlanHistorySchemaMemberSetTests so the failure is visible without
+          # a Windows build, and so a bump cannot ride in on a merge.
+          floor = current('Models/PlanHistoryEntry.cs', 'PlanHistoryIndex',
+                          'MinimumReadableSchemaVersion')
+          if floor != 1:
+              bad.append(
+                  'PlanHistoryIndex.MinimumReadableSchemaVersion is %d, not 1 - every '
+                  'user who wrote history below that version loses all of it on '
+                  'upgrade. If that is genuinely intended, change this step in the '
+                  'same commit and say why in the message.' % floor)
           for prefix, shipped in families:
               for version in range(1, shipped + 1):
                   name = '%s%d.json' % (prefix, version)
