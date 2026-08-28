@@ -75,6 +75,18 @@ jobs:
           # whose two states were a filled and a hollow circle shipped with
           # no visual state at all (KNOWN-ISSUES #64).
           #
+          # The module now also ships a font of its own, ref/glyphs.fnt, so
+          # "the shipped font" is two fonts and the check has to know WHICH
+          # one a string is drawn in. It cannot: a codepoint in a .cs file
+          # says nothing about the Font its Label was given. So the rule is
+          # scoped instead of widened. Every codepoint from our own atlas is
+          # named exactly once, in Services/UiGlyphs.cs, and every seat that
+          # draws one goes through that constant - which is also the file
+          # whose doc comment says which font it belongs to. Allowing our
+          # PUA codepoints anywhere else would let one be pasted into a
+          # string that a Menomonia Label draws, and it would vanish exactly
+          # the way the original five did.
+          #
           # Module source only: tests and tools carry deliberately odd text,
           # and ref/ is API and wiki data rather than authored strings.
           # Whole-line comments are skipped, so a comment may still name a
@@ -87,6 +99,17 @@ jobs:
               line = line.split('#')[0].strip()
               if line:
                   allowed.add(int(line, 16))
+
+          # The module's own atlas, read from the artifact the .bhm ships
+          # rather than from a list beside it, so a regenerated font and this
+          # gate cannot disagree. Regenerate with tools/build-glyph-font.py.
+          GLYPH_OWNER = 'Services/UiGlyphs.cs'
+          shipped = set()
+          for line in open('ref/glyphs.fnt', encoding='ascii'):
+              if line.startswith('char '):
+                  for token in line.split():
+                      if token.startswith('id='):
+                          shipped.add(int(token[3:]))
 
           # Empty, and it should stay that way: the Ranker's three broken
           # glyphs - the last waived entries - are gone, replaced by the
@@ -101,6 +124,7 @@ jobs:
           escape = re.compile(r'\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})')
           bad = []
           seen = set()
+          named = set()
           for f in files:
               for n, line in enumerate(open(f, encoding='utf-8'), 1):
                   if line.lstrip().startswith(('//', '*', '/*')):
@@ -109,14 +133,27 @@ jobs:
                       cp = int(m.group(1) or m.group(2), 16)
                       if cp in allowed:
                           continue
+                      if f == GLYPH_OWNER and cp in shipped:
+                          named.add(cp)
+                          continue
                       seen.add((f, cp))
                       if (f, cp) not in waived:
                           bad.append(f'{f}:{n}: U+{cp:04X}')
           if bad:
-              print('UI strings use codepoints the shipped font cannot draw.')
+              print('UI strings use codepoints no shipped font can draw.')
               print('They will render as nothing at all. Use a codepoint from')
-              print('docs/font-codepoints.txt, a texture, or a drawn primitive:')
+              print('docs/font-codepoints.txt, a constant from')
+              print(f'{GLYPH_OWNER}, a texture, or a drawn primitive:')
               print('\n'.join(bad))
+              sys.exit(1)
+          unnamed = sorted(shipped - named)
+          if unnamed:
+              print(f'ref/glyphs.fnt carries glyphs {GLYPH_OWNER} does not name.')
+              print('Every glyph in the atlas costs licence surface and is a')
+              print('vocabulary nothing re-measures when it drifts. Name it or')
+              print('drop it from tools/build-glyph-font.py and regenerate:')
+              for cp in unnamed:
+                  print(f'  U+{cp:04X}')
               sys.exit(1)
           stale = sorted(waived - seen)
           if stale:
@@ -126,7 +163,8 @@ jobs:
                   print(f'  {f} U+{cp:04X}')
               sys.exit(1)
           print(f'{len(files)} module sources; every glyph escape is one of the '
-                f'{len(allowed)} the font carries.')
+                f'{len(allowed)} Menomonia carries or one of the {len(shipped)} '
+                f'in ref/glyphs.fnt, and every one of those is named.')
           PY
 
       - name: Tests stay free of Blish HUD and Gw2Sharp
