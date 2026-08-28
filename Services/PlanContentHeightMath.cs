@@ -157,21 +157,63 @@ namespace GW2CraftingHelper.Services
         // is gone with the sublabel.
         public const int RecipeRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
 
-        // 58, not 56: the cost tiles' captions moved to the ColumnHeader
-        // tier, whose 25px line box puts the caption block's bottom at
-        // CostTileCaptionY 4 + 25 + 2 = 31, one past the y=30 a 56px band
-        // bottom-anchored its 20px coin run at. 58 restores the clearance
-        // (amount y = 58 - 6 - 20 = 32).
-        public const int CostTileRowHeight = 58;
-
         // Caption y and amount bottom pad of an UNHIGHLIGHTED formula band
         // (the profit band; a highlighted one uses
         // SummarySectionLayoutMath's box-derived pair instead). Here rather
-        // than with the renderer that draws them because they are the other
-        // two thirds of CostTileRowHeight's arithmetic - the caption's line
-        // box has to end above the amount run the band bottom-anchors.
+        // than with the renderer that draws them because they are two of
+        // CostTileRowHeight's five terms.
         public const int CostTileCaptionY = 4;
         public const int CostTileAmountBottomPad = 6;
+
+        /// <summary>
+        /// The ONE distance between a formula tile's caption line box and
+        /// the top of the amount run under it, in BOTH Total Cost bands
+        /// (the cost band's boxed tiles and the profit band's plain ones).
+        /// <para>
+        /// It used to be a residual rather than a constant: both bands
+        /// BOTTOM-anchored their amount inside a fixed row height, so the
+        /// space under the caption was whatever the height arithmetic left
+        /// over - 1px on the profit band, which the field report called
+        /// cramped ("'Sell Value' and the gold line are a little cramped").
+        /// Anchoring the amount UNDER the caption instead makes the gap
+        /// this number at every band, and the two bands cannot drift apart.
+        /// </para>
+        /// <para>
+        /// 8, from the caption tier's own metrics rather than by eye: a
+        /// label and the value it names read as one group only while the
+        /// space between them stays under about one cap height
+        /// (ColumnHeaderInk.CapHeight is 17), and reads as touching much
+        /// below half of it. 8 is the 4pt-scale step at half that cap
+        /// height. Against ColumnHeaderInk's lowest ink - 26, one past its
+        /// own 25px line box - it leaves 7px of clear air under the
+        /// caption's descenders.
+        /// </para>
+        /// </summary>
+        public const int CostTileLabelToValueGap = 8;
+
+        /// <summary>
+        /// Height a formula band reserves for one caption line.
+        /// Deliberately above what the font measures: the renderer places
+        /// the caption from real font metrics and hangs the amount below
+        /// it, so a reserve under the real line box makes the band clip its
+        /// own amount. 29 = ColumnHeaderInk's measured 25px line box plus
+        /// one 4pt step of slack for a font Blish resolved differently
+        /// than this module measured.
+        /// </summary>
+        public const int CostTileCaptionLineHeight = 29;
+
+        // 67 = 4 caption y + 29 caption line + 8 label-to-value gap + a
+        // 20px coin run (never shorter than the coin icon) + 6 bottom pad.
+        // Was 58 while the amount was bottom-anchored and the gap under the
+        // caption was whatever was left (1px) - see CostTileLabelToValueGap.
+        // This band carries no divider, so no RowDividerScissorSimulation
+        // pair moves with it.
+        public const int CostTileRowHeight =
+            CostTileCaptionY
+            + CostTileCaptionLineHeight
+            + CostTileLabelToValueGap
+            + CoinSegmentMath.CoinIconSize
+            + CostTileAmountBottomPad;
 
         // The Summary section's COST formula band is no longer a taller
         // twin of this row: its result tile shares the band's one amount

@@ -94,22 +94,45 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void CostTileRow_CaptionBlockEndsAboveTheAmountRun()
+        public void CostTileRow_HoldsItsCaptionGapAndAmountRun()
         {
-            // The band bottom-anchors a coin run (never shorter than the
-            // 20px coin icon) above its own bottom pad; the caption block
-            // is the caption's line box plus the 2px the renderer adds
-            // under it.
-            int captionBlockBottom = PlanContentHeightMath.CostTileCaptionY
+            // The band HANGS its coin run (never shorter than the 20px coin
+            // icon) one CostTileLabelToValueGap under the caption's line
+            // box, rather than bottom-anchoring it above its own pad and
+            // letting the leftover decide the gap - which is what left the
+            // profit band's amount 1px under its caption. The row height
+            // has to hold that stack plus the bottom pad.
+            int amountY = PlanContentHeightMath.CostTileCaptionY
                 + TypeRampMetrics.ColumnHeaderInk.LineHeight
-                + 2;
-            int amountY = PlanContentHeightMath.CostTileRowHeight
-                - PlanContentHeightMath.CostTileAmountBottomPad
-                - CoinSegmentMath.CoinIconSize;
+                + PlanContentHeightMath.CostTileLabelToValueGap;
 
             Assert.True(
-                amountY >= captionBlockBottom,
-                $"amount run at {amountY} overprints a caption block ending at {captionBlockBottom}");
+                amountY + CoinSegmentMath.CoinIconSize
+                    + PlanContentHeightMath.CostTileAmountBottomPad
+                    <= PlanContentHeightMath.CostTileRowHeight,
+                $"a coin run at {amountY} overflows the "
+                    + $"{PlanContentHeightMath.CostTileRowHeight}px band");
+        }
+
+        [Fact]
+        public void CostTileCaptionLineHeight_CoversTheTierTheCaptionIsDrawnAt()
+        {
+            // The reserve is what keeps the hang-under-the-caption model
+            // safe: the renderer measures the real font, so a reserve below
+            // the tier's own line box would let the amount fall out of the
+            // band the height math sized.
+            Assert.True(
+                TypeRampMetrics.ColumnHeaderInk.LineHeight
+                    <= PlanContentHeightMath.CostTileCaptionLineHeight,
+                $"caption line box {TypeRampMetrics.ColumnHeaderInk.LineHeight} exceeds the "
+                    + $"{PlanContentHeightMath.CostTileCaptionLineHeight}px reserve");
+
+            // One 4pt step of slack, no more: under the hang model every
+            // unused pixel of reserve is dead space under the band's box.
+            Assert.Equal(
+                4,
+                PlanContentHeightMath.CostTileCaptionLineHeight
+                    - TypeRampMetrics.ColumnHeaderInk.LineHeight);
         }
 
         private static PlanRowViewModel Row(PlanRowType type, string sublabel = null)
