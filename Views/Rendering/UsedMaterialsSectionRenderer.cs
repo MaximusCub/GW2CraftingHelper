@@ -150,25 +150,21 @@ namespace TaimisToolbench.Views.Rendering
             // against one row's short "1x" would let its name run under the
             // column's widest value.
             string fullName = row.Label ?? "";
-            var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
-                qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, RowTextY,
-                ItemIconTier.BagSidebar);
+
             // Composed at HOVER time, not here: a plan restored from disk
             // fills its stat cache in the background (Q13), and a snapshot
             // taken now could never show what lands after it. It also
             // keeps the compose work off the render path.
-            Func<TooltipContent> buildTooltip = () => ItemRowTooltipComposer.BuildRowContent(
-                _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
-                fullName,
-                nameHandle.NameLabel.Text != fullName,
-                null);
-            TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
-            TooltipFacility.ApplyRichDeferred(nameHandle.NameLabel, buildTooltip);
-            if (row.ItemId > 0)
-            {
-                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
-            }
+            int itemId = row.ItemId;
+            var hover = ItemIconTooltip.ForItem(
+                ItemTooltipIdentity.ForItem(fullName, row.IconUrl, row.Rarity),
+                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
+                    : () => _getItemStatBlock(itemId));
+
+            var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
+                rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
+                qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, RowTextY,
+                ItemIconTier.BagSidebar, hover);
 
             var qtyLabel = LabelHelpers.WithDescenderClearance(
                 new Label()
@@ -181,7 +177,6 @@ namespace TaimisToolbench.Views.Rendering
                     Location = new Point(qtyRightEdge - qtyWidth, RowTextY),
                     Parent = rowPanel,
                 });
-            TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
 
             // Qty label position is a pure reposition (qtyWidth is
             // font-only); the name is left untouched during drag ticks and

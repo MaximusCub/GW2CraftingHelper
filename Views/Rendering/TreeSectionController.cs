@@ -864,9 +864,10 @@ namespace TaimisToolbench.Views.Rendering
             ItemIconFrame frame = dimmed
                 ? ItemIconFrame.Explicit(new Color(60, 60, 60))
                 : ItemIconFrame.ForRarity(node.Rarity);
+            var hover = TreeRowHover(node, captionText);
             var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, node.IconUrl, frame, iconX, PlanContentHeightMath.TreeRowIconPad,
-                ItemIconTier.BagSidebar);
+                ItemIconTier.BagSidebar, hover);
             Panel iconScrim = null;
             if (dimmed)
             {
@@ -987,35 +988,9 @@ namespace TaimisToolbench.Views.Rendering
             handle.QtyLabel = qtyLabel;
             handle.NameLabel = nameLabel;
 
-            // ExtraTooltipLines never depends on panelWidth (unit
-            // price / acquisition hint text is fixed), so it is computed
-            // once and reused verbatim by the settle re-ellipsis pass -
-            // only the "is the name actually truncated" line needs to be
-            // reconsidered when nameMaxWidth changes.
-            //
-            // The line-building itself (unit price, price-side-fallback
-            // caveat, acquisition hint, caption, wiki-link line) lives in
-            // the pure, unit-tested
-            // Services/TreeRowTooltipComposer.cs - see that class's own doc
-            // comment and docs/ARCHITECTURE.md section 5's STANDING RULE.
-            // Only the Blish-bound right-click event wiring below stays
-            // here.
-            var currentPlan = _host.CurrentPlan;
-            var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(node, captionText, currentPlan);
-
-            // Composed at HOVER time, not here: a plan restored from disk
-            // fills its stat cache in the background (Q13), so a snapshot
-            // taken at render time could never show what lands after it.
-            // The lookup itself is a session cache read - see
-            // ItemMetadataService.GetCachedStatBlock, which never fetches.
-            Func<TooltipContent> getStatContent =
-                () => TreeRowTooltipComposer.BuildStatTooltipContent(node, _getItemStatBlock);
-
             WireWikiLinkContextAction(rowPanel, node);
 
-            UpdateTreeRowTooltip(
-                rowPanel, nameLabel, qtyLabel, iconFrame, iconScrim,
-                fullName, getStatContent, extraTooltipContent);
+            StampRowIcon(iconFrame, iconScrim, hover);
 
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
@@ -1546,13 +1521,7 @@ namespace TaimisToolbench.Views.Rendering
             DisposeValueCell(handle.CostCell);
             RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);
 
-            var extraTooltipContent = TreeRowTooltipComposer.BuildExtraTooltipContent(
-                newNode, handle.CaptionText, _host.CurrentPlan);
-            UpdateTreeRowTooltip(
-                handle.RowPanel, handle.NameLabel, handle.QtyLabel, handle.IconFrame, handle.IconScrim,
-                handle.FullName,
-                () => TreeRowTooltipComposer.BuildStatTooltipContent(newNode, _getItemStatBlock),
-                extraTooltipContent);
+            StampRowIcon(handle.IconFrame, handle.IconScrim, TreeRowHover(newNode, handle.CaptionText));
 
             handle.Node = newNode;
             if (handle.State != null)
@@ -1615,62 +1584,53 @@ namespace TaimisToolbench.Views.Rendering
         /// coin icons - see <see cref="TooltipFacility"/>.
         /// </para>
         /// </summary>
-        private static void UpdateTreeRowTooltip(
-            Panel rowPanel, Label nameLabel, Label qtyLabel,
-            Panel iconFrame, Panel iconScrim,
-            string fullName,
-            Func<TooltipContent> getStatContent, TooltipContent extraContent)
+        private ItemIconTooltip TreeRowHover(CraftingTreeNode node, string captionText)
         {
-            // The whole tooltip is composed when the box is about to be
-            // drawn - see TooltipFacility.ApplyRichDeferred. Which means
-            // the row's re-ellipsis no longer has to re-stamp anything,
-            // and a stat block fetched after this render still shows.
-            Func<TooltipContent> build = () =>
-            {
-                // The stat block already OPENS with the full item name, in
-                // its rarity colour, so the truncation line would be a
-                // duplicate; the name line is the no-stats fallback only.
-                // The blank between it and the plan lines is its own
-                // block rhythm.
-                // nameLabel.Text, not the display name captured at build
-                // time: the settle re-ellipsis rewrites the label in place
-                // and no longer re-stamps anything, so the truncation
-                // state has to be read live.
-                return ItemRowTooltipComposer.BuildRowContent(
-                    getStatContent(), fullName, nameLabel.Text != fullName, extraContent);
-            };
-
-            // The name and quantity Labels get it too, not just the row
-            // Panel. Tooltip lookup reads ONE control -
-            // Tooltip.HandleMouseMoved uses Control.ActiveControl, which is
-            // the deepest capturing control under the cursor - so a Label
-            // lying over the row swallows the row's hover. Same
-            // swallowed-hover class already fixed in
-            // ShoppingListSectionRenderer, in LogTabContent's rows, and in
-            // this file's own pill outer/inner/label stamping. On the tree
-            // it bit the worst spot: the item NAME, which is exactly what a
-            // reader points at to find out what the row is, and exactly
-            // what the tooltip's full-name line exists to expand.
+            // ExtraTooltipLines never depends on panelWidth (unit
+            // price / acquisition hint text is fixed), so it is computed
+            // once and reused verbatim by the settle re-ellipsis pass.
             //
-            // Tooltips ONLY. The row's click, right-click and hover-wash
-            // handlers stay on rowPanel alone and must not be copied onto
-            // these Labels: mouse EVENTS do reach the parent, because
-            // Container.TriggerMouseInput fires the container's own handlers
-            // (base.TriggerMouseInput) before it recurses into children - the
-            // deepest child only wins the RETURN value (ActiveControl) and
-            // suppresses its siblings. Duplicating toggleHandler onto a Label
-            // would toggle the row twice per click.
-            TooltipFacility.ApplyRichDeferred(rowPanel, build);
-            TooltipFacility.ApplyRichDeferred(nameLabel, build);
-            TooltipFacility.ApplyRichDeferred(qtyLabel, build);
+            // The line-building itself (unit price, price-side-fallback
+            // caveat, acquisition hint, caption, wiki-link line) lives in
+            // the pure, unit-tested
+            // Services/TreeRowTooltipComposer.cs - see that class's own doc
+            // comment and docs/ARCHITECTURE.md section 5's STANDING RULE.
+            var extraContent = TreeRowTooltipComposer.BuildExtraTooltipContent(
+                node, captionText, _host.CurrentPlan);
+            var identity = ItemTooltipIdentity.ForItem(node.Name ?? "", node.IconUrl, node.Rarity);
+            var getStatBlock = _getItemStatBlock;
 
-            // The icon column is the same swallowed-hover case, one level
-            // deeper: the framed icon is a Panel inside a Panel, and a
-            // dimmed row lays a scrim Panel over the top of both. Left
-            // unstamped, the largest and most obvious target on the row -
-            // the item picture - was the one spot that showed nothing.
-            IconControls.ApplyRichDeferredToIconTree(iconFrame, build);
-            IconControls.ApplyRichDeferredToIconTree(iconScrim, build);
+            // Composed at HOVER time, not here: a plan restored from disk
+            // fills its stat cache in the background (Q13), so a snapshot
+            // taken at render time could never show what lands after it.
+            // The lookup itself is a session cache read - see
+            // ItemMetadataService.GetCachedStatBlock, which never fetches.
+            return ItemIconTooltip.Composed(
+                identity,
+                () => ItemRowTooltipComposer.BuildRowContent(
+                    TreeRowTooltipComposer.BuildStatTooltipContent(node, getStatBlock),
+                    identity,
+                    extraContent));
+        }
+
+        /// <summary>
+        /// The row's icon, and the scrim a dimmed row lays over the top of
+        /// it - Blish resolves a tooltip on the deepest control under the
+        /// cursor, so the scrim rather than the icon beneath it is what the
+        /// cursor finds. Nothing else on the row is stamped: the item's
+        /// hover belongs to its picture
+        /// (<see cref="ItemIconTooltip.StampOnIconTree"/>).
+        /// <para>
+        /// The icon is re-stamped rather than left as CreateItemIcon set
+        /// it, because the in-place re-render swaps the row's NODE under a
+        /// reused icon control and the old node's hover would otherwise
+        /// survive the swap.
+        /// </para>
+        /// </summary>
+        private static void StampRowIcon(Panel iconFrame, Panel iconScrim, ItemIconTooltip hover)
+        {
+            hover.StampOnIconTree(iconFrame);
+            hover.StampOnIconOverlay(iconScrim);
         }
 
         // --- Decision pills ---

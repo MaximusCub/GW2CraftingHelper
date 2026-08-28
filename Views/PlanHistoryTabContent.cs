@@ -67,6 +67,8 @@ namespace TaimisToolbench.Views
         // Returns null on success, an error message on failure; throws
         // OperationCanceledException on cancellation.
         private readonly Func<PlanHistoryEntry, CancellationToken, Task<string>> _resolveEntryAsync;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+        private readonly ItemStatWarmer _statWarmer;
         private readonly ModalDialog _modalDialog;
         private readonly ModuleSettings _settings;
         private readonly ResizeSettleDebounce _resizeSettle;
@@ -101,7 +103,14 @@ namespace TaimisToolbench.Views
             Func<PlanHistoryEntry, bool> openEntry,
             Func<PlanHistoryEntry, CancellationToken, Task<string>> resolveEntryAsync,
             ModalDialog modalDialog,
-            ModuleSettings settings)
+            ModuleSettings settings,
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            // The twin of getItemStatBlock, and the reason this tab's
+            // hovers are not identity-only: the accessor above is a pure
+            // cache read that never fetches, so without this a history row
+            // could only show a full item tooltip for an item some earlier
+            // plan happened to touch. See ItemStatWarmer.
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
             _snapshotEntries = snapshotEntries ?? (() => new List<PlanHistoryEntry>());
             _mutateIndex = mutateIndex ?? (_ => { });
@@ -109,6 +118,8 @@ namespace TaimisToolbench.Views
             _resolveEntryAsync = resolveEntryAsync;
             _modalDialog = modalDialog;
             _settings = settings;
+            _getItemStatBlock = getItemStatBlock;
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "history");
 
             _resizeSettle = new ResizeSettleDebounce(
                 RefitAfterResizeSettle,
@@ -128,6 +139,17 @@ namespace TaimisToolbench.Views
                 // must.
                 _statusOverride = null;
             }
+
+            // Off-thread, and deliberately not awaited: the rows render
+            // from their own persisted name/icon/rarity either way, and
+            // their hovers are deferred, so whatever this fills in shows on
+            // the next hover without a re-render. Started here rather than
+            // in Build because Build runs off the main thread and may be
+            // skipped entirely when nothing changed.
+            // Bounded by the retention cap, so this is one batched request
+            // on the first visit and nothing at all on later ones -
+            // WarmStatBlocksAsync skips every id the cache already holds.
+            _statWarmer.Start(PlanHistoryItemIds.ForEntries(_snapshotEntries()));
         }
 
         public void Build(Container container)
@@ -304,7 +326,7 @@ namespace TaimisToolbench.Views
 
             SetHeaderLabel(0, bands.IconX);
             SetHeaderLabelRight(1, bands.CostRightEdge);
-            SetHeaderLabelRight(2, bands.WhenX + bands.WhenWidth);
+            SetHeaderLabelRight(2, bands.WhenRightEdge);
         }
 
         private void SetHeaderLabel(int index, int x)
@@ -333,7 +355,6 @@ namespace TaimisToolbench.Views
         {
             public PlanHistoryEntry Entry;
             public string FullLabel;
-            public bool LabelShortened;
             public Panel Panel;
             public IconNameRowHelpers.IconNameHandle IconName;
             public CoinCurrencyRenderer.ValueCellHandle CostCell;
@@ -346,6 +367,13 @@ namespace TaimisToolbench.Views
             public Panel DetailPanel;
             public readonly List<Label> DetailFlexLabels = new List<Label>();
             public readonly List<string> DetailFlexFulls = new List<string>();
+
+            /// <summary>Parallel to the two above: a detail line that is an
+            /// ITEM NAME carries no tooltip of its own at any width - the
+            /// item's icon beside it is the one control that answers for it
+            /// (ItemIconTooltip.StampOnIconTree). The settings, note and
+            /// timestamp lines keep their own truncation text.</summary>
+            public readonly List<bool> DetailFlexSilent = new List<bool>();
         }
 
         private void RebuildRows()
@@ -477,12 +505,14 @@ namespace TaimisToolbench.Views
             };
 
             var firstSummary = FirstSummary(entry);
+            string firstRarity = ResolvedRarity(firstSummary);
+            var hover = RowHover(entry, firstSummary, firstRarity);
+
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                row.Panel, firstSummary?.IconUrl, firstSummary?.Rarity,
+                row.Panel, firstSummary?.IconUrl, firstRarity,
                 bands.IconX, PlanHistoryRowLayout.IconY, row.FullLabel, UiFonts.Body,
                 bands.NameX + bands.NameWidth, 0, 0, bands.NameX, PlanHistoryRowLayout.MainLineTextY,
-                ItemIconTier.BagSlot);
-            ApplyRowTooltip(row);
+                ItemIconTier.BagSlot, hover);
 
             row.CostCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
                 row.Panel, entry.TotalCoinCostAtGeneration, null, bands.CostRightEdge,
@@ -490,7 +520,7 @@ namespace TaimisToolbench.Views
 
             row.WhenLabel = LabelHelpers.CreateRightAlignedLabel(
                 row.Panel, WhenText(entry), UiFonts.Body, StatusColor,
-                bands.WhenX + bands.WhenWidth, PlanHistoryRowLayout.MainLineTextY);
+                bands.WhenRightEdge, PlanHistoryRowLayout.MainLineTextY);
 
             row.View = CreateActionButton(row.Panel, "View", bands.ViewX,
                 "Show what this plan cost when it was generated. Nothing is recalculated.");
@@ -561,36 +591,60 @@ namespace TaimisToolbench.Views
             return null;
         }
 
-        private void ApplyRowTooltip(RenderedRow row)
+        /// <summary>
+        /// One history row's hover: the icon+name header the row already
+        /// draws - which is the FIRST item's, quantity and all - then the
+        /// rest of the plan's items and its override/ignored counts. No
+        /// stat block: the row is a PLAN, and claiming one item's stats
+        /// for a three-item request would be a lie the icon does not tell.
+        /// </summary>
+        private ItemIconTooltip RowHover(
+            PlanHistoryEntry entry, PlanHistoryItemSummary firstSummary, string firstRarity)
         {
-            var entry = row.Entry;
             var itemLines = PlanHistoryLabels.ItemLineTexts(entry);
-            bool nameShortened = !string.Equals(row.IconName.NameLabel.Text, row.FullLabel, StringComparison.Ordinal);
-            row.LabelShortened = nameShortened || itemLines.Count > 3;
-
-            string tooltip = null;
-            if (row.LabelShortened)
+            var extras = new List<string>();
+            for (int i = 1; i < itemLines.Count; i++)
             {
-                var lines = new List<string>(itemLines);
-                if (entry.OverrideCountAtGeneration > 0)
-                {
-                    lines.Add(StatusText.ForOverridesChip(entry.OverrideCountAtGeneration));
-                }
-
-                if (entry.IgnoredCountAtGeneration > 0)
-                {
-                    lines.Add(StatusText.ForIgnoredChip(entry.IgnoredCountAtGeneration));
-                }
-
-                tooltip = string.Join("\n", lines);
+                extras.Add(itemLines[i]);
             }
 
-            // Stamped on every control in the row's name band - Blish
-            // resolves the tooltip on the control under the mouse and does
-            // not bubble.
-            TooltipFacility.ApplyPlain(row.Panel, tooltip);
-            TooltipFacility.ApplyPlain(row.IconName.NameLabel, tooltip);
-            IconControls.ApplyPlainToIconTree(row.IconName.IconFrame, tooltip);
+            if (entry.OverrideCountAtGeneration > 0)
+            {
+                extras.Add(StatusText.ForOverridesChip(entry.OverrideCountAtGeneration));
+            }
+
+            if (entry.IgnoredCountAtGeneration > 0)
+            {
+                extras.Add(StatusText.ForIgnoredChip(entry.IgnoredCountAtGeneration));
+            }
+
+            // An entry whose summaries were never captured heads nothing
+            // rather than inventing a subject: there is no item to name and
+            // no icon to show, and the chips below are the whole hover.
+            var identity = itemLines.Count > 0
+                ? ItemTooltipIdentity.ForItem(itemLines[0], firstSummary?.IconUrl, firstRarity)
+                : ItemTooltipIdentity.Unnamed();
+
+            return ItemIconTooltip.ForItem(identity, null, () => extras);
+        }
+
+        /// <summary>
+        /// The ONE rarity a summary renders at - its captured value, else
+        /// whatever this session's stat cache holds. Fed to the icon frame,
+        /// the name colour and the hover header alike, so the three cannot
+        /// disagree.
+        /// </summary>
+        private string ResolvedRarity(PlanHistoryItemSummary summary)
+        {
+            if (summary == null)
+            {
+                return null;
+            }
+
+            var block = _getItemStatBlock == null || summary.ItemId <= 0
+                ? null
+                : _getItemStatBlock(summary.ItemId);
+            return ItemRarityResolution.Resolve(summary.Rarity, block?.Rarity);
         }
 
         private FeedbackButton CreateActionButton(Panel parent, string text, int x, string tooltip)
@@ -677,12 +731,23 @@ namespace TaimisToolbench.Views
                     continue;
                 }
 
+                string rarity = ResolvedRarity(summary);
+                int summaryItemId = summary.ItemId;
+                string full = line < itemLines.Count ? itemLines[line] : "";
+
+                // A detail line IS one item, so it gets the standard item
+                // hover in full - the icon+name header either way, and this
+                // session's stat block underneath it when there is one.
+                var lineHover = ItemIconTooltip.ForItem(
+                    ItemTooltipIdentity.ForItem(full, summary.IconUrl, rarity),
+                    _getItemStatBlock == null || summaryItemId <= 0 ? (Func<ItemStatBlock>)null
+                        : () => _getItemStatBlock(summaryItemId));
+
                 IconControls.CreateItemIcon(
-                    panel, summary.IconUrl, ItemIconFrame.ForRarity(summary.Rarity),
-                    x, y + PlanHistoryRowLayout.IconPad, ItemIconTier.BagSidebar);
+                    panel, summary.IconUrl, ItemIconFrame.ForRarity(rarity),
+                    x, y + PlanHistoryRowLayout.IconPad, ItemIconTier.BagSidebar, lineHover);
 
                 int textX = x + PlanHistoryRowLayout.DetailIconTotal + PlanHistoryRowLayout.IconGap;
-                string full = line < itemLines.Count ? itemLines[line] : "";
 
                 // The item's own rarity colour, as the row above it and
                 // every other item name in the module takes: an unknown
@@ -692,7 +757,7 @@ namespace TaimisToolbench.Views
                 AddFlexLabel(
                     row, panel, full, UiFonts.Body, textX,
                     y + PlanHistoryRowLayout.DetailItemTextY, rightEdge,
-                    RarityColors.GetRarityNameColor(summary.Rarity));
+                    RarityColors.GetRarityNameColor(rarity), silent: true);
                 y += PlanHistoryRowLayout.DetailItemLineHeight;
                 line++;
             }
@@ -763,7 +828,7 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void AddFlexLabel(
             RenderedRow row, Panel panel, string full, BitmapFont font,
-            int x, int y, int rightEdge, Color? color = null)
+            int x, int y, int rightEdge, Color? color = null, bool silent = false)
         {
             string shown = LabelHelpers.EllipsizeToWidth(font, full, Math.Max(0, rightEdge - x));
             var label = new Label
@@ -776,10 +841,15 @@ namespace TaimisToolbench.Views
                 Location = new Point(x, y),
                 Parent = panel,
             };
-            TooltipFacility.ApplyPlain(
-                label, string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+            if (!silent)
+            {
+                TooltipFacility.ApplyPlain(
+                    label, string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+            }
+
             row.DetailFlexLabels.Add(label);
             row.DetailFlexFulls.Add(full);
+            row.DetailFlexSilent.Add(silent);
         }
 
         /// <summary>
@@ -882,11 +952,10 @@ namespace TaimisToolbench.Views
 
             if (measureText)
             {
-                if (IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
-                        bands.NameX + bands.NameWidth, 0, 0))
-                {
-                    ApplyRowTooltip(row);
-                }
+                // Re-ellipsis only. The row's hover is deferred and says
+                // the same at any width, so nothing is re-stamped here.
+                IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
+                    bands.NameX + bands.NameWidth, 0, 0);
             }
 
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
@@ -895,7 +964,7 @@ namespace TaimisToolbench.Views
             CoinCurrencyRenderer.RepositionValueCellRightAligned(
                 row.CostCell, bands.CostRightEdge, PlanHistoryRowLayout.MainLineTextY);
             row.WhenLabel.Location = new Point(
-                Math.Max(0, bands.WhenX + bands.WhenWidth - row.WhenLabel.Width),
+                Math.Max(0, bands.WhenRightEdge - row.WhenLabel.Width),
                 PlanHistoryRowLayout.MainLineTextY);
 
             row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, MainLineButtonY);
@@ -922,8 +991,12 @@ namespace TaimisToolbench.Views
                         if (!string.Equals(label.Text, shown, StringComparison.Ordinal))
                         {
                             label.Text = shown;
-                            TooltipFacility.ApplyPlain(
-                                label, string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+                            if (!row.DetailFlexSilent[i])
+                            {
+                                TooltipFacility.ApplyPlain(
+                                    label,
+                                    string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
+                            }
                         }
                     }
                 }

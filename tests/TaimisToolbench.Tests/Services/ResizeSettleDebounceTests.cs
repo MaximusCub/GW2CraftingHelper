@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using TaimisToolbench.Services;
 using Xunit;
@@ -291,6 +292,56 @@ namespace TaimisToolbench.Tests.Services
 
             Task finished = await Task.WhenAny(ran.Task, Task.Delay(30000));
             Assert.Same(ran.Task, finished);
+        }
+
+        [Fact]
+        public async Task TheSettleWindowDoesNotDependOnTheAmbientSynchronizationContext()
+        {
+            // The callback reaches the UI thread through the marshal, so the
+            // waiter must never park its continuation on whatever context
+            // happened to be current when Schedule was called. A context
+            // that accepts posts and never runs them stands in for a
+            // saturated one; without ConfigureAwait(false) on the waiter's
+            // delay, the settle callback lands in DeadContext and is never
+            // seen again.
+            var ran = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var dead = new DeadContext();
+            var original = SynchronizationContext.Current;
+
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(dead);
+
+                // Schedule runs the waiter synchronously as far as its first
+                // await, so the context installed here is the one that await
+                // would capture.
+                new ResizeSettleDebounce(
+                    () => ran.TrySetResult(true), RunInline, 1, null).Schedule();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(original);
+            }
+
+            Task finished = await Task.WhenAny(ran.Task, Task.Delay(30000));
+            Assert.Same(ran.Task, finished);
+            Assert.Equal(0, dead.Posts);
+        }
+
+        /// <summary>
+        /// Accepts posted continuations and never runs them - what a
+        /// saturated context looks like from the awaiting side.
+        /// </summary>
+        private sealed class DeadContext : SynchronizationContext
+        {
+            private int _posts;
+
+            public int Posts => Volatile.Read(ref _posts);
+
+            public override void Post(SendOrPostCallback d, object state)
+            {
+                Interlocked.Increment(ref _posts);
+            }
         }
 
         private static bool RunInline(Action action)

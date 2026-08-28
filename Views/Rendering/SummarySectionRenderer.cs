@@ -833,7 +833,7 @@ namespace TaimisToolbench.Views.Rendering
                 IconControls.CreateItemIcon(
                     rowPanel, row.IconUrl, ItemIconFrame.NotAnItem(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
-                    ItemIconTier.CurrencyListRow, row.Label);
+                    ItemIconTier.CurrencyListRow, ItemIconTooltip.Naming(row.Label));
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
@@ -851,16 +851,10 @@ namespace TaimisToolbench.Views.Rendering
                 Location = new Point(nameX, SummarySectionLayoutMath.CurrencyRowTextY),
                 Parent = rowPanel,
             });
-            if (displayName != fullName)
-            {
-                // Stamp BOTH the label AND the row panel - a label
-                // captures the mouse before a tooltip on a control
-                // underneath it is ever reached, so the panel's tooltip
-                // alone only fires on the blank strip beside the name.
-                TooltipFacility.ApplyPlain(nameLabel, fullName);
-                TooltipFacility.ApplyPlain(rowPanel, fullName);
-            }
 
+            // No tooltip on the name or the row: the currency's icon names
+            // it (ItemIconTooltip.Naming), and that is the one control on
+            // the row that answers for it.
             var numberColor = new Color(220, 220, 220);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
@@ -912,11 +906,6 @@ namespace TaimisToolbench.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    // Both controls, same reasoning as the
-                    // build-time tooltip assignment above.
-                    string tooltip = newDisplayName != fullName ? fullName : null;
-                    TooltipFacility.ApplyPlain(nameLabel, tooltip);
-                    TooltipFacility.ApplyPlain(rowPanel, tooltip);
                 }
             });
         }
