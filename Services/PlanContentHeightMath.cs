@@ -113,7 +113,7 @@ namespace TaimisToolbench.Services
 
         // Baseline y of every column-header label inside that band. Lives
         // here rather than with the chrome that draws it
-        // (Views/Rendering/TableHeaderStyle, which aliases this) because it
+        // (Views/Rendering/HeaderBands, which aliases this) because it
         // is half of the arithmetic above: a label y and a band height that
         // move independently are how a header's descenders end up on the
         // row under them.
@@ -139,6 +139,27 @@ namespace TaimisToolbench.Services
         // lift the 18pt header gave it. Ink bottom 10 + 21 = 31, also clear
         // of the divider top at 35.
         public const int SectionHeaderCaretY = 10;
+
+        // --- Tab title band (one per tab, drawn by
+        // Views/Rendering/HeaderBands.CreateTabTitleBand, which aliases
+        // both constants below). ---
+
+        // 44. Blish_HUD.Controls.Panel draws a 36px band for a Panel.Title
+        // and prints it at DefaultFont16; that height, that font and the
+        // band's text bounds are literals inside Panel.RecalculateLayout
+        // and Panel.PaintBeforeChildren, and every layout rectangle they
+        // write is private, so the band can be neither retargeted nor
+        // subclassed - the module draws its own instead. Sized for the
+        // SectionTitle tier: that ink block spans TabTitleY + capTopY 4 to
+        // TabTitleY + lowestInk 30, i.e. 26px, and centring 26 in 44 leaves
+        // 9px of air above and below. It also seats a UiMetrics.ButtonHeight
+        // control - the Snapshot tab's two actions ride this band.
+        public const int TabTitleBandHeight = 44;
+
+        // Top y of the tab title label inside that band: (44 - 26) / 2 - 4.
+        // The two are one piece of arithmetic, for the reason
+        // ColumnHeaderLabelY gives above.
+        public const int TabTitleY = 5;
 
         // 36, not 32: this row's two labels sit at y=7 and y=9, whose
         // Font16/Font14 ink (28) landed on the 32px row's divider top (29).

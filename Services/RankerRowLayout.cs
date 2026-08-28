@@ -54,7 +54,7 @@ namespace TaimisToolbench.Services
 
         // The three right-hand cells each reserve enough width for BOTH
         // their widest cell text ("100%", "999d", a coin amount) and their
-        // own column-header label at TableHeaderStyle's bold ColumnHeader
+        // own column-header label at the header band's bold ColumnHeader
         // font. The header labels right-align at the same edges the cells
         // do, so a band narrower than its header collides the headers into
         // each other - the live desktop gate caught exactly that

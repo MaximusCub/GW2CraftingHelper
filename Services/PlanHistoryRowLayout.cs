@@ -74,7 +74,7 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Floor for the coin cell band: fits bold "Cost" under
-        /// TableHeaderStyle's ColumnHeader font with clearance. Rows may
+        /// the header band's ColumnHeader font with clearance. Rows may
         /// measure wider; never narrower.
         /// </summary>
         public const int MinCostCellWidth = 60;

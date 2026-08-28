@@ -408,5 +408,34 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(200, shared.X);
             Assert.Equal(chromeRight, shared.X + shared.Width);
         }
+
+        [Fact]
+        public void BandControlY_CentresAControlInTheTabTitleBand()
+        {
+            // The tab's two actions moved out of an in-view header row that
+            // repeated the tab's name and onto the title band itself, so
+            // the band has to seat a button as well as its own title. 28 is
+            // Views/Rendering/UiMetrics.ButtonHeight, which the Views layer
+            // owns and this layer may not name.
+            const int buttonHeight = 28;
+            int y = SnapshotHeaderLayout.BandControlY(
+                PlanContentHeightMath.TabTitleBandHeight, buttonHeight);
+
+            Assert.Equal(
+                PlanContentHeightMath.TabTitleBandHeight - buttonHeight - y,
+                y);
+            Assert.True(y > 0, "a button seated at the band's very top edge is not centred");
+        }
+
+        [Fact]
+        public void BandControlY_FloorsAtZeroForAControlTallerThanItsBand()
+        {
+            // Control.Size ignores a negative component and a negative
+            // Location would park the control above the band and be
+            // clipped, so the degenerate case has to land inside the band
+            // rather than outside it.
+            Assert.Equal(0, SnapshotHeaderLayout.BandControlY(20, 40));
+            Assert.Equal(0, SnapshotHeaderLayout.BandControlY(0, 28));
+        }
     }
 }

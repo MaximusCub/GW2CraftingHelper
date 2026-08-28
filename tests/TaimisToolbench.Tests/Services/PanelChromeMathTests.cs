@@ -24,6 +24,14 @@ namespace TaimisToolbench.Tests.Services
     /// while its top sat flush under the title bar, because the content
     /// region Module.cs hands Blish was authored window-region-relative and
     /// Blish reads it as absolute texture coordinates (KNOWN-ISSUES #66).
+    ///
+    /// The TOP of the chain has one term the vendor no longer supplies: the
+    /// module does not set Panel.Title, so Blish reserves no 36px header and
+    /// the tab's name is drawn on the module's own taller band inside the
+    /// content region. The sweep walks the chain as the adapter really
+    /// builds it - untitled panel, band subtracted - and the budgets below
+    /// are literals so that shrinking the band back cannot quietly move the
+    /// assertions with it.
     /// </summary>
     public class PanelChromeMathTests
     {
@@ -203,9 +211,26 @@ namespace TaimisToolbench.Tests.Services
         {
             Assert.Equal(WindowBottomMarginBudget, WindowSizing.WindowContentBottomMargin);
             Assert.Equal(BottomGapBudget, WindowSizing.WindowToTabPanelBottomChrome);
-            Assert.Equal(
-                TitleBarHeight + OuterPadding + HeaderHeight + InnerPadding,
-                WindowSizing.WindowToTabPanelTopChrome);
+            Assert.Equal(TopGapBudget, WindowSizing.WindowToTabPanelTopChrome);
+        }
+
+        [Fact]
+        public void TabTitleBand_CostsLessThanTheViewportReclaimedForIt()
+        {
+            // The owner's report was about screen real estate, so the trade
+            // has to be stated as an assertion and not only in a commit
+            // message. The tab title band is 15px more chrome than the 36px
+            // Blish header it replaced (7 border padding + 44 band, against
+            // 36), and KNOWN-ISSUES #66 returned 26px at the bottom. Every
+            // tab is therefore net ahead, and this fails the moment the band
+            // grows past what that fix paid for.
+            int chrome = WindowSizing.WindowToTabPanelTopChrome
+                + WindowSizing.WindowToTabPanelBottomChrome;
+
+            Assert.True(
+                chrome < PreReclaimVerticalChromeBudget,
+                $"vertical chrome {chrome} is no better than the "
+                    + $"{PreReclaimVerticalChromeBudget} a tab paid before the viewport fix");
         }
 
         [Fact]
@@ -232,20 +257,41 @@ namespace TaimisToolbench.Tests.Services
         private const int BottomGapBudget =
             WindowBottomMarginBudget + OuterPadding + BottomPadding + InnerPadding;
 
+        // Literals for the same reason, on the other edge. 7 is Blish's
+        // Panel.TOP_PADDING, which is the whole top inset now that no
+        // Panel.Title reserves a header; 44 is
+        // PlanContentHeightMath.TabTitleBandHeight, restated so that
+        // retreating the band to the 36px Blish used to draw fails here
+        // instead of moving this budget along with it.
+        private const int TabTitleBandBudget = 44;
+        private const int TopGapBudget =
+            TitleBarHeight + OuterPadding + TopPadding + TabTitleBandBudget + InnerPadding;
+
+        // 176: what a tab paid vertically at the commit before KNOWN-ISSUES
+        // #66 was fixed - 102 above (40 title bar + 16 outer + 36 Blish
+        // header + 10 inner) and 74 below (41 window bottom margin + 16
+        // outer + 7 Panel bottom padding + 10 inner).
+        private const int PreReclaimVerticalChromeBudget = 176;
+
         /// <summary>
         /// The chain Views/ViewAdapter.cs builds, rebuilt from the shipped
         /// constants: Blish sizes the window's content region, the adapter
-        /// insets a titled, bordered panel by OUTER on every edge, and the
-        /// container a tab renders into is that panel's content region less
-        /// INNER on every edge. Only the window's own arithmetic is restated
-        /// here; the panel chrome comes from the production helper.
+        /// insets an UNTITLED bordered panel by OUTER on every edge, gives
+        /// the top of that panel's content region to the tab title band, and
+        /// the container a tab renders into is what is left less INNER on
+        /// every edge. Only the window's own arithmetic is restated here;
+        /// the panel chrome comes from the production helper.
         /// </summary>
         private static int TabPanelHeight(int windowHeight)
         {
             int bordered = WindowSizing.WindowContentHeightFor(windowHeight) - (2 * OuterPadding);
 
-            return PanelChromeMath.PaddedContentHeight(
-                bordered, Insets(showBorder: true, hasTitle: true), InnerPadding);
+            int padded = PanelChromeMath.PaddedContentHeight(
+                bordered, Insets(showBorder: true, hasTitle: false), InnerPadding);
+
+            int height = padded - PlanContentHeightMath.TabTitleBandHeight;
+
+            return height > 0 ? height : 0;
         }
 
         /// <summary>
@@ -254,7 +300,8 @@ namespace TaimisToolbench.Tests.Services
         /// </summary>
         private static int BottomGap(int windowHeight)
         {
-            int top = WindowSizing.WindowContentTop + OuterPadding + HeaderHeight + InnerPadding;
+            int top = WindowSizing.WindowContentTop + OuterPadding + TopPadding
+                + PlanContentHeightMath.TabTitleBandHeight + InnerPadding;
 
             return windowHeight - (top + TabPanelHeight(windowHeight));
         }

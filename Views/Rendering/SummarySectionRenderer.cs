@@ -674,7 +674,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private static int WidestCurrencyHeaderLabel()
         {
-            var font = TableHeaderStyle.Font;
+            var font = HeaderBands.Font;
             int widest = 0;
             for (int i = 0; i < CurrencyHeaderLabels.Length; i++)
             {
@@ -757,28 +757,27 @@ namespace TaimisToolbench.Views.Rendering
         private void CreateCurrencyTableHeaderRow(
             FlowPanel parent, int panelWidth, int widestNumberWidth)
         {
-            var band = CreateCurrencyRowPanel(
-                parent, panelWidth, TableHeaderStyle.RowHeight, TableHeaderStyle.BandColor);
-            var font = TableHeaderStyle.Font;
+            var band = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
+            var font = HeaderBands.Font;
             LabelHelpers.WithDescenderClearance(new Label()
             {
-                Text = "Currency", Font = font, TextColor = TableHeaderStyle.LabelColor,
+                Text = "Currency", Font = font, TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, TableHeaderStyle.LabelY),
+                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, HeaderBands.LabelY),
                 Parent = band,
             });
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
                 panelWidth, widestNumberWidth);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, RequiredHeaderText, font, TableHeaderStyle.LabelColor,
-                edges.RequiredRightEdge, TableHeaderStyle.LabelY);
+                band, RequiredHeaderText, font, HeaderBands.LabelColor,
+                edges.RequiredRightEdge, HeaderBands.LabelY);
             var haveLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, HaveHeaderText, font, TableHeaderStyle.LabelColor,
-                edges.HaveRightEdge, TableHeaderStyle.LabelY);
+                band, HaveHeaderText, font, HeaderBands.LabelColor,
+                edges.HaveRightEdge, HeaderBands.LabelY);
             var neededLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, NeededHeaderText, font, TableHeaderStyle.LabelColor,
-                edges.NeededRightEdge, TableHeaderStyle.LabelY);
+                band, NeededHeaderText, font, HeaderBands.LabelColor,
+                edges.NeededRightEdge, HeaderBands.LabelY);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -787,14 +786,14 @@ namespace TaimisToolbench.Views.Rendering
             // maxTotalWidth).
             _sink.AddRelayout(w =>
             {
-                band.Size = new Point(w, TableHeaderStyle.RowHeight);
+                band.Size = new Point(w, HeaderBands.RowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), HeaderBands.LabelY);
                 haveLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), HeaderBands.LabelY);
                 neededLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), HeaderBands.LabelY);
             });
         }
 

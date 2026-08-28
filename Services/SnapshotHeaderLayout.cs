@@ -47,6 +47,17 @@ namespace TaimisToolbench.Services
         /// the module's one button gap, not the 20 they used to keep.</summary>
         public const int HeaderButtonGap = UiSpacing.ButtonGap;
 
+        /// <summary>
+        /// Top y of a control seated on the tab's title band. Centred, and
+        /// floored at 0 so a band shorter than its own control still places
+        /// it inside itself rather than above the band's top edge.
+        /// </summary>
+        public static int BandControlY(int bandHeight, int controlHeight)
+        {
+            int y = (bandHeight - controlHeight) / 2;
+            return y > 0 ? y : 0;
+        }
+
         /// <summary>Gap the result line keeps clear of the coin block beside
         /// it - the module's one name-to-column gap.</summary>
         public const int ResultLineToCoinGap = SnapshotItemGridLayout.CellAmountGap;

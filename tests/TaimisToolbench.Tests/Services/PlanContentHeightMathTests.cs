@@ -62,6 +62,46 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TabTitleBand_CentresItsTitlesInkBlock()
+        {
+            // The band carries no rule and no neighbour: the thing the
+            // title must clear is the band's own two edges, and the reason
+            // the height is 44 rather than the 38 a section band uses is
+            // that the ink is CENTRED in it rather than top-seated. Assert
+            // the centring, not the literals - a tier swap moves both.
+            int inkTop = PlanContentHeightMath.TabTitleY
+                + TypeRampMetrics.SectionTitleInk.CapTopY;
+            int inkBottom = TypeRampMetrics.InkBottom(
+                TypeRampMetrics.SectionTitleInk, PlanContentHeightMath.TabTitleY);
+            int below = PlanContentHeightMath.TabTitleBandHeight - inkBottom;
+
+            Assert.True(
+                inkTop >= ScissorSafeClearance,
+                $"tab title ink top {inkTop} crowds the band's top edge");
+            Assert.True(
+                below >= ScissorSafeClearance,
+                $"tab title ink bottom {inkBottom} crowds the "
+                    + $"{PlanContentHeightMath.TabTitleBandHeight}px band");
+            Assert.True(
+                inkTop == below || inkTop == below - 1 || inkTop == below + 1,
+                $"tab title ink is not centred: {inkTop} above, {below} below");
+        }
+
+        [Fact]
+        public void TabTitleBand_IsTallerThanTheSectionBandItReplaced()
+        {
+            // The three grid tabs each drew a SectionHeaderRowHeight band
+            // repeating their own tab name under Blish's 36px DefaultFont16
+            // header. One band replaces both, so it has to be the taller
+            // one of the two - otherwise the title got smaller, which is
+            // the opposite of the change.
+            Assert.True(
+                PlanContentHeightMath.TabTitleBandHeight
+                    > PlanContentHeightMath.SectionHeaderRowHeight,
+                "the tab title band must outrank the section band beneath it");
+        }
+
+        [Fact]
         public void SectionHeaderBand_TitleAndCaretBothClearTheDivider()
         {
             // The divider is a 2px rule bottom-anchored at height - 3.

@@ -71,7 +71,7 @@ namespace TaimisToolbench.Views.Rendering
             // ColumnHeader tier a header is routinely wider than the data
             // under it, and a column narrower than its own header lets the
             // neighbouring column run under that header.
-            int maxNameWidth = MeasureWidth(TableHeaderStyle.Font, DisciplineHeaderText);
+            int maxNameWidth = MeasureWidth(HeaderBands.Font, DisciplineHeaderText);
             int maxCharWidth = 0;
             int maxLevelWidth = 0;
             bool anyCharacterText = false;
@@ -97,7 +97,7 @@ namespace TaimisToolbench.Views.Rendering
                         // it starts at the same charX and can be wider than
                         // a short availability string.
                         anyCharacterText = true;
-                        maxCharWidth = MeasureWidth(TableHeaderStyle.Font, CharactersHeaderText);
+                        maxCharWidth = MeasureWidth(HeaderBands.Font, CharactersHeaderText);
                     }
 
                     int charWidth = MeasureWidth(charFont, section.Rows[i].CharacterAvailabilityText);
@@ -113,7 +113,7 @@ namespace TaimisToolbench.Views.Rendering
             // The Level band is reserved even when no row carries a level:
             // its header still right-aligns onto the pinned edge, and the
             // Characters column's ellipsis budget has to stop short of it.
-            int levelHeaderWidth = MeasureWidth(TableHeaderStyle.Font, LevelHeaderText);
+            int levelHeaderWidth = MeasureWidth(HeaderBands.Font, LevelHeaderText);
             int levelColumnWidth = maxLevelWidth > levelHeaderWidth ? maxLevelWidth : levelHeaderWidth;
 
             if (anyCharacterText)

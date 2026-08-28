@@ -122,17 +122,12 @@ namespace TaimisToolbench.Views
         private readonly ResizeSettleDebounce _rowRefitSettle;
 
         // Layout constants
-        private const int HeaderRowY = 5;
 
-        // The section-header band every other heading in the module draws:
-        // 38 tall with its 2px rule at 35, rather than the 40px band with a
-        // flush rule this tab had of its own.
-        private const int HeaderHeight = PlanContentHeightMath.SectionHeaderRowHeight;
-        private const int HeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
-
-        // Vertically centred in the header band, derived rather than written
-        // down - and it clears the rule beneath it by two.
-        private const int HeaderButtonY = (HeaderHeight - UiMetrics.ButtonHeight) / 2;
+        // The two actions ride the tab title band Views/ViewAdapter draws,
+        // which this tab does not own and cannot size - so the seat is
+        // derived from that band's height, not from a row of this tab's.
+        private static readonly int HeaderButtonY = SnapshotHeaderLayout.BandControlY(
+            PlanContentHeightMath.TabTitleBandHeight, UiMetrics.ButtonHeight);
 
         /// <summary>Left gutter every element on this tab starts at.</summary>
         private const int Inset = SnapshotHeaderLayout.SnapshotHeaderInset;
@@ -145,13 +140,10 @@ namespace TaimisToolbench.Views
         private const int StatusSpinnerReserve =
             InlineSpinnerLayout.SnapshotStatusSize + InlineSpinnerLayout.LabelGap;
 
-        // The status label gets its own full-width row beneath the
-        // header rather than sharing _headerPanel with the buttons - a
-        // long status string slid under the button row at the window's
-        // clamped minimum size. So
-        // every row below shifts down by StatusRowHeight + the same 5px
-        // gap the header already used before SearchRowY.
-        private const int StatusRowY = HeaderRowY + HeaderHeight + 5;
+        // The status label gets its own full-width row rather than sharing
+        // the button band - a long status string slid under the button row
+        // at the window's clamped minimum size.
+        private const int StatusRowY = 5;
         private const int StatusRowHeight = SnapshotHeaderLayout.StatusRowHeight;
         private const int SearchRowY = StatusRowY + StatusRowHeight + 5;
         private const int SearchRowHeight = 35;
@@ -304,8 +296,6 @@ namespace TaimisToolbench.Views
         private const int WalletRowHeight = 36;
 
         // UI controls (stored for resize handler)
-        private Panel _headerPanel;
-        private Panel _headerDivider;
         private Panel _statusPanel;
         private Panel _filterPanel;
         private Panel _sourceFilterPanel;
@@ -470,6 +460,41 @@ namespace TaimisToolbench.Views
             ApplyStatusDisplay();
         }
 
+        /// <summary>
+        /// Fills the tab title band with this tab's two actions. Called by
+        /// the view adapter BEFORE <see cref="Build"/>, on the strip of the
+        /// band that shares the content panel's x-span, so
+        /// <see cref="LayoutHeaderRow"/> can right-anchor them against the
+        /// content width every other element on this tab pins to.
+        /// </summary>
+        public void BuildHeaderActions(Container band)
+        {
+            _clearButton = new FeedbackButton()
+            {
+                Text = "Clear Cache",
+                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(Inset, HeaderButtonY),
+                Parent = band,
+                Enabled = _clearCache != null,
+            };
+            TooltipFacility.ApplyPlain(
+                _clearButton,
+                "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.");
+
+            _refreshButton = new FeedbackButton()
+            {
+                Text = "Refresh Now",
+                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
+                Location = new Point(Inset, HeaderButtonY),
+                Parent = band,
+                Enabled = _refreshAsync != null,
+            };
+
+            _clearButton.Click += (_, __) => ConfirmClearCache();
+
+            _refreshButton.Click += async (_, __) => await RefreshNowAsync();
+        }
+
         public void Build(Container buildPanel)
         {
             // A fresh build cycle supersedes any debounced rebuild still
@@ -488,69 +513,16 @@ namespace TaimisToolbench.Views
             _containerWidth = w;
             _containerHeight = buildPanel.ContentRegion.Height;
 
-            // Header row
-            _headerPanel = new Panel()
-            {
-                Size = new Point(w, HeaderHeight),
-                Location = new Point(0, HeaderRowY),
-                Parent = buildPanel,
-            };
-
-            new Label()
-            {
-                Font = UiFonts.SectionTitle,
-                Text = "Account Snapshot",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(Inset, HeaderTitleY),
-                Parent = _headerPanel,
-            };
-
-            // Bottom-anchored with 1px clearance, like every other section
-            // header in the module - see LabelHelpers.CreateRowDivider for
-            // why flush anchoring is unsafe. It stops at the tab's one right
-            // edge rather than the container's.
-            _headerDivider = new Panel()
-            {
-                Size = new Point(SnapshotHeaderLayout.ChromeRightEdge(w), 2),
-                Location = new Point(0, HeaderHeight - 3),
-                BackgroundColor = SectionDividerColor,
-                Parent = _headerPanel,
-            };
-
-            _clearButton = new FeedbackButton()
-            {
-                Text = "Clear Cache",
-                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(Inset, HeaderButtonY),
-                Parent = _headerPanel,
-                Enabled = _clearCache != null,
-            };
-            TooltipFacility.ApplyPlain(
-                _clearButton,
-                "Discard the cached account snapshot. It can only be rebuilt when the GW2 API is reachable.");
-
-            _refreshButton = new FeedbackButton()
-            {
-                Text = "Refresh Now",
-                Size = new Point(HeaderButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(Inset, HeaderButtonY),
-                Parent = _headerPanel,
-                Enabled = _refreshAsync != null,
-            };
             LayoutHeaderRow(w);
 
-            _clearButton.Click += (_, __) => ConfirmClearCache();
-
-            _refreshButton.Click += async (_, __) => await RefreshNowAsync();
-
-            // Re-applies the confirm-dialog gate to the buttons this call
-            // just recreated: a tab switch while the Clear Cache confirm is
-            // open must not hand the user back a live Refresh Now.
+            // Re-applies the confirm-dialog gate to the buttons
+            // BuildHeaderActions just recreated: a tab switch while the
+            // Clear Cache confirm is open must not hand the user back a
+            // live Refresh Now.
             SetSnapshotActionsEnabled(true);
 
-            // Full-width status row beneath the header buttons - see
-            // StatusRowY.
+            // Full-width status row, the first row this tab owns - the
+            // buttons above it are on the title band. See StatusRowY.
             _statusPanel = new Panel()
             {
                 Size = new Point(w, StatusRowHeight),
@@ -778,9 +750,9 @@ namespace TaimisToolbench.Views
                 // does not dispose") - so if the user switched away from
                 // this tab before this tail lands, this guard does not trip
                 // and UpdateCoinDisplay/ApplyStatusDisplay/RebuildContent
-                // below still run, just into a real header panel the user
+                // below still run, just into a real status panel the user
                 // can no longer see. Wasted work, not a hazard.
-                if (_headerPanel == null || _headerPanel.Parent == null)
+                if (_statusPanel == null || _statusPanel.Parent == null)
                 {
                     return;
                 }
@@ -802,7 +774,6 @@ namespace TaimisToolbench.Views
             _containerWidth = w;
             _containerHeight = h;
 
-            _headerPanel.Size = new Point(w, HeaderHeight);
             LayoutHeaderRow(w);
             _statusPanel.Size = new Point(w, StatusRowHeight);
 
@@ -1335,8 +1306,8 @@ namespace TaimisToolbench.Views
                     // detaches, it does not dispose") - so this guard
                     // covers module teardown only; a tab-switched-away
                     // user still gets SetSnapshot/SetStatus run into a
-                    // real, just no-longer-visible, header panel.
-                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    // real, just no-longer-visible, status panel.
+                    if (_statusPanel == null || _statusPanel.Parent == null)
                     {
                         return;
                     }
@@ -1382,7 +1353,7 @@ namespace TaimisToolbench.Views
                 _saveStatusThreadSafe(status);
                 MainThreadMarshal.Run(() =>
                 {
-                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    if (_statusPanel == null || _statusPanel.Parent == null)
                     {
                         return;
                     }
@@ -1415,7 +1386,7 @@ namespace TaimisToolbench.Views
                     // clears a flag a later rebuild reads, and leaving it
                     // set would spin a spinner over a finished refresh.
                     SetRefreshSpinnerVisible(false);
-                    if (_headerPanel == null || _headerPanel.Parent == null)
+                    if (_statusPanel == null || _statusPanel.Parent == null)
                     {
                         return;
                     }
@@ -2126,7 +2097,7 @@ namespace TaimisToolbench.Views
             /// </summary>
             public void RefreshHeaders()
             {
-                var font = TableHeaderStyle.Font;
+                var font = HeaderBands.Font;
                 NameText = SortableHeaderLabel.Decorate(
                     NameTitle, Sort.IndicatorFor(SnapshotTableColumn.Name));
                 AmountText = SortableHeaderLabel.Decorate(
@@ -2180,12 +2151,7 @@ namespace TaimisToolbench.Views
                 Parent = chrome.TitlePanel,
             };
 
-            chrome.HeaderPanel = new Panel()
-            {
-                Size = new Point(0, PlanContentHeightMath.ColumnHeaderRowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = _resultGridPanel,
-            };
+            chrome.HeaderPanel = HeaderBands.CreateColumnHeaderBand(_resultGridPanel, 0);
 
             chrome.Cells = new SortableHeaderCells(chrome.HeaderPanel);
             chrome.SortBy = column => SortSection(chrome, column);
@@ -2326,9 +2292,9 @@ namespace TaimisToolbench.Views
         {
             var label = LabelHelpers.WithDescenderClearance(new Label()
             {
-                Font = TableHeaderStyle.Font,
+                Font = HeaderBands.Font,
                 Text = text,
-                TextColor = TableHeaderStyle.LabelColor,
+                TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Parent = chrome.HeaderPanel,
@@ -2668,10 +2634,12 @@ namespace TaimisToolbench.Views
         // lays out left-to-right from it, i.e. it is anchor-neutral by
         // construction; only the higher-level right-aligned convenience
         /// <summary>
-        /// Places the header band's two buttons and its rule against the
-        /// tab's ONE right edge - the edge the scrolling grid's last column
-        /// also ends on. Build and the resize handler both come through
-        /// here, so the two cannot drift.
+        /// Places the title band's two buttons against the tab's ONE right
+        /// edge - the edge the scrolling grid's last column also ends on.
+        /// Build and the resize handler both come through here, so the two
+        /// cannot drift. The width passed is the CONTENT panel's, and the
+        /// strip the buttons live on is exactly as wide and starts at the
+        /// same x, so one edge serves both.
         /// </summary>
         private void LayoutHeaderRow(int containerWidth)
         {
@@ -2686,7 +2654,6 @@ namespace TaimisToolbench.Views
             _refreshButton.Location = new Point(refreshX, HeaderButtonY);
             _clearButton.Location = new Point(
                 refreshX - SnapshotHeaderLayout.HeaderButtonGap - HeaderButtonWidth, HeaderButtonY);
-            _headerDivider.Size = new Point(rightEdge, 2);
 
             _statusBudget = SnapshotHeaderLayout.StatusMaxWidth(containerWidth, StatusSpinnerReserve);
             ApplyStatusText();

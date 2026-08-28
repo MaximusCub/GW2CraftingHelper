@@ -179,14 +179,20 @@ namespace TaimisToolbench.Services
             - (WindowContentRegionTop + WindowContentRegionHeight);
 
         // WindowBase2.STANDARD_TITLEBAR_HEIGHT / _VERTICAL_OFFSET and
-        // Panel.HEADER_HEIGHT / BOTTOM_PADDING, restated as literals to keep
+        // Panel.TOP_PADDING / BOTTOM_PADDING, restated as literals to keep
         // this class arithmetic. Views/ViewAdapter.cs feeds PanelChromeMath
         // the vendor's own values at runtime, so a Blish upgrade that moves
         // either one moves the real layout and leaves these behind: they are
         // to be re-read on that upgrade and nothing else checks them.
+        //
+        // Panel.HEADER_HEIGHT is deliberately NOT among them: the module
+        // stopped setting Panel.Title, so Blish reserves no header band and
+        // the top inset falls to TOP_PADDING. The band a tab wears is the
+        // module's own, and it is the taller
+        // PlanContentHeightMath.TabTitleBandHeight below.
         private const int TitleBarHeight = 40;
         private const int TitleBarVerticalOffset = 11;
-        private const int PanelHeaderHeight = 36;
+        private const int PanelTopPadding = 7;
         private const int PanelBottomPadding = 7;
 
         /// <summary>
@@ -219,15 +225,22 @@ namespace TaimisToolbench.Services
         /// <see cref="WindowToTabPanelChrome"/>:
         /// <code>
         /// above  40 title bar + 0 window top margin + 16 outer
-        ///        + 36 Panel header + 10 inner              = 102
+        ///        + 7 Panel top padding + 44 tab title band
+        ///        + 10 inner                               = 117
         /// below  15 window bottom margin + 16 outer
-        ///        + 7 Panel bottom padding + 10 inner       =  48
+        ///        + 7 Panel bottom padding + 10 inner      =  48
         /// </code>
-        /// Both are constants, so the panel grows one-for-one with the
-        /// window and a gap at the bottom is the same gap at every size.
+        /// The 7 + 44 above used to read "36 Panel header": Blish reserved
+        /// its own header band for a Panel.Title and printed the tab's name
+        /// in it at DefaultFont16. The module draws that band itself now, so
+        /// Blish reserves only the border's top padding and the module's
+        /// taller band sits inside the content region under it.
+        /// Both totals are constants, so the panel grows one-for-one with
+        /// the window and a gap at the bottom is the same gap at every size.
         /// </summary>
         public const int WindowToTabPanelTopChrome =
-            WindowContentTop + TabPanelOuterPadding + PanelHeaderHeight + TabPanelInnerPadding;
+            WindowContentTop + TabPanelOuterPadding + PanelTopPadding
+            + PlanContentHeightMath.TabTitleBandHeight + TabPanelInnerPadding;
 
         /// <summary>The bottom half of <see cref="WindowToTabPanelTopChrome"/>'s table.</summary>
         public const int WindowToTabPanelBottomChrome =

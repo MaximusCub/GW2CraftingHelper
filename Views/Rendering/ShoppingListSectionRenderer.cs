@@ -105,13 +105,13 @@ namespace TaimisToolbench.Views.Rendering
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
             int maxQtyWidth =
-                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(amountHeaderText).Width);
+                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             // The Source band is floored at its own header too, but for the
             // mirror-image reason the right-aligned bands are: this column
             // is LEFT-ruled, so a header wider than the widest badge would
             // overhang to the RIGHT, into the Amount column beside it.
             int sourceColumnWidth =
-                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(sourceHeaderText).Width);
+                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(sourceHeaderText).Width);
             foreach (var row in rows)
             {
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
@@ -192,14 +192,9 @@ namespace TaimisToolbench.Views.Rendering
             string amountHeaderText, string sourceHeaderText)
         {
             var edges = scan.EdgesFor(panelWidth);
-            var rowPanel = new Panel()
-            {
-                Size = new Point(panelWidth, TableHeaderStyle.RowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent,
-            };
-            var font = TableHeaderStyle.Font;
-            var color = TableHeaderStyle.LabelColor;
+            var rowPanel = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
+            var font = HeaderBands.Font;
+            var color = HeaderBands.LabelColor;
 
             // This section builds its own header row rather than going
             // through ColumnHeaderRowRenderer, so "Item" has to opt into the
@@ -213,7 +208,7 @@ namespace TaimisToolbench.Views.Rendering
                 Text = SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)),
                 Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(NameX, TableHeaderStyle.LabelY), Parent = rowPanel,
+                Location = new Point(NameX, HeaderBands.LabelY), Parent = rowPanel,
             });
             // Left-aligned at the column's x, like the badges under it -
             // the other three right-align off their own bands.
@@ -221,17 +216,17 @@ namespace TaimisToolbench.Views.Rendering
             {
                 Text = sourceHeaderText, Font = font, TextColor = color,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(edges.SourceX, TableHeaderStyle.LabelY), Parent = rowPanel,
+                Location = new Point(edges.SourceX, HeaderBands.LabelY), Parent = rowPanel,
             });
             var amountLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, amountHeaderText,
-                font, color, edges.QtyRightEdge, TableHeaderStyle.LabelY);
+                font, color, edges.QtyRightEdge, HeaderBands.LabelY);
             var eachLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each)),
-                font, color, edges.EachRightEdge, TableHeaderStyle.LabelY);
+                font, color, edges.EachRightEdge, HeaderBands.LabelY);
             var totalLabel = LabelHelpers.CreateRightAlignedLabel(
                 rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
-                font, color, edges.TotalRightEdge, TableHeaderStyle.LabelY);
+                font, color, edges.TotalRightEdge, HeaderBands.LabelY);
 
             // The hit area is each column's whole header CELL (see
             // SortableHeaderCells); the labels carry only the note.
@@ -275,14 +270,14 @@ namespace TaimisToolbench.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 var e = scan.EdgesFor(w);
-                rowPanel.Size = new Point(w, TableHeaderStyle.RowHeight);
-                sourceLabel.Location = new Point(e.SourceX, TableHeaderStyle.LabelY);
+                rowPanel.Size = new Point(w, HeaderBands.RowHeight);
+                sourceLabel.Location = new Point(e.SourceX, HeaderBands.LabelY);
                 amountLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), HeaderBands.LabelY);
                 eachLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), HeaderBands.LabelY);
                 totalLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), HeaderBands.LabelY);
 
                 // Four of the five columns are pinned off the panel edge,
                 // so their cells move with them.
