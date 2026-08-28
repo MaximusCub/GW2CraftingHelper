@@ -106,6 +106,7 @@
     <Compile Include="Services\PlanHistoryDedupKey.cs" />
     <Compile Include="Services\PlanHistoryRetention.cs" />
     <Compile Include="Services\PlanHistoryRowLayout.cs" />
+    <Compile Include="Services\PlanHistoryItemIds.cs" />
     <Compile Include="Services\PlanHistoryLabels.cs" />
     <Compile Include="Views\PlanHistoryTabContent.cs" />
     <Compile Include="Services\PlanStore.cs" />
@@ -242,6 +243,7 @@
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
     <Compile Include="Views\Rendering\ItemIconTooltip.cs" />
+    <Compile Include="Views\Rendering\ItemStatWarmer.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
     <Compile Include="Views\Rendering\RichTooltipSurface.cs" />

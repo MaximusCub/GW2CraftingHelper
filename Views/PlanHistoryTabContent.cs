@@ -68,6 +68,7 @@ namespace TaimisToolbench.Views
         // OperationCanceledException on cancellation.
         private readonly Func<PlanHistoryEntry, CancellationToken, Task<string>> _resolveEntryAsync;
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+        private readonly ItemStatWarmer _statWarmer;
         private readonly ModalDialog _modalDialog;
         private readonly ModuleSettings _settings;
         private readonly ResizeSettleDebounce _resizeSettle;
@@ -103,7 +104,13 @@ namespace TaimisToolbench.Views
             Func<PlanHistoryEntry, CancellationToken, Task<string>> resolveEntryAsync,
             ModalDialog modalDialog,
             ModuleSettings settings,
-            Func<int, ItemStatBlock> getItemStatBlock = null)
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            // The twin of getItemStatBlock, and the reason this tab's
+            // hovers are not identity-only: the accessor above is a pure
+            // cache read that never fetches, so without this a history row
+            // could only show a full item tooltip for an item some earlier
+            // plan happened to touch. See ItemStatWarmer.
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
             _snapshotEntries = snapshotEntries ?? (() => new List<PlanHistoryEntry>());
             _mutateIndex = mutateIndex ?? (_ => { });
@@ -112,6 +119,7 @@ namespace TaimisToolbench.Views
             _modalDialog = modalDialog;
             _settings = settings;
             _getItemStatBlock = getItemStatBlock;
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "history");
 
             _resizeSettle = new ResizeSettleDebounce(
                 RefitAfterResizeSettle,
@@ -131,6 +139,17 @@ namespace TaimisToolbench.Views
                 // must.
                 _statusOverride = null;
             }
+
+            // Off-thread, and deliberately not awaited: the rows render
+            // from their own persisted name/icon/rarity either way, and
+            // their hovers are deferred, so whatever this fills in shows on
+            // the next hover without a re-render. Started here rather than
+            // in Build because Build runs off the main thread and may be
+            // skipped entirely when nothing changed.
+            // Bounded by the retention cap, so this is one batched request
+            // on the first visit and nothing at all on later ones -
+            // WarmStatBlocksAsync skips every id the cache already holds.
+            _statWarmer.Start(PlanHistoryItemIds.ForEntries(_snapshotEntries()));
         }
 
         public void Build(Container container)

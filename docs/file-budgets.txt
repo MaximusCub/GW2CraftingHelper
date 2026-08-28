@@ -78,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                              2581
+Module.cs                                                                              2594
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -258,7 +258,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
-Views/CraftingPlanView.cs                                                              4989
+Views/CraftingPlanView.cs                                                              4971
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              381
 Views/ItemRowState.cs                                                                    31
@@ -267,7 +267,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                      2741
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
-Views/PlanHistoryTabContent.cs                                                         1285
+Views/PlanHistoryTabContent.cs                                                         1304
 Views/RankerTabContent.cs                                                              2531
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574

@@ -90,7 +90,7 @@ namespace TaimisToolbench.Views
         // Q13: fills the session stat cache for a restored plan's items in
         // the background. Never on the hover path - see
         // ItemMetadataService.GetCachedStatBlock.
-        private readonly Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
+        private readonly ItemStatWarmer _statWarmer;
 
         // Supplier rather than a stored CancellationToken so this view takes
         // no dependency on when the module's source is created - the view is
@@ -702,7 +702,7 @@ namespace TaimisToolbench.Views
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
             _getItemStatBlock = getItemStatBlock;
-            _warmItemStatsAsync = warmItemStatsAsync;
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "plan");
             _moduleLifetimeToken = moduleLifetimeToken;
 
             // Before anything that could read the row count:
@@ -913,30 +913,12 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void StartRestoredStatWarmup(CraftingPlanResult result)
         {
-            if (_warmItemStatsAsync == null || result?.ItemMetadata == null || result.ItemMetadata.Count == 0)
+            if (result?.ItemMetadata == null || result.ItemMetadata.Count == 0)
             {
                 return;
             }
 
-            var ids = new List<int>(result.ItemMetadata.Keys);
-            _ = WarmRestoredStatsAsync(ids);
-        }
-
-        private async Task WarmRestoredStatsAsync(IReadOnlyList<int> ids)
-        {
-            try
-            {
-                int filled = await _warmItemStatsAsync(ids).ConfigureAwait(false);
-                if (filled > 0)
-                {
-                    MainThreadMarshal.Run(TooltipFacility.RefreshCurrent);
-                }
-            }
-            catch (Exception ex)
-            {
-                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan",
-                    $"Restored-plan stat top-up did not complete: {ex.GetType().Name} - {ex.Message}");
-            }
+            _statWarmer.Start(new List<int>(result.ItemMetadata.Keys));
         }
 
         /// <summary>
