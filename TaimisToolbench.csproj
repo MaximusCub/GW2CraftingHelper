@@ -95,6 +95,7 @@
     <Compile Include="Services\SnapshotHeaderLayout.cs" />
     <Compile Include="Services\SnapshotHelpers.cs" />
     <Compile Include="Services\SnapshotSearchResultBuilder.cs" />
+    <Compile Include="Services\PanelChromeMath.cs" />
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
     <Compile Include="Models\PersistedPlan.cs" />

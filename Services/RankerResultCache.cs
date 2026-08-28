@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The Crafting Ranker's two answer sets - one per comparison mode -

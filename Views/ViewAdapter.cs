@@ -3,6 +3,7 @@ using System.Linq;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
 namespace TaimisToolbench.Views
 {
@@ -29,6 +30,14 @@ namespace TaimisToolbench.Views
         private readonly Action<Container> _buildAction;
         private readonly string _title;
 
+        // The edge insets Blish will give the bordered panel, computed once
+        // from Blish's own public Panel constants. Held rather than read back
+        // off the panel because Panel.ContentRegion is only refreshed by
+        // RecalculateLayout, which Control.UpdateLayout SKIPS while the
+        // panel's parent is layout-suspended - see PanelChromeMath, which
+        // owns the arithmetic and the failure it prevents.
+        private readonly PanelChromeMath.Insets _borderedInsets;
+
         // The window container Build subscribed on, and the handler it
         // added - held so Unload can detach them. buildPanel is the
         // module-lifetime window itself (WindowBase2.ShowView passes the
@@ -44,6 +53,14 @@ namespace TaimisToolbench.Views
         {
             _title = title ?? "";
             _buildAction = buildAction ?? throw new ArgumentNullException(nameof(buildAction));
+            _borderedInsets = PanelChromeMath.PanelInsets(
+                showBorder: true,
+                hasTitle: !string.IsNullOrEmpty(_title),
+                headerHeight: Panel.HEADER_HEIGHT,
+                topPadding: Panel.TOP_PADDING,
+                rightPadding: Panel.RIGHT_PADDING,
+                bottomPadding: Panel.BOTTOM_PADDING,
+                leftPadding: Panel.LEFT_PADDING);
         }
 
         protected override void Build(Container buildPanel)
@@ -68,9 +85,7 @@ namespace TaimisToolbench.Views
             {
                 Parent = buildPanel,
                 Location = new Point(OUTER_PADDING, OUTER_PADDING),
-                Size = new Point(
-                    buildPanel.ContentRegion.Width - 2 * OUTER_PADDING,
-                    buildPanel.ContentRegion.Height - 2 * OUTER_PADDING),
+                Size = BorderedSize(buildPanel),
                 ShowBorder = true,
                 Title = _title,
             };
@@ -87,24 +102,52 @@ namespace TaimisToolbench.Views
             {
                 Parent = borderedPanel,
                 Location = new Point(INNER_PADDING, INNER_PADDING),
-                Size = new Point(
-                    borderedPanel.ContentRegion.Width - 2 * INNER_PADDING,
-                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING),
+                Size = ContentSize(borderedPanel.Size),
             };
 
             _resizedHandler = (s, e) =>
             {
-                borderedPanel.Size = new Point(
-                    buildPanel.ContentRegion.Width - 2 * OUTER_PADDING,
-                    buildPanel.ContentRegion.Height - 2 * OUTER_PADDING);
-                contentPanel.Size = new Point(
-                    borderedPanel.ContentRegion.Width - 2 * INNER_PADDING,
-                    borderedPanel.ContentRegion.Height - 2 * INNER_PADDING);
+                var bordered = BorderedSize(buildPanel);
+                borderedPanel.Size = bordered;
+
+                // Derived from the size just assigned, never read back off
+                // borderedPanel.ContentRegion: a resize the window performs
+                // from inside its own layout pass reaches here with that
+                // region still describing the PREVIOUS size, and nothing
+                // re-reads it afterwards. See PanelChromeMath.
+                contentPanel.Size = ContentSize(bordered);
             };
             _resizedOwner = buildPanel;
             buildPanel.Resized += _resizedHandler;
 
             _buildAction(contentPanel);
+        }
+
+        /// <summary>
+        /// The bordered panel's size, inset from the window's content region
+        /// by <see cref="OUTER_PADDING"/>. The WINDOW's ContentRegion is the
+        /// one region in this chain that is safe to read at any time:
+        /// WindowBase2.OnResized assigns it directly from the new size,
+        /// synchronously, before it raises Resized - it is not derived by a
+        /// layout pass, so it cannot lag one behind the way a Panel's does.
+        /// </summary>
+        private static Point BorderedSize(Container buildPanel)
+        {
+            return new Point(
+                Math.Max(0, buildPanel.ContentRegion.Width - (2 * OUTER_PADDING)),
+                Math.Max(0, buildPanel.ContentRegion.Height - (2 * OUTER_PADDING)));
+        }
+
+        /// <summary>
+        /// The inner content panel's size for a bordered panel of
+        /// <paramref name="borderedSize"/>: that panel's content region, less
+        /// <see cref="INNER_PADDING"/> on all four edges.
+        /// </summary>
+        private Point ContentSize(Point borderedSize)
+        {
+            return new Point(
+                PanelChromeMath.PaddedContentWidth(borderedSize.X, _borderedInsets, INNER_PADDING),
+                PanelChromeMath.PaddedContentHeight(borderedSize.Y, _borderedInsets, INNER_PADDING));
         }
 
         /// <summary>

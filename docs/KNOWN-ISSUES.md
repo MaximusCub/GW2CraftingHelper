@@ -856,6 +856,18 @@ font" step in `.github/workflows/tests.yml`. The Ranker's three are waived
 in that step until its own branch lands; the waiver fails the build once
 it goes stale. Full record: `dev/records/glyph-fixes.md`.
 
+### 65. First-paint viewport truncation (the resize that fixed it)
+
+On opening the window, content below a certain point was not drawn at all
+until the window got a nudge, which made everything appear. The hosted
+view's container was sized from `Panel.ContentRegion` read back off a
+panel that had just been resized; Blish refreshes that region only in
+`RecalculateLayout`, which `Control.UpdateLayout` skips while the panel's
+parent is layout-suspended - as the window is for the whole of its own
+layout pass, including the minimum-size clamp that resizes it from inside
+that pass. `Services/PanelChromeMath.cs` derives the size instead, so no
+read-back can lag. Full record: `dev/records/firstpaint-truncation.md`.
+
 ---
 
 ## DEFERRED (recorded, not implemented)
@@ -1173,3 +1185,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
   Cited as: glyph-fixes, KNOWN-ISSUES #64.
   `dev/records/glyph-fixes.md`
+- **First-paint viewport truncation (2026-08-27)** - gate NOT RUN (no live session available on this branch).
+  Cited as: KNOWN-ISSUES #65.
+  `dev/records/firstpaint-truncation.md`
