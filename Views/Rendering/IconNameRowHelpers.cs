@@ -59,11 +59,14 @@ namespace TaimisToolbench.Views.Rendering
             internal int NameX;
 
             /// <summary>
-            /// The framed icon Panel. Returned so a caller can stamp the
-            /// row's tooltip onto it and its children: Blish resolves a
+            /// The framed icon Panel. The row's hover is already stamped on
+            /// it and its children by the builder - Blish resolves a
             /// tooltip on the deepest control under the cursor and never
             /// bubbles, so an unstamped icon is a hole in the row's own
-            /// hover - and the icon is the biggest target on the row.
+            /// hover, and the icon is the biggest target on the row. Still
+            /// returned because a caller with a WIDER hover than the icon's
+            /// own (the whole row panel, a quantity column) re-stamps the
+            /// same intent across all of it.
             /// </summary>
             internal Panel IconFrame;
         }
@@ -83,16 +86,22 @@ namespace TaimisToolbench.Views.Rendering
         /// <c>ItemRarityResolution.Resolve</c> returned; null is a
         /// legitimately unknown rarity and renders neutral in both places.
         /// </para>
+        /// <para>
+        /// <paramref name="tooltip"/> is stamped on the icon tree and
+        /// NOWHERE else - not on the name label this helper builds beside
+        /// it, and not on the row. See
+        /// <see cref="ItemIconTooltip.StampOnIconTree"/> for why.
+        /// </para>
         /// </summary>
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string resolvedRarity, int iconX, int iconY,
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
-            ItemIconTier tier)
+            ItemIconTier tier, ItemIconTooltip tooltip)
         {
             return Build(
                 rowPanel, iconUrl, resolvedRarity, iconX, iconY, fullName, font,
                 rightEdge, qtyWidth, nameGap, nameX, nameY,
-                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier));
+                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltip);
         }
 
         /// <summary>
@@ -107,20 +116,20 @@ namespace TaimisToolbench.Views.Rendering
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
-            int iconSize = 32, int borderThickness = 1)
+            ItemIconTooltip tooltip, int iconSize = 32, int borderThickness = 1)
         {
             return Build(
                 rowPanel, iconUrl, rarity, iconX, iconY, fullName, font,
-                rightEdge, qtyWidth, nameGap, nameX, nameY, iconSize, borderThickness);
+                rightEdge, qtyWidth, nameGap, nameX, nameY, iconSize, borderThickness, tooltip);
         }
 
         private static IconNameHandle Build(
             Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
-            int iconSize, int borderThickness)
+            int iconSize, int borderThickness, ItemIconTooltip tooltip)
         {
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);
+                rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness, tooltip);
 
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(rightEdge, qtyWidth, nameGap, nameX);
             string displayName = LabelHelpers.EllipsizeToWidth(font, fullName, nameMaxWidth);

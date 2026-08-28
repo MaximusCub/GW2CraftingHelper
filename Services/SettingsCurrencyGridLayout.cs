@@ -5,26 +5,91 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure placement arithmetic (Blish-free, unit-testable) for the
-    /// Settings tab's currency list: the horizontal extent of one cell,
-    /// which rows a filter query keeps, and where each surviving row's cell
-    /// sits in the grid. The view
+    /// Settings tab's currency list: the extent of one cell, which rows a
+    /// filter query keeps, and where each surviving row's cell sits in the
+    /// grid. The view
     /// (SettingsTabContent.AddCurrencyRow / ApplyCurrencyFilter) only copies
     /// the results onto controls.
     /// </summary>
     internal static class SettingsCurrencyGridLayout
     {
-        // Horizontal layout of one currency cell. These live here rather
-        // than in the view so SettingsCurrencyMinColumnWidth below is derived from the same
-        // numbers the controls are placed with and cannot drift from them,
-        // and so the arithmetic is covered by Blish-free tests.
+        // Layout of one currency cell. These live here rather than in the
+        // view so SettingsCurrencyMinColumnWidth and ComputeHeight below are
+        // derived from the same numbers the controls are placed with and
+        // cannot drift from them, and so the arithmetic is covered by
+        // Blish-free tests.
         //
         // The cell justifies like a plan table row: the
         // [amount][Ignore][tag] block pins to the cell's own right edge (see
         // PlanRelayoutMath.PinnedRightEdge) and the NAME is the only part
-        // that flexes. 16, not the 8 the name used to sit at, so the first
-        // column's names line up with the section titles above them.
-        public const int CellNameX = SettingsFormLayout.CellLeftPad;
+        // that flexes.
+
+        /// <summary>Left x of the cell's leading currency icon. 16, not the
+        /// 8 the cell's content used to start at, so the first column's
+        /// icons line up with the section titles above them.</summary>
+        public const int CellIconX = SettingsFormLayout.CellLeftPad;
+
+        /// <summary>
+        /// The cell's currency icon. One row per currency with the icon as
+        /// the row's subject rather than a unit marker on a number, so it
+        /// takes the wallet LIST tier - the same reading and the same
+        /// constant as the plan Summary's currency table
+        /// (<see cref="SummarySectionLayoutMath.CurrencyIconSize"/>) and the
+        /// Snapshot tab's wallet rows. The renderer insets the art by the
+        /// module's 1px frame either side, so the framed box occupies
+        /// exactly this measured window.
+        /// </summary>
+        public const int CellIconSize = CurrencyIconTiers.WalletListIconSize;
+
+        /// <summary>Gap between the icon and the name it labels - the same 8
+        /// every other icon-then-name row in the module keeps
+        /// (RankerRowLayout.IconGap, PlanHistoryRowLayout.IconGap,
+        /// SummarySectionLayoutMath.CurrencyNameX).</summary>
+        public const int CellIconToNameGap = 8;
+
+        public const int CellNameX = CellIconX + CellIconSize + CellIconToNameGap;
         public const int CellInputWidth = 70;
+
+        /// <summary>
+        /// Height of one cell. The row carries a wallet-LIST-tier icon, so
+        /// it takes the module's list-tier currency row geometry unchanged:
+        /// the icon box plus
+        /// <see cref="PlanContentHeightMath.CurrencyRowIconPad"/> above and
+        /// below, measured off the game's own 42px wallet-list row pitch
+        /// (see <see cref="CurrencyIconTiers"/>). Was a private 32 in the
+        /// view - a height that predated the icon and cannot hold one.
+        /// </summary>
+        public const int CurrencyRowHeight = PlanContentHeightMath.CurrencyRowHeight;
+
+        /// <summary>
+        /// Clearance below the cell's row rule. Load-bearing, not slack: at
+        /// this row height a bottom-flush divider vanishes at the 0.897
+        /// "Normal" UI scale, and this pixel is what makes the pair immune
+        /// at all four scales - proven in
+        /// tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs.
+        /// </summary>
+        public const int CellDividerClearance = 1;
+
+        /// <summary>Top y of the cell's icon: the list tier's own clearance,
+        /// which centres the 32px box in the 42px row.</summary>
+        public const int CellIconY = PlanContentHeightMath.CurrencyRowIconPad;
+
+        /// <summary>Y of a Body line box centred in the cell - the rule the
+        /// Summary's currency table applies at this same row height
+        /// (SummarySectionLayoutMath.CurrencyRowTextY), so the name shares
+        /// the icon's centre instead of sitting at the top of the row.
+        /// </summary>
+        public static int CellTextY =>
+            (CurrencyRowHeight - TypeRampMetrics.BodyInk.LineHeight) / 2;
+
+        /// <summary>Y of a control of the given height centred in the cell.
+        /// The amount box is the one caller; its height is the view's, since
+        /// it is a Blish TextBox's.</summary>
+        public static int CellControlY(int controlHeight)
+        {
+            int y = (CurrencyRowHeight - controlHeight) / 2;
+            return y > 0 ? y : 0;
+        }
 
         /// <summary>
         /// Gap between the amount box and the "Ignore" checkbox. Was 6, with
@@ -77,10 +142,17 @@ namespace TaimisToolbench.Services
             CellInputWidth + CellInputToClearGap + CellClearWidth + CellTagWidth;
 
         /// <summary>
-        /// Narrowest column a cell fits in, term by term: the name inset, a
+        /// Narrowest column a cell fits in, term by term: the icon band
+        /// (inset, icon, gap - all of it inside <see cref="CellNameX"/>), a
         /// 22-character name floor, the name-to-control gap, the pinned
         /// control block, and the table right margin. Below this the grid
         /// falls back to a single column rather than clipping.
+        /// <para>
+        /// The icon band was added to this minimum at the same time it was
+        /// added to the cell, so <see cref="CellNameMaxWidth"/> at this
+        /// width is still exactly <see cref="CellNameFloor"/> - the name
+        /// budget at the narrowest supported column did not move.
+        /// </para>
         /// </summary>
         public const int SettingsCurrencyMinColumnWidth =
             CellNameX + CellNameFloor + NameToControlGap + CellControlBlockWidth

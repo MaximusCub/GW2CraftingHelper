@@ -155,15 +155,27 @@ namespace TaimisToolbench.Services
             return percent.ToString(CultureInfo.InvariantCulture) + "%";
         }
 
-        /// <summary>The Days cell: "62d" or a dash when the item has no daily gate.</summary>
+        /// <summary>
+        /// The Days cell: "62d", or "0" for an item that has been solved and
+        /// has no daily gate at all, or a dash for one that has never been
+        /// solved.
+        /// <para>
+        /// The zero is the point. A measured "no wait" used to draw the same
+        /// dash as "not yet calculated", which made the two indistinguishable
+        /// in the one column where the difference decides whether the row can
+        /// be started today.
+        /// </para>
+        /// </summary>
         public static string FormatDays(RankerRowMetrics metrics)
         {
-            if (metrics == null || metrics.DaysRemaining <= 0)
+            if (metrics == null)
             {
                 return DashText;
             }
 
-            return metrics.DaysRemaining.ToString(CultureInfo.InvariantCulture) + "d";
+            return metrics.DaysRemaining <= 0
+                ? ZeroDaysText
+                : metrics.DaysRemaining.ToString(CultureInfo.InvariantCulture) + "d";
         }
 
         /// <summary>One gate's cell in the breakdown sub-line: "82%" or a dash.</summary>
@@ -193,6 +205,9 @@ namespace TaimisToolbench.Services
         public const string NotMeasurableText = "Not measurable";
         public const string NothingLeftText = "Nothing left";
         public const string DashText = "-";
+
+        /// <summary>A measured absence of any daily gate - see <see cref="FormatDays"/>.</summary>
+        public const string ZeroDaysText = "0";
 
         private static readonly IReadOnlyDictionary<int, int> EmptyIntMap = new Dictionary<int, int>();
 

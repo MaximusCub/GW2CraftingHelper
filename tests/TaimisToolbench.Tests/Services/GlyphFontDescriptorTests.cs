@@ -29,6 +29,9 @@ namespace TaimisToolbench.Tests.Services
 
         private const int SortAscending = 0xE100;
         private const int SortDescending = 0xE101;
+        private const int CaretUp = 0xE102;
+        private const int CaretDown = 0xE103;
+        private const int CaretRight = 0xE104;
 
         /// <summary>Fragments for the malformed-input cases below.</summary>
         private const string Common = "common lineHeight=24 base=18 scaleW=21 scaleH=8\n";
@@ -54,11 +57,56 @@ namespace TaimisToolbench.Tests.Services
             // and no code names is a vocabulary nothing re-measures when it
             // drifts. Services/UiGlyphs is the list, and the "UI glyph
             // escapes" CI step is the other half of the same gate.
-            Assert.Equal(2, font.Count);
+            Assert.Equal(5, font.Count);
             Assert.True(font.TryGet(SortAscending, out _));
             Assert.True(font.TryGet(SortDescending, out _));
+            Assert.True(font.TryGet(CaretUp, out _));
+            Assert.True(font.TryGet(CaretDown, out _));
+            Assert.True(font.TryGet(CaretRight, out _));
             Assert.Equal(UiGlyphs.SortAscending, char.ConvertFromUtf32(SortAscending));
             Assert.Equal(UiGlyphs.SortDescending, char.ConvertFromUtf32(SortDescending));
+            Assert.Equal(UiGlyphs.CaretUp, char.ConvertFromUtf32(CaretUp));
+            Assert.Equal(UiGlyphs.CaretDown, char.ConvertFromUtf32(CaretDown));
+            Assert.Equal(UiGlyphs.CaretRight, char.ConvertFromUtf32(CaretRight));
+        }
+
+        [Fact]
+        public void TheReadingSizeCarets_AreAMatchedTrio()
+        {
+            var font = Shipped();
+            Assert.True(font.TryGet(CaretUp, out var up));
+            Assert.True(font.TryGet(CaretDown, out var down));
+            Assert.True(font.TryGet(CaretRight, out var right));
+
+            // Up and down are one artwork mirrored, so they must agree on
+            // every metric or an expand/collapse toggle moves under the
+            // cursor.
+            Assert.Equal(up.Width, down.Width);
+            Assert.Equal(up.Height, down.Height);
+            Assert.Equal(up.XAdvance, down.XAdvance);
+            Assert.Equal(up.YOffset, down.YOffset);
+
+            // The right caret is the same ink AREA turned on its side rather
+            // than the same bounding box, which is what stops it reading as
+            // the lighter member of the set beside its own partner.
+            Assert.Equal(up.Width * up.Height, right.Width * right.Height);
+
+            // A separate SIZE from the sort pair, which is why it is a
+            // separate pair of codepoints - see UiGlyphs.CaretUp.
+            Assert.True(font.TryGet(SortAscending, out var sortUp));
+            Assert.True(up.Height > sortUp.Height);
+        }
+
+        [Theory]
+        [InlineData(true, "v")]
+        [InlineData(false, ">")]
+        public void WithoutTheAtlas_ACaretDegradesToTheAsciiItReplaced(bool expanded, string ascii)
+        {
+            Assert.Equal(ascii, UiGlyphs.ExpandCaret(expanded, glyphsAvailable: false));
+
+            string glyph = UiGlyphs.ExpandCaret(expanded, glyphsAvailable: true);
+            Assert.NotEqual(ascii, glyph);
+            Assert.True(Shipped().TryGet(char.ConvertToUtf32(glyph, 0), out _));
         }
 
         [Fact]

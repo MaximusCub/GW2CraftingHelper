@@ -183,6 +183,18 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(VanishCount(PlanContentHeightMath.CraftStepRowHeight, 0, 0.897f) > 0);
         }
 
+        [Fact]
+        public void TheCurrencyGridRowIsVulnerableWithoutTheClearancePixel()
+        {
+            // Why SettingsCurrencyGridLayout.CellDividerClearance survived
+            // the row's growth from 32 to the list-tier height: the taller
+            // row is not immune by itself. Bottom-flush it vanishes on ~10%
+            // of scroll phases at the 0.897 "Normal" scale, the same rate
+            // and the same scale as the M36b heights above.
+            Assert.True(
+                VanishCount(SettingsCurrencyGridLayout.CurrencyRowHeight, 0, 0.897f) > 0);
+        }
+
         // --- The proof over the shipped geometry ---
         public static IEnumerable<object[]> ShippedDividerGeometries()
         {
@@ -211,10 +223,11 @@ namespace TaimisToolbench.Tests.Services
                 // y = SectionHeaderRowHeight - 2 - 1, same shape.
                 (PlanContentHeightMath.SectionHeaderRowHeight, 1),
 
-                // SettingsTabContent's currency grid rows (CurrencyRowHeight
-                // 32, CellDividerClearance 1 - private consts, mirrored
-                // here).
-                (32, 1),
+                // SettingsTabContent's currency grid rows, whose height is
+                // the module's list-tier currency row (icon box plus
+                // PlanContentHeightMath.CurrencyRowIconPad either side).
+                (SettingsCurrencyGridLayout.CurrencyRowHeight,
+                    SettingsCurrencyGridLayout.CellDividerClearance),
             };
 
             var seen = new HashSet<(int, int)>();

@@ -473,3 +473,50 @@ full treatment on every tab; that is its own milestone, not a fix to
 this one.
 
 
+
+---
+
+## Amendment - 2026-08-28: a promoted tier may seat on ROW CONTENT when the row's own art sets its height
+
+The placement table above seats every promoted tier on CHROME - section
+titles, column headers, status lines - and nothing on the content of a
+row. That reading was applied literally once since: a request to promote
+the Plan History tab's row name was declined, citing this record.
+
+The maintainer has now ruled the other way for the Crafting Ranker
+(2026-08-28, branch `ranker-columns`):
+
+> "i feel like the font size on crafting ranker for 'materials,
+> currencies, etc' could be a touch larger for better legibility - maybe
+> the item name goes up a size class and these labels go to the same size
+> as item name - given the icon size the item name font size has room for
+> it vertically to be larger"
+
+The rationale in that last clause is the rule, not the exception. A
+Ranker row is 60px tall because it carries a tier-1 bag-slot item icon
+(`RankerRowLayout.RowHeight` = `ItemIconTiers.BagSlotIconSize` + 3px
+clearance each side), and a Body 16 line box is 20 of those 60. The
+height was already paid for; refusing to use it is not restraint, it is
+waste. So:
+
+| Ranker surface | Was | Now |
+|---|---|---|
+| Item name | Body 16 | **Status 18 bold** |
+| Gate strip labels and percentages (Materials / Currencies / Time gates / Disciplines / Recipes) | Caption 14 | **Body 16** |
+| Readiness percentage | Status 18 bold | unchanged - it now draws white inside its own bar |
+
+**The rule, stated so the next reader does not have to infer it:** a
+promoted tier may seat on row content when the row's own ART, not its
+text, sets the row height - and only up to the height that art already
+bought. Where a row's height is set by its text (the Log tab's rows, the
+plan's currency table), the original reading stands and a promotion there
+would grow the row.
+
+The rhythm is derived rather than re-picked: `RankerRowLayout.MainLineY`
+centres any line box in `RowHeight`, and every seat on the Ranker's main
+line - rank caption, name, days, coin run, readiness bar, buttons, chip -
+resolves its y through it. A further tier change moves one expression.
+
+NOT extended to the other tabs in that branch. Plan History, Snapshot and
+Log rows keep Body 16; whether the same argument applies to them is a
+separate call, and their row heights are not all set by art.

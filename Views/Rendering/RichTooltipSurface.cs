@@ -437,7 +437,8 @@ namespace TaimisToolbench.Views.Rendering
                 // with - the name beside it already carries the rarity.
                 IconControls.CreateItemIcon(
                     _contentPanel, row.IconUrl, ItemIconFrame.Explicit(HeaderIconFrameColor),
-                    0, row.Y, ItemIconTier.TooltipHeader);
+                    0, row.Y, ItemIconTier.TooltipHeader,
+                    ItemIconTooltip.None(ItemIconSilence.DrawnInsideATooltip));
             }
 
             // The name is centred on the icon, not top-aligned (measured,

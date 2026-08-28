@@ -6,10 +6,20 @@ namespace TaimisToolbench.Services
     /// Pure column arithmetic for one Plan History row, in the shape of
     /// RankerRowLayout / LogRowLayout.
     ///
-    /// Same law as every other table in the module: the name column is
-    /// the only flexing element, it consumes every pixel the pinned
-    /// right-hand block does not, and at no width is there empty space to
-    /// the right of the action buttons.
+    /// Same law as every other table in the module: the action block is
+    /// pinned to the right edge, and the three data columns to its left -
+    /// Plan, Cost, Generated - are JUSTIFIED across the span the block
+    /// leaves, through the shared <see cref="JustifiedColumnTracks"/> the
+    /// Crafting Plan tab's currency table distributes by. At no width is
+    /// there empty space to the right of the action buttons.
+    /// <para>
+    /// Distribution replaced a packed stack in which Cost and Generated
+    /// hugged the buttons and the name band absorbed ALL of the row's
+    /// slack: at the real window width that put several hundred px of
+    /// nothing between a plan's name and its cost, with no anchor for the
+    /// eye between them - the same complaint, and the same fix, the
+    /// currency table already carries.
+    /// </para>
     /// </summary>
     internal static class PlanHistoryRowLayout
     {
@@ -87,6 +97,14 @@ namespace TaimisToolbench.Services
         public const int MinWhenWidth = 100;
 
         /// <summary>
+        /// One track per data column - Cost, Generated - plus one for the
+        /// Plan label, which is the leftmost and the only flexing element.
+        /// See <see cref="JustifiedColumnTracks"/> for what a track is and
+        /// why the label gets the slack of the first data column's track.
+        /// </summary>
+        public const int TrackCount = 3;
+
+        /// <summary>
         /// TIER 2: the expanded row's per-item list IS a dense item list -
         /// the same class as the Crafting Plan tab's Used Materials,
         /// Shopping List and Required Recipes rows, which is why it takes
@@ -128,6 +146,18 @@ namespace TaimisToolbench.Services
 
             public readonly int WhenX;
             public readonly int WhenWidth;
+
+            /// <summary>
+            /// Right edge of the Generated column - the timestamp cell's
+            /// and its header label's alike. Exposed rather than restated
+            /// as <c>WhenX + WhenWidth</c> at each seat: a header computed
+            /// from its own expression is exactly how the Ranker's drifted
+            /// 37px off the column it named.
+            /// </summary>
+            public int WhenRightEdge
+            {
+                get { return WhenX + WhenWidth; }
+            }
 
             public readonly int ViewX;
             public readonly int OpenX;
@@ -177,11 +207,23 @@ namespace TaimisToolbench.Services
             int openX = resolveX - ButtonGap - ActionButtonWidth;
             int viewX = openX - ButtonGap - ActionButtonWidth;
 
-            int whenX = viewX - CellGap - whenWidth;
-            int costRightEdge = whenX - CellGap;
-
             int iconX = Inset;
             int nameX = iconX + IconTotal + IconGap;
+
+            // The columns' own pinned right edge: the action block's left
+            // edge, one cell gap clear of it. Generated always lands here;
+            // where Cost lands is what distribution decides.
+            int columnsRightEdge = viewX - CellGap;
+            int trackSpan = columnsRightEdge - nameX;
+
+            // Both bands have to clear a track, not just the wider one:
+            // equal tracks mean the widest band is the binding constraint.
+            int costRightEdge = JustifiedColumnTracks.FitsDistributed(
+                trackSpan, TrackCount, Math.Max(costWidth, whenWidth), CellGap)
+                ? JustifiedColumnTracks.RightEdge(nameX, trackSpan, TrackCount, 1)
+                : columnsRightEdge - whenWidth - CellGap;
+
+            int whenX = columnsRightEdge - whenWidth;
             int nameWidth = costRightEdge - costWidth - CellGap - nameX;
 
             // A window narrow enough to squeeze the name out clamps

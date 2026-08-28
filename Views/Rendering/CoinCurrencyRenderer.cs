@@ -194,6 +194,32 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
+        /// A MEASURED zero, drawn the way the game draws one: "0" against
+        /// the copper icon. Deliberately NOT
+        /// <see cref="RenderValueCellRightAligned"/>'s dash, which claims a
+        /// value could not be priced at all - a row that has been solved and
+        /// owes nothing has a real answer, and a dash hides it behind the
+        /// same mark an unpriceable row gets.
+        /// </summary>
+        internal static ValueCellHandle RenderZeroValueCellRightAligned(
+            Panel parent, int rightEdgeX, int y, BitmapFont font)
+        {
+            var segments = BuildCoinSegments(0, font);
+            int width = TotalCoinSegmentsWidth(segments);
+            return new ValueCellHandle
+            {
+                CoinSegments = LayoutCoinSegments(parent, segments, rightEdgeX - width, y, font),
+                CurrencySegments = SegmentLayoutHandle.Empty,
+            };
+        }
+
+        /// <summary>Width of <see cref="RenderZeroValueCellRightAligned"/>'s cell.</summary>
+        internal static int MeasureZeroValueWidth(BitmapFont font)
+        {
+            return TotalCoinSegmentsWidth(BuildCoinSegments(0, font));
+        }
+
+        /// <summary>
         /// Non-allocating reposition twin to LayoutCoinSegments/
         /// LayoutCurrencySegments (m2 3.7/4) - moves EXISTING segment
         /// controls to new x-positions using the cached TextWidths, never
