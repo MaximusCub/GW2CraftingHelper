@@ -841,6 +841,21 @@ fresh scrape of any merchant recomputes its offer ids. Gate not yet run
 live. Full record:
 `dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`.
 
+### 64. UI glyphs the shipped font cannot draw
+
+Blish exposes one text face and Menomonia carries 226 codepoints, none of
+them geometric. Five escapes shipped outside that set and drew nothing:
+Plan History's pin toggle (U+25CF / U+25CB - the glyph WAS the whole
+pinned-state model, so pinned and unpinned rows were indistinguishable),
+its delete cross (U+2715), and three in the Ranker. A missing codepoint
+also advances zero pixels, so neither a layout assertion nor a screenshot
+diff catches it. Plan History is fixed here - a Blish `Checkbox` for the
+pin, U+00D7 for the delete - and the class is gated by
+`docs/font-codepoints.txt` plus the "UI glyph escapes exist in the shipped
+font" step in `.github/workflows/tests.yml`. The Ranker's three are waived
+in that step until its own branch lands; the waiver fails the build once
+it goes stale. Full record: `dev/records/glyph-fixes.md`.
+
 ---
 
 ## DEFERRED (recorded, not implemented)
@@ -1155,3 +1170,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
+  Cited as: glyph-fixes, KNOWN-ISSUES #64.
+  `dev/records/glyph-fixes.md`

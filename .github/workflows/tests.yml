@@ -64,6 +64,76 @@ jobs:
             exit 1
           fi
 
+      - name: UI glyph escapes exist in the shipped font
+        shell: bash
+        run: |
+          # The step above forces non-ASCII into \uXXXX escapes. Escaping is
+          # not rendering: Blish ships one text face, and Menomonia carries
+          # 226 codepoints. Anything else draws nothing AND advances zero
+          # pixels, so it is invisible to the eye, to MeasureString and to
+          # every layout assertion the suite has - which is how a pin toggle
+          # whose two states were a filled and a hollow circle shipped with
+          # no visual state at all (KNOWN-ISSUES #64).
+          #
+          # Module source only: tests and tools carry deliberately odd text,
+          # and ref/ is API and wiki data rather than authored strings.
+          # Whole-line comments are skipped, so a comment may still name a
+          # codepoint the font lacks in order to warn about it.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          allowed = set()
+          for line in open('docs/font-codepoints.txt', encoding='utf-8'):
+              line = line.split('#')[0].strip()
+              if line:
+                  allowed.add(int(line, 16))
+
+          # Views/RankerTabContent.cs shipped three of the same broken
+          # glyphs and is being repaired on its own branch; waiving them
+          # here keeps the two changes from colliding. Every waiver is
+          # checked for staleness below, so the day that branch lands this
+          # step fails until the dead entries are deleted.
+          waived = {
+              ('Views/RankerTabContent.cs', 0x25B2),
+              ('Views/RankerTabContent.cs', 0x25BC),
+              ('Views/RankerTabContent.cs', 0x2715),
+          }
+
+          files = subprocess.run(
+              ['git', 'ls-files', 'Models/*.cs', 'Services/*.cs', 'Views/*.cs',
+               'Contracts/*.cs', 'Properties/*.cs', 'Module.cs'],
+              capture_output=True, text=True, check=True).stdout.split()
+          escape = re.compile(r'\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})')
+          bad = []
+          seen = set()
+          for f in files:
+              for n, line in enumerate(open(f, encoding='utf-8'), 1):
+                  if line.lstrip().startswith(('//', '*', '/*')):
+                      continue
+                  for m in escape.finditer(line):
+                      cp = int(m.group(1) or m.group(2), 16)
+                      if cp in allowed:
+                          continue
+                      seen.add((f, cp))
+                      if (f, cp) not in waived:
+                          bad.append(f'{f}:{n}: U+{cp:04X}')
+          if bad:
+              print('UI strings use codepoints the shipped font cannot draw.')
+              print('They will render as nothing at all. Use a codepoint from')
+              print('docs/font-codepoints.txt, a texture, or a drawn primitive:')
+              print('\n'.join(bad))
+              sys.exit(1)
+          stale = sorted(waived - seen)
+          if stale:
+              print('Waivers for glyphs that are no longer in the source.')
+              print('Delete them from this step:')
+              for f, cp in stale:
+                  print(f'  {f} U+{cp:04X}')
+              sys.exit(1)
+          print(f'{len(files)} module sources; every glyph escape is one of the '
+                f'{len(allowed)} the font carries.')
+          PY
+
       - name: Tests stay free of Blish HUD and Gw2Sharp
         shell: bash
         run: |
