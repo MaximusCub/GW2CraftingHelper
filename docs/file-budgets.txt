@@ -228,7 +228,7 @@ Services/SummarySectionLayoutMath.cs                                            
 Services/TableSortState.cs                                                              105
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
-Services/TooltipLayoutMath.cs                                                           439
+Services/TooltipLayoutMath.cs                                                           487
 Services/TooltipTextFormat.cs                                                           136
 Services/TopRegionLayoutMath.cs                                                          99
 Services/TradingPostMath.cs                                                              57
@@ -284,7 +284,7 @@ Views/Rendering/PlanHeaderRenderer.cs                                           
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RarityColors.cs                                                          75
 Views/Rendering/RecipesSectionRenderer.cs                                               339
-Views/Rendering/RichTooltipSurface.cs                                                   613
+Views/Rendering/RichTooltipSurface.cs                                                   599
 Views/Rendering/RankerReadinessColors.cs                                                 75
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
 Views/Rendering/ShoppingBadgeColors.cs                                                   72
@@ -508,7 +508,7 @@ tests/GW2CraftingHelper.Tests/Services/TableSortStateTests.cs                   
 tests/GW2CraftingHelper.Tests/Services/TextWrapMathTests.cs                             297
 tests/GW2CraftingHelper.Tests/Services/TooltipComposerContentTests.cs                   215
 tests/GW2CraftingHelper.Tests/Services/TooltipContentTests.cs                           152
-tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                        505
+tests/GW2CraftingHelper.Tests/Services/TooltipLayoutMathTests.cs                        627
 tests/GW2CraftingHelper.Tests/Services/TooltipSpanRoleTests.cs                          108
 tests/GW2CraftingHelper.Tests/Services/TooltipTextFormatTests.cs                        138
 tests/GW2CraftingHelper.Tests/Services/TopRegionLayoutMathTests.cs                      144
