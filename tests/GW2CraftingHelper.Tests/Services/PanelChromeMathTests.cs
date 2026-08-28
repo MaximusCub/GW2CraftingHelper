@@ -10,7 +10,7 @@ namespace GW2CraftingHelper.Tests.Services
     /// panel-sized default a not-yet-laid-out Blish panel reports. The
     /// difference between the two IS the first-paint truncation - a viewport
     /// sized from the wrong one keeps a stale height, and the bottom of the
-    /// plan is not drawn until a resize corrects it (KNOWN-ISSUES #64).
+    /// plan is not drawn until a resize corrects it (KNOWN-ISSUES #65).
     ///
     /// The vendor constants below are Blish_HUD.Controls.Panel's own public
     /// values, restated here as literals because the test project is

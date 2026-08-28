@@ -18,7 +18,7 @@ namespace GW2CraftingHelper.Services
     /// from it stay wrong until the next real resize. That was the
     /// first-paint truncation - the hosted view's viewport kept a
     /// pre-clamp height, so the bottom of the content was simply not there
-    /// until the window got nudged (KNOWN-ISSUES #64).
+    /// until the window got nudged (KNOWN-ISSUES #65).
     /// </para>
     /// <para>
     /// The vendor constants are not duplicated here: the one caller

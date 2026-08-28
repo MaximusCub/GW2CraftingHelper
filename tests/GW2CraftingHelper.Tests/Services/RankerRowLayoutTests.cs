@@ -104,14 +104,62 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void TotalRowHeight_IsTheBaseRowPlusOneLinePerSubLine()
+        public void ARowWithNothingBelowItsHeadline_IsExactlyTheBaseRowTall()
         {
-            Assert.Equal(RankerRowLayout.RowHeight, RankerRowLayout.TotalRowHeight(0));
-            Assert.Equal(RankerRowLayout.RowHeight + RankerRowLayout.SubLineHeight,
-                RankerRowLayout.TotalRowHeight(1));
-            Assert.Equal(RankerRowLayout.RowHeight + 3 * RankerRowLayout.SubLineHeight,
-                RankerRowLayout.TotalRowHeight(3));
-            Assert.Equal(RankerRowLayout.RowHeight, RankerRowLayout.TotalRowHeight(-4));
+            // Compact mode's floor, and an unmeasured row's height.
+            var empty = RankerRowLayout.SubLines(hasGates: false, currencyLines: 0, noteLines: 0);
+
+            Assert.Equal(RankerRowLayout.RowHeight, empty.TotalHeight);
+            Assert.Equal(-1, empty.GateY);
+            Assert.Equal(-1, empty.CurrencyY);
+            Assert.Equal(-1, empty.NoteY);
+        }
+
+        [Fact]
+        public void CompactRows_AreShorterThanFullOnesByTheDetailTheyDrop()
+        {
+            var compact = RankerRowLayout.SubLines(hasGates: true, currencyLines: 0, noteLines: 0);
+            var full = RankerRowLayout.SubLines(hasGates: true, currencyLines: 2, noteLines: 1);
+
+            Assert.True(compact.TotalHeight < full.TotalHeight);
+            Assert.Equal(-1, compact.CurrencyY);
+            Assert.Equal(-1, compact.NoteY);
+
+            // Same gate strip in both: compact drops the explanation, never
+            // the comparison.
+            Assert.Equal(compact.GateY, full.GateY);
+        }
+
+        [Fact]
+        public void EachBlockStartsBelowTheOneBeforeIt_AndInsideTheRow()
+        {
+            var block = RankerRowLayout.SubLines(hasGates: true, currencyLines: 3, noteLines: 2);
+
+            Assert.True(block.GateY >= RankerRowLayout.RowHeight);
+            Assert.True(block.CurrencyY >= block.GateY + RankerRowLayout.SubLineHeight);
+            Assert.True(block.NoteY
+                >= block.CurrencyY + 3 * RankerRowLayout.CurrencyLineHeight);
+            Assert.True(block.NoteY + 2 * RankerRowLayout.SubLineHeight <= block.TotalHeight);
+        }
+
+        [Fact]
+        public void CurrencyLinesUseTheirOwnPitch_BecauseTheirIconIsTallerThanText()
+        {
+            var one = RankerRowLayout.SubLines(hasGates: true, currencyLines: 1, noteLines: 0);
+            var two = RankerRowLayout.SubLines(hasGates: true, currencyLines: 2, noteLines: 0);
+
+            Assert.Equal(RankerRowLayout.CurrencyLineHeight, two.TotalHeight - one.TotalHeight);
+            Assert.True(RankerRowLayout.CurrencyLineHeight > RankerRowLayout.SubLineHeight);
+            Assert.True(RankerRowLayout.CurrencyLineHeight
+                >= RankerRowLayout.CurrencyIconSize);
+        }
+
+        [Fact]
+        public void NegativeLineCountsAreClamped()
+        {
+            var block = RankerRowLayout.SubLines(hasGates: false, currencyLines: -3, noteLines: -1);
+
+            Assert.Equal(RankerRowLayout.RowHeight, block.TotalHeight);
         }
 
         [Theory]
@@ -290,6 +338,133 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.True(slots.RefreshX >= 0);
             Assert.True(slots.StatusWidth >= 0);
+        }
+
+        // The comparison-mode radio strip. Measured footprints: the dot,
+        // its gap and the widest of the two option labels at UiFonts.Body,
+        // which the view measures for real; these stand in for them.
+        private const int RadioLabelWidth = 44;
+        private const int FirstOptionWidth = 130;
+        private const int SecondOptionWidth = 120;
+        private const int OptionGap = 16;
+        private const int AddButtonRight = 380;
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AtEveryRealWidth_BothModeOptionsFitInsideTheRowAndNeverOverlap(int rowWidth)
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                rowWidth, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth,
+                OptionGap, AddButtonRight);
+
+            Assert.True(slots.FirstX >= AddButtonRight);
+            Assert.True(slots.FirstX + FirstOptionWidth <= slots.SecondX);
+            Assert.True(slots.SecondX + SecondOptionWidth <= rowWidth - RankerRowLayout.Inset);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AtEveryRealWidth_TheCaptionClearsTheControlToItsLeft(int rowWidth)
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                rowWidth, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth,
+                OptionGap, AddButtonRight);
+
+            // Shown or dropped, never overlapped: -1 is the view's cue to
+            // hide it.
+            Assert.True(slots.LabelX == -1 || slots.LabelX >= AddButtonRight);
+            if (slots.LabelX >= 0)
+            {
+                Assert.True(slots.LabelX + RadioLabelWidth <= slots.FirstX);
+            }
+        }
+
+        [Fact]
+        public void WhenTheRowIsTooNarrowForTheCaption_ItIsDroppedRatherThanOverlapped()
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                AddButtonRight + FirstOptionWidth + OptionGap + SecondOptionWidth + RankerRowLayout.Inset,
+                RadioLabelWidth, FirstOptionWidth, SecondOptionWidth, OptionGap, AddButtonRight);
+
+            Assert.Equal(-1, slots.LabelX);
+            Assert.Equal(AddButtonRight, slots.FirstX);
+        }
+
+        [Fact]
+        public void AtAnAbsurdlyNarrowWidth_NothingIsPlacedLeftOfTheControlBeforeIt()
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                120, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth, OptionGap, AddButtonRight);
+
+            Assert.Equal(-1, slots.LabelX);
+            Assert.Equal(AddButtonRight, slots.FirstX);
+            Assert.Equal(AddButtonRight, slots.SecondX);
+        }
+
+        // WHY THE COLUMN HEADER HAS TO BE RE-SEATED WHENEVER THE COIN BAND
+        // CHANGES. Ready and Days are derived by walking LEFT from the coin
+        // band, so a table that has not been refreshed yet (coin band at its
+        // MinRemainingCellWidth floor) puts those two rails in a different
+        // place than the same table does once a real coin cell has been
+        // measured. The header labels are right-aligned on the very same
+        // rails, so a view that re-renders its rows without re-seating its
+        // header leaves the two disagreeing by exactly this difference -
+        // the reported "Ready/Days/Remaining are poorly aligned with the
+        // content below" (measured at 37px in the 2026-08-27 capture).
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AWiderCoinBand_MovesTheReadyAndDaysRailsButNotTheCoinRail(int rowWidth)
+        {
+            var narrow = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth);
+            var wide = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth + 37);
+
+            Assert.Equal(narrow.RemainingRightEdge, wide.RemainingRightEdge);
+            Assert.Equal(narrow.DaysRightEdge - 37, wide.DaysRightEdge);
+            Assert.Equal(narrow.ReadyRightEdge - 37, wide.ReadyRightEdge);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void TheSameBandWidth_GivesTheHeaderAndTheCellsOneSetOfRails(int rowWidth)
+        {
+            // The view derives both from this one call; anything that
+            // recomputes the band has to recompute both sides of it.
+            var first = RankerRowLayout.Compute(rowWidth, 137);
+            var second = RankerRowLayout.Compute(rowWidth, 137);
+
+            Assert.Equal(first.ReadyRightEdge, second.ReadyRightEdge);
+            Assert.Equal(first.DaysRightEdge, second.DaysRightEdge);
+            Assert.Equal(first.RemainingRightEdge, second.RemainingRightEdge);
+        }
+
+        // Independent mode shows no reorder arrows: its order IS its answer.
+        // The two rails they leave behind are reclaimed rather than stranded,
+        // which is the module's standing rule about dead space.
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void WithNoReorderButtons_TheRowStillEndsOnItsOneRightEdge(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, showReorder: false);
+
+            Assert.Equal(rowWidth - RankerRowLayout.Inset,
+                bands.RemoveX + RankerRowLayout.ButtonWidth);
+            Assert.Equal(-1, bands.UpX);
+            Assert.Equal(-1, bands.DownX);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void WithNoReorderButtons_EveryBandToTheirLeftGainsTheirWidth(int rowWidth)
+        {
+            var withArrows = RankerRowLayout.Compute(rowWidth, 137, showReorder: true);
+            var without = RankerRowLayout.Compute(rowWidth, 137, showReorder: false);
+
+            int reclaimed = 2 * (RankerRowLayout.ButtonWidth + RankerRowLayout.ButtonGap);
+            Assert.Equal(withArrows.RemainingRightEdge + reclaimed, without.RemainingRightEdge);
+            Assert.Equal(withArrows.DaysRightEdge + reclaimed, without.DaysRightEdge);
+            Assert.Equal(withArrows.ReadyRightEdge + reclaimed, without.ReadyRightEdge);
+            Assert.Equal(withArrows.NameWidth + reclaimed, without.NameWidth);
+            Assert.Equal(withArrows.RemoveX, without.RemoveX);
         }
     }
 }

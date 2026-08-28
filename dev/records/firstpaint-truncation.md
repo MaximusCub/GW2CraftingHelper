@@ -1,7 +1,7 @@
 > **Milestone record - 2026-08-27, branch `firstpaint-truncation`.**
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../docs/README.md).
 
-## First-paint viewport truncation (KNOWN-ISSUES #64)
+## First-paint viewport truncation (KNOWN-ISSUES #65)
 
 The report, in the maintainer's words: "there was a bug where the bottom of
 the viewport was cut off until the window got a slight resize jiggle to

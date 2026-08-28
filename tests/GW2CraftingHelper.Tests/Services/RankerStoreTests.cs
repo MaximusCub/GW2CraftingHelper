@@ -210,6 +210,50 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ARarityAdoptedAfterLoad_SurvivesTheSaveAndTheNextLoad()
+        {
+            // The full field round trip: a list written before rarity was
+            // ever populated, the adoption a refresh performs on it, and the
+            // save that has to carry it across sessions.
+            File.WriteAllText(FilePath,
+                "{ \"SchemaVersion\": 1, \"Entries\": [ " +
+                "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\", \"IconUrl\": \"t.png\" } ] }");
+
+            var store = new RankerStore(_temp.Path);
+            var loaded = store.Load();
+            Assert.Null(loaded.Entries[0].Rarity);
+
+            Assert.True(RankerRarityAdoption.AdoptFromStatCache(
+                loaded.Entries, id => new ItemStatBlock { ItemId = id, Rarity = "Legendary" }));
+            Assert.True(store.Save(loaded));
+
+            Assert.Equal("Legendary", store.Load().Entries[0].Rarity);
+        }
+
+        [Fact]
+        public void TheCompactChoice_PersistsAndDefaultsToTheFullBreakdown()
+        {
+            var store = new RankerStore(_temp.Path);
+            var watchlist = SampleWatchlist();
+
+            Assert.False(watchlist.Compact);
+            watchlist.Compact = true;
+            Assert.True(store.Save(watchlist));
+            Assert.True(store.Load().Compact);
+
+            // And a file written before the field existed reads as the full
+            // breakdown the tab has always shown, list intact.
+            File.WriteAllText(FilePath,
+                "{ \"SchemaVersion\": 1, \"Mode\": 1, \"Entries\": [ " +
+                "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\" } ] }");
+
+            var loaded = store.Load();
+            Assert.False(loaded.Compact);
+            Assert.Equal(RankerMode.Independent, loaded.Mode);
+            Assert.Single(loaded.Entries);
+        }
+
+        [Fact]
         public void Save_ToAnUnwritablePath_ReportsFailureRatherThanThrowing()
         {
             // A file where the directory should be: every Save path under it

@@ -215,6 +215,7 @@ SnapshotItemEntry.Count:Int32
 SnapshotItemEntry.IconUrl:String
 SnapshotItemEntry.ItemId:Int32
 SnapshotItemEntry.Name:String
+SnapshotItemEntry.Rarity:String
 SnapshotItemEntry.Source:String
 TimegatedItem.CapType:TimegatedCapType
 TimegatedItem.CapValue:Int32

@@ -61,6 +61,14 @@ namespace GW2CraftingHelper.Services
         public const int ActionButtonWidth = 84;
         public const int IconButtonWidth = 28;
 
+        /// <summary>
+        /// Band for the pin toggle, which is a Blish Checkbox and not a
+        /// button: it paints a 20px box gutter plus its label, and "Pin"
+        /// measures 17px in the 14px face Checkbox draws with, so the
+        /// painted control is ~37px and this band clears it.
+        /// </summary>
+        public const int PinToggleWidth = 44;
+
         /// <summary>Below this the pinned block cannot fit and the name band collapses to zero.</summary>
         public const int MinNameWidth = 40;
 
@@ -164,7 +172,7 @@ namespace GW2CraftingHelper.Services
             int rightEdge = Math.Max(0, rowWidth - Inset);
 
             int deleteX = rightEdge - IconButtonWidth;
-            int pinX = deleteX - ButtonGap - IconButtonWidth;
+            int pinX = deleteX - ButtonGap - PinToggleWidth;
             int resolveX = pinX - ButtonGap - ActionButtonWidth;
             int openX = resolveX - ButtonGap - ActionButtonWidth;
             int viewX = openX - ButtonGap - ActionButtonWidth;

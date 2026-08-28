@@ -25,7 +25,9 @@ namespace GW2CraftingHelper.Services
         private const int ItemBulkLimit = 200;
 
         private readonly Gw2ApiManager _apiManager;
-        private readonly Dictionary<int, (string Name, string IconUrl)> _itemCache = new Dictionary<int, (string, string)>();
+        private readonly Dictionary<int, (string Name, string IconUrl, string Rarity)> _itemCache =
+            new Dictionary<int, (string, string, string)>();
+
         private readonly Dictionary<int, (string Name, string IconUrl)> _currencyCache = new Dictionary<int, (string, string)>();
         private readonly object _cacheLock = new object();
 
@@ -391,7 +393,8 @@ namespace GW2CraftingHelper.Services
                         foreach (var item in fetched)
                         {
                             var url = item.Icon.Url;
-                            _itemCache[item.Id] = (item.Name ?? "", url != null ? url.AbsoluteUri : "");
+                            _itemCache[item.Id] =
+                                (item.Name ?? "", url != null ? url.AbsoluteUri : "", RarityOf(item));
                         }
                     }
                 }
@@ -404,6 +407,7 @@ namespace GW2CraftingHelper.Services
                         {
                             entry.Name = cached.Name;
                             entry.IconUrl = cached.IconUrl;
+                            entry.Rarity = cached.Rarity;
                         }
                     }
                 }
@@ -413,6 +417,32 @@ namespace GW2CraftingHelper.Services
                 Logger.Warn(ex, "Failed to resolve item names/icons");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve item names/icons: {ex.GetType().Name} - {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// The rarity string for a fetched item, in the spelling
+        /// RarityColors switches on, or "" when the API sent one this
+        /// module does not know. Gw2Sharp models rarity as an ApiEnum, which
+        /// keeps the wire string in RawValue and falls back to the parsed
+        /// enum name; either is run past the rarity policy so an
+        /// unrecognised value degrades to unknown rather than to a wrong
+        /// colour.
+        /// </summary>
+        private static string RarityOf(Gw2Sharp.WebApi.V2.Models.Item item)
+        {
+            var rarity = item?.Rarity;
+            if (rarity == null)
+            {
+                return "";
+            }
+
+            string raw = rarity.RawValue;
+            if (string.IsNullOrEmpty(raw))
+            {
+                raw = rarity.Value.ToString();
+            }
+
+            return ItemRarityResolution.Normalize(raw) ?? "";
         }
 
         private async Task ResolveCurrencyDetailsAsync(List<SnapshotWalletEntry> wallet, CancellationToken ct)

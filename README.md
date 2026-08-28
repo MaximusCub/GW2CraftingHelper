@@ -65,15 +65,30 @@ session that measured it.
 
 ## Screenshots
 
-Recipe tree with per-node decision pills, Best Path / Craft All / Buy All /
-Ignore controls, and the Total Cost breakdown:
+The Total Cost band - materials value, what your own materials cover, and
+the actual coin cost, with the currencies the plan needs:
+
+![Crafting plan Total Cost band with currency requirements](docs/images/plan-total-cost.png)
+
+Recipe tree with per-node decision pills (Craft / TP / Vendor / Ignore) and
+per-row costs:
 
 ![Crafting plan recipe tree with decision pills](docs/images/plan-recipe-tree.png)
 
-Used Materials and Shopping List sections (item names colored by GW2
-rarity) with vendor-tagged shopping rows:
+Item tooltips mirror the in-game look - measured from live captures, down
+to the font, the background texture and cursor-adjacent placement:
 
-![Used Materials and Shopping List sections with vendor-tagged shopping rows](docs/images/plan-owned-materials.png)
+![GW2-authentic item tooltip on a recipe tree row](docs/images/item-tooltip.png)
+
+Account snapshot - items and currencies across bank, material storage,
+shared inventory and every character, with search and source filters:
+
+![Account snapshot with per-source item locations](docs/images/snapshot.png)
+
+Plan History - every generated plan kept with its cost and date; open a
+saved plan exactly as it was, or re-solve it at today's prices:
+
+![Plan History with View, Open and Re-solve](docs/images/plan-history.png)
 
 ## Tabs
 
@@ -158,8 +173,8 @@ commit history carries `Co-Authored-By` trailers rather than hiding them.
 What that is worth depends entirely on the process around it, so here is the
 process, all of it checkable from this repository:
 
-- **Nothing ships untested.** Three test projects - 2,767 for the module plus
-  233 across the seeder and vendor-updater tools (measured 2026-08-25; the
+- **Nothing ships untested.** Three test projects - 3,084 for the module plus
+  233 across the seeder and vendor-updater tools (measured 2026-08-26; the
   badge above is the live answer) - run on every pull request and every push
   to `master` on
   [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml),
@@ -179,8 +194,25 @@ process, all of it checkable from this repository:
   and committed against the *old* implementation first. The 14.8MB vendor
   dataset, for instance, is pinned byte-for-byte against the writer that
   produces it.
+- **The build is warning-clean, and the compiler enforces it.**
+  `GW2CraftingHelper.csproj` sets `TreatWarningsAsErrors`, so a build that
+  prints anything failed. The StyleCop rules not yet satisfied are a named
+  list in that file's `<NoWarn>` - 26 rule IDs, each a bounded cleanup job -
+  and [`CONTRIBUTING.md`](CONTRIBUTING.md) states the rule that the list
+  only ever shrinks.
+- **The repo's other rules are enforced by CI, not memory.** The `invariants`
+  job in [`tests.yml`](.github/workflows/tests.yml) fails the build on
+  non-ASCII characters in source, a `.cs` file missing its `<Compile Include>`
+  entry, a doc or comment citing a file that does not exist, a broken
+  relative markdown link, and any source file growing past its pinned line
+  budget ([`docs/file-budgets.txt`](docs/file-budgets.txt) - a ratchet
+  introduced after one decomposed view quietly grew back past its
+  pre-refactor size with nothing watching).
 - **UI changes are checked in the running game**, not asserted from a diff, and
-  what was actually observed is recorded.
+  what was actually observed is recorded: each milestone record under
+  [`dev/records/`](dev/records/) ends in an explicit `Gate:` line - PASS,
+  FAIL, or "not required" with the reason - naming the live desktop session
+  that verified it, and a claim with no gate behind it says so.
 - **Every change is adversarially reviewed** against a written checklist in
   [`CLAUDE.md`](CLAUDE.md) - null inputs, empty collections, cancellation, API
   failure, race conditions, invariant violations - with findings classified and

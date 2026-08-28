@@ -153,7 +153,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
                 qtyRightEdge, maxQtyWidth, NameToQtyGap, NameX, RowTextY,
-                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
+                ItemIconTier.BagSidebar);
             // Composed at HOVER time, not here: a plan restored from disk
             // fills its stat cache in the background (Q13), and a snapshot
             // taken now could never show what lands after it. It also

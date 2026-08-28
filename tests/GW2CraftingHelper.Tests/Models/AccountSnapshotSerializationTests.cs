@@ -17,8 +17,8 @@ namespace GW2CraftingHelper.Tests.Models
                 CoinCopper = 1234567,
                 Items = new List<SnapshotItemEntry>
                 {
-                    new SnapshotItemEntry { ItemId = 100, Name = "Iron Ore", Count = 50, Source = "Bank" },
-                    new SnapshotItemEntry { ItemId = 200, Name = "Gold Ore", Count = 10, Source = "Character:Ranger" },
+                    new SnapshotItemEntry { ItemId = 100, Name = "Iron Ore", Count = 50, Source = "Bank", Rarity = "Basic" },
+                    new SnapshotItemEntry { ItemId = 200, Name = "Gold Ore", Count = 10, Source = "Character:Ranger", Rarity = "Fine" },
                 },
                 Wallet = new List<SnapshotWalletEntry>
                 {
@@ -55,7 +55,9 @@ namespace GW2CraftingHelper.Tests.Models
             Assert.Equal(original.Items[0].Name, deserialized.Items[0].Name);
             Assert.Equal(original.Items[0].Count, deserialized.Items[0].Count);
             Assert.Equal(original.Items[0].Source, deserialized.Items[0].Source);
+            Assert.Equal(original.Items[0].Rarity, deserialized.Items[0].Rarity);
             Assert.Equal(original.Items[1].ItemId, deserialized.Items[1].ItemId);
+            Assert.Equal(original.Items[1].Rarity, deserialized.Items[1].Rarity);
             Assert.Equal(original.Wallet.Count, deserialized.Wallet.Count);
             Assert.Equal(original.Wallet[0].CurrencyId, deserialized.Wallet[0].CurrencyId);
             Assert.Equal(original.Wallet[0].CurrencyName, deserialized.Wallet[0].CurrencyName);

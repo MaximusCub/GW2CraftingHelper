@@ -165,6 +165,68 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal("", result.Wallet[0].IconUrl);
         }
 
+        // --- Item rarity: captured with the name and icon, so the Snapshot
+        // tab's frames and names no longer depend on whether a plan
+        // happened to touch the item this session. ---
+        [Fact]
+        public void Serialize_Deserialize_ItemRarity_RoundTrips()
+        {
+            var original = new AccountSnapshot
+            {
+                CapturedAt = new DateTime(2025, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 24358,
+                        Name = "Ancient Bone",
+                        Count = 250,
+                        Source = "Material Storage",
+                        Rarity = "Basic",
+                    },
+                    new SnapshotItemEntry
+                    {
+                        ItemId = 19685,
+                        Name = "Orichalcum Ingot",
+                        Count = 10,
+                        Source = "Bank",
+                        Rarity = "Fine",
+                    },
+                },
+            };
+
+            string json = SnapshotHelpers.SerializeSnapshot(original);
+            var result = SnapshotHelpers.DeserializeSnapshot(json);
+
+            Assert.Equal("Basic", result.Items[0].Rarity);
+            Assert.Equal("Fine", result.Items[1].Rarity);
+        }
+
+        [Fact]
+        public void Deserialize_OldJsonMissingItemRarity_LoadsAndResolvesUnknown()
+        {
+            // A snapshot.json written before the field existed: it must load
+            // (no plan/snapshot loss on an additive field), and its rows must
+            // resolve to "unknown" rather than to a wrong colour. The session
+            // stat cache is still allowed to supply one, which is what the
+            // second assertion covers.
+            string oldJson = @"{
+                ""CapturedAt"": ""2025-06-15T12:00:00Z"",
+                ""CoinCopper"": 0,
+                ""Items"": [
+                    { ""ItemId"": 1, ""Name"": ""Old Item"", ""Count"": 5, ""Source"": ""Bank"" }
+                ],
+                ""Wallet"": []
+            }";
+
+            var result = SnapshotHelpers.DeserializeSnapshot(oldJson);
+
+            Assert.NotNull(result);
+            Assert.Equal("", result.Items[0].Rarity);
+            Assert.Null(ItemRarityResolution.Resolve(result.Items[0].Rarity, null));
+            Assert.Equal("Exotic", ItemRarityResolution.Resolve(result.Items[0].Rarity, "Exotic"));
+        }
+
         // --- Per-character discipline display: backward compat for
         // a legacy snapshot.json that predates CharacterDisciplines. ---
         [Fact]

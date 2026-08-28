@@ -357,7 +357,7 @@ namespace GW2CraftingHelper.Views.Rendering
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
                 edges.SourceX, 0, NameToQtyGap, NameX, RowTextY,
-                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
+                ItemIconTier.BagSidebar);
             var nameLabel = nameHandle.NameLabel;
 
             string sourceTag = ShoppingSourceBadge.ForRow(row);

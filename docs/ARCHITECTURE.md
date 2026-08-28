@@ -119,7 +119,7 @@ away therefore still executes its render into a detached,
 unreachable-but-not-disposed tree: wasted work (rebuilding rows or content
 nobody will ever see), not a crash and not a correctness bug - but a call
 site whose comment claims the guard catches that case is asserting something
-false, which is its own defect (KNOWN-ISSUES #36, third fix-loop round).
+false, which is its own defect (KNOWN-ISSUES #36).
 
 **Also verified: `Container.Children` is lock-guarded - the hazard a
 marshaled `Build()` tail actually closes is the compound dispose-then-add
@@ -159,7 +159,7 @@ cannot run two call stacks at the same instant), rather than relying on a
 lock inside `Children` that was never the thing missing. A call site whose
 comment instead claims `Children` itself would have been corrupted is
 asserting something the decompiled source disproves - its own defect
-(KNOWN-ISSUES #36, fourth fix-loop round).
+(KNOWN-ISSUES #36).
 
 ### The logging-channel rule for these guards
 
@@ -356,7 +356,7 @@ exempt and is still read directly: `WindowBase2.OnResized` assigns it from
 the new size synchronously, before raising `Resized`, so it is never a
 layout pass behind.
 
-**Full history:** KNOWN-ISSUES items 12, 14, 19, 64.
+**Full history:** KNOWN-ISSUES items 12, 14, 19, 65.
 
 ---
 
@@ -427,8 +427,8 @@ implements explicitly - `ISectionRelayoutSink` for relayout registration,
 `TreeSectionController` needs beyond it - or, where null is itself a
 meaningful value, a constructor delegate. This was violated once - a `GetPillColors`
 `private -> internal` bump on `CraftingPlanView` - and reverted for this
-reason; the rule is stated here so the revert does not have to be
-re-litigated in each file. `MainView -> Views/Rendering` (e.g.
+reason; the rule is stated here, once, so it does not have to be restated
+at each call site. `MainView -> Views/Rendering` (e.g.
 `CoinCurrencyRenderer.AddSegmentSpec`) is a forward call and fine.
 
 `TreeSectionController` is constructed once, in `CraftingPlanView`'s own
@@ -461,9 +461,9 @@ fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
 
 The file then grew back past its own pre-decomposition baseline - 5,281
 lines on 2026-08-25, +2,156 in the 33 days after the decomposition
-landed - with nothing in CI to notice. It stands at **4,863 lines,
-measured 2026-08-25** (`wc -l Views/CraftingPlanView.cs`), against the
-~4,802 above. `Views/Rendering/` holds 8,932 lines across 36 files on the
+landed - with nothing in CI to notice. It stands at **4,987 lines,
+measured 2026-08-26** (`wc -l Views/CraftingPlanView.cs`), against the
+~4,802 above. `Views/Rendering/` holds 9,109 lines across 37 files on the
 same date, so the split of plan-tab code is roughly 65% outside the view -
 a ratio that can move in either direction, unlike the one-off before/after
 figure. Both numbers, and the date, so a later reader can re-run the two
