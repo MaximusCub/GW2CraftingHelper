@@ -13,9 +13,10 @@ namespace TaimisToolbench.Views
     /// texture-derived constructed size nor a size persisted by an earlier
     /// session can open the window below the minimum.
     /// <para>
-    /// The window's POSITION is clamped too, but on a different schedule and
-    /// for a different reason - see <see cref="ClampToScreen"/> and
-    /// <see cref="Services.WindowPlacement"/>.
+    /// A size too LARGE for the client, and the window's POSITION, are
+    /// corrected too, but on a different schedule and for a different
+    /// reason - see <see cref="FitSizeToScreen"/>,
+    /// <see cref="ClampToScreen"/> and <see cref="Services.WindowPlacement"/>.
     /// </para>
     /// </summary>
     /// <remarks>
@@ -103,9 +104,9 @@ namespace TaimisToolbench.Views
         private void OnScreenResized(object sender, ResizedEventArgs e)
         {
             // Size first: the position clamp is taken against the size the
-            // window ends up at, and the floor this screen supports may have
-            // just grown it.
-            ClampToMinimum();
+            // window ends up at, and both the floor and the ceiling this
+            // screen supports may have just moved.
+            FitSizeToScreen();
             ClampToScreen();
         }
 
@@ -119,13 +120,14 @@ namespace TaimisToolbench.Views
         /// The persisted SIZE is restored on the same path, one statement
         /// earlier, and Control.Size reaches RecalculateLayout synchronously
         /// (dev/records/firstpaint-truncation.md) - so the size floor has
-        /// already been applied by the time the position is clamped against
-        /// it here.
+        /// already been applied by the time <see cref="FitSizeToScreen"/>
+        /// takes the ceiling and the position is clamped against the result.
         /// </para>
         /// </summary>
         public override void Show()
         {
             base.Show();
+            FitSizeToScreen();
             ClampToScreen();
         }
 
@@ -194,6 +196,41 @@ namespace TaimisToolbench.Views
             if (clamped != this.Location)
             {
                 this.Location = clamped;
+            }
+        }
+
+        /// <summary>
+        /// Shrinks the window onto the current sprite screen, on the rule
+        /// <see cref="Services.WindowPlacement.ClampExtent"/> states, and
+        /// applies the floor in the same pass.
+        /// <para>
+        /// Called from the same two events as <see cref="ClampToScreen"/>
+        /// and for the same reason, and like it NOT from the layout path:
+        /// WindowBase2 writes Size on every frame of a resize drag, and a
+        /// ceiling there would cap a user dragging the grip on a window
+        /// whose left edge is off-screen.
+        /// </para>
+        /// <para>
+        /// The shrink is not persisted as the user's preference: Blish
+        /// writes the size setting only from OnGlobalMouseRelease, and only
+        /// while Resizing - a flag set by pressing the grip (BlishHUD 1.3.0,
+        /// decompiled). A programmatic write is invisible to it, so the size
+        /// chosen on a wide client is restored in full the next time the
+        /// window is opened on one.
+        /// </para>
+        /// </summary>
+        private void FitSizeToScreen()
+        {
+            var screen = Blish_HUD.GameService.Graphics.SpriteScreen;
+            var min = EffectiveMinSize();
+
+            var fitted = new Point(
+                Services.WindowPlacement.ClampExtent(this.Width, min.X, screen?.Width ?? 0),
+                Services.WindowPlacement.ClampExtent(this.Height, min.Y, screen?.Height ?? 0));
+
+            if (fitted != this.Size)
+            {
+                this.Size = fitted;
             }
         }
 

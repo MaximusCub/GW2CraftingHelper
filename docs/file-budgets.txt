@@ -259,7 +259,7 @@ Services/VendorOfferStore.cs                                                    
 Services/WheelDeltaSanitizer.cs                                                          92
 Services/WikiLinkBuilder.cs                                                             139
 Services/WikiLinkLauncher.cs                                                             86
-Services/WindowPlacement.cs                                                             66
+Services/WindowPlacement.cs                                                             106
 Services/WindowSizing.cs                                                                276
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
@@ -313,7 +313,7 @@ Views/Rendering/UiFonts.cs                                                      
 Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                             47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         209
-Views/ResizableTabbedWindow.cs                                                          213
+Views/ResizableTabbedWindow.cs                                                          250
 Views/SettingsTabContent.cs                                                             2855
 Views/SuggestionPanel.cs                                                                 495
 Views/ViewAdapter.cs                                                                    247
@@ -552,7 +552,7 @@ tests/TaimisToolbench.Tests/Services/ValueDetailTooltipBuilderTests.cs          
 tests/TaimisToolbench.Tests/Services/VendorOfferStoreTests.cs                         576
 tests/TaimisToolbench.Tests/Services/WheelDeltaSanitizerTests.cs                      183
 tests/TaimisToolbench.Tests/Services/WikiLinkBuilderTests.cs                          228
-tests/TaimisToolbench.Tests/Services/WindowPlacementTests.cs                            144
+tests/TaimisToolbench.Tests/Services/WindowPlacementTests.cs                            267
 tests/TaimisToolbench.Tests/Services/WindowSizingTests.cs                              76
 tests/TaimisToolbench.Tests/Services/ZojjasClaymoreValidationTests.cs                 471
 tests/VendorOfferUpdater.Tests/ApplyExclusionsTests.cs                                   85

@@ -123,22 +123,145 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void ClampAxis_SizeSavedWiderThanTheClient_PinsTheLeadingEdgeAndStillFitsTheOtherAxis()
+        public void SizeThenPosition_ASizeDraggedOutOnTheUltrawide_PutsTheGripBackOnScreen()
         {
-            // A session that DID drag the resize grip persists that size, and
-            // nothing shrinks a too-large window back down - so the two axes
-            // can land on different sides of the rule at once.
-            const int SavedWidth = 2000;
-            const int SavedHeight = 1200;
+            // The trap the position clamp alone cannot open: a session that
+            // DID drag the resize grip on the ultrawide persists that size,
+            // Blish restores it whole, and it is wider AND taller than a
+            // 1920x1080 client. The window is fitted first and positioned
+            // against the fitted size, in that order, because the position
+            // rule reads the extent.
+            const int SavedWidth = UltrawideWidth;
+            const int SavedHeight = UltrawideHeight;
+            const int ClientWidth = 1920;
+            const int ClientHeight = 1080;
+            Assert.True(SavedWidth > ClientWidth);
+            Assert.True(SavedHeight > ClientHeight);
 
-            // Wider than the portrait client: leading edge wins, and the grip
-            // stays out of reach until the user drags the title bar.
-            Assert.Equal(0, WindowPlacement.ClampAxis(900, SavedWidth, PortraitWidth));
+            int width = WindowPlacement.ClampExtent(
+                SavedWidth, WindowSizing.EffectiveMinWindowWidth(ClientWidth), ClientWidth);
+            int height = WindowPlacement.ClampExtent(
+                SavedHeight, WindowSizing.MinWindowHeight, ClientHeight);
+            int x = WindowPlacement.ClampAxis(900, width, ClientWidth);
+            int y = WindowPlacement.ClampAxis(900, height, ClientHeight);
 
-            // Shorter than it: fully on screen, grip included.
-            int y = WindowPlacement.ClampAxis(900, SavedHeight, PortraitHeight);
+            // The grip is the window's bottom-right corner, and it is what
+            // the user needs in order to undo the size themselves.
+            Assert.True(x + width <= ClientWidth);
+            Assert.True(y + height <= ClientHeight);
+            Assert.True(x >= 0);
             Assert.True(y >= 0);
-            Assert.True(y + SavedHeight <= PortraitHeight);
+        }
+
+        [Fact]
+        public void ClampExtent_TheSameSizeOnThePortraitClient_ShrinksOnlyTheAxisThatOverflows()
+        {
+            // 3440x1440 saved, restored on 1080x1920: the width overflows and
+            // the height does not, so exactly one axis moves. A ceiling that
+            // fitted both axes to the smaller screen dimension would lose
+            // 480px of a window that fits.
+            Assert.Equal(
+                PortraitWidth,
+                WindowPlacement.ClampExtent(
+                    UltrawideWidth,
+                    WindowSizing.EffectiveMinWindowWidth(PortraitWidth),
+                    PortraitWidth));
+
+            Assert.Equal(
+                UltrawideHeight,
+                WindowPlacement.ClampExtent(
+                    UltrawideHeight, WindowSizing.MinWindowHeight, PortraitHeight));
+        }
+
+        [Theory]
+        [InlineData(PortraitWidth, PortraitHeight)]
+        [InlineData(UltrawideWidth, UltrawideHeight)]
+        [InlineData(1920, 1080)]
+        [InlineData(1366, 768)]
+        public void ClampExtent_OnEveryScreenTheWindowFits_NeverLeavesTheWindowLargerThanTheClient(
+            int screenWidth, int screenHeight)
+        {
+            int minWidth = WindowSizing.EffectiveMinWindowWidth(screenWidth);
+            Assert.True(minWidth <= screenWidth);
+            Assert.True(screenHeight >= WindowSizing.MinWindowHeight);
+
+            foreach (int width in new[] { 0, minWidth - 1, minWidth, screenWidth, 5000 })
+            {
+                int fitted = WindowPlacement.ClampExtent(width, minWidth, screenWidth);
+
+                Assert.True(fitted <= screenWidth);
+                Assert.True(fitted >= minWidth);
+            }
+
+            int minHeight = WindowSizing.MinWindowHeight;
+            foreach (int height in new[] { 0, minHeight, screenHeight, 5000 })
+            {
+                int fitted = WindowPlacement.ClampExtent(height, minHeight, screenHeight);
+
+                Assert.True(fitted <= screenHeight);
+                Assert.True(fitted >= minHeight);
+            }
+        }
+
+        [Theory]
+        [InlineData(800)]
+        [InlineData(640)]
+        public void ClampExtent_ClientNarrowerThanTheWindowFloor_TheFloorWins(int screenWidth)
+        {
+            // Floor and ceiling converge and cross below
+            // NarrowScreenFloorWidth. The floor wins, so this stays the
+            // leading-edge case ClampAxis_ClientNarrowerThanTheWindowFloor_
+            // PinsTheLeadingEdge covers, and the enforced minimum the window
+            // grows back to on its next layout pass is the value returned
+            // here - the two clamps agree instead of oscillating.
+            int minWidth = WindowSizing.EffectiveMinWindowWidth(screenWidth);
+            Assert.Equal(WindowSizing.NarrowScreenFloorWidth, minWidth);
+            Assert.True(minWidth > screenWidth);
+
+            Assert.Equal(minWidth, WindowPlacement.ClampExtent(UltrawideWidth, minWidth, screenWidth));
+            Assert.Equal(minWidth, WindowPlacement.ClampExtent(minWidth, minWidth, screenWidth));
+            Assert.Equal(minWidth, WindowPlacement.ClampExtent(500, minWidth, screenWidth));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        public void ClampExtent_UnknownScreenExtent_AppliesTheFloorAndNoCeiling(int screenExtent)
+        {
+            // What the size path did before it had a ceiling at all: an
+            // unsettled sprite screen is not a reason to shrink anything.
+            Assert.Equal(
+                UltrawideWidth,
+                WindowPlacement.ClampExtent(UltrawideWidth, WindowSizing.MinWindowWidth, screenExtent));
+            Assert.Equal(
+                WindowSizing.MinWindowWidth,
+                WindowPlacement.ClampExtent(930, WindowSizing.MinWindowWidth, screenExtent));
+        }
+
+        [Fact]
+        public void ClampExtent_DoesNotRegressTheFloor_OnAClientTheMinimumFitsOn()
+        {
+            // A size persisted below the current minimum still grows: the
+            // ceiling is added to the floor, not swapped for it.
+            int minWidth = WindowSizing.EffectiveMinWindowWidth(UltrawideWidth);
+            Assert.Equal(WindowSizing.MinWindowWidth, minWidth);
+
+            Assert.Equal(minWidth, WindowPlacement.ClampExtent(930, minWidth, UltrawideWidth));
+            Assert.Equal(
+                WindowSizing.MinWindowHeight,
+                WindowPlacement.ClampExtent(400, WindowSizing.MinWindowHeight, UltrawideHeight));
+        }
+
+        [Fact]
+        public void ClampExtent_IsIdempotent()
+        {
+            int minWidth = WindowSizing.EffectiveMinWindowWidth(PortraitWidth);
+
+            foreach (int width in new[] { 0, 500, 930, minWidth, UltrawideWidth, 5000 })
+            {
+                int once = WindowPlacement.ClampExtent(width, minWidth, PortraitWidth);
+                Assert.Equal(once, WindowPlacement.ClampExtent(once, minWidth, PortraitWidth));
+            }
         }
     }
 }
