@@ -2415,13 +2415,23 @@ namespace GW2CraftingHelper.Views
             };
 
             // The module's one icon component, at tier 1 of the two-tier
-            // icon system (owner ruling): in-game bag-slot-sized art in a
-            // 1px frame, filling the 56px item row. Rarity comes from the
-            // session stat cache because an AccountSnapshot carries none; a
-            // miss is neutral.
-            string rarity = RarityFor(row.ItemId);
+            // icon system (owner ruling): in-game bag-slot-sized art in the
+            // tier's frame, filling the 56px item row.
+            //
+            // ONE resolved rarity feeds the frame below and the name colour
+            // further down. It comes from the snapshot itself first - a
+            // capture records rarity alongside each item's name and icon,
+            // off the same /v2/items response - and falls back to the
+            // session's stat cache only for a snapshot.json written before
+            // captures carried it. Before that field existed the cache was
+            // the ONLY source, and it holds an item only if a plan happened
+            // to touch it this session, which is why an account's whole
+            // item list rendered neutral except for the two or three items
+            // the last plan used.
+            string rarity = ItemRarityResolution.Resolve(row.Rarity, RarityFor(row.ItemId));
             var icon = IconControls.CreateItemIcon(
-                rowPanel, row.IconUrl, rarity, 2, 1, ItemIconTiers.BagSlotIconSize);
+                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity), 2, 1,
+                ItemIconTier.BagSlot);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2585,10 +2595,13 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel,
             };
 
-            // Same component as the item rows; no rarity, so neutral.
+            // Same component as the item rows, at the wallet row's own named
+            // tier; a currency has no rarity to resolve, so neutral by
+            // intent rather than by omission.
             var icon = IconControls.CreateItemIcon(
-                rowPanel, entry.IconUrl, (string)null, 2, 2,
-                tooltipText: string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
+                rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
+                ItemIconTier.WalletRow,
+                string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
             // Never display raw currency IDs (repo invariant). Same two
             // columns as the item run above, so one header pair shape

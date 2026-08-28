@@ -211,8 +211,8 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, row.IconUrl, row.Rarity, IconX, 0,
-                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
+                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(row.Rarity),
+                IconX, 0, ItemIconTier.BagSidebar);
 
             var font = UiFonts.Body;
             string fullName = row.Label ?? "";

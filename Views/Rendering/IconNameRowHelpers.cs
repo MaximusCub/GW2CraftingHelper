@@ -70,17 +70,54 @@ namespace GW2CraftingHelper.Views.Rendering
 
         /// <summary>
         /// Builds the rarity-framed icon and the ellipsized, rarity-colored,
-        /// drop-shadowed name label immediately to its right. rightEdge/
-        /// qtyWidth/nameGap are threaded straight into
+        /// drop-shadowed name label immediately to its right, at a named
+        /// <see cref="ItemIconTier"/>. rightEdge/qtyWidth/nameGap are
+        /// threaded straight into
         /// PlanRelayoutMath.NameMaxWidthBeforeColumn exactly as each
         /// pre-extraction caller computed them inline (untouched - this
         /// helper does not change that arithmetic, only where it is
         /// called from).
+        /// <para>
+        /// One <paramref name="resolvedRarity"/> feeds BOTH the frame and
+        /// the name colour, so the two cannot disagree. It is what
+        /// <c>ItemRarityResolution.Resolve</c> returned; null is a
+        /// legitimately unknown rarity and renders neutral in both places.
+        /// </para>
+        /// </summary>
+        internal static IconNameHandle CreateIconAndEllipsizedName(
+            Panel rowPanel, string iconUrl, string resolvedRarity, int iconX, int iconY,
+            string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
+            ItemIconTier tier)
+        {
+            return Build(
+                rowPanel, iconUrl, resolvedRarity, iconX, iconY, fullName, font,
+                rightEdge, qtyWidth, nameGap, nameX, nameY,
+                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier));
+        }
+
+        /// <summary>
+        /// The pre-tier signature, kept ONLY so the two row builders owned
+        /// by in-flight branches keep compiling until they migrate:
+        /// Views/PlanHistoryTabContent.cs (both defaults, becomes
+        /// ItemIconTier.PlanHistoryDetail) and Views/RankerTabContent.cs
+        /// (iconSize only, becomes ItemIconTier.BagSlot). The defaults stay
+        /// because those two calls rely on them; the tests workflow's
+        /// named-tier step allow-lists exactly those files.
         /// </summary>
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
             string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
             int iconSize = 32, int borderThickness = 1)
+        {
+            return Build(
+                rowPanel, iconUrl, rarity, iconX, iconY, fullName, font,
+                rightEdge, qtyWidth, nameGap, nameX, nameY, iconSize, borderThickness);
+        }
+
+        private static IconNameHandle Build(
+            Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,
+            string fullName, BitmapFont font, int rightEdge, int qtyWidth, int nameGap, int nameX, int nameY,
+            int iconSize, int borderThickness)
         {
             var iconFrame = IconControls.CreateItemIcon(
                 rowPanel, iconUrl, rarity, iconX, iconY, iconSize, borderThickness);

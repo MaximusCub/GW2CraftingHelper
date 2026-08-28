@@ -861,10 +861,12 @@ namespace GW2CraftingHelper.Views.Rendering
             // panels have no tint/filter property, so a translucent black
             // overlay approximates gw2e's grayscale+opacity filter).
             int iconX = shape.IconX;
-            Color frameColor = dimmed ? new Color(60, 60, 60) : RarityColors.GetRarityBorderColor(node.Rarity);
+            ItemIconFrame frame = dimmed
+                ? ItemIconFrame.Explicit(new Color(60, 60, 60))
+                : ItemIconFrame.ForRarity(node.Rarity);
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, node.IconUrl, frameColor, iconX, PlanContentHeightMath.TreeRowIconPad,
-                TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconBorder);
+                rowPanel, node.IconUrl, frame, iconX, PlanContentHeightMath.TreeRowIconPad,
+                ItemIconTier.BagSidebar);
             Panel iconScrim = null;
             if (dimmed)
             {

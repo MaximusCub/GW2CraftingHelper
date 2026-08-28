@@ -14,41 +14,93 @@ namespace GW2CraftingHelper.Views.Rendering
     /// a tooltip on the deepest control and never bubbles.
     /// <see cref="CreateUnframedIcon"/> and <see cref="CreateAssetIcon"/>
     /// are the only unframed paths, and say why themselves.
+    /// <para>
+    /// THE RULE, stated once: every framed item icon goes through
+    /// <see cref="CreateItemIcon"/> at a named <see cref="ItemIconTier"/>,
+    /// with an <see cref="ItemIconFrame"/> that says why it is the colour it
+    /// is. No pixel size and no rarity string reaches this file from a call
+    /// site that did not name one.
+    /// </para>
     /// </summary>
     internal static class IconControls
     {
         // --- Icon helper ---
 
         /// <summary>
-        /// Item icon inside a rarity-colored frame. Defaults to the legacy
-        /// small size (32px icon, 1px border = 34px overall), still used by
-        /// the compact sites outside the two-tier ruling (wallet rows,
-        /// search suggestions, Plan History); the Crafting Plan tab's rows
-        /// pass ItemIconTiers.BagSidebarIconSize and the plan header /
-        /// Snapshot grid / Ranker rows pass ItemIconTiers.BagSlotIconSize.
+        /// THE item icon. Every framed icon in the module is built here, at
+        /// a NAMED <see cref="ItemIconTier"/> and with an explicit
+        /// <see cref="ItemIconFrame"/> - no bare pixel size, no bare rarity
+        /// string, no defaults. Both halves of that rule exist because both
+        /// were opt-in before and both silently drifted: eleven call sites
+        /// each chose their own size, and a call site with no rarity to hand
+        /// looked identical to one that had looked and found none.
+        ///
+        /// <para>
+        /// The frame's thickness comes from the tier
+        /// (<c>ItemIconTiers.BorderThickness</c>), never from the caller, so
+        /// two icons at the same tier cannot differ. Reserve room with
+        /// <c>ItemIconTiers.FrameSize(tier)</c> - art plus both borders -
+        /// rather than restating the sum.
+        /// </para>
+        ///
+        /// <para>
+        /// Returns the outer frame Panel so a caller whose icon position
+        /// depends on panelWidth (currently only the plan header's centered
+        /// title) can reposition it on relayout without recreating it.
         /// <paramref name="tooltipText"/> is for an icon whose subject is
         /// not already spelled out beside it; callers wanting the full item
         /// hover stamp it after, via <see cref="ApplyRichToIconTree"/>.
+        /// </para>
+        /// </summary>
+        internal static Panel CreateItemIcon(
+            Panel parent, string iconUrl, ItemIconFrame frame, int x, int y,
+            ItemIconTier tier, string tooltipText = null)
+        {
+            return CreateFramedIcon(
+                parent, iconUrl, frame.Color, x, y,
+                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltipText);
+        }
+
+        /// <summary>
+        /// The pre-tier signature, kept ONLY so the call sites owned by
+        /// in-flight branches keep compiling until they migrate; the
+        /// defaults are gone so nothing new can drift into it by accident,
+        /// and the tests workflow's "Every item icon renders at a named
+        /// tier" step allow-lists exactly the files below and fails on any
+        /// other caller.
+        ///
+        /// <para>
+        /// Remaining callers, each a one-line change to the tier overload
+        /// once its branch lands: Views/PlanHistoryTabContent.cs
+        /// (PlanHistoryDetail), Views/RankerTabContent.cs (InlineCurrency),
+        /// Views/Rendering/RichTooltipSurface.cs (TooltipHeader),
+        /// Views/Rendering/SummarySectionRenderer.cs (InlineCurrency).
+        /// </para>
         /// </summary>
         internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, string rarity, int x, int y,
-            int iconSize = 32, int borderThickness = 1, string tooltipText = null)
+            int iconSize, int borderThickness, string tooltipText = null)
         {
-            return CreateItemIcon(
+            return CreateFramedIcon(
                 parent, iconUrl, RarityColors.GetRarityBorderColor(rarity), x, y,
                 iconSize, borderThickness, tooltipText);
         }
 
         /// <summary>
-        /// Same as above with an explicit frame color, for dimmed
-        /// not-crafted subtree rows (neutral grey frame instead of rarity).
-        /// Returns the outer frame Panel so a caller whose icon position
-        /// depends on panelWidth (currently only the plan header's centered
-        /// title) can reposition it on relayout without recreating it.
+        /// The explicit-colour twin of the pre-tier signature above, kept on
+        /// the same terms and for the same allow-listed callers.
         /// </summary>
         internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, Color frameColor, int x, int y,
-            int iconSize = 32, int borderThickness = 1, string tooltipText = null)
+            int iconSize, int borderThickness, string tooltipText = null)
+        {
+            return CreateFramedIcon(
+                parent, iconUrl, frameColor, x, y, iconSize, borderThickness, tooltipText);
+        }
+
+        private static Panel CreateFramedIcon(
+            Panel parent, string iconUrl, Color frameColor, int x, int y,
+            int iconSize, int borderThickness, string tooltipText)
         {
             int frameSize = iconSize + borderThickness * 2;
             var frame = new Panel()
