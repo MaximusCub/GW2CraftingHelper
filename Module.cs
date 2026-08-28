@@ -240,6 +240,13 @@ namespace TaimisToolbench
         private int _liveGw2BuildId;
         private int _corpusProbeRunning;
 
+        // The corpus sweep (RecipeCorpusRefresher), phase 2: refetches the
+        // content of every held recipe once per build, so an in-place
+        // ingredient change is repaired rather than served stale forever.
+        // Sequenced after a green probe and never awaited by anything.
+        private RecipeCorpusRefresher _recipeCorpusRefresher;
+        private int _corpusRefreshRunning;
+
         // Bumped only by ClearCache; a
         // fetch that captured an older epoch before starting must discard
         // its result rather than commit over a cleared cache. A bare
@@ -548,6 +555,11 @@ namespace TaimisToolbench
             var recipeService = new RecipeService(recipeApi, cacheStore: recipeCacheStore);
             _recipeCorpusVerifier = new RecipeCorpusVerifier(
                 _httpClient, recipeCacheStore, recipeService.InvalidateSearch);
+            _recipeCorpusRefresher = new RecipeCorpusRefresher(
+                _httpClient,
+                recipeCacheStore,
+                recipeService.InvalidateSearch,
+                message => ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", message));
 
             // Async build ID fetch: stamps provenance and licenses the
             // corpus probe - never a wipe. The overlay is already loaded
@@ -638,6 +650,7 @@ namespace TaimisToolbench
                 // re-checks with the corpus count for the seed-swap case.
                 if (store.VerifiedKnownRecipeCount == store.GetKnownPositiveRecipeIds().Count)
                 {
+                    KickCorpusRefresh(buildId);
                     return;
                 }
             }
@@ -665,6 +678,14 @@ namespace TaimisToolbench
                             ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe corpus verification failed ({result.Error?.GetType().Name} - {result.Error?.Message}); recipes added since {lastVerified} may show as UNKNOWN. Retrying at the next plan generation.");
                             break;
                     }
+
+                    if (result.Status != CorpusVerificationStatus.Failed)
+                    {
+                        // Only behind a reachable API: a sweep launched
+                        // straight after a failed probe would spend 67
+                        // requests failing at the first one.
+                        KickCorpusRefresh(buildId);
+                    }
                 }
                 catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
                 {
@@ -676,6 +697,117 @@ namespace TaimisToolbench
                     Volatile.Write(ref _corpusProbeRunning, 0);
                 }
             });
+        }
+
+        /// <summary>
+        /// Phase 2 of corpus maintenance, after a green probe: refetches
+        /// the content of every positive recipe the module holds, so a
+        /// recipe whose ingredients changed in place (KNOWN-ISSUES #48)
+        /// stops being served stale. Resumable across launches, one run at
+        /// a time, and awaited by nothing - plan generation keeps using the
+        /// best corpus it has while this improves it underneath.
+        /// </summary>
+        private void KickCorpusRefresh(int buildId)
+        {
+            var store = _recipeCacheStore;
+            var refresher = _recipeCorpusRefresher;
+            if (buildId == 0 || store == null || refresher == null || !store.CorpusUsable)
+            {
+                return;
+            }
+
+            if (store.CorpusRefreshBuildId == buildId && store.CorpusRefreshComplete)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref _corpusRefreshRunning, 1, 0) != 0)
+            {
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var priority = PriorityRecipeIds.FromItemIds(store, ReadPriorityItemIds());
+                    var result = await refresher.RefreshAsync(
+                        buildId,
+                        store.GetKnownPositiveRecipeIds(),
+                        priority,
+                        _buildIdCts.Token);
+
+                    switch (result.Status)
+                    {
+                        case CorpusRefreshStatus.Completed:
+                            ModuleLog.Shared.Write(ModuleLogLevel.Info, "startup", $"Recipe corpus content refreshed at build {buildId}: {result.RecipesUpdated} recipe(s) changed since the last build, {result.RecipesFetched} refetched over {result.RequestCount} request(s).");
+                            break;
+                        case CorpusRefreshStatus.Interrupted:
+                            ModuleLog.Shared.Write(ModuleLogLevel.Warn, "startup", $"Recipe corpus content refresh interrupted after {result.RequestCount} request(s) ({result.Error?.GetType().Name} - {result.Error?.Message}); {result.RecipesUpdated} recipe(s) already repaired, resuming at the next launch.");
+                            break;
+                    }
+                }
+                catch (Exception ex) when (ex is OperationCanceledException || ex is ObjectDisposedException)
+                {
+                    // Unloaded mid-sweep: _buildIdCts is cancelled and
+                    // _httpClient disposed before this task can finish. The
+                    // cursor written after the last completed batch is what
+                    // the next launch resumes from.
+                }
+                finally
+                {
+                    Volatile.Write(ref _corpusRefreshRunning, 0);
+                }
+            });
+        }
+
+        /// <summary>
+        /// The item ids the user actually depends on, for the sweep's
+        /// ordering: Ranker watchlist, the restored plan, plan history.
+        /// Read off disk rather than off the loaded fields, because the
+        /// sweep starts from a background build-id fetch that can beat
+        /// LoadAsync to them. Ordering input only - the sweep covers every
+        /// held recipe regardless, so a source that reads as empty costs
+        /// priority, never coverage.
+        /// </summary>
+        private IReadOnlyList<int> ReadPriorityItemIds()
+        {
+            var itemIds = new List<int>();
+            try
+            {
+                var watchlist = _rankerStore?.Load();
+                if (watchlist?.Entries != null)
+                {
+                    foreach (var entry in watchlist.Entries)
+                    {
+                        itemIds.Add(entry.ItemId);
+                    }
+                }
+
+                // The already-restored plan, not a second LoadLatest():
+                // that call reports a discarded result to the user, and
+                // reading the file twice would say it twice.
+                var plan = _pendingPlanRestore?.Plan;
+                if (plan?.RequestItems != null)
+                {
+                    foreach (var item in plan.RequestItems)
+                    {
+                        itemIds.Add(item.ItemId);
+                    }
+                }
+
+                var history = _planHistoryStore?.Load();
+                if (history?.Entries != null)
+                {
+                    itemIds.AddRange(PlanHistoryItemIds.ForEntries(history.Entries));
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "startup", $"Corpus sweep ordering inputs unavailable, sweeping in id order: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            return itemIds;
         }
 
         /// <summary>

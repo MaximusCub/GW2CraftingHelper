@@ -23,7 +23,10 @@ namespace TaimisToolbench.Services
         internal const string SchemaVersion = "2026-08-15";
 
         // /v2 page cap, the same batch idiom as ItemMetadataService.
-        private const int BatchSize = 200;
+        // Internal so RecipeCorpusRefresher chunks its sweep at the same
+        // width this client would split on anyway, rather than restating
+        // the cap and drifting from it.
+        internal const int BatchSize = 200;
 
         private readonly HttpClient _http;
 
