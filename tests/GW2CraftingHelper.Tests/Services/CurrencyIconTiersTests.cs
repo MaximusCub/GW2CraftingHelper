@@ -64,10 +64,15 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void RankerCurrencyShortfallLines_DrawAtTheBarTier()
+        public void RankerCurrencyShortfallLines_DrawAtTheListTier()
         {
-            // A shortfall sub-line reads as a sentence, not a table row.
-            Assert.Equal(CurrencyIconTiers.WalletBarIconSize, RankerRowLayout.CurrencyIconSize);
+            // Owner ruling, 2026-08-27, superseding this line's original
+            // bar-tier seat: the Ranker's breakdown is a currency LIST - a
+            // grid of named entries with their own amounts - and it reads at
+            // the size the game's wallet list uses. The line carries its own
+            // taller pitch to hold it.
+            Assert.Equal(CurrencyIconTiers.WalletListIconSize, RankerRowLayout.CurrencyIconSize);
+            Assert.True(RankerRowLayout.CurrencyLineHeight >= RankerRowLayout.CurrencyIconSize);
         }
 
         // --- The heights that carry them ---

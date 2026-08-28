@@ -59,7 +59,7 @@ Models/PlanViewModel.cs                                                         
 Models/PriceBasis.cs                                                                     32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                         59
-Models/RankerWatchlistEntry.cs                                                           77
+Models/RankerWatchlistEntry.cs                                                           86
 Models/RecipeNode.cs                                                                     49
 Models/RecipeOption.cs                                                                   32
 Models/RecipeSheetSavingsOpportunity.cs                                                  64
@@ -172,7 +172,7 @@ Services/RankerRarityAdoption.cs                                                
 Services/RankerReadinessCalculator.cs                                                   666
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             343
+Services/RankerRowLayout.cs                                                             452
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -264,7 +264,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                         1246
-Views/RankerTabContent.cs                                                              2489
+Views/RankerTabContent.cs                                                              2578
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              184
@@ -460,8 +460,8 @@ tests/GW2CraftingHelper.Tests/Services/RankerPriorityOrderingTests.cs           
 tests/GW2CraftingHelper.Tests/Services/RankerRarityAdoptionTests.cs                     130
 tests/GW2CraftingHelper.Tests/Services/RankerReadinessCalculatorTests.cs                741
 tests/GW2CraftingHelper.Tests/Services/RankerResultCacheTests.cs                        215
-tests/GW2CraftingHelper.Tests/Services/RankerRowLayoutTests.cs                          422
-tests/GW2CraftingHelper.Tests/Services/RankerStoreTests.cs                              249
+tests/GW2CraftingHelper.Tests/Services/RankerRowLayoutTests.cs                          470
+tests/GW2CraftingHelper.Tests/Services/RankerStoreTests.cs                              272
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                     124
 tests/GW2CraftingHelper.Tests/Services/RecipeCacheStoreTests.cs                         998
 tests/GW2CraftingHelper.Tests/Services/RecipeClientFactoryTests.cs                      143

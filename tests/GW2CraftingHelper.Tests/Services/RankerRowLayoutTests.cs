@@ -104,14 +104,62 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void TotalRowHeight_IsTheBaseRowPlusOneLinePerSubLine()
+        public void ARowWithNothingBelowItsHeadline_IsExactlyTheBaseRowTall()
         {
-            Assert.Equal(RankerRowLayout.RowHeight, RankerRowLayout.TotalRowHeight(0));
-            Assert.Equal(RankerRowLayout.RowHeight + RankerRowLayout.SubLineHeight,
-                RankerRowLayout.TotalRowHeight(1));
-            Assert.Equal(RankerRowLayout.RowHeight + 3 * RankerRowLayout.SubLineHeight,
-                RankerRowLayout.TotalRowHeight(3));
-            Assert.Equal(RankerRowLayout.RowHeight, RankerRowLayout.TotalRowHeight(-4));
+            // Compact mode's floor, and an unmeasured row's height.
+            var empty = RankerRowLayout.SubLines(hasGates: false, currencyLines: 0, noteLines: 0);
+
+            Assert.Equal(RankerRowLayout.RowHeight, empty.TotalHeight);
+            Assert.Equal(-1, empty.GateY);
+            Assert.Equal(-1, empty.CurrencyY);
+            Assert.Equal(-1, empty.NoteY);
+        }
+
+        [Fact]
+        public void CompactRows_AreShorterThanFullOnesByTheDetailTheyDrop()
+        {
+            var compact = RankerRowLayout.SubLines(hasGates: true, currencyLines: 0, noteLines: 0);
+            var full = RankerRowLayout.SubLines(hasGates: true, currencyLines: 2, noteLines: 1);
+
+            Assert.True(compact.TotalHeight < full.TotalHeight);
+            Assert.Equal(-1, compact.CurrencyY);
+            Assert.Equal(-1, compact.NoteY);
+
+            // Same gate strip in both: compact drops the explanation, never
+            // the comparison.
+            Assert.Equal(compact.GateY, full.GateY);
+        }
+
+        [Fact]
+        public void EachBlockStartsBelowTheOneBeforeIt_AndInsideTheRow()
+        {
+            var block = RankerRowLayout.SubLines(hasGates: true, currencyLines: 3, noteLines: 2);
+
+            Assert.True(block.GateY >= RankerRowLayout.RowHeight);
+            Assert.True(block.CurrencyY >= block.GateY + RankerRowLayout.SubLineHeight);
+            Assert.True(block.NoteY
+                >= block.CurrencyY + 3 * RankerRowLayout.CurrencyLineHeight);
+            Assert.True(block.NoteY + 2 * RankerRowLayout.SubLineHeight <= block.TotalHeight);
+        }
+
+        [Fact]
+        public void CurrencyLinesUseTheirOwnPitch_BecauseTheirIconIsTallerThanText()
+        {
+            var one = RankerRowLayout.SubLines(hasGates: true, currencyLines: 1, noteLines: 0);
+            var two = RankerRowLayout.SubLines(hasGates: true, currencyLines: 2, noteLines: 0);
+
+            Assert.Equal(RankerRowLayout.CurrencyLineHeight, two.TotalHeight - one.TotalHeight);
+            Assert.True(RankerRowLayout.CurrencyLineHeight > RankerRowLayout.SubLineHeight);
+            Assert.True(RankerRowLayout.CurrencyLineHeight
+                >= RankerRowLayout.CurrencyIconSize);
+        }
+
+        [Fact]
+        public void NegativeLineCountsAreClamped()
+        {
+            var block = RankerRowLayout.SubLines(hasGates: false, currencyLines: -3, noteLines: -1);
+
+            Assert.Equal(RankerRowLayout.RowHeight, block.TotalHeight);
         }
 
         [Theory]

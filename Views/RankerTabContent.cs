@@ -47,6 +47,12 @@ namespace GW2CraftingHelper.Views
         private const int AddButtonWidth = 72;
         /// <summary>Clearance between the mode strip and the Add button to its left.</summary>
         private const int ModeGap = 8;
+
+        // Blish's Checkbox draws its 32px box at x-9 and its label at x+20
+        // (measured, decompiled 1.3.0), so its true footprint is wider than
+        // its Location suggests and starts left of it.
+        private const int CheckboxArtOverhang = 9;
+        private const int CheckboxTextInset = 20;
         private const int BannerHeight = 30;
 
         // Vertical centring inside the 60px tier-1 main line (see
@@ -57,6 +63,15 @@ namespace GW2CraftingHelper.Views
         private const int MainLineChipY = 19;
         private const int MainLineButtonY = 16;
         private const int MainLineIconY = 3;
+
+        /// <summary>
+        /// The promoted readiness figure sits one tier above the rest of the
+        /// main line, so it is centred against the Body text beside it rather
+        /// than sharing its top edge - a taller line box on the same y reads
+        /// as a row that sags.
+        /// </summary>
+        private static int ReadyLineY =>
+            MainLineTextY - (UiFonts.Status.LineHeight - UiFonts.Body.LineHeight) / 2;
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
@@ -143,6 +158,7 @@ namespace GW2CraftingHelper.Views
         private Label _modeLabel;
         private readonly List<ModeRadio> _modeRadios = new List<ModeRadio>();
         private Label _statusLabel;
+        private Checkbox _compactCheckbox;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
         private Label _bannerLabel;
@@ -312,6 +328,13 @@ namespace GW2CraftingHelper.Views
         private List<RankerWatchlistEntry> Entries => _watchlist.Entries;
 
         private RankerMode Mode => _watchlist.Mode;
+
+        /// <summary>
+        /// Headline plus gate percentages only - see RenderSubLines. Persisted
+        /// beside the mode, because it is the same kind of choice: how the
+        /// user wants to read the table, not what the table says.
+        /// </summary>
+        private bool Compact => _watchlist.Compact;
 
         // ---------------------------------------------------------------
         // Comparison mode
@@ -635,6 +658,18 @@ namespace GW2CraftingHelper.Views
 
             _spinner = InlineSpinner.Create(_toolbarPanel, InlineSpinnerLayout.SnapshotStatusSize);
 
+            // Blish's own Checkbox, art and all - the module's established
+            // shape for a persisted on/off, and no glyph anywhere near it.
+            _compactCheckbox = new Checkbox
+            {
+                Text = "Compact",
+                Checked = Compact,
+                Location = new Point(0, 12),
+                Parent = _toolbarPanel,
+            };
+            TooltipFacility.ApplyPlain(_compactCheckbox, CompactTooltip);
+            _compactCheckbox.CheckedChanged += (_, e) => OnCompactChanged(e.Checked);
+
             _refreshButton = new FeedbackButton
             {
                 Text = "Refresh",
@@ -643,6 +678,25 @@ namespace GW2CraftingHelper.Views
                 Parent = _toolbarPanel,
             };
             _refreshButton.Click += (_, __) => OnRefreshClicked();
+        }
+
+        private const string CompactTooltip =
+            "Show each row's headline and its five category percentages only, so more rows fit on screen. The currency detail and the notes come back when you switch it off.";
+
+        /// <summary>
+        /// A display choice, not a measurement one: nothing is recomputed and
+        /// no answer changes, so both modes' answer sets survive it untouched.
+        /// </summary>
+        private void OnCompactChanged(bool compact)
+        {
+            if (compact == _watchlist.Compact)
+            {
+                return;
+            }
+
+            _watchlist.Compact = compact;
+            Persist();
+            RebuildRows();
         }
 
         private void BuildColumnHeader(Container container, int width)
@@ -681,9 +735,17 @@ namespace GW2CraftingHelper.Views
             _toolbarPanel.Size = new Point(width, ToolbarHeight);
             _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);
 
+            // The checkbox's art hangs 9px left of its own Location (Blish
+            // draws it at x-9), so the width the toolbar reserves for it
+            // includes that overhang and the control is seated 9px inside.
+            int compactWidth = CheckboxArtOverhang + CheckboxTextInset
+                + LabelHelpers.MeasureWith(UiFonts.Caption)(_compactCheckbox.Text);
             var toolbar = RankerRowLayout.Toolbar(
-                barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap);
+                barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
+                compactWidth);
             _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
+            _compactCheckbox.Location = new Point(
+                toolbar.CompactX + CheckboxArtOverhang, _compactCheckbox.Location.Y);
             _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
@@ -1196,9 +1258,17 @@ namespace GW2CraftingHelper.Views
                 LabelHelpers.ApplyTagTooltip(row.Chip, ChipTooltip(metrics));
             }
 
+            // THE ROW'S TYPE RAMP. Two reading sizes exist (Caption 14,
+            // Body 16) and the promoted tiers above them are bold rather
+            // than merely bigger - see Views/Rendering/UiFonts. The item
+            // name and this percentage are what the table is FOR, so the
+            // percentage takes the Status tier; Days and the coin cell stay
+            // at Body; the gate strip, the currency detail and the notes sit
+            // at Caption, separated from each other by rhythm and indent
+            // rather than by a fourth size the ramp does not have.
             row.ReadyLabel = new Label
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = metrics == null ? RankerReadinessCalculator.DashText : RankerReadinessCalculator.FormatReadiness(metrics),
                 TextColor = metrics == null
                     ? RankerReadinessColors.Neutral
@@ -1207,7 +1277,7 @@ namespace GW2CraftingHelper.Views
                         : RankerReadinessColors.ForReadiness(metrics.Readiness),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, MainLineTextY),
+                Location = new Point(0, ReadyLineY),
                 Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
@@ -1277,8 +1347,8 @@ namespace GW2CraftingHelper.Views
             SetRowButtonEnabled(row.Remove, !_isRefreshing);
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
-            int subLines = RenderSubLines(row, bands);
-            row.Panel.Size = new Point(barWidth, RankerRowLayout.TotalRowHeight(subLines));
+            var subLines = RenderSubLines(row, bands);
+            row.Panel.Size = new Point(barWidth, subLines.TotalHeight);
 
             LayoutRow(row, bands, measureText: true);
         }
@@ -1363,20 +1433,38 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>Returns the number of sub-lines rendered.</summary>
-        private int RenderSubLines(RenderedRow row, in RankerRowLayout.Bands bands)
+        /// <summary>
+        /// The row's breakdown, under its headline. Returns the block the
+        /// row's height is taken from.
+        /// <para>
+        /// COMPACT MODE stops after the gate strip: the five category
+        /// percentages are the comparison, the currency detail and the notes
+        /// are the explanation, and a user comparing twenty rows wants the
+        /// former on screen at once (owner ruling, 2026-08-27). Nothing is
+        /// lost - the hidden detail is one toggle away, and the gate strip
+        /// itself still hovers with its own numbers.
+        /// </para>
+        /// </summary>
+        private RankerRowLayout.SubLineBlock RenderSubLines(
+            RenderedRow row, in RankerRowLayout.Bands bands)
         {
             var metrics = row.Metrics;
             if (metrics == null)
             {
-                return 0;
+                return RankerRowLayout.SubLines(false, 0, 0);
             }
 
-            int line = 0;
+            bool detail = !Compact;
+            int currencyLines = detail
+                ? RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count)
+                : 0;
+            var notes = detail ? BuildNotes(metrics) : EmptyNotes;
+            var block = RankerRowLayout.SubLines(true, currencyLines, notes.Count);
 
             // The gate breakdown, justified across the full sub-line band so
             // the five barriers read as one strip rather than a left-packed
             // sentence with dead space to its right.
-            int gateY = RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight;
+            int gateY = block.GateY;
             for (int i = 0; i < metrics.Gates.Count && i < RankerRowLayout.GateCellCount; i++)
             {
                 var gate = metrics.Gates[i];
@@ -1404,31 +1492,33 @@ namespace GW2CraftingHelper.Views
                 });
             }
 
-            line++;
-
-            int currencyLines = RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count);
-            int shown = Math.Min(
+            int shown = currencyLines == 0 ? 0 : Math.Min(
                 metrics.CurrencyShortfalls.Count,
                 RankerRowLayout.CurrenciesPerLine * RankerRowLayout.MaxCurrencyLines);
             for (int i = 0; i < shown; i++)
             {
                 var shortfall = metrics.CurrencyShortfalls[i];
-                int y = RankerRowLayout.RowHeight
-                    + (line + i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.SubLineHeight;
+                int y = block.CurrencyY
+                    + (i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.CurrencyLineHeight;
+
+                // The wallet-tier icon is taller than its own caption text,
+                // so the text centres on the ICON rather than the icon
+                // sitting on the text's line box.
+                int textY = y + (RankerRowLayout.CurrencyIconSize - UiFonts.Caption.LineHeight) / 2;
 
                 string fullName = CurrencyName(shortfall);
                 row.CurrencyNameFulls.Add(fullName);
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
                     row.Panel, CurrencyIconUrl(shortfall), (string)null,
-                    0, y + 1, RankerRowLayout.CurrencyIconSize, 1, fullName));
+                    0, y, RankerRowLayout.CurrencyIconSize, 1, fullName));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
                     Text = fullName,
-                    TextColor = Color.White,
+                    TextColor = ValueTextColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, y),
+                    Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
                 row.CurrencyValueLabels.Add(new Label
@@ -1438,32 +1528,31 @@ namespace GW2CraftingHelper.Views
                     TextColor = shortfall.Short > 0 ? ValueTextColor : RankerReadinessColors.ForReadiness(1.0),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, y),
+                    Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
             }
 
-            line += currencyLines;
-
-            foreach (string note in BuildNotes(metrics))
+            for (int i = 0; i < notes.Count; i++)
             {
                 row.NoteLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
-                    Text = note,
-                    TextColor = ValueTextColor,
+                    Text = notes[i],
+                    TextColor = DimColor,
                     AutoSizeWidth = false,
                     AutoSizeHeight = true,
                     Width = Math.Max(0, bands.SubLineWidth),
-                    Location = new Point(bands.SubLineX,
-                        RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight),
+                    Location = new Point(
+                        bands.SubLineX, block.NoteY + i * RankerRowLayout.SubLineHeight),
                     Parent = row.Panel,
                 });
-                line++;
             }
 
-            return line;
+            return block;
         }
+
+        private static readonly IReadOnlyList<string> EmptyNotes = new List<string>();
 
         private void LayoutRow(RenderedRow row, in RankerRowLayout.Bands bands, bool measureText)
         {
@@ -1482,7 +1571,7 @@ namespace GW2CraftingHelper.Views
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
             row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
+                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), ReadyLineY);
 
             if (row.Chip != null)
             {
@@ -1794,7 +1883,7 @@ namespace GW2CraftingHelper.Views
             return shortfall.Short.ToString("N0", CultureInfo.InvariantCulture) + " short";
         }
 
-        private IEnumerable<string> BuildNotes(RankerRowMetrics metrics)
+        private IReadOnlyList<string> BuildNotes(RankerRowMetrics metrics)
         {
             var notes = new List<string>();
 
