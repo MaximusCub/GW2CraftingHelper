@@ -346,6 +346,82 @@ jobs:
           # times and leave the long blocks in place with nothing to notice.
           python3 tools/comment-budgets.py --check
 
+      - name: Saved plans from older builds still load
+        shell: bash
+        run: |
+          # The corpus half of the compatibility gate. The loading half is
+          # PlanCompatibilityFixtureTests, which needs a Windows build; this
+          # runs here, in seconds, and catches the mistake that actually
+          # happens - bumping a schema version and shipping without leaving
+          # behind the file that proves the NEXT build can still read what
+          # this one wrote. tests/shared/plan_fixtures/README.md is the
+          # workflow; the one-liner is `dotnet test tests/TaimisToolbench.Tests`,
+          # which captures a missing fixture from the real serializer and
+          # fails telling you to git add it.
+          python3 - <<'PY'
+          import json, os, re, sys
+
+          FIXTURES = 'tests/shared/plan_fixtures'
+
+          def current(path, type_name, const):
+              text = open(path, encoding='utf-8').read()
+              body = text.split('class ' + type_name, 1)[1]
+              return int(re.search(r'public const int %s = (\d+);' % const, body).group(1))
+
+          families = [
+              ('plan-v', current('Models/PersistedPlan.cs', 'PersistedPlan', 'CurrentSchemaVersion')),
+              ('plan-history-index-v',
+               current('Models/PlanHistoryEntry.cs', 'PlanHistoryIndex', 'CurrentSchemaVersion')),
+          ]
+
+          bad = []
+          checked = 0
+          for prefix, shipped in families:
+              for version in range(1, shipped + 1):
+                  name = '%s%d.json' % (prefix, version)
+                  if not os.path.exists(os.path.join(FIXTURES, name)):
+                      bad.append('%s/%s is missing, but version %d shipped.' % (FIXTURES, name, version))
+
+          # Every file in the directory, variants included: a fixture whose
+          # name claims a version its bytes do not carry would be checked
+          # against the wrong contract and quietly prove nothing.
+          for name in sorted(os.listdir(FIXTURES)):
+              if not name.endswith('.json'):
+                  continue
+              stamp = re.search(r'-v(\d+)', name)
+              if stamp is None:
+                  bad.append('%s/%s does not name the version it pins.' % (FIXTURES, name))
+                  continue
+              claimed = int(stamp.group(1))
+              document = json.load(open(os.path.join(FIXTURES, name), encoding='utf-8'))
+              checked += 1
+              if document.get('SchemaVersion') != claimed:
+                  bad.append('%s/%s is stamped SchemaVersion %r, not %d.'
+                             % (FIXTURES, name, document.get('SchemaVersion'), claimed))
+              rows = document.get('RequestItems')
+              if name.startswith('plan-history-index-v'):
+                  rows = [r for entry in document.get('Entries', []) for r in entry.get('RequestItems', [])]
+              if not rows:
+                  bad.append('%s/%s carries no request at all, so it can prove nothing.'
+                             % (FIXTURES, name))
+                  continue
+              for row in rows:
+                  if 'ItemId' not in row or 'Quantity' not in row:
+                      bad.append('%s/%s has a request row missing ItemId/Quantity.' % (FIXTURES, name))
+
+          if bad:
+              print('The saved-plan compatibility corpus is incomplete.')
+              print('A plan written by any shipped build must still restore its request in')
+              print('every later build - these fixtures are what makes that checkable:')
+              for line in bad:
+                  print('  ' + line)
+              print('Run `dotnet test tests/TaimisToolbench.Tests` to capture a missing')
+              print('fixture from the real serializer, then git add it in the same commit')
+              print('as the bump. See %s/README.md.' % FIXTURES)
+              sys.exit(1)
+          print('%d saved-plan fixtures; every shipped schema version has one.' % checked)
+          PY
+
       - name: Public surface stays within its pinned count
         shell: bash
         run: |
