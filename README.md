@@ -207,7 +207,9 @@ process, all of it checkable from this repository:
   relative markdown link, and any source file growing past its pinned line
   budget ([`docs/file-budgets.txt`](docs/file-budgets.txt) - a ratchet
   introduced after one decomposed view quietly grew back past its
-  pre-refactor size with nothing watching).
+  pre-refactor size with nothing watching). Comment length is ratcheted the
+  same way ([`docs/comment-budgets.txt`](docs/comment-budgets.txt)), because
+  a line budget cannot tell a 50-line comment from 50 lines of code.
 - **UI changes are checked in the running game**, not asserted from a diff, and
   what was actually observed is recorded: each milestone record under
   [`dev/records/`](dev/records/) ends in an explicit `Gate:` line - PASS,

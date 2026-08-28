@@ -206,7 +206,13 @@ tag; see `docs/RELEASING.md`.
   needs them. Keep contiguous comment blocks to roughly 12 lines: past
   that, the invariant a caller must not violate stays inline and the
   narrative moves to `docs/ARCHITECTURE.md` under a section the comment
-  then points at. State a rule once, canonically, and point at it from the
+  then points at. That length is counted, not just stated:
+  [`docs/comment-budgets.txt`](docs/comment-budgets.txt) pins how many
+  over-length blocks each tracked `.cs` file carries - inline `//` runs
+  over 12 lines and XML `///` runs over 30, counted separately - and CI
+  fails when a count goes up. After a cleanup, re-pin in the same commit
+  with `python3 tools/comment-budgets.py > docs/comment-budgets.txt`.
+  State a rule once, canonically, and point at it from the
   other sites rather than restating it - a comment claiming to "mirror X
   exactly" promises a synchronisation nothing enforces.
 - **Cite documents by repo-relative path.** A `.md` filename in a `.cs`
