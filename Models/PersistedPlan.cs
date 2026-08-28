@@ -45,8 +45,16 @@ namespace GW2CraftingHelper.Models
         /// here, one line from the version.
         /// </para>
         /// </summary>
+        /// <remarks>
+        /// Last moved by SnapshotItemEntry.Rarity, which is purely ADDITIVE
+        /// (see tests/shared/persisted_plan_schema.txt's one-line diff):
+        /// Newtonsoft leaves an absent field at its "" initializer, so a
+        /// plan or snapshot written before the field existed still
+        /// deserializes correctly and <see cref="CurrentSchemaVersion"/>
+        /// stays at 3. A bump here would cost every saved plan on disk.
+        /// </remarks>
         public const string SchemaShapeHash =
-            "4b81071d80ce7c73fd04145a9d4c3cff5a187d6e89ba80b8e5bb0f3e5c8e8df4";
+            "76417b936a8017c8f300238dba4d0411da0e2615516e0ecc65b27f0521e09461";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
