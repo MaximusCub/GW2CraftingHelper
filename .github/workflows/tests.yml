@@ -336,6 +336,16 @@ jobs:
           fi
           echo "Every budgeted file is within its entry."
 
+      - name: Comment blocks stay within their pinned counts
+        shell: bash
+        run: |
+          # A ratchet, not a metric. docs/comment-budgets.txt explains itself;
+          # this is the half that has teeth. The line-budget step above counts
+          # total lines, which makes a 50-line comment indistinguishable from
+          # 50 lines of code - so the August comment sweep could land three
+          # times and leave the long blocks in place with nothing to notice.
+          python3 tools/comment-budgets.py --check
+
       - name: Public surface stays within its pinned count
         shell: bash
         run: |
