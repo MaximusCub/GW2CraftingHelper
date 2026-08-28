@@ -1695,7 +1695,9 @@ namespace TaimisToolbench.Views
         {
             try
             {
-                await Task.Delay(SearchDebounceMs, token);
+                // Not onto a captured context; MainThreadMarshal below is the
+                // way back to the UI thread (ResizeSettleDebounce says why).
+                await Task.Delay(SearchDebounceMs, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
