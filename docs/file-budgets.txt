@@ -111,7 +111,7 @@ Services/Gw2AccountRecipeClient.cs                                              
 Services/Gw2AccountSnapshotService.cs                                                   491
 Services/Gw2ItemApiClient.cs                                                            201
 Services/Gw2PriceApiClient.cs                                                            66
-Services/Gw2RecipeApiClient.cs                                                          203
+Services/Gw2RecipeApiClient.cs                                                          206
 Services/GzipJsonFile.cs                                                                 60
 Services/HeaderCellMath.cs                                                              135
 Services/IAccountRecipeClient.cs                                                         13
@@ -190,7 +190,9 @@ Services/Recipes/IRecipeCacheStore.cs                                           
 Services/Recipes/InMemoryRecipeCacheStore.cs                                             56
 Services/Recipes/ItemNameSeedData.cs                                                     56
 Services/Recipes/OverlayRecipeCacheStore.cs                                             567
+Services/Recipes/PriorityRecipeIds.cs                                                   101
 Services/Recipes/RecipeCacheSerializer.cs                                               256
+Services/Recipes/RecipeCorpusRefresher.cs                                               434
 Services/Recipes/RecipeCorpusVerifier.cs                                                257
 Services/Recipes/SeededRecipeCacheStore.cs                                              215
 Services/RecipesColumnMath.cs                                                            79
