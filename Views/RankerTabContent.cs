@@ -1459,13 +1459,18 @@ namespace GW2CraftingHelper.Views
                 ? RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count)
                 : 0;
             var notes = detail ? BuildNotes(metrics) : EmptyNotes;
-            var block = RankerRowLayout.SubLines(true, currencyLines, notes.Count);
+
+            // A measured row always has gates; one that somehow has none
+            // must not reserve a line for a strip it will not draw.
+            bool hasGates = metrics.Gates != null && metrics.Gates.Count > 0;
+            var block = RankerRowLayout.SubLines(hasGates, currencyLines, notes.Count);
 
             // The gate breakdown, justified across the full sub-line band so
             // the five barriers read as one strip rather than a left-packed
             // sentence with dead space to its right.
             int gateY = block.GateY;
-            for (int i = 0; i < metrics.Gates.Count && i < RankerRowLayout.GateCellCount; i++)
+            int gateCount = hasGates ? metrics.Gates.Count : 0;
+            for (int i = 0; i < gateCount && i < RankerRowLayout.GateCellCount; i++)
             {
                 var gate = metrics.Gates[i];
                 row.GateNameLabels.Add(new Label
@@ -2097,9 +2102,7 @@ namespace GW2CraftingHelper.Views
             _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
             Persist();
             RebuildRows();
-            SetStatus(Mode == RankerMode.Cascade
-                ? "Order changed - press Refresh to recalculate the rows below it."
-                : "Order changed. It applies in \"" + CascadeModeItem + "\" mode.", isError: false);
+            SetStatus("Order changed - press Refresh to recalculate the rows below it.", isError: false);
         }
 
         private void RemoveRow(int index)
