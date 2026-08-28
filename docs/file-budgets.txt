@@ -148,7 +148,7 @@ Services/PhaseOrdinalGuard.cs                                                   
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
 Services/PillTooltipTextComposer.cs                                                     224
-Services/PlanContentHeightMath.cs                                                       427
+Services/PlanContentHeightMath.cs                                                       474
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                            82
@@ -224,7 +224,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    408
+Services/SummarySectionLayoutMath.cs                                                    526
 Services/TableSortState.cs                                                              105
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
@@ -291,7 +291,7 @@ Views/Rendering/ShoppingBadgeColors.cs                                          
 Views/Rendering/ShoppingListSectionRenderer.cs                                          495
 Views/Rendering/SortableHeaderCells.cs                                                  230
 Views/Rendering/SortableHeaderLabel.cs                                                   52
-Views/Rendering/SummarySectionRenderer.cs                                               922
+Views/Rendering/SummarySectionRenderer.cs                                               955
 Views/Rendering/TableHeaderStyle.cs                                                      70
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
@@ -405,7 +405,7 @@ tests/GW2CraftingHelper.Tests/Services/PhaseOrdinalGuardTests.cs                
 tests/GW2CraftingHelper.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/GW2CraftingHelper.Tests/Services/PillSubduingTooltipBuilderTests.cs               130
 tests/GW2CraftingHelper.Tests/Services/PillTooltipTextComposerTests.cs                  284
-tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    533
+tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    564
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryLabelsTests.cs                         77
@@ -503,7 +503,7 @@ tests/GW2CraftingHelper.Tests/Services/SourceFilterFlowLayoutTests.cs           
 tests/GW2CraftingHelper.Tests/Services/StatusStoreTests.cs                              116
 tests/GW2CraftingHelper.Tests/Services/StatusTextTests.cs                               345
 tests/GW2CraftingHelper.Tests/Services/StatusUpdateGuardTests.cs                         33
-tests/GW2CraftingHelper.Tests/Services/SummarySectionLayoutMathTests.cs                 537
+tests/GW2CraftingHelper.Tests/Services/SummarySectionLayoutMathTests.cs                 856
 tests/GW2CraftingHelper.Tests/Services/TableSortStateTests.cs                           192
 tests/GW2CraftingHelper.Tests/Services/TextWrapMathTests.cs                             297
 tests/GW2CraftingHelper.Tests/Services/TooltipComposerContentTests.cs                   215
