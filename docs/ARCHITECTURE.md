@@ -833,15 +833,37 @@ between its index row and its blob.
 **Plan History was already split** along the same line, across two files
 rather than within one: the index row in `plan_history.json` carries the
 request identity, and the expensive result lives in a per-entry blob. A
-`PersistedPlan` bump therefore already discarded blobs and kept rows, and
-needed no change here. Its own `PlanHistoryIndex.CurrentSchemaVersion`
-remains all-or-nothing for the index, which is the one place a bump can
-still cost the user data.
+`PersistedPlan` bump therefore already discarded blobs and kept rows.
+
+**The index answers the same contract by a different mechanism.** It is a
+*collection*, so its compatibility unit is the row, not a layer - there is
+no cheaper half to fall back to, and a user who loses 200 saved plans is
+no happier than one who loses one. Two things make a row survive:
+
+- `PlanHistoryStore.Load` accepts any file stamped in
+  `[PlanHistoryIndex.MinimumReadableSchemaVersion, CurrentSchemaVersion]`
+  and `Save` restamps it. Exact-match rejection was what made a bump cost
+  the whole history; a range costs nothing, and needs no migration code
+  because there is nothing to migrate.
+- That range is only safe because the row graph is **additive-only**.
+  `PlanHistoryIndex.SchemaShapeHash` is what holds it to that: a rename,
+  removal or retype anywhere reachable from `PlanHistoryIndex` moves the
+  hash and cannot land without editing the line next to both version
+  constants. An addition is free - Newtonsoft leaves an absent member at
+  its default, so every existing row still loads.
+
+`MinimumReadableSchemaVersion` is therefore the single constant in the
+module whose value *is* the amount of user data a release destroys. It is
+1, and it is pinned twice - by `PlanHistorySchemaMemberSetTests` and by
+the CI corpus step - so raising it is a deliberate, reviewed act and never
+a side effect of a merge. A newer-than-current file is still discarded:
+this build cannot know what a later one wrote, which is the same answer
+the plan gives to the same question.
 
 **What enforces it.** `tests/shared/plan_fixtures/` holds one serialized
-plan per shipped schema version, captured from the real serializer, plus
-a hostile fixture whose entire result graph has been renamed out from
-under the loader.
+plan per shipped schema version and one index per shipped index version,
+captured from the real serializers, plus a hostile fixture whose entire
+result graph has been renamed out from under the loader.
 `tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs`
 loads every one of them through the real `PlanStore`; the "Saved plans
 from older builds still load" step in `.github/workflows/tests.yml`
@@ -853,4 +875,6 @@ belongs to which layer), `Models/PersistedPlanLoad.cs` (what a read
 returns), `Services/PlanStoreHelpers.cs` (both readers and the resolver),
 `Services/PlanStore.cs` (the two severities and the "nothing restorable"
 case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
-request-only restore).
+request-only restore), `Models/PlanHistoryEntry.cs` and
+`Services/PlanHistoryStore.cs` (the index's readable range and the
+additive-only row graph behind it).
