@@ -326,7 +326,7 @@ namespace TaimisToolbench.Views
 
             SetHeaderLabel(0, bands.IconX);
             SetHeaderLabelRight(1, bands.CostRightEdge);
-            SetHeaderLabelRight(2, bands.WhenX + bands.WhenWidth);
+            SetHeaderLabelRight(2, bands.WhenRightEdge);
         }
 
         private void SetHeaderLabel(int index, int x)
@@ -520,7 +520,7 @@ namespace TaimisToolbench.Views
 
             row.WhenLabel = LabelHelpers.CreateRightAlignedLabel(
                 row.Panel, WhenText(entry), UiFonts.Body, StatusColor,
-                bands.WhenX + bands.WhenWidth, PlanHistoryRowLayout.MainLineTextY);
+                bands.WhenRightEdge, PlanHistoryRowLayout.MainLineTextY);
 
             row.View = CreateActionButton(row.Panel, "View", bands.ViewX,
                 "Show what this plan cost when it was generated. Nothing is recalculated.");
@@ -964,7 +964,7 @@ namespace TaimisToolbench.Views
             CoinCurrencyRenderer.RepositionValueCellRightAligned(
                 row.CostCell, bands.CostRightEdge, PlanHistoryRowLayout.MainLineTextY);
             row.WhenLabel.Location = new Point(
-                Math.Max(0, bands.WhenX + bands.WhenWidth - row.WhenLabel.Width),
+                Math.Max(0, bands.WhenRightEdge - row.WhenLabel.Width),
                 PlanHistoryRowLayout.MainLineTextY);
 
             row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, MainLineButtonY);

@@ -155,7 +155,7 @@ Services/PlanHistoryBlobStore.cs                                                
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                            82
 Services/PlanHistoryRetention.cs                                                        102
-Services/PlanHistoryRowLayout.cs                                                        221
+Services/PlanHistoryRowLayout.cs                                                        263
 Services/PlanHistoryStore.cs                                                            135
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
@@ -228,7 +228,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    526
+Services/SummarySectionLayoutMath.cs                                                    522
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                     62
 Services/GlyphFontDescriptor.cs                                                         316
@@ -420,7 +420,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                         77
 tests/TaimisToolbench.Tests/Services/PlanHistoryRetentionTests.cs                     139
-tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     217
+tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     339
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         234
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
 tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         700
