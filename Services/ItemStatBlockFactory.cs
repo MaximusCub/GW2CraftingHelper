@@ -131,13 +131,25 @@ namespace GW2CraftingHelper.Services
         /// both carry BOTH flags and render ONE account line), and
         /// SoulbindOnAcquire over SoulBindOnUse.
         /// <para>
-        /// AccountBound reads "Account Bound on Acquire" - the wording of
-        /// the live3 almonds and fury-scorched material hovers. The game
-        /// also shows instance-state wordings for the SAME flags ("Account
-        /// Bound" on an already-bound inventory copy, heart-of-destroyer
-        /// 67017; bare "Soulbound" on red-festival-lantern 68638), but
-        /// which copy the player holds is instance state /v2/items cannot
-        /// carry, so the flag-describing acquisition wording is emitted.
+        /// A bind-ON-ACQUIRE flag reads BARE - "Account Bound",
+        /// "Soulbound" - because that is what the game prints on the
+        /// ordinary inventory hover the module's tooltips stand in for.
+        /// MEASURED on five captures carrying such a flag: Gift of
+        /// Twilight 19648 (the 2026-08-27 owner A/B, same item hovered in
+        /// the module and in the game), heart-of-destroyer 67017 and
+        /// holographic-wings 79157 - all AccountBound + AccountBindOnUse,
+        /// all bare "Account Bound" - relic-livingcity 104938
+        /// (AccountBound + SoulBindOnUse, "Account Bound" stacked over
+        /// "Soulbound on Use") and red-festival-lantern 68638
+        /// (SoulbindOnAcquire + SoulBindOnUse, bare "Soulbound"). The
+        /// "on Acquire" wording appears on exactly two captures - almonds
+        /// 12337 and fury-scorched 86967 - and both are MATERIAL STORAGE
+        /// hovers, where the copy shown is not bound to anyone yet. Which
+        /// copy the player is looking at is instance state /v2/items
+        /// cannot carry, so the majority-and-A/B wording wins. A
+        /// bind-on-USE flag keeps its "on Use" tail: the binding has not
+        /// happened yet for any copy, and that is what the relic capture
+        /// shows.
         /// </para>
         /// </summary>
         private static IReadOnlyList<string> ResolveBindings(HashSet<string> flags)
@@ -145,10 +157,10 @@ namespace GW2CraftingHelper.Services
             List<string> lines = null;
 
             string account =
-                flags.Contains("AccountBound") ? "Account Bound on Acquire" :
+                flags.Contains("AccountBound") ? "Account Bound" :
                 flags.Contains("AccountBindOnUse") ? "Account Bound on Use" : null;
             string soul =
-                flags.Contains("SoulbindOnAcquire") ? "Soulbound on Acquire" :
+                flags.Contains("SoulbindOnAcquire") ? "Soulbound" :
                 flags.Contains("SoulBindOnUse") ? "Soulbound on Use" : null;
 
             if (account != null)

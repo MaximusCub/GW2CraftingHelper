@@ -22,8 +22,9 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Item icon inside a rarity-colored frame. Defaults to the legacy
         /// small size (32px icon, 1px border = 34px overall), still used by
-        /// the compact sites outside the two-tier ruling (wallet rows,
-        /// search suggestions, Plan History); the Crafting Plan tab's rows
+        /// the compact sites outside the two-tier rulings (search
+        /// suggestions, Plan History); currency rows pass
+        /// CurrencyIconTiers.WalletListIconSize - 2 and the Crafting Plan tab's rows
         /// pass ItemIconTiers.BagSidebarIconSize and the plan header /
         /// Snapshot grid / Ranker rows pass ItemIconTiers.BagSlotIconSize.
         /// <paramref name="tooltipText"/> is for an icon whose subject is

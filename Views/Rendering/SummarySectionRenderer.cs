@@ -146,12 +146,11 @@ namespace GW2CraftingHelper.Views.Rendering
         // footnote row already use, so the section reads as one left edge.
         private const int LoneTileContentX = 8;
 
-        // Aliased, not duplicated: these two and CostTileRowHeight are one
-        // piece of arithmetic - see PlanContentHeightMath. A highlighted
-        // band uses SummarySectionLayoutMath's box-derived pair instead -
-        // see CreateFormulaBand.
+        // Aliased, not duplicated: this and CostTileRowHeight are one piece
+        // of arithmetic - see PlanContentHeightMath. A highlighted band
+        // starts its caption at SummarySectionLayoutMath's box-derived y
+        // instead - see CreateFormulaBand.
         private const int BandCaptionY = PlanContentHeightMath.CostTileCaptionY;
-        private const int BandAmountBottomPad = PlanContentHeightMath.CostTileAmountBottomPad;
 
         private static readonly Color BandCaptionColor = new Color(153, 153, 153);
 
@@ -224,14 +223,18 @@ namespace GW2CraftingHelper.Views.Rendering
         /// tile's controls are its CHILDREN, so the fill is painted behind
         /// them by the container's own paint order (no z-index games) and a
         /// resize moves one control instead of re-centring three runs.
-        /// Amounts are bottom-anchored inside rowHeight rather than pinned
-        /// to a fixed y, so no font metric can push an amount out of the
-        /// band the caller's height math reserved.
+        /// Amounts hang one PlanContentHeightMath.CostTileLabelToValueGap
+        /// under the measured caption line, in every band, so the distance
+        /// between a caption and the number it names is that constant
+        /// rather than whatever a fixed row height happened to leave over.
         ///
         /// currencyNoteText, when non-null, draws a small disclosure line
-        /// under the RESULT tile's caption - the plan has costs the coin
-        /// figure above does not include. rowHeight must already account
-        /// for it (SummarySectionLayoutMath.CostBandHeight).
+        /// under the RESULT tile's AMOUNT - the plan has costs the coin
+        /// figure does not include. It hangs below the run rather than
+        /// sitting between caption and run, so it cannot push the other
+        /// tiles' amounts down (they share one amountY). rowHeight must
+        /// already account for it
+        /// (SummarySectionLayoutMath.CostBandHeight).
         ///
         /// row.TooltipText is set directly on captionLabel itself, not on
         /// rowPanel, so hovering the header text always shows it
@@ -294,28 +297,33 @@ namespace GW2CraftingHelper.Views.Rendering
             var amountFont = UiFonts.Body;
 
             // A highlighted band carries its result tile's box, so its
-            // caption starts one box margin+padding down and its amount
-            // stops the same distance above the band's bottom edge; both
-            // numbers are the ones CostBandHeight reserved room for.
+            // caption starts one box margin+padding down; that y is the one
+            // CostBandHeight reserved room for. Everything below the
+            // caption follows from it and the shared label-to-value gap, so
+            // the band needs no second (bottom-anchored) pad of its own.
             int captionY = highlightResult ? SummarySectionLayoutMath.CostBandCaptionY : BandCaptionY;
-            int amountBottomPad = highlightResult
-                ? SummarySectionLayoutMath.CostBandAmountBottomPad
-                : BandAmountBottomPad;
 
             int captionHeight = (int)System.Math.Ceiling(captionFont.MeasureString("0").Height);
             int noteHeight = (int)System.Math.Ceiling(noteFont.MeasureString("0").Height);
-            int noteY = captionY + captionHeight + 2;
-            int captionBlockBottom =
-                (currencyNoteText != null ? noteY + noteHeight : captionY + captionHeight) + 2;
 
             int amountHeight = AmountBlockHeight(amountFont);
             int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
 
-            int amountY = SummarySectionLayoutMath.BandAmountY(
-                rowHeight, amountHeight, captionBlockBottom, amountBottomPad);
+            // One amountY for the whole band, hung the SAME
+            // label-to-value gap under the caption in both bands (the
+            // profit band's amount used to be bottom-anchored inside its
+            // row height, which left it 1px under its caption). The
+            // disclosure line is a footnote BELOW this run and so is not a
+            // term of it: all three tiles' coin runs sit on one line
+            // whether or not the result tile carries a note.
+            int amountY = SummarySectionLayoutMath.BandAmountY(captionY + captionHeight);
+            int noteY = SummarySectionLayoutMath.BandNoteY(amountY, amountHeight);
 
             int boxTop = SummarySectionLayoutMath.CostBandBoxTop;
-            int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(amountY, amountHeight);
+            int boxContentBottom = currencyNoteText != null
+                ? noteY + noteHeight
+                : amountY + amountHeight;
+            int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(boxContentBottom);
 
             var tiles = new List<CostTileHandle>(tileCount);
             for (int i = 0; i < tileCount; i++)
@@ -386,6 +394,14 @@ namespace GW2CraftingHelper.Views.Rendering
                 });
                 TooltipFacility.ApplyPlain(captionLabel, row.TooltipText);
 
+                var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(
+                    host, segments,
+                    TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, segmentsWidth),
+                    amountY - hostTop, amountFont, 1f, iconYOffset);
+
+                // Built after the amount because it hangs UNDER it: the
+                // disclosure is a footnote on this tile's number, not a
+                // second caption over it.
                 Label noteLabel = null;
                 if (noteText != null)
                 {
@@ -403,11 +419,6 @@ namespace GW2CraftingHelper.Views.Rendering
                     });
                     TooltipFacility.ApplyPlain(noteLabel, currencyNoteTooltip);
                 }
-
-                var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(
-                    host, segments,
-                    TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, segmentsWidth),
-                    amountY - hostTop, amountFont, 1f, iconYOffset);
 
                 tiles.Add(new CostTileHandle
                 {
@@ -509,7 +520,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // The highlight box is the taller of the two, so a highlighted
             // band is asserted on the box's own bottom edge.
             System.Diagnostics.Debug.Assert(
-                (highlightResult ? boxTop + boxHeight : amountY + amountHeight) <= rowHeight,
+                (highlightResult ? boxTop + boxHeight : boxContentBottom) <= rowHeight,
                 "SummarySectionRenderer: a formula band's amounts (and its highlight box) must fit " +
                 "inside the row height SummarySectionLayoutMath reserved for it - see CostBandHeight.");
 #endif
@@ -638,6 +649,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
             }
 
+            CreateCurrencyTableTopGap(parent, panelWidth);
             CreateCurrencyTableHeaderRow(parent, panelWidth, widestNumberWidth);
             for (int i = 0; i < rows.Count; i++)
             {
@@ -720,6 +732,26 @@ namespace GW2CraftingHelper.Views.Rendering
                 BackgroundColor = background,
                 Parent = parent,
             };
+        }
+
+        /// <summary>
+        /// Open space between the formula bands and the currency table's
+        /// header band. An empty Panel, the same way
+        /// CraftingPlanView.CreateCollapsibleSection spaces two whole
+        /// sections apart: this FlowPanel is SingleTopToBottom with no
+        /// control padding, so a gap has to be a row. Counted by
+        /// SummarySectionLayoutMath.BodyHeight under the SAME "at least one
+        /// CurrencyCost row" condition that gets it built.
+        /// </summary>
+        private void CreateCurrencyTableTopGap(FlowPanel parent, int panelWidth)
+        {
+            var gap = new Panel()
+            {
+                Size = new Point(panelWidth, SummarySectionLayoutMath.CurrencyTableTopGap),
+                Parent = parent,
+            };
+            _sink.AddRelayout(w =>
+                gap.Size = new Point(w, SummarySectionLayoutMath.CurrencyTableTopGap));
         }
 
         private void CreateCurrencyTableHeaderRow(
@@ -817,7 +849,8 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = displayName, Font = font, TextColor = Color.White,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(nameX, 4), Parent = rowPanel,
+                Location = new Point(nameX, SummarySectionLayoutMath.CurrencyRowTextY),
+                Parent = rowPanel,
             });
             if (displayName != fullName)
             {
@@ -830,11 +863,11 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             var numberColor = new Color(220, 220, 220);
-            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, 4);
+            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, haveText, font, numberColor, edges.HaveRightEdge, 4);
+            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, haveText, font, numberColor, edges.HaveRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, neededText, font, numberColor, edges.NeededRightEdge, 4);
+            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, neededText, font, numberColor, edges.NeededRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
 
             Panel marker = null;
             if (row.CurrencyFullyCovered)
@@ -849,9 +882,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // shipped half-working.
             }
 
-            // No CreateRowDivider here: the 28px CurrencyRowHeight was
-            // never proven immune to the vanishing-divider defect (only
-            // 36px rows are proven immune), and the header row's dark
+            // No CreateRowDivider here: CurrencyRowHeight was never proven
+            // immune to the vanishing-divider defect (only 36px rows are
+            // proven immune), and moving it to the wallet-list tier's 42px
+            // does not change that - it is still an unproven height, and
+            // still draws no divider, so RowDividerScissorSimulationTests
+            // has nothing to pin for this section. The header row's dark
             // background already delineates the table - introducing a
             // divider at an unproven row height risks resurrecting that
             // defect for a visual element nothing asked for.
@@ -859,9 +895,9 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
-                requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 4);
-                haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), 4);
-                neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 4);
+                requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
+                haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
+                neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
                 if (marker != null)
                 {
                     marker.Location = new Point(
