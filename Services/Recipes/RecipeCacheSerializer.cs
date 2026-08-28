@@ -89,6 +89,28 @@ namespace TaimisToolbench.Services.Recipes
         /// </summary>
         public int VerifiedKnownRecipeCount { get; set; }
 
+        /// <summary>
+        /// The build the content sweep (RecipeCorpusRefresher) is working
+        /// through, or has finished; 0 = never run. A live build that
+        /// differs resets the two fields below and the sweep restarts.
+        /// </summary>
+        public int CorpusRefreshBuildId { get; set; }
+
+        /// <summary>
+        /// Every held positive recipe id less than or equal to this has
+        /// been refetched at <see cref="CorpusRefreshBuildId"/>. The sweep
+        /// walks ids ascending precisely so an interrupted run resumes
+        /// from one integer instead of replaying from zero.
+        /// </summary>
+        public int CorpusRefreshCursorId { get; set; }
+
+        /// <summary>
+        /// True once the ascending pass reached the end at
+        /// <see cref="CorpusRefreshBuildId"/>: corpus content is current
+        /// for that build and is not fetched again until the build moves.
+        /// </summary>
+        public bool CorpusRefreshComplete { get; set; }
+
         public string UpdatedUtc { get; set; }
     }
 

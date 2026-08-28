@@ -185,12 +185,12 @@ Services/RecipeNodeIds.cs                                                       
 Services/RecipeService.cs                                                               555
 Services/RecipeSheetItemSeedService.cs                                                   78
 Services/RecipeSheetSavingsCalculator.cs                                                321
-Services/Recipes/CompositeRecipeCacheStore.cs                                           200
+Services/Recipes/CompositeRecipeCacheStore.cs                                           215
 Services/Recipes/IRecipeCacheStore.cs                                                    44
 Services/Recipes/InMemoryRecipeCacheStore.cs                                             56
 Services/Recipes/ItemNameSeedData.cs                                                     56
-Services/Recipes/OverlayRecipeCacheStore.cs                                             483
-Services/Recipes/RecipeCacheSerializer.cs                                               234
+Services/Recipes/OverlayRecipeCacheStore.cs                                             567
+Services/Recipes/RecipeCacheSerializer.cs                                               256
 Services/Recipes/RecipeCorpusVerifier.cs                                                257
 Services/Recipes/SeededRecipeCacheStore.cs                                              215
 Services/RecipesColumnMath.cs                                                            79
