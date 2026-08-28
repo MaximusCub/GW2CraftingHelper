@@ -13,10 +13,11 @@ namespace TaimisToolbench.Services
     /// </summary>
     internal static class SettingsCurrencyGridLayout
     {
-        // Horizontal layout of one currency cell. These live here rather
-        // than in the view so SettingsCurrencyMinColumnWidth below is derived from the same
-        // numbers the controls are placed with and cannot drift from them,
-        // and so the arithmetic is covered by Blish-free tests.
+        // Layout of one currency cell. These live here rather than in the
+        // view so SettingsCurrencyMinColumnWidth and ComputeHeight below are
+        // derived from the same numbers the controls are placed with and
+        // cannot drift from them, and so the arithmetic is covered by
+        // Blish-free tests.
         //
         // The cell justifies like a plan table row: the
         // [amount][Ignore][tag] block pins to the cell's own right edge (see

@@ -200,7 +200,7 @@ Services/ScrollMath.cs                                                          
 Services/SeasonalOfferFilter.cs                                                         107
 Services/SeasonalVendorTipCalculator.cs                                                 134
 Services/SellSideEconomics.cs                                                           406
-Services/SettingsCurrencyGridLayout.cs                                                  325
+Services/SettingsCurrencyGridLayout.cs                                                  326
 Services/SettingsFormLayout.cs                                                          174
 Services/SettingsInputParser.cs                                                         239
 Services/SettingsSaveBarLayout.cs                                                        80
