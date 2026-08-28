@@ -264,7 +264,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                    31
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                      2785
+Views/MainView.cs                                                                      2787
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                         1231
@@ -309,7 +309,7 @@ Views/Rendering/UiMetrics.cs                                                    
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         214
 Views/ResizableTabbedWindow.cs                                                          153
 Views/SettingsTabContent.cs                                                            2605
-Views/SuggestionPanel.cs                                                                491
+Views/SuggestionPanel.cs                                                                494
 Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/TaimisToolbench.Tests/Helpers/CapturingProgress.cs                               22

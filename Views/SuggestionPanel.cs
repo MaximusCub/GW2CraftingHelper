@@ -101,7 +101,10 @@ namespace TaimisToolbench.Views
             IReadOnlyList<ItemSearchResult> results;
             try
             {
-                results = await _searchProvider.SearchAsync(query, MaxResults, ct);
+                // Not onto a captured context; the marshal below is the way
+                // back to the UI thread (ResizeSettleDebounce says why).
+                results = await _searchProvider
+                    .SearchAsync(query, MaxResults, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
