@@ -225,3 +225,11 @@ process, all of it checkable from this repository:
 ## License
 
 [MIT](LICENSE)
+
+### Third-party assets
+
+UI glyphs are rasterized from [Bootstrap Icons](https://github.com/twbs/icons),
+(c) 2019-2024 The Bootstrap Authors, MIT License. The notice ships inside the
+module alongside the artwork - see
+[`ref/THIRD-PARTY-NOTICES.txt`](ref/THIRD-PARTY-NOTICES.txt). Regenerate the
+atlas with `python3 tools/build-glyph-font.py --fetch --out-dir ref`.

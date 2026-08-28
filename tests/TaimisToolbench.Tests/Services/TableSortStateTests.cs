@@ -6,6 +6,13 @@ namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The click cycle behind the Crafting Plan's sortable column headers.
+    /// <para>
+    /// The indicators are asserted as literal codepoints rather than against
+    /// TableSortState's own constants, which would mirror the implementation
+    /// and pass no matter what it said. U+E100 and U+E101 are the caret pair
+    /// in the module's shipped glyph font; GlyphFontDescriptorTests is what
+    /// proves ref/glyphs.fnt actually carries them.
+    /// </para>
     /// </summary>
     public class TableSortStateTests
     {
@@ -36,7 +43,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(TableSortDirection.Ascending, state.Direction);
             Assert.Equal(PlanTableColumn.Item, state.Column);
             Assert.True(state.IsActive(PlanTableColumn.Item));
-            Assert.Equal("^", state.IndicatorFor(PlanTableColumn.Item));
+            Assert.Equal("\uE100", state.IndicatorFor(PlanTableColumn.Item));
         }
 
         [Fact]
@@ -48,7 +55,7 @@ namespace TaimisToolbench.Tests.Services
             state.Cycle(PlanTableColumn.Item);
 
             Assert.Equal(TableSortDirection.Descending, state.Direction);
-            Assert.Equal("v", state.IndicatorFor(PlanTableColumn.Item));
+            Assert.Equal("\uE101", state.IndicatorFor(PlanTableColumn.Item));
         }
 
         [Fact]
@@ -92,7 +99,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(TableSortDirection.Ascending, state.Direction);
             Assert.False(state.IsActive(PlanTableColumn.Item));
             Assert.Equal(string.Empty, state.IndicatorFor(PlanTableColumn.Item));
-            Assert.Equal("^", state.IndicatorFor(PlanTableColumn.Amount));
+            Assert.Equal("\uE100", state.IndicatorFor(PlanTableColumn.Amount));
         }
 
         [Fact]
@@ -159,7 +166,7 @@ namespace TaimisToolbench.Tests.Services
             state.Cycle(PlanTableColumn.Item);
 
             Assert.Equal(TableSortDirection.Ascending, state.Direction);
-            Assert.Equal("^", state.IndicatorFor(PlanTableColumn.Item));
+            Assert.Equal("\uE100", state.IndicatorFor(PlanTableColumn.Item));
         }
 
         [Fact]
@@ -182,7 +189,7 @@ namespace TaimisToolbench.Tests.Services
 
             state.Cycle(PlanTableColumn.Each);
 
-            Assert.Equal("^", state.IndicatorFor(PlanTableColumn.Each));
+            Assert.Equal("\uE100", state.IndicatorFor(PlanTableColumn.Each));
             Assert.Equal(string.Empty, state.IndicatorFor(PlanTableColumn.Total));
             Assert.Equal(string.Empty, state.IndicatorFor(PlanTableColumn.Item));
             Assert.Equal(string.Empty, state.IndicatorFor(PlanTableColumn.Amount));

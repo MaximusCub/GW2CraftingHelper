@@ -20,6 +20,16 @@
   <ItemGroup>
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Goldens\**\*" CopyToOutputDirectory="PreserveNewest" />
+
+    <!--
+      The SHIPPED glyph font, not a copy of it: GlyphFontDescriptorTests reads
+      the same two files the .bhm packages, through the same parser the module
+      loads them with. A fixture copy would have let the atlas and the code
+      drift apart, which is the one failure a glyph font cannot show on screen.
+      Linked rather than copied into the test tree for the same reason.
+    -->
+    <None Include="..\..\ref\glyphs.fnt" Link="ref\glyphs.fnt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\ref\glyphs_0.png" Link="ref\glyphs_0.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

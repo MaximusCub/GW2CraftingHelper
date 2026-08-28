@@ -78,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                              2525
+Module.cs                                                                              2574
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -229,7 +229,9 @@ Services/StatusStore.cs                                                         
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
 Services/SummarySectionLayoutMath.cs                                                    526
-Services/TableSortState.cs                                                              105
+Services/TableSortState.cs                                                              114
+Services/UiGlyphs.cs                                                                     62
+Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
 Services/TooltipLayoutMath.cs                                                           487
@@ -273,7 +275,7 @@ Views/Rendering/ColumnHeaderRowRenderer.cs                                      
 Views/Rendering/CraftStepsSectionRenderer.cs                                            276
 Views/Rendering/DisciplinesSectionRenderer.cs                                           275
 Views/Rendering/EmptyPlanStateRenderer.cs                                                81
-Views/Rendering/FeedbackButton.cs                                                        43
+Views/Rendering/FeedbackButton.cs                                                       260
 Views/Rendering/HeaderCellPlan.cs                                                        90
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
@@ -294,14 +296,15 @@ Views/Rendering/RowRelayoutHelpers.cs                                           
 Views/Rendering/ShoppingBadgeColors.cs                                                   72
 Views/Rendering/ShoppingListSectionRenderer.cs                                          495
 Views/Rendering/SortableHeaderCells.cs                                                  230
-Views/Rendering/SortableHeaderLabel.cs                                                   52
+Views/Rendering/SortableHeaderLabel.cs                                                   69
 Views/Rendering/SummarySectionRenderer.cs                                               955
 Views/Rendering/TableHeaderStyle.cs                                                      70
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                               2068
 Views/Rendering/TreeToolbarCommands.cs                                                   81
-Views/Rendering/UiFonts.cs                                                              151
+Views/Rendering/UiFonts.cs                                                              222
+Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                             47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         214
 Views/ResizableTabbedWindow.cs                                                          153
@@ -513,7 +516,8 @@ tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                        
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                               345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                 856
-tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           192
+tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
+tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      239
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                   215
 tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                           152

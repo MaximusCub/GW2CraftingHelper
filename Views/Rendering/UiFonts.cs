@@ -1,4 +1,5 @@
 using Blish_HUD;
+using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.BitmapFonts;
 using TaimisToolbench.Services;
 
@@ -34,19 +35,25 @@ namespace TaimisToolbench.Views.Rendering
     /// <para>
     /// Blish's own Label default is DefaultFont14, so a Label this module
     /// builds without an explicit Font renders one step below Body. Every
-    /// label site therefore sets one. Four control types are excluded and
-    /// stay at Blish's own default: Checkbox and StandardButton (which
-    /// FeedbackButton derives from) expose no Font property at all, and
-    /// TextBox and Dropdown have internal padding Blish authors against
+    /// label site therefore sets one. Three control types are excluded and
+    /// stay at Blish's own default: Checkbox expose no Font property at all,
+    /// and TextBox and Dropdown have internal padding Blish authors against
     /// DefaultFont14 while holding typed values rather than module prose.
-    /// Anything MEASURING one of those four measures in
+    /// Anything MEASURING one of those three measures in
     /// <see cref="Caption"/>, which is the size they actually paint - and
     /// so does anything sizing a tooltip Blish renders itself
     /// (Services.TooltipTextFormat).
+    /// <see cref="FeedbackButton"/> used to be a fourth, because
+    /// StandardButton exposes no Font either; it now declares
+    /// <see cref="Caption"/> explicitly, so the button's size is a decision
+    /// this ramp made rather than a Blish default it happened to match.
     /// </para>
     /// </summary>
     internal static class UiFonts
     {
+        private static BitmapFont _glyphs;
+        private static BitmapFont _columnHeader;
+
         /// <summary>Row text, table cells, tooltips - the module's prose.</summary>
         internal static BitmapFont Body => GameService.Content.DefaultFont16;
 
@@ -57,9 +64,73 @@ namespace TaimisToolbench.Views.Rendering
         /// Every column header the module draws, and the Total Cost band's
         /// tile captions. Bold, because headers used to be the same size and
         /// weight as the rows under them.
+        /// <para>
+        /// Once <see cref="InstallGlyphs"/> has run this is Menomonia Bold 20
+        /// PLUS the module's own glyphs, which is what lets a sortable
+        /// header carry its indicator INSIDE its own text. Cached, not
+        /// rebuilt: merging sweeps the whole BMP once, and this property is
+        /// read on every render and by every header's MeasureString.
+        /// </para>
         /// </summary>
         internal static BitmapFont ColumnHeader =>
-            Bold(TypeRampMetrics.ColumnHeaderPointSize);
+            _columnHeader ?? Bold(TypeRampMetrics.ColumnHeaderPointSize);
+
+        /// <summary>
+        /// The module's own glyphs, alone: for a control whose whole label is
+        /// one glyph. Null until <see cref="InstallGlyphs"/> has run, so read
+        /// <see cref="GlyphsAvailable"/> before seating anything on it.
+        /// </summary>
+        internal static BitmapFont Glyphs => _glyphs;
+
+        /// <summary>
+        /// Whether ref/glyphs.fnt and its atlas loaded. False only on a
+        /// corrupt install - and then every glyph seat has to degrade to the
+        /// ASCII it replaced (Services.UiGlyphs.AsciiFallback), because an
+        /// absent codepoint draws nothing and advances zero pixels.
+        /// </summary>
+        internal static bool GlyphsAvailable => _glyphs != null;
+
+        /// <summary>
+        /// Seats the shipped glyph font. Called once from Module load, after
+        /// GameService.Content is up and the ContentsManager has produced the
+        /// descriptor and its atlas page.
+        /// </summary>
+        internal static void InstallGlyphs(GlyphFontDescriptor descriptor, Texture2D page)
+        {
+            if (descriptor == null || page == null)
+            {
+                return;
+            }
+
+            // Both or neither. GlyphsAvailable is what every glyph seat reads
+            // to decide whether to draw a glyph or the ASCII it replaced, so a
+            // half-installed pair - glyphs seated but the header font still
+            // plain Menomonia - would answer "yes" to a header that then drew
+            // nothing at all. Built into locals first so a throw anywhere in
+            // here leaves the module on the fully degraded path.
+            var glyphs = GlyphFont.Standalone(descriptor, page);
+            var columnHeader = GlyphFont.Merged(
+                "Menomonia-Bold20+GwchGlyphs",
+                Bold(TypeRampMetrics.ColumnHeaderPointSize),
+                TypeRampMetrics.ColumnHeaderInk.BaselineY,
+                descriptor,
+                page);
+
+            _glyphs = glyphs;
+            _columnHeader = columnHeader;
+        }
+
+        /// <summary>
+        /// Drops both fonts on module unload. They hold TextureRegion2Ds over
+        /// a Texture2D the ContentsManager disposes when the module goes
+        /// away; a re-enable in the same process would otherwise find these
+        /// statics still pointing at it.
+        /// </summary>
+        internal static void ResetGlyphs()
+        {
+            _glyphs = null;
+            _columnHeader = null;
+        }
 
         /// <summary>Every section title in the module.</summary>
         internal static BitmapFont SectionTitle =>
