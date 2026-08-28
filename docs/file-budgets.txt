@@ -78,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                              2577
+Module.cs                                                                              2580
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -254,7 +254,7 @@ Services/VendorOfferStore.cs                                                    
 Services/WheelDeltaSanitizer.cs                                                          92
 Services/WikiLinkBuilder.cs                                                             139
 Services/WikiLinkLauncher.cs                                                             86
-Services/WindowSizing.cs                                                                147
+Services/WindowSizing.cs                                                                276
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
@@ -310,7 +310,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                          153
 Views/SettingsTabContent.cs                                                            2605
 Views/SuggestionPanel.cs                                                                491
-Views/ViewAdapter.cs                                                                    245
+Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/TaimisToolbench.Tests/Helpers/CapturingProgress.cs                               22
 tests/TaimisToolbench.Tests/Helpers/CraftingPlanResultBuilders.cs                      94
@@ -410,7 +410,7 @@ tests/TaimisToolbench.Tests/Services/MysticForgeRecipeDataTests.cs              
 tests/TaimisToolbench.Tests/Services/MysticForgeSeedStalenessTests.cs                 470
 tests/TaimisToolbench.Tests/Services/NotesSectionLayoutMathTests.cs                   197
 tests/TaimisToolbench.Tests/Services/OwnedMaterialsForceBuyPrePassTests.cs            178
-tests/TaimisToolbench.Tests/Services/PanelChromeMathTests.cs                          141
+tests/TaimisToolbench.Tests/Services/PanelChromeMathTests.cs                          317
 tests/TaimisToolbench.Tests/Services/PhaseOrdinalGuardTests.cs                         46
 tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs               130

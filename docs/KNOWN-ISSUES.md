@@ -868,6 +868,23 @@ layout pass, including the minimum-size clamp that resizes it from inside
 that pass. `Services/PanelChromeMath.cs` derives the size instead, so no
 read-back can lag. Full record: `dev/records/firstpaint-truncation.md`.
 
+### 66. Content viewport falls short of the window's bottom edge
+
+The scroll viewport ended 74px above the bottom of the window at every
+window size, while its top edge sat flush under the title bar. Not a stale
+size (#65 covers that one) and not a ratio error: a constant, and the
+constant is the window's own bottom margin. Blish reads the `windowRegion`
+and `contentRegion` rectangles a window is constructed from as absolute
+texture coordinates - `_contentMargin.Y` is `windowRegion.Bottom -
+contentRegion.Bottom` - but the pair in `Module.cs` had its vertical terms
+authored relative to the window region, so the 15px of clearance intended
+below the content came out as 15 + `windowRegion.Top` = 41, and the same
+mix-up left the top margin at 0. The premise behind the clearance was also
+wrong: background 502049 is 88% opaque at the window region's own last row
+and does not fade until seven rows below it. The vertical terms now live in
+`Services/WindowSizing.cs` beside the chrome they produce. Full record:
+`dev/records/viewport-bottom-margin.md`.
+
 ---
 
 ## DEFERRED (recorded, not implemented)

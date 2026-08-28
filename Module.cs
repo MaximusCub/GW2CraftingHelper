@@ -844,16 +844,19 @@ namespace TaimisToolbench
             // earlier session.
             // Validated in-game to align with Event Table / Blish HUD's own
             // TabbedWindow dimensions.
-            // contentRegion must end above the window bottom: flush would be
-            // contentRegion.Y + contentRegion.Height == windowRegion.Height
-            // (11 + 699 == 710), but texture 502049 also fades to transparent
-            // over roughly its last 15 rows (verified via screenshot: content
-            // at the flush edge shows windows behind bleeding through), so an
-            // extra 15px margin keeps every row on opaque backdrop.
+            // The vertical terms of both rectangles live in WindowSizing,
+            // which owns the bottom margin they leave Blish and the panel
+            // height that falls out of it; the horizontal ones stay here,
+            // accounted for by WindowSizing.WindowToTabPanelChrome.
             _mainWindow = new ResizableTabbedWindow(
                 AsyncTexture2D.FromAssetId(502049),
-                new Rectangle(35, 26, 930, 710),
-                new Rectangle(81, 11, 884, 684),
+                new Rectangle(
+                    35, WindowSizing.WindowRegionTop, 930, WindowSizing.WindowRegionHeight),
+                new Rectangle(
+                    81,
+                    WindowSizing.WindowContentRegionTop,
+                    884,
+                    WindowSizing.WindowContentRegionHeight),
                 new Point(WindowSizing.MinWindowWidth, WindowSizing.MinWindowHeight))
             {
                 Parent = GameService.Graphics.SpriteScreen,

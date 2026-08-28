@@ -85,15 +85,16 @@ namespace TaimisToolbench.Services
         /// repo's source except the border term:
         /// <code>
         ///  46  window region 930 - content region 884        (Module.cs)
-        ///  32  ViewAdapter OUTER_PADDING x2                  (ViewAdapter.cs)
-        ///   8  Blish Panel border chrome, ~4 a side          (ViewAdapter.cs)
-        ///  20  ViewAdapter INNER_PADDING x2                  (ViewAdapter.cs)
+        ///  32  TabPanelOuterPadding x2
+        ///   8  Blish Panel border chrome, ~4 a side
+        ///  20  TabPanelInnerPadding x2
         ///  20  RightEdgePadding, clear of the scrollbar      (tab content)
         /// </code>
         /// The 8px border term is worth +/-2px; nothing derived from it is
         /// within 400px of a layout boundary.
         /// </summary>
-        public const int WindowToTabPanelChrome = 46 + 32 + 8 + 20 + RightEdgePadding;
+        public const int WindowToTabPanelChrome =
+            46 + (2 * TabPanelOuterPadding) + 8 + (2 * TabPanelInnerPadding) + RightEdgePadding;
 
         /// <summary>
         /// Width the vertical scrollbar of a scrolling content panel
@@ -119,10 +120,138 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const int RightEdgePadding = ScrollbarAllowance;
 
+        /// <summary>
+        /// Inset between the window's content region and the bordered panel
+        /// a tab's view is built into, on all four edges (Views/ViewAdapter.cs,
+        /// which matches Blish's own WindowBase2.STANDARD_MARGIN here).
+        /// </summary>
+        public const int TabPanelOuterPadding = 16;
+
+        /// <summary>
+        /// Inset between that bordered panel's content region and the
+        /// container a tab actually renders into, on all four edges.
+        /// </summary>
+        public const int TabPanelInnerPadding = 10;
+
         /// <summary>Panel width a tab's content gets inside a window of this width.</summary>
         public static int TabPanelWidthFor(int windowWidth)
         {
             return windowWidth - WindowToTabPanelChrome;
+        }
+
+        /// <summary>
+        /// Texture-space rows of background 502049 that Module.cs hands
+        /// Blish as the window region and the content region. Blish reads
+        /// BOTH as absolute texture coordinates: its bottom margin is
+        /// <c>windowRegion.Bottom - contentRegion.Bottom</c>, and its top
+        /// inset cancels <see cref="WindowContentRegionTop"/> against the
+        /// title bar's own vertical offset. A content region authored
+        /// window-region-relative therefore pays
+        /// <see cref="WindowRegionTop"/> twice at the bottom and nothing at
+        /// the top, which is the asymmetry KNOWN-ISSUES #66 records.
+        /// </summary>
+        public const int WindowRegionTop = 26;
+
+        /// <summary>Height of that window region.</summary>
+        public const int WindowRegionHeight = 710;
+
+        /// <summary>Texture-space top of the content region.</summary>
+        public const int WindowContentRegionTop = 11;
+
+        /// <summary>
+        /// Height of the content region, set so
+        /// <see cref="WindowContentBottomMargin"/> comes out at 15 rows.
+        /// The clearance is for the texture's soft bottom edge, measured off
+        /// asset 502049 rather than guessed: alpha there is 223-241 of 255
+        /// at row 736 - the window region's own bottom - and stays above 200
+        /// until row 744, so the window region already ends inside the
+        /// opaque area and 15 rows of margin is generous.
+        /// </summary>
+        public const int WindowContentRegionHeight = 710;
+
+        /// <summary>
+        /// Blish's WindowBase2 <c>_contentMargin.Y</c>: the control-space
+        /// gap left below the window's content region, constant at every
+        /// window height.
+        /// </summary>
+        public const int WindowContentBottomMargin =
+            (WindowRegionTop + WindowRegionHeight)
+            - (WindowContentRegionTop + WindowContentRegionHeight);
+
+        // WindowBase2.STANDARD_TITLEBAR_HEIGHT / _VERTICAL_OFFSET and
+        // Panel.TOP_PADDING / BOTTOM_PADDING, restated as literals to keep
+        // this class arithmetic. Views/ViewAdapter.cs feeds PanelChromeMath
+        // the vendor's own values at runtime, so a Blish upgrade that moves
+        // either one moves the real layout and leaves these behind: they are
+        // to be re-read on that upgrade and nothing else checks them.
+        //
+        // Panel.HEADER_HEIGHT is deliberately NOT among them: the module
+        // stopped setting Panel.Title, so Blish reserves no header band and
+        // the top inset falls to TOP_PADDING. The band a tab wears is the
+        // module's own, and it is the taller
+        // PlanContentHeightMath.TabTitleBandHeight below.
+        private const int TitleBarHeight = 40;
+        private const int TitleBarVerticalOffset = 11;
+        private const int PanelTopPadding = 7;
+        private const int PanelBottomPadding = 7;
+
+        /// <summary>
+        /// Control-space top of the window's content region, mirroring
+        /// WindowBase2.ConstructWindow: the content region's texture-space
+        /// top, plus the title bar, less the window's own top padding
+        /// (floored at the title bar's vertical offset). It lands on the
+        /// title bar's height exactly - the content region begins flush
+        /// under the title bar with no top margin at all, which is the half
+        /// of the pair that makes a bottom margin visible.
+        /// </summary>
+        public const int WindowContentTop =
+            WindowContentRegionTop + TitleBarHeight
+            - (WindowRegionTop - TitleBarHeight > TitleBarVerticalOffset
+                ? WindowRegionTop - TitleBarHeight
+                : TitleBarVerticalOffset);
+
+        /// <summary>
+        /// Content-region height Blish gives a window of this height,
+        /// mirroring WindowBase2.OnResized.
+        /// </summary>
+        public static int WindowContentHeightFor(int windowHeight)
+        {
+            return Math.Max(0, windowHeight - WindowContentTop - WindowContentBottomMargin);
+        }
+
+        /// <summary>
+        /// Vertical chrome between the window's own height and the panel a
+        /// tab's content is rendered into - the twin of
+        /// <see cref="WindowToTabPanelChrome"/>:
+        /// <code>
+        /// above  40 title bar + 0 window top margin + 16 outer
+        ///        + 7 Panel top padding + 44 tab title band
+        ///        + 10 inner                               = 117
+        /// below  15 window bottom margin + 16 outer
+        ///        + 7 Panel bottom padding + 10 inner      =  48
+        /// </code>
+        /// The 7 + 44 above used to read "36 Panel header": Blish reserved
+        /// its own header band for a Panel.Title and printed the tab's name
+        /// in it at DefaultFont16. The module draws that band itself now, so
+        /// Blish reserves only the border's top padding and the module's
+        /// taller band sits inside the content region under it.
+        /// Both totals are constants, so the panel grows one-for-one with
+        /// the window and a gap at the bottom is the same gap at every size.
+        /// </summary>
+        public const int WindowToTabPanelTopChrome =
+            WindowContentTop + TabPanelOuterPadding + PanelTopPadding
+            + PlanContentHeightMath.TabTitleBandHeight + TabPanelInnerPadding;
+
+        /// <summary>The bottom half of <see cref="WindowToTabPanelTopChrome"/>'s table.</summary>
+        public const int WindowToTabPanelBottomChrome =
+            WindowContentBottomMargin + TabPanelOuterPadding + PanelBottomPadding + TabPanelInnerPadding;
+
+        /// <summary>Panel height a tab's content gets inside a window of this height.</summary>
+        public static int TabPanelHeightFor(int windowHeight)
+        {
+            return Math.Max(
+                0,
+                windowHeight - WindowToTabPanelTopChrome - WindowToTabPanelBottomChrome);
         }
 
         /// <summary>
