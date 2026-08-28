@@ -87,7 +87,7 @@ Services/AchievementBitDedupPrePass.cs                                          
 Services/AcquisitionHintService.cs                                                       75
 Services/BoundedConcurrency.cs                                                           51
 Services/ClickSoundVolume.cs                                                             90
-Services/CoinSegmentMath.cs                                                             190
+Services/CoinSegmentMath.cs                                                             203
 Services/ColumnBoardLayout.cs                                                           130
 Services/CompetencyOpportunityCalculator.cs                                              83
 Services/CompositeRecipeApiClient.cs                                                     84
@@ -148,7 +148,7 @@ Services/PhaseOrdinalGuard.cs                                                   
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
 Services/PillTooltipTextComposer.cs                                                     224
-Services/PlanContentHeightMath.cs                                                       398
+Services/PlanContentHeightMath.cs                                                       427
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                            82
@@ -170,7 +170,7 @@ Services/RankerPriorityCascade.cs                                               
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerReadinessCalculator.cs                                                   666
 Services/RankerReadinessWeights.cs                                                       61
-Services/RankerRowLayout.cs                                                             289
+Services/RankerRowLayout.cs                                                             295
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -224,7 +224,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    399
+Services/SummarySectionLayoutMath.cs                                                    408
 Services/TableSortState.cs                                                              105
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
@@ -258,7 +258,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                    31
 Views/LogTabContent.cs                                                                 1441
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                      2798
+Views/MainView.cs                                                                      2808
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                         1246
@@ -274,7 +274,7 @@ Views/Rendering/HeaderCellPlan.cs                                               
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
 Views/Rendering/ITreePlanHost.cs                                                         88
-Views/Rendering/IconControls.cs                                                         279
+Views/Rendering/IconControls.cs                                                         280
 Views/Rendering/IconNameRowHelpers.cs                                                   136
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
@@ -291,7 +291,7 @@ Views/Rendering/ShoppingBadgeColors.cs                                          
 Views/Rendering/ShoppingListSectionRenderer.cs                                          495
 Views/Rendering/SortableHeaderCells.cs                                                  230
 Views/Rendering/SortableHeaderLabel.cs                                                   52
-Views/Rendering/SummarySectionRenderer.cs                                               919
+Views/Rendering/SummarySectionRenderer.cs                                               922
 Views/Rendering/TableHeaderStyle.cs                                                      70
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
@@ -339,7 +339,7 @@ tests/GW2CraftingHelper.Tests/Services/AmalgamatedRiftEssenceIngestionTests.cs  
 tests/GW2CraftingHelper.Tests/Services/BoundedConcurrencyTests.cs                       196
 tests/GW2CraftingHelper.Tests/Services/ClickSoundVolumeTests.cs                         131
 tests/GW2CraftingHelper.Tests/Services/CoinFormattingTests.cs                           211
-tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs                          316
+tests/GW2CraftingHelper.Tests/Services/CoinSegmentMathTests.cs                          319
 tests/GW2CraftingHelper.Tests/Services/ColumnBoardLayoutTests.cs                        193
 tests/GW2CraftingHelper.Tests/Services/CompetencyOpportunityCalculatorTests.cs          205
 tests/GW2CraftingHelper.Tests/Services/CompositeRecipeApiClientTests.cs                 221
@@ -405,7 +405,7 @@ tests/GW2CraftingHelper.Tests/Services/PhaseOrdinalGuardTests.cs                
 tests/GW2CraftingHelper.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/GW2CraftingHelper.Tests/Services/PillSubduingTooltipBuilderTests.cs               130
 tests/GW2CraftingHelper.Tests/Services/PillTooltipTextComposerTests.cs                  284
-tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    530
+tests/GW2CraftingHelper.Tests/Services/PlanContentHeightMathTests.cs                    533
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryLabelsTests.cs                         77
@@ -413,7 +413,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanHistoryRetentionTests.cs             
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryRowLayoutTests.cs                     217
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryStoreTests.cs                         234
 tests/GW2CraftingHelper.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
-tests/GW2CraftingHelper.Tests/Services/PlanRelayoutMathTests.cs                         697
+tests/GW2CraftingHelper.Tests/Services/PlanRelayoutMathTests.cs                         700
 tests/GW2CraftingHelper.Tests/Services/PlanResultBuilderTests.cs                       1103
 tests/GW2CraftingHelper.Tests/Services/PlanRootIgnoreTests.cs                           412
 tests/GW2CraftingHelper.Tests/Services/PlanSolverCapNoticeSuppressionTests.cs           202

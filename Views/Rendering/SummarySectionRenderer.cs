@@ -849,9 +849,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // shipped half-working.
             }
 
-            // No CreateRowDivider here: the 28px CurrencyRowHeight was
-            // never proven immune to the vanishing-divider defect (only
-            // 36px rows are proven immune), and the header row's dark
+            // No CreateRowDivider here: CurrencyRowHeight was never proven
+            // immune to the vanishing-divider defect (only 36px rows are
+            // proven immune), and moving it to the wallet-list tier's 42px
+            // does not change that - it is still an unproven height, and
+            // still draws no divider, so RowDividerScissorSimulationTests
+            // has nothing to pin for this section. The header row's dark
             // background already delineates the table - introducing a
             // divider at an unproven row height risks resurrecting that
             // defect for a visual element nothing asked for.

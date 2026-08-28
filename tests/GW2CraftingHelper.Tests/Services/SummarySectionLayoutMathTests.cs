@@ -166,10 +166,13 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            // 6 margin + 6 pad + 32 caption line + 4 gap + 20 coin run
+            // 6 margin + 6 pad + 32 caption line + 4 gap + 20 amount run
             // + 6 pad + 6 margin. The caption line is 32, not the 25 it was
             // at Caption: the tile captions moved to the ColumnHeader tier,
-            // whose measured line height is 25 rather than 18.
+            // whose measured line height is 25 rather than 18. The amount
+            // run is 20 because the amount TEXT is 20; it read as "the coin
+            // icon" only while inline coins also drew at 20, and stayed 20
+            // when they moved onto the 16px wallet BAR tier.
             Assert.Equal(80, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
@@ -216,7 +219,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SummarySectionLayoutMath.CostBandHeight(false)
                     - (SummarySectionLayoutMath.CostBandCaptionLineHeight
                         + SummarySectionLayoutMath.CostBandCaptionToAmountGap
-                        + CoinSegmentMath.CoinIconSize));
+                        + PlanContentHeightMath.AmountRunHeight));
         }
 
         [Fact]
@@ -248,11 +251,11 @@ namespace GW2CraftingHelper.Tests.Services
                 {
                     int amountY = SummarySectionLayoutMath.BandAmountY(
                         rowHeight,
-                        CoinSegmentMath.CoinIconSize,
+                        PlanContentHeightMath.AmountRunHeight,
                         captionBlockBottom,
                         SummarySectionLayoutMath.CostBandAmountBottomPad);
                     int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(
-                        amountY, CoinSegmentMath.CoinIconSize);
+                        amountY, PlanContentHeightMath.AmountRunHeight);
 
                     // The caption block must clear the amount run rather
                     // than be overprinted by it.
