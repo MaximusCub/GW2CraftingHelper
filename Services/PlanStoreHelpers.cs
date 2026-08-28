@@ -53,10 +53,12 @@ namespace TaimisToolbench.Services
         };
 
         /// <summary>
-        /// The members a request-only restore reseeds the tab from. Pinned
-        /// here rather than left implicit because the golden fixtures and
-        /// the CI corpus check both read this list as the definition of
-        /// "the request layer".
+        /// The members a request-only restore reseeds the tab from. Named
+        /// rather than left implicit so that
+        /// PlanCompatibilityFixtureTests' layer-classification test can
+        /// require every PersistedPlan member to sit in exactly one of
+        /// these three lists - a member in none of them would be skipped
+        /// by the request read and silently default on restore.
         /// </summary>
         internal static readonly IReadOnlyList<string> RequestLayerMembers = new[]
         {

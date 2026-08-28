@@ -163,7 +163,7 @@ Services/PlanRelayoutMath.cs                                                    
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                 2012
 Services/PlanStore.cs                                                                   219
-Services/PlanStoreHelpers.cs                                                            372
+Services/PlanStoreHelpers.cs                                                            374
 Services/PlanStripStatusBoard.cs                                                        307
 Services/PlanStripTickDecision.cs                                                        97
 Services/PlanStructuralValidator.cs                                                     597
