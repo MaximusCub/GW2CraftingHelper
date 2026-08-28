@@ -388,5 +388,35 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(first.DaysRightEdge, second.DaysRightEdge);
             Assert.Equal(first.RemainingRightEdge, second.RemainingRightEdge);
         }
+
+        // Independent mode shows no reorder arrows: its order IS its answer.
+        // The two rails they leave behind are reclaimed rather than stranded,
+        // which is the module's standing rule about dead space.
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void WithNoReorderButtons_TheRowStillEndsOnItsOneRightEdge(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, showReorder: false);
+
+            Assert.Equal(rowWidth - RankerRowLayout.Inset,
+                bands.RemoveX + RankerRowLayout.ButtonWidth);
+            Assert.Equal(-1, bands.UpX);
+            Assert.Equal(-1, bands.DownX);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void WithNoReorderButtons_EveryBandToTheirLeftGainsTheirWidth(int rowWidth)
+        {
+            var withArrows = RankerRowLayout.Compute(rowWidth, 137, showReorder: true);
+            var without = RankerRowLayout.Compute(rowWidth, 137, showReorder: false);
+
+            int reclaimed = 2 * (RankerRowLayout.ButtonWidth + RankerRowLayout.ButtonGap);
+            Assert.Equal(withArrows.RemainingRightEdge + reclaimed, without.RemainingRightEdge);
+            Assert.Equal(withArrows.DaysRightEdge + reclaimed, without.DaysRightEdge);
+            Assert.Equal(withArrows.ReadyRightEdge + reclaimed, without.ReadyRightEdge);
+            Assert.Equal(withArrows.NameWidth + reclaimed, without.NameWidth);
+            Assert.Equal(withArrows.RemoveX, without.RemoveX);
+        }
     }
 }

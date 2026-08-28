@@ -713,6 +713,23 @@ namespace GW2CraftingHelper.Views
             SetHeaderLabelRight(4, bands.RemainingRightEdge);
         }
 
+        /// <summary>
+        /// The "#" column means a different thing in each mode - a priority
+        /// the user set, or a ranking the tab worked out - and a bare number
+        /// cannot say which. The other four headers are mode-independent.
+        /// </summary>
+        private void UpdateColumnHeaderTooltips()
+        {
+            if (_columnHeaderLabels.Count == 0)
+            {
+                return;
+            }
+
+            TooltipFacility.ApplyPlain(_columnHeaderLabels[0], Mode == RankerMode.Independent
+                ? "Rank by readiness, worked out from the numbers on the right. Your own priority order is kept, and comes back when you switch to \"" + CascadeModeItem + "\"."
+                : "Your priority order. The row above has first claim on your materials, currencies, coin and daily crafts - use the arrows to change it.");
+        }
+
         private void SetHeaderLabel(int index, int x)
         {
             if (index < _columnHeaderLabels.Count)
@@ -804,7 +821,12 @@ namespace GW2CraftingHelper.Views
         private class RenderedRow
         {
             public int ItemId;
+
+            /// <summary>Index in the STORED priority list - what a move or a removal acts on.</summary>
             public int Index;
+
+            /// <summary>Where the row sits in the table right now; see ReorderVisible.</summary>
+            public int DisplayPosition;
             public string FullName;
             public Panel Panel;
             public Label RankLabel;
@@ -865,9 +887,10 @@ namespace GW2CraftingHelper.Views
             }
             else
             {
-                foreach (int priorityIndex in DisplayOrder())
+                var order = DisplayOrder();
+                for (int position = 0; position < order.Count; position++)
                 {
-                    _rows.Add(CreateRow(Entries[priorityIndex], priorityIndex, barWidth));
+                    _rows.Add(CreateRow(Entries[order[position]], order[position], position, barWidth));
                 }
 
                 // Every row's cells are measured before any is rendered, so
@@ -884,6 +907,7 @@ namespace GW2CraftingHelper.Views
                 ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
                 : "Add an item to your list first.");
 
+            UpdateColumnHeaderTooltips();
             RebuildCaptions(barWidth);
             if (_contentPanel.Parent is Container container)
             {
@@ -1069,15 +1093,38 @@ namespace GW2CraftingHelper.Views
 
         private RankerRowLayout.Bands BandsFor(int barWidth)
         {
-            return RankerRowLayout.Compute(barWidth, _remainingBandWidth);
+            return RankerRowLayout.Compute(barWidth, _remainingBandWidth, ReorderVisible);
         }
 
-        private RenderedRow CreateRow(RankerWatchlistEntry entry, int index, int barWidth)
+        /// <summary>
+        /// THE INDEPENDENT-MODE RANK MODEL, in one place.
+        /// <list type="bullet">
+        /// <item><description>The STORED list is always the user's priority
+        /// order and is never touched by independent mode - it is what
+        /// cascade mode goes back to, and what persists.</description></item>
+        /// <item><description>Independent mode DISPLAYS by readiness, so the
+        /// number in the "#" column is that ranking, not a priority; the
+        /// column header says which on hover.</description></item>
+        /// <item><description>There is therefore nothing to reorder while it
+        /// is displayed, and the arrows are not shown at all - a disabled
+        /// arrow invites a click that can never do anything. Remove stays:
+        /// it is about the list, not about the order.</description></item>
+        /// <item><description>A row added while independent mode is
+        /// displayed still goes to the bottom of the stored priority order,
+        /// and shows wherever its readiness puts it - which is last until it
+        /// has been measured.</description></item>
+        /// </list>
+        /// </summary>
+        private bool ReorderVisible => Mode == RankerMode.Cascade;
+
+        private RenderedRow CreateRow(
+            RankerWatchlistEntry entry, int index, int displayPosition, int barWidth)
         {
             var row = new RenderedRow
             {
                 ItemId = entry.ItemId,
                 Index = index,
+                DisplayPosition = displayPosition,
                 FullName = BuildDisplayName(entry),
             };
             var metrics = _results.Metrics(Mode, entry.ItemId);
@@ -1123,7 +1170,7 @@ namespace GW2CraftingHelper.Views
             row.RankLabel = new Label
             {
                 Font = UiFonts.Caption,
-                Text = (row.Index + 1).ToString(CultureInfo.InvariantCulture) + ".",
+                Text = (row.DisplayPosition + 1).ToString(CultureInfo.InvariantCulture) + ".",
                 TextColor = ValueTextColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1211,18 +1258,23 @@ namespace GW2CraftingHelper.Views
                     row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
             }
 
-            row.Up = CreateRowButton(row.Panel, ReorderArrowAssetId, true, bands.UpX, MoveUpTooltip());
-            row.Down = CreateRowButton(row.Panel, ReorderArrowAssetId, false, bands.DownX, MoveDownTooltip());
+            row.Up = null;
+            row.Down = null;
+            int rowIndex = row.Index;
+
+            if (ReorderVisible)
+            {
+                row.Up = CreateRowButton(row.Panel, ReorderArrowAssetId, true, bands.UpX, MoveUpTooltip());
+                row.Down = CreateRowButton(row.Panel, ReorderArrowAssetId, false, bands.DownX, MoveDownTooltip());
+                SetRowButtonEnabled(row.Up, CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Down, CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+                row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
+                row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
+            }
+
             row.Remove = CreateRowButton(row.Panel, RemoveMarkAssetId, false, bands.RemoveX,
                 "Remove this item from your list.");
-
-            SetRowButtonEnabled(row.Up, CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
-            SetRowButtonEnabled(row.Down, CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
             SetRowButtonEnabled(row.Remove, !_isRefreshing);
-
-            int rowIndex = row.Index;
-            row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
-            row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
             int subLines = RenderSubLines(row, bands);
@@ -1451,8 +1503,12 @@ namespace GW2CraftingHelper.Views
                     row.RemainingCell, bands.RemainingRightEdge, MainLineTextY);
             }
 
-            row.Up.Location = new Point(bands.UpX, MainLineButtonY);
-            row.Down.Location = new Point(bands.DownX, MainLineButtonY);
+            if (row.Up != null)
+            {
+                row.Up.Location = new Point(bands.UpX, MainLineButtonY);
+                row.Down.Location = new Point(bands.DownX, MainLineButtonY);
+            }
+
             row.Remove.Location = new Point(bands.RemoveX, MainLineButtonY);
 
             for (int i = 0; i < row.GateNameLabels.Count; i++)

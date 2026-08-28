@@ -77,8 +77,12 @@ namespace GW2CraftingHelper.Services
             /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
             public readonly int RemainingRightEdge;
 
+            /// <summary>Left edge of the move-up button, or -1 when the row has none.</summary>
             public readonly int UpX;
+
+            /// <summary>Left edge of the move-down button, or -1 when the row has none.</summary>
             public readonly int DownX;
+
             public readonly int RemoveX;
 
             /// <summary>Left edge of the sub-lines, aligned under the item name.</summary>
@@ -117,18 +121,23 @@ namespace GW2CraftingHelper.Services
         /// field test flagged, so it now trails the item name inside the
         /// name band (see the view's chip placement).
         /// </summary>
-        public static Bands Compute(int rowWidth, int remainingCellWidth)
+        public static Bands Compute(int rowWidth, int remainingCellWidth, bool showReorder = true)
         {
             rowWidth = Math.Max(0, rowWidth);
             remainingCellWidth = Math.Max(MinRemainingCellWidth, remainingCellWidth);
 
             int rightEdge = Math.Max(0, rowWidth - Inset);
 
+            // Independent mode has no reorder buttons at all - the order it
+            // displays is its own answer, not something to drag. Their rails
+            // are not left empty: every band to their left widens into the
+            // space, which is what keeps the table justified to the panel
+            // rather than stranding 64px of nothing under the header.
             int removeX = rightEdge - ButtonWidth;
-            int downX = removeX - ButtonGap - ButtonWidth;
-            int upX = downX - ButtonGap - ButtonWidth;
+            int downX = showReorder ? removeX - ButtonGap - ButtonWidth : -1;
+            int upX = showReorder ? downX - ButtonGap - ButtonWidth : -1;
 
-            int remainingRightEdge = upX - CellGap;
+            int remainingRightEdge = (showReorder ? upX : removeX) - CellGap;
             int daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
             int readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
 
