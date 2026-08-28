@@ -18,4 +18,4 @@
 # the type, where a reviewer can see it.
 #
 # Format: one integer on the single non-comment line.
-11
+10
