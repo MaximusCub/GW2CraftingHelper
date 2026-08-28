@@ -34,12 +34,12 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(bands.CostRightEdge < bands.WhenX);
             Assert.True(bands.WhenX + bands.WhenWidth < bands.ViewX);
 
-            // The five buttons run View, Open, Re-solve, Pin, Delete with
-            // no overlap...
+            // The cluster runs View, Open, Re-solve, the Pin toggle and
+            // Delete with no overlap...
             Assert.True(bands.ViewX + PlanHistoryRowLayout.ActionButtonWidth <= bands.OpenX);
             Assert.True(bands.OpenX + PlanHistoryRowLayout.ActionButtonWidth <= bands.ResolveX);
             Assert.True(bands.ResolveX + PlanHistoryRowLayout.ActionButtonWidth <= bands.PinX);
-            Assert.True(bands.PinX + PlanHistoryRowLayout.IconButtonWidth <= bands.DeleteX);
+            Assert.True(bands.PinX + PlanHistoryRowLayout.PinToggleWidth <= bands.DeleteX);
 
             // ...and the rightmost button's right edge lands exactly at
             // rowWidth - Inset: no band of empty space to the right.
