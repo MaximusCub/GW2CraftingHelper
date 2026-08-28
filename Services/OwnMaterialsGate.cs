@@ -23,7 +23,7 @@ namespace TaimisToolbench.Services
     /// not.
     /// </para>
     /// </summary>
-    public static class OwnMaterialsGate
+    internal static class OwnMaterialsGate
     {
         /// <summary>
         /// Applied only while the toggle is gated off, so the disabled
