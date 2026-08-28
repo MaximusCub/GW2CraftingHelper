@@ -171,6 +171,7 @@ Services/RankerPriorityOrdering.cs                                              
 Services/RankerRarityAdoption.cs                                                         87
 Services/RankerReadinessCalculator.cs                                                   666
 Services/RankerReadinessWeights.cs                                                       61
+Services/RankerResultCache.cs                                                           263
 Services/RankerRowLayout.cs                                                             334
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
@@ -263,7 +264,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                         1215
-Views/RankerTabContent.cs                                                              2359
+Views/RankerTabContent.cs                                                              2433
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              184
@@ -458,6 +459,7 @@ tests/GW2CraftingHelper.Tests/Services/RankerPriorityCascadeTests.cs            
 tests/GW2CraftingHelper.Tests/Services/RankerPriorityOrderingTests.cs                   256
 tests/GW2CraftingHelper.Tests/Services/RankerRarityAdoptionTests.cs                     130
 tests/GW2CraftingHelper.Tests/Services/RankerReadinessCalculatorTests.cs                741
+tests/GW2CraftingHelper.Tests/Services/RankerResultCacheTests.cs                        215
 tests/GW2CraftingHelper.Tests/Services/RankerRowLayoutTests.cs                          392
 tests/GW2CraftingHelper.Tests/Services/RankerStoreTests.cs                              249
 tests/GW2CraftingHelper.Tests/Services/ReceiptCaptionHelperTests.cs                     124

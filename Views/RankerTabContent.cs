@@ -119,13 +119,10 @@ namespace GW2CraftingHelper.Views
 
         private readonly RankerWatchlist _watchlist;
 
-        // Ephemeral, session-scoped, keyed by item id. Never persisted: a
-        // readiness number goes stale the moment Trading Post prices move.
-        private readonly Dictionary<int, RankerRowMetrics> _metricsByItemId =
-            new Dictionary<int, RankerRowMetrics>();
-
-        private readonly Dictionary<int, CraftingPlanResult> _lastOwnedResults =
-            new Dictionary<int, CraftingPlanResult>();
+        // Ephemeral, session-scoped, one answer set per comparison mode.
+        // Never persisted: a readiness number goes stale the moment Trading
+        // Post prices move. RankerResultCache owns the invalidation rules.
+        private readonly RankerResultCache _results = new RankerResultCache();
 
         private readonly List<RenderedRow> _rows = new List<RenderedRow>();
 
@@ -168,6 +165,7 @@ namespace GW2CraftingHelper.Views
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
         private bool _firstRefreshDone;
+        private DateTime? _snapshotStamp;
         private bool _rarityDirty;
         private DateTime? _lastRefreshLocal;
         private string _statusOverride;
@@ -202,7 +200,7 @@ namespace GW2CraftingHelper.Views
         /// The last Refresh's owned solve per item id, for a future
         /// next-action classifier. Session-scoped and never persisted.
         /// </summary>
-        public IReadOnlyDictionary<int, CraftingPlanResult> LastOwnedResults => _lastOwnedResults;
+        public IReadOnlyDictionary<int, CraftingPlanResult> LastOwnedResults => _results.OwnedResults(Mode);
 
         /// <summary>Main thread, immediately before Blish queues the off-thread Build.</summary>
         public void BeginRebuild()
@@ -350,26 +348,19 @@ namespace GW2CraftingHelper.Views
             UpdateModeRadios();
             RebuildRows();
 
-            bool anyStale = false;
-            for (int i = 0; i < Entries.Count; i++)
+            // Toggling IS the request. A mode this session has already
+            // computed displays instantly from its own answer set above;
+            // one it has not is computed now, for the rows that need it,
+            // rather than parked behind a Refresh press the user has no
+            // reason to expect (owner ruling, 2026-08-27).
+            if (Entries.Count > 0 && !_results.IsComplete(mode, Entries))
             {
-                _metricsByItemId.TryGetValue(Entries[i].ItemId, out var metrics);
-                if (!RankerPriorityOrdering.MetricsAreCurrent(metrics, i, mode))
-                {
-                    anyStale = true;
-                    break;
-                }
+                StartRefresh(mode, recomputeAll: false);
+                return;
             }
 
-            if (Entries.Count > 0 && anyStale)
-            {
-                SetStatus("Comparison mode changed - press Refresh to recalculate.", isError: false);
-            }
-            else
-            {
-                _statusOverride = null;
-                UpdateStatusLine();
-            }
+            _statusOverride = null;
+            UpdateStatusLine();
         }
 
         /// <summary>
@@ -392,7 +383,7 @@ namespace GW2CraftingHelper.Views
 
             return RankerPriorityOrdering.IndependentDisplayOrder(Entries, entry =>
             {
-                _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
+                var metrics = _results.Metrics(Mode, entry.ItemId);
                 return RankerPriorityOrdering.MetricsAreCurrent(
                     metrics, Entries.IndexOf(entry), Mode) ? metrics : null;
             });
@@ -860,6 +851,7 @@ namespace GW2CraftingHelper.Views
             _bannerPanel = null;
             _bannerLabel = null;
 
+            InvalidateOnSnapshotChange();
             AdoptRarityFromStatCache();
 
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
@@ -917,6 +909,36 @@ namespace GW2CraftingHelper.Views
             if (RankerRarityAdoption.AdoptFromStatCache(Entries, _getItemStatBlock))
             {
                 Persist();
+            }
+        }
+
+        /// <summary>
+        /// Every number in either answer set was measured against the
+        /// holdings of one account snapshot; a newer one makes all of them
+        /// claims about an account that no longer exists.
+        /// <para>
+        /// Checked when the table is being rebuilt rather than on a timer,
+        /// deliberately: the snapshot re-fetches itself on a schedule, and
+        /// blanking a table the user is reading - possibly mid-hover - to
+        /// announce a background event is worse than answering with the
+        /// numbers they were already reading until they next ask for them.
+        /// </para>
+        /// </summary>
+        private void InvalidateOnSnapshotChange()
+        {
+            var stamp = _getSnapshot()?.CapturedAt;
+            if (stamp == _snapshotStamp)
+            {
+                return;
+            }
+
+            bool hadResults = _results.HasAnyResults;
+            _snapshotStamp = stamp;
+            _results.InvalidateEverything();
+
+            if (hadResults)
+            {
+                SetStatus("Your account snapshot changed - press Refresh to recalculate.", isError: false);
             }
         }
 
@@ -1058,7 +1080,7 @@ namespace GW2CraftingHelper.Views
                 Index = index,
                 FullName = BuildDisplayName(entry),
             };
-            _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
+            var metrics = _results.Metrics(Mode, entry.ItemId);
             row.Metrics = RankerPriorityOrdering.MetricsAreCurrent(metrics, index, Mode) ? metrics : null;
 
             row.Panel = new Panel
@@ -1695,7 +1717,7 @@ namespace GW2CraftingHelper.Views
 
         private IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadataFor(int currencyId)
         {
-            foreach (var result in _lastOwnedResults.Values)
+            foreach (var result in _results.EnumerateOwned(Mode))
             {
                 if (result?.CurrencyMetadata != null && result.CurrencyMetadata.ContainsKey(currencyId))
                 {
@@ -1789,7 +1811,7 @@ namespace GW2CraftingHelper.Views
 
         private string VendorCappedName(int itemId)
         {
-            foreach (var result in _lastOwnedResults.Values)
+            foreach (var result in _results.EnumerateOwned(Mode))
             {
                 if (result?.ItemMetadata != null &&
                     result.ItemMetadata.TryGetValue(itemId, out var meta) &&
@@ -1925,10 +1947,14 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            InvalidateFrom(invalidatedFrom);
+            // Order matters to the cascade and to nothing else, so the
+            // independent answers survive a reorder untouched.
+            _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
             Persist();
             RebuildRows();
-            SetStatus("Order changed - press Refresh to recalculate the rows below it.", isError: false);
+            SetStatus(Mode == RankerMode.Cascade
+                ? "Order changed - press Refresh to recalculate the rows below it."
+                : "Order changed. It applies in \"" + CascadeModeItem + "\" mode.", isError: false);
         }
 
         private void RemoveRow(int index)
@@ -1939,16 +1965,13 @@ namespace GW2CraftingHelper.Views
             }
 
             string name = Entries[index].Name;
-            int removedItemId = Entries[index].ItemId;
             int invalidatedFrom = RankerPriorityOrdering.RemoveAt(Entries, index);
-            _metricsByItemId.Remove(removedItemId);
-            _lastOwnedResults.Remove(removedItemId);
-            if (Mode == RankerMode.Cascade)
-            {
-                // Independent rows are position-free, so the survivors'
-                // numbers are untouched by a removal.
-                InvalidateFrom(invalidatedFrom);
-            }
+
+            // The removed row leaves both sets; the survivors' independent
+            // numbers are position-free and stand, while the cascade below
+            // the gap no longer has the right claims above it.
+            _results.KeepOnly(Entries);
+            _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
 
             Persist();
             RebuildRows();
@@ -1957,40 +1980,19 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// Drops every cached metric from <paramref name="index"/> down. A
-        /// row's numbers are a function of its POSITION under the cascade, so
-        /// a row that moved is showing a figure for a slot it no longer
-        /// occupies. Rows above the change are genuinely unaffected: the
-        /// cascade never depends on anything below.
+        /// The entry at index changed in place (a quantity edit): the row
+        /// itself is wrong under BOTH modes, and under the cascade so is
+        /// everything below it. See RankerResultCache for the rules.
         /// </summary>
-        private void InvalidateFrom(int index)
+        private void InvalidateAfterChangeAt(int index)
         {
-            if (index < 0)
+            if (index < 0 || index >= Entries.Count)
             {
                 return;
             }
 
-            for (int i = index; i < Entries.Count; i++)
-            {
-                _metricsByItemId.Remove(Entries[i].ItemId);
-            }
-        }
-
-        /// <summary>
-        /// Invalidation after the entry at index changed in place (a
-        /// quantity update): Cascade stales it and everything below it;
-        /// Independent rows are position-free, so only the row itself.
-        /// </summary>
-        private void InvalidateAfterChangeAt(int index)
-        {
-            if (Mode == RankerMode.Cascade)
-            {
-                InvalidateFrom(index);
-            }
-            else if (index >= 0 && index < Entries.Count)
-            {
-                _metricsByItemId.Remove(Entries[index].ItemId);
-            }
+            _results.InvalidateItem(Entries[index].ItemId);
+            _results.InvalidateCascadeFrom(Entries, index);
         }
 
         private void Persist()
@@ -2024,11 +2026,46 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            StartRefresh();
+            // A press means "these numbers are old" - prices move even when
+            // the list does not - so it recomputes the displayed mode whole
+            // rather than trusting anything already cached for it.
+            StartRefresh(Mode, recomputeAll: true);
         }
 
-        private void StartRefresh()
+        /// <summary>
+        /// One row of a run's work plan, decided on the MAIN thread where the
+        /// cache lives. A row the mode's set already answers is not re-solved;
+        /// under the cascade its cached solve is still replayed, because the
+        /// rows below it are measured against what it claims.
+        /// </summary>
+        private sealed class RefreshRow
         {
+            public RankerWatchlistEntry Entry;
+            public int Slot;
+            public bool Solve;
+            public CraftingPlanResult CachedOwned;
+        }
+
+        /// <summary>
+        /// Starts a run for one mode. <paramref name="recomputeAll"/> drops
+        /// that mode's set first (the Refresh button); otherwise only the rows
+        /// the cache cannot answer are solved, which is what makes a toggle to
+        /// a mode computed earlier in the session cost nothing.
+        /// </summary>
+        private void StartRefresh(RankerMode mode, bool recomputeAll)
+        {
+            if (recomputeAll)
+            {
+                _results.InvalidateMode(mode);
+            }
+
+            int firstStale = _results.FirstStaleIndex(mode, Entries);
+            if (firstStale < 0)
+            {
+                // Every row already answered under this mode.
+                return;
+            }
+
             int myGen = ++_refreshGeneration;
             var cts = new CancellationTokenSource();
             _refreshCts = cts;
@@ -2036,24 +2073,48 @@ namespace GW2CraftingHelper.Views
             SetControlsEnabled(false);
             _spinner.Visible = true;
 
-            var entries = Entries.Select(e => new RankerWatchlistEntry
+            // Read HERE, on the main thread, and once: every row in a run is
+            // measured against the same account state, and the stamp the
+            // cache is judged against has to be the one the run actually
+            // used - not whatever a background re-fetch has replaced it with
+            // by the time the run ends.
+            var snapshot = _getSnapshot();
+            _snapshotStamp = snapshot?.CapturedAt;
+
+            var work = new List<RefreshRow>(Entries.Count);
+            for (int i = 0; i < Entries.Count; i++)
             {
-                ItemId = e.ItemId,
-                Quantity = e.Quantity,
-                Name = e.Name,
-                IconUrl = e.IconUrl,
-                Rarity = e.Rarity,
-            }).ToList();
+                var entry = Entries[i];
+                bool cached = mode == RankerMode.Cascade
+                    ? i < firstStale
+                    : RankerPriorityOrdering.MetricsAreCurrent(
+                        _results.Metrics(mode, entry.ItemId), i, mode);
 
-            // Read on the main thread; the run keeps this mode even if a
-            // toggle could slip in mid-run.
-            var mode = Mode;
+                work.Add(new RefreshRow
+                {
+                    // Copied: the run reads these off the main thread, and
+                    // the user can edit the list while it is in flight.
+                    Entry = new RankerWatchlistEntry
+                    {
+                        ItemId = entry.ItemId,
+                        Quantity = entry.Quantity,
+                        Name = entry.Name,
+                        IconUrl = entry.IconUrl,
+                        Rarity = entry.Rarity,
+                    },
+                    Slot = i,
+                    Solve = !cached,
+                    CachedOwned = cached ? _results.Owned(mode, entry.ItemId) : null,
+                });
+            }
 
-            Task.Run(() => RunRefreshAsync(entries, mode, myGen, cts.Token));
+            string activeCharacter = _getActiveCharacterName();
+            Task.Run(() => RunRefreshAsync(work, snapshot, activeCharacter, mode, myGen, cts.Token));
         }
 
         private async Task RunRefreshAsync(
-            List<RankerWatchlistEntry> entries, RankerMode mode, int myGen, CancellationToken ct)
+            List<RefreshRow> work, AccountSnapshot snapshot, string activeCharacter,
+            RankerMode mode, int myGen, CancellationToken ct)
         {
             int updated = 0;
             string failure = null;
@@ -2061,33 +2122,46 @@ namespace GW2CraftingHelper.Views
 
             try
             {
-                // Read once per run, so every row in a run is measured against
-                // the same account state.
-                var snapshot = _getSnapshot();
-                string activeCharacter = _getActiveCharacterName();
                 var valuation = _settings?.GetEffectiveCurrencyValuation();
                 var homesteadTiers = _settings?.GetHomesteadEfficiencyTiers();
                 var cascade = new RankerPriorityCascade(snapshot);
 
                 // Independent mode is slot 1 semantics for EVERY row: one
                 // unconsumed availability (the full account), no Consume
-                // threading between rows. Still 2N solves either way - the
-                // mode only changes which snapshot the owned solve sees,
-                // which is why toggling stales metrics instead of re-solving.
+                // threading between rows. The mode only changes which
+                // snapshot the owned solve sees, which is why each mode
+                // keeps its own answer set rather than staling the other's.
                 var fullAvailability = mode == RankerMode.Independent
                     ? cascade.CurrentAvailability
                     : null;
 
-                for (int i = 0; i < entries.Count; i++)
+                int total = work.Count(w => w.Solve);
+                int position = 0;
+
+                foreach (var row in work)
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var entry = entries[i];
-                    int slot = i;
+                    if (!row.Solve)
+                    {
+                        // Answered already. Under the cascade the row still
+                        // has to claim what it claimed last time, or every
+                        // row below it would be measured against materials
+                        // this one is already spending.
+                        if (mode == RankerMode.Cascade && row.CachedOwned != null)
+                        {
+                            cascade.Consume(row.CachedOwned);
+                        }
+
+                        continue;
+                    }
+
+                    var entry = row.Entry;
+                    int slot = row.Slot;
                     string name = entry.Name;
-                    int position = i + 1;
-                    int total = entries.Count;
-                    MainThreadMarshal.Run(() => ReportProgress(myGen, position, total, name));
+                    int reportPosition = ++position;
+                    int reportTotal = total;
+                    MainThreadMarshal.Run(() => ReportProgress(myGen, reportPosition, reportTotal, name));
 
                     var availability = fullAvailability ?? cascade.CurrentAvailability;
 
@@ -2134,7 +2208,7 @@ namespace GW2CraftingHelper.Views
                     updated++;
 
                     int itemId = entry.ItemId;
-                    MainThreadMarshal.Run(() => ApplyRowMetrics(myGen, itemId, metrics, owned));
+                    MainThreadMarshal.Run(() => ApplyRowMetrics(myGen, mode, itemId, metrics, owned));
                 }
             }
             catch (OperationCanceledException)
@@ -2150,7 +2224,7 @@ namespace GW2CraftingHelper.Views
             int finalUpdated = updated;
             string finalFailure = failure;
             bool wasCancelled = cancelled;
-            MainThreadMarshal.Run(() => FinishRefresh(myGen, finalUpdated, finalFailure, wasCancelled));
+            MainThreadMarshal.Run(() => FinishRefresh(myGen, mode, finalUpdated, finalFailure, wasCancelled));
         }
 
         private void ReportProgress(int myGen, int position, int total, string name)
@@ -2169,7 +2243,8 @@ namespace GW2CraftingHelper.Views
             SetStatus(text, isError: false);
         }
 
-        private void ApplyRowMetrics(int myGen, int itemId, RankerRowMetrics metrics, CraftingPlanResult owned)
+        private void ApplyRowMetrics(
+            int myGen, RankerMode mode, int itemId, RankerRowMetrics metrics, CraftingPlanResult owned)
         {
             if (myGen != _refreshGeneration)
             {
@@ -2193,8 +2268,7 @@ namespace GW2CraftingHelper.Views
                 return;
             }
 
-            _metricsByItemId[itemId] = metrics;
-            _lastOwnedResults[itemId] = owned;
+            _results.Store(mode, itemId, metrics, owned);
 
             var row = _rows.FirstOrDefault(r => r.ItemId == itemId);
             if (row == null || entry == null)
@@ -2215,7 +2289,7 @@ namespace GW2CraftingHelper.Views
             RenderRowContent(row, entry, barWidth);
         }
 
-        private void FinishRefresh(int myGen, int updated, string failure, bool cancelled)
+        private void FinishRefresh(int myGen, RankerMode mode, int updated, string failure, bool cancelled)
         {
             if (myGen != _refreshGeneration)
             {
