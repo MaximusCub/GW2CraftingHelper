@@ -157,6 +157,21 @@ namespace GW2CraftingHelper.Services
         // is gone with the sublabel.
         public const int RecipeRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
 
+        // Reserved height of a formula band's amount run: the taller of the
+        // amount text's own line box (Regular16, 20 - TypeRampMetrics) and
+        // the coin icon beside it, which is what SummarySectionRenderer.
+        // AmountBlockHeight measures at render time.
+        //
+        // Spelled as CoinSegmentMath.CoinIconSize alone until the wallet BAR
+        // tier made the icon the SHORTER of the pair: that only ever agreed
+        // with the text by coincidence, and a reserve named after the icon
+        // now under-reserves by 4px.
+        public const int AmountTextLineHeight = 20;
+        public const int AmountRunHeight =
+            CoinSegmentMath.CoinIconSize > AmountTextLineHeight
+                ? CoinSegmentMath.CoinIconSize
+                : AmountTextLineHeight;
+
         // Caption y and amount bottom pad of an UNHIGHLIGHTED formula band
         // (the profit band; a highlighted one uses
         // SummarySectionLayoutMath's box-derived pair instead). Here rather
@@ -202,17 +217,26 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int CostTileCaptionLineHeight = 29;
 
-        // 67 = 4 caption y + 29 caption line + 8 label-to-value gap + a
-        // 20px coin run (never shorter than the coin icon) + 6 bottom pad.
-        // Was 58 while the amount was bottom-anchored and the gap under the
-        // caption was whatever was left (1px) - see CostTileLabelToValueGap.
+        // 67 = 4 caption y + 29 caption line + 8 label-to-value gap + a 20px
+        // amount run + 6 bottom pad. Was 58 while the amount was
+        // BOTTOM-anchored and the gap under the caption was whatever was
+        // left (1px) - see CostTileLabelToValueGap. There is no
+        // CostTileAmountY constant any more for the same reason: the band
+        // hangs its run under the caption it actually measured, so the run's
+        // y is not a constant of the row at all.
+        //
+        // AmountRunHeight, never CoinSegmentMath.CoinIconSize: the run is as
+        // tall as the taller of its text and its icon, and since the coin
+        // runs moved onto the 16px wallet BAR tier that is the text. Naming
+        // the icon here would under-reserve the row by 4px.
+        //
         // This band carries no divider, so no RowDividerScissorSimulation
         // pair moves with it.
         public const int CostTileRowHeight =
             CostTileCaptionY
             + CostTileCaptionLineHeight
             + CostTileLabelToValueGap
-            + CoinSegmentMath.CoinIconSize
+            + AmountRunHeight
             + CostTileAmountBottomPad;
 
         // The Summary section's COST formula band is no longer a taller
@@ -220,7 +244,17 @@ namespace GW2CraftingHelper.Services
         // font and is highlighted with a tinted box instead, so its height
         // is the box's own geometry - Services/SummarySectionLayoutMath.
         // CostBandHeight. The profit band still uses CostTileRowHeight.
-        public const int CurrencyRowHeight = 28;
+        //
+        // The Summary's currency table mirrors the in-game wallet list, so
+        // its row geometry is measured from the same capture as the icon it
+        // carries: the list's row band is 42px with a 32px icon box centred
+        // in it, i.e. 5px of clearance above and below
+        // (Services/CurrencyIconTiers). Icon-plus-pad, not the old literal
+        // 28, which predated the tier and could not hold a list-tier icon.
+        public const int CurrencyRowIconPad = 5;
+        public const int CurrencyRowHeight =
+            CurrencyIconTiers.WalletListIconSize + (2 * CurrencyRowIconPad);
+
         public const int FallbackTextRowHeight = 28;
 
         /// <summary>Clearance above and below a tree row's icon frame. The

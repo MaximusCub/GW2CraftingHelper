@@ -849,7 +849,8 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 Text = displayName, Font = font, TextColor = Color.White,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(nameX, 4), Parent = rowPanel,
+                Location = new Point(nameX, SummarySectionLayoutMath.CurrencyRowTextY),
+                Parent = rowPanel,
             });
             if (displayName != fullName)
             {
@@ -862,11 +863,11 @@ namespace GW2CraftingHelper.Views.Rendering
             }
 
             var numberColor = new Color(220, 220, 220);
-            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, 4);
+            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, haveText, font, numberColor, edges.HaveRightEdge, 4);
+            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, haveText, font, numberColor, edges.HaveRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, neededText, font, numberColor, edges.NeededRightEdge, 4);
+            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, neededText, font, numberColor, edges.NeededRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
 
             Panel marker = null;
             if (row.CurrencyFullyCovered)
@@ -881,9 +882,12 @@ namespace GW2CraftingHelper.Views.Rendering
                 // shipped half-working.
             }
 
-            // No CreateRowDivider here: the 28px CurrencyRowHeight was
-            // never proven immune to the vanishing-divider defect (only
-            // 36px rows are proven immune), and the header row's dark
+            // No CreateRowDivider here: CurrencyRowHeight was never proven
+            // immune to the vanishing-divider defect (only 36px rows are
+            // proven immune), and moving it to the wallet-list tier's 42px
+            // does not change that - it is still an unproven height, and
+            // still draws no divider, so RowDividerScissorSimulationTests
+            // has nothing to pin for this section. The header row's dark
             // background already delineates the table - introducing a
             // divider at an unproven row height risks resurrecting that
             // defect for a visual element nothing asked for.
@@ -891,9 +895,9 @@ namespace GW2CraftingHelper.Views.Rendering
             {
                 rowPanel.Size = new Point(w, rowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
-                requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), 4);
-                haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), 4);
-                neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), 4);
+                requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
+                haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
+                neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
                 if (marker != null)
                 {
                     marker.Location = new Point(

@@ -192,9 +192,10 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>
         /// Height of the cost formula band's single tile row: the highlight
-        /// box's margin+padding, a caption line, the gap, one amount run (a
-        /// coin run is never shorter than CoinSegmentMath.CoinIconSize,
-        /// which is what makes that the amount block's reserved height),
+        /// box's margin+padding, a caption line, the gap, one amount run
+        /// (PlanContentHeightMath.AmountRunHeight - the taller of the amount
+        /// text's line box and the coin icon beside it, which since the coin
+        /// runs moved onto the wallet BAR tier is the text, not the icon),
         /// and the disclosure line hanging under the amount when there is
         /// one. That line used to be counted BETWEEN the caption and a
         /// bottom-anchored amount, which dropped all three tiles' coin runs
@@ -210,7 +211,7 @@ namespace GW2CraftingHelper.Services
             return CostBandCaptionY
                 + CostBandCaptionLineHeight
                 + CostBandCaptionToAmountGap
-                + CoinSegmentMath.CoinIconSize
+                + PlanContentHeightMath.AmountRunHeight
                 + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
                 + CostBandAmountBottomPad;
         }
@@ -379,13 +380,37 @@ namespace GW2CraftingHelper.Services
         /// <summary>Left x of the currency icon.</summary>
         public const int CurrencyIconX = 8;
 
-        /// <summary>Icon size for the currency table's leading icon.</summary>
-        public const int CurrencyIconSize = 18;
+        /// <summary>
+        /// Icon size for the currency table's leading icon. This IS the
+        /// in-game wallet list - one row per currency, name then amounts,
+        /// icon as the row's subject - so it takes the list tier
+        /// (<see cref="CurrencyIconTiers.WalletListIconSize"/>), not the bar
+        /// tier the inline coin runs above it use. The renderer insets the
+        /// art by the module's 1px frame either side, so the framed box
+        /// occupies exactly the measured 32px window.
+        /// </summary>
+        public const int CurrencyIconSize = CurrencyIconTiers.WalletListIconSize;
 
         /// <summary>
         /// Left x of the currency name label - past the icon plus a gap.
         /// </summary>
         public const int CurrencyNameX = CurrencyIconX + CurrencyIconSize + 8;
+
+        /// <summary>
+        /// Baseline-box y of the currency row's name and its three numbers:
+        /// their Body line box centred in the row, the same rule the row's
+        /// own icon and coverage marker already centre by.
+        /// <para>
+        /// Was a hard-coded 4, which centred a 20px line box only in the
+        /// 28px row this table drew before its icon took the wallet-LIST
+        /// tier and the row became 42 (PlanContentHeightMath.
+        /// CurrencyRowHeight). The literal agreed with the row by
+        /// coincidence, and when the coincidence lapsed the text sat 7px
+        /// high beside a centred icon. Derived, it cannot lapse again.
+        /// </para>
+        /// </summary>
+        public static int CurrencyRowTextY =>
+            (PlanContentHeightMath.CurrencyRowHeight - TypeRampMetrics.BodyInk.LineHeight) / 2;
 
         /// <summary>Gap reserved before/between the right-side columns.</summary>
         public const int CurrencyColumnGap = 14;

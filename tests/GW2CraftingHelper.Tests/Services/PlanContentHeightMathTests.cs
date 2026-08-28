@@ -96,22 +96,33 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostTileRow_HoldsItsCaptionGapAndAmountRun()
         {
-            // The band HANGS its coin run (never shorter than the 20px coin
-            // icon) one CostTileLabelToValueGap under the caption's line
-            // box, rather than bottom-anchoring it above its own pad and
-            // letting the leftover decide the gap - which is what left the
-            // profit band's amount 1px under its caption. The row height
-            // has to hold that stack plus the bottom pad.
+            // The band HANGS its amount run one CostTileLabelToValueGap
+            // under the caption's line box, rather than bottom-anchoring it
+            // above its own pad and letting the leftover decide the gap -
+            // which is what left the profit band's amount 1px under its
+            // caption. The row height has to hold that stack plus the pad.
+            //
+            // AmountRunHeight, not CoinIconSize: the run is as tall as the
+            // taller of its text and its icon, and since the coins moved
+            // onto the 16px wallet BAR tier that is the text. Modelling the
+            // icon here would understate the run by 4px and let a band that
+            // actually overflows pass.
             int amountY = PlanContentHeightMath.CostTileCaptionY
                 + TypeRampMetrics.ColumnHeaderInk.LineHeight
                 + PlanContentHeightMath.CostTileLabelToValueGap;
 
             Assert.True(
-                amountY + CoinSegmentMath.CoinIconSize
+                amountY + PlanContentHeightMath.AmountRunHeight
                     + PlanContentHeightMath.CostTileAmountBottomPad
                     <= PlanContentHeightMath.CostTileRowHeight,
-                $"a coin run at {amountY} overflows the "
+                $"an amount run at {amountY} overflows the "
                     + $"{PlanContentHeightMath.CostTileRowHeight}px band");
+
+            // And the reserve is genuinely the text's, not the icon's - the
+            // regression #202 found and this branch has to keep found.
+            Assert.True(
+                PlanContentHeightMath.AmountRunHeight >= CoinSegmentMath.CoinIconSize,
+                "the amount run must never be reserved shorter than its own coin icon");
         }
 
         [Fact]

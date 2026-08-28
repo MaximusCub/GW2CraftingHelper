@@ -169,7 +169,10 @@ namespace GW2CraftingHelper.Tests.Services
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
             // 6 margin + 6 pad + 29 caption line + 8 label-to-value gap
-            // + 20 coin run + 6 pad + 6 margin.
+            // + 20 amount run + 6 pad + 6 margin. The amount run is 20
+            // because the amount TEXT is 20; it read as "the coin icon" only
+            // while inline coins also drew at 20, and stayed 20 when they
+            // moved onto the 16px wallet BAR tier.
             Assert.Equal(81, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
@@ -237,12 +240,12 @@ namespace GW2CraftingHelper.Tests.Services
         public void BandNoteY_HangsTheDisclosureUnderTheAmount_NotAboveIt()
         {
             int amountY = SummarySectionLayoutMath.BandAmountY(37);
-            int noteY = SummarySectionLayoutMath.BandNoteY(amountY, CoinSegmentMath.CoinIconSize);
+            int noteY = SummarySectionLayoutMath.BandNoteY(amountY, PlanContentHeightMath.AmountRunHeight);
 
             Assert.Equal(
-                amountY + CoinSegmentMath.CoinIconSize + SummarySectionLayoutMath.CostBandAmountToNoteGap,
+                amountY + PlanContentHeightMath.AmountRunHeight + SummarySectionLayoutMath.CostBandAmountToNoteGap,
                 noteY);
-            Assert.True(noteY > amountY + CoinSegmentMath.CoinIconSize);
+            Assert.True(noteY > amountY + PlanContentHeightMath.AmountRunHeight);
         }
 
         [Fact]
@@ -256,7 +259,7 @@ namespace GW2CraftingHelper.Tests.Services
             // guarantee - and the band grows DOWNWARD for the note instead.
             int amountBottom = SummarySectionLayoutMath.BandAmountY(
                 SummarySectionLayoutMath.CostBandCaptionY + TypeRampMetrics.ColumnHeaderInk.LineHeight)
-                + CoinSegmentMath.CoinIconSize;
+                + PlanContentHeightMath.AmountRunHeight;
 
             Assert.True(
                 amountBottom + SummarySectionLayoutMath.CostBandAmountBottomPad
@@ -278,8 +281,8 @@ namespace GW2CraftingHelper.Tests.Services
             // Blish clips a container's children, so a box measured off the
             // amount alone would crop the footnote hanging under it.
             int amountY = SummarySectionLayoutMath.BandAmountY(37);
-            int amountBottom = amountY + CoinSegmentMath.CoinIconSize;
-            int noteBottom = SummarySectionLayoutMath.BandNoteY(amountY, CoinSegmentMath.CoinIconSize)
+            int amountBottom = amountY + PlanContentHeightMath.AmountRunHeight;
+            int noteBottom = SummarySectionLayoutMath.BandNoteY(amountY, PlanContentHeightMath.AmountRunHeight)
                 + TypeRampMetrics.CaptionInk.LineHeight;
 
             int amountOnlyBox = SummarySectionLayoutMath.CostBandBoxHeight(amountBottom);
@@ -375,7 +378,7 @@ namespace GW2CraftingHelper.Tests.Services
                 SummarySectionLayoutMath.CostBandHeight(false)
                     - (SummarySectionLayoutMath.CostBandCaptionLineHeight
                         + SummarySectionLayoutMath.CostBandCaptionToAmountGap
-                        + CoinSegmentMath.CoinIconSize));
+                        + PlanContentHeightMath.AmountRunHeight));
 
             Assert.Equal(
                 2 * SummarySectionLayoutMath.CostBandBoxMarginY
@@ -415,11 +418,11 @@ namespace GW2CraftingHelper.Tests.Services
                     captionBlockBottom++)
                 {
                     int amountY = SummarySectionLayoutMath.BandAmountY(captionBlockBottom);
-                    int contentBottom = amountY + CoinSegmentMath.CoinIconSize;
+                    int contentBottom = amountY + PlanContentHeightMath.AmountRunHeight;
                     if (hasNote)
                     {
                         contentBottom = SummarySectionLayoutMath.BandNoteY(
-                            amountY, CoinSegmentMath.CoinIconSize)
+                            amountY, PlanContentHeightMath.AmountRunHeight)
                             + TypeRampMetrics.CaptionInk.LineHeight;
                     }
 
@@ -563,19 +566,48 @@ namespace GW2CraftingHelper.Tests.Services
         public void ComputeCurrencyColumnEdges_DistributesTheColumnsAcrossThePanel()
         {
             // 800: pinned right edge 792, marker 758, Needed 744. The name
-            // starts at 34, so 710px carry four equal tracks and each
-            // column's right edge is its own quarter's end.
+            // starts at CurrencyNameX 48 (8 gutter + the 32px wallet-LIST
+            // icon + 8), so 696px carry four equal tracks and each column's
+            // right edge is its own quarter's end.
             var edges800 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            Assert.Equal(389, edges800.RequiredRightEdge);
-            Assert.Equal(566, edges800.HaveRightEdge);
+            Assert.Equal(396, edges800.RequiredRightEdge);
+            Assert.Equal(570, edges800.HaveRightEdge);
             Assert.Equal(744, edges800.NeededRightEdge);
             Assert.Equal(758, edges800.MarkerX);
 
             var edges1200 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
-            Assert.Equal(589, edges1200.RequiredRightEdge);
-            Assert.Equal(866, edges1200.HaveRightEdge);
+            Assert.Equal(596, edges1200.RequiredRightEdge);
+            Assert.Equal(870, edges1200.HaveRightEdge);
             Assert.Equal(1144, edges1200.NeededRightEdge);
             Assert.Equal(1158, edges1200.MarkerX);
+        }
+
+        [Fact]
+        public void CurrencyRowTextY_CentresTheRowsTextTheSameWayItsIconIsCentred()
+        {
+            // The row's icon and coverage marker centre themselves in the
+            // row; its name and numbers used a hard-coded 4, which centred
+            // a Body line box only in the 28px row this table drew before
+            // the icon took the wallet-LIST tier. Derived from the row it
+            // is actually drawn in, the two cannot part company again.
+            int rowHeight = PlanContentHeightMath.CurrencyRowHeight;
+            int textY = SummarySectionLayoutMath.CurrencyRowTextY;
+
+            Assert.Equal(
+                (rowHeight - TypeRampMetrics.BodyInk.LineHeight) / 2,
+                textY);
+
+            // Same centring rule the icon beside it uses, within the pixel
+            // integer division can cost.
+            int iconY = (rowHeight - SummarySectionLayoutMath.CurrencyIconSize) / 2;
+            Assert.InRange(
+                (textY + TypeRampMetrics.BodyInk.LineHeight / 2)
+                    - (iconY + SummarySectionLayoutMath.CurrencyIconSize / 2),
+                -1, 1);
+
+            // And the text's own ink stays inside the row.
+            Assert.True(textY >= 0);
+            Assert.True(textY + TypeRampMetrics.BodyInk.LowestInk <= rowHeight);
         }
 
         [Fact]
@@ -637,8 +669,15 @@ namespace GW2CraftingHelper.Tests.Services
             // Below the width a track can hold a reserved number band plus
             // its gap there is nothing to distribute, and spreading anyway
             // would overlap the columns. 300: right edge 292, marker 258,
-            // Needed 244, and 210px of span cannot give four tracks 74px
+            // Needed 244, and 196px of span cannot give four tracks 74px
             // each - so the columns pack right-to-left as they always did.
+            //
+            // The threshold is a function of CurrencyNameX, so the wallet-
+            // LIST icon moving that from 34 to 48 raised it from a ~386px
+            // panel to ~400px. Both are far under the module's own window
+            // minimum (a 1436px window leaves a 1310px plan panel), so the
+            // distributed regime is what actually ships and this branch
+            // exists to degrade rather than overlap.
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(300);
 
             Assert.Equal(258, edges.MarkerX);
