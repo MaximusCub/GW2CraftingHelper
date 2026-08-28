@@ -163,6 +163,107 @@ namespace VendorOfferUpdater.Tests
                 VendorOfferDiff.Format(result, "old", "new"));
         }
 
+        /// <summary>
+        /// VendorOfferHasher's own comment records that recomputing the hash
+        /// changes every id in the dataset at once. Reported as repricings that
+        /// is tens of thousands of lines whose before and after are identical,
+        /// burying the handful of rows a reviewer actually has to check.
+        /// </summary>
+        [Fact]
+        public void HashFormatChange_IsRehashed_NotRepriced()
+        {
+            var before = new List<VendorOffer> { Offer(1, "Miyani", 100), Offer(2, "Miyani", 200) };
+            var after = new List<VendorOffer> { Offer(1, "Miyani", 100), Offer(2, "Miyani", 200) };
+            foreach (var offer in after)
+            {
+                offer.OfferId = "stale-format-" + offer.OutputItemId;
+            }
+
+            var result = VendorOfferDiff.Compute(before, after);
+
+            Assert.Empty(result.Repriced);
+            Assert.Empty(result.Added);
+            Assert.Empty(result.Removed);
+            Assert.Empty(result.Retagged);
+            Assert.Equal(2, result.Rehashed);
+            Assert.True(result.IsEmpty);
+
+            string report = VendorOfferDiff.Format(result, "old", "new");
+            Assert.Contains("rehashed: 2", report);
+            Assert.Contains("the file moved without a data change", report);
+        }
+
+        /// <summary>
+        /// One merchant can sell the same item at several output counts (the
+        /// live dataset's "Cannibal" | item 67389 rows are x1/x3/x8). Pairing
+        /// those on (merchant, item) alone pairs the x1 row's old cost against
+        /// the x3 row's new cost, inventing a price move in a row nobody
+        /// touched.
+        /// </summary>
+        [Fact]
+        public void RowsDifferingOnlyInOutputCount_AreNotCrossPairedIntoRepricings()
+        {
+            var counts = new[] { 1, 3, 8 };
+            var before = counts.Select(c => Offer(67389, "Cannibal", c * 10, outputCount: c)).ToList();
+            var after = counts.Select(c => Offer(67389, "Cannibal", c * 10, outputCount: c)).ToList();
+            foreach (var offer in after)
+            {
+                offer.OfferId = "stale-format-x" + offer.OutputCount;
+            }
+
+            var result = VendorOfferDiff.Compute(before, after);
+
+            Assert.Empty(result.Repriced);
+            Assert.Empty(result.Added);
+            Assert.Empty(result.Removed);
+            Assert.Equal(3, result.Rehashed);
+        }
+
+        /// <summary>
+        /// A rehash must not swallow a real change arriving in the same run:
+        /// the reviewer still has to see the one row that actually moved.
+        /// </summary>
+        [Fact]
+        public void RealRepricingIsStillReportedAlongsideARehash()
+        {
+            var before = new List<VendorOffer> { Offer(1, "Miyani", 100), Offer(2, "Miyani", 200) };
+            var after = new List<VendorOffer> { Offer(1, "Miyani", 100), Offer(2, "Miyani", 999) };
+            foreach (var offer in after)
+            {
+                offer.OfferId = "stale-format-" + offer.OutputItemId;
+            }
+
+            var result = VendorOfferDiff.Compute(before, after);
+
+            Assert.Equal(1, result.Rehashed);
+            Assert.Single(result.Repriced);
+            Assert.Equal(2, result.Repriced[0].After.OutputItemId);
+            Assert.Contains("200x currency 1 -> 999x currency 1",
+                VendorOfferDiff.Format(result, "old", "new"));
+        }
+
+        /// <summary>
+        /// SeasonalFestival sits outside both the hash and the content key, so a
+        /// row that is rehashed AND retagged in one run must still report the
+        /// retag - a dropped festival tag is a regression this dataset has had.
+        /// </summary>
+        [Fact]
+        public void RehashedRowThatAlsoChangedFestival_IsStillReportedAsARetag()
+        {
+            var before = new List<VendorOffer> { Offer(1, "Miyani", 100, festival: "Wintersday") };
+            var after = new List<VendorOffer> { Offer(1, "Miyani", 100) };
+            after[0].OfferId = "stale-format-1";
+
+            var result = VendorOfferDiff.Compute(before, after);
+
+            Assert.Equal(1, result.Rehashed);
+            Assert.Single(result.Retagged);
+            Assert.Empty(result.Repriced);
+            Assert.False(result.IsEmpty);
+            Assert.Contains("festival Wintersday -> (none)",
+                VendorOfferDiff.Format(result, "old", "new"));
+        }
+
         [Fact]
         public void SurplusRowsForOneMerchantItemPair_FallThroughAsAddsAndRemoves()
         {
