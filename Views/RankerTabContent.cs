@@ -1016,6 +1016,35 @@ namespace GW2CraftingHelper.Views
             return changed;
         }
 
+        /// <summary>
+        /// Re-seats EVERYTHING the coin band's width moves, which is the
+        /// rows AND the column header over them.
+        /// <para>
+        /// The header is the half that was missed, and it is the reported
+        /// "Ready/Days/Remaining are poorly aligned with the content below".
+        /// A table with no results yet measures its coin band at
+        /// RankerRowLayout.MinRemainingCellWidth; the first refresh replaces
+        /// that with a real coin cell, and since the Ready and Days rails
+        /// are derived by walking LEFT from the coin band, both move by the
+        /// difference (37px in the 2026-08-27 capture) while the header
+        /// labels stayed where the empty table had put them. Fixing the
+        /// rails' arithmetic - the previous attempt - could not fix that,
+        /// because the header was simply never asked again.
+        /// </para>
+        /// </summary>
+        private void RelayoutTable(int barWidth)
+        {
+            foreach (var each in _rows)
+            {
+                if (each.Index < Entries.Count)
+                {
+                    RenderRowContent(each, Entries[each.Index], barWidth);
+                }
+            }
+
+            PositionColumnHeader(barWidth);
+        }
+
         private RankerRowLayout.Bands BandsFor(int barWidth)
         {
             return RankerRowLayout.Compute(barWidth, _remainingBandWidth);
@@ -2179,17 +2208,7 @@ namespace GW2CraftingHelper.Views
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             if (RecomputeBandWidths())
             {
-                // A wider coin cell moves the Ready and Days columns for
-                // EVERY row, so they all have to follow rather than drifting
-                // out of alignment as results land one at a time.
-                foreach (var each in _rows)
-                {
-                    if (each.Index < Entries.Count)
-                    {
-                        RenderRowContent(each, Entries[each.Index], barWidth);
-                    }
-                }
-
+                RelayoutTable(barWidth);
                 return;
             }
 

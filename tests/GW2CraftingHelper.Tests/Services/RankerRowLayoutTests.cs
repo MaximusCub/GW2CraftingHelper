@@ -352,5 +352,41 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Equal(AddButtonRight, slots.FirstX);
             Assert.Equal(AddButtonRight, slots.SecondX);
         }
+
+        // WHY THE COLUMN HEADER HAS TO BE RE-SEATED WHENEVER THE COIN BAND
+        // CHANGES. Ready and Days are derived by walking LEFT from the coin
+        // band, so a table that has not been refreshed yet (coin band at its
+        // MinRemainingCellWidth floor) puts those two rails in a different
+        // place than the same table does once a real coin cell has been
+        // measured. The header labels are right-aligned on the very same
+        // rails, so a view that re-renders its rows without re-seating its
+        // header leaves the two disagreeing by exactly this difference -
+        // the reported "Ready/Days/Remaining are poorly aligned with the
+        // content below" (measured at 37px in the 2026-08-27 capture).
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AWiderCoinBand_MovesTheReadyAndDaysRailsButNotTheCoinRail(int rowWidth)
+        {
+            var narrow = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth);
+            var wide = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth + 37);
+
+            Assert.Equal(narrow.RemainingRightEdge, wide.RemainingRightEdge);
+            Assert.Equal(narrow.DaysRightEdge - 37, wide.DaysRightEdge);
+            Assert.Equal(narrow.ReadyRightEdge - 37, wide.ReadyRightEdge);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void TheSameBandWidth_GivesTheHeaderAndTheCellsOneSetOfRails(int rowWidth)
+        {
+            // The view derives both from this one call; anything that
+            // recomputes the band has to recompute both sides of it.
+            var first = RankerRowLayout.Compute(rowWidth, 137);
+            var second = RankerRowLayout.Compute(rowWidth, 137);
+
+            Assert.Equal(first.ReadyRightEdge, second.ReadyRightEdge);
+            Assert.Equal(first.DaysRightEdge, second.DaysRightEdge);
+            Assert.Equal(first.RemainingRightEdge, second.RemainingRightEdge);
+        }
     }
 }
