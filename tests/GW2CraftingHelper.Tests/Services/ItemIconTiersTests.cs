@@ -102,5 +102,49 @@ namespace GW2CraftingHelper.Tests.Services
             // already reserved, rather than growing the box. 22 + 2 = 24.
             Assert.Equal(24, ItemIconTiers.FrameSize(ItemIconTier.SearchSuggestion));
         }
+
+        [Fact]
+        public void TheCurrencyTiersFramedBoxIsTheMeasuredWalletWindow()
+        {
+            // The one place the item tiers and the currency tiers differ:
+            // a bag slot's measurement is the ART (the game draws no frame
+            // of its own, so the module's 1px sits outside it), while a
+            // wallet icon's measurement is the whole BOX. So the currency
+            // tiers inset, and their FRAME - not their art - is what has to
+            // equal CurrencyIconTiers. Shipping a second copy of 32 and 16
+            // is what this asserts against.
+            Assert.Equal(
+                CurrencyIconTiers.WalletListIconSize,
+                ItemIconTiers.FrameSize(ItemIconTier.CurrencyListRow));
+            Assert.Equal(
+                CurrencyIconTiers.WalletBarIconSize,
+                ItemIconTiers.FrameSize(ItemIconTier.CurrencyBarRun));
+        }
+
+        [Fact]
+        public void TheSummaryCurrencyTableReservesTheCurrencyListTiersBox()
+        {
+            // SummarySectionLayoutMath lays the currency table's name column
+            // out past this width. It and the tier must be the same number,
+            // or the icon and the column it is measured against drift.
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyIconSize,
+                ItemIconTiers.FrameSize(ItemIconTier.CurrencyListRow));
+        }
+
+        [Fact]
+        public void PlanHistoryRowsReserveTheItemTiersTheyDraw()
+        {
+            // Both Plan History tiers came from the merged history-parity
+            // work, which put its rows on the shared item tiers. These
+            // assertions are what keeps the tab's row-height arithmetic and
+            // the icons it actually draws from parting company again.
+            Assert.Equal(
+                PlanHistoryRowLayout.IconTotal,
+                ItemIconTiers.FrameSize(ItemIconTier.BagSlot));
+            Assert.Equal(
+                PlanHistoryRowLayout.DetailIconTotal,
+                ItemIconTiers.FrameSize(ItemIconTier.BagSidebar));
+        }
     }
 }

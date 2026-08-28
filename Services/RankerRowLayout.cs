@@ -242,8 +242,14 @@ namespace GW2CraftingHelper.Services
         /// <summary>Indent of the currency grid under the sub-line band.</summary>
         public const int CurrencyIndent = 16;
 
-        /// <summary>Inline currency icon edge; +2 border fits the 20px sub-line.</summary>
-        public const int CurrencyIconSize = 16;
+        /// <summary>
+        /// Inline currency icon edge; +2 border fits the 20px sub-line. A
+        /// shortfall sub-line reads "&lt;icon&gt; 1,234 Karma" inside a
+        /// sentence, not as a table row, so it is the wallet BAR tier - which
+        /// is the size this line already shipped at, now named rather than
+        /// coincidental (Services/CurrencyIconTiers).
+        /// </summary>
+        public const int CurrencyIconSize = CurrencyIconTiers.WalletBarIconSize;
 
         /// <summary>Gap between a currency icon's frame and its name.</summary>
         public const int CurrencyIconGap = 6;

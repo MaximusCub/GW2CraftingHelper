@@ -21,7 +21,17 @@ namespace GW2CraftingHelper.Services
     /// </summary>
     internal static class CoinSegmentMath
     {
-        public const int CoinIconSize = 20;
+        /// <summary>
+        /// Size of the icon in an inline coin/currency SEGMENT - a unit
+        /// marker sitting to the right of a number inside a cell or a
+        /// sentence, which is the in-game wallet summary bar's tier, not the
+        /// wallet list's. Defined as that tier rather than as a number of its
+        /// own: see <see cref="CurrencyIconTiers"/> for the measurement, and
+        /// use <see cref="CurrencyIconTiers.WalletListIconSize"/> instead
+        /// wherever the icon is a currency TABLE ROW's subject (the Summary
+        /// currency table, the Snapshot wallet rows).
+        /// </summary>
+        public const int CoinIconSize = CurrencyIconTiers.WalletBarIconSize;
         public const int CoinLabelIconGap = 2;
         public const int CoinSegmentGap = 6;
 
@@ -149,10 +159,13 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Width of a whole coin run. iconSize defaults to the shared
-        /// CoinIconSize every plan table draws at; the rich tooltip passes
-        /// its own smaller, line-height-derived size (gap G22) and must
-        /// measure with the same number it draws with.
+        /// Width of a whole coin run. iconSize defaults to CoinIconSize, the
+        /// bar tier every plan table draws inline runs at; the rich tooltip
+        /// passes its own line-height-derived size (gap G22) and must measure
+        /// with the same number it draws with. That derived size converges on
+        /// the same tier - a 20px line height gives 16 - so the override is
+        /// now a font-tracking refinement of the bar tier rather than a
+        /// departure from it.
         /// </summary>
         public static int TotalCoinSegmentsWidth(List<CoinSegmentSpec> segments, int iconSize = 0)
         {

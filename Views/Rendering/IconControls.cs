@@ -62,19 +62,20 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// The pre-tier signature, kept ONLY so the call sites owned by
-        /// in-flight branches keep compiling until they migrate; the
+        /// The pre-tier signature, kept ONLY so the one call site still owned
+        /// by an in-flight branch keeps compiling until it migrates; the
         /// defaults are gone so nothing new can drift into it by accident,
         /// and the tests workflow's "Every item icon renders at a named
-        /// tier" step allow-lists exactly the files below and fails on any
-        /// other caller.
+        /// tier" step allow-lists exactly that file and fails on any other
+        /// caller.
         ///
         /// <para>
-        /// Remaining callers, each a one-line change to the tier overload
-        /// once its branch lands: Views/PlanHistoryTabContent.cs
-        /// (PlanHistoryDetail), Views/RankerTabContent.cs (InlineCurrency),
-        /// Views/Rendering/RichTooltipSurface.cs (TooltipHeader),
-        /// Views/Rendering/SummarySectionRenderer.cs (InlineCurrency).
+        /// The only remaining caller is Views/RankerTabContent.cs, whose
+        /// shortfall cells become ItemIconTier.CurrencyBarRun. That one is
+        /// NOT pixel-neutral: it passes the wallet-bar measurement as ART
+        /// and frames outside it, so its box is 18 where the measured window
+        /// is 16, and the tier insets as the other two currency sites
+        /// already do. Whoever owns that file makes the call.
         /// </para>
         /// </summary>
         internal static Panel CreateItemIcon(

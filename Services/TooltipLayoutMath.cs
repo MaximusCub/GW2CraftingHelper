@@ -68,13 +68,60 @@ namespace GW2CraftingHelper.Services
         public const int MinContentWidth = 120;
 
         /// <summary>
+        /// The item tooltip's own wrap maximum, in the width units
+        /// <c>BitmapFont.MeasureString</c> reports for the shipped
+        /// Menomonia 14 face with Blish's <c>LetterSpacing = -1</c>.
+        /// <para>
+        /// DERIVED FROM THE GAME'S OWN BREAK DECISIONS rather than from a
+        /// game-pixel cap converted by a scale factor. The earlier 350 came
+        /// from a measured game cap of [345, 347) game px multiplied by a
+        /// MEAN font ratio of 1.014; that mean hides a real per-string
+        /// spread of 0.99x to 1.03x, because LetterSpacing = -1 tightens
+        /// tracking on a face whose glyph boxes are already ~10% wider than
+        /// the game's, so how a given string lands depends on its letter
+        /// count as much as its length. The 2026-08-27 owner A/B - Gift of
+        /// Twilight 19648 hovered in the module and in the game - caught
+        /// the low end of that spread: the game wrapped its description and
+        /// the module did not.
+        /// </para>
+        /// <para>
+        /// Each live capture that wraps a paragraph pins the cap twice: it
+        /// must be at least the width of the line the game KEPT whole, and
+        /// below that line plus the word the game PUSHED down. Measured
+        /// through this face for the whole wrapped corpus (widths in this
+        /// constant's units):
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Gift of Twilight 19648: 282 kept / 338 with "Twilight."
+        /// pushed down; its "Made by combining these items in the Mystic
+        /// Forge:" line, 317, stays whole.</item>
+        /// <item>eyes-of-kormir 83103: 313 kept / 366 with "because";
+        /// 315 kept / 352 with "under".</item>
+        /// <item>heart-of-destroyer 67017: 293 kept / 362 with
+        /// "Bloodstone"; 326 kept / 387 with "Destroyer".</item>
+        /// <item>fury-scorched 86967: 357 kept / 378 with "for" - the ONE
+        /// outlier, see below.</item>
+        /// </list>
+        /// <para>
+        /// Every constraint but fury's intersects at [326, 338); 332 is its
+        /// midpoint, so no decision sits within 6px of flipping. Fury's
+        /// kept line needs a cap of 357+, which would un-wrap Gift of
+        /// Twilight AND eyes' second line, so it loses 1 constraint to 5.
+        /// Fury's own line is the corpus's widest-measuring string in this
+        /// face (1.03x the game) and it will wrap one word early - a
+        /// recorded, measured cost of rendering the game's text at a face
+        /// the game does not ship.
+        /// </para>
+        /// </summary>
+        public const int ItemTooltipMaxContentWidth = 332;
+
+        /// <summary>
         /// The width a tooltip may wrap at on this screen.
         /// <paramref name="preferredWidth"/> defaults to Blish's own 500 so
         /// every existing caller reads the same as every plain tooltip; a
-        /// caller with a measured cap of its own - the item tooltip, whose
-        /// wrap maximum is derived from live captures (gap G24,
-        /// fidelity-audit section 1.5) - passes it and does not move the
-        /// shared constant out from under the rest.
+        /// caller with a measured cap of its own - the item tooltip, at
+        /// <see cref="ItemTooltipMaxContentWidth"/> - passes it and does
+        /// not move the shared constant out from under the rest.
         /// </summary>
         public static int MaxContentWidth(int screenWidth, int chromeWidth, int preferredWidth = 0)
         {
@@ -421,8 +468,9 @@ namespace GW2CraftingHelper.Services
         /// <paramref name="boxLength"/> can source starting at
         /// <paramref name="offset"/>: the box length, clamped to what the
         /// texture has left past the offset, never negative. The 942px
-        /// texture leaves 939x938 - a rich tooltip (max content width 350
-        /// plus chrome) never approaches it, so the clamp exists for the
+        /// texture leaves 939x938 - a rich tooltip is
+        /// <see cref="ItemTooltipMaxContentWidth"/> plus chrome at its
+        /// widest and never approaches it, so the clamp exists for the
         /// pathological box, not the common one.
         /// </summary>
         public static int CanvasArtSourceLength(int boxLength, int textureLength, int offset)

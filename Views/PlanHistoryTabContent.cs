@@ -40,7 +40,17 @@ namespace GW2CraftingHelper.Views
 
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int ClearButtonWidth = 120;
-        private const int DetailIconSize = 20;
+
+        // The one row seat that cannot live in PlanHistoryRowLayout beside
+        // the others: the module's button height is Views-layer geometry,
+        // and Services does not reach into Views. Same centring rule.
+        private static readonly int MainLineButtonY =
+            (PlanHistoryRowLayout.RowHeight - UiMetrics.ButtonHeight) / 2;
+
+        // Not a row: one prose line with no icon column, so it does not
+        // follow the rows' frame-driven height. It does share their left
+        // edge - it stands where the list would.
+        private const int EmptyStateHeight = 44;
 
         private static readonly Color DimColor = new Color(150, 150, 150);
         private static readonly Color StatusColor = new Color(200, 200, 200);
@@ -236,7 +246,8 @@ namespace GW2CraftingHelper.Views
 
             _headerDivider = new Panel
             {
-                Size = new Point(Math.Max(0, width - ScrollbarAllowance), 2),
+                Size = new Point(
+                    Math.Max(0, width - ScrollbarAllowance), PlanContentHeightMath.RowDividerHeight),
                 Location = new Point(0, SectionBandHeight - 3),
                 BackgroundColor = SectionDividerColor,
                 Parent = _headerPanel,
@@ -307,7 +318,7 @@ namespace GW2CraftingHelper.Views
             int barWidth = Math.Max(0, width - ScrollbarAllowance);
 
             _headerPanel.Size = new Point(width, SectionBandHeight);
-            _headerDivider.Size = new Point(barWidth, 2);
+            _headerDivider.Size = new Point(barWidth, PlanContentHeightMath.RowDividerHeight);
             _toolbarPanel.Size = new Point(width, ToolbarHeight);
             _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);
 
@@ -434,7 +445,7 @@ namespace GW2CraftingHelper.Views
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             var panel = new Panel
             {
-                Size = new Point(barWidth, 44),
+                Size = new Point(barWidth, EmptyStateHeight),
                 Parent = _contentPanel,
             };
 
@@ -445,7 +456,7 @@ namespace GW2CraftingHelper.Views
                 TextColor = DimColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(8, 8),
+                Location = new Point(PlanHistoryRowLayout.Inset, 8),
                 Parent = panel,
             };
         }
@@ -507,16 +518,18 @@ namespace GW2CraftingHelper.Views
             var firstSummary = FirstSummary(entry);
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 row.Panel, firstSummary?.IconUrl, firstSummary?.Rarity,
-                bands.IconX, 5, row.FullLabel, UiFonts.Body,
-                bands.NameX + bands.NameWidth, 0, 0, bands.NameX, 12);
+                bands.IconX, PlanHistoryRowLayout.IconY, row.FullLabel, UiFonts.Body,
+                bands.NameX + bands.NameWidth, 0, 0, bands.NameX, PlanHistoryRowLayout.MainLineTextY,
+                ItemIconTier.BagSlot);
             ApplyRowTooltip(row);
 
             row.CostCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                row.Panel, entry.TotalCoinCostAtGeneration, null, bands.CostRightEdge, 12, UiFonts.Body);
+                row.Panel, entry.TotalCoinCostAtGeneration, null, bands.CostRightEdge,
+                PlanHistoryRowLayout.MainLineTextY, UiFonts.Body);
 
             row.WhenLabel = LabelHelpers.CreateRightAlignedLabel(
                 row.Panel, WhenText(entry), UiFonts.Body, StatusColor,
-                bands.WhenX + bands.WhenWidth, 12);
+                bands.WhenX + bands.WhenWidth, PlanHistoryRowLayout.MainLineTextY);
 
             row.View = CreateActionButton(row.Panel, "View", bands.ViewX,
                 "Show what this plan cost when it was generated. Nothing is recalculated.");
@@ -621,7 +634,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = text,
                 Size = new Point(PlanHistoryRowLayout.ActionButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(x, 8),
+                Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
             TooltipFacility.ApplyPlain(button, tooltip);
@@ -634,7 +647,7 @@ namespace GW2CraftingHelper.Views
             {
                 Text = glyph,
                 Size = new Point(PlanHistoryRowLayout.IconButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(x, 8),
+                Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
             TooltipFacility.ApplyPlain(button, tooltip);
@@ -667,7 +680,7 @@ namespace GW2CraftingHelper.Views
 
             int rightEdge = Math.Max(0, barWidth - PlanHistoryRowLayout.Inset);
             int x = bands.NameX;
-            int y = 6;
+            int y = PlanHistoryRowLayout.DetailPadding / 2;
 
             var summaries = entry.ItemSummaries ?? new List<PlanHistoryItemSummary>();
             int line = 0;
@@ -679,12 +692,21 @@ namespace GW2CraftingHelper.Views
                 }
 
                 IconControls.CreateItemIcon(
-                    panel, summary.IconUrl, summary.Rarity, x, y,
-                    iconSize: DetailIconSize, borderThickness: 1);
+                    panel, summary.IconUrl, ItemIconFrame.ForRarity(summary.Rarity),
+                    x, y + PlanHistoryRowLayout.IconPad, ItemIconTier.BagSidebar);
 
-                int textX = x + DetailIconSize + 2 + 8;
+                int textX = x + PlanHistoryRowLayout.DetailIconTotal + PlanHistoryRowLayout.IconGap;
                 string full = line < itemLines.Count ? itemLines[line] : "";
-                AddFlexLabel(row, panel, full, UiFonts.Body, textX, y + 1, rightEdge);
+
+                // The item's own rarity colour, as the row above it and
+                // every other item name in the module takes: an unknown
+                // rarity resolves to the same 200-grey these lines used to
+                // be pinned at, so nothing dims - a KNOWN rarity stops
+                // being thrown away.
+                AddFlexLabel(
+                    row, panel, full, UiFonts.Body, textX,
+                    y + PlanHistoryRowLayout.DetailItemTextY, rightEdge,
+                    RarityColors.GetRarityNameColor(summary.Rarity));
                 y += PlanHistoryRowLayout.DetailItemLineHeight;
                 line++;
             }
@@ -747,16 +769,22 @@ namespace GW2CraftingHelper.Views
             return panel;
         }
 
+        /// <summary>
+        /// A detail line that re-ellipsizes on resize. color overrides the
+        /// tier's own default, which is the hierarchy this panel reads in:
+        /// Body lines are content at StatusColor, Caption lines are muted
+        /// notes at DimColor.
+        /// </summary>
         private void AddFlexLabel(
             RenderedRow row, Panel panel, string full, BitmapFont font,
-            int x, int y, int rightEdge)
+            int x, int y, int rightEdge, Color? color = null)
         {
             string shown = LabelHelpers.EllipsizeToWidth(font, full, Math.Max(0, rightEdge - x));
             var label = new Label
             {
                 Font = font,
                 Text = shown,
-                TextColor = font == UiFonts.Caption ? DimColor : StatusColor,
+                TextColor = color ?? (font == UiFonts.Caption ? DimColor : StatusColor),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(x, y),
@@ -878,19 +906,21 @@ namespace GW2CraftingHelper.Views
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
-            CoinCurrencyRenderer.RepositionValueCellRightAligned(row.CostCell, bands.CostRightEdge, 12);
+            CoinCurrencyRenderer.RepositionValueCellRightAligned(
+                row.CostCell, bands.CostRightEdge, PlanHistoryRowLayout.MainLineTextY);
             row.WhenLabel.Location = new Point(
-                Math.Max(0, bands.WhenX + bands.WhenWidth - row.WhenLabel.Width), 12);
+                Math.Max(0, bands.WhenX + bands.WhenWidth - row.WhenLabel.Width),
+                PlanHistoryRowLayout.MainLineTextY);
 
-            row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, 8);
+            row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, MainLineButtonY);
             if (row.Open != null)
             {
-                row.Open.Location = new Point(bands.OpenX, 8);
+                row.Open.Location = new Point(bands.OpenX, MainLineButtonY);
             }
 
-            row.Resolve.Location = new Point(bands.ResolveX, 8);
-            row.Pin.Location = new Point(bands.PinX, 8);
-            row.Delete.Location = new Point(bands.DeleteX, 8);
+            row.Resolve.Location = new Point(bands.ResolveX, MainLineButtonY);
+            row.Pin.Location = new Point(bands.PinX, MainLineButtonY);
+            row.Delete.Location = new Point(bands.DeleteX, MainLineButtonY);
 
             if (row.DetailPanel != null)
             {

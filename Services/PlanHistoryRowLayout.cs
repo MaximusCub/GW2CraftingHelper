@@ -14,13 +14,50 @@ namespace GW2CraftingHelper.Services
     internal static class PlanHistoryRowLayout
     {
         public const int Inset = 16;
-        public const int IconSize = 32;
+
+        /// <summary>
+        /// TIER 1 of the two-tier icon system (owner ruling - see
+        /// ItemIconTiers): a history row is one whole PLAN headlined by its
+        /// target item, the same "one row, one object" shape as the
+        /// Ranker's watchlist rows, the Snapshot grid and the plan heading
+        /// - not the dense per-ingredient lists that take tier 2. Only the
+        /// EXPANDED row's item list is dense, and that takes tier 2 below.
+        /// </summary>
+        public const int IconSize = ItemIconTiers.BagSlotIconSize;
+
         public const int IconBorder = 1;
         public const int IconTotal = IconSize + 2 * IconBorder;
         public const int IconGap = 8;
         public const int CellGap = 20;
         public const int ButtonGap = 8;
-        public const int RowHeight = 44;
+
+        /// <summary>
+        /// Clearance above and below an icon frame on this tab, the
+        /// 3px-each-side law every frame-driven row in the module is built
+        /// on (RankerRowLayout.RowHeight's tier-1 60,
+        /// PlanContentHeightMath.TreeRowIconPad's tier-2 48). Not the
+        /// divider clearance: these rows draw no row divider, so nothing
+        /// here enters the M36b scissor derivation.
+        /// </summary>
+        public const int IconPad = 3;
+
+        /// <summary>y of the row's icon frame - and, with the frame, the
+        /// whole of RowHeight.</summary>
+        public const int IconY = IconPad;
+
+        // 54 + 3 + 3 = 60, the same sum RankerRowLayout.RowHeight is.
+        public const int RowHeight = IconTotal + 2 * IconPad;
+
+        /// <summary>
+        /// y of every text seat on the main line - the plan label, the coin
+        /// cell and the timestamp all sit on one reading line, centred on
+        /// the Body line box rather than picked. A taller row that left
+        /// these where they were would top-pack the text against a
+        /// vertically centred icon.
+        /// </summary>
+        public static readonly int MainLineTextY =
+            (RowHeight - TypeRampMetrics.Regular16.LineHeight) / 2;
+
         public const int ActionButtonWidth = 84;
         public const int IconButtonWidth = 28;
 
@@ -41,8 +78,30 @@ namespace GW2CraftingHelper.Services
         /// </summary>
         public const int MinWhenWidth = 100;
 
+        /// <summary>
+        /// TIER 2: the expanded row's per-item list IS a dense item list -
+        /// the same class as the Crafting Plan tab's Used Materials,
+        /// Shopping List and Required Recipes rows, which is why it takes
+        /// the in-game bag-SIDEBAR size and their frame border rather than
+        /// the tier-1 art the row above it headlines with.
+        /// </summary>
+        public const int DetailIconSize = ItemIconTiers.BagSidebarIconSize;
+
+        public const int DetailIconBorder = PlanContentHeightMath.RowIconBorder;
+        public const int DetailIconTotal = PlanContentHeightMath.RowIconFrameSize;
+
         // Detail-panel line heights - see DetailHeight.
-        public const int DetailItemLineHeight = 24;
+
+        // 42 + 3 + 3 = 48, the frame-plus-breathing-room law again. The
+        // plan tab's own tier-2 rows sum to 45 instead, because they carry
+        // a divider and its clearance pixel where this list carries neither.
+        public const int DetailItemLineHeight = DetailIconTotal + 2 * IconPad;
+
+        /// <summary>y of an item line's text inside its own line box, on
+        /// the same centring rule as <see cref="MainLineTextY"/>.</summary>
+        public static readonly int DetailItemTextY =
+            (DetailItemLineHeight - TypeRampMetrics.Regular16.LineHeight) / 2;
+
         public const int DetailSettingsLineHeight = 24;
         public const int DetailChipsLineHeight = 26;
         public const int DetailCaptionLineHeight = 22;

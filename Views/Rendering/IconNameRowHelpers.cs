@@ -96,13 +96,13 @@ namespace GW2CraftingHelper.Views.Rendering
         }
 
         /// <summary>
-        /// The pre-tier signature, kept ONLY so the two row builders owned
-        /// by in-flight branches keep compiling until they migrate:
-        /// Views/PlanHistoryTabContent.cs (both defaults, becomes
-        /// ItemIconTier.PlanHistoryDetail) and Views/RankerTabContent.cs
-        /// (iconSize only, becomes ItemIconTier.BagSlot). The defaults stay
-        /// because those two calls rely on them; the tests workflow's
-        /// named-tier step allow-lists exactly those files.
+        /// The pre-tier signature, kept ONLY so the one row builder still
+        /// owned by an in-flight branch keeps compiling until it migrates:
+        /// Views/RankerTabContent.cs, which passes iconSize and leans on the
+        /// borderThickness default, and becomes ItemIconTier.BagSlot with no
+        /// pixel change. The defaults stay because that call relies on one;
+        /// the tests workflow's named-tier step allow-lists exactly that
+        /// file and this one, which carries the shim.
         /// </summary>
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string rarity, int iconX, int iconY,

@@ -165,6 +165,10 @@ namespace GW2CraftingHelper.Views
         // scrollbar. Which mode is live is decided by the flow itself, in
         // ApplyTopRegionLayout - see Services/SnapshotHeaderLayout.
         private const int SearchToFilterGapY = 3;
+        // Caption-driven, not icon-driven: the block holds the caption
+        // label's own line box beside an inline coin run drawn at y=2. The
+        // run is the wallet BAR tier (2 + 16 = 18), so the icons clear this
+        // height with room to spare; it is the caption that sets it.
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;
 
@@ -2595,12 +2599,15 @@ namespace GW2CraftingHelper.Views
                 Parent = _resultGridPanel,
             };
 
-            // Same component as the item rows, at the wallet row's own named
-            // tier; a currency has no rarity to resolve, so neutral by
-            // intent rather than by omission.
+            // Same component as the item rows; no rarity, so neutral by
+            // intent rather than by omission. One row per currency, name and
+            // balance beside its icon: this IS the in-game wallet list, so
+            // the icon takes the list tier, whose art is already inset by the
+            // module's 1px frame so the framed box occupies exactly the
+            // measured 32px window rather than overflowing it to 34.
             var icon = IconControls.CreateItemIcon(
                 rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
-                ItemIconTier.WalletRow,
+                ItemIconTier.CurrencyListRow,
                 string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
 
             // Never display raw currency IDs (repo invariant). Same two

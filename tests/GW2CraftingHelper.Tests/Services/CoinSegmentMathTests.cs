@@ -136,8 +136,11 @@ namespace GW2CraftingHelper.Tests.Services
         public void TotalCurrencySegmentsWidth_MultipleSegments_GapBetweenNotAfter()
         {
             // Pins the gap arithmetic exactly (1 gap for 2 segments):
-            // 30 + 2 + 20 = 52 for the first, 10 + 2 + 20 = 32 for the
-            // second, plus a single 6px segmentGap between them = 90.
+            // 30 + 2 + 16 = 48 for the first, 10 + 2 + 16 = 28 for the
+            // second, plus a single 6px segmentGap between them = 82.
+            // The 16 is CurrencyIconTiers.WalletBarIconSize, which
+            // CoinIconSize now is - re-baselined from 20 when the inline
+            // runs moved onto the measured wallet bar tier.
             var segments = new List<CoinSegmentMath.CurrencySegmentSpec>
             {
                 new CoinSegmentMath.CurrencySegmentSpec { IconUrl = "karma.png", Text = "1200", TextWidth = 30 },
@@ -149,7 +152,7 @@ namespace GW2CraftingHelper.Tests.Services
                 (10 + LabelIconGap + IconSize) +
                 SegmentGap;
             Assert.Equal(expected, CoinSegmentMath.TotalCurrencySegmentsWidth(segments));
-            Assert.Equal(90, expected);
+            Assert.Equal(82, expected);
         }
 
         [Fact]

@@ -120,28 +120,6 @@ namespace GW2CraftingHelper.Views.Rendering
         private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
 
         /// <summary>
-        /// TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the preferred
-        /// width for every plain tooltip in the module (gap G24); the shared
-        /// <c>TooltipLayoutMath.PreferredMaxContentWidth</c> is untouched.
-        /// <para>
-        /// The game's measured wrap maximum, converted into THIS surface's
-        /// measurement space. The live3 corpus brackets the cap at
-        /// [345, 347) px of game-scale text: fury-scorched holds a 345px
-        /// line unwrapped while eyes-of-kormir breaks before a word that
-        /// would end at 348 (fidelity-audit, live3 sizing section - the
-        /// owner captures were scale-calibrated against the lossless
-        /// sandbox sigil pair, pixel-identical). The tooltip renders at
-        /// Menomonia 14, which Blish's exact chain (MeasureString with its
-        /// LetterSpacing = -1) puts at 1.014x the game's text width
-        /// (fidelity-audit section 1.5), scaling the bracket to
-        /// [350, 352); 350 is its floor. The 2026-08-26 owner field ruling
-        /// retired the Menomonia-16 readability bump this constant was
-        /// briefly 392 for.
-        /// </para>
-        /// </summary>
-        private const int MaxContentWidth = 350;
-
-        /// <summary>
         /// The inline effect icon beside a consumable's effect block:
         /// ~26px square with the text column starting ~31px in, both
         /// measured on live3 soul-pastries (icon columns 21-47, text at 51
@@ -158,7 +136,8 @@ namespace GW2CraftingHelper.Views.Rendering
         /// line, measured on the steak capture) - not the module's shared
         /// 20px table icon, which under the +2pt font wave reads small on
         /// a 22px line and tall on a 16px one. TOOLTIP-LOCAL for the same
-        /// reason as the width above: <c>CoinSegmentMath.CoinIconSize</c>
+        /// reason the item wrap cap is its own constant:
+        /// <c>CoinSegmentMath.CoinIconSize</c>
         /// is the plan tables' constant and stays theirs (gap G22).
         /// </summary>
         private static int CoinIconSizeFor(int lineHeight)
@@ -245,7 +224,7 @@ namespace GW2CraftingHelper.Views.Rendering
                 }
 
                 // A box that outruns the 939x938 the crop can source
-                // (never seen - max content width 350 plus chrome) gets
+                // (never seen - the item cap plus chrome) gets
                 // the fallback tint on the uncovered strips rather than
                 // a stretch: only ever right/bottom, since the crop is
                 // anchored to the box's top-left like the game's.
@@ -376,8 +355,15 @@ namespace GW2CraftingHelper.Views.Rendering
 
             DisposeContent();
 
+            // TOOLTIP-LOCAL, deliberately: Blish's own 500 stays the
+            // preferred width for every plain tooltip in the module (gap
+            // G24). The item cap is derived from the game's captured wrap
+            // decisions - see TooltipLayoutMath.ItemTooltipMaxContentWidth,
+            // where it lives so the derivation stays Blish-free and pinned.
             int maxWidth = TooltipLayoutMath.MaxContentWidth(
-                GameService.Graphics.SpriteScreen.Width, ChromeWidth, MaxContentWidth);
+                GameService.Graphics.SpriteScreen.Width,
+                ChromeWidth,
+                TooltipLayoutMath.ItemTooltipMaxContentWidth);
 
             var layout = TooltipLayoutMath.LayoutContent(
                 content, maxWidth, lineHeight,
@@ -450,8 +436,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
                 IconControls.CreateItemIcon(
-                    _contentPanel, row.IconUrl, HeaderIconFrameColor,
-                    0, row.Y, HeaderIconSize, HeaderIconBorder);
+                    _contentPanel, row.IconUrl, ItemIconFrame.Explicit(HeaderIconFrameColor),
+                    0, row.Y, ItemIconTier.TooltipHeader);
             }
 
             // The name is centred on the icon, not top-aligned (measured,

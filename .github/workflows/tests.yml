@@ -282,11 +282,8 @@ jobs:
           # branch that owns it. Removing an entry is the act of the commit
           # that migrates its call; adding one needs a reason in the message.
           ALLOWED = {
-              'Views/PlanHistoryTabContent.cs': 'PR #201 owns this file',
               'Views/RankerTabContent.cs': 'the Ranker rarity branch owns this file',
-              'Views/Rendering/RichTooltipSurface.cs': 'the tooltip branch owns this file',
-              'Views/Rendering/SummarySectionRenderer.cs': 'the summary-band branch owns this file',
-              'Views/Rendering/IconNameRowHelpers.cs': 'carries the legacy shim for the two row builders above',
+              'Views/Rendering/IconNameRowHelpers.cs': 'carries the legacy shim for the row builder above',
           }
           CALLS = ('IconControls.CreateItemIcon(',
                    'IconNameRowHelpers.CreateIconAndEllipsizedName(')

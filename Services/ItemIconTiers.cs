@@ -1,32 +1,50 @@
 namespace GW2CraftingHelper.Services
 {
     /// <summary>
-    /// The closed vocabulary of item-icon sizes. Every framed icon in the
-    /// module names one of these; none passes a bare number. The two
-    /// governed tiers are the ruling; the rest are the surfaces the ruling
-    /// exempts, named here rather than left as literals so "what size is
-    /// that icon" has exactly one answer per surface and a new surface has
-    /// to pick from this list instead of inventing a number.
+    /// The closed vocabulary of framed-icon sizes: what a call site names
+    /// instead of passing a number. Nothing is measured here - every tier
+    /// resolves to a constant on <see cref="ItemIconTiers"/> or
+    /// <see cref="CurrencyIconTiers"/>, which own the measurements. This is
+    /// the vocabulary; those two are the ruler.
+    ///
+    /// <para>
+    /// Four of the six are governed by an owner ruling (two item tiers, two
+    /// currency tiers). The last two are the surfaces no ruling covers, named
+    /// here rather than left as literals so every icon in the module traces
+    /// to a name and a new surface has to pick from this list instead of
+    /// inventing a number.
+    /// </para>
     /// </summary>
     internal enum ItemIconTier
     {
         /// <summary>
-        /// TIER 1 - in-game bag-slot art: the Snapshot tab's item grid, the
-        /// Crafting Plan heading item, the Crafting Ranker's rows.
+        /// ITEM TIER 1 - in-game bag-slot art: the Snapshot tab's item grid,
+        /// the Crafting Plan heading item, the Crafting Ranker's rows, the
+        /// Plan History tab's collapsed rows.
         /// </summary>
         BagSlot,
 
         /// <summary>
-        /// TIER 2 - in-game bag-SIDEBAR art: every row-level icon in the
-        /// Crafting Plan tab.
+        /// ITEM TIER 2 - in-game bag-SIDEBAR art: every row-level icon in
+        /// the Crafting Plan tab, and the Plan History tab's expanded
+        /// per-item detail lines.
         /// </summary>
         BagSidebar,
 
         /// <summary>
-        /// EXEMPT - the Snapshot tab's wallet rows. A currency has no
-        /// rarity and its row is half the height of an item row.
+        /// CURRENCY TIER 1 - in-game wallet LIST art, where the icon is a
+        /// table row's subject rather than a unit marker on a number: the
+        /// Snapshot tab's wallet rows and the plan Summary's currency table.
         /// </summary>
-        WalletRow,
+        CurrencyListRow,
+
+        /// <summary>
+        /// CURRENCY TIER 2 - in-game wallet SUMMARY BAR art, for a currency
+        /// icon inline beside a number inside a cell (the Ranker's shortfall
+        /// cells). The coin runs themselves are unframed and go through
+        /// CoinCurrencyRenderer, not here.
+        /// </summary>
+        CurrencyBarRun,
 
         /// <summary>
         /// EXEMPT - the item-search suggestion list, whose row height is
@@ -39,18 +57,6 @@ namespace GW2CraftingHelper.Services
         /// tooltip rather than to the game's bags.
         /// </summary>
         TooltipHeader,
-
-        /// <summary>
-        /// EXEMPT - a currency icon inline in a table cell (the plan
-        /// summary's currency table, the Ranker's shortfall cells).
-        /// </summary>
-        InlineCurrency,
-
-        /// <summary>
-        /// EXEMPT - the Plan History tab's expanded per-item detail lines,
-        /// which are caption-height.
-        /// </summary>
-        PlanHistoryDetail,
     }
 
     /// <summary>
@@ -115,11 +121,30 @@ namespace GW2CraftingHelper.Services
             {
                 case ItemIconTier.BagSlot: return BagSlotIconSize;
                 case ItemIconTier.BagSidebar: return BagSidebarIconSize;
-                case ItemIconTier.WalletRow: return 32;
+
+                // The two currency tiers read their measurement off
+                // CurrencyIconTiers rather than restating it, so the module
+                // has ONE source of truth per measured window. They differ
+                // from the item tiers in where the frame sits: an item tier's
+                // measured window is the ART (the game draws no frame of its
+                // own around a bag slot, so the module's 1px sits outside
+                // it), while a currency tier's measured window is the whole
+                // BOX - the wallet list's 32px is the icon's footprint in the
+                // row. So the art is inset by the frame and the framed box
+                // lands exactly on the measurement instead of overflowing it
+                // by 2. Both currency call sites already did this arithmetic
+                // inline; here it happens once.
+                case ItemIconTier.CurrencyListRow:
+                    return CurrencyIconTiers.WalletListIconSize - (2 * FrameBorder);
+                case ItemIconTier.CurrencyBarRun:
+                    return CurrencyIconTiers.WalletBarIconSize - (2 * FrameBorder);
+
+                // The two the rulings do not cover. Their numbers ARE the
+                // measurement, because the surface each belongs to is the
+                // only thing that sizes them: the suggestion dropdown's 24px
+                // row box, and the game tooltip's own 32px header icon.
                 case ItemIconTier.SearchSuggestion: return 22;
                 case ItemIconTier.TooltipHeader: return 32;
-                case ItemIconTier.InlineCurrency: return 16;
-                case ItemIconTier.PlanHistoryDetail: return 20;
 
                 // Not a fallback that guesses a size: an unnamed tier is a
                 // programming error, and a silent default is how the module

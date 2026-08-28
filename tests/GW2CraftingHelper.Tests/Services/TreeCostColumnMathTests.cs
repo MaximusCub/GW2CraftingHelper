@@ -172,9 +172,11 @@ namespace GW2CraftingHelper.Tests.Services
         // Pinned as absolute pixel offsets from the column's right edge
         // rather than recomputed from the same constants the formula
         // reads. Segment width is text + CoinLabelIconGap(2) +
-        // CoinIconSize(20); sub-columns are separated by
-        // CoinSegmentGap(6). A deliberate geometry change re-baselines the
-        // literals here.
+        // CoinIconSize(16, = CurrencyIconTiers.WalletBarIconSize);
+        // sub-columns are separated by CoinSegmentGap(6). A deliberate
+        // geometry change re-baselines the literals here - as the move of
+        // the inline coin runs onto the measured wallet bar tier just did,
+        // 20 -> 16.
         [Fact]
         public void ComputeEdges_AllThreeDenominations_StackRightToLeft()
         {
@@ -183,8 +185,8 @@ namespace GW2CraftingHelper.Tests.Services
 
             Assert.Equal(1000, edges.CurrencyRightEdge);
             Assert.Equal(1000, edges.CopperRightEdge);          // no currency band
-            Assert.Equal(1000 - 42 - 6, edges.SilverRightEdge); // copper: 20+2+20
-            Assert.Equal(1000 - 42 - 6 - 42 - 6, edges.GoldRightEdge);
+            Assert.Equal(1000 - 38 - 6, edges.SilverRightEdge); // copper: 20+2+16
+            Assert.Equal(1000 - 38 - 6 - 38 - 6, edges.GoldRightEdge);
         }
 
         [Fact]
@@ -208,8 +210,8 @@ namespace GW2CraftingHelper.Tests.Services
             var widths = new TreeCostColumnMath.CostColumnWidths(0, 20, 20, 0);
             var edges = TreeCostColumnMath.ComputeEdges(1000, widths);
 
-            Assert.Equal(1000 - 42 - 6, edges.SilverRightEdge);
-            Assert.Equal(42 + 6 + 42, edges.TotalWidth);
+            Assert.Equal(1000 - 38 - 6, edges.SilverRightEdge);
+            Assert.Equal(38 + 6 + 38, edges.TotalWidth);
         }
 
         [Fact]
@@ -339,12 +341,12 @@ namespace GW2CraftingHelper.Tests.Services
         {
             Assert.Equal(0, TreeCostColumnMath.TotalWidth(TreeCostColumnMath.CostColumnWidths.Empty));
 
-            // copper only: 20 + 2 + 20
-            Assert.Equal(42, TreeCostColumnMath.TotalWidth(
+            // copper only: 20 + 2 + 16
+            Assert.Equal(38, TreeCostColumnMath.TotalWidth(
                 new TreeCostColumnMath.CostColumnWidths(0, 0, 20, 0)));
 
-            // gold(52) + gap + silver(42) + gap + copper(42) + gap + currency(88)
-            Assert.Equal(52 + 6 + 42 + 6 + 42 + 6 + 88, TreeCostColumnMath.TotalWidth(
+            // gold(48) + gap + silver(38) + gap + copper(38) + gap + currency(88)
+            Assert.Equal(48 + 6 + 38 + 6 + 38 + 6 + 88, TreeCostColumnMath.TotalWidth(
                 new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88)));
         }
 
