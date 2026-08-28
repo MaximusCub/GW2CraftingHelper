@@ -1205,12 +1205,15 @@ namespace TaimisToolbench.Views
             // The chip trails the name inside the name band (see
             // RankerRowLayout.Compute's comment), so the name's budget
             // reserves the chip's width first.
+            // ONE resolved rarity feeds the frame, the name colour and the
+            // hover header - resolving it three times is how they drift.
+            string rarity = ItemRarityResolution.Resolve(entry.Rarity, StatRarityFor(entry.ItemId));
+            var hover = ItemHover(row, entry, rarity);
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                row.Panel, entry.IconUrl, entry.Rarity,
+                row.Panel, entry.IconUrl, rarity,
                 bands.IconX, MainLineIconY, row.FullName, UiFonts.Body,
                 NameBudgetRightEdge(bands, row.ChipWidth), 0, 0, bands.NameX, MainLineTextY,
-                iconSize: RankerRowLayout.IconSize);
-            ApplyItemTooltip(row, entry);
+                hover, iconSize: RankerRowLayout.IconSize);
 
             if (chipText != null)
             {
@@ -1477,7 +1480,8 @@ namespace TaimisToolbench.Views
                 row.CurrencyNameFulls.Add(fullName);
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
                     row.Panel, CurrencyIconUrl(shortfall), (string)null,
-                    0, y, RankerRowLayout.CurrencyIconSize, 1, fullName));
+                    0, y, RankerRowLayout.CurrencyIconSize, 1,
+                    ItemIconTooltip.Naming(fullName)));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
@@ -1606,9 +1610,6 @@ namespace TaimisToolbench.Views
                     {
                         name.Text = shown;
                     }
-
-                    TooltipFacility.ApplyPlain(name,
-                        string.Equals(shown, full, StringComparison.Ordinal) ? null : full);
                 }
             }
 
@@ -1726,50 +1727,37 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The standard rich item tooltip on the whole main line, stamped
-        /// deferred so a stat block the session caches later shows without
-        /// a re-render, falling back to the plain full name until then -
-        /// the same shape MainView.ApplyItemRowTooltip established.
+        /// The standard rich item hover for one watchlist row: the item's
+        /// icon+name header either way, plus the session stat block when it
+        /// has one.
         /// <para>
-        /// Stamped on the row PANEL and the rank as well as the name and
-        /// the icon tree, because Blish resolves a tooltip on the deepest
-        /// control under the cursor and never bubbles to the parent
-        /// (KNOWN-ISSUES #57): every control the cursor can land on is its
-        /// own hover, and the panel is what it lands on between them. With
-        /// only the name and the icon stamped, most of the row - the rank,
-        /// the gap after a short name, the whole strip right of it - was a
-        /// hole where the row answered nothing at all.
+        /// Its caller stamps it on the row PANEL and the rank as well,
+        /// because Blish resolves a tooltip on the deepest control under
+        /// the cursor and never bubbles to the parent (KNOWN-ISSUES #57):
+        /// every control the cursor can land on is its own hover, and the
+        /// panel is what it lands on between them.
         /// </para>
         /// </summary>
-        private void ApplyItemTooltip(RenderedRow row, RankerWatchlistEntry entry)
+        private ItemIconTooltip ItemHover(RenderedRow row, RankerWatchlistEntry entry, string rarity)
         {
             int itemId = entry.ItemId;
-            string fullName = row.FullName;
-            Func<TooltipContent> build = () => ItemRowTooltipComposer.BuildRowContent(
-                _getItemStatBlock == null || itemId <= 0 ? null : _getItemStatBlock(itemId),
-                fullName,
-                true,
-                (IReadOnlyList<string>)null);
-
-            StampItemTooltip(row.Panel, fullName, build);
-            StampItemTooltip(row.RankLabel, fullName, build);
-            StampItemTooltip(row.IconName.NameLabel, fullName, build);
-
-            // The icon tree keeps its own note (a missing-icon square says
-            // so) as the builder's fallback, so it is stamped rich-only.
-            IconControls.ApplyRichDeferredToIconTree(row.IconName.IconFrame, build);
+            return ItemIconTooltip.ForItem(
+                ItemTooltipIdentity.ForItem(row.FullName, entry.IconUrl, rarity),
+                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
+                    : () => _getItemStatBlock(itemId));
         }
 
-        /// <summary>
-        /// The plain name is registered FIRST so the facility captures it as
-        /// the deferred builder's fallback: a builder that composes nothing,
-        /// or throws, then still names the item instead of leaving the
-        /// control silent.
-        /// </summary>
-        private static void StampItemTooltip(Control control, string fullName, Func<TooltipContent> build)
+        /// <summary>The rarity the session stat cache knows for an item, or
+        /// null - the fallback behind an entry's own captured value.</summary>
+        private string StatRarityFor(int itemId)
         {
-            TooltipFacility.ApplyPlain(control, fullName);
-            TooltipFacility.ApplyRichDeferred(control, build);
+            if (_getItemStatBlock == null || itemId <= 0)
+            {
+                return null;
+            }
+
+            var block = _getItemStatBlock(itemId);
+            return block == null ? null : block.Rarity;
         }
 
         private bool CanReorder => !_isRefreshing && Mode == RankerMode.Cascade;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
@@ -35,10 +36,13 @@ namespace TaimisToolbench.Views.Rendering
     internal sealed class RecipesSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
-        internal RecipesSectionRenderer(ISectionRelayoutSink sink)
+        internal RecipesSectionRenderer(
+            ISectionRelayoutSink sink, Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         // Left x of the name column (past the row's tier-2 framed icon at
@@ -210,9 +214,17 @@ namespace TaimisToolbench.Views.Rendering
                 wikiHint = WikiHintText;
             }
 
-            var iconFrame = IconControls.CreateItemIcon(
+            int itemId = row.ItemId;
+            string hintLine = wikiHint;
+            var hover = ItemIconTooltip.ForItem(
+                ItemTooltipIdentity.ForItem(row.Label ?? "", row.IconUrl, row.Rarity),
+                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
+                    : () => _getItemStatBlock(itemId),
+                () => hintLine == null ? null : new List<string> { hintLine });
+
+            IconControls.CreateItemIcon(
                 rowPanel, row.IconUrl, ItemIconFrame.ForRarity(row.Rarity),
-                IconX, 0, ItemIconTier.BagSidebar);
+                IconX, 0, ItemIconTier.BagSidebar, hover);
 
             var font = UiFonts.Body;
             string fullName = row.Label ?? "";
@@ -229,7 +241,6 @@ namespace TaimisToolbench.Views.Rendering
                     Location = new Point(NameX, NameY),
                     Parent = rowPanel,
                 });
-            StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
 
             Label disciplineLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
@@ -298,7 +309,6 @@ namespace TaimisToolbench.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    StampRowTooltip(rowPanel, nameLabel, iconFrame, fullName, wikiHint);
                 }
             });
         }
@@ -309,31 +319,5 @@ namespace TaimisToolbench.Views.Rendering
         private const int NameY = 12;
 
         private const string WikiHintText = "Right-click: Open wiki page";
-
-        /// <summary>
-        /// The row's tooltip, on the name label AND the row panel: the full
-        /// recipe name when it is truncated, then the wiki hint when the
-        /// row has one. Composed rather than assigned over each other -
-        /// truncation used to clobber the hint, and the hint used to be
-        /// stamped on the panel alone, where the name label swallowed it.
-        /// Null for a row with neither is a deliberate clear (see
-        /// TooltipFacility.ApplyPlain), which is what a widening drag
-        /// leaves behind.
-        /// </summary>
-        private static void StampRowTooltip(
-            Panel rowPanel, Label nameLabel, Panel iconFrame, string fullName, string wikiHint)
-        {
-            string truncationLine = nameLabel.Text != fullName ? fullName : null;
-            string tooltip = truncationLine == null
-                ? wikiHint
-                : (wikiHint == null ? truncationLine : truncationLine + "\n" + wikiHint);
-
-            TooltipFacility.ApplyPlain(rowPanel, tooltip);
-            TooltipFacility.ApplyPlain(nameLabel, tooltip);
-
-            // The icon is the row's biggest target and was the one part of
-            // it that answered a hover with nothing.
-            IconControls.ApplyPlainToIconTree(iconFrame, tooltip);
-        }
     }
 }
