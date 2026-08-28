@@ -116,12 +116,10 @@ namespace TaimisToolbench.Services
                     // can make this negative, which Task.Delay rejects.
                     int remaining = (int)(_settleMs - elapsedMs);
 
-                    // ConfigureAwait(false) because the callback reaches the
-                    // UI thread through _marshal, never through a captured
-                    // context. Capturing one puts the settle window at the
-                    // mercy of whatever else that context is serving: under
-                    // a bounded SynchronizationContext a 1ms window has been
-                    // observed taking 32 SECONDS to fire.
+                    // The callback reaches the UI thread through _marshal, so
+                    // capturing a context only lends this window that
+                    // context's throughput: measured at 32s for a 1ms window
+                    // under a saturated one.
                     await _delay(remaining > 0 ? remaining : 1).ConfigureAwait(false);
                 }
 
