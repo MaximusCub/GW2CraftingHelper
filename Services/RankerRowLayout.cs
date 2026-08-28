@@ -27,7 +27,26 @@ namespace GW2CraftingHelper.Services
 
         // 60: the 54px tier-1 icon frame plus 3px of clearance each side.
         public const int RowHeight = 60;
+
+        /// <summary>A text-only sub-line: the gate strip, and a note.</summary>
         public const int SubLineHeight = 20;
+
+        /// <summary>
+        /// A currency line carries a wallet-LIST-tier icon (the game's own
+        /// 32px), so it cannot sit in a text line's pitch. 4px of clearance,
+        /// against the main line's 3.
+        /// </summary>
+        public const int CurrencyLineHeight = CurrencyIconTiers.WalletListIconSize + 4;
+
+        // RHYTHM. Grouping is carried by the gaps BETWEEN blocks rather than
+        // by uniform padding everywhere: the headline, the gate strip and the
+        // currency detail are three different kinds of statement, and a
+        // reader should see three groups instead of one wall of lines. Inside
+        // a block, lines keep their own pitch and take no gap at all.
+        public const int GateTopGap = 2;
+        public const int CurrencyTopGap = 8;
+        public const int NoteTopGap = 8;
+
         public const int ButtonWidth = 28;
 
         /// <summary>Room for "25." at UiFonts.Caption plus clearance.</summary>
@@ -42,8 +61,13 @@ namespace GW2CraftingHelper.Services
         // ("ReadhyDaining") when an empty table let the coin band collapse
         // to the width of a dash.
 
-        /// <summary>Fits bold "Ready" (~50px) and body "100%".</summary>
-        public const int ReadyCellWidth = 58;
+        /// <summary>
+        /// Fits the bold "Ready" header (~50px) and the readiness figure,
+        /// which draws one tier above the rest of the row (UiFonts.Status,
+        /// 18 bold): "100%" measures wider there than the Body 16 this cell
+        /// was first sized for.
+        /// </summary>
+        public const int ReadyCellWidth = 66;
 
         /// <summary>Fits bold "Days" (~46px) and body "999d".</summary>
         public const int DaysCellWidth = 54;
@@ -77,8 +101,12 @@ namespace GW2CraftingHelper.Services
             /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
             public readonly int RemainingRightEdge;
 
+            /// <summary>Left edge of the move-up button, or -1 when the row has none.</summary>
             public readonly int UpX;
+
+            /// <summary>Left edge of the move-down button, or -1 when the row has none.</summary>
             public readonly int DownX;
+
             public readonly int RemoveX;
 
             /// <summary>Left edge of the sub-lines, aligned under the item name.</summary>
@@ -117,18 +145,23 @@ namespace GW2CraftingHelper.Services
         /// field test flagged, so it now trails the item name inside the
         /// name band (see the view's chip placement).
         /// </summary>
-        public static Bands Compute(int rowWidth, int remainingCellWidth)
+        public static Bands Compute(int rowWidth, int remainingCellWidth, bool showReorder = true)
         {
             rowWidth = Math.Max(0, rowWidth);
             remainingCellWidth = Math.Max(MinRemainingCellWidth, remainingCellWidth);
 
             int rightEdge = Math.Max(0, rowWidth - Inset);
 
+            // Independent mode has no reorder buttons at all - the order it
+            // displays is its own answer, not something to drag. Their rails
+            // are not left empty: every band to their left widens into the
+            // space, which is what keeps the table justified to the panel
+            // rather than stranding 64px of nothing under the header.
             int removeX = rightEdge - ButtonWidth;
-            int downX = removeX - ButtonGap - ButtonWidth;
-            int upX = downX - ButtonGap - ButtonWidth;
+            int downX = showReorder ? removeX - ButtonGap - ButtonWidth : -1;
+            int upX = showReorder ? downX - ButtonGap - ButtonWidth : -1;
 
-            int remainingRightEdge = upX - CellGap;
+            int remainingRightEdge = (showReorder ? upX : removeX) - CellGap;
             int daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
             int readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
 
@@ -182,10 +215,79 @@ namespace GW2CraftingHelper.Services
             width = Math.Max(0, right - left);
         }
 
-        /// <summary>Total height of a row carrying <paramref name="subLineCount"/> sub-lines.</summary>
-        public static int TotalRowHeight(int subLineCount)
+        /// <summary>
+        /// Where each block of a row's sub-lines starts, relative to the row
+        /// panel's top, and how tall the row ends up. One place, so the row's
+        /// HEIGHT and the y its labels are drawn at cannot disagree - they are
+        /// the same arithmetic read twice.
+        /// <para>
+        /// A block with no lines takes no height AND no gap, so a row with
+        /// nothing below its headline is exactly RowHeight tall - which is
+        /// what compact mode is.
+        /// </para>
+        /// </summary>
+        public readonly struct SubLineBlock
         {
-            return RowHeight + Math.Max(0, subLineCount) * SubLineHeight;
+            /// <summary>Y of the gate strip, or -1 when the row has none.</summary>
+            public readonly int GateY;
+
+            /// <summary>Y of the first currency line, or -1 when there are none.</summary>
+            public readonly int CurrencyY;
+
+            /// <summary>Y of the first note line, or -1 when there are none.</summary>
+            public readonly int NoteY;
+
+            /// <summary>Total height of the row, sub-lines included.</summary>
+            public readonly int TotalHeight;
+
+            public SubLineBlock(int gateY, int currencyY, int noteY, int totalHeight)
+            {
+                GateY = gateY;
+                CurrencyY = currencyY;
+                NoteY = noteY;
+                TotalHeight = totalHeight;
+            }
+        }
+
+        public static SubLineBlock SubLines(bool hasGates, int currencyLines, int noteLines)
+        {
+            currencyLines = Math.Max(0, currencyLines);
+            noteLines = Math.Max(0, noteLines);
+
+            int y = RowHeight;
+            int gateY = -1;
+            int currencyY = -1;
+            int noteY = -1;
+
+            if (hasGates)
+            {
+                y += GateTopGap;
+                gateY = y;
+                y += SubLineHeight;
+            }
+
+            if (currencyLines > 0)
+            {
+                y += CurrencyTopGap;
+                currencyY = y;
+                y += currencyLines * CurrencyLineHeight;
+            }
+
+            if (noteLines > 0)
+            {
+                y += NoteTopGap;
+                noteY = y;
+                y += noteLines * SubLineHeight;
+            }
+
+            // The breath a stack of sub-lines needs so the next row's
+            // headline does not sit on this row's last detail line.
+            if (y > RowHeight)
+            {
+                y += GateTopGap;
+            }
+
+            return new SubLineBlock(gateY, currencyY, noteY, y);
         }
 
         /// <summary>Fits the fixed "Refresh" label with clearance; never fed status text.</summary>
@@ -196,6 +298,9 @@ namespace GW2CraftingHelper.Services
             /// <summary>Left edge of the right-anchored Refresh button.</summary>
             public readonly int RefreshX;
 
+            /// <summary>Left edge of the compact toggle, seated left of Refresh.</summary>
+            public readonly int CompactX;
+
             /// <summary>Left edge of the status line's band.</summary>
             public readonly int StatusX;
 
@@ -205,9 +310,10 @@ namespace GW2CraftingHelper.Services
             /// </summary>
             public readonly int StatusWidth;
 
-            public ToolbarSlots(int refreshX, int statusX, int statusWidth)
+            public ToolbarSlots(int refreshX, int compactX, int statusX, int statusWidth)
             {
                 RefreshX = refreshX;
+                CompactX = compactX;
                 StatusX = statusX;
                 StatusWidth = statusWidth;
             }
@@ -220,11 +326,60 @@ namespace GW2CraftingHelper.Services
         /// there - the field test showed status-length text stamped onto
         /// the fixed-width button spilling past its edges.
         /// </summary>
-        public static ToolbarSlots Toolbar(int barWidth, int spinnerSize, int labelGap)
+        public static ToolbarSlots Toolbar(
+            int barWidth, int spinnerSize, int labelGap, int compactWidth = 0)
         {
             int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
-            int statusRight = refreshX - spinnerSize - 2 * labelGap;
-            return new ToolbarSlots(refreshX, Inset, Math.Max(0, statusRight - Inset));
+            int compactX = compactWidth <= 0
+                ? refreshX
+                : Math.Max(Inset, refreshX - CellGap - compactWidth);
+            int statusRight = compactX - spinnerSize - 2 * labelGap;
+            return new ToolbarSlots(refreshX, compactX, Inset, Math.Max(0, statusRight - Inset));
+        }
+
+        public readonly struct ModeStripSlots
+        {
+            /// <summary>Left edge of the "Compare:" caption, or -1 when it does not fit.</summary>
+            public readonly int LabelX;
+
+            /// <summary>Left edge of the first option's indicator.</summary>
+            public readonly int FirstX;
+
+            /// <summary>Left edge of the second option's indicator.</summary>
+            public readonly int SecondX;
+
+            public ModeStripSlots(int labelX, int firstX, int secondX)
+            {
+                LabelX = labelX;
+                FirstX = firstX;
+                SecondX = secondX;
+            }
+        }
+
+        /// <summary>
+        /// The right-anchored comparison-mode strip: caption, then the two
+        /// options in reading order, laid out from the right edge so the
+        /// last one ends where the table does.
+        /// <para>
+        /// The caption is the only droppable part. At a width where it
+        /// would run under whatever sits to its left (<paramref name="minX"/>
+        /// is that control's right edge) it is dropped rather than
+        /// overlapped - the two options are self-describing, the word
+        /// "Compare:" is not load-bearing, and BOTH options staying legible
+        /// is the whole point of the control.
+        /// </para>
+        /// </summary>
+        public static ModeStripSlots ModeStrip(
+            int barWidth, int labelWidth, int firstWidth, int secondWidth, int gap, int minX)
+        {
+            barWidth = Math.Max(0, barWidth);
+            minX = Math.Max(0, minX);
+
+            int secondX = Math.Max(minX, barWidth - Inset - secondWidth);
+            int firstX = Math.Max(minX, secondX - gap - firstWidth);
+            int labelX = firstX - gap - labelWidth;
+
+            return new ModeStripSlots(labelX < minX ? -1 : labelX, firstX, secondX);
         }
 
         /// <summary>
@@ -243,13 +398,15 @@ namespace GW2CraftingHelper.Services
         public const int CurrencyIndent = 16;
 
         /// <summary>
-        /// Inline currency icon edge; +2 border fits the 20px sub-line. A
-        /// shortfall sub-line reads "&lt;icon&gt; 1,234 Karma" inside a
-        /// sentence, not as a table row, so it is the wallet BAR tier - which
-        /// is the size this line already shipped at, now named rather than
-        /// coincidental (Services/CurrencyIconTiers).
+        /// The breakdown's currency entries draw at the game's wallet LIST
+        /// tier (owner ruling, 2026-08-27: "I would like to try getting away
+        /// with the larger icons"), which is why a currency line has a pitch
+        /// of its own rather than sharing the text sub-line's 20px. The
+        /// Remaining cell's inline gold/silver/copper run stays on the BAR
+        /// tier: that one really is an inline coin run inside a sentence,
+        /// which is what the bar tier is for.
         /// </summary>
-        public const int CurrencyIconSize = CurrencyIconTiers.WalletBarIconSize;
+        public const int CurrencyIconSize = CurrencyIconTiers.WalletListIconSize;
 
         /// <summary>Gap between a currency icon's frame and its name.</summary>
         public const int CurrencyIconGap = 6;
