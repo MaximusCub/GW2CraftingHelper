@@ -1,4 +1,5 @@
 using Blish_HUD.Controls;
+using GW2CraftingHelper.Services;
 
 namespace GW2CraftingHelper.Views.Rendering
 {
@@ -11,9 +12,11 @@ namespace GW2CraftingHelper.Views.Rendering
     /// hover and the click belong to the cell around it - see
     /// SortableHeaderCells.
     /// <para>
-    /// Indicators are ASCII "^"/"v" from
-    /// <see cref="Services.TableSortState{TColumn}"/>, matching the caret
-    /// vocabulary the tree and section headers already use.
+    /// Indicators come from <see cref="Services.TableSortState{TColumn}"/>
+    /// and are drawn from the module's own glyph font, which is why
+    /// <see cref="TableHeaderStyle.Font"/> is Menomonia MERGED with those
+    /// glyphs rather than either font alone: the indicator and the title are
+    /// one string in one Label, and a Label has one Font.
     /// </para>
     /// </summary>
     internal static class SortableHeaderLabel
@@ -24,10 +27,24 @@ namespace GW2CraftingHelper.Views.Rendering
         /// <summary>
         /// Header text carrying its sort indicator, or the bare title when
         /// the column is not the active one.
+        /// <para>
+        /// The one seam that knows both the indicator and whether the font
+        /// that draws it exists, so it is where the degraded path lives: on a
+        /// corrupt install the glyph font is absent, its codepoints draw
+        /// nothing AND advance zero pixels, and a header would silently lose
+        /// the only mark saying which column is sorted. Falling back to the
+        /// mismatched ASCII pair is worse typography and infinitely better
+        /// information.
+        /// </para>
         /// </summary>
         internal static string Decorate(string title, string indicator)
         {
-            return string.IsNullOrEmpty(indicator) ? title : title + " " + indicator;
+            if (string.IsNullOrEmpty(indicator))
+            {
+                return title;
+            }
+
+            return title + " " + (UiFonts.GlyphsAvailable ? indicator : UiGlyphs.AsciiFallback(indicator));
         }
 
         /// <summary>

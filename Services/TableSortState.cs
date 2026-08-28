@@ -34,9 +34,18 @@ namespace GW2CraftingHelper.Services
     internal sealed class TableSortState<TColumn>
         where TColumn : struct
     {
-        /// <summary>ASCII sort markers - the tree's caret vocabulary.</summary>
-        public const string AscendingIndicator = "^";
-        public const string DescendingIndicator = "v";
+        /// <summary>
+        /// The sort markers, from the module's own shipped glyph font. A
+        /// matched pair: same ink, one mirrored, same advance, same seat on
+        /// the cap band. The ASCII pair they replaced was not - "^" is a
+        /// circumflex accent sitting near the cap line and "v" is a lowercase
+        /// letter on the x-height, 3px apart vertically and 4px apart in
+        /// height, because Menomonia has no symmetric up/down glyphs at all.
+        /// See Services/UiGlyphs, and Views/Rendering/SortableHeaderLabel for
+        /// what happens if the font did not load.
+        /// </summary>
+        public const string AscendingIndicator = UiGlyphs.SortAscending;
+        public const string DescendingIndicator = UiGlyphs.SortDescending;
 
         private static readonly EqualityComparer<TColumn> ColumnComparer = EqualityComparer<TColumn>.Default;
 
