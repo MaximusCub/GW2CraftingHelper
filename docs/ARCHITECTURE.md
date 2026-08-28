@@ -338,6 +338,34 @@ plan that has a tree - and the invariant it guarantees is that a hidden row
 costs exactly zero, so the strip with no toolbar is byte-identical to the
 strip before the row existed.
 
+### 4.1 Header bands: three tiers, one factory
+
+Chrome that names something is banded; chrome that holds an interactive
+control is not. There are exactly three tiers, and
+`Views/Rendering/HeaderBands.cs` is the only place two of them are built:
+
+- **Tier 1 - tab title.** One per tab, `PlanContentHeightMath.
+  TabTitleBandHeight` tall, `UiFonts.SectionTitle`, wearing GW2 asset
+  1032325 over an opaque base. It is the ONLY place a tab is named:
+  `Blish_HUD.Controls.Tab.Draw` renders the tab's icon and nothing else,
+  its `Name` is a hover tooltip, and `TabbedWindow2` never sets the
+  window's `Subtitle`. `Views/ViewAdapter.cs` draws it instead of setting
+  `Panel.Title`, because Blish's own header is pinned to 36px and
+  `DefaultFont16` by literals inside private layout methods. A tab
+  therefore does NOT repeat its own name in its content.
+- **Tier 2 - section title.** No band: `UiFonts.SectionTitle` over a 2px
+  rule at `SectionHeaderRowHeight - 3`. If tier 1 and tier 2 wore the same
+  chrome the tab title would stop reading as the top of the hierarchy, and
+  the Crafting Plan tab stacks six tier-2 headings in one scroll.
+- **Tier 3 - column header.** `ColumnHeaderRowHeight` (32) of opaque base
+  plus the same texture. 32 is the asset's native height, so this is the
+  one surface in the module where it maps 1:1 with no vertical stretch.
+
+The base colour and the texture are private to `HeaderBands`, so a call
+site cannot hand-roll a band from them - the reason the class is a factory
+and not the bag of constants it replaced, which eight sites borrowed a
+colour from and seven of which built their own panel.
+
 One rung further out, the same rule governs the container those heights
 are measured against. `Views/ViewAdapter.cs` derives the hosted view's
 container size from `Services/PanelChromeMath.cs` - a Blish-free mirror of

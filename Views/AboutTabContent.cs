@@ -112,16 +112,17 @@ namespace TaimisToolbench.Views
         /// <summary>Gap between one block on the board and the next.</summary>
         private const int BlockGap = 20;
 
-        // The module name sits at the Display tier now, so the band holds a
-        // 36px line box: the title at y=2 puts its lowest ink at y=39, and
-        // the rule at HeaderRowHeight - 3 clears it by two.
-        private const int HeaderRowHeight = 44;
-        private const int HeaderTitleY = 2;
-
         // The ramp's section-title band, named once in PlanContentHeightMath
         // and aliased here rather than re-derived.
         private const int SectionHeaderRowHeight = PlanContentHeightMath.SectionHeaderRowHeight;
         private const int SectionHeaderTitleY = PlanContentHeightMath.SectionHeaderTitleY;
+
+        // The identity row is a section-title band, not a Display one:
+        // UiFonts.Display resolves to Blish's DefaultFont32, the exact face
+        // and size WindowBase2.PaintTitleText prints the window title in
+        // some 50px above this row, and the string is the same module name.
+        private const int HeaderRowHeight = SectionHeaderRowHeight;
+        private const int HeaderTitleY = SectionHeaderTitleY;
         private const int IconSize = 32;
         private const int IconToNameGap = 10;
         private const int NameToVersionGap = 8;
@@ -343,7 +344,7 @@ namespace TaimisToolbench.Views
             _nameLabel = new Label()
             {
                 Text = info.Name,
-                Font = UiFonts.Display,
+                Font = UiFonts.SectionTitle,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(Inset, HeaderTitleY),
@@ -588,11 +589,12 @@ namespace TaimisToolbench.Views
             int nameX = _iconImage == null ? Inset : Inset + IconSize + IconToNameGap;
             _nameLabel.Location = new Point(nameX, HeaderTitleY);
 
-            int nameWidth = (int)Math.Ceiling(UiFonts.Display.MeasureString(_nameLabel.Text ?? "").Width);
+            int nameWidth = (int)Math.Ceiling(
+                UiFonts.SectionTitle.MeasureString(_nameLabel.Text ?? "").Width);
 
             // Same baseline as the title beside it, not the same top: the
             // two tiers have different line boxes.
-            int baseline = HeaderTitleY + TypeRampMetrics.Regular32.BaselineY;
+            int baseline = HeaderTitleY + TypeRampMetrics.SectionTitleInk.BaselineY;
             _versionLabel.Location = new Point(
                 nameX + nameWidth + NameToVersionGap,
                 TypeRampMetrics.BaselineAlignedY(TypeRampMetrics.Regular20, baseline));

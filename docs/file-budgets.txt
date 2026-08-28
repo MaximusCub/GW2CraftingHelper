@@ -255,7 +255,7 @@ Services/WheelDeltaSanitizer.cs                                                 
 Services/WikiLinkBuilder.cs                                                             139
 Services/WikiLinkLauncher.cs                                                             86
 Services/WindowSizing.cs                                                                147
-Views/AboutTabContent.cs                                                                998
+Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
 Views/CraftingPlanView.cs                                                              4987
