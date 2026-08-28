@@ -59,11 +59,13 @@ namespace TaimisToolbench.Services
                         continue;
                     }
 
-                    // A step priced partly in non-coin vendor currency is not
-                    // fully represented by UnitCost alone - not safely
-                    // comparable to a pure-coin seasonal offer (repo invariant:
-                    // avoid invalid currency comparisons).
-                    if (step.VendorCurrencyCosts != null && step.VendorCurrencyCosts.Count > 0)
+                    // A step priced partly in non-coin vendor currency, or in
+                    // an untradeable barter item, is not fully represented by
+                    // UnitCost alone - not safely comparable to a pure-coin
+                    // seasonal offer (repo invariant: avoid invalid currency
+                    // comparisons).
+                    if (step.VendorHasBarterItemCost ||
+                        (step.VendorCurrencyCosts != null && step.VendorCurrencyCosts.Count > 0))
                     {
                         continue;
                     }

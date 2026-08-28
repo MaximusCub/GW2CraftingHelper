@@ -21,7 +21,8 @@ namespace TaimisToolbench.Tests.Services
             bool priceSideFellBack = false,
             bool isCostComponent = false,
             IReadOnlyList<CostLine> vendorCurrencyCosts = null,
-            string acquisitionHint = null)
+            string acquisitionHint = null,
+            bool vendorHasBarterItemCost = false)
         {
             return new CraftingTreeNode
             {
@@ -33,6 +34,7 @@ namespace TaimisToolbench.Tests.Services
                 PriceSideFellBack = priceSideFellBack,
                 IsCostComponent = isCostComponent,
                 VendorCurrencyCosts = vendorCurrencyCosts,
+                VendorHasBarterItemCost = vendorHasBarterItemCost,
                 AcquisitionHint = acquisitionHint,
             };
         }
@@ -215,6 +217,37 @@ namespace TaimisToolbench.Tests.Services
                 lines,
                 l => l.StartsWith(
                     "A vendor cost item's instant-buy price is unavailable - its buy-order price is used"));
+        }
+
+        [Fact]
+        public void PureBarterVendorOffer_SuppressesTheZeroCoinUnitPriceLine()
+        {
+            // A barter-only offer has UnitCost 0 (not null - see
+            // CraftingTreeBuilder.BuildNode) and, unlike a currency-priced
+            // one, an EMPTY VendorCurrencyCosts. Rendering the coin line
+            // would state "Unit price: 0c" for an item that really costs
+            // account-bound tokens.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 5, unitCost: 0,
+                vendorHasBarterItemCost: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
+
+            Assert.DoesNotContain(lines, l => l.StartsWith("Unit price:"));
+        }
+
+        [Fact]
+        public void MixedCoinAndBarterVendorOffer_StillShowsItsRealCoinUnitPrice()
+        {
+            // The suppression above is scoped to a genuinely zero coin
+            // part: an offer that also charges coin must still show it.
+            var node = Node(
+                CraftingDecision.BuyFromVendor, quantity: 5, unitCost: 500,
+                vendorHasBarterItemCost: true);
+
+            var lines = TreeRowTooltipComposer.BuildExtraTooltipContent(node, null, null).ToPlainLines();
+
+            Assert.Contains("Unit price: 5s 0c", lines);
         }
 
         [Fact]

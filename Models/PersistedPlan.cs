@@ -57,17 +57,18 @@ namespace TaimisToolbench.Models
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Last moved by CurrencyValuation.ItemCopperPerUnit/ClearedItemIds
-        /// (barter-item valuations), which is purely ADDITIVE (see
-        /// tests/shared/persisted_plan_schema.txt's two-line diff):
-        /// Newtonsoft leaves both absent collections empty, so a plan or
-        /// snapshot written before the item tables existed still
-        /// deserializes correctly and <see cref="CurrentSchemaVersion"/>
-        /// stays at 3. A bump here now costs a re-solve rather than the
-        /// plan, but it still costs one.
+        /// Last moved by the barter-item valuation work, which is purely
+        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's four-line
+        /// diff): two CurrencyValuation collections, absent from an older
+        /// file and left empty by Newtonsoft, and two bool flags, absent
+        /// and left false - which is what an older plan, written when no
+        /// barter offer could win at all, correctly means. A plan or
+        /// snapshot written before any of them still deserializes and
+        /// <see cref="CurrentSchemaVersion"/> stays at 3. A bump here now
+        /// costs a re-solve rather than the plan, but it still costs one.
         /// </remarks>
         public const string SchemaShapeHash =
-            "e347f4dc1938671a69cfb7f932b032a55bbfd90c637262e8bb1e5447a2bc785d";
+            "175e4a5791f5dc7868a0f36becaad5546b6c9c25de4b700eff0cf93d401a6e33";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why

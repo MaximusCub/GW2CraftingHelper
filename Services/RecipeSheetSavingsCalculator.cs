@@ -89,11 +89,13 @@ namespace TaimisToolbench.Services
                 learnedRecipeIds.Contains(node.ReferenceRecipeId.Value) == false &&
                 node.Quantity > 0 &&
                 node.UnitCost.HasValue &&
-                // A vendor decision priced partly in non-coin currency is
-                // not fully represented by UnitCost alone (see
-                // PlanStep.VendorCurrencyCosts' own doc comment) - not
-                // safely comparable to a pure-coin craft cost.
+                // A vendor decision priced partly in non-coin currency OR
+                // in an untradeable barter item is not fully represented by
+                // UnitCost alone (see PlanStep.VendorCurrencyCosts' and
+                // VendorHasBarterItemCost's own doc comments) - not safely
+                // comparable to a pure-coin craft cost.
                 (node.VendorCurrencyCosts == null || node.VendorCurrencyCosts.Count == 0) &&
+                !node.VendorHasBarterItemCost &&
                 // Read-only check here (Add happens only on a successful
                 // emit, inside TryEmit) - an earlier tree occurrence of
                 // this same item that failed to qualify (e.g. a different
@@ -159,10 +161,11 @@ namespace TaimisToolbench.Services
                     return;
                 }
 
-                // SubtreeCost is coin-only, so a karma-priced descendant
-                // anywhere under this child would silently vanish from
-                // craftTotal; bail rather than under-count.
-                if (SubtreeHasVendorCurrencyCosts(child))
+                // SubtreeCost is coin-only, so a karma-priced or
+                // barter-priced descendant anywhere under this child would
+                // silently vanish from craftTotal; bail rather than
+                // under-count.
+                if (SubtreeHasNonCoinVendorCosts(child))
                 {
                     return;
                 }
@@ -267,25 +270,27 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// True when node or any descendant carries a non-empty
-        /// VendorCurrencyCosts - i.e. the subtree's rolled-up SubtreeCost
-        /// is not fully representable in coin.
+        /// True when node or any descendant is paid partly in something
+        /// other than coin - a non-empty VendorCurrencyCosts, or an
+        /// untradeable barter item - i.e. the subtree's rolled-up
+        /// SubtreeCost is not fully representable in coin.
         /// </summary>
-        private static bool SubtreeHasVendorCurrencyCosts(CraftingTreeNode node)
+        private static bool SubtreeHasNonCoinVendorCosts(CraftingTreeNode node)
         {
             if (node == null)
             {
                 return false;
             }
 
-            if (node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0)
+            if (node.VendorHasBarterItemCost ||
+                (node.VendorCurrencyCosts != null && node.VendorCurrencyCosts.Count > 0))
             {
                 return true;
             }
 
             foreach (var child in node.Children)
             {
-                if (SubtreeHasVendorCurrencyCosts(child))
+                if (SubtreeHasNonCoinVendorCosts(child))
                 {
                     return true;
                 }

@@ -208,6 +208,9 @@ namespace TaimisToolbench.Services
             treeNode.VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                 ? decision.VendorCurrencyCosts
                 : null;
+            treeNode.VendorHasBarterItemCost = decision.Source == AcquisitionSource.BuyFromVendor &&
+                decision.VendorItemCosts != null &&
+                decision.VendorItemCosts.Any(line => !line.GoldValue.HasValue);
 
             if (decision.Source == AcquisitionSource.BuyFromTp ||
                 decision.Source == AcquisitionSource.BuyFromVendor)
@@ -345,12 +348,19 @@ namespace TaimisToolbench.Services
         /// whose winning offer mixed 2+ cost kinds (coin / non-coin
         /// currency / TP-valued item); a single-kind offer (the vast
         /// majority) returns null and the caller falls back to the
-        /// reference branch.
+        /// reference branch. One single-kind offer is the exception: a
+        /// pure-BARTER offer, whose cost is an untradeable item's units.
+        /// A pure-coin or pure-TP-item offer shows its whole cost in the
+        /// parent's own coin cell and a pure-currency one in that cell's
+        /// currency segments (TreeCostColumnMath.ShowsCurrencySegments),
+        /// but a barter quantity has neither, so without a leaf the row
+        /// would state no cost at all.
         ///
         /// A raw coin component never gets its own leaf - it stays folded
         /// into the parent's SubtreeCost, which keeps "parent total = sum
-        /// of the parts a leaf can show" true (currency leaves have blank
-        /// cost cells by design; only item leaves must visibly sum).
+        /// of the parts a leaf can show" true (currency leaves, and item
+        /// leaves for an untradeable barter item, have blank cost cells by
+        /// design; only a TP-valued item leaf must visibly sum).
         ///
         /// Every number on a leaf is read from
         /// decision.VendorCurrencyCosts/VendorItemCosts - nothing is
@@ -365,7 +375,9 @@ namespace TaimisToolbench.Services
             int currencyCount = decision.VendorCurrencyCosts?.Count ?? 0;
             int itemCount = decision.VendorItemCosts?.Count ?? 0;
             int kindCount = (currencyCount > 0 ? 1 : 0) + (itemCount > 0 ? 1 : 0) + (decision.VendorHasRawCoin ? 1 : 0);
-            if (kindCount < 2)
+            bool hasBarterItem = decision.VendorItemCosts != null &&
+                decision.VendorItemCosts.Any(line => !line.GoldValue.HasValue);
+            if (kindCount < 2 && !hasBarterItem)
             {
                 return null;
             }
@@ -392,7 +404,9 @@ namespace TaimisToolbench.Services
                         IsCostComponent = true,
                         // The exact gold value already folded into the
                         // parent's own SubtreeCost for this line - see this
-                        // method's own doc comment.
+                        // method's own doc comment. Null for a barter line
+                        // (nothing was folded), which renders the same
+                        // blank cost cell a currency leaf gets below.
                         SubtreeCost = line.GoldValue,
                         UnitCost = line.Quantity > 0 ? line.GoldValue / line.Quantity : (long?)null,
                         ComponentOwnedQuantity = ResolveOwnedQuantity(line.ItemId, ctx.OwnedVendorItemAmounts),

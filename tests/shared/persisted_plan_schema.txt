@@ -87,6 +87,7 @@ CraftingTreeNode.SubtreeCost:Nullable`1<Int64>
 CraftingTreeNode.UnitCost:Nullable`1<Int64>
 CraftingTreeNode.VendorComponentCostsUnreliable:Boolean
 CraftingTreeNode.VendorCurrencyCosts:IReadOnlyList`1<CostLine>
+CraftingTreeNode.VendorHasBarterItemCost:Boolean
 CurrencyCost.Amount:Int64
 CurrencyCost.CurrencyId:Int32
 CurrencyMetadata.CurrencyId:Int32
@@ -166,6 +167,7 @@ PlanStep.Source:AcquisitionSource
 PlanStep.TotalCost:Int64
 PlanStep.UnitCost:Int64
 PlanStep.VendorCurrencyCosts:List`1<CostLine>
+PlanStep.VendorHasBarterItemCost:Boolean
 PlanStep.VendorOfferCurrencyCostLinesPerBatch:List`1<CostLine>
 PlanStep.VendorOfferOutputCount:Int32
 RecipeNode.AchievementBit:Nullable`1<Int32>

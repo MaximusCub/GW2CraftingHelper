@@ -36,5 +36,16 @@ namespace TaimisToolbench.Models
         public int VendorOfferOutputCount { get; set; }
 
         public List<CostLine> VendorOfferCurrencyCostLinesPerBatch { get; set; }
+
+        // True when this step's winning vendor offer is paid partly in an
+        // untradeable barter item - an Item cost line with no Trading Post
+        // price, whose units are the cost. UnitCost/TotalCost then do NOT
+        // represent this step's whole cost, exactly as they do not when
+        // VendorCurrencyCosts is non-empty: any consumer treating a coin
+        // figure as complete must check both. The barter quantities
+        // themselves are not carried here - they reach the display through
+        // the tree's synthesized cost-component leaves
+        // (CraftingTreeBuilder.BuildVendorCostComponentLeaves).
+        public bool VendorHasBarterItemCost { get; set; }
     }
 }

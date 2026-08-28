@@ -41,6 +41,49 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void PureBarterVendorOffer_SynthesizesItsComponentLeafDespiteBeingSingleKind()
+        {
+            // Item 42 has no TP price, so the offer's whole cost is 5 of an
+            // untradeable token: one cost KIND, which the 2+-kind gate
+            // would normally reject. It is the one single-kind shape with
+            // nowhere else to render - a pure-coin offer shows its cost in
+            // the parent's coin cell and a pure-currency one in that cell's
+            // currency segments, but a barter quantity has neither.
+            var tree = Leaf(1, 1);
+            var prices = new Dictionary<int, ItemPrice>();
+            var offer = new VendorOffer
+            {
+                OfferId = "test-pure-barter",
+                OutputItemId = 1,
+                OutputCount = 1,
+                CostLines = new List<CostLine> { new CostLine { Type = "Item", Id = 42, Count = 5 } },
+                MerchantName = "Barter Vendor",
+                Locations = new List<string>(),
+            };
+            var vendorOffers = new Dictionary<int, IReadOnlyList<VendorOffer>>
+            {
+                { 1, new List<VendorOffer> { offer } },
+            };
+            var metadata = Meta((42, "Black Lion Claim Ticket", "ticket.png"));
+
+            var node = BuildViaRealSolver(tree, prices, metadata, vendorOffers);
+
+            Assert.Equal(CraftingDecision.BuyFromVendor, node.Decision);
+            Assert.True(node.VendorHasBarterItemCost);
+
+            var leaf = node.Children.Single();
+            Assert.True(leaf.IsCostComponent);
+            Assert.Equal(42, leaf.ItemId);
+            Assert.Equal("Black Lion Claim Ticket", leaf.Name);
+            Assert.Equal(5, leaf.Quantity);
+
+            // Blank cost cell, exactly as a currency component leaf gets:
+            // the quantity IS the cost, and no gold figure exists for it.
+            Assert.Null(leaf.SubtreeCost);
+            Assert.Null(leaf.UnitCost);
+        }
+
+        [Fact]
         public void LeafBuyNode_HasNoChildren()
         {
             var tree = Leaf(1, 5);
