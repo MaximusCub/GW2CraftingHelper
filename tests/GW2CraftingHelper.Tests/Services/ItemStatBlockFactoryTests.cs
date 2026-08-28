@@ -34,12 +34,14 @@ namespace GW2CraftingHelper.Tests.Services
                 block.Attributes.Select(a => a.DisplayName + "=" + a.Value).ToArray());
 
             // AccountBound AND AccountBindOnUse are both set - ONE line,
-            // and the AccountBound flag's wording wins: live3 almonds
-            // (12337) and fury-scorched (86967) carry exactly this flag
-            // pair and the game renders "Account Bound on Acquire"
-            // (2026-08-26), not the on-Use variant the old
-            // most-specific-wins ladder picked.
-            Assert.Equal(new[] { "Account Bound on Acquire" }, block.Bindings);
+            // and the AccountBound flag's wording wins, BARE: the
+            // 2026-08-27 Gift of Twilight A/B (19648, the same flag pair)
+            // shows the game printing "Account Bound" on an ordinary
+            // inventory hover, as do heart-of-destroyer 67017 and
+            // holographic-wings 79157. Neither the on-Use variant the old
+            // most-specific-wins ladder picked, nor the "on Acquire" tail
+            // that only the two material-storage hovers show.
+            Assert.Equal(new[] { "Account Bound" }, block.Bindings);
             Assert.Equal(240L, block.VendorValue);
             Assert.Equal(
                 "Crafted in the style of the renowned asuran genius, Zojja.",
@@ -96,9 +98,11 @@ namespace GW2CraftingHelper.Tests.Services
             // and the game stacks one line per dimension: live3
             // relic-livingcity (104938, AccountBound + SoulBindOnUse)
             // shows "Account Bound" over "Soulbound on Use" (2026-08-26).
-            // The Rebreather carries the same pair.
+            // The Rebreather carries the same pair - and the capture is
+            // the exact wording pair, bare account line and on-Use soul
+            // line, that the module now reproduces character for character.
             Assert.Equal(
-                new[] { "Account Bound on Acquire", "Soulbound on Use" }, block.Bindings);
+                new[] { "Account Bound", "Soulbound on Use" }, block.Bindings);
             Assert.Equal(73, block.Defense);
             Assert.Equal(39, block.StatChoiceCount);
             Assert.Null(block.VendorValue);
@@ -151,7 +155,7 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Null(ascended.NourishmentDescription);
             Assert.Null(ascended.NourishmentDurationMs);
             Assert.Null(ascended.EffectName);
-            Assert.Equal(new[] { "Account Bound on Acquire" }, ascended.Bindings);
+            Assert.Equal(new[] { "Account Bound" }, ascended.Bindings);
 
             // The effect's own name and icon ride the same details block
             // (live API, 12472) - what the game's effect block leads with.
