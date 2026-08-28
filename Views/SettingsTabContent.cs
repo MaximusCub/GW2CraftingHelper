@@ -207,6 +207,13 @@ namespace TaimisToolbench.Views
             public Panel Cell;
             public Panel Divider;
 
+            // The cell's leading currency icon, built only once this
+            // session's currency metadata has resolved - see
+            // EnsureCurrencyRowIcon. Null until then, and null for the whole
+            // session when the fetch never succeeds; the cell reserves the
+            // band either way, so nothing moves when it appears.
+            public Panel Icon;
+
             public Label NameLabel;
             public TextBox Input;
 
@@ -244,6 +251,13 @@ namespace TaimisToolbench.Views
         // Row names in _rows order, held so the filter keystroke path does
         // not rebuild a 47-entry list per character typed.
         private readonly List<string> _currencyNames = new List<string>();
+
+        // This session's currency name/icon list, pushed in by Module once
+        // the one /v2/currencies fetch resolves (SetCurrencyMetadata). Held
+        // across Build cycles - the instance outlives its control tree - so
+        // re-opening the tab does not blank the icons until a refetch. Null
+        // means "not resolved yet", which is not the same as "no icon".
+        private IReadOnlyDictionary<int, CurrencyMetadata> _currencyMetadata;
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
@@ -1740,25 +1754,28 @@ namespace TaimisToolbench.Views
             }
         }
 
-        // One line per currency: name, input, Clear, and one tag slot that
-        // shows either the default/cleared state or an "Invalid" warning.
-        // The horizontal constants live in SettingsCurrencyGridLayout so its
-        // SettingsCurrencyMinColumnWidth (the one/two-column threshold) is
-        // derived from the same numbers, not hand-copied from them; these
-        // are compile-time aliases, not a second copy.
-        // 32, not 30: the cell's labels sit at y=6, whose lowest Font16 ink
-        // is y=27 - exactly the top of the 30px row's own divider
-        // (30 - 2 - CellDividerClearance).
-        private const int CurrencyRowHeight = 32;
+        // One line per currency: icon, name, input, Ignore, and one tag slot
+        // that shows either the default/cleared state or an "Invalid"
+        // warning. The cell's geometry lives in SettingsCurrencyGridLayout
+        // so its SettingsCurrencyMinColumnWidth (the one/two-column
+        // threshold) and its row height are derived from the same numbers
+        // the controls are placed with, not hand-copied from them; these are
+        // aliases, not a second copy.
+        private const int CurrencyRowHeight = SettingsCurrencyGridLayout.CurrencyRowHeight;
         private const int CellNameX = SettingsCurrencyGridLayout.CellNameX;
         private const int CellInputWidth = SettingsCurrencyGridLayout.CellInputWidth;
-        private const int CellTextY = 6;
-        // 1, not 2: the input then ends at y=27, clear of the row rule
-        // LabelHelpers.CreateRowDivider puts at
-        // CurrencyRowHeight - 2 - CellDividerClearance.
-        private const int CellInputY = 1;
-        private const int CellDividerClearance = 1;
+        private const int CellDividerClearance = SettingsCurrencyGridLayout.CellDividerClearance;
+        private static readonly int CellTextY = SettingsCurrencyGridLayout.CellTextY;
+        private static readonly int CellInputY = SettingsCurrencyGridLayout.CellControlY(InputHeight);
         private const int CurrencyFilterWidth = 200;
+
+        // The filter row is an ordinary RowHeight form row, not a grid cell.
+        // It borrowed the cell's own Y's while the two heights were within a
+        // pixel of each other; the cell is 42 now, so it centres in its own
+        // height instead.
+        private static readonly int FilterInputY = (RowHeight - InputHeight) / 2;
+        private static readonly int FilterTextY =
+            (RowHeight - TypeRampMetrics.BodyInk.LineHeight) / 2;
 
         private void AddCurrencyFilterRow(int panelWidth)
         {
@@ -1771,8 +1788,11 @@ namespace TaimisToolbench.Views
 
             _currencyFilterInput = new TextBox()
             {
-                Size = new Point(CurrencyFilterWidth, 26),
-                Location = new Point(CellNameX, CellInputY),
+                Size = new Point(CurrencyFilterWidth, InputHeight),
+                // The section's own left inset, not the cell's name x: this
+                // row sits above the grid, not inside a cell, and lines up
+                // with the section title and the cells' icon column.
+                Location = new Point(SettingsFormLayout.CellLeftPad, FilterInputY),
                 // "Search {scope}..." - the one placeholder shape the
                 // module's other three search boxes use; this box was the
                 // lone "Filter ..." spelling.
@@ -1791,7 +1811,8 @@ namespace TaimisToolbench.Views
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 TextColor = InfoTextColor,
-                Location = new Point(CellNameX + CurrencyFilterWidth + 12, CellTextY),
+                Location = new Point(
+                    SettingsFormLayout.CellLeftPad + CurrencyFilterWidth + 12, FilterTextY),
                 Parent = rowPanel,
             };
 
@@ -1813,7 +1834,7 @@ namespace TaimisToolbench.Views
             _currencyCountLabel.Location = new Point(
                 PlanRelayoutMath.RightAlignedX(
                     PlanRelayoutMath.PinnedRightEdge(_panelWidth), width),
-                CellTextY);
+                FilterTextY);
         }
 
         // The plan tables' column-header band, aliased: same tier over the
@@ -2027,8 +2048,77 @@ namespace TaimisToolbench.Views
 
             input.TextChanged += (_, __) => RefreshDirtyState();
 
+            EnsureCurrencyRowIcon(row);
             LayoutCurrencyCell(row, columnWidth, measureText: true);
             _rows.Add(row);
+        }
+
+        /// <summary>
+        /// Hands the tab the session's currency metadata, on the main
+        /// thread. Called once per session by Module after the one
+        /// /v2/currencies fetch resolves, and again for nothing after that:
+        /// the service caches the whole list for the session, so a second
+        /// call would carry the same icons.
+        /// <para>
+        /// A null or empty dictionary is ignored rather than stored - a
+        /// failed fetch must not overwrite icons a previous call already
+        /// resolved, and it is the "not known yet" state the rows already
+        /// render.
+        /// </para>
+        /// </summary>
+        public void SetCurrencyMetadata(IReadOnlyDictionary<int, CurrencyMetadata> metadata)
+        {
+            if (metadata == null || metadata.Count == 0)
+            {
+                return;
+            }
+
+            _currencyMetadata = metadata;
+
+            // Every tab re-open runs Build again and rebuilds these rows,
+            // which pick the metadata up themselves; this pass is for the
+            // rows already on screen when the fetch lands.
+            foreach (var row in _rows)
+            {
+                EnsureCurrencyRowIcon(row);
+            }
+        }
+
+        /// <summary>
+        /// Builds one cell's currency icon, once the icon is knowable.
+        /// <para>
+        /// Nothing is drawn while <see cref="_currencyMetadata"/> is null:
+        /// that is "not fetched yet", not "this currency has no icon", and
+        /// IconControls' empty-slot placeholder states the second. Once the
+        /// list has resolved, every row gets an icon control - a currency
+        /// the list carries with no icon URL of its own then gets that
+        /// placeholder, which is the state it really is in.
+        /// </para>
+        /// <para>
+        /// The band is reserved by the cell's geometry
+        /// (SettingsCurrencyGridLayout.CellNameX is past the icon whether or
+        /// not one is drawn), so an icon arriving mid-session moves no other
+        /// control. Built at most once per row per Build cycle.
+        /// </para>
+        /// </summary>
+        private void EnsureCurrencyRowIcon(CurrencyRow row)
+        {
+            if (_currencyMetadata == null || row.Icon != null)
+            {
+                return;
+            }
+
+            row.Icon = IconControls.CreateItemIcon(
+                row.Cell,
+                CurrencyDisplayResolver.ResolveIconUrl(row.CurrencyId, _currencyMetadata),
+                // A currency has no rarity to resolve: neutral by intent,
+                // the same call ItemIconFrame.NotAnItem() records at the
+                // Snapshot tab's wallet rows.
+                ItemIconFrame.NotAnItem(),
+                SettingsCurrencyGridLayout.CellIconX,
+                SettingsCurrencyGridLayout.CellIconY,
+                ItemIconTier.CurrencyListRow,
+                row.Name);
         }
 
         /// <summary>

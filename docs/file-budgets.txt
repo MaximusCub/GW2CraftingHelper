@@ -78,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                              2580
+Module.cs                                                                              2631
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -200,7 +200,7 @@ Services/ScrollMath.cs                                                          
 Services/SeasonalOfferFilter.cs                                                         107
 Services/SeasonalVendorTipCalculator.cs                                                 134
 Services/SellSideEconomics.cs                                                           406
-Services/SettingsCurrencyGridLayout.cs                                                  254
+Services/SettingsCurrencyGridLayout.cs                                                  325
 Services/SettingsFormLayout.cs                                                          174
 Services/SettingsInputParser.cs                                                         239
 Services/SettingsSaveBarLayout.cs                                                        80
@@ -308,7 +308,7 @@ Views/Rendering/GlyphFont.cs                                                    
 Views/Rendering/UiMetrics.cs                                                             47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         214
 Views/ResizableTabbedWindow.cs                                                          153
-Views/SettingsTabContent.cs                                                            2605
+Views/SettingsTabContent.cs                                                            2695
 Views/SuggestionPanel.cs                                                                491
 Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
@@ -375,7 +375,7 @@ tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs        
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153
-tests/TaimisToolbench.Tests/Services/GridLawGoldenTests.cs                             93
+tests/TaimisToolbench.Tests/Services/GridLawGoldenTests.cs                            100
 tests/TaimisToolbench.Tests/Services/Gw2ApiClient404Tests.cs                          213
 tests/TaimisToolbench.Tests/Services/Gw2ItemApiClientDetailParseTests.cs              147
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientHttpTests.cs                   264
@@ -485,13 +485,13 @@ tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                  
 tests/TaimisToolbench.Tests/Services/RequestLabelFormatterTests.cs                     76
 tests/TaimisToolbench.Tests/Services/RequiredRecipesVisibilityTests.cs                144
 tests/TaimisToolbench.Tests/Services/ResizeSettleDebounceTests.cs                     302
-tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs              252
+tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs              265
 tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                         239
 tests/TaimisToolbench.Tests/Services/ScrollMathTests.cs                               104
 tests/TaimisToolbench.Tests/Services/SeasonalOfferFilterTests.cs                       86
 tests/TaimisToolbench.Tests/Services/SeasonalVendorTipCalculatorTests.cs              213
 tests/TaimisToolbench.Tests/Services/SellSideEconomicsTests.cs                        246
-tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs               519
+tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs               595
 tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                       268
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                      338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                    117
