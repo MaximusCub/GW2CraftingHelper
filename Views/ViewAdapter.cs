@@ -21,11 +21,13 @@ namespace TaimisToolbench.Views
     /// </summary>
     internal class ViewAdapter : View
     {
-        // Match WindowBase2.STANDARD_MARGIN (internal const = 16)
-        private const int OUTER_PADDING = 16;
+        // Both named once in Services/WindowSizing.cs, which derives the
+        // window-to-panel chrome from them; OUTER_PADDING is there because
+        // it matches Blish's WindowBase2.STANDARD_MARGIN (internal const).
+        private const int OUTER_PADDING = WindowSizing.TabPanelOuterPadding;
 
         // Inner padding between border chrome and view content
-        private const int INNER_PADDING = 10;
+        private const int INNER_PADDING = WindowSizing.TabPanelInnerPadding;
 
         private readonly Action<Container> _buildAction;
         private readonly string _title;
