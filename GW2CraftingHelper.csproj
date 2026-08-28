@@ -275,6 +275,7 @@
     <Compile Include="Models\RankerWatchlistEntry.cs" />
     <Compile Include="Models\RankerSlotAvailability.cs" />
     <Compile Include="Models\RankerRowMetrics.cs" />
+    <Compile Include="Services\RankerRarityAdoption.cs" />
     <Compile Include="Services\RankerStore.cs" />
     <Compile Include="Services\RankerWatchlistLimits.cs" />
     <Compile Include="Services\RankerPriorityOrdering.cs" />

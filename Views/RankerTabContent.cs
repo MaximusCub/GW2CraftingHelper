@@ -746,6 +746,8 @@ namespace GW2CraftingHelper.Views
             _bannerPanel = null;
             _bannerLabel = null;
 
+            AdoptRarityFromStatCache();
+
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             _lastLayoutWidth = _contentPanel.Width;
 
@@ -783,6 +785,25 @@ namespace GW2CraftingHelper.Views
             }
 
             UpdateStatusLine();
+        }
+
+        /// <summary>
+        /// Colours rows whose rarity this session already knows from some
+        /// other tab's work, before their own first refresh has run. Cheap
+        /// (one dictionary read per uncoloured row) and saves only when
+        /// something actually changed, so the common case writes nothing.
+        /// </summary>
+        private void AdoptRarityFromStatCache()
+        {
+            if (_getItemStatBlock == null)
+            {
+                return;
+            }
+
+            if (RankerRarityAdoption.AdoptFromStatCache(Entries, _getItemStatBlock))
+            {
+                Persist();
+            }
         }
 
         private void BuildBanner(int barWidth)
@@ -1924,7 +1945,24 @@ namespace GW2CraftingHelper.Views
 
         private void ApplyRowMetrics(int myGen, int itemId, RankerRowMetrics metrics, CraftingPlanResult owned)
         {
-            if (myGen != _refreshGeneration || !_buildComplete || !IsLive)
+            if (myGen != _refreshGeneration)
+            {
+                return;
+            }
+
+            var entry = Entries.FirstOrDefault(e => e.ItemId == itemId);
+
+            // Adopted BEFORE the liveness gate below: the solve's metadata
+            // knows the rarity the Add-time search result never carried, and
+            // that is a fact about the item rather than about the view, so a
+            // run the user tabbed away from must not lose it. Persisted once
+            // per run, in FinishRefresh, which is not gated either.
+            if (RankerRarityAdoption.AdoptFromMetadata(entry, owned?.ItemMetadata))
+            {
+                _rarityDirty = true;
+            }
+
+            if (!_buildComplete || !IsLive)
             {
                 return;
             }
@@ -1933,22 +1971,9 @@ namespace GW2CraftingHelper.Views
             _lastOwnedResults[itemId] = owned;
 
             var row = _rows.FirstOrDefault(r => r.ItemId == itemId);
-            var entry = Entries.FirstOrDefault(e => e.ItemId == itemId);
             if (row == null || entry == null)
             {
                 return;
-            }
-
-            // The solve's metadata knows the rarity the Add-time search
-            // result never carried; adopt it so the name and icon frame
-            // take their rarity colour (persisted once, in FinishRefresh).
-            if (owned?.ItemMetadata != null &&
-                owned.ItemMetadata.TryGetValue(itemId, out var meta) &&
-                !string.IsNullOrEmpty(meta?.Rarity) &&
-                !string.Equals(entry.Rarity, meta.Rarity, StringComparison.Ordinal))
-            {
-                entry.Rarity = meta.Rarity;
-                _rarityDirty = true;
             }
 
             row.Metrics = metrics;

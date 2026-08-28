@@ -210,6 +210,27 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void ARarityAdoptedAfterLoad_SurvivesTheSaveAndTheNextLoad()
+        {
+            // The full field round trip: a list written before rarity was
+            // ever populated, the adoption a refresh performs on it, and the
+            // save that has to carry it across sessions.
+            File.WriteAllText(FilePath,
+                "{ \"SchemaVersion\": 1, \"Entries\": [ " +
+                "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\", \"IconUrl\": \"t.png\" } ] }");
+
+            var store = new RankerStore(_temp.Path);
+            var loaded = store.Load();
+            Assert.Null(loaded.Entries[0].Rarity);
+
+            Assert.True(RankerRarityAdoption.AdoptFromStatCache(
+                loaded.Entries, id => new ItemStatBlock { ItemId = id, Rarity = "Legendary" }));
+            Assert.True(store.Save(loaded));
+
+            Assert.Equal("Legendary", store.Load().Entries[0].Rarity);
+        }
+
+        [Fact]
         public void Save_ToAnUnwritablePath_ReportsFailureRatherThanThrowing()
         {
             // A file where the directory should be: every Save path under it
