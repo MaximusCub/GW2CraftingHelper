@@ -841,6 +841,18 @@ fresh scrape of any merchant recomputes its offer ids. Gate not yet run
 live. Full record:
 `dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`.
 
+### 64. First-paint viewport truncation (the resize that fixed it)
+
+On opening the window, content below a certain point was not drawn at all
+until the window got a nudge, which made everything appear. The hosted
+view's container was sized from `Panel.ContentRegion` read back off a
+panel that had just been resized; Blish refreshes that region only in
+`RecalculateLayout`, which `Control.UpdateLayout` skips while the panel's
+parent is layout-suspended - as the window is for the whole of its own
+layout pass, including the minimum-size clamp that resizes it from inside
+that pass. `Services/PanelChromeMath.cs` derives the size instead, so no
+read-back can lag. Full record: `dev/records/firstpaint-truncation.md`.
+
 ---
 
 ## DEFERRED (recorded, not implemented)
@@ -1155,3 +1167,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **First-paint viewport truncation (2026-08-27)** - gate NOT RUN (no live session available on this branch).
+  Cited as: KNOWN-ISSUES #64.
+  `dev/records/firstpaint-truncation.md`

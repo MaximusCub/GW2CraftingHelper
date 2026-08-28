@@ -144,6 +144,7 @@ Services/ModuleSettings.cs                                                      
 Services/MysticForgeRecipeData.cs                                                       211
 Services/NotesSectionLayoutMath.cs                                                      111
 Services/OwnedMaterialsForceBuyPrePass.cs                                               128
+Services/PanelChromeMath.cs                                                             132
 Services/PhaseOrdinalGuard.cs                                                            40
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
@@ -303,7 +304,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                          153
 Views/SettingsTabContent.cs                                                            2611
 Views/SuggestionPanel.cs                                                                489
-Views/ViewAdapter.cs                                                                    133
+Views/ViewAdapter.cs                                                                    176
 tests/GW2CraftingHelper.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/GW2CraftingHelper.Tests/Helpers/CapturingProgress.cs                               22
 tests/GW2CraftingHelper.Tests/Helpers/CraftingPlanResultBuilders.cs                      94
@@ -401,6 +402,7 @@ tests/GW2CraftingHelper.Tests/Services/MysticForgeRecipeDataTests.cs            
 tests/GW2CraftingHelper.Tests/Services/MysticForgeSeedStalenessTests.cs                 470
 tests/GW2CraftingHelper.Tests/Services/NotesSectionLayoutMathTests.cs                   197
 tests/GW2CraftingHelper.Tests/Services/OwnedMaterialsForceBuyPrePassTests.cs            178
+tests/GW2CraftingHelper.Tests/Services/PanelChromeMathTests.cs                          141
 tests/GW2CraftingHelper.Tests/Services/PhaseOrdinalGuardTests.cs                         46
 tests/GW2CraftingHelper.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/GW2CraftingHelper.Tests/Services/PillSubduingTooltipBuilderTests.cs               130

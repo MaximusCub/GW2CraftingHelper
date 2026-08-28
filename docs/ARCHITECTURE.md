@@ -338,7 +338,25 @@ plan that has a tree - and the invariant it guarantees is that a hidden row
 costs exactly zero, so the strip with no toolbar is byte-identical to the
 strip before the row existed.
 
-**Full history:** KNOWN-ISSUES items 12, 14, 19.
+One rung further out, the same rule governs the container those heights
+are measured against. `Views/ViewAdapter.cs` derives the hosted view's
+container size from `Services/PanelChromeMath.cs` - a Blish-free mirror of
+`Panel`'s own content-region arithmetic, fed Blish's public `Panel`
+constants - rather than reading `Panel.ContentRegion` back after resizing
+that panel. A `Panel` writes its `ContentRegion` only from
+`RecalculateLayout`, and `Control.UpdateLayout` skips `RecalculateLayout`
+entirely while the control's PARENT is layout-suspended, which a parent is
+for the whole of its own layout pass. A window that resizes itself from
+inside that pass - `Views/ResizableTabbedWindow.cs`'s minimum-size clamp
+is called from `RecalculateLayout` and writes `Size` - therefore reaches
+its `Resized` subscribers with the child panel's region still describing
+the previous size. Sizes computed from it are wrong and stay wrong, since
+nothing reads the region again. The window's own `ContentRegion` is
+exempt and is still read directly: `WindowBase2.OnResized` assigns it from
+the new size synchronously, before raising `Resized`, so it is never a
+layout pass behind.
+
+**Full history:** KNOWN-ISSUES items 12, 14, 19, 64.
 
 ---
 
