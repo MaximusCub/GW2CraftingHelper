@@ -138,6 +138,7 @@ namespace TaimisToolbench.Views
         private readonly Func<AccountSnapshot> _getSnapshot;
         private readonly Func<string> _getActiveCharacterName;
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+        private readonly ItemStatWarmer _statWarmer;
         private readonly ResizeSettleDebounce _resizeSettle;
 
         private readonly RankerWatchlist _watchlist;
@@ -201,7 +202,8 @@ namespace TaimisToolbench.Views
             RankerStore store,
             Func<AccountSnapshot> getSnapshot,
             Func<string> getActiveCharacterName,
-            Func<int, ItemStatBlock> getItemStatBlock = null)
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
             _pipeline = pipeline;
             _itemSearchProvider = itemSearchProvider;
@@ -210,6 +212,7 @@ namespace TaimisToolbench.Views
             _getSnapshot = getSnapshot ?? (() => null);
             _getActiveCharacterName = getActiveCharacterName ?? (() => null);
             _getItemStatBlock = getItemStatBlock;
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "ranker");
             _watchlist = store?.Load() ?? new RankerWatchlist();
 
             _resizeSettle = new ResizeSettleDebounce(
@@ -229,6 +232,12 @@ namespace TaimisToolbench.Views
         public void BeginRebuild()
         {
             _buildComplete = false;
+
+            // Without this the watchlist's hovers degrade to the item's name
+            // and nothing else: GetCachedStatBlock is a pure read, so a stat
+            // block only exists here if some other tab already fetched it.
+            _statWarmer.Start(
+                Entries.Select(e => e.ItemId).Where(id => id > 0).Distinct().ToList());
         }
 
         public void Build(Container container)
