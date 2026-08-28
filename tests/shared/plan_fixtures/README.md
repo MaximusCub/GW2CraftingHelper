@@ -50,6 +50,11 @@ still running that build.
 | `plan-v1-alien-result.json` | `plan-v1.json` with every property name inside `Result` prefixed, so no member of the result graph can bind to anything. It is the hostile case the split exists for: proof that a request survives a result this build cannot read at all. |
 | `plan-history-index-v1.json` | Captured live from `PlanHistoryStore.Save`. |
 
+None of the pre-split fixtures carries a `RequestSchemaVersion` field,
+because no build that wrote them had one. That is not an omission to
+tidy up: it is what makes them exercise the rule that an absent request
+version reads as 1 rather than as "unrecorded".
+
 `plan-v1.json` and `plan-v2.json` are restamps rather than captures
 because no build that writes those versions still exists to run. Their
 `Result` subtrees therefore carry the current shape, which is deliberate
