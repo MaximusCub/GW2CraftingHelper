@@ -951,18 +951,13 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void BuildColumnHeader(Container container, int width)
         {
-            _columnHeaderPanel = new Panel
-            {
-                Size = new Point(width, PlanContentHeightMath.ColumnHeaderRowHeight),
-                Location = new Point(0, ToolbarHeight + StatusRowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = container,
-            };
+            _columnHeaderPanel = HeaderBands.CreateColumnHeaderBand(
+                container, width, 0, ToolbarHeight + StatusRowHeight);
 
             new Label
             {
-                Font = TableHeaderStyle.Font,
-                TextColor = TableHeaderStyle.LabelColor,
+                Font = HeaderBands.Font,
+                TextColor = HeaderBands.LabelColor,
                 Text = "Time",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -972,8 +967,8 @@ namespace TaimisToolbench.Views
 
             _tagHeaderLabel = new Label
             {
-                Font = TableHeaderStyle.Font,
-                TextColor = TableHeaderStyle.LabelColor,
+                Font = HeaderBands.Font,
+                TextColor = HeaderBands.LabelColor,
                 Text = TagHeaderText,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -983,8 +978,8 @@ namespace TaimisToolbench.Views
 
             _messageHeaderLabel = new Label
             {
-                Font = TableHeaderStyle.Font,
-                TextColor = TableHeaderStyle.LabelColor,
+                Font = HeaderBands.Font,
+                TextColor = HeaderBands.LabelColor,
                 Text = "Message",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -1075,7 +1070,7 @@ namespace TaimisToolbench.Views
         {
             if (_tagHeaderWidth <= 0)
             {
-                _tagHeaderWidth = Measure(TableHeaderStyle.Font, TagHeaderText).Width;
+                _tagHeaderWidth = Measure(HeaderBands.Font, TagHeaderText).Width;
             }
 
             return _tagHeaderWidth;

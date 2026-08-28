@@ -149,7 +149,7 @@ namespace TaimisToolbench.Views.Rendering
 
                 var cell = _cells[i];
                 cell.Label = columns[i].Label;
-                cell.RestingTextColor = TableHeaderStyle.LabelColor;
+                cell.RestingTextColor = HeaderBands.LabelColor;
                 cell.OnClick = columns[i].OnClick;
                 cell.X = columns[i].X;
                 cell.Width = columns[i].Width;

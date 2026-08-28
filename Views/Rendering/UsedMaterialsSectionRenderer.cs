@@ -84,7 +84,7 @@ namespace TaimisToolbench.Views.Rendering
             string amountHeaderText =
                 SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
             int maxQtyWidth =
-                (int)System.Math.Ceiling(TableHeaderStyle.Font.MeasureString(amountHeaderText).Width);
+                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);

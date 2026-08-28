@@ -1818,7 +1818,6 @@ namespace TaimisToolbench.Views
 
         // The plan tables' column-header band, aliased: same tier over the
         // same kind of data columns.
-        private const int CurrencyHeaderRowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
         private const int CurrencyHeaderTextY = PlanContentHeightMath.ColumnHeaderLabelY;
 
         /// <summary>
@@ -1831,12 +1830,7 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void AddCurrencyGridHeader(int panelWidth)
         {
-            _currencyHeaderPanel = new Panel()
-            {
-                Size = new Point(panelWidth, CurrencyHeaderRowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = _rootPanel,
-            };
+            _currencyHeaderPanel = HeaderBands.CreateColumnHeaderBand(_rootPanel, panelWidth);
             _fullWidthPanels.Add(_currencyHeaderPanel);
 
             LayoutCurrencyGridHeader();
@@ -1846,8 +1840,8 @@ namespace TaimisToolbench.Views
         {
             return new Label()
             {
-                Font = TableHeaderStyle.Font,
-                TextColor = TableHeaderStyle.LabelColor,
+                Font = HeaderBands.Font,
+                TextColor = HeaderBands.LabelColor,
                 Text = text,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,

@@ -39,7 +39,7 @@ namespace TaimisToolbench.Views.Rendering
     // which is what every flat table wants.
     //
     // Chrome (band color, font, label color, height, label y) comes from
-    // the shared TableHeaderStyle - see that class for the L3 inventory and
+    // the shared HeaderBands - see that class for the L3 inventory and
     // the reason the band, rather than the Shopping List's lighter
     // treatment, is the one every plan table now uses.
     //
@@ -66,38 +66,34 @@ namespace TaimisToolbench.Views.Rendering
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
             Func<int, int> leftColumnEndForWidth = null)
         {
-            var rowPanel = new Panel()
-            {
-                Size = new Point(BandWidth(rightXForWidth, panelWidth), TableHeaderStyle.RowHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = parent,
-            };
-            var font = TableHeaderStyle.Font;
+            var rowPanel = HeaderBands.CreateColumnHeaderBand(
+                parent, BandWidth(rightXForWidth, panelWidth));
+            var font = HeaderBands.Font;
             var leftLabelControl = LabelHelpers.WithDescenderClearance(new Label()
             {
-                Text = leftLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
+                Text = leftLabel, Font = font, TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(leftX, TableHeaderStyle.LabelY), Parent = rowPanel,
+                Location = new Point(leftX, HeaderBands.LabelY), Parent = rowPanel,
             });
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
                 middleLabelControl = LabelHelpers.WithDescenderClearance(new Label()
                 {
-                    Text = middleLabel, Font = font, TextColor = TableHeaderStyle.LabelColor,
+                    Text = middleLabel, Font = font, TextColor = HeaderBands.LabelColor,
                     AutoSizeWidth = true, AutoSizeHeight = true,
                     Location = new Point(
-                        middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, TableHeaderStyle.LabelY),
+                        middleXForWidth != null ? middleXForWidth(panelWidth) : middleX, HeaderBands.LabelY),
                     Parent = rowPanel,
                 });
             }
 
             var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, rightLabel, font, TableHeaderStyle.LabelColor,
+                rowPanel, rightLabel, font, HeaderBands.LabelColor,
                 rightXForWidth != null
                     ? rightXForWidth(panelWidth)
                     : panelWidth - PlanRelayoutMath.TableRightMargin,
-                TableHeaderStyle.LabelY);
+                HeaderBands.LabelY);
 
             // The hit area is the whole cell (SortableHeaderCells); the
             // labels only carry the note, which they would swallow.
@@ -132,13 +128,13 @@ namespace TaimisToolbench.Views.Rendering
 
             sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(BandWidth(rightXForWidth, w), TableHeaderStyle.RowHeight);
+                rowPanel.Size = new Point(BandWidth(rightXForWidth, w), HeaderBands.RowHeight);
                 int rightEdge = rightXForWidth != null ? rightXForWidth(w) : w - PlanRelayoutMath.TableRightMargin;
                 rightLabelControl.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width), TableHeaderStyle.LabelY);
+                    PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width), HeaderBands.LabelY);
                 if (middleLabelControl != null && middleXForWidth != null)
                 {
-                    middleLabelControl.Location = new Point(middleXForWidth(w), TableHeaderStyle.LabelY);
+                    middleLabelControl.Location = new Point(middleXForWidth(w), HeaderBands.LabelY);
                 }
 
                 // A right-pinned column's edge moves with the panel.

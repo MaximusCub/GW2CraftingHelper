@@ -14,7 +14,7 @@ namespace TaimisToolbench.Views.Rendering
     /// <para>
     /// Indicators come from <see cref="Services.TableSortState{TColumn}"/>
     /// and are drawn from the module's own glyph font, which is why
-    /// <see cref="TableHeaderStyle.Font"/> is Menomonia MERGED with those
+    /// <see cref="HeaderBands.Font"/> is Menomonia MERGED with those
     /// glyphs rather than either font alone: the indicator and the title are
     /// one string in one Label, and a Label has one Font.
     /// </para>

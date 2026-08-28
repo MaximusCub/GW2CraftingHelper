@@ -67,7 +67,7 @@ namespace TaimisToolbench.Views.Rendering
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {
             var font = UiFonts.Body;
-            var headerFont = TableHeaderStyle.Font;
+            var headerFont = HeaderBands.Font;
 
             int statusColumnWidth = MeasureWidth(headerFont, StatusHeaderText);
             int disciplineColumnWidth = 0;
