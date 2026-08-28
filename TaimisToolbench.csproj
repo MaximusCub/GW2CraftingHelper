@@ -377,6 +377,8 @@
     <Compile Include="Services\Recipes\IRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\InMemoryRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\RecipeCacheSerializer.cs" />
+    <Compile Include="Services\Recipes\PriorityRecipeIds.cs" />
+    <Compile Include="Services\Recipes\RecipeCorpusRefresher.cs" />
     <Compile Include="Services\Recipes\RecipeCorpusVerifier.cs" />
     <Compile Include="Services\Recipes\SeededRecipeCacheStore.cs" />
     <Compile Include="Services\Recipes\OverlayRecipeCacheStore.cs" />

@@ -36,6 +36,12 @@ namespace TaimisToolbench.Services.Recipes
 
         public int VerifiedKnownRecipeCount => _overlay.VerifiedKnownRecipeCount;
 
+        public int CorpusRefreshBuildId => _overlay.CorpusRefreshBuildId;
+
+        public int CorpusRefreshCursorId => _overlay.CorpusRefreshCursorId;
+
+        public bool CorpusRefreshComplete => _overlay.CorpusRefreshComplete;
+
         public bool NegativesVerifiedAtCurrentBuild
         {
             get
@@ -61,6 +67,15 @@ namespace TaimisToolbench.Services.Recipes
         public void SetCorpusVerified(int buildId, int knownRecipeCount)
         {
             _overlay.SetCorpusVerified(buildId, knownRecipeCount);
+        }
+
+        /// <summary>
+        /// Records the content sweep's resume point
+        /// (RecipeCorpusRefresher); flushed into the overlay manifest.
+        /// </summary>
+        public void SetCorpusRefreshProgress(int buildId, int cursorRecipeId, bool complete)
+        {
+            _overlay.SetCorpusRefreshProgress(buildId, cursorRecipeId, complete);
         }
 
         /// <summary>

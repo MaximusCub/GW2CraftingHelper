@@ -33,6 +33,9 @@ namespace TaimisToolbench.Services.Recipes
         private int? _storedBuildId;
         private int _negativesVerifiedBuildId;
         private int _verifiedKnownRecipeCount;
+        private int _corpusRefreshBuildId;
+        private int _corpusRefreshCursorId;
+        private bool _corpusRefreshComplete;
         private int _droppedLearnedNegatives;
 
         // The overlay manifest's schema. 1 stored learned negatives (empty
@@ -70,6 +73,50 @@ namespace TaimisToolbench.Services.Recipes
                 lock (_gate)
                 {
                     return _verifiedKnownRecipeCount;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The build the content sweep (RecipeCorpusRefresher) last made
+        /// progress against, off the manifest; 0 = never run.
+        /// </summary>
+        public int CorpusRefreshBuildId
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _corpusRefreshBuildId;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The sweep's resume point: every held positive recipe id at or
+        /// below this was refetched at <see cref="CorpusRefreshBuildId"/>.
+        /// </summary>
+        public int CorpusRefreshCursorId
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _corpusRefreshCursorId;
+                }
+            }
+        }
+
+        /// <summary>
+        /// True once the sweep finished at <see cref="CorpusRefreshBuildId"/>.
+        /// </summary>
+        public bool CorpusRefreshComplete
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _corpusRefreshComplete;
                 }
             }
         }
@@ -124,6 +171,9 @@ namespace TaimisToolbench.Services.Recipes
                 _storedBuildId = null;
                 _negativesVerifiedBuildId = 0;
                 _verifiedKnownRecipeCount = 0;
+                _corpusRefreshBuildId = 0;
+                _corpusRefreshCursorId = 0;
+                _corpusRefreshComplete = false;
                 _droppedLearnedNegatives = 0;
 
                 if (!Directory.Exists(_cacheDir))
@@ -142,6 +192,9 @@ namespace TaimisToolbench.Services.Recipes
                             _storedBuildId = manifest.Gw2BuildId;
                             _negativesVerifiedBuildId = manifest.NegativesVerifiedBuildId;
                             _verifiedKnownRecipeCount = manifest.VerifiedKnownRecipeCount;
+                            _corpusRefreshBuildId = manifest.CorpusRefreshBuildId;
+                            _corpusRefreshCursorId = manifest.CorpusRefreshCursorId;
+                            _corpusRefreshComplete = manifest.CorpusRefreshComplete;
                         }
                     }
                     catch (Exception ex)
@@ -280,6 +333,31 @@ namespace TaimisToolbench.Services.Recipes
         }
 
         /// <summary>
+        /// Records how far the content sweep has walked the held corpus at
+        /// this build. Written after every batch so an unload, a network
+        /// drop or a game exit costs at most the batch in flight; a
+        /// buildId that differs from the stored one resets the cursor,
+        /// which is what makes a new game build restart the sweep.
+        /// </summary>
+        public void SetCorpusRefreshProgress(int buildId, int cursorRecipeId, bool complete)
+        {
+            lock (_gate)
+            {
+                if (_corpusRefreshBuildId == buildId
+                    && _corpusRefreshCursorId == cursorRecipeId
+                    && _corpusRefreshComplete == complete)
+                {
+                    return;
+                }
+
+                _corpusRefreshBuildId = buildId;
+                _corpusRefreshCursorId = cursorRecipeId;
+                _corpusRefreshComplete = complete;
+                _stampDirty = true;
+            }
+        }
+
+        /// <summary>
         /// A snapshot of the recipe ids the overlay holds, for the corpus
         /// diff; copied under the lock because the overlay mutates.
         /// </summary>
@@ -364,6 +442,9 @@ namespace TaimisToolbench.Services.Recipes
                 _storedBuildId = null;
                 _negativesVerifiedBuildId = 0;
                 _verifiedKnownRecipeCount = 0;
+                _corpusRefreshBuildId = 0;
+                _corpusRefreshCursorId = 0;
+                _corpusRefreshComplete = false;
                 _droppedLearnedNegatives = 0;
                 ClearDirtyLocked();
             }
@@ -422,6 +503,9 @@ namespace TaimisToolbench.Services.Recipes
                     Gw2BuildId = _storedBuildId ?? 0,
                     NegativesVerifiedBuildId = _negativesVerifiedBuildId,
                     VerifiedKnownRecipeCount = _verifiedKnownRecipeCount,
+                    CorpusRefreshBuildId = _corpusRefreshBuildId,
+                    CorpusRefreshCursorId = _corpusRefreshCursorId,
+                    CorpusRefreshComplete = _corpusRefreshComplete,
                     UpdatedUtc = DateTime.UtcNow.ToString("o"),
                 };
                 string manifestJson = RecipeCacheSerializer.SerializeManifest(manifest);

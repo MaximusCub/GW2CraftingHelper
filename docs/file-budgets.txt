@@ -79,7 +79,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                               2675
+Module.cs                                                                               2807
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -111,7 +111,7 @@ Services/Gw2AccountRecipeClient.cs                                              
 Services/Gw2AccountSnapshotService.cs                                                   491
 Services/Gw2ItemApiClient.cs                                                            201
 Services/Gw2PriceApiClient.cs                                                            66
-Services/Gw2RecipeApiClient.cs                                                          203
+Services/Gw2RecipeApiClient.cs                                                          206
 Services/GzipJsonFile.cs                                                                 60
 Services/HeaderCellMath.cs                                                              135
 Services/IAccountRecipeClient.cs                                                         13
@@ -185,12 +185,14 @@ Services/RecipeNodeIds.cs                                                       
 Services/RecipeService.cs                                                               555
 Services/RecipeSheetItemSeedService.cs                                                   78
 Services/RecipeSheetSavingsCalculator.cs                                                321
-Services/Recipes/CompositeRecipeCacheStore.cs                                           200
+Services/Recipes/CompositeRecipeCacheStore.cs                                           215
 Services/Recipes/IRecipeCacheStore.cs                                                    44
 Services/Recipes/InMemoryRecipeCacheStore.cs                                             56
 Services/Recipes/ItemNameSeedData.cs                                                     56
-Services/Recipes/OverlayRecipeCacheStore.cs                                             483
-Services/Recipes/RecipeCacheSerializer.cs                                               234
+Services/Recipes/OverlayRecipeCacheStore.cs                                             567
+Services/Recipes/PriorityRecipeIds.cs                                                   101
+Services/Recipes/RecipeCacheSerializer.cs                                               256
+Services/Recipes/RecipeCorpusRefresher.cs                                               434
 Services/Recipes/RecipeCorpusVerifier.cs                                                257
 Services/Recipes/SeededRecipeCacheStore.cs                                              215
 Services/RecipesColumnMath.cs                                                            79
@@ -484,7 +486,9 @@ tests/TaimisToolbench.Tests/Services/RecipeServiceTests.cs                      
 tests/TaimisToolbench.Tests/Services/RecipeSheetItemSeedServiceTests.cs               145
 tests/TaimisToolbench.Tests/Services/RecipeSheetSavingsCalculatorTests.cs             607
 tests/TaimisToolbench.Tests/Services/Recipes/ItemNameSeedDataTests.cs                 102
+tests/TaimisToolbench.Tests/Services/Recipes/PriorityRecipeIdsTests.cs                129
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCacheSerializerTests.cs            227
+tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusRefresherTests.cs            659
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusVerifierTests.cs             362
 tests/TaimisToolbench.Tests/Services/Recipes/SeedFinalizeIndexTests.cs                108
 tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                         84
