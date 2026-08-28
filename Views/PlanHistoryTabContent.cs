@@ -520,7 +520,7 @@ namespace GW2CraftingHelper.Views
                 row.Panel, firstSummary?.IconUrl, firstSummary?.Rarity,
                 bands.IconX, PlanHistoryRowLayout.IconY, row.FullLabel, UiFonts.Body,
                 bands.NameX + bands.NameWidth, 0, 0, bands.NameX, PlanHistoryRowLayout.MainLineTextY,
-                PlanHistoryRowLayout.IconSize, PlanHistoryRowLayout.IconBorder);
+                ItemIconTier.BagSlot);
             ApplyRowTooltip(row);
 
             row.CostCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
@@ -717,9 +717,8 @@ namespace GW2CraftingHelper.Views
                 }
 
                 IconControls.CreateItemIcon(
-                    panel, summary.IconUrl, summary.Rarity, x, y + PlanHistoryRowLayout.IconPad,
-                    iconSize: PlanHistoryRowLayout.DetailIconSize,
-                    borderThickness: PlanHistoryRowLayout.DetailIconBorder);
+                    panel, summary.IconUrl, ItemIconFrame.ForRarity(summary.Rarity),
+                    x, y + PlanHistoryRowLayout.IconPad, ItemIconTier.BagSidebar);
 
                 int textX = x + PlanHistoryRowLayout.DetailIconTotal + PlanHistoryRowLayout.IconGap;
                 string full = line < itemLines.Count ? itemLines[line] : "";

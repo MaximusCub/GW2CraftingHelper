@@ -436,8 +436,8 @@ namespace GW2CraftingHelper.Views.Rendering
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
                 IconControls.CreateItemIcon(
-                    _contentPanel, row.IconUrl, HeaderIconFrameColor,
-                    0, row.Y, HeaderIconSize, HeaderIconBorder);
+                    _contentPanel, row.IconUrl, ItemIconFrame.Explicit(HeaderIconFrameColor),
+                    0, row.Y, ItemIconTier.TooltipHeader);
             }
 
             // The name is centred on the icon, not top-aligned (measured,

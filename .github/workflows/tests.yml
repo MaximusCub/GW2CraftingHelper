@@ -333,6 +333,86 @@ jobs:
           fi
           echo "Public top-level types: $actual (pin: $pinned)."
 
+      - name: Every item icon renders at a named tier
+        shell: bash
+        run: |
+          # The owner's report: "tons of items in account snapshot dont have
+          # the right color borders... there should be a library call to paint
+          # these icons that everything is using that pushes the standards".
+          # There was one - IconControls.CreateItemIcon - but its size and
+          # border were DEFAULTED parameters, so the standard was opt-in and
+          # eleven call sites each chose their own numbers. The defaults are
+          # gone and the tier is now a required ItemIconTier; this is what
+          # stops the pre-tier overloads growing a twelfth caller while the
+          # four below wait for their branches to land.
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          # Each entry is a file that still calls a pre-tier overload, and the
+          # branch that owns it. Removing an entry is the act of the commit
+          # that migrates its call; adding one needs a reason in the message.
+          ALLOWED = {
+              'Views/RankerTabContent.cs': 'the Ranker rarity branch owns this file',
+              'Views/Rendering/IconNameRowHelpers.cs': 'carries the legacy shim for the row builder above',
+          }
+          CALLS = ('IconControls.CreateItemIcon(',
+                   'IconNameRowHelpers.CreateIconAndEllipsizedName(')
+
+          files = subprocess.run(
+              ['git', 'ls-files', 'Models/*.cs', 'Services/*.cs', 'Views/*.cs',
+               'Contracts/*.cs', 'Properties/*.cs', 'Module.cs'],
+              capture_output=True, text=True, check=True).stdout.split()
+
+          def arguments(text, open_paren):
+              # Walk to the matching close paren so a call broken over several
+              # lines is read whole. An unbalanced walk returns None rather
+              # than the rest of the file: the tail would be near-certain to
+              # contain the word ItemIconTier somewhere and would turn this
+              # step into a silent pass.
+              depth, i = 0, open_paren
+              while i < len(text):
+                  if text[i] == '(':
+                      depth += 1
+                  elif text[i] == ')':
+                      depth -= 1
+                      if depth == 0:
+                          return text[open_paren + 1:i]
+                  i += 1
+              return None
+
+          bad, unused = [], []
+          seen = set()
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for marker in CALLS:
+                  for m in re.finditer(re.escape(marker), text):
+                      args = arguments(text, m.end() - 1)
+                      if args is not None and 'ItemIconTier.' in args:
+                          continue
+                      line = text.count('\n', 0, m.start()) + 1
+                      seen.add(f)
+                      if f not in ALLOWED:
+                          bad.append(f'{f}:{line}')
+
+          for path, why in sorted(ALLOWED.items()):
+              if path not in files:
+                  bad.append(f'{path}: allow-listed but not in the tree ({why})')
+              elif path not in seen:
+                  unused.append(f'{path} ({why})')
+
+          if bad:
+              print('These item icons are built without a named ItemIconTier:')
+              print('\n'.join(sorted(bad)))
+              print('Pass a tier from Services/ItemIconTiers.cs. Every framed item icon')
+              print('in the module traces to one; a new size is a new named tier there.')
+              sys.exit(1)
+          if unused:
+              print('NOTE: these files no longer call a pre-tier overload - drop them')
+              print('from this step\'s allow-list to bank the migration:')
+              print('\n'.join(sorted(unused)))
+          print('Every item icon outside the allow-list names its tier.')
+          PY
+
       - name: Module source cites no out-of-repo spec sections
         shell: bash
         run: |

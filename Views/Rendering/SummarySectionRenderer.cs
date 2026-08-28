@@ -832,9 +832,9 @@ namespace GW2CraftingHelper.Views.Rendering
                 // inset inside the box the unframed icon occupied so the
                 // currency column's own x's do not move.
                 IconControls.CreateItemIcon(
-                    rowPanel, row.IconUrl, (string)null,
+                    rowPanel, row.IconUrl, ItemIconFrame.NotAnItem(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
-                    SummarySectionLayoutMath.CurrencyIconSize - 2, 1, row.Label);
+                    ItemIconTier.CurrencyListRow, row.Label);
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;

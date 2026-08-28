@@ -157,8 +157,8 @@ namespace GW2CraftingHelper.Views.Rendering
             };
 
             var iconFrame = IconControls.CreateItemIcon(
-                rowPanel, row.IconUrl, row.Rarity, IconX, PlanContentHeightMath.CraftStepIconY,
-                ItemIconTiers.BagSidebarIconSize, PlanContentHeightMath.RowIconBorder);
+                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(row.Rarity),
+                IconX, PlanContentHeightMath.CraftStepIconY, ItemIconTier.BagSidebar);
 
             var textFont = UiFonts.Body;
             var greyColor = new Color(170, 170, 170);

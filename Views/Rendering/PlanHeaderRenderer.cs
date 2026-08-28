@@ -50,18 +50,20 @@ namespace GW2CraftingHelper.Views.Rendering
         {
             // Tier 1 of the two-tier icon system (owner ruling): the plan's
             // heading item carries in-game bag-slot-sized art, like the
-            // Snapshot grid and the Ranker rows. Header height follows the
-            // 56px frame with 4px of clearance each side.
+            // Snapshot grid and the Ranker rows. The frame thickness comes
+            // from the tier now, not from a local constant - this header
+            // was the one tier-1 site drawing a 2px frame, so its icon was
+            // 56px where every other tier-1 icon was 54. Header height is
+            // unchanged at 64, which now clears the 54px frame by 5px a
+            // side instead of 4.
             const int headerHeight = 64;
-            const int iconSize = ItemIconTiers.BagSlotIconSize;
-            const int iconBorder = 2;
             const int iconPad = 10;
 
             // Same 8px content gutter the Summary section's tiles, the
             // currency table's icon column and the footnote all start at.
             const int headerX = 8;
 
-            int frameSize = iconSize + iconBorder * 2;
+            int frameSize = ItemIconTiers.FrameSize(ItemIconTier.BagSlot);
 
             var titleFont = UiFonts.Display;
 
@@ -105,8 +107,8 @@ namespace GW2CraftingHelper.Views.Rendering
             };
 
             var iconFrame = IconControls.CreateItemIcon(
-                titlePanel, vm.TargetIconUrl, vm.TargetRarity, headerX, iconY,
-                iconSize: iconSize, borderThickness: iconBorder);
+                titlePanel, vm.TargetIconUrl, ItemIconFrame.ForRarity(vm.TargetRarity),
+                headerX, iconY, ItemIconTier.BagSlot);
 
             int textX = headerX + frameSize + iconPad;
             var nameLabel = new Label()
@@ -133,7 +135,7 @@ namespace GW2CraftingHelper.Views.Rendering
             // anything lying over the panel wins the hover outright
             // (Control.ActiveControl is the deepest capturing control),
             // the same swallowed-hover class already fixed on tree rows.
-            // The 56px icon is the header's largest target and the most
+            // The tier-1 icon is the header's largest target and the most
             // natural one to point at.
             var treeRoot = vm.TreeRoot;
             Func<TooltipContent> buildStatContent =

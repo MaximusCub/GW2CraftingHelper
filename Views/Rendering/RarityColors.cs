@@ -72,4 +72,76 @@ namespace GW2CraftingHelper.Views.Rendering
             }
         }
     }
+
+    /// <summary>
+    /// What colour an item icon's frame is, and WHY - the parameter
+    /// IconControls.CreateItemIcon takes instead of a bare rarity string.
+    ///
+    /// <para>
+    /// A string parameter cannot tell "this row has no rarity" apart from
+    /// "nobody looked", so a call site that silently passed null got the
+    /// neutral frame and no reviewer could see the difference. That is how
+    /// the Snapshot tab shipped hundreds of grey frames next to two gold
+    /// ones. Here the call site has to say which it means, and a factory
+    /// name is what a diff shows.
+    /// </para>
+    /// </summary>
+    internal readonly struct ItemIconFrame
+    {
+        private readonly Color _color;
+
+        private ItemIconFrame(Color color)
+        {
+            _color = color;
+        }
+
+        /// <summary>The frame colour to paint.</summary>
+        internal Color Color
+        {
+            get { return _color; }
+        }
+
+        /// <summary>
+        /// The item's RESOLVED rarity - what
+        /// <c>ItemRarityResolution.Resolve</c> returned after looking in
+        /// every place this surface has. A null return from that policy is
+        /// legitimately unknown and lands on the neutral frame; a caller
+        /// that has NOT looked should not be calling this.
+        /// </summary>
+        internal static ItemIconFrame ForRarity(string resolvedRarity)
+        {
+            return new ItemIconFrame(RarityColors.GetRarityBorderColor(resolvedRarity));
+        }
+
+        /// <summary>
+        /// An item whose rarity this surface structurally cannot know - the
+        /// search suggestion list, whose provider returns id/name/icon and
+        /// nothing else. Neutral, and the call site is on record that the
+        /// gap is in the DATA, not in the wiring.
+        /// </summary>
+        internal static ItemIconFrame UnknownRarity()
+        {
+            return new ItemIconFrame(RarityColors.GetRarityBorderColor(null));
+        }
+
+        /// <summary>
+        /// The subject has no rarity to resolve at all - a currency, a coin
+        /// denomination. Same neutral frame as an unknown rarity, but the
+        /// call site is on record that nothing is missing.
+        /// </summary>
+        internal static ItemIconFrame NotAnItem()
+        {
+            return new ItemIconFrame(RarityColors.GetRarityBorderColor(null));
+        }
+
+        /// <summary>
+        /// A colour the call site owns for a reason it states: the dimmed
+        /// grey of a not-crafted subtree row, the game's own light grey
+        /// around a tooltip header icon.
+        /// </summary>
+        internal static ItemIconFrame Explicit(Color color)
+        {
+            return new ItemIconFrame(color);
+        }
+    }
 }

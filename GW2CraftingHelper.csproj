@@ -193,6 +193,7 @@
     <Compile Include="Services\CurrencyIconTiers.cs" />
     <Compile Include="Services\ItemIconTiers.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
+    <Compile Include="Services\ItemRarityResolution.cs" />
     <Compile Include="Services\ItemStatMath.cs" />
     <Compile Include="Services\ItemDescriptionSanitizer.cs" />
     <Compile Include="Services\ItemStatBlockFactory.cs" />

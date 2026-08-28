@@ -9,7 +9,8 @@ namespace GW2CraftingHelper.Tests.Services
 {
     public class SnapshotSearchResultBuilderTests
     {
-        private static SnapshotItemEntry Entry(int itemId, string name, int count, string source, string iconUrl = "")
+        private static SnapshotItemEntry Entry(
+            int itemId, string name, int count, string source, string iconUrl = "", string rarity = "")
         {
             return new SnapshotItemEntry
             {
@@ -18,6 +19,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Count = count,
                 Source = source,
                 IconUrl = iconUrl,
+                Rarity = rarity,
             };
         }
 
@@ -146,6 +148,43 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.Single(result[0].Breakdown);
             Assert.Equal("Bank", result[0].Breakdown[0].Label);
             Assert.Equal(40, result[0].Breakdown[0].Count);
+        }
+
+        [Fact]
+        public void BuildItemRows_CarriesTheCapturedRarityOntoTheRow()
+        {
+            // The row is what the Snapshot tab draws a rarity frame and a
+            // rarity-coloured name from. Dropping the field here is exactly
+            // how the tab rendered a neutral frame for every item the
+            // session's stat cache had never seen.
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(24358, "Ancient Bone", 250, AccountItemIndex.SourceMaterialStorage, rarity: "Basic"),
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", new SnapshotSourceFilter(), null);
+
+            Assert.Equal("Basic", Assert.Single(result).Rarity);
+        }
+
+        [Fact]
+        public void BuildItemRows_ItemWithNoCapturedRarity_LeavesTheRowEmptyRatherThanNull()
+        {
+            // A row read out of a pre-rarity snapshot.json. The view resolves
+            // "" through ItemRarityResolution, which reads it as unknown; a
+            // null here would be indistinguishable but is not what the model
+            // promises, and the view's fallback path is the one being kept
+            // alive for exactly these rows.
+            var items = new List<SnapshotItemEntry> { Entry(100, "Iron Ore", 40, AccountItemIndex.SourceBank) };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", new SnapshotSourceFilter(), null);
+
+            Assert.Equal("", Assert.Single(result).Rarity);
+            Assert.Null(ItemRarityResolution.Resolve(result[0].Rarity, null));
         }
 
         [Fact]
