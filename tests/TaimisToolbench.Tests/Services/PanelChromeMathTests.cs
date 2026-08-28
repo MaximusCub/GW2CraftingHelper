@@ -16,6 +16,14 @@ namespace TaimisToolbench.Tests.Services
     /// values, restated here as literals because the test project is
     /// deliberately Blish-free: a drift between them and the vendor's is a
     /// Blish upgrade, which is exactly when these numbers should be re-read.
+    ///
+    /// The second half of the file walks the same chain end to end, from the
+    /// window height down to the panel a tab renders into, at window sizes
+    /// from the module's floor to a 4K-tall client. What it pins is the
+    /// bottom of that chain: the viewport used to stop 74px above the window
+    /// while its top sat flush under the title bar, because the content
+    /// region Module.cs hands Blish was authored window-region-relative and
+    /// Blish reads it as absolute texture coordinates (KNOWN-ISSUES #66).
     /// </summary>
     public class PanelChromeMathTests
     {
@@ -128,6 +136,127 @@ namespace TaimisToolbench.Tests.Services
             // from the other end. 0 shrinks it honestly.
             Assert.Equal(0, PanelChromeMath.ContentHeight(outerHeight, insets));
             Assert.Equal(0, PanelChromeMath.PaddedContentHeight(outerHeight, insets, 10));
+        }
+
+        // Window heights the sweep runs at: the module's own floor, the
+        // constructed size, the common 16:9 client heights, a 1440p client
+        // (the one this was reported from) and a 4K one. The defect is a
+        // constant, so a single size would have caught it - the sweep is
+        // what proves it is a constant and not a ratio.
+        [Theory]
+        [InlineData(710)]
+        [InlineData(750)]
+        [InlineData(900)]
+        [InlineData(1080)]
+        [InlineData(1200)]
+        [InlineData(1440)]
+        [InlineData(2160)]
+        public void ViewportBottomGap_IsTheBudgetAtEveryWindowHeight(int windowHeight)
+        {
+            Assert.Equal(BottomGapBudget, BottomGap(windowHeight));
+        }
+
+        [Theory]
+        [InlineData(710)]
+        [InlineData(750)]
+        [InlineData(900)]
+        [InlineData(1080)]
+        [InlineData(1200)]
+        [InlineData(1440)]
+        [InlineData(2160)]
+        public void TabPanelHeightFor_IsTheChainViewAdapterActuallyWalks(int windowHeight)
+        {
+            Assert.Equal(WindowSizing.TabPanelHeightFor(windowHeight), TabPanelHeight(windowHeight));
+        }
+
+        [Fact]
+        public void TabPanelHeight_GrowsOneForOneWithTheWindow()
+        {
+            // A ratio error - the other shape a short viewport could take -
+            // would show up here as a delta that is not 1.
+            for (int windowHeight = 710; windowHeight < 2160; windowHeight += 137)
+            {
+                Assert.Equal(
+                    TabPanelHeight(windowHeight) + 1,
+                    TabPanelHeight(windowHeight + 1));
+            }
+        }
+
+        [Fact]
+        public void WindowBottomMargin_IsNoLargerThanThePanelInsetBesideIt()
+        {
+            // The regression in one line. Blish's own bottom margin is the
+            // outermost of the four terms below the viewport, and it is the
+            // one the module chooses: 41px of it (windowRegion.Bottom 736
+            // less contentRegion.Bottom 695) put the viewport 74px above the
+            // window while the top margin was 0. Anything at or under one
+            // panel inset keeps the two ends of the window comparable.
+            Assert.True(
+                WindowSizing.WindowContentBottomMargin <= WindowSizing.TabPanelOuterPadding,
+                $"window bottom margin {WindowSizing.WindowContentBottomMargin} exceeds "
+                    + $"the {WindowSizing.TabPanelOuterPadding}px panel inset beside it");
+            Assert.Equal(0, WindowSizing.WindowContentTop - TitleBarHeight);
+        }
+
+        [Fact]
+        public void WindowToTabPanelChrome_MatchesTheBudgetOnEachEdge()
+        {
+            Assert.Equal(WindowBottomMarginBudget, WindowSizing.WindowContentBottomMargin);
+            Assert.Equal(BottomGapBudget, WindowSizing.WindowToTabPanelBottomChrome);
+            Assert.Equal(
+                TitleBarHeight + OuterPadding + HeaderHeight + InnerPadding,
+                WindowSizing.WindowToTabPanelTopChrome);
+        }
+
+        [Fact]
+        public void TabPanelHeight_FloorsAtZeroForAWindowShorterThanItsOwnChrome()
+        {
+            Assert.Equal(0, WindowSizing.TabPanelHeightFor(0));
+            Assert.Equal(0, WindowSizing.TabPanelHeightFor(WindowSizing.WindowToTabPanelTopChrome));
+            Assert.True(WindowSizing.TabPanelHeightFor(WindowSizing.MinWindowHeight) > 0);
+        }
+
+        private const int TitleBarHeight = 40;
+        private const int OuterPadding = WindowSizing.TabPanelOuterPadding;
+        private const int InnerPadding = WindowSizing.TabPanelInnerPadding;
+
+        // Written as literals, not summed off WindowSizing: a budget that
+        // follows the constant it is meant to hold cannot fail. 15 is the
+        // texture rows between the content region's bottom and the window
+        // region's bottom, and it is generous - background 502049 is still
+        // 88% opaque at the window region's own last row. The other three
+        // are the panel inset, Blish's Panel.BOTTOM_PADDING and the inner
+        // inset. 74 is what the four came to while the content region was
+        // authored window-region-relative (KNOWN-ISSUES #66).
+        private const int WindowBottomMarginBudget = 15;
+        private const int BottomGapBudget =
+            WindowBottomMarginBudget + OuterPadding + BottomPadding + InnerPadding;
+
+        /// <summary>
+        /// The chain Views/ViewAdapter.cs builds, rebuilt from the shipped
+        /// constants: Blish sizes the window's content region, the adapter
+        /// insets a titled, bordered panel by OUTER on every edge, and the
+        /// container a tab renders into is that panel's content region less
+        /// INNER on every edge. Only the window's own arithmetic is restated
+        /// here; the panel chrome comes from the production helper.
+        /// </summary>
+        private static int TabPanelHeight(int windowHeight)
+        {
+            int bordered = WindowSizing.WindowContentHeightFor(windowHeight) - (2 * OuterPadding);
+
+            return PanelChromeMath.PaddedContentHeight(
+                bordered, Insets(showBorder: true, hasTitle: true), InnerPadding);
+        }
+
+        /// <summary>
+        /// Control-space distance from the bottom of that container to the
+        /// bottom of the window - the band the report was about.
+        /// </summary>
+        private static int BottomGap(int windowHeight)
+        {
+            int top = WindowSizing.WindowContentTop + OuterPadding + HeaderHeight + InnerPadding;
+
+            return windowHeight - (top + TabPanelHeight(windowHeight));
         }
 
         [Fact]
