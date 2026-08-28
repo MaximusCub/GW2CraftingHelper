@@ -67,7 +67,7 @@ namespace TaimisToolbench.Models
         /// plan, but it still costs one.
         /// </remarks>
         public const string SchemaShapeHash =
-            "cb4cf3e52a316b91173a929bf2200ac52c3f58a4764a9d1cb4e0f70a7d7d0c93";
+            "2349ee68c01e7d21d1a7af1cdb1b1080ba974bdf76325cbc49cee647cdec9c0e";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why

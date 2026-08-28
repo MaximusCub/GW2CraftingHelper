@@ -872,9 +872,11 @@ namespace TaimisToolbench.Views
         /// overrides): there is nothing to render, and a caller that
         /// mistakes this for a restore would otherwise leave the tab
         /// claiming a plan it does not have. Row names come from the
-        /// discarded result's metadata, which by definition is not here,
-        /// so rows seed with RestoredRequestInputs.UnnamedRowPlaceholder
-        /// and take their names back on the next Generate.
+        /// request's own PlanRequestItem.Name, since the result's
+        /// ItemMetadata is by definition not here; a plan written before
+        /// that member existed keeps
+        /// RestoredRequestInputs.UnnamedRowPlaceholder and takes its names
+        /// back on the next Generate.
         /// </para>
         /// </summary>
         public void ApplyRestoredRequest(
@@ -3686,7 +3688,7 @@ namespace TaimisToolbench.Views
                 }
 
                 row.QuantityText = qty.ToString();
-                rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText));
+                rowInputs.Add(new ItemRowRequestBuilder.RowInput(row.ItemId, row.QuantityText, row.ItemName));
 
                 // Best-effort "name x quantity[, name x quantity...]"
                 // label (e.g. "Orrax Manifested x1") for the pipeline's rich

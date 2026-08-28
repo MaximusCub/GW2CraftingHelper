@@ -52,7 +52,7 @@ Models/PersistedPlan.cs                                                         
 Models/PersistedPlanLoad.cs                                                              49
 Models/PillSourceCostBreakdown.cs                                                        76
 Models/PlanHistoryEntry.cs                                                              106
-Models/PlanRequestItem.cs                                                                15
+Models/PlanRequestItem.cs                                                                26
 Models/PlanSolveContext.cs                                                              196
 Models/PlanStatus.cs                                                                     11
 Models/PlanStep.cs                                                                       40
@@ -79,7 +79,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                               2670
+Module.cs                                                                               2675
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -125,7 +125,7 @@ Services/ItemDescriptionSanitizer.cs                                            
 Services/ItemIconTiers.cs                                                               180
 Services/ItemMetadataService.cs                                                         327
 Services/ItemRarityResolution.cs                                                         78
-Services/ItemRowRequestBuilder.cs                                                        92
+Services/ItemRowRequestBuilder.cs                                                       101
 Services/ItemRowSelection.cs                                                            199
 Services/ItemRowTooltipComposer.cs                                                       86
 Services/ItemSearchProviderFactory.cs                                                    61
@@ -260,7 +260,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
-Views/CraftingPlanView.cs                                                               5022
+Views/CraftingPlanView.cs                                                               5024
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              381
 Views/ItemRowState.cs                                                                    31
@@ -489,6 +489,7 @@ tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                  
 tests/TaimisToolbench.Tests/Services/RequestLabelFormatterTests.cs                     76
 tests/TaimisToolbench.Tests/Services/RequiredRecipesVisibilityTests.cs                144
 tests/TaimisToolbench.Tests/Services/ResizeSettleDebounceTests.cs                     353
+tests/TaimisToolbench.Tests/Services/RestoredRequestInputsTests.cs                    240
 tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs              265
 tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                         239
 tests/TaimisToolbench.Tests/Services/ScrollMathTests.cs                               104

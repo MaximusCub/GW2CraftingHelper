@@ -2470,7 +2470,12 @@ namespace TaimisToolbench
             {
                 if (item != null)
                 {
-                    copy.Add(new PlanRequestItem { ItemId = item.ItemId, Quantity = item.Quantity });
+                    copy.Add(new PlanRequestItem
+                    {
+                        ItemId = item.ItemId,
+                        Quantity = item.Quantity,
+                        Name = item.Name,
+                    });
                 }
             }
 

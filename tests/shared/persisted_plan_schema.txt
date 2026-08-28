@@ -130,6 +130,7 @@ PillSourceCostBreakdown.IsIncomplete:Boolean
 PillSourceCostBreakdown.RawCoin:Int64
 PillSourceCostBreakdown.RawQuantitiesReducedByOwnedStock:Boolean
 PlanRequestItem.ItemId:Int32
+PlanRequestItem.Name:String
 PlanRequestItem.Quantity:Int32
 PlanSolveContext.AccountItems:IReadOnlyList`1<SnapshotItemEntry>
 PlanSolveContext.AcquisitionHints:IReadOnlyDictionary`2<Int32,AcquisitionHint>
