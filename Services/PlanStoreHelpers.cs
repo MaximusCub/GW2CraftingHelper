@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using TaimisToolbench.Models;
 
 namespace TaimisToolbench.Services
@@ -17,9 +20,61 @@ namespace TaimisToolbench.Services
     /// schema version at Info via its own onInfo callback (see PlanStore.cs).
     /// (2) Compact (not Indented)
     /// formatting - see SerializePersistedPlan's own doc comment.
+    /// <para>
+    /// Two read entry points, because a plan.json is two independently
+    /// versioned layers (see PersistedPlan's own doc comment):
+    /// LoadPersistedPlanDocument reads both and degrades to the request
+    /// alone when the result layer is unreadable, while
+    /// DeserializePersistedPlan is the strict all-or-nothing read a caller
+    /// takes when a request without a result would buy it nothing -
+    /// PlanHistoryBlobStore, whose index row already carries the request.
+    /// </para>
     /// </summary>
     internal static class PlanStoreHelpers
     {
+        // Raised from Newtonsoft's default 64: a persisted +24 Agony
+        // Infusion plan (23 recipe levels, the deepest chain in the game
+        // per docs/research/minimum-window-width.md) nests ~3 JSON levels
+        // per tree node and failed to load with the default. Saving is
+        // unaffected - Json.NET only enforces MaxDepth on read. 512 covers
+        // the validator's 200-domain-level bound at ~3 JSON levels each.
+        private const int ReadMaxDepth = 512;
+
+        /// <summary>
+        /// The members that reach the RESULT graph, skipped whole (never
+        /// bound to a type) by the request-only read - which is exactly
+        /// what makes a request survive a result-shape change it could
+        /// not possibly deserialize. See docs/ARCHITECTURE.md section 12.
+        /// </summary>
+        internal static readonly IReadOnlyList<string> ResultGraphMembers = new[]
+        {
+            nameof(PersistedPlan.Result),
+            nameof(PersistedPlan.NodeOverrides),
+        };
+
+        /// <summary>
+        /// The members a request-only restore reseeds the tab from. Pinned
+        /// here rather than left implicit because the golden fixtures and
+        /// the CI corpus check both read this list as the definition of
+        /// "the request layer".
+        /// </summary>
+        internal static readonly IReadOnlyList<string> RequestLayerMembers = new[]
+        {
+            nameof(PersistedPlan.GeneratedAt),
+            nameof(PersistedPlan.RequestItems),
+            nameof(PersistedPlan.UseOwnMaterials),
+            nameof(PersistedPlan.PriceBasis),
+            nameof(PersistedPlan.ValueOwnMaterials),
+            nameof(PersistedPlan.IgnoredItemIds),
+        };
+
+        /// <summary>The two version stamps, one per layer.</summary>
+        internal static readonly IReadOnlyList<string> VersionMembers = new[]
+        {
+            nameof(PersistedPlan.SchemaVersion),
+            nameof(PersistedPlan.RequestSchemaVersion),
+        };
+
         /// <summary>
         /// Serializes a PersistedPlan to a JSON string. Returns null if
         /// plan is null.
@@ -48,7 +103,7 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Deserializes a PersistedPlan from a JSON string. Returns null
+        /// The STRICT read: a whole PersistedPlan or nothing. Returns null
         /// for null/whitespace input. Throws (does not swallow) for
         /// malformed JSON, a document too degraded to render safely (no
         /// Result/Plan at all), a SchemaVersion mismatch (as
@@ -67,15 +122,8 @@ namespace TaimisToolbench.Services
                 return null;
             }
 
-            // MaxDepth raised from Newtonsoft's default 64: a persisted
-            // +24 Agony Infusion plan (23 recipe levels, the deepest chain
-            // in the game per docs/research/minimum-window-width.md) nests
-            // ~3 JSON levels per tree node and failed to load with the
-            // default - saving is unaffected because Json.NET only
-            // enforces MaxDepth on read. 512 covers the validator's
-            // 200-domain-level bound at ~3 JSON levels each.
             var plan = JsonConvert.DeserializeObject<PersistedPlan>(
-                json, new JsonSerializerSettings { MaxDepth = 512 });
+                json, new JsonSerializerSettings { MaxDepth = ReadMaxDepth });
 
             // A structurally valid but too-degraded-to-render object (e.g.
             // a JSON document that happened to parse but was never a real
@@ -152,6 +200,119 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The TWO-LAYER read, and the only one a restore should use:
+        /// PersistedPlanLoad.Full when the whole document was readable,
+        /// PersistedPlanLoad.RequestOnly carrying the cause when only the
+        /// result layer was not. Returns null for null/whitespace input.
+        /// <para>
+        /// Throws only when the REQUEST layer itself is unreadable: a
+        /// document that is not JSON at all, or one whose
+        /// RequestSchemaVersion is above this build's. Everything else -
+        /// result-schema drift, a damaged or absent result, a result
+        /// written to a shape this build cannot bind - costs the result
+        /// and keeps the plan. That asymmetry is the contract; see
+        /// docs/ARCHITECTURE.md section 12.
+        /// </para>
+        /// </summary>
+        internal static PersistedPlanLoad LoadPersistedPlanDocument(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            PersistedPlan full = null;
+            Exception resultFailure = null;
+            try
+            {
+                full = DeserializePersistedPlan(json);
+            }
+            catch (Exception ex)
+            {
+                resultFailure = ex;
+            }
+
+            if (resultFailure == null)
+            {
+                // Checked on the success path too. A future build could in
+                // principle break the request layer without touching the
+                // result graph, and this build would otherwise reseed the
+                // tab from members it had misread.
+                RejectNewerRequestLayer(full);
+                return PersistedPlanLoad.Full(full);
+            }
+
+            var request = DeserializeRequestLayer(json);
+            if (request == null)
+            {
+                throw new InvalidDataException(
+                    "Saved plan has no readable request layer - corrupt file.");
+            }
+
+            RejectNewerRequestLayer(request);
+            return PersistedPlanLoad.RequestOnly(request, resultFailure);
+        }
+
+        /// <summary>
+        /// Binds the request layer alone, with every member in
+        /// <see cref="ResultGraphMembers"/> skipped as an unread token
+        /// rather than deserialized into a type. Same document, same
+        /// property names, same file - there is no second on-disk shape,
+        /// and no tolerant read of the result graph either: it is not read
+        /// at all.
+        /// </summary>
+        internal static PersistedPlan DeserializeRequestLayer(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            return JsonConvert.DeserializeObject<PersistedPlan>(
+                json,
+                new JsonSerializerSettings
+                {
+                    MaxDepth = ReadMaxDepth,
+                    ContractResolver = RequestLayerResolver.Instance,
+                });
+        }
+
+        private static void RejectNewerRequestLayer(PersistedPlan plan)
+        {
+            int observed = plan.RequestSchemaVersion;
+            int max = PersistedPlan.CurrentRequestSchemaVersion;
+            if (observed > max)
+            {
+                throw new InvalidDataException(
+                    $"Saved plan's request is schema {observed}, and this build reads at most {max} - it was written by a newer build.");
+            }
+        }
+
+        // The resolver behind DeserializeRequestLayer. Scoped to
+        // PersistedPlan's own declarations so a same-named member on
+        // another type in the graph is unaffected.
+        private sealed class RequestLayerResolver : DefaultContractResolver
+        {
+            internal static readonly RequestLayerResolver Instance = new RequestLayerResolver();
+
+            private static readonly HashSet<string> Skipped =
+                new HashSet<string>(ResultGraphMembers, StringComparer.Ordinal);
+
+            protected override JsonProperty CreateProperty(
+                MemberInfo member, MemberSerialization memberSerialization)
+            {
+                var property = base.CreateProperty(member, memberSerialization);
+                if (member.DeclaringType == typeof(PersistedPlan)
+                    && Skipped.Contains(property.PropertyName))
+                {
+                    property.Ignored = true;
+                }
+
+                return property;
+            }
+        }
+
+        /// <summary>
         /// Re-derives CraftingTreeNode.IsPlanRoot, which is internal and
         /// therefore never serialized (see the member's own comment for
         /// why it is kept off the persisted graph). Restore is the one path
@@ -192,7 +353,9 @@ namespace TaimisToolbench.Services
     /// InvalidDataException the corrupt/degraded paths throw so the ONE
     /// caller that can tell a user anything - PlanStore.LoadLatest - can
     /// report it as the routine, self-healing event it is (Info, no
-    /// "corrupt") rather than as damage. Derives straight from Exception
+    /// "corrupt") rather than as damage. The message stops at the two
+    /// versions and states no outcome: what survives the rejection is the
+    /// caller's to know (PlanStore.ReportDiscardedResult appends it). Derives straight from Exception
     /// only because InvalidDataException is sealed on .NET Framework; every
     /// other handler on this path is a catch-all, so it still degrades to
     /// the same null + one log line. The message names both versions,
@@ -202,7 +365,7 @@ namespace TaimisToolbench.Services
     internal sealed class PlanSchemaVersionMismatchException : Exception
     {
         internal PlanSchemaVersionMismatchException(int observedVersion, int expectedVersion)
-            : base($"Saved plan file is schema {observedVersion}, this build expects {expectedVersion} - starting fresh.")
+            : base($"Saved plan file is schema {observedVersion}, this build expects {expectedVersion}.")
         {
         }
     }

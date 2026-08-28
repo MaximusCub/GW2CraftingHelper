@@ -48,7 +48,8 @@ Models/ItemPrice.cs                                                             
 Models/ItemStatBlock.cs                                                                 131
 Models/MaterialSourceAllocation.cs                                                        9
 Models/OwnMaterialsMode.cs                                                               43
-Models/PersistedPlan.cs                                                                 132
+Models/PersistedPlan.cs                                                                 168
+Models/PersistedPlanLoad.cs                                                              49
 Models/PillSourceCostBreakdown.cs                                                        76
 Models/PlanHistoryEntry.cs                                                              106
 Models/PlanRequestItem.cs                                                                15
@@ -162,7 +163,7 @@ Services/PlanRelayoutMath.cs                                                    
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                 2012
 Services/PlanStore.cs                                                                   165
-Services/PlanStoreHelpers.cs                                                            209
+Services/PlanStoreHelpers.cs                                                            372
 Services/PlanStripStatusBoard.cs                                                        307
 Services/PlanStripTickDecision.cs                                                        97
 Services/PlanStructuralValidator.cs                                                     597

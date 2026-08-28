@@ -118,6 +118,7 @@ PersistedPlan.IgnoredItemIds:IReadOnlyList`1<Int32>
 PersistedPlan.NodeOverrides:IReadOnlyDictionary`2<Int32,AcquisitionSource>
 PersistedPlan.PriceBasis:PriceBasis
 PersistedPlan.RequestItems:IReadOnlyList`1<PlanRequestItem>
+PersistedPlan.RequestSchemaVersion:Int32
 PersistedPlan.Result:CraftingPlanResult
 PersistedPlan.SchemaVersion:Int32
 PersistedPlan.UseOwnMaterials:Boolean
