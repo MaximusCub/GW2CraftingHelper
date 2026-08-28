@@ -911,7 +911,10 @@ namespace TaimisToolbench
 
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
-                () => new ViewAdapter("Snapshot", c => _snapshotContent.Build(c)),
+                () => new ViewAdapter(
+                    "Snapshot",
+                    c => _snapshotContent.Build(c),
+                    b => _snapshotContent.BuildHeaderActions(b)),
                 "Snapshot"));
 
             _rankerContent = new RankerTabContent(

@@ -78,7 +78,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             35
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                              2574
+Module.cs                                                                              2577
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -264,11 +264,11 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                    31
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                      2818
+Views/MainView.cs                                                                      2785
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
-Views/PlanHistoryTabContent.cs                                                         1271
-Views/RankerTabContent.cs                                                              2581
+Views/PlanHistoryTabContent.cs                                                         1231
+Views/RankerTabContent.cs                                                              2543
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              180
@@ -310,7 +310,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                          153
 Views/SettingsTabContent.cs                                                            2605
 Views/SuggestionPanel.cs                                                                491
-Views/ViewAdapter.cs                                                                    176
+Views/ViewAdapter.cs                                                                    245
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/TaimisToolbench.Tests/Helpers/CapturingProgress.cs                               22
 tests/TaimisToolbench.Tests/Helpers/CraftingPlanResultBuilders.cs                      94

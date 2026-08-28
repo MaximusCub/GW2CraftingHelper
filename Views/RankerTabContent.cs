@@ -30,14 +30,15 @@ namespace TaimisToolbench.Views
     {
         private static readonly Logger Logger = Logger.GetLogger<RankerTabContent>();
 
-        private const int SectionBandHeight = PlanContentHeightMath.SectionHeaderRowHeight;
-        private const int SectionTitleY = PlanContentHeightMath.SectionHeaderTitleY;
         private const int AddRowHeight = 40;
         private const int ToolbarHeight = 40;
         private const int ColumnHeaderRowHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
         private const int ColumnHeaderLabelY = PlanContentHeightMath.ColumnHeaderLabelY;
+
+        // No section band: this tab is named once, by the title band
+        // Views/ViewAdapter draws above every tab's content.
         private const int TopChromeHeight =
-            SectionBandHeight + AddRowHeight + ToolbarHeight + ColumnHeaderRowHeight;
+            AddRowHeight + ToolbarHeight + ColumnHeaderRowHeight;
 
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int CaptionLineHeight = 18;
@@ -85,7 +86,6 @@ namespace TaimisToolbench.Views
 
         private static readonly Color StatusColor = new Color(200, 200, 200);
         private static readonly Color ErrorColor = new Color(255, 100, 100);
-        private static readonly Color SectionDividerColor = new Color(130, 130, 130);
 
         // The affordability chip reuses SummarySectionRenderer's
         // full-coverage tag colors (PillKind.Selected's darkened green,
@@ -141,8 +141,6 @@ namespace TaimisToolbench.Views
 
         private readonly List<RenderedRow> _rows = new List<RenderedRow>();
 
-        private Panel _headerPanel;
-        private Panel _headerDivider;
         private Panel _addPanel;
         private Panel _toolbarPanel;
         private Panel _columnHeaderPanel;
@@ -234,7 +232,6 @@ namespace TaimisToolbench.Views
 
             int w = container.ContentRegion.Width;
 
-            BuildSectionBand(container, w);
             BuildAddRow(container, w);
             BuildToolbar(container, w);
             BuildColumnHeader(container, w);
@@ -415,39 +412,11 @@ namespace TaimisToolbench.Views
         // ---------------------------------------------------------------
         // Chrome
         // ---------------------------------------------------------------
-        private void BuildSectionBand(Container container, int width)
-        {
-            _headerPanel = new Panel
-            {
-                Size = new Point(width, SectionBandHeight),
-                Parent = container,
-            };
-
-            new Label
-            {
-                Font = UiFonts.SectionTitle,
-                Text = "Crafting Ranker",
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(RankerRowLayout.Inset, SectionTitleY),
-                Parent = _headerPanel,
-            };
-
-            _headerDivider = new Panel
-            {
-                Size = new Point(Math.Max(0, width - ScrollbarAllowance), 2),
-                Location = new Point(0, SectionBandHeight - 3),
-                BackgroundColor = SectionDividerColor,
-                Parent = _headerPanel,
-            };
-        }
-
         private void BuildAddRow(Container container, int width)
         {
             _addPanel = new Panel
             {
                 Size = new Point(width, AddRowHeight),
-                Location = new Point(0, SectionBandHeight),
                 Parent = container,
             };
 
@@ -641,7 +610,7 @@ namespace TaimisToolbench.Views
             _toolbarPanel = new Panel
             {
                 Size = new Point(width, ToolbarHeight),
-                Location = new Point(0, SectionBandHeight + AddRowHeight),
+                Location = new Point(0, AddRowHeight),
                 Parent = container,
             };
 
@@ -701,20 +670,15 @@ namespace TaimisToolbench.Views
 
         private void BuildColumnHeader(Container container, int width)
         {
-            _columnHeaderPanel = new Panel
-            {
-                Size = new Point(width, ColumnHeaderRowHeight),
-                Location = new Point(0, SectionBandHeight + AddRowHeight + ToolbarHeight),
-                BackgroundColor = TableHeaderStyle.BandColor,
-                Parent = container,
-            };
+            _columnHeaderPanel = HeaderBands.CreateColumnHeaderBand(
+                container, width, 0, AddRowHeight + ToolbarHeight);
 
             foreach (string text in new[] { "#", "Item", "Ready", "Days", "Remaining" })
             {
                 _columnHeaderLabels.Add(new Label
                 {
-                    Font = TableHeaderStyle.Font,
-                    TextColor = TableHeaderStyle.LabelColor,
+                    Font = HeaderBands.Font,
+                    TextColor = HeaderBands.LabelColor,
                     Text = text,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -729,8 +693,6 @@ namespace TaimisToolbench.Views
             int height = container.ContentRegion.Height;
             int barWidth = Math.Max(0, width - ScrollbarAllowance);
 
-            _headerPanel.Size = new Point(width, SectionBandHeight);
-            _headerDivider.Size = new Point(barWidth, 2);
             _addPanel.Size = new Point(width, AddRowHeight);
             _toolbarPanel.Size = new Point(width, ToolbarHeight);
             _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);

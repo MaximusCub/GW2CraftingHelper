@@ -4,6 +4,7 @@ using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using Microsoft.Xna.Framework;
 using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
 namespace TaimisToolbench.Views
 {
@@ -13,11 +14,16 @@ namespace TaimisToolbench.Views
     /// as a View so existing MainView, CraftingPlanView, etc. work
     /// with TabbedWindow2 without conversion.
     ///
-    /// Renders a bordered Panel with a title header matching the
-    /// BlishHUD native style (Panel.ShowBorder), inset from the
-    /// tab content region by OUTER_PADDING. An inner content panel
-    /// provides additional left/right/bottom padding so view content
-    /// does not press against the border chrome.
+    /// Renders a bordered Panel (Panel.ShowBorder) inset from the tab
+    /// content region by OUTER_PADDING, wearing the module's own tab title
+    /// band along the top of its content region and an inner content panel
+    /// beneath it so view content does not press against the border chrome.
+    ///
+    /// The band is the module's rather than Blish's Panel.Title header
+    /// because the title is the tab's ONLY name - the tab strip draws icons
+    /// only - and Blish's header is fixed at 36px and DefaultFont16 by
+    /// literals inside private layout methods. See
+    /// Views/Rendering/HeaderBands.
     /// </summary>
     internal class ViewAdapter : View
     {
@@ -28,6 +34,7 @@ namespace TaimisToolbench.Views
         private const int INNER_PADDING = 10;
 
         private readonly Action<Container> _buildAction;
+        private readonly Action<Container> _decorateBand;
         private readonly string _title;
 
         // The edge insets Blish will give the bordered panel, computed once
@@ -49,13 +56,25 @@ namespace TaimisToolbench.Views
         private Container _resizedOwner;
         private EventHandler<ResizedEventArgs> _resizedHandler;
 
-        public ViewAdapter(string title, Action<Container> buildAction)
+        /// <param name="decorateBand">
+        /// Optional: fills a strip of the title band that shares the content
+        /// panel's x-span, so a tab whose actions belong beside its title
+        /// can right-anchor them on the SAME edge its content uses. Runs
+        /// before <paramref name="buildAction"/>.
+        /// </param>
+        public ViewAdapter(
+            string title, Action<Container> buildAction, Action<Container> decorateBand = null)
         {
             _title = title ?? "";
             _buildAction = buildAction ?? throw new ArgumentNullException(nameof(buildAction));
+            _decorateBand = decorateBand;
+
+            // hasTitle: false unconditionally - the module never sets
+            // Panel.Title, so Blish reserves only the border's top padding
+            // and the band below sits inside the content region.
             _borderedInsets = PanelChromeMath.PanelInsets(
                 showBorder: true,
-                hasTitle: !string.IsNullOrEmpty(_title),
+                hasTitle: false,
                 headerHeight: Panel.HEADER_HEIGHT,
                 topPadding: Panel.TOP_PADDING,
                 rightPadding: Panel.RIGHT_PADDING,
@@ -78,22 +97,42 @@ namespace TaimisToolbench.Views
                 child.Dispose();
             }
 
-            // Bordered inner panel with title header, matching BlishHUD
-            // Settings-style visual language (Panel.ShowBorder uses
-            // assets 1032325/1002144/605025 for border chrome).
+            // Bordered inner panel, matching BlishHUD Settings-style
+            // visual language (Panel.ShowBorder uses assets
+            // 1032325/1002144/605025 for border chrome).
+            var borderedSize = BorderedSize(buildPanel);
             var borderedPanel = new Panel()
             {
                 Parent = buildPanel,
                 Location = new Point(OUTER_PADDING, OUTER_PADDING),
-                Size = BorderedSize(buildPanel),
+                Size = borderedSize,
                 ShowBorder = true,
-                Title = _title,
             };
 
+            // Top of the bordered panel's content region, spanning exactly
+            // the x-range Blish's own title header would have used.
+            var titleBand = HeaderBands.CreateTabTitleBand(
+                borderedPanel, BandWidth(borderedSize), _title, INNER_PADDING + UiSpacing.Inset);
+
+            // The decorator's strip starts where the content panel starts
+            // and is as wide, so a caller right-anchoring against its width
+            // lands on the same vertical line the content does.
+            Panel bandActions = null;
+            if (_decorateBand != null)
+            {
+                bandActions = new Panel()
+                {
+                    Parent = titleBand,
+                    Location = new Point(INNER_PADDING, 0),
+                    Size = new Point(ContentWidth(borderedSize), HeaderBands.TabTitleHeight),
+                };
+            }
+
             // Inner content panel with additional padding so view content
-            // does not sit flush against the border chrome. The bordered
-            // panel's own internal padding (4px L/R, 7px T/B, 36px header)
-            // is not enough visual breathing room.
+            // does not sit flush against the band above it or the border
+            // chrome around it. The bordered panel's own internal padding
+            // (4px L/R, 7px T/B with no title set) is not enough visual
+            // breathing room.
             // Deliberately NOT scrollable: every hosted view provides its
             // own CanScroll panel. Nesting two CanScroll panels parents an
             // invisible outer Scrollbar over the same strip as the visible
@@ -101,24 +140,36 @@ namespace TaimisToolbench.Views
             var contentPanel = new Panel()
             {
                 Parent = borderedPanel,
-                Location = new Point(INNER_PADDING, INNER_PADDING),
-                Size = ContentSize(borderedPanel.Size),
+                Location = new Point(INNER_PADDING, HeaderBands.TabTitleHeight + INNER_PADDING),
+                Size = ContentSize(borderedSize),
             };
 
             _resizedHandler = (s, e) =>
             {
                 var bordered = BorderedSize(buildPanel);
                 borderedPanel.Size = bordered;
+                titleBand.Size = new Point(BandWidth(bordered), HeaderBands.TabTitleHeight);
 
                 // Derived from the size just assigned, never read back off
                 // borderedPanel.ContentRegion: a resize the window performs
                 // from inside its own layout pass reaches here with that
                 // region still describing the PREVIOUS size, and nothing
                 // re-reads it afterwards. See PanelChromeMath.
-                contentPanel.Size = ContentSize(bordered);
+                var content = ContentSize(bordered);
+                if (bandActions != null)
+                {
+                    bandActions.Size = new Point(content.X, HeaderBands.TabTitleHeight);
+                }
+
+                contentPanel.Size = content;
             };
             _resizedOwner = buildPanel;
             buildPanel.Resized += _resizedHandler;
+
+            if (bandActions != null)
+            {
+                _decorateBand(bandActions);
+            }
 
             _buildAction(contentPanel);
         }
@@ -139,15 +190,33 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
+        /// The title band's width: the bordered panel's full content-region
+        /// width, which is the span Blish's own header occupied.
+        /// </summary>
+        private int BandWidth(Point borderedSize)
+        {
+            return PanelChromeMath.ContentWidth(borderedSize.X, _borderedInsets);
+        }
+
+        /// <summary>
         /// The inner content panel's size for a bordered panel of
         /// <paramref name="borderedSize"/>: that panel's content region, less
-        /// <see cref="INNER_PADDING"/> on all four edges.
+        /// <see cref="INNER_PADDING"/> on all four edges and less the title
+        /// band that now sits above it. Floored at 0 - Control.Size ignores a
+        /// negative component, which would strand the panel at a stale size.
         /// </summary>
         private Point ContentSize(Point borderedSize)
         {
-            return new Point(
-                PanelChromeMath.PaddedContentWidth(borderedSize.X, _borderedInsets, INNER_PADDING),
-                PanelChromeMath.PaddedContentHeight(borderedSize.Y, _borderedInsets, INNER_PADDING));
+            int height = PanelChromeMath.PaddedContentHeight(
+                borderedSize.Y, _borderedInsets, INNER_PADDING) - HeaderBands.TabTitleHeight;
+
+            return new Point(ContentWidth(borderedSize), height > 0 ? height : 0);
+        }
+
+        private int ContentWidth(Point borderedSize)
+        {
+            return PanelChromeMath.PaddedContentWidth(
+                borderedSize.X, _borderedInsets, INNER_PADDING);
         }
 
         /// <summary>
