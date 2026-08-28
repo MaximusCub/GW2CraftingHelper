@@ -3,7 +3,7 @@ using Blish_HUD.Controls;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// Full release of Blish text-input focus.

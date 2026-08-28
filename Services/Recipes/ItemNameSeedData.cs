@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
-namespace GW2CraftingHelper.Services.Recipes
+namespace TaimisToolbench.Services.Recipes
 {
     internal class ItemNameEntry
     {

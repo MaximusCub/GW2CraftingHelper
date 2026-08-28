@@ -1,4 +1,4 @@
-# Contributing to GW2 Crafting Helper
+# Contributing to Taimi's Toolbench
 
 Thanks for your interest in contributing. This document covers what you
 actually need to build, test, and submit a change to this repository. It is
@@ -22,8 +22,8 @@ obvious code lives in `docs/` (see `docs/KNOWN-ISSUES.md` and
 ## Building
 
 ```
-nuget restore GW2CraftingHelper.sln
-dotnet build GW2CraftingHelper.csproj -p:Platform=x64
+nuget restore TaimisToolbench.sln
+dotnet build TaimisToolbench.csproj -p:Platform=x64
 ```
 
 **The restore step is separate and mandatory on a fresh clone.** This is a
@@ -42,21 +42,21 @@ computer. ... The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets
 ```
 
 `.github/workflows/tests.yml` runs the same `nuget restore
-GW2CraftingHelper.sln` step for the same reason.
+TaimisToolbench.sln` step for the same reason.
 
 The `Platform=x64` argument is required - the project only defines output
-paths for the `x64` platform (see `GW2CraftingHelper.csproj`'s
+paths for the `x64` platform (see `TaimisToolbench.csproj`'s
 `Debug|x64`/`Release|x64` property groups). Building without it fails
 outright with "The BaseOutputPath/OutputPath property is not set", not a
 silently-working-but-wrong build.
 
 A successful build also produces a `.bhm` file next to the built DLL (e.g.
-`bin\x64\Release\GW2CraftingHelper.bhm`) - see `docs/RELEASING.md` for how
+`bin\x64\Release\TaimisToolbench.bhm`) - see `docs/RELEASING.md` for how
 that packaging step works and what it currently does and does not cover.
 
 ### The build emits zero warnings, and that is enforced
 
-`GW2CraftingHelper.csproj` sets `TreatWarningsAsErrors`, so a build that
+`TaimisToolbench.csproj` sets `TreatWarningsAsErrors`, so a build that
 prints anything at all is a build that failed. **Do not report warning
 counts in a commit message.** There is nothing to count and nothing to
 compare against a remembered number; if the build succeeded, it was clean.
@@ -81,7 +81,7 @@ The same gate covers the test and tool projects: each SDK-style project
 imports `StyleGate.props`, which references the same ruleset and carries a
 copy of the module's `<NoWarn>` list (the module cannot import it - see the
 comment in that file). Taking a rule on therefore means deleting its ID
-from both `GW2CraftingHelper.csproj` and `StyleGate.props` in the same
+from both `TaimisToolbench.csproj` and `StyleGate.props` in the same
 commit, and fixing what every project then reports.
 
 The three largest remaining are `SA1117` (252, parameter layout), `SA1401`
@@ -90,7 +90,7 @@ mechanical fix that leaves the code better than it found it, which is why
 they are still here and the whitespace rules are not.
 
 To **run** what you built rather than develop against it, build in Release
-for `x64` and copy `bin\x64\Release\GW2CraftingHelper.bhm` into your Blish
+for `x64` and copy `bin\x64\Release\TaimisToolbench.bhm` into your Blish
 HUD installation's `modules` folder, then reload Blish HUD. Players do not
 need any of this - `README.md`'s Installing section points them at the
 `.bhm` attached to a GitHub Release, which is the same artifact built by
@@ -99,7 +99,7 @@ need any of this - `README.md`'s Installing section points them at the
 ## Testing
 
 ```
-dotnet test GW2CraftingHelper.sln
+dotnet test TaimisToolbench.sln
 ```
 
 That runs all three test projects, which is what CI runs. To run one at a
@@ -107,8 +107,8 @@ time (the same three steps, in the same order, as
 `.github/workflows/tests.yml`):
 
 ```
-dotnet test tests/GW2CraftingHelper.Tests/GW2CraftingHelper.Tests.csproj -c Release
-dotnet test tests/GW2CraftingHelper.RecipeSeeder.Tests/GW2CraftingHelper.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
+dotnet test tests/TaimisToolbench.Tests/TaimisToolbench.Tests.csproj -c Release
+dotnet test tests/TaimisToolbench.RecipeSeeder.Tests/TaimisToolbench.RecipeSeeder.Tests.csproj -p:Platform=x64 -c Release
 dotnet test tests/VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj -c Release
 ```
 
@@ -116,7 +116,7 @@ Running only the first one is the trap worth naming: the golden-vector suite
 that pins `tools/VendorOfferUpdater/VendorOfferHasher.cs` - the SHA-256
 `offerId` keying every row of the 15MB `ref/vendor_offers.json` - lives in the
 third project, so a change to the hasher passes locally and fails CI.
-`GW2CraftingHelper.Tests` and `GW2CraftingHelper.RecipeSeeder.Tests` target
+`TaimisToolbench.Tests` and `TaimisToolbench.RecipeSeeder.Tests` target
 `net48`; `VendorOfferUpdater.Tests` targets `net8.0`, so a solution-level
 run needs both the .NET 8 SDK and .NET Framework 4.8 on the machine.
 
@@ -136,7 +136,7 @@ and that any new test must follow:
 
 CI (`.github/workflows/tests.yml`) restores, builds the whole solution with
 `-p:Platform=x64`, and runs this test project plus the two tool suites
-(`tests/GW2CraftingHelper.RecipeSeeder.Tests`,
+(`tests/TaimisToolbench.RecipeSeeder.Tests`,
 `tests/VendorOfferUpdater.Tests`). It runs on every pull request and on
 pushes to `master`; a docs-only change skips the Windows build job, and the
 `invariants` job still reports. That job fails the build on non-ASCII `.cs`
@@ -148,7 +148,7 @@ tag; see `docs/RELEASING.md`.
 
 ## Project/Solution Structure
 
-- `GW2CraftingHelper.csproj` is a **non-SDK-style** (classic) project and
+- `TaimisToolbench.csproj` is a **non-SDK-style** (classic) project and
   lists every source file explicitly via `<Compile Include="...">`. If you
   add a new `.cs` file, you must add a matching `<Compile Include>` entry
   yourself - the build will simply not see a file that isn't listed. This
@@ -161,7 +161,7 @@ tag; see `docs/RELEASING.md`.
 - `tools/` contains standalone offline utilities (see below) that are
   separate console projects, most of them SDK-style, each with its own
   README where one exists.
-- `GW2CraftingHelper.sln` lists every project, including the tools - if you
+- `TaimisToolbench.sln` lists every project, including the tools - if you
   add a new tool project, add it to the `.sln` too (a project that only
   exists on disk but isn't in the `.sln` is easy to miss entirely, which
   happened to `MysticForgeSeeder` before this was fixed).
@@ -171,14 +171,14 @@ tag; see `docs/RELEASING.md`.
 - Allman brace style (opening brace on its own line) for C#.
 - **Everything is `internal` unless Blish HUD itself must see it. Tests reach
   internals via `InternalsVisibleTo`.** This is a leaf module assembly:
-  nothing on disk links against `GW2CraftingHelper.dll`, and Blish
+  nothing on disk links against `TaimisToolbench.dll`, and Blish
   discovers exactly one type from it - the `Module` subclass, found by MEF
   through its `[Import("ModuleParameters")]` constructor. So `Module` is the
   only `public` type in the shipped assembly, and a `public` you add
   anywhere else is a promise to a caller that does not exist.
   `Properties/AssemblyInfo.cs` grants `InternalsVisibleTo` to the test
   project and to the two developer tools that reference the module
-  (`GW2CraftingHelper.Harness`, `GW2CraftingHelper.RecipeSeeder`), so
+  (`TaimisToolbench.Harness`, `TaimisToolbench.RecipeSeeder`), so
   `internal` costs nothing in testability or tooling. It buys the compiler's
   dead-code detection back: an unreferenced `internal` type is a warning,
   an unreferenced `public` one is silence. Nested members keep whatever
@@ -220,7 +220,7 @@ tag; see `docs/RELEASING.md`.
   invariant a reader must not re-derive. It is the norm here rather than
   the exception - 200 of the 248 production `.cs` files carry at least one,
   1,247 blocks across 12,118 `///` lines (measured 2026-08-25) - but it is
-  **not** mandated, which is why `GW2CraftingHelper.ruleset` leaves SA1600
+  **not** mandated, which is why `TaimisToolbench.ruleset` leaves SA1600
   and SA1602 off. Do not add `<summary>Gets the item id.</summary>` to a
   property called `ItemId`; a prose `//` at the decision point is worth
   more than a doc comment that restates the signature.
@@ -231,7 +231,7 @@ tag; see `docs/RELEASING.md`.
   without the guard a null surfaces later as a `NullReferenceException`
   inside a render closure, pointing at the wrong code.
 - Private fields are `_camelCase`; the naming convention is enforced by
-  `.editorconfig`, and `GW2CraftingHelper.ruleset` suppresses SA1309 so the
+  `.editorconfig`, and `TaimisToolbench.ruleset` suppresses SA1309 so the
   analyzer does not fight it.
 - Follow the patterns already established in neighboring files rather than
   introducing new structure for a small change.
@@ -266,7 +266,7 @@ never called from module code, and the GW2 Wiki is never queried by the
 running module either. All of it is produced ahead of time by the offline
 tools under `tools/` and committed to the repo:
 
-- `tools/GW2CraftingHelper.RecipeSeeder` - queries the official GW2 API
+- `tools/TaimisToolbench.RecipeSeeder` - queries the official GW2 API
   (`api.guildwars2.com`) to build `ref/recipes_seed.json`,
   `ref/recipe_search_seed.json`, and related files.
 - `tools/VendorOfferUpdater` - scrapes the GW2 Wiki (Semantic MediaWiki API)

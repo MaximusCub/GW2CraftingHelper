@@ -1,17 +1,17 @@
-using Blish_HUD;
-using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
-using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Blish_HUD;
+using Blish_HUD.Controls;
+using Microsoft.Xna.Framework;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The Snapshot tab: a search-as-you-type account-inventory browser

@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using Blish_HUD;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// Marshals a single action onto the Blish HUD main (UI) thread. Blish

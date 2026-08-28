@@ -1,9 +1,9 @@
 THIRD-PARTY NOTICES
 ===================
 
-This file ships inside the distributed module (GW2CraftingHelper.bhm). Every
+This file ships inside the distributed module (TaimisToolbench.bhm). Every
 file under ref/ is packaged by the BuildBlishHUDModule target in
-GW2CraftingHelper.csproj, so this notice travels with the artwork it covers.
+TaimisToolbench.csproj, so this notice travels with the artwork it covers.
 
 
 Bootstrap Icons

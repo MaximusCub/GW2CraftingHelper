@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Blish-free mirror of the arithmetic Blish_HUD.Controls.Panel uses to

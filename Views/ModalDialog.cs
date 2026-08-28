@@ -3,15 +3,15 @@ using System.Linq;
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     internal class ModalDialog : IDisposable
     {
-        private const string WindowId = "GW2CraftingHelper_ModalDialog_c4f19a";
+        private const string WindowId = "TaimisToolbench_ModalDialog_c4f19a";
 
         // 400x150 before, with the message in an unwrapped 380px-wide
         // centered Label: a sentence wider than the label (Clear Cache's is

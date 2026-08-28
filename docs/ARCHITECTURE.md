@@ -613,7 +613,7 @@ inventing a new one. The load-bearing rules:
 **Where:** `Services/PlanSolver.cs` (`Evaluate`, `SelectBestRecipes`,
 `PickCheapest`); the normative spec these rules echo is
 `docs/gw2e-parity-spec.md`. Whole-result goldens for these decisions live
-in `tests/GW2CraftingHelper.Tests/Goldens/plan-solver/` - a difference
+in `tests/TaimisToolbench.Tests/Goldens/plan-solver/` - a difference
 there is a finding to investigate, never a file to re-baseline.
 
 **Full history:** KNOWN-ISSUES items 20, 21, 24, 25, 26 (the M33-M37
@@ -632,7 +632,7 @@ gw2efficiency or the GW2 Wiki at runtime; `gw2efficiency` is research-only,
 consulted at dev time to write `docs/gw2e-parity-spec.md` and never called
 from module code.
 
-- `tools/GW2CraftingHelper.RecipeSeeder` queries the official GW2 API
+- `tools/TaimisToolbench.RecipeSeeder` queries the official GW2 API
   (`api.guildwars2.com`) to build `ref/recipes_seed.json` and
   `ref/recipe_search_seed.json`.
 - `tools/VendorOfferUpdater` scrapes the GW2 Wiki's Semantic MediaWiki

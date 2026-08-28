@@ -1,10 +1,10 @@
-using GW2CraftingHelper.Services;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.BitmapFonts;
 using MonoGame.Extended.TextureAtlases;
-using System.Collections.Generic;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Turns the parsed ref/glyphs.fnt plus its atlas page into a MonoGame

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// An <see cref="ItemStatBlock"/> rendered as tooltip content, in the

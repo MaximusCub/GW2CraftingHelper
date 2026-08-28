@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Parses user-entered currency valuation text from the Settings tab

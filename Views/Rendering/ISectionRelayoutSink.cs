@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The minimal seam a section renderer needs from CraftingPlanView to

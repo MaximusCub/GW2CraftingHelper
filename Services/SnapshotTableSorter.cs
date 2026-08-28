@@ -1,8 +1,8 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>Columns the Snapshot tab's two runs expose - one enum,
     /// because they are the same two columns over different data.</summary>

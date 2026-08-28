@@ -4,9 +4,9 @@ using System.Runtime.CompilerServices;
 // subclass, via MEF - so Module is the only public type here and everything
 // else is internal (see CONTRIBUTING.md, "Code Style"). The assemblies that
 // legitimately consume module internals are named below; none of them ship.
-// GW2CraftingHelper.RecipeSeeder.Tests is on the list transitively: it calls
+// TaimisToolbench.RecipeSeeder.Tests is on the list transitively: it calls
 // RecipeSeeder's own internals, and those signatures mention module types.
-[assembly: InternalsVisibleTo("GW2CraftingHelper.Tests")]
-[assembly: InternalsVisibleTo("GW2CraftingHelper.Harness")]
-[assembly: InternalsVisibleTo("GW2CraftingHelper.RecipeSeeder")]
-[assembly: InternalsVisibleTo("GW2CraftingHelper.RecipeSeeder.Tests")]
+[assembly: InternalsVisibleTo("TaimisToolbench.Tests")]
+[assembly: InternalsVisibleTo("TaimisToolbench.Harness")]
+[assembly: InternalsVisibleTo("TaimisToolbench.RecipeSeeder")]
+[assembly: InternalsVisibleTo("TaimisToolbench.RecipeSeeder.Tests")]

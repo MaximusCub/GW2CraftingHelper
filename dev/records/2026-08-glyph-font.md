@@ -29,7 +29,7 @@ decompiled 1.3.0 binary:
 All four live in `Paint` and `RecalculateLayout`, and **both are virtual**.
 Everything above them - the hover tween through the `common/button-states`
 atlas, the click event and its `Enabled` gate, the tooltip plumbing every one
-of this module's 23 buttons relies on, focus, opacity, the Container/Control
+of this module's 22 buttons relies on, focus, opacity, the Container/Control
 lifecycle - is inherited free, and is exactly the part that would have to be
 rebuilt, and kept rebuilt against future Blish releases, by a control derived
 from `Control`. The button art is Blish's own and both textures are reachable

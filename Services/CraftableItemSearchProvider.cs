@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services.Recipes;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class CraftableItemSearchProvider : IItemSearchProvider
     {

@@ -2,7 +2,7 @@ using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // Factors the "row divider +
     // width-only relayout closure" tail that closes every row builder in

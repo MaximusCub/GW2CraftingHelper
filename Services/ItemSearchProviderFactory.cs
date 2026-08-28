@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services.Recipes;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal static class ItemSearchProviderFactory
     {

@@ -1,9 +1,9 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// See docs/ARCHITECTURE.md section 9 (data pipeline: seeds, wiki

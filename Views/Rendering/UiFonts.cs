@@ -1,9 +1,9 @@
 using Blish_HUD;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The type sizes the module draws in, named by ROLE rather than by

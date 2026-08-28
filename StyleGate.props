@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The module's style gate, packaged as one import for the SDK-style test and
      tool projects so every project in the solution answers to the same ruleset
-     and the same warning ratchet. GW2CraftingHelper.csproj cannot import this
+     and the same warning ratchet. TaimisToolbench.csproj cannot import this
      file - it is a packages.config project, and a PackageReference item inside
      one flips NuGet into a mixed restore mode - so it carries its own copy of
      these settings, and the NoWarn list below must stay in sync with that
@@ -13,7 +13,7 @@
 <Project>
 
   <PropertyGroup>
-    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)GW2CraftingHelper.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)TaimisToolbench.ruleset</CodeAnalysisRuleSet>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);SA1005;SA1009;SA1111;SA1116;SA1117;SA1118;SA1120;SA1122;SA1201;SA1202;SA1203;SA1204;SA1208;SA1214;SA1310;SA1312;SA1401;SA1402;SA1407;SA1515;SA1649</NoWarn>
     <!-- NuGet audit advisories (NU1901-NU1904) stay visible as warnings but do

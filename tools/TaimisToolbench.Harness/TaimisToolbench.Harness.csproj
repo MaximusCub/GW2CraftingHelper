@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\StyleGate.props" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <!-- Pinned to the value this net48 project actually resolves to today - measured
+         via a diagnostic-verbosity build - matching TaimisToolbench.csproj (M38
+         WP-02 / a6-csharp.md section 10). -->
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\TaimisToolbench.csproj">
+      <SetPlatform>Platform=x64</SetPlatform>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tool-only implementation of the module's IMysticForgeRecipeSource -
+         see that file's own doc comment for why it is linked here instead
+         of compiled into the shipped module. -->
+    <Compile Include="..\Shared\FileMysticForgeRecipeSource.cs"
+             Link="FileMysticForgeRecipeSource.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\ref\mystic_forge_recipes.json" Link="ref\mystic_forge_recipes.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\vendor_offers.json" Link="ref\vendor_offers.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\recipe_search_seed.json" Link="ref\recipe_search_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\recipes_seed.json" Link="ref\recipes_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\recipe_seed_manifest.json" Link="ref\recipe_seed_manifest.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\item_name_seed.json" Link="ref\item_name_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\ref\acquisition_hints_seed.json" Link="ref\acquisition_hints_seed.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

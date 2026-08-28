@@ -11,16 +11,16 @@ using Blish_HUD.Controls;
 using Blish_HUD.Modules;
 using Blish_HUD.Modules.Managers;
 using Blish_HUD.Settings;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Views;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Views;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper
+namespace TaimisToolbench
 {
     internal class ContentsManagerRecipeSource : IMysticForgeRecipeSource
     {
@@ -857,7 +857,7 @@ namespace GW2CraftingHelper
                 new Point(WindowSizing.MinWindowWidth, WindowSizing.MinWindowHeight))
             {
                 Parent = GameService.Graphics.SpriteScreen,
-                Title = "GW2 Crafting Helper",
+                Title = "Taimi's Toolbench",
                 Emblem = new AsyncTexture2D(_emblemTexture),
                 Id = $"{nameof(Module)}_MainWindow",
 
@@ -1001,7 +1001,7 @@ namespace GW2CraftingHelper
 
             _cornerIcon = new CornerIcon()
             {
-                IconName = "GW2 Crafting Helper",
+                IconName = "Taimi's Toolbench",
                 Icon = new AsyncTexture2D(_cornerIconTexture),
                 Priority = 1245846523,
                 Parent = GameService.Graphics.SpriteScreen,

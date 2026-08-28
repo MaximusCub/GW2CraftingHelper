@@ -1,10 +1,10 @@
+using System;
 using Blish_HUD;
 using Blish_HUD.Content;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework.Audio;
-using System;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Plays the module's UI click at a user-controlled volume. Blish's

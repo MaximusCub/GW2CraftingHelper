@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure list-state transitions for the Crafting Ranker's priority order,

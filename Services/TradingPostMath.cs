@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Trading Post fee arithmetic. GW2 charges a 5% listing fee and a 10%

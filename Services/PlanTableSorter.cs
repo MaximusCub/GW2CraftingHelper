@@ -1,8 +1,8 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Columns the Crafting Plan's two sortable tables expose. Used

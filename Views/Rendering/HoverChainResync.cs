@@ -1,7 +1,7 @@
 using Blish_HUD;
 using Blish_HUD.Input;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Re-resolves which control the cursor is over, after this module has
