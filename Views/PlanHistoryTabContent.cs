@@ -380,7 +380,7 @@ namespace GW2CraftingHelper.Views
             public FeedbackButton View;
             public FeedbackButton Open;
             public FeedbackButton Resolve;
-            public FeedbackButton Pin;
+            public Checkbox Pin;
             public FeedbackButton Delete;
             public Panel DetailPanel;
             public readonly List<Label> DetailFlexLabels = new List<Label>();
@@ -555,13 +555,17 @@ namespace GW2CraftingHelper.Views
                     + "Replaces the plan currently shown there. Manual decision overrides are not restored.");
             row.Resolve.Click += (_, __) => OnResolveClicked(entry);
 
-            row.Pin = CreateIconButton(row.Panel, entry.Pinned ? "\u25CF" : "\u25CB", bands.PinX,
-                entry.Pinned
-                    ? "Unpin this entry."
-                    : "Pin this entry so it is never removed automatically.");
-            row.Pin.Click += (_, __) => OnPinClicked(entry);
+            // Both seats used to carry geometric glyphs the shipped font
+            // does not have - U+25CF/U+25CB for the pin, U+2715 for the
+            // delete - which draw nothing and advance zero pixels, so the
+            // pinned state had no representation at all. KNOWN-ISSUES #64.
+            // A Checkbox rather than a button wearing an icon: StandardButton
+            // blits its Icon untinted onto light button art, where Blish's
+            // white affordance textures disappear just as surely.
+            row.Pin = CreatePinToggle(row.Panel, entry.Pinned, bands.PinX);
+            row.Pin.CheckedChanged += (_, __) => OnPinClicked(entry);
 
-            row.Delete = CreateIconButton(row.Panel, "\u2715", bands.DeleteX,
+            row.Delete = CreateIconButton(row.Panel, "\u00D7", bands.DeleteX,
                 "Remove this entry from the history.");
             row.Delete.Click += (_, __) => OnDeleteClicked(entry);
 
@@ -652,6 +656,27 @@ namespace GW2CraftingHelper.Views
             };
             TooltipFacility.ApplyPlain(button, tooltip);
             return button;
+        }
+
+        // Checkbox centres its 32px state art on Height/2, so handing it
+        // the button height sits it on the same line as the buttons beside
+        // it. Checked is set here and the handler wired by the caller, so
+        // construction cannot fire a pin toggle back at the store.
+        private Checkbox CreatePinToggle(Panel parent, bool pinned, int x)
+        {
+            var toggle = new Checkbox
+            {
+                Text = "Pin",
+                Checked = pinned,
+                Size = new Point(PlanHistoryRowLayout.PinToggleWidth, UiMetrics.ButtonHeight),
+                Location = new Point(x, MainLineButtonY),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(
+                toggle,
+                "Keep this entry. Pinned entries are never trimmed automatically, "
+                    + "and Clear History leaves them alone.");
+            return toggle;
         }
 
         // ---------------------------------------------------------------
