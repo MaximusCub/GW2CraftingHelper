@@ -358,6 +358,7 @@
     <Compile Include="Services\WikiLinkBuilder.cs" />
     <Compile Include="Services\WikiLinkLauncher.cs" />
     <Compile Include="Services\WindowSizing.cs" />
+    <Compile Include="Services\WindowPlacement.cs" />
     <Compile Include="Services\ReceiptCaptionHelper.cs" />
     <Compile Include="Services\Gw2AccountRecipeClient.cs" />
     <Compile Include="Services\IMysticForgeRecipeSource.cs" />

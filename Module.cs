@@ -958,6 +958,7 @@ namespace TaimisToolbench
 
             _settingsContent = new SettingsTabContent(_settings, _modalDialog);
             WarmCurrencyMetadataForSettings(lifetimeToken);
+            WarmBarterItemMetadataForSettings(itemMetadataService, lifetimeToken);
 
             // dataDir is threaded in as a parameter and _moduleIconTexture
             // is already loaded (LoadTextures runs first) - trivial
@@ -1004,6 +1005,54 @@ namespace TaimisToolbench
                 {
                     // Unloaded mid-fetch: _lifetimeCts is cancelled and
                     // _httpClient disposed before this task can finish.
+                }
+            });
+        }
+
+        /// <summary>
+        /// The barter-item half of <see cref="WarmCurrencyMetadataForSettings"/>:
+        /// the Vendor Cost Valuations grid's item rows carry an icon on the
+        /// same terms its currency rows do, and this resolves them through
+        /// the module's ONE <see cref="ItemMetadataService"/> - the same
+        /// cache every plan generation reads - rather than a second fetch of
+        /// its own. Roughly two dozen ids, so one batched /v2/items request.
+        /// <para>
+        /// Background and never awaited, for the reason the currency warm
+        /// gives. Failure costs the item icons and nothing else; unlike
+        /// CurrencyMetadataService, GetMetadataAsync rethrows when every
+        /// batch of a wave failed, so a total outage arrives here as an
+        /// ordinary exception and is swallowed here rather than left
+        /// unobserved on a Task nobody awaits.
+        /// </para>
+        /// </summary>
+        private void WarmBarterItemMetadataForSettings(
+            ItemMetadataService service, CancellationToken lifetimeToken)
+        {
+            var settingsContent = _settingsContent;
+            var ids = SettingsTabContent.BarterItemIconIds;
+            if (service == null || settingsContent == null || ids.Count == 0)
+            {
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var metadata = await service.GetMetadataAsync(ids, lifetimeToken);
+                    if (metadata == null || metadata.Count == 0)
+                    {
+                        return;
+                    }
+
+                    MainThreadMarshal.Run(() => settingsContent.SetBarterItemMetadata(metadata));
+                }
+                catch (Exception)
+                {
+                    // Cancellation, a disposed HttpClient on unload, and a
+                    // /v2/items outage all land here and all mean the same
+                    // thing to the grid: the item rows keep the empty slot
+                    // the cell already reserves.
                 }
             });
         }

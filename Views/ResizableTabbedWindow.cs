@@ -12,6 +12,11 @@ namespace TaimisToolbench.Views
     /// Also clamps at construction and on every layout pass, so neither the
     /// texture-derived constructed size nor a size persisted by an earlier
     /// session can open the window below the minimum.
+    /// <para>
+    /// The window's POSITION is clamped too, but on a different schedule and
+    /// for a different reason - see <see cref="ClampToScreen"/> and
+    /// <see cref="Services.WindowPlacement"/>.
+    /// </para>
     /// </summary>
     /// <remarks>
     /// Sealed: the constructor clamps, which writes <c>Size</c> and so runs
@@ -97,7 +102,31 @@ namespace TaimisToolbench.Views
 
         private void OnScreenResized(object sender, ResizedEventArgs e)
         {
+            // Size first: the position clamp is taken against the size the
+            // window ends up at, and the floor this screen supports may have
+            // just grown it.
             ClampToMinimum();
+            ClampToScreen();
+        }
+
+        /// <summary>
+        /// Runs AFTER the base implementation, which is where a persisted
+        /// position is restored and where Blish applies its own top-left-
+        /// corner-only clamp - see <see cref="Services.WindowPlacement"/> for
+        /// why that one is not enough on a client narrower than the one the
+        /// position was saved against.
+        /// <para>
+        /// The persisted SIZE is restored on the same path, one statement
+        /// earlier, and Control.Size reaches RecalculateLayout synchronously
+        /// (dev/records/firstpaint-truncation.md) - so the size floor has
+        /// already been applied by the time the position is clamped against
+        /// it here.
+        /// </para>
+        /// </summary>
+        public override void Show()
+        {
+            base.Show();
+            ClampToScreen();
         }
 
         /// <summary>
@@ -135,6 +164,37 @@ namespace TaimisToolbench.Views
             this.Hidden -= OnWindowHidden;
             FocusRelease.ReleaseWithin(this);
             base.DisposeControl();
+        }
+
+        /// <summary>
+        /// Moves the window back inside the current sprite screen, on the
+        /// rule <see cref="Services.WindowPlacement"/> states.
+        /// <para>
+        /// Called from <see cref="Show"/> and from the screen's own resize,
+        /// and deliberately from nowhere else - not from the layout path
+        /// <see cref="ClampToMinimum"/> uses. WindowBase2 writes Location on
+        /// every frame of a drag, so a clamp anywhere on that path would
+        /// fight the user for a window they had deliberately parked half
+        /// off-screen; both callers here are discrete events at which the
+        /// position's frame of reference has just changed.
+        /// </para>
+        /// </summary>
+        private void ClampToScreen()
+        {
+            var screen = Blish_HUD.GameService.Graphics.SpriteScreen;
+            if (screen == null)
+            {
+                return;
+            }
+
+            var clamped = new Point(
+                Services.WindowPlacement.ClampAxis(this.Location.X, this.Width, screen.Width),
+                Services.WindowPlacement.ClampAxis(this.Location.Y, this.Height, screen.Height));
+
+            if (clamped != this.Location)
+            {
+                this.Location = clamped;
+            }
         }
 
         private void ClampToMinimum()
