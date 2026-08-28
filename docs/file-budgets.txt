@@ -153,7 +153,7 @@ Services/PlanHistoryBlobStore.cs                                                
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                            82
 Services/PlanHistoryRetention.cs                                                        102
-Services/PlanHistoryRowLayout.cs                                                        213
+Services/PlanHistoryRowLayout.cs                                                        221
 Services/PlanHistoryStore.cs                                                            135
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
@@ -263,7 +263,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                      2808
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
-Views/PlanHistoryTabContent.cs                                                         1246
+Views/PlanHistoryTabContent.cs                                                         1271
 Views/RankerTabContent.cs                                                              2581
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574
