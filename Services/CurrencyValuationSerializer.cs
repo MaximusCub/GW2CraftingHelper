@@ -16,11 +16,13 @@ namespace TaimisToolbench.Services
     /// PersistedModel below) - a currency the user explicitly cleared of
     /// CurrencyDecisionDefaults' curated default must stay unvalued forever,
     /// not just until the next Deserialize invents one from the default
-    /// table (CurrencyValuation.TryGetEffectiveCopperValue). Deserialize
-    /// still reads the OLD pre-Feature-1 flat-dict shape (a bare
-    /// {"2":100,...} object, no "Values"/"Cleared" properties) so an
-    /// already-persisted settings value from before this feature keeps
-    /// working with no migration step.
+    /// table (CurrencyValuation.TryGetEffectiveCopperValue). It later
+    /// gained "ItemValues"/"ItemCleared", the barter-item twins of that
+    /// pair. Every addition has been additive on purpose: Deserialize still
+    /// reads the OLD pre-Feature-1 flat-dict shape (a bare {"2":100,...}
+    /// object, no "Values"/"Cleared" properties), and a settings value
+    /// written before the item tables existed simply has no item entries -
+    /// there is no migration step at any point in that chain.
     /// </summary>
     internal static class CurrencyValuationSerializer
     {
@@ -29,17 +31,22 @@ namespace TaimisToolbench.Services
             public Dictionary<int, long> Values { get; set; }
 
             public List<int> Cleared { get; set; }
+
+            public Dictionary<int, long> ItemValues { get; set; }
+
+            public List<int> ItemCleared { get; set; }
         }
 
         /// <summary>
         /// Serializes the valuation's entries to JSON. Returns an empty
         /// string when there is nothing at all to persist (no explicit
-        /// values and no cleared currencies).
+        /// values and no cleared ids, currency or item).
         /// </summary>
         internal static string Serialize(CurrencyValuation valuation)
         {
             if (valuation == null ||
-                (valuation.CopperPerUnit.Count == 0 && valuation.ClearedCurrencyIds.Count == 0))
+                (valuation.CopperPerUnit.Count == 0 && valuation.ClearedCurrencyIds.Count == 0 &&
+                 valuation.ItemCopperPerUnit.Count == 0 && valuation.ClearedItemIds.Count == 0))
             {
                 return string.Empty;
             }
@@ -63,10 +70,21 @@ namespace TaimisToolbench.Services
             // clear the same set of currencies.
             var cleared = new List<int>(valuation.ClearedCurrencyIds);
             cleared.Sort();
+
+            var itemValues = new Dictionary<int, long>(valuation.ItemCopperPerUnit.Count);
+            foreach (var kvp in valuation.ItemCopperPerUnit)
+            {
+                itemValues[kvp.Key] = kvp.Value;
+            }
+
+            var itemCleared = new List<int>(valuation.ClearedItemIds);
+            itemCleared.Sort();
             var model = new PersistedModel
             {
                 Values = values,
                 Cleared = cleared,
+                ItemValues = itemValues,
+                ItemCleared = itemCleared,
             };
             return JsonConvert.SerializeObject(model);
         }
@@ -103,14 +121,15 @@ namespace TaimisToolbench.Services
                 // dict ({"2":100,...}) has neither (its own keys are
                 // currency ids, never the literal strings "Values"/
                 // "Cleared").
-                if (obj.Property("Values") != null || obj.Property("Cleared") != null)
+                if (obj.Property("Values") != null || obj.Property("Cleared") != null ||
+                    obj.Property("ItemValues") != null || obj.Property("ItemCleared") != null)
                 {
                     var model = obj.ToObject<PersistedModel>();
-                    return BuildValuation(model?.Values, model?.Cleared);
+                    return BuildValuation(model?.Values, model?.Cleared, model?.ItemValues, model?.ItemCleared);
                 }
 
                 var flat = obj.ToObject<Dictionary<int, long>>();
-                return BuildValuation(flat, null);
+                return BuildValuation(flat, null, null, null);
             }
             catch (JsonException)
             {
@@ -129,7 +148,10 @@ namespace TaimisToolbench.Services
         /// the UI layer.
         /// </summary>
         private static CurrencyValuation BuildValuation(
-            Dictionary<int, long> rawValues, List<int> rawCleared)
+            Dictionary<int, long> rawValues,
+            List<int> rawCleared,
+            Dictionary<int, long> rawItemValues,
+            List<int> rawItemCleared)
         {
             var valid = new Dictionary<int, long>();
             if (rawValues != null)
@@ -159,9 +181,41 @@ namespace TaimisToolbench.Services
                 }
             }
 
-            return valid.Count == 0 && validCleared.Count == 0
+            // Item side: same skip-the-bad-entry posture as the currency
+            // side above, minus the coin-id guard (no item id names the
+            // coin currency).
+            var validItems = new Dictionary<int, long>();
+            if (rawItemValues != null)
+            {
+                foreach (var kvp in rawItemValues)
+                {
+                    if (kvp.Value <= 0)
+                    {
+                        continue;
+                    }
+
+                    validItems[kvp.Key] = kvp.Value;
+                }
+            }
+
+            var validItemCleared = new List<int>();
+            if (rawItemCleared != null)
+            {
+                foreach (int itemId in rawItemCleared)
+                {
+                    if (validItems.ContainsKey(itemId))
+                    {
+                        continue;
+                    }
+
+                    validItemCleared.Add(itemId);
+                }
+            }
+
+            return valid.Count == 0 && validCleared.Count == 0 &&
+                   validItems.Count == 0 && validItemCleared.Count == 0
                 ? CurrencyValuation.None
-                : new CurrencyValuation(valid, validCleared);
+                : new CurrencyValuation(valid, validCleared, validItems, validItemCleared);
         }
     }
 }

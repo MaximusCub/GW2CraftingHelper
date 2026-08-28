@@ -191,5 +191,84 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.False(result.IsCleared(Gw2Constants.CoinCurrencyId));
         }
+
+        // --- barter-item valuations: "ItemValues"/"ItemCleared", the
+        // item-keyed twins of "Values"/"Cleared". ---
+        [Fact]
+        public void SerializeThenDeserialize_RoundTripsItemEntriesAndClears()
+        {
+            var valuation = new CurrencyValuation(
+                new Dictionary<int, long> { { 2, 5 } },
+                new[] { 23 },
+                new Dictionary<int, long> { { 19925, 667 } },
+                new[] { 46682 });
+
+            string json = CurrencyValuationSerializer.Serialize(valuation);
+            var roundTripped = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(roundTripped.TryGetItemCopperValue(19925, out long obsidianValue));
+            Assert.Equal(667, obsidianValue);
+            Assert.True(roundTripped.IsItemCleared(46682));
+
+            // The currency side must survive the addition untouched.
+            Assert.True(roundTripped.TryGetCopperValue(2, out long karmaValue));
+            Assert.Equal(5, karmaValue);
+            Assert.True(roundTripped.IsCleared(23));
+        }
+
+        [Fact]
+        public void Deserialize_PreItemTableShape_StillReadsCurrencySideAndHasNoItemEntries()
+        {
+            // A settings value persisted before the item tables existed:
+            // no "ItemValues"/"ItemCleared" properties at all. There is no
+            // migration step - it simply has no item entries.
+            var json = "{\"Values\":{\"2\":5},\"Cleared\":[23]}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(result.TryGetCopperValue(2, out long karmaValue));
+            Assert.Equal(5, karmaValue);
+            Assert.True(result.IsCleared(23));
+            Assert.Empty(result.ItemCopperPerUnit);
+            Assert.Empty(result.ClearedItemIds);
+        }
+
+        [Fact]
+        public void Deserialize_ItemOnlyPayload_IsDetectedAsTheNewShape()
+        {
+            // Neither "Values" nor "Cleared" is present, so the shape probe
+            // must key off the item properties too rather than mistaking
+            // this for the old flat currency dict.
+            var json = "{\"ItemValues\":{\"19925\":667}}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(result.TryGetItemCopperValue(19925, out long obsidianValue));
+            Assert.Equal(667, obsidianValue);
+        }
+
+        [Fact]
+        public void Deserialize_NonPositiveItemValue_SkippedNotFatal()
+        {
+            var json = "{\"ItemValues\":{\"19925\":0,\"46682\":3600}}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.False(result.TryGetItemCopperValue(19925, out _));
+            Assert.True(result.TryGetItemCopperValue(46682, out long crystallineValue));
+            Assert.Equal(3600, crystallineValue);
+        }
+
+        [Fact]
+        public void Deserialize_ItemBothValuedAndCleared_ExplicitValueWins()
+        {
+            var json = "{\"ItemValues\":{\"19925\":667},\"ItemCleared\":[19925]}";
+
+            var result = CurrencyValuationSerializer.Deserialize(json);
+
+            Assert.True(result.TryGetItemCopperValue(19925, out long obsidianValue));
+            Assert.Equal(667, obsidianValue);
+            Assert.False(result.IsItemCleared(19925));
+        }
     }
 }

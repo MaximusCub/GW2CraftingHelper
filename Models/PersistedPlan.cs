@@ -57,17 +57,17 @@ namespace TaimisToolbench.Models
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Last moved by PersistedPlan.RequestSchemaVersion, which is purely
-        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's one-line
-        /// diff):
-        /// Newtonsoft leaves an absent field at its "" initializer, so a
-        /// plan or snapshot written before the field existed still
+        /// Last moved by CurrencyValuation.ItemCopperPerUnit/ClearedItemIds
+        /// (barter-item valuations), which is purely ADDITIVE (see
+        /// tests/shared/persisted_plan_schema.txt's two-line diff):
+        /// Newtonsoft leaves both absent collections empty, so a plan or
+        /// snapshot written before the item tables existed still
         /// deserializes correctly and <see cref="CurrentSchemaVersion"/>
         /// stays at 3. A bump here now costs a re-solve rather than the
         /// plan, but it still costs one.
         /// </remarks>
         public const string SchemaShapeHash =
-            "2349ee68c01e7d21d1a7af1cdb1b1080ba974bdf76325cbc49cee647cdec9c0e";
+            "e347f4dc1938671a69cfb7f932b032a55bbfd90c637262e8bb1e5447a2bc785d";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why
