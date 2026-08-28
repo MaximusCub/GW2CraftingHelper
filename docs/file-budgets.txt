@@ -410,7 +410,7 @@ tests/GW2CraftingHelper.Tests/Services/PlanHistoryBlobStoreTests.cs             
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryLabelsTests.cs                         77
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryRetentionTests.cs                     139
-tests/GW2CraftingHelper.Tests/Services/PlanHistoryRowLayoutTests.cs                     125
+tests/GW2CraftingHelper.Tests/Services/PlanHistoryRowLayoutTests.cs                     217
 tests/GW2CraftingHelper.Tests/Services/PlanHistoryStoreTests.cs                         234
 tests/GW2CraftingHelper.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
 tests/GW2CraftingHelper.Tests/Services/PlanRelayoutMathTests.cs                         697

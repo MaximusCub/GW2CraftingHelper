@@ -95,6 +95,98 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public void TheRowIsTierOne_AndItsHeightIsDerivedFromThatFrame()
+        {
+            // The defect this pins: the tab shipped before the two-tier
+            // ruling and carried a local 32px legacy icon in a 44px row,
+            // while every other "one row, one object" surface in the module
+            // had moved to tier 1.
+            Assert.Equal(ItemIconTiers.BagSlotIconSize, PlanHistoryRowLayout.IconSize);
+            Assert.Equal(
+                PlanHistoryRowLayout.IconSize + 2 * PlanHistoryRowLayout.IconBorder,
+                PlanHistoryRowLayout.IconTotal);
+
+            // Frame plus breathing room, and the frame is centred in it -
+            // no divider term, because these rows draw none.
+            Assert.Equal(
+                PlanHistoryRowLayout.IconTotal + 2 * PlanHistoryRowLayout.IconPad,
+                PlanHistoryRowLayout.RowHeight);
+            Assert.Equal(
+                PlanHistoryRowLayout.RowHeight,
+                PlanHistoryRowLayout.IconY + PlanHistoryRowLayout.IconTotal
+                    + PlanHistoryRowLayout.IconPad);
+
+            // The sibling tier-1 row list in the module: a history row and
+            // a watchlist row must not be different heights.
+            Assert.Equal(RankerRowLayout.RowHeight, PlanHistoryRowLayout.RowHeight);
+        }
+
+        [Fact]
+        public void TheExpandedItemListIsTierTwo_AndItsLineHeightIsDerivedFromThatFrame()
+        {
+            // The expanded row's per-item list is a DENSE item list, so it
+            // takes the plan tab's own row-icon tier - not the tier-1 art
+            // the row above it headlines with, and not the local 20px it
+            // used to hard-code.
+            Assert.Equal(ItemIconTiers.BagSidebarIconSize, PlanHistoryRowLayout.DetailIconSize);
+            Assert.Equal(PlanContentHeightMath.RowIconBorder, PlanHistoryRowLayout.DetailIconBorder);
+            Assert.Equal(PlanContentHeightMath.RowIconFrameSize, PlanHistoryRowLayout.DetailIconTotal);
+            Assert.True(PlanHistoryRowLayout.DetailIconSize < PlanHistoryRowLayout.IconSize);
+
+            Assert.Equal(
+                PlanHistoryRowLayout.DetailIconTotal + 2 * PlanHistoryRowLayout.IconPad,
+                PlanHistoryRowLayout.DetailItemLineHeight);
+        }
+
+        [Theory]
+        [MemberData(nameof(GateWidths))]
+        public void TheNameColumnStartsClearOfTheTierOneFrame(int rowWidth)
+        {
+            var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+
+            Assert.Equal(PlanHistoryRowLayout.Inset, bands.IconX);
+            Assert.Equal(
+                bands.IconX + PlanHistoryRowLayout.IconTotal + PlanHistoryRowLayout.IconGap,
+                bands.NameX);
+        }
+
+        [Fact]
+        public void EveryTextSeatCentresItsLineBoxOnTheIconBesideIt()
+        {
+            AssertCentredOnFrame(
+                PlanHistoryRowLayout.MainLineTextY,
+                PlanHistoryRowLayout.RowHeight,
+                PlanHistoryRowLayout.IconY,
+                PlanHistoryRowLayout.IconTotal);
+
+            AssertCentredOnFrame(
+                PlanHistoryRowLayout.DetailItemTextY,
+                PlanHistoryRowLayout.DetailItemLineHeight,
+                PlanHistoryRowLayout.IconPad,
+                PlanHistoryRowLayout.DetailIconTotal);
+        }
+
+        /// <summary>
+        /// A text seat is right when the Body line box is centred in its
+        /// band (to the pixel integer division leaves), its lowest ink
+        /// stays inside the band, and it reads on the same line as the icon
+        /// frame beside it rather than floating above or below it.
+        /// </summary>
+        private static void AssertCentredOnFrame(int textY, int bandHeight, int frameY, int frameSize)
+        {
+            var ink = TypeRampMetrics.Regular16;
+
+            int above = textY;
+            int below = bandHeight - (textY + ink.LineHeight);
+            Assert.True(above >= 0 && below >= 0);
+            Assert.True(System.Math.Abs(above - below) <= 1);
+            Assert.True(textY + ink.LowestInk <= bandHeight);
+
+            Assert.True(textY >= frameY);
+            Assert.True(textY + ink.LineHeight <= frameY + frameSize);
+        }
+
+        [Fact]
         public void DetailHeight_IsMonotonicInItemCount()
         {
             int previous = -1;
