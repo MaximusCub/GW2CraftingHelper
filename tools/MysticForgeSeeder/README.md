@@ -3,13 +3,13 @@
 Offline tool that scrapes Mystic Forge recipes from the
 [GW2 Wiki](https://wiki.guildwars2.com/) API and resolves the item names it
 finds to GW2 item IDs, producing `ref/mystic_forge_recipes.json` - the
-Mystic Forge recipe data the module (and `tools/GW2CraftingHelper.RecipeSeeder`,
+Mystic Forge recipe data the module (and `tools/TaimisToolbench.RecipeSeeder`,
 which merges it into the main recipe search index) reads at build/seed time.
 The official GW2 API does not expose Mystic Forge recipes, which is why this
 tool goes to the wiki instead.
 
 This is a standalone .NET 8 console project with no dependency on the main
-`GW2CraftingHelper.csproj` - it does not need the module's `packages/`
+`TaimisToolbench.csproj` - it does not need the module's `packages/`
 restored to build.
 
 ## Quick Start
@@ -49,14 +49,14 @@ that root's `ref/` directory.
 
 | File | Role |
 |------|------|
-| `ref/mystic_forge_recipes.json` | Resolved Mystic Forge recipes. Committed and consumed by the module and by `tools/GW2CraftingHelper.RecipeSeeder`. |
+| `ref/mystic_forge_recipes.json` | Resolved Mystic Forge recipes. Committed and consumed by the module and by `tools/TaimisToolbench.RecipeSeeder`. |
 | `ref/mf_item_id_cache.json` | Name -> item ID cache (including unresolved-name sentinels). Gitignored - dev-only, avoids re-resolving known names on every run. |
 
 ## When to Re-run
 
 - After a game update adds, removes, or changes Mystic Forge recipes.
 - After the wiki's Mystic Forge recipe pages are corrected/updated.
-- Followed by re-running `tools/GW2CraftingHelper.RecipeSeeder`, since that
+- Followed by re-running `tools/TaimisToolbench.RecipeSeeder`, since that
   tool merges `ref/mystic_forge_recipes.json` into the search index it
   produces - a stale seed here means stale Mystic Forge search results in
   the module.

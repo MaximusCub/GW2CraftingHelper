@@ -1,4 +1,4 @@
-# GW2CraftingHelper.RecipeSeeder
+# TaimisToolbench.RecipeSeeder
 
 Offline tool that queries the official [GW2 API](https://api.guildwars2.com/)
 (`/v2/recipes`, `/v2/items`) to build the recipe seed files the module reads
@@ -9,7 +9,7 @@ at startup instead of fetching every recipe live.
 From the repo root:
 
 ```
-dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+dotnet run --project tools/TaimisToolbench.RecipeSeeder/TaimisToolbench.RecipeSeeder.csproj -- --output-dir ref --force
 ```
 
 Pass `--output-dir` explicitly: with no flag the tool writes into the

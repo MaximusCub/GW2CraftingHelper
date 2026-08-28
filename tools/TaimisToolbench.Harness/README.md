@@ -1,4 +1,4 @@
-# GW2CraftingHelper.Harness
+# TaimisToolbench.Harness
 
 A console harness for exercising the crafting-plan pipeline
 (`Services/CraftingPlanPipeline.cs`, `Services/PlanSolver.cs`) directly,
@@ -6,13 +6,13 @@ without running inside Blish HUD. Useful for checking plan output, timing,
 and cache behavior after a solver/pipeline change without a manual
 in-game/in-Blish test pass for every iteration.
 
-It references `GW2CraftingHelper.csproj` directly (`ProjectReference` with
+It references `TaimisToolbench.csproj` directly (`ProjectReference` with
 `SetPlatform=x64`), so building it also builds the main module.
 
 ## Quick Start
 
 ```
-dotnet run --project tools/GW2CraftingHelper.Harness/GW2CraftingHelper.Harness.csproj -- --profile 1
+dotnet run --project tools/TaimisToolbench.Harness/TaimisToolbench.Harness.csproj -- --profile 1
 ```
 
 ## CLI Reference

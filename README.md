@@ -1,6 +1,6 @@
-# GW2 Crafting Helper
+# Taimi's Toolbench
 
-[![tests](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml/badge.svg)](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml)
+[![tests](https://github.com/MaximusCub/TaimisToolbench/actions/workflows/tests.yml/badge.svg)](https://github.com/MaximusCub/TaimisToolbench/actions/workflows/tests.yml)
 
 A [Blish HUD](https://blishhud.com/) module built around one thing: a crafting-plan
 **solver** that answers "what's the cheapest way to get N of this item" for Guild
@@ -113,8 +113,8 @@ saved plan exactly as it was, or re-solve it at today's prices:
 
 ## Installing
 
-1. Download `GW2CraftingHelper.bhm` from the
-   [Releases page](https://github.com/MaximusCub/GW2CraftingHelper/releases).
+1. Download `TaimisToolbench.bhm` from the
+   [Releases page](https://github.com/MaximusCub/TaimisToolbench/releases).
 2. Drop it into your Blish HUD installation's `modules` folder
    (`Documents\Guild Wars 2\addons\blishhud\modules` in a default install).
 3. Start or reload Blish HUD and enable the module, then authorize an API key
@@ -126,7 +126,7 @@ same Release/x64 build a developer would run locally. If the Releases page is
 empty, no tag has been pushed since that workflow landed - build it yourself in
 the meantime, following the build instructions in
 [`CONTRIBUTING.md`](CONTRIBUTING.md) and copying the resulting
-`bin\x64\Release\GW2CraftingHelper.bhm` as in step 2 above.
+`bin\x64\Release\TaimisToolbench.bhm` as in step 2 above.
 
 There is no Blish HUD module-repository listing yet, so the download is manual.
 [`docs/RELEASING.md`](docs/RELEASING.md) records exactly what the packaging
@@ -149,9 +149,9 @@ Windows only. The module targets .NET Framework 4.8 inside Blish HUD's XNA
 host, and CI runs on `windows-latest`. From a fresh clone:
 
 ```
-nuget restore GW2CraftingHelper.sln
-dotnet build GW2CraftingHelper.csproj -p:Platform=x64
-dotnet test GW2CraftingHelper.sln
+nuget restore TaimisToolbench.sln
+dotnet build TaimisToolbench.csproj -p:Platform=x64
+dotnet test TaimisToolbench.sln
 ```
 
 The restore step is not optional, and **`dotnet restore` will not do it**:
@@ -161,7 +161,7 @@ this is a classic `packages.config` project, which only `nuget.exe` restores
 `The missing file is packages\BlishHUD.1.3.0\build\BlishHUD.targets`, which
 is what a missing restore looks like rather than a broken checkout.
 
-`dotnet test GW2CraftingHelper.sln` runs all three test projects, the same
+`dotnet test TaimisToolbench.sln` runs all three test projects, the same
 set CI runs; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the per-project
 commands, project structure, and pull request expectations.
 
@@ -177,7 +177,7 @@ process, all of it checkable from this repository:
   233 across the seeder and vendor-updater tools (measured 2026-08-26; the
   badge above is the live answer) - run on every pull request and every push
   to `master` on
-  [CI](https://github.com/MaximusCub/GW2CraftingHelper/actions/workflows/tests.yml),
+  [CI](https://github.com/MaximusCub/TaimisToolbench/actions/workflows/tests.yml),
   and again inside the [release workflow](.github/workflows/release.yml),
   which will not publish a tagged build until they pass. That same CI run also
   builds the shipping `Release|x64` configuration and checks the `.bhm` came
@@ -195,7 +195,7 @@ process, all of it checkable from this repository:
   dataset, for instance, is pinned byte-for-byte against the writer that
   produces it.
 - **The build is warning-clean, and the compiler enforces it.**
-  `GW2CraftingHelper.csproj` sets `TreatWarningsAsErrors`, so a build that
+  `TaimisToolbench.csproj` sets `TreatWarningsAsErrors`, so a build that
   prints anything failed. The StyleCop rules not yet satisfied are a named
   list in that file's `<NoWarn>` - 26 rule IDs, each a bounded cleanup job -
   and [`CONTRIBUTING.md`](CONTRIBUTING.md) states the rule that the list
