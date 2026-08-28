@@ -175,7 +175,7 @@ Services/RankerReadinessCalculator.cs                                           
 Services/RankerReadinessRamp.cs                                                         226
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             642
+Services/RankerRowLayout.cs                                                             651
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -470,7 +470,7 @@ tests/TaimisToolbench.Tests/Services/RankerRarityAdoptionTests.cs               
 tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs                747
 tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      186
 tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
-tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          735
+tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          746
 tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                              272
 tests/TaimisToolbench.Tests/Services/ReceiptCaptionHelperTests.cs                     124
 tests/TaimisToolbench.Tests/Services/RecipeCacheStoreTests.cs                         998

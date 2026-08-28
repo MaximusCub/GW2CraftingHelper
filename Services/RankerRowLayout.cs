@@ -221,8 +221,17 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const int TrackCount = 6;
 
-        /// <summary>Tracks the item name spans; see <see cref="TrackCount"/>.</summary>
+        /// <summary>
+        /// Tracks the item name spans; see <see cref="TrackCount"/>. The two
+        /// constants are COUPLED - Compute reads the four data columns off
+        /// tracks NameTrackSpan..TrackCount, so TrackCount has to stay
+        /// NameTrackSpan plus <see cref="DataColumnCount"/>. Asserted rather
+        /// than left to be noticed.
+        /// </summary>
         public const int NameTrackSpan = 2;
+
+        /// <summary>Status, Ready, Days, Remaining - one track each.</summary>
+        public const int DataColumnCount = 4;
 
         /// <summary>
         /// Right edge of track <paramref name="index"/> (0-based) of

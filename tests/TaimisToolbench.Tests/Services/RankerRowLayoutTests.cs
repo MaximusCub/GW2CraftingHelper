@@ -727,6 +727,17 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TheNameSpanAndTheTrackCountAreOneDecision()
+        {
+            // Compute reads Status, Ready, Days and Remaining off tracks
+            // NameTrackSpan..TrackCount. Widening the name band by moving
+            // NameTrackSpan alone would silently drop the Remaining column
+            // off the end of the span rather than fail to build.
+            Assert.Equal(RankerRowLayout.TrackCount,
+                RankerRowLayout.NameTrackSpan + RankerRowLayout.DataColumnCount);
+        }
+
+        [Fact]
         public void MainLineY_ClampsRatherThanGoingNegative()
         {
             Assert.Equal(0, RankerRowLayout.MainLineY(RankerRowLayout.RowHeight + 100));
