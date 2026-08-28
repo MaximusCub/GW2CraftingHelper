@@ -39,7 +39,7 @@ namespace GW2CraftingHelper.Tests.Services
                 "Gloves Armor",
                 "Required Level: 80",
                 "Crafted in the style of the renowned asuran genius, Zojja.",
-                "Account Bound on Acquire",
+                "Account Bound",
                 "2s 40c",
             }, await LinesFor(RealItemJson.ZojjasWarfists));
         }
@@ -89,6 +89,34 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
+        public async Task GiftOfTwilight_MatchesTheOwnerABCaptureLineForLine()
+        {
+            // The 2026-08-27 A/B: the owner hovered item 19648 in the
+            // module and in the live game and captured both. The game's box
+            // reads header, description paragraph, blank, forge line, four
+            // bullets, blank, "Trophy", "Account Bound", 6s 40c - and the
+            // bound line is BARE, which is what this capture corrected.
+            // (The game additionally wraps the description after
+            // "greatsword"; that is layout, pinned in
+            // TooltipLayoutMathTests, not composition.)
+            Assert.Equal(new[]
+            {
+                "Gift of Twilight",
+                "A gift used to create the legendary greatsword Twilight.",
+                "",
+                "Made by combining these items in the Mystic Forge:",
+                "\u2022 1 Gift of Metal",
+                "\u2022 1 Gift of Darkness",
+                "\u2022 100 Icy Runestones",
+                "\u2022 1 Superior Sigil of Blood",
+                "",
+                "Trophy",
+                "Account Bound",
+                "6s 40c",
+            }, await LinesFor(RealItemJson.GiftOfTwilight));
+        }
+
+        [Fact]
         public async Task AConsumablesValueFollowsTheLineAboveItWithNoBlank()
         {
             // Measured on steak.png (2012) and re-confirmed across live3
@@ -98,7 +126,7 @@ namespace GW2CraftingHelper.Tests.Services
             // contiguous under the line above it.
             var lines = await LinesFor(RealItemJson.CilantroSteak);
 
-            Assert.Equal("Account Bound on Acquire", lines[lines.Length - 2]);
+            Assert.Equal("Account Bound", lines[lines.Length - 2]);
             Assert.Equal("1s 65c", lines[lines.Length - 1]);
         }
 
@@ -421,7 +449,7 @@ namespace GW2CraftingHelper.Tests.Services
             // No effect data means no consume prompt either - the prompt
             // is only measured beside a populated effect block.
             Assert.DoesNotContain("Double-click to consume.", lines);
-            Assert.Contains("Account Bound on Acquire", lines);
+            Assert.Contains("Account Bound", lines);
         }
 
         [Fact]
@@ -429,9 +457,11 @@ namespace GW2CraftingHelper.Tests.Services
         {
             var lines = await LinesFor(RealItemJson.Rebreather);
 
-            // Both dimensions stack, account line first (live3
-            // relic-livingcity, 2026-08-26).
-            Assert.Contains("Account Bound on Acquire", lines);
+            // Both dimensions stack, account line first, and each is
+            // worded the way live3 relic-livingcity shows for this exact
+            // flag pair: bare "Account Bound" over "Soulbound on Use"
+            // (2026-08-26).
+            Assert.Contains("Account Bound", lines);
             Assert.Contains("Soulbound on Use", lines);
             Assert.Contains("Defense: 73", lines);
             Assert.Contains("Double-click to select stats.", lines);
@@ -521,7 +551,7 @@ namespace GW2CraftingHelper.Tests.Services
             var identity = content.Lines
                 .SelectMany(l => l.Spans)
                 .Where(s => s.Text == "Gloves Armor" ||
-                            s.Text == "Heavy" || s.Text == "Account Bound on Acquire")
+                            s.Text == "Heavy" || s.Text == "Account Bound")
                 .ToArray();
 
             Assert.Equal(3, identity.Length);
