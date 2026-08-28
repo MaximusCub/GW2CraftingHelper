@@ -96,16 +96,19 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostTileRow_CaptionBlockEndsAboveTheAmountRun()
         {
-            // The band bottom-anchors a coin run (never shorter than the
-            // 20px coin icon) above its own bottom pad; the caption block
-            // is the caption's line box plus the 2px the renderer adds
-            // under it.
+            // The band bottom-anchors its amount run above its own bottom
+            // pad; the caption block is the caption's line box plus the 2px
+            // the renderer adds under it. AmountRunHeight, not CoinIconSize:
+            // the run is as tall as the taller of its text and its icon, and
+            // since the coins moved onto the 16px wallet BAR tier that is
+            // the text. Modelling the icon here would under-state the run
+            // and pass a band the renderer actually has to clamp.
             int captionBlockBottom = PlanContentHeightMath.CostTileCaptionY
                 + TypeRampMetrics.ColumnHeaderInk.LineHeight
                 + 2;
             int amountY = PlanContentHeightMath.CostTileRowHeight
                 - PlanContentHeightMath.CostTileAmountBottomPad
-                - CoinSegmentMath.CoinIconSize;
+                - PlanContentHeightMath.AmountRunHeight;
 
             Assert.True(
                 amountY >= captionBlockBottom,
