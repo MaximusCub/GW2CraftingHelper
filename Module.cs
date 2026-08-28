@@ -900,7 +900,8 @@ namespace TaimisToolbench
                 OpenHistoryEntry,
                 ResolveHistoryEntryAsync,
                 _modalDialog,
-                _settings);
+                _settings,
+                _getItemStatBlock);
 
             _planHistoryTab = new Tab(
                 AsyncTexture2D.FromAssetId(156691),

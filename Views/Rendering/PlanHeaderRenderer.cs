@@ -106,9 +106,29 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = contentPanel,
             };
 
-            var iconFrame = IconControls.CreateItemIcon(
+            // PlanViewModel carries no target item id of its own, so the
+            // tree root - the very item this header names - is the id. A
+            // multi-item batch has no single target (TreeRoot is null there
+            // by design) and no stat block either; the header row is
+            // composed from what the header already draws, so the hover
+            // opens on the same icon and name whether or not a stat block
+            // has landed.
+            //
+            // Composed at hover time, so a plan restored from disk shows
+            // its stats as soon as the background top-up lands (Q13).
+            var treeRoot = vm.TreeRoot;
+            var identity = ItemTooltipIdentity.ForItem(
+                nameText, vm.TargetIconUrl, vm.TargetRarity);
+            var hover = ItemIconTooltip.Composed(
+                identity,
+                () => ItemRowTooltipComposer.BuildRowContent(
+                    TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock),
+                    identity,
+                    (TooltipContent)null));
+
+            IconControls.CreateItemIcon(
                 titlePanel, vm.TargetIconUrl, ItemIconFrame.ForRarity(vm.TargetRarity),
-                headerX, iconY, ItemIconTier.BagSlot);
+                headerX, iconY, ItemIconTier.BagSlot, hover);
 
             int textX = headerX + frameSize + iconPad;
             var nameLabel = new Label()
@@ -124,34 +144,6 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = titlePanel,
             };
 
-            // PlanViewModel carries no target item id of its own, so the
-            // tree root - the very item this header names - is the id. A
-            // multi-item batch has no single target and no single tooltip
-            // either (TreeRoot is null there by design).
-            //
-            // Composed at hover time, so a plan restored from disk shows
-            // its stats as soon as the background top-up lands (Q13).
-            // Stamped on the Label and the icon as well as the panel:
-            // anything lying over the panel wins the hover outright
-            // (Control.ActiveControl is the deepest capturing control),
-            // the same swallowed-hover class already fixed on tree rows.
-            // The tier-1 icon is the header's largest target and the most
-            // natural one to point at.
-            var treeRoot = vm.TreeRoot;
-            Func<TooltipContent> buildStatContent =
-                () => TreeRowTooltipComposer.BuildStatTooltipContent(treeRoot, _getItemStatBlock);
-            TooltipFacility.ApplyRichDeferred(titlePanel, buildStatContent);
-            TooltipFacility.ApplyRichDeferred(nameLabel, buildStatContent);
-
-            // The icon only for a real item root: a multi-item batch has
-            // no single target (TreeRoot is null by design), and stamping
-            // an always-empty builder over the icon would replace its own
-            // "no icon available" note with silence.
-            if (TreeRowTooltipComposer.RowIdIsAnItemId(treeRoot))
-            {
-                IconControls.ApplyRichDeferredToIconTree(iconFrame, buildStatContent);
-            }
-
             if (qtyText.Length > 0)
             {
                 var qtyLabel = new Label()
@@ -164,7 +156,6 @@ namespace TaimisToolbench.Views.Rendering
                     Location = new Point(textX + nameWidth, qtyY),
                     Parent = titlePanel,
                 };
-                TooltipFacility.ApplyRichDeferred(qtyLabel, buildStatContent);
             }
 
             // Every x here is now a constant or a font-only measurement,

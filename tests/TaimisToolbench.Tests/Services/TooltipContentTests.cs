@@ -136,12 +136,12 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void OrText_CoversTheRestoredPlanRowThatComposesNothingYet()
         {
-            // The case the icon tree actually hits: a plan restored from
-            // disk has no stat block for the row yet, and a name short
-            // enough not to ellipsize adds no line either - so the deferred
-            // builder is empty and the icon's own note has to survive.
+            // The case the icon tree actually hits: a row with no item
+            // identity at all - a synthesized cost-component leaf - and no
+            // stat block, so the deferred builder is empty and the icon's
+            // own note has to survive.
             var composed = ItemRowTooltipComposer.BuildRowContent(
-                (ItemStatBlock)null, "Short", nameTruncated: false, extraLines: null);
+                (ItemStatBlock)null, ItemTooltipIdentity.Unnamed(), extraLines: null);
 
             Assert.True(composed.IsEmpty);
             Assert.Equal(

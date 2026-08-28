@@ -4745,7 +4745,8 @@ namespace TaimisToolbench.Views
                     // Row rendering (including the TimegatedNotice
                     // informational rows) moved to
                     // Views/Rendering/CraftStepsSectionRenderer.
-                    new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    new CraftStepsSectionRenderer(this, _getItemStatBlock)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
                     // Row rendering lives in
@@ -4908,7 +4909,8 @@ namespace TaimisToolbench.Views
                     Rows = visibleRows,
                     IsDefaultExpanded = section.IsDefaultExpanded,
                 };
-                new RecipesSectionRenderer(this).Render(filteredSection, contentFlow, panelWidth);
+                new RecipesSectionRenderer(this, _getItemStatBlock)
+                    .Render(filteredSection, contentFlow, panelWidth);
             }
 
 #if DEBUG

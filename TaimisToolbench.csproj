@@ -202,6 +202,7 @@
     <Compile Include="Services\ItemStatBlockFactory.cs" />
     <Compile Include="Services\ItemStatTooltipComposer.cs" />
     <Compile Include="Services\ItemRowTooltipComposer.cs" />
+    <Compile Include="Services\ItemTooltipIdentity.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
     <Compile Include="Services\CostLineValuation.cs" />
     <Compile Include="Services\SeasonalOfferFilter.cs" />
@@ -240,6 +241,7 @@
     <Compile Include="Views\Rendering\RarityColors.cs" />
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
+    <Compile Include="Views\Rendering\ItemIconTooltip.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
     <Compile Include="Views\Rendering\CoinCurrencyRenderer.cs" />
     <Compile Include="Views\Rendering\RichTooltipSurface.cs" />

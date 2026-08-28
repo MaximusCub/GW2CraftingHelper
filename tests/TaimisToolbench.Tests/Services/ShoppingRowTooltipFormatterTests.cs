@@ -164,8 +164,7 @@ namespace TaimisToolbench.Tests.Services
 
             var lines = ShoppingRowTooltipFormatter.BuildRowContent(
                 new ItemStatBlock { ItemId = 1, Name = "Bag of Stuff", Rarity = "Fine", VendorValue = 7 },
-                "Bag of Stuff",
-                nameTruncated: true,
+                ItemTooltipIdentity.ForItem("Bag of Stuff", "icon://bag", "Fine"),
                 hintText: "Salvage from level 80 gear.",
                 currencyCosts: costs).ToPlainLines();
 
@@ -182,12 +181,17 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void BuildRowContent_WithoutStats_IsExactlyTheTooltipTheRowAlwaysHad()
+        public void BuildRowContent_WithoutStats_StillHeadsWithTheRowsOwnIconAndName()
         {
-            var lines = ShoppingRowTooltipFormatter.BuildRowContent(
-                null, "A Very Long Item Name", true, "A hint.", null).ToPlainLines();
+            var content = ShoppingRowTooltipFormatter.BuildRowContent(
+                null,
+                ItemTooltipIdentity.ForItem("A Very Long Item Name", "icon://long", "Rare"),
+                "A hint.",
+                null);
 
-            Assert.Equal(new[] { "A Very Long Item Name", "", "A hint." }, lines);
+            Assert.Equal(TooltipLineKind.Header, content.Lines[0].Kind);
+            Assert.Equal("icon://long", content.Lines[0].IconUrl);
+            Assert.Equal(new[] { "A Very Long Item Name", "", "A hint." }, content.ToPlainLines());
         }
 }
 }

@@ -23,10 +23,13 @@ namespace TaimisToolbench.Views.Rendering
     internal sealed class CraftStepsSectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
-        internal CraftStepsSectionRenderer(ISectionRelayoutSink sink)
+        internal CraftStepsSectionRenderer(
+            ISectionRelayoutSink sink, Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         /// <summary>
@@ -156,9 +159,15 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = rowPanel,
             };
 
-            var iconFrame = IconControls.CreateItemIcon(
+            int itemId = row.ItemId;
+            var hover = ItemIconTooltip.ForItem(
+                ItemTooltipIdentity.ForItem(row.Label ?? "", row.IconUrl, row.Rarity),
+                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
+                    : () => _getItemStatBlock(itemId));
+
+            IconControls.CreateItemIcon(
                 rowPanel, row.IconUrl, ItemIconFrame.ForRarity(row.Rarity),
-                IconX, PlanContentHeightMath.CraftStepIconY, ItemIconTier.BagSidebar);
+                IconX, PlanContentHeightMath.CraftStepIconY, ItemIconTier.BagSidebar, hover);
 
             var textFont = UiFonts.Body;
             var greyColor = new Color(170, 170, 170);
@@ -203,7 +212,6 @@ namespace TaimisToolbench.Views.Rendering
                     AutoSizeWidth = true, AutoSizeHeight = true,
                     Location = new Point(nameX, RowTextY), Parent = rowPanel,
                 });
-            StampNameTooltip(rowPanel, nameLabel, iconFrame, fullName);
 
             Label sublabelLabel = null;
             if (!string.IsNullOrEmpty(row.Sublabel))
@@ -249,28 +257,8 @@ namespace TaimisToolbench.Views.Rendering
                 if (nameLabel.Text != newDisplayName)
                 {
                     nameLabel.Text = newDisplayName;
-                    StampNameTooltip(rowPanel, nameLabel, iconFrame, fullName);
                 }
             });
-        }
-
-        /// <summary>
-        /// The step's full item name on the label AND the row panel when
-        /// the name is truncated, and a deliberate clear of both when a
-        /// widening drag untruncates it (see TooltipFacility.ApplyPlain).
-        /// The label is stamped because it captures the hover before the
-        /// row panel beneath it.
-        /// </summary>
-        private static void StampNameTooltip(
-            Panel rowPanel, Label nameLabel, Panel iconFrame, string fullName)
-        {
-            string tooltip = nameLabel.Text != fullName ? fullName : null;
-            TooltipFacility.ApplyPlain(rowPanel, tooltip);
-            TooltipFacility.ApplyPlain(nameLabel, tooltip);
-
-            // The icon is the row's biggest target and was the one part of
-            // it that answered a hover with nothing.
-            IconControls.ApplyPlainToIconTree(iconFrame, tooltip);
         }
     }
 }
