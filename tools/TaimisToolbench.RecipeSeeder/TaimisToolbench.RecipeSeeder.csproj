@@ -6,17 +6,17 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <!-- Pinned to the value this net48 project actually resolves to today - measured
-         via a diagnostic-verbosity build - matching GW2CraftingHelper.csproj (M38
+         via a diagnostic-verbosity build - matching TaimisToolbench.csproj (M38
          WP-02 / a6-csharp.md section 10). -->
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="GW2CraftingHelper.RecipeSeeder.Tests" />
+    <InternalsVisibleTo Include="TaimisToolbench.RecipeSeeder.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\GW2CraftingHelper.csproj">
+    <ProjectReference Include="..\..\TaimisToolbench.csproj">
       <SetPlatform>Platform=x64</SetPlatform>
     </ProjectReference>
   </ItemGroup>

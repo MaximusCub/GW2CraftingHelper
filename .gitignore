@@ -371,7 +371,7 @@ packages/
 # This is NOT what keeps them out of the shipped .bhm. An earlier version of
 # this comment said it was - that BlishHUD.targets packs all of ref/
 # "regardless", so untracking was the only defence - and that has not been true
-# since GW2CraftingHelper.csproj overrode BuildBlishHUDModule to add an Exclude.
+# since TaimisToolbench.csproj overrode BuildBlishHUDModule to add an Exclude.
 # It was never quite true anyway: gitignore governs what git stores, and the
 # packer reads the disk, so a working copy that had run the tools shipped them
 # regardless of this file. The Exclude in that target is the single control over

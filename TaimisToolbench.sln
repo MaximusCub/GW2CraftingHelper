@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.2.11415.280
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper", "GW2CraftingHelper.csproj", "{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaimisToolbench", "TaimisToolbench.csproj", "{FEC31CE0-4539-4A1B-A633-78E3BDBD8C56}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GW2CraftingHelper.Tests", "tests\GW2CraftingHelper.Tests\GW2CraftingHelper.Tests.csproj", "{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TaimisToolbench.Tests", "tests\TaimisToolbench.Tests\TaimisToolbench.Tests.csproj", "{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
 EndProject
@@ -15,13 +15,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VendorOfferUpdater.Tests", "tests\VendorOfferUpdater.Tests\VendorOfferUpdater.Tests.csproj", "{C883AE5B-0DF6-4199-BB20-8DB5287BDA3B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.Harness", "tools\GW2CraftingHelper.Harness\GW2CraftingHelper.Harness.csproj", "{39EBF52C-44AD-4B86-8953-B945FFD24297}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaimisToolbench.Harness", "tools\TaimisToolbench.Harness\TaimisToolbench.Harness.csproj", "{39EBF52C-44AD-4B86-8953-B945FFD24297}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.RecipeSeeder", "tools\GW2CraftingHelper.RecipeSeeder\GW2CraftingHelper.RecipeSeeder.csproj", "{A1B2C3D4-5678-9012-3456-789012345678}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaimisToolbench.RecipeSeeder", "tools\TaimisToolbench.RecipeSeeder\TaimisToolbench.RecipeSeeder.csproj", "{A1B2C3D4-5678-9012-3456-789012345678}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MysticForgeSeeder", "tools\MysticForgeSeeder\MysticForgeSeeder.csproj", "{EE57408C-A82D-4F51-B3A3-AC15D4627766}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GW2CraftingHelper.RecipeSeeder.Tests", "tests\GW2CraftingHelper.RecipeSeeder.Tests\GW2CraftingHelper.RecipeSeeder.Tests.csproj", "{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaimisToolbench.RecipeSeeder.Tests", "tests\TaimisToolbench.RecipeSeeder.Tests\TaimisToolbench.RecipeSeeder.Tests.csproj", "{A9B2C056-F0A9-4171-A821-D167EC2E5EA7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

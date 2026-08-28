@@ -38,7 +38,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\GW2CraftingHelper.csproj">
+    <ProjectReference Include="..\..\TaimisToolbench.csproj">
       <SetPlatform>Platform=x64</SetPlatform>
     </ProjectReference>
   </ItemGroup>

@@ -1,11 +1,11 @@
-# Root .editorconfig for GW2CraftingHelper.
+# Root .editorconfig for TaimisToolbench.
 #
 # This codifies the house style CLAUDE.md already documents and that the
 # codebase already follows almost everywhere (measured by sampling files
 # across Models/, Services/, and Views/ during M38 WP-02) - it is not
 # introducing a new style. Build-time enforcement of the mechanical parts
 # (braces, one-statement-per-line, using order) comes from StyleCop.Analyzers
-# + GW2CraftingHelper.ruleset (see packages.config); the settings below are
+# + TaimisToolbench.ruleset (see packages.config); the settings below are
 # consumed by editors/IDEs and by StyleCop's own settings resolution.
 root = true
 
@@ -21,7 +21,7 @@ indent_size = 4
 tab_width = 4
 
 # Allman brace style (CLAUDE.md: "Use Allman brace style for C#"; StyleCop's
-# SA1500 enforces this at build time - see GW2CraftingHelper.ruleset, which
+# SA1500 enforces this at build time - see TaimisToolbench.ruleset, which
 # deliberately leaves SA1500 at its default warning severity).
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_else = true
