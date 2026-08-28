@@ -1393,10 +1393,20 @@ namespace GW2CraftingHelper.Views
         }
 
         /// <summary>
-        /// The standard rich item tooltip on the icon and name, stamped
+        /// The standard rich item tooltip on the whole main line, stamped
         /// deferred so a stat block the session caches later shows without
         /// a re-render, falling back to the plain full name until then -
         /// the same shape MainView.ApplyItemRowTooltip established.
+        /// <para>
+        /// Stamped on the row PANEL and the rank as well as the name and
+        /// the icon tree, because Blish resolves a tooltip on the deepest
+        /// control under the cursor and never bubbles to the parent
+        /// (KNOWN-ISSUES #57): every control the cursor can land on is its
+        /// own hover, and the panel is what it lands on between them. With
+        /// only the name and the icon stamped, most of the row - the rank,
+        /// the gap after a short name, the whole strip right of it - was a
+        /// hole where the row answered nothing at all.
+        /// </para>
         /// </summary>
         private void ApplyItemTooltip(RenderedRow row, RankerWatchlistEntry entry)
         {
@@ -1408,8 +1418,25 @@ namespace GW2CraftingHelper.Views
                 true,
                 (IReadOnlyList<string>)null);
 
-            TooltipFacility.ApplyRichDeferred(row.IconName.NameLabel, build);
+            StampItemTooltip(row.Panel, fullName, build);
+            StampItemTooltip(row.RankLabel, fullName, build);
+            StampItemTooltip(row.IconName.NameLabel, fullName, build);
+
+            // The icon tree keeps its own note (a missing-icon square says
+            // so) as the builder's fallback, so it is stamped rich-only.
             IconControls.ApplyRichDeferredToIconTree(row.IconName.IconFrame, build);
+        }
+
+        /// <summary>
+        /// The plain name is registered FIRST so the facility captures it as
+        /// the deferred builder's fallback: a builder that composes nothing,
+        /// or throws, then still names the item instead of leaving the
+        /// control silent.
+        /// </summary>
+        private static void StampItemTooltip(Control control, string fullName, Func<TooltipContent> build)
+        {
+            TooltipFacility.ApplyPlain(control, fullName);
+            TooltipFacility.ApplyRichDeferred(control, build);
         }
 
         private bool CanReorder => !_isRefreshing && Mode == RankerMode.Cascade;
