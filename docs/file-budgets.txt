@@ -150,7 +150,7 @@ Services/PhaseOrdinalGuard.cs                                                   
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
 Services/PillTooltipTextComposer.cs                                                     224
-Services/PlanContentHeightMath.cs                                                       474
+Services/PlanContentHeightMath.cs                                                       495
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                            82
@@ -213,7 +213,7 @@ Services/SnapshotFailureClassification.cs                                       
 Services/SnapshotFailureClassifier.cs                                                   143
 Services/SnapshotFailureKind.cs                                                          50
 Services/SnapshotFetchFailedException.cs                                                 69
-Services/SnapshotHeaderLayout.cs                                                        194
+Services/SnapshotHeaderLayout.cs                                                        205
 Services/SnapshotHelpers.cs                                                              79
 Services/SnapshotItemGridLayout.cs                                                      236
 Services/SnapshotRefreshSlot.cs                                                          93
@@ -415,7 +415,7 @@ tests/TaimisToolbench.Tests/Services/PhaseOrdinalGuardTests.cs                  
 tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs               130
 tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                  284
-tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                    564
+tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                    604
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                         77
@@ -502,7 +502,7 @@ tests/TaimisToolbench.Tests/Services/SnapshotCommitGateTests.cs                 
 tests/TaimisToolbench.Tests/Services/SnapshotEpochGuardTests.cs                        33
 tests/TaimisToolbench.Tests/Services/SnapshotFailureClassifierTests.cs                267
 tests/TaimisToolbench.Tests/Services/SnapshotFetchFailedExceptionTests.cs              75
-tests/TaimisToolbench.Tests/Services/SnapshotHeaderLayoutTests.cs                     414
+tests/TaimisToolbench.Tests/Services/SnapshotHeaderLayoutTests.cs                     441
 tests/TaimisToolbench.Tests/Services/SnapshotHelpersTests.cs                           95
 tests/TaimisToolbench.Tests/Services/SnapshotItemGridLayoutTests.cs                   334
 tests/TaimisToolbench.Tests/Services/SnapshotRefreshSlotTests.cs                      241
