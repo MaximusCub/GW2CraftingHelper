@@ -36,6 +36,47 @@ namespace TaimisToolbench.Services
         internal const string SortDescending = "\uE101";
 
         /// <summary>
+        /// The reading-size caret trio, for the affordances drawn at body
+        /// size rather than inside a column header: the Crafting Ranker's
+        /// reorder buttons, the recipe tree's expand/collapse column and the
+        /// plan's own section headers. All three were ASCII - "^", "v" and
+        /// ">" - which is a circumflex accent, a lowercase letter and a
+        /// greater-than sign standing in for three triangles they do not
+        /// resemble and do not match each other in weight or baseline.
+        /// <para>
+        /// A separate pair of codepoints from <see cref="SortAscending"/>
+        /// and <see cref="SortDescending"/> because they are a separate
+        /// SIZE: 12x8 of ink against the sort pair's 9x6, which is a speck
+        /// beside body text. tools/build-glyph-font.py's GLYPHS table
+        /// carries both rows and says why.
+        /// </para>
+        /// </summary>
+        internal const string CaretUp = "\uE102";
+
+        /// <summary>Down caret - see <see cref="CaretUp"/>.</summary>
+        internal const string CaretDown = "\uE103";
+
+        /// <summary>
+        /// Right caret - see <see cref="CaretUp"/>. Authored 8x12 rather
+        /// than 12x8 so it carries the same ink area as its collapsed/
+        /// expanded partner instead of reading as the lighter of the two.
+        /// </summary>
+        internal const string CaretRight = "\uE104";
+
+        /// <summary>
+        /// The caret an expand/collapse affordance draws, already degraded
+        /// when the atlas is not there. Every tree and section-header seat
+        /// asks here rather than choosing between a glyph and an ASCII
+        /// stand-in itself, so the two states can never come from different
+        /// vocabularies.
+        /// </summary>
+        internal static string ExpandCaret(bool expanded, bool glyphsAvailable)
+        {
+            string glyph = expanded ? CaretDown : CaretRight;
+            return glyphsAvailable ? glyph : AsciiFallback(glyph);
+        }
+
+        /// <summary>
         /// What a seat drew before the glyph font existed, for the one case
         /// where the font is not there: a corrupt install whose ref/glyphs.fnt
         /// or ref/glyphs_0.png failed to load. A codepoint with no region
@@ -55,6 +96,9 @@ namespace TaimisToolbench.Services
             {
                 case SortAscending: return "^";
                 case SortDescending: return "v";
+                case CaretUp: return "^";
+                case CaretDown: return "v";
+                case CaretRight: return ">";
                 default: return glyph;
             }
         }

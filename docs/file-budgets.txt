@@ -230,7 +230,7 @@ Services/StatusText.cs                                                          
 Services/StatusUpdateGuard.cs                                                            38
 Services/SummarySectionLayoutMath.cs                                                    526
 Services/TableSortState.cs                                                              114
-Services/UiGlyphs.cs                                                                     62
+Services/UiGlyphs.cs                                                                    106
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
@@ -242,7 +242,7 @@ Services/TradingPostService.cs                                                  
 Services/TreeChipStripLayout.cs                                                         202
 Services/TreeCostColumnMath.cs                                                          381
 Services/TreeRowIdentity.cs                                                              94
-Services/TreeRowShapePlanner.cs                                                         124
+Services/TreeRowShapePlanner.cs                                                         133
 Services/TreeRowTooltipComposer.cs                                                      237
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
@@ -258,7 +258,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
-Views/CraftingPlanView.cs                                                              4987
+Views/CraftingPlanView.cs                                                              4988
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              381
 Views/ItemRowState.cs                                                                    31
@@ -301,9 +301,9 @@ Views/Rendering/SortableHeaderLabel.cs                                          
 Views/Rendering/SummarySectionRenderer.cs                                               954
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
-Views/Rendering/TreeSectionController.cs                                               2068
+Views/Rendering/TreeSectionController.cs                                               2069
 Views/Rendering/TreeToolbarCommands.cs                                                   81
-Views/Rendering/UiFonts.cs                                                              222
+Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                             47
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         214
@@ -517,7 +517,7 @@ tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                         
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                 856
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
-tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      239
+tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      287
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                   215
 tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                           152

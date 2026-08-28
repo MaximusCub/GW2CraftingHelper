@@ -4528,15 +4528,15 @@ namespace TaimisToolbench.Views
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
             PressFeedback.Wire(headerPanel, suppressPress);
 
-            // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
-            // pixel-level screenshot scans showed the triangles failing to
-            // render here (and even on the tree's own row caret), so ASCII
-            // is the only glyph confirmed to render. Do not re-attempt
-            // Unicode without a fresh render check.
+            // The module's own filled caret from ref/glyphs.fnt, drawn in the
+            // Body face it was merged into. NOT U+25BC/U+25B6: Menomonia
+            // carries neither, and a codepoint it lacks draws nothing and
+            // advances zero pixels. UiGlyphs.ExpandCaret is also what
+            // degrades to the old ASCII pair if the atlas fails to load.
             var headerArrow = new Label()
             {
-                Font = UiFonts.Body,
-                Text = expanded ? "v" : ">",
+                Font = UiFonts.BodyGlyphs,
+                Text = UiGlyphs.ExpandCaret(expanded, UiFonts.GlyphsAvailable),
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -4614,7 +4614,8 @@ namespace TaimisToolbench.Views
                 {
                     contentFlow.Visible = !contentFlow.Visible;
                     _sectionExpansion[sectionKey] = contentFlow.Visible;
-                    headerArrow.Text = contentFlow.Visible ? "v" : ">";
+                    headerArrow.Text =
+                        UiGlyphs.ExpandCaret(contentFlow.Visible, UiFonts.GlyphsAvailable);
                     _contentPanel.Invalidate();
                 });
             };
