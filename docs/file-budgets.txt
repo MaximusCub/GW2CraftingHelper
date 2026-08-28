@@ -59,7 +59,7 @@ Models/PlanViewModel.cs                                                         
 Models/PriceBasis.cs                                                                     32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                         59
-Models/RankerWatchlistEntry.cs                                                           77
+Models/RankerWatchlistEntry.cs                                                           86
 Models/RecipeNode.cs                                                                     49
 Models/RecipeOption.cs                                                                   32
 Models/RecipeSheetSavingsOpportunity.cs                                                  64
@@ -169,9 +169,11 @@ Services/PlanTableSorter.cs                                                     
 Services/PlanViewModelBuilder.cs                                                       1539
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
+Services/RankerRarityAdoption.cs                                                         87
 Services/RankerReadinessCalculator.cs                                                   666
 Services/RankerReadinessWeights.cs                                                       61
-Services/RankerRowLayout.cs                                                             295
+Services/RankerResultCache.cs                                                           263
+Services/RankerRowLayout.cs                                                             452
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -263,7 +265,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                         1271
-Views/RankerTabContent.cs                                                              2112
+Views/RankerTabContent.cs                                                              2581
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 574
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              184
@@ -458,9 +460,11 @@ tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs        
 tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                 354
 tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs                    377
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                   256
+tests/TaimisToolbench.Tests/Services/RankerRarityAdoptionTests.cs                     130
 tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs                741
-tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          295
-tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                              228
+tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
+tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          470
+tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                              272
 tests/TaimisToolbench.Tests/Services/ReceiptCaptionHelperTests.cs                     124
 tests/TaimisToolbench.Tests/Services/RecipeCacheStoreTests.cs                         998
 tests/TaimisToolbench.Tests/Services/RecipeClientFactoryTests.cs                      143

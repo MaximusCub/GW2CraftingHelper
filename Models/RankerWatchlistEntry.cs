@@ -73,5 +73,14 @@ namespace TaimisToolbench.Models
         /// </summary>
         [JsonProperty]
         internal RankerMode Mode { get; set; }
+
+        /// <summary>
+        /// Whether the table hides each row's currency detail and notes,
+        /// showing the headline and the gate percentages alone. Additive in
+        /// exactly the same way as Mode: a file written before the field
+        /// existed deserializes to false, which is the full breakdown the
+        /// tab has always shown.
+        /// </summary>
+        public bool Compact { get; set; }
     }
 }

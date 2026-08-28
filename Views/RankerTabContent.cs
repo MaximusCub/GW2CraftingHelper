@@ -5,8 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
+using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using TaimisToolbench.Contracts;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
@@ -43,8 +45,14 @@ namespace TaimisToolbench.Views
         private const int SearchBoxWidth = 260;
         private const int QuantityBoxWidth = 56;
         private const int AddButtonWidth = 72;
-        private const int ModeDropdownWidth = 150;
+        /// <summary>Clearance between the mode strip and the Add button to its left.</summary>
         private const int ModeGap = 8;
+
+        // Blish's Checkbox draws its 32px box at x-9 and its label at x+20
+        // (measured, decompiled 1.3.0), so its true footprint is wider than
+        // its Location suggests and starts left of it.
+        private const int CheckboxArtOverhang = 9;
+        private const int CheckboxTextInset = 20;
         private const int BannerHeight = 30;
 
         // Vertical centring inside the 60px tier-1 main line (see
@@ -55,6 +63,15 @@ namespace TaimisToolbench.Views
         private const int MainLineChipY = 19;
         private const int MainLineButtonY = 16;
         private const int MainLineIconY = 3;
+
+        /// <summary>
+        /// The promoted readiness figure sits one tier above the rest of the
+        /// main line, so it is centred against the Body text beside it rather
+        /// than sharing its top edge - a taller line box on the same y reads
+        /// as a row that sags.
+        /// </summary>
+        private static int ReadyLineY =>
+            MainLineTextY - (UiFonts.Status.LineHeight - UiFonts.Body.LineHeight) / 2;
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
@@ -79,6 +96,33 @@ namespace TaimisToolbench.Views
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
         private static readonly Color AffordableChipFill = AffordableChipBorder * 0.15f;
 
+        // Row action art, by GW2 .dat asset id (the mechanism the module
+        // already uses for its tab and coin icons):
+        //   155953 - Blish's own 32px section-header caret, a cream DOWN
+        //            triangle. The up arrow is the same asset flipped, so
+        //            the pair can never disagree about weight or colour.
+        //   733269 - the matched 16px grey X of Blish's own remove pair.
+        private const int ReorderArrowAssetId = 155953;
+        private const int RemoveMarkAssetId = 733269;
+
+        // The plate a row action sits on, and the three states its art
+        // takes. Dim by default so a table of them reads as one quiet
+        // column rather than as a wall of arrows.
+        private static readonly Color RowButtonFill = new Color(0, 0, 0) * 0.25f;
+        private static readonly Color RowButtonHoverFill = new Color(255, 255, 255) * 0.12f;
+        private static readonly Color RowButtonTint = new Color(210, 210, 210);
+        private static readonly Color RowButtonHoverTint = Color.White;
+        private static readonly Color RowButtonDisabledTint = new Color(255, 255, 255) * 0.25f;
+
+        // The comparison-mode radio indicator: 157330 is the small green dot
+        // the game uses for "on"; its "-cantint" twin is the grey dot for
+        // "off". Art, not a U+25CF/U+25CB pair - neither exists in the font.
+        private const int RadioOnAssetId = 157330;
+        private const string RadioOffTextureName = "157330-cantint";
+        private const int RadioIndicatorSize = 16;
+        private const int RadioIndicatorGap = 6;
+        private const int RadioOptionGap = 16;
+
         private readonly CraftingPlanPipeline _pipeline;
         private readonly IItemSearchProvider _itemSearchProvider;
         private readonly ModuleSettings _settings;
@@ -90,13 +134,10 @@ namespace TaimisToolbench.Views
 
         private readonly RankerWatchlist _watchlist;
 
-        // Ephemeral, session-scoped, keyed by item id. Never persisted: a
-        // readiness number goes stale the moment Trading Post prices move.
-        private readonly Dictionary<int, RankerRowMetrics> _metricsByItemId =
-            new Dictionary<int, RankerRowMetrics>();
-
-        private readonly Dictionary<int, CraftingPlanResult> _lastOwnedResults =
-            new Dictionary<int, CraftingPlanResult>();
+        // Ephemeral, session-scoped, one answer set per comparison mode.
+        // Never persisted: a readiness number goes stale the moment Trading
+        // Post prices move. RankerResultCache owns the invalidation rules.
+        private readonly RankerResultCache _results = new RankerResultCache();
 
         private readonly List<RenderedRow> _rows = new List<RenderedRow>();
 
@@ -115,9 +156,9 @@ namespace TaimisToolbench.Views
         private FeedbackButton _addButton;
         private FeedbackButton _refreshButton;
         private Label _modeLabel;
-        private Dropdown _modeDropdown;
-        private bool _suppressModeChange;
+        private readonly List<ModeRadio> _modeRadios = new List<ModeRadio>();
         private Label _statusLabel;
+        private Checkbox _compactCheckbox;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
         private Label _bannerLabel;
@@ -140,6 +181,7 @@ namespace TaimisToolbench.Views
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
         private bool _firstRefreshDone;
+        private DateTime? _snapshotStamp;
         private bool _rarityDirty;
         private DateTime? _lastRefreshLocal;
         private string _statusOverride;
@@ -174,7 +216,7 @@ namespace TaimisToolbench.Views
         /// The last Refresh's owned solve per item id, for a future
         /// next-action classifier. Session-scoped and never persisted.
         /// </summary>
-        public IReadOnlyDictionary<int, CraftingPlanResult> LastOwnedResults => _lastOwnedResults;
+        public IReadOnlyDictionary<int, CraftingPlanResult> LastOwnedResults => _results.OwnedResults(Mode);
 
         /// <summary>Main thread, immediately before Blish queues the off-thread Build.</summary>
         public void BeginRebuild()
@@ -287,6 +329,13 @@ namespace TaimisToolbench.Views
 
         private RankerMode Mode => _watchlist.Mode;
 
+        /// <summary>
+        /// Headline plus gate percentages only - see RenderSubLines. Persisted
+        /// beside the mode, because it is the same kind of choice: how the
+        /// user wants to read the table, not what the table says.
+        /// </summary>
+        private bool Compact => _watchlist.Compact;
+
         // ---------------------------------------------------------------
         // Comparison mode
         // ---------------------------------------------------------------
@@ -319,29 +368,22 @@ namespace TaimisToolbench.Views
 
             _watchlist.Mode = mode;
             Persist();
-            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(mode));
+            UpdateModeRadios();
             RebuildRows();
 
-            bool anyStale = false;
-            for (int i = 0; i < Entries.Count; i++)
+            // Toggling IS the request. A mode this session has already
+            // computed displays instantly from its own answer set above;
+            // one it has not is computed now, for the rows that need it,
+            // rather than parked behind a Refresh press the user has no
+            // reason to expect (owner ruling, 2026-08-27).
+            if (Entries.Count > 0 && !_results.IsComplete(mode, Entries))
             {
-                _metricsByItemId.TryGetValue(Entries[i].ItemId, out var metrics);
-                if (!RankerPriorityOrdering.MetricsAreCurrent(metrics, i, mode))
-                {
-                    anyStale = true;
-                    break;
-                }
+                StartRefresh(mode, recomputeAll: false);
+                return;
             }
 
-            if (Entries.Count > 0 && anyStale)
-            {
-                SetStatus("Comparison mode changed - press Refresh to recalculate.", isError: false);
-            }
-            else
-            {
-                _statusOverride = null;
-                UpdateStatusLine();
-            }
+            _statusOverride = null;
+            UpdateStatusLine();
         }
 
         /// <summary>
@@ -364,7 +406,7 @@ namespace TaimisToolbench.Views
 
             return RankerPriorityOrdering.IndependentDisplayOrder(Entries, entry =>
             {
-                _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
+                var metrics = _results.Metrics(Mode, entry.ItemId);
                 return RankerPriorityOrdering.MetricsAreCurrent(
                     metrics, Entries.IndexOf(entry), Mode) ? metrics : null;
             });
@@ -466,42 +508,132 @@ namespace TaimisToolbench.Views
             TooltipFacility.ApplyPlain(_addButton, "Add this item to the bottom of your priority list.");
             _addButton.Click += (_, __) => AddPendingItem();
 
-            // The comparison-mode selector, right-anchored on this row (the
-            // toolbar row below is the status band's full width). Same
-            // labelled-Dropdown shape as the plan tab's "Prices:" control -
-            // the module's established two-way mode switch.
+            // The comparison mode is a two-option, mutually exclusive
+            // choice and BOTH options should read at all times, which a
+            // dropdown cannot do - it hides the alternative behind a click
+            // (owner ruling, 2026-08-27). Blish ships no radio control, so
+            // this is the smallest honest one: the game's own indicator dot
+            // plus a label, both clickable, both always visible. The dot is
+            // art rather than a U+25CF/U+25CB pair, neither of which exists
+            // in the bitmap font (see CreateRowButton).
             _modeLabel = new Label
             {
                 Font = UiFonts.Body,
                 Text = "Compare:",
+                TextColor = DimColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 10),
                 Parent = _addPanel,
             };
-            _modeDropdown = new Dropdown
+
+            _modeRadios.Clear();
+            _modeRadios.Add(CreateModeRadio(RankerMode.Cascade));
+            _modeRadios.Add(CreateModeRadio(RankerMode.Independent));
+            UpdateModeRadios();
+        }
+
+        /// <summary>One option of the comparison-mode radio pair.</summary>
+        private sealed class ModeRadio
+        {
+            public RankerMode Mode;
+            public Image Indicator;
+            public Label Text;
+
+            /// <summary>Indicator, gap and label - what the strip has to fit.</summary>
+            public int Width;
+        }
+
+        private ModeRadio CreateModeRadio(RankerMode mode)
+        {
+            var indicator = new Image(AsyncTexture2D.FromAssetId(RadioOnAssetId))
             {
-                Size = new Point(ModeDropdownWidth, 28),
-                Location = new Point(0, 6),
+                Size = new Point(RadioIndicatorSize, RadioIndicatorSize),
+                Location = new Point(0, 12),
                 Parent = _addPanel,
             };
-            _modeDropdown.Items.Add(ModeItem(RankerMode.Cascade));
-            _modeDropdown.Items.Add(ModeItem(RankerMode.Independent));
-            _suppressModeChange = true;
-            _modeDropdown.SelectedItem = ModeItem(Mode);
-            _suppressModeChange = false;
-            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(Mode));
-            _modeDropdown.ValueChanged += (_, e) =>
-            {
-                if (_suppressModeChange)
-                {
-                    return;
-                }
 
-                OnModeChanged(e.CurrentValue == ModeItem(RankerMode.Independent)
-                    ? RankerMode.Independent
-                    : RankerMode.Cascade);
+            var label = new Label
+            {
+                Font = UiFonts.Body,
+                Text = ModeItem(mode),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, 10),
+                Parent = _addPanel,
             };
+
+            // The label is as clickable as the dot: a 16px target is not a
+            // control, it is a dare.
+            indicator.Click += (_, __) => OnModeChanged(mode);
+            label.Click += (_, __) => OnModeChanged(mode);
+
+            string tooltip = ModeTooltip(mode);
+            TooltipFacility.ApplyPlain(indicator, tooltip);
+            TooltipFacility.ApplyPlain(label, tooltip);
+
+            return new ModeRadio
+            {
+                Mode = mode,
+                Indicator = indicator,
+                Text = label,
+                Width = RadioIndicatorSize + RadioIndicatorGap
+                    + LabelHelpers.MeasureWith(UiFonts.Body)(ModeItem(mode)),
+            };
+        }
+
+        /// <summary>
+        /// Selection is carried by BOTH the dot and the label: the dot alone
+        /// is a 16px difference in a row of text, which the field test for
+        /// the tab's other indicators showed reads as no difference at all.
+        /// </summary>
+        private void UpdateModeRadios()
+        {
+            foreach (var radio in _modeRadios)
+            {
+                bool selected = radio.Mode == Mode;
+                bool enabled = radio.Indicator.Enabled;
+                radio.Indicator.Tint = selected
+                    ? (enabled ? Color.White : Color.White * 0.4f)
+                    : new Color(255, 255, 255) * (enabled ? 0.25f : 0.15f);
+                radio.Text.TextColor = selected
+                    ? (enabled ? Color.White : DimColor)
+                    : (enabled ? ValueTextColor * 0.8f : DimColor);
+            }
+        }
+
+        /// <summary>
+        /// Seats the mode strip against the row's right edge, never left of
+        /// the Add button. A hidden caption is moved off-panel rather than
+        /// left where it would be overlapped.
+        /// </summary>
+        private void PositionModeStrip(int barWidth)
+        {
+            if (_modeRadios.Count < 2)
+            {
+                return;
+            }
+
+            int addButtonRight = RankerRowLayout.Inset + SearchBoxWidth + QuantityBoxWidth + 16 + AddButtonWidth;
+            var slots = RankerRowLayout.ModeStrip(
+                barWidth, _modeLabel.Width, _modeRadios[0].Width, _modeRadios[1].Width,
+                RadioOptionGap, addButtonRight + ModeGap);
+
+            _modeLabel.Visible = slots.LabelX >= 0;
+            if (slots.LabelX >= 0)
+            {
+                _modeLabel.Location = new Point(slots.LabelX, _modeLabel.Location.Y);
+            }
+
+            PlaceModeRadio(_modeRadios[0], slots.FirstX);
+            PlaceModeRadio(_modeRadios[1], slots.SecondX);
+        }
+
+        private static void PlaceModeRadio(ModeRadio radio, int x)
+        {
+            radio.Indicator.Location = new Point(x, radio.Indicator.Location.Y);
+            radio.Text.Location = new Point(
+                x + RadioIndicatorSize + RadioIndicatorGap, radio.Text.Location.Y);
         }
 
         private void BuildToolbar(Container container, int width)
@@ -526,6 +658,18 @@ namespace TaimisToolbench.Views
 
             _spinner = InlineSpinner.Create(_toolbarPanel, InlineSpinnerLayout.SnapshotStatusSize);
 
+            // Blish's own Checkbox, art and all - the module's established
+            // shape for a persisted on/off, and no glyph anywhere near it.
+            _compactCheckbox = new Checkbox
+            {
+                Text = "Compact",
+                Checked = Compact,
+                Location = new Point(0, 12),
+                Parent = _toolbarPanel,
+            };
+            TooltipFacility.ApplyPlain(_compactCheckbox, CompactTooltip);
+            _compactCheckbox.CheckedChanged += (_, e) => OnCompactChanged(e.Checked);
+
             _refreshButton = new FeedbackButton
             {
                 Text = "Refresh",
@@ -534,6 +678,25 @@ namespace TaimisToolbench.Views
                 Parent = _toolbarPanel,
             };
             _refreshButton.Click += (_, __) => OnRefreshClicked();
+        }
+
+        private const string CompactTooltip =
+            "Show each row's headline and its five category percentages only, so more rows fit on screen. The currency detail and the notes come back when you switch it off.";
+
+        /// <summary>
+        /// A display choice, not a measurement one: nothing is recomputed and
+        /// no answer changes, so both modes' answer sets survive it untouched.
+        /// </summary>
+        private void OnCompactChanged(bool compact)
+        {
+            if (compact == _watchlist.Compact)
+            {
+                return;
+            }
+
+            _watchlist.Compact = compact;
+            Persist();
+            RebuildRows();
         }
 
         private void BuildColumnHeader(Container container, int width)
@@ -572,17 +735,21 @@ namespace TaimisToolbench.Views
             _toolbarPanel.Size = new Point(width, ToolbarHeight);
             _columnHeaderPanel.Size = new Point(width, ColumnHeaderRowHeight);
 
+            // The checkbox's art hangs 9px left of its own Location (Blish
+            // draws it at x-9), so the width the toolbar reserves for it
+            // includes that overhang and the control is seated 9px inside.
+            int compactWidth = CheckboxArtOverhang + CheckboxTextInset
+                + LabelHelpers.MeasureWith(UiFonts.Caption)(_compactCheckbox.Text);
             var toolbar = RankerRowLayout.Toolbar(
-                barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap);
+                barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
+                compactWidth);
             _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
+            _compactCheckbox.Location = new Point(
+                toolbar.CompactX + CheckboxArtOverhang, _compactCheckbox.Location.Y);
             _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
-            _modeDropdown.Location = new Point(
-                Math.Max(0, barWidth - ModeDropdownWidth), _modeDropdown.Location.Y);
-            _modeLabel.Location = new Point(
-                Math.Max(0, _modeDropdown.Location.X - ModeGap - _modeLabel.Width),
-                _modeLabel.Location.Y);
+            PositionModeStrip(barWidth);
 
             PositionColumnHeader(barWidth);
 
@@ -606,6 +773,23 @@ namespace TaimisToolbench.Views
             SetHeaderLabelRight(2, bands.ReadyRightEdge);
             SetHeaderLabelRight(3, bands.DaysRightEdge);
             SetHeaderLabelRight(4, bands.RemainingRightEdge);
+        }
+
+        /// <summary>
+        /// The "#" column means a different thing in each mode - a priority
+        /// the user set, or a ranking the tab worked out - and a bare number
+        /// cannot say which. The other four headers are mode-independent.
+        /// </summary>
+        private void UpdateColumnHeaderTooltips()
+        {
+            if (_columnHeaderLabels.Count == 0)
+            {
+                return;
+            }
+
+            TooltipFacility.ApplyPlain(_columnHeaderLabels[0], Mode == RankerMode.Independent
+                ? "Rank by readiness, worked out from the numbers on the right. Your own priority order is kept, and comes back when you switch to \"" + CascadeModeItem + "\"."
+                : "Your priority order. The row above has first claim on your materials, currencies, coin and daily crafts - use the arrows to change it.");
         }
 
         private void SetHeaderLabel(int index, int x)
@@ -699,7 +883,12 @@ namespace TaimisToolbench.Views
         private class RenderedRow
         {
             public int ItemId;
+
+            /// <summary>Index in the STORED priority list - what a move or a removal acts on.</summary>
             public int Index;
+
+            /// <summary>Where the row sits in the table right now; see ReorderVisible.</summary>
+            public int DisplayPosition;
             public string FullName;
             public Panel Panel;
             public Label RankLabel;
@@ -711,9 +900,9 @@ namespace TaimisToolbench.Views
             public CoinCurrencyRenderer.ValueCellHandle RemainingCell;
             public Label RemainingDash;
             public int RemainingCellWidth;
-            public FeedbackButton Up;
-            public FeedbackButton Down;
-            public FeedbackButton Remove;
+            public Image Up;
+            public Image Down;
+            public Image Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
             public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
@@ -746,6 +935,9 @@ namespace TaimisToolbench.Views
             _bannerPanel = null;
             _bannerLabel = null;
 
+            InvalidateOnSnapshotChange();
+            AdoptRarityFromStatCache();
+
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             _lastLayoutWidth = _contentPanel.Width;
 
@@ -757,9 +949,10 @@ namespace TaimisToolbench.Views
             }
             else
             {
-                foreach (int priorityIndex in DisplayOrder())
+                var order = DisplayOrder();
+                for (int position = 0; position < order.Count; position++)
                 {
-                    _rows.Add(CreateRow(Entries[priorityIndex], priorityIndex, barWidth));
+                    _rows.Add(CreateRow(Entries[order[position]], order[position], position, barWidth));
                 }
 
                 // Every row's cells are measured before any is rendered, so
@@ -776,6 +969,7 @@ namespace TaimisToolbench.Views
                 ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
                 : "Add an item to your list first.");
 
+            UpdateColumnHeaderTooltips();
             RebuildCaptions(barWidth);
             if (_contentPanel.Parent is Container container)
             {
@@ -783,6 +977,55 @@ namespace TaimisToolbench.Views
             }
 
             UpdateStatusLine();
+        }
+
+        /// <summary>
+        /// Colours rows whose rarity this session already knows from some
+        /// other tab's work, before their own first refresh has run. Cheap
+        /// (one dictionary read per uncoloured row) and saves only when
+        /// something actually changed, so the common case writes nothing.
+        /// </summary>
+        private void AdoptRarityFromStatCache()
+        {
+            if (_getItemStatBlock == null)
+            {
+                return;
+            }
+
+            if (RankerRarityAdoption.AdoptFromStatCache(Entries, _getItemStatBlock))
+            {
+                Persist();
+            }
+        }
+
+        /// <summary>
+        /// Every number in either answer set was measured against the
+        /// holdings of one account snapshot; a newer one makes all of them
+        /// claims about an account that no longer exists.
+        /// <para>
+        /// Checked when the table is being rebuilt rather than on a timer,
+        /// deliberately: the snapshot re-fetches itself on a schedule, and
+        /// blanking a table the user is reading - possibly mid-hover - to
+        /// announce a background event is worse than answering with the
+        /// numbers they were already reading until they next ask for them.
+        /// </para>
+        /// </summary>
+        private void InvalidateOnSnapshotChange()
+        {
+            var stamp = _getSnapshot()?.CapturedAt;
+            if (stamp == _snapshotStamp)
+            {
+                return;
+            }
+
+            bool hadResults = _results.HasAnyResults;
+            _snapshotStamp = stamp;
+            _results.InvalidateEverything();
+
+            if (hadResults)
+            {
+                SetStatus("Your account snapshot changed - press Refresh to recalculate.", isError: false);
+            }
         }
 
         private void BuildBanner(int barWidth)
@@ -881,20 +1124,72 @@ namespace TaimisToolbench.Views
             return changed;
         }
 
-        private RankerRowLayout.Bands BandsFor(int barWidth)
+        /// <summary>
+        /// Re-seats EVERYTHING the coin band's width moves, which is the
+        /// rows AND the column header over them.
+        /// <para>
+        /// The header is the half that was missed, and it is the reported
+        /// "Ready/Days/Remaining are poorly aligned with the content below".
+        /// A table with no results yet measures its coin band at
+        /// RankerRowLayout.MinRemainingCellWidth; the first refresh replaces
+        /// that with a real coin cell, and since the Ready and Days rails
+        /// are derived by walking LEFT from the coin band, both move by the
+        /// difference (37px in the 2026-08-27 capture) while the header
+        /// labels stayed where the empty table had put them. Fixing the
+        /// rails' arithmetic - the previous attempt - could not fix that,
+        /// because the header was simply never asked again.
+        /// </para>
+        /// </summary>
+        private void RelayoutTable(int barWidth)
         {
-            return RankerRowLayout.Compute(barWidth, _remainingBandWidth);
+            foreach (var each in _rows)
+            {
+                if (each.Index < Entries.Count)
+                {
+                    RenderRowContent(each, Entries[each.Index], barWidth);
+                }
+            }
+
+            PositionColumnHeader(barWidth);
         }
 
-        private RenderedRow CreateRow(RankerWatchlistEntry entry, int index, int barWidth)
+        private RankerRowLayout.Bands BandsFor(int barWidth)
+        {
+            return RankerRowLayout.Compute(barWidth, _remainingBandWidth, ReorderVisible);
+        }
+
+        /// <summary>
+        /// THE INDEPENDENT-MODE RANK MODEL, in one place.
+        /// <list type="bullet">
+        /// <item><description>The STORED list is always the user's priority
+        /// order and is never touched by independent mode - it is what
+        /// cascade mode goes back to, and what persists.</description></item>
+        /// <item><description>Independent mode DISPLAYS by readiness, so the
+        /// number in the "#" column is that ranking, not a priority; the
+        /// column header says which on hover.</description></item>
+        /// <item><description>There is therefore nothing to reorder while it
+        /// is displayed, and the arrows are not shown at all - a disabled
+        /// arrow invites a click that can never do anything. Remove stays:
+        /// it is about the list, not about the order.</description></item>
+        /// <item><description>A row added while independent mode is
+        /// displayed still goes to the bottom of the stored priority order,
+        /// and shows wherever its readiness puts it - which is last until it
+        /// has been measured.</description></item>
+        /// </list>
+        /// </summary>
+        private bool ReorderVisible => Mode == RankerMode.Cascade;
+
+        private RenderedRow CreateRow(
+            RankerWatchlistEntry entry, int index, int displayPosition, int barWidth)
         {
             var row = new RenderedRow
             {
                 ItemId = entry.ItemId,
                 Index = index,
+                DisplayPosition = displayPosition,
                 FullName = BuildDisplayName(entry),
             };
-            _metricsByItemId.TryGetValue(entry.ItemId, out var metrics);
+            var metrics = _results.Metrics(Mode, entry.ItemId);
             row.Metrics = RankerPriorityOrdering.MetricsAreCurrent(metrics, index, Mode) ? metrics : null;
 
             row.Panel = new Panel
@@ -937,7 +1232,7 @@ namespace TaimisToolbench.Views
             row.RankLabel = new Label
             {
                 Font = UiFonts.Caption,
-                Text = (row.Index + 1).ToString(CultureInfo.InvariantCulture) + ".",
+                Text = (row.DisplayPosition + 1).ToString(CultureInfo.InvariantCulture) + ".",
                 TextColor = ValueTextColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -963,9 +1258,17 @@ namespace TaimisToolbench.Views
                 LabelHelpers.ApplyTagTooltip(row.Chip, ChipTooltip(metrics));
             }
 
+            // THE ROW'S TYPE RAMP. Two reading sizes exist (Caption 14,
+            // Body 16) and the promoted tiers above them are bold rather
+            // than merely bigger - see Views/Rendering/UiFonts. The item
+            // name and this percentage are what the table is FOR, so the
+            // percentage takes the Status tier; Days and the coin cell stay
+            // at Body; the gate strip, the currency detail and the notes sit
+            // at Caption, separated from each other by rhythm and indent
+            // rather than by a fourth size the ramp does not have.
             row.ReadyLabel = new Label
             {
-                Font = UiFonts.Body,
+                Font = UiFonts.Status,
                 Text = metrics == null ? RankerReadinessCalculator.DashText : RankerReadinessCalculator.FormatReadiness(metrics),
                 TextColor = metrics == null
                     ? RankerReadinessColors.Neutral
@@ -974,7 +1277,7 @@ namespace TaimisToolbench.Views
                         : RankerReadinessColors.ForReadiness(metrics.Readiness),
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, MainLineTextY),
+                Location = new Point(0, ReadyLineY),
                 Parent = row.Panel,
             };
             TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
@@ -1025,22 +1328,27 @@ namespace TaimisToolbench.Views
                     row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
             }
 
-            row.Up = CreateRowButton(row.Panel, "\u25B2", bands.UpX, MoveUpTooltip());
-            row.Down = CreateRowButton(row.Panel, "\u25BC", bands.DownX, MoveDownTooltip());
-            row.Remove = CreateRowButton(row.Panel, "\u2715", bands.RemoveX,
-                "Remove this item from your list.");
-
-            row.Up.Enabled = CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-            row.Down.Enabled = CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
-            row.Remove.Enabled = !_isRefreshing;
-
+            row.Up = null;
+            row.Down = null;
             int rowIndex = row.Index;
-            row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
-            row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
+
+            if (ReorderVisible)
+            {
+                row.Up = CreateRowButton(row.Panel, ReorderArrowAssetId, true, bands.UpX, MoveUpTooltip());
+                row.Down = CreateRowButton(row.Panel, ReorderArrowAssetId, false, bands.DownX, MoveDownTooltip());
+                SetRowButtonEnabled(row.Up, CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Down, CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+                row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
+                row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
+            }
+
+            row.Remove = CreateRowButton(row.Panel, RemoveMarkAssetId, false, bands.RemoveX,
+                "Remove this item from your list.");
+            SetRowButtonEnabled(row.Remove, !_isRefreshing);
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
-            int subLines = RenderSubLines(row, bands);
-            row.Panel.Size = new Point(barWidth, RankerRowLayout.TotalRowHeight(subLines));
+            var subLines = RenderSubLines(row, bands);
+            row.Panel.Size = new Point(barWidth, subLines.TotalHeight);
 
             LayoutRow(row, bands, measureText: true);
         }
@@ -1055,35 +1363,114 @@ namespace TaimisToolbench.Views
                 : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
         }
 
-        private FeedbackButton CreateRowButton(Panel parent, string glyph, int x, string tooltip)
+        /// <summary>
+        /// A row action, drawn as ART rather than as a text glyph. The three
+        /// buttons used to be StandardButtons labelled U+25B2, U+25BC and
+        /// U+2715; Blish's Menomonia is a bitmap font carrying 226
+        /// codepoints (ASCII, Latin-1 and about thirty punctuation marks)
+        /// and none of those three is among them, so all three rendered as
+        /// literally nothing - the field shot's blank grey rectangles. A
+        /// missing codepoint also measures zero width, which is why no
+        /// layout test caught it.
+        /// <para>
+        /// An Image, not a StandardButton with an Icon: the up arrow is the
+        /// down arrow flipped (Blish's own Panel/MenuItem carets do the same
+        /// with a rotation), and only Image exposes SpriteEffects.
+        /// </para>
+        /// </summary>
+        private Image CreateRowButton(Panel parent, int assetId, bool flipVertically, int x, string tooltip)
         {
-            var button = new FeedbackButton
+            var button = new Image(AsyncTexture2D.FromAssetId(assetId))
             {
-                Text = glyph,
                 Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
+                SpriteEffects = flipVertically ? SpriteEffects.FlipVertically : SpriteEffects.None,
+                BackgroundColor = RowButtonFill,
+                Tint = RowButtonTint,
                 Parent = parent,
             };
+
+            // Hover feedback in the button's own vocabulary: the art
+            // brightens and the plate lifts. StandardButton's atlas walk is
+            // not available to an Image, and a row action that answers a
+            // hover with nothing reads as decoration.
+            button.MouseEntered += (_, __) => ApplyRowButtonTint(button, hover: true);
+            button.MouseLeft += (_, __) => ApplyRowButtonTint(button, hover: false);
+
             TooltipFacility.ApplyPlain(button, tooltip);
             return button;
         }
 
+        /// <summary>
+        /// Enabled state is a click gate AND a visual one: Blish's Control
+        /// blocks the Click on a disabled control but draws it unchanged, and
+        /// an arrow that looks live but does nothing is worse than one that
+        /// looks spent. Independent mode disables both reorder arrows on
+        /// every row, so this is the common state, not the rare one.
+        /// </summary>
+        private static void SetRowButtonEnabled(Image button, bool enabled)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Enabled = enabled;
+            ApplyRowButtonTint(button, hover: false);
+        }
+
+        private static void ApplyRowButtonTint(Image button, bool hover)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Tint = !button.Enabled
+                ? RowButtonDisabledTint
+                : hover ? RowButtonHoverTint : RowButtonTint;
+            button.BackgroundColor = button.Enabled && hover ? RowButtonHoverFill : RowButtonFill;
+        }
+
         /// <summary>Returns the number of sub-lines rendered.</summary>
-        private int RenderSubLines(RenderedRow row, in RankerRowLayout.Bands bands)
+        /// <summary>
+        /// The row's breakdown, under its headline. Returns the block the
+        /// row's height is taken from.
+        /// <para>
+        /// COMPACT MODE stops after the gate strip: the five category
+        /// percentages are the comparison, the currency detail and the notes
+        /// are the explanation, and a user comparing twenty rows wants the
+        /// former on screen at once (owner ruling, 2026-08-27). Nothing is
+        /// lost - the hidden detail is one toggle away, and the gate strip
+        /// itself still hovers with its own numbers.
+        /// </para>
+        /// </summary>
+        private RankerRowLayout.SubLineBlock RenderSubLines(
+            RenderedRow row, in RankerRowLayout.Bands bands)
         {
             var metrics = row.Metrics;
             if (metrics == null)
             {
-                return 0;
+                return RankerRowLayout.SubLines(false, 0, 0);
             }
 
-            int line = 0;
+            bool detail = !Compact;
+            int currencyLines = detail
+                ? RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count)
+                : 0;
+            var notes = detail ? BuildNotes(metrics) : EmptyNotes;
+
+            // A measured row always has gates; one that somehow has none
+            // must not reserve a line for a strip it will not draw.
+            bool hasGates = metrics.Gates != null && metrics.Gates.Count > 0;
+            var block = RankerRowLayout.SubLines(hasGates, currencyLines, notes.Count);
 
             // The gate breakdown, justified across the full sub-line band so
             // the five barriers read as one strip rather than a left-packed
             // sentence with dead space to its right.
-            int gateY = RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight;
-            for (int i = 0; i < metrics.Gates.Count && i < RankerRowLayout.GateCellCount; i++)
+            int gateY = block.GateY;
+            int gateCount = hasGates ? metrics.Gates.Count : 0;
+            for (int i = 0; i < gateCount && i < RankerRowLayout.GateCellCount; i++)
             {
                 var gate = metrics.Gates[i];
                 row.GateNameLabels.Add(new Label
@@ -1110,31 +1497,33 @@ namespace TaimisToolbench.Views
                 });
             }
 
-            line++;
-
-            int currencyLines = RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count);
-            int shown = Math.Min(
+            int shown = currencyLines == 0 ? 0 : Math.Min(
                 metrics.CurrencyShortfalls.Count,
                 RankerRowLayout.CurrenciesPerLine * RankerRowLayout.MaxCurrencyLines);
             for (int i = 0; i < shown; i++)
             {
                 var shortfall = metrics.CurrencyShortfalls[i];
-                int y = RankerRowLayout.RowHeight
-                    + (line + i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.SubLineHeight;
+                int y = block.CurrencyY
+                    + (i / RankerRowLayout.CurrenciesPerLine) * RankerRowLayout.CurrencyLineHeight;
+
+                // The wallet-tier icon is taller than its own caption text,
+                // so the text centres on the ICON rather than the icon
+                // sitting on the text's line box.
+                int textY = y + (RankerRowLayout.CurrencyIconSize - UiFonts.Caption.LineHeight) / 2;
 
                 string fullName = CurrencyName(shortfall);
                 row.CurrencyNameFulls.Add(fullName);
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
                     row.Panel, CurrencyIconUrl(shortfall), (string)null,
-                    0, y + 1, RankerRowLayout.CurrencyIconSize, 1, fullName));
+                    0, y, RankerRowLayout.CurrencyIconSize, 1, fullName));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
                     Text = fullName,
-                    TextColor = Color.White,
+                    TextColor = ValueTextColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, y),
+                    Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
                 row.CurrencyValueLabels.Add(new Label
@@ -1144,32 +1533,31 @@ namespace TaimisToolbench.Views
                     TextColor = shortfall.Short > 0 ? ValueTextColor : RankerReadinessColors.ForReadiness(1.0),
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, y),
+                    Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
             }
 
-            line += currencyLines;
-
-            foreach (string note in BuildNotes(metrics))
+            for (int i = 0; i < notes.Count; i++)
             {
                 row.NoteLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
-                    Text = note,
-                    TextColor = ValueTextColor,
+                    Text = notes[i],
+                    TextColor = DimColor,
                     AutoSizeWidth = false,
                     AutoSizeHeight = true,
                     Width = Math.Max(0, bands.SubLineWidth),
-                    Location = new Point(bands.SubLineX,
-                        RankerRowLayout.RowHeight + line * RankerRowLayout.SubLineHeight),
+                    Location = new Point(
+                        bands.SubLineX, block.NoteY + i * RankerRowLayout.SubLineHeight),
                     Parent = row.Panel,
                 });
-                line++;
             }
 
-            return line;
+            return block;
         }
+
+        private static readonly IReadOnlyList<string> EmptyNotes = new List<string>();
 
         private void LayoutRow(RenderedRow row, in RankerRowLayout.Bands bands, bool measureText)
         {
@@ -1188,7 +1576,7 @@ namespace TaimisToolbench.Views
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
             row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
+                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), ReadyLineY);
 
             if (row.Chip != null)
             {
@@ -1209,8 +1597,12 @@ namespace TaimisToolbench.Views
                     row.RemainingCell, bands.RemainingRightEdge, MainLineTextY);
             }
 
-            row.Up.Location = new Point(bands.UpX, MainLineButtonY);
-            row.Down.Location = new Point(bands.DownX, MainLineButtonY);
+            if (row.Up != null)
+            {
+                row.Up.Location = new Point(bands.UpX, MainLineButtonY);
+                row.Down.Location = new Point(bands.DownX, MainLineButtonY);
+            }
+
             row.Remove.Location = new Point(bands.RemoveX, MainLineButtonY);
 
             for (int i = 0; i < row.GateNameLabels.Count; i++)
@@ -1372,10 +1764,20 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The standard rich item tooltip on the icon and name, stamped
+        /// The standard rich item tooltip on the whole main line, stamped
         /// deferred so a stat block the session caches later shows without
         /// a re-render, falling back to the plain full name until then -
         /// the same shape MainView.ApplyItemRowTooltip established.
+        /// <para>
+        /// Stamped on the row PANEL and the rank as well as the name and
+        /// the icon tree, because Blish resolves a tooltip on the deepest
+        /// control under the cursor and never bubbles to the parent
+        /// (KNOWN-ISSUES #57): every control the cursor can land on is its
+        /// own hover, and the panel is what it lands on between them. With
+        /// only the name and the icon stamped, most of the row - the rank,
+        /// the gap after a short name, the whole strip right of it - was a
+        /// hole where the row answered nothing at all.
+        /// </para>
         /// </summary>
         private void ApplyItemTooltip(RenderedRow row, RankerWatchlistEntry entry)
         {
@@ -1387,8 +1789,25 @@ namespace TaimisToolbench.Views
                 true,
                 (IReadOnlyList<string>)null);
 
-            TooltipFacility.ApplyRichDeferred(row.IconName.NameLabel, build);
+            StampItemTooltip(row.Panel, fullName, build);
+            StampItemTooltip(row.RankLabel, fullName, build);
+            StampItemTooltip(row.IconName.NameLabel, fullName, build);
+
+            // The icon tree keeps its own note (a missing-icon square says
+            // so) as the builder's fallback, so it is stamped rich-only.
             IconControls.ApplyRichDeferredToIconTree(row.IconName.IconFrame, build);
+        }
+
+        /// <summary>
+        /// The plain name is registered FIRST so the facility captures it as
+        /// the deferred builder's fallback: a builder that composes nothing,
+        /// or throws, then still names the item instead of leaving the
+        /// control silent.
+        /// </summary>
+        private static void StampItemTooltip(Control control, string fullName, Func<TooltipContent> build)
+        {
+            TooltipFacility.ApplyPlain(control, fullName);
+            TooltipFacility.ApplyRichDeferred(control, build);
         }
 
         private bool CanReorder => !_isRefreshing && Mode == RankerMode.Cascade;
@@ -1448,7 +1867,7 @@ namespace TaimisToolbench.Views
 
         private IReadOnlyDictionary<int, CurrencyMetadata> CurrencyMetadataFor(int currencyId)
         {
-            foreach (var result in _lastOwnedResults.Values)
+            foreach (var result in _results.EnumerateOwned(Mode))
             {
                 if (result?.CurrencyMetadata != null && result.CurrencyMetadata.ContainsKey(currencyId))
                 {
@@ -1469,7 +1888,7 @@ namespace TaimisToolbench.Views
             return shortfall.Short.ToString("N0", CultureInfo.InvariantCulture) + " short";
         }
 
-        private IEnumerable<string> BuildNotes(RankerRowMetrics metrics)
+        private IReadOnlyList<string> BuildNotes(RankerRowMetrics metrics)
         {
             var notes = new List<string>();
 
@@ -1542,7 +1961,7 @@ namespace TaimisToolbench.Views
 
         private string VendorCappedName(int itemId)
         {
-            foreach (var result in _lastOwnedResults.Values)
+            foreach (var result in _results.EnumerateOwned(Mode))
             {
                 if (result?.ItemMetadata != null &&
                     result.ItemMetadata.TryGetValue(itemId, out var meta) &&
@@ -1678,7 +2097,9 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            InvalidateFrom(invalidatedFrom);
+            // Order matters to the cascade and to nothing else, so the
+            // independent answers survive a reorder untouched.
+            _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
             Persist();
             RebuildRows();
             SetStatus("Order changed - press Refresh to recalculate the rows below it.", isError: false);
@@ -1692,16 +2113,13 @@ namespace TaimisToolbench.Views
             }
 
             string name = Entries[index].Name;
-            int removedItemId = Entries[index].ItemId;
             int invalidatedFrom = RankerPriorityOrdering.RemoveAt(Entries, index);
-            _metricsByItemId.Remove(removedItemId);
-            _lastOwnedResults.Remove(removedItemId);
-            if (Mode == RankerMode.Cascade)
-            {
-                // Independent rows are position-free, so the survivors'
-                // numbers are untouched by a removal.
-                InvalidateFrom(invalidatedFrom);
-            }
+
+            // The removed row leaves both sets; the survivors' independent
+            // numbers are position-free and stand, while the cascade below
+            // the gap no longer has the right claims above it.
+            _results.KeepOnly(Entries);
+            _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
 
             Persist();
             RebuildRows();
@@ -1710,40 +2128,19 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Drops every cached metric from <paramref name="index"/> down. A
-        /// row's numbers are a function of its POSITION under the cascade, so
-        /// a row that moved is showing a figure for a slot it no longer
-        /// occupies. Rows above the change are genuinely unaffected: the
-        /// cascade never depends on anything below.
+        /// The entry at index changed in place (a quantity edit): the row
+        /// itself is wrong under BOTH modes, and under the cascade so is
+        /// everything below it. See RankerResultCache for the rules.
         /// </summary>
-        private void InvalidateFrom(int index)
+        private void InvalidateAfterChangeAt(int index)
         {
-            if (index < 0)
+            if (index < 0 || index >= Entries.Count)
             {
                 return;
             }
 
-            for (int i = index; i < Entries.Count; i++)
-            {
-                _metricsByItemId.Remove(Entries[i].ItemId);
-            }
-        }
-
-        /// <summary>
-        /// Invalidation after the entry at index changed in place (a
-        /// quantity update): Cascade stales it and everything below it;
-        /// Independent rows are position-free, so only the row itself.
-        /// </summary>
-        private void InvalidateAfterChangeAt(int index)
-        {
-            if (Mode == RankerMode.Cascade)
-            {
-                InvalidateFrom(index);
-            }
-            else if (index >= 0 && index < Entries.Count)
-            {
-                _metricsByItemId.Remove(Entries[index].ItemId);
-            }
+            _results.InvalidateItem(Entries[index].ItemId);
+            _results.InvalidateCascadeFrom(Entries, index);
         }
 
         private void Persist()
@@ -1777,11 +2174,46 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            StartRefresh();
+            // A press means "these numbers are old" - prices move even when
+            // the list does not - so it recomputes the displayed mode whole
+            // rather than trusting anything already cached for it.
+            StartRefresh(Mode, recomputeAll: true);
         }
 
-        private void StartRefresh()
+        /// <summary>
+        /// One row of a run's work plan, decided on the MAIN thread where the
+        /// cache lives. A row the mode's set already answers is not re-solved;
+        /// under the cascade its cached solve is still replayed, because the
+        /// rows below it are measured against what it claims.
+        /// </summary>
+        private sealed class RefreshRow
         {
+            public RankerWatchlistEntry Entry;
+            public int Slot;
+            public bool Solve;
+            public CraftingPlanResult CachedOwned;
+        }
+
+        /// <summary>
+        /// Starts a run for one mode. <paramref name="recomputeAll"/> drops
+        /// that mode's set first (the Refresh button); otherwise only the rows
+        /// the cache cannot answer are solved, which is what makes a toggle to
+        /// a mode computed earlier in the session cost nothing.
+        /// </summary>
+        private void StartRefresh(RankerMode mode, bool recomputeAll)
+        {
+            if (recomputeAll)
+            {
+                _results.InvalidateMode(mode);
+            }
+
+            int firstStale = _results.FirstStaleIndex(mode, Entries);
+            if (firstStale < 0)
+            {
+                // Every row already answered under this mode.
+                return;
+            }
+
             int myGen = ++_refreshGeneration;
             var cts = new CancellationTokenSource();
             _refreshCts = cts;
@@ -1789,24 +2221,48 @@ namespace TaimisToolbench.Views
             SetControlsEnabled(false);
             _spinner.Visible = true;
 
-            var entries = Entries.Select(e => new RankerWatchlistEntry
+            // Read HERE, on the main thread, and once: every row in a run is
+            // measured against the same account state, and the stamp the
+            // cache is judged against has to be the one the run actually
+            // used - not whatever a background re-fetch has replaced it with
+            // by the time the run ends.
+            var snapshot = _getSnapshot();
+            _snapshotStamp = snapshot?.CapturedAt;
+
+            var work = new List<RefreshRow>(Entries.Count);
+            for (int i = 0; i < Entries.Count; i++)
             {
-                ItemId = e.ItemId,
-                Quantity = e.Quantity,
-                Name = e.Name,
-                IconUrl = e.IconUrl,
-                Rarity = e.Rarity,
-            }).ToList();
+                var entry = Entries[i];
+                bool cached = mode == RankerMode.Cascade
+                    ? i < firstStale
+                    : RankerPriorityOrdering.MetricsAreCurrent(
+                        _results.Metrics(mode, entry.ItemId), i, mode);
 
-            // Read on the main thread; the run keeps this mode even if a
-            // toggle could slip in mid-run.
-            var mode = Mode;
+                work.Add(new RefreshRow
+                {
+                    // Copied: the run reads these off the main thread, and
+                    // the user can edit the list while it is in flight.
+                    Entry = new RankerWatchlistEntry
+                    {
+                        ItemId = entry.ItemId,
+                        Quantity = entry.Quantity,
+                        Name = entry.Name,
+                        IconUrl = entry.IconUrl,
+                        Rarity = entry.Rarity,
+                    },
+                    Slot = i,
+                    Solve = !cached,
+                    CachedOwned = cached ? _results.Owned(mode, entry.ItemId) : null,
+                });
+            }
 
-            Task.Run(() => RunRefreshAsync(entries, mode, myGen, cts.Token));
+            string activeCharacter = _getActiveCharacterName();
+            Task.Run(() => RunRefreshAsync(work, snapshot, activeCharacter, mode, myGen, cts.Token));
         }
 
         private async Task RunRefreshAsync(
-            List<RankerWatchlistEntry> entries, RankerMode mode, int myGen, CancellationToken ct)
+            List<RefreshRow> work, AccountSnapshot snapshot, string activeCharacter,
+            RankerMode mode, int myGen, CancellationToken ct)
         {
             int updated = 0;
             string failure = null;
@@ -1814,33 +2270,46 @@ namespace TaimisToolbench.Views
 
             try
             {
-                // Read once per run, so every row in a run is measured against
-                // the same account state.
-                var snapshot = _getSnapshot();
-                string activeCharacter = _getActiveCharacterName();
                 var valuation = _settings?.GetEffectiveCurrencyValuation();
                 var homesteadTiers = _settings?.GetHomesteadEfficiencyTiers();
                 var cascade = new RankerPriorityCascade(snapshot);
 
                 // Independent mode is slot 1 semantics for EVERY row: one
                 // unconsumed availability (the full account), no Consume
-                // threading between rows. Still 2N solves either way - the
-                // mode only changes which snapshot the owned solve sees,
-                // which is why toggling stales metrics instead of re-solving.
+                // threading between rows. The mode only changes which
+                // snapshot the owned solve sees, which is why each mode
+                // keeps its own answer set rather than staling the other's.
                 var fullAvailability = mode == RankerMode.Independent
                     ? cascade.CurrentAvailability
                     : null;
 
-                for (int i = 0; i < entries.Count; i++)
+                int total = work.Count(w => w.Solve);
+                int position = 0;
+
+                foreach (var row in work)
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var entry = entries[i];
-                    int slot = i;
+                    if (!row.Solve)
+                    {
+                        // Answered already. Under the cascade the row still
+                        // has to claim what it claimed last time, or every
+                        // row below it would be measured against materials
+                        // this one is already spending.
+                        if (mode == RankerMode.Cascade && row.CachedOwned != null)
+                        {
+                            cascade.Consume(row.CachedOwned);
+                        }
+
+                        continue;
+                    }
+
+                    var entry = row.Entry;
+                    int slot = row.Slot;
                     string name = entry.Name;
-                    int position = i + 1;
-                    int total = entries.Count;
-                    MainThreadMarshal.Run(() => ReportProgress(myGen, position, total, name));
+                    int reportPosition = ++position;
+                    int reportTotal = total;
+                    MainThreadMarshal.Run(() => ReportProgress(myGen, reportPosition, reportTotal, name));
 
                     var availability = fullAvailability ?? cascade.CurrentAvailability;
 
@@ -1887,7 +2356,7 @@ namespace TaimisToolbench.Views
                     updated++;
 
                     int itemId = entry.ItemId;
-                    MainThreadMarshal.Run(() => ApplyRowMetrics(myGen, itemId, metrics, owned));
+                    MainThreadMarshal.Run(() => ApplyRowMetrics(myGen, mode, itemId, metrics, owned));
                 }
             }
             catch (OperationCanceledException)
@@ -1903,7 +2372,7 @@ namespace TaimisToolbench.Views
             int finalUpdated = updated;
             string finalFailure = failure;
             bool wasCancelled = cancelled;
-            MainThreadMarshal.Run(() => FinishRefresh(myGen, finalUpdated, finalFailure, wasCancelled));
+            MainThreadMarshal.Run(() => FinishRefresh(myGen, mode, finalUpdated, finalFailure, wasCancelled));
         }
 
         private void ReportProgress(int myGen, int position, int total, string name)
@@ -1922,33 +2391,37 @@ namespace TaimisToolbench.Views
             SetStatus(text, isError: false);
         }
 
-        private void ApplyRowMetrics(int myGen, int itemId, RankerRowMetrics metrics, CraftingPlanResult owned)
+        private void ApplyRowMetrics(
+            int myGen, RankerMode mode, int itemId, RankerRowMetrics metrics, CraftingPlanResult owned)
         {
-            if (myGen != _refreshGeneration || !_buildComplete || !IsLive)
+            if (myGen != _refreshGeneration)
             {
                 return;
             }
 
-            _metricsByItemId[itemId] = metrics;
-            _lastOwnedResults[itemId] = owned;
+            var entry = Entries.FirstOrDefault(e => e.ItemId == itemId);
+
+            // Adopted BEFORE the liveness gate below: the solve's metadata
+            // knows the rarity the Add-time search result never carried, and
+            // that is a fact about the item rather than about the view, so a
+            // run the user tabbed away from must not lose it. Persisted once
+            // per run, in FinishRefresh, which is not gated either.
+            if (RankerRarityAdoption.AdoptFromMetadata(entry, owned?.ItemMetadata))
+            {
+                _rarityDirty = true;
+            }
+
+            if (!_buildComplete || !IsLive)
+            {
+                return;
+            }
+
+            _results.Store(mode, itemId, metrics, owned);
 
             var row = _rows.FirstOrDefault(r => r.ItemId == itemId);
-            var entry = Entries.FirstOrDefault(e => e.ItemId == itemId);
             if (row == null || entry == null)
             {
                 return;
-            }
-
-            // The solve's metadata knows the rarity the Add-time search
-            // result never carried; adopt it so the name and icon frame
-            // take their rarity colour (persisted once, in FinishRefresh).
-            if (owned?.ItemMetadata != null &&
-                owned.ItemMetadata.TryGetValue(itemId, out var meta) &&
-                !string.IsNullOrEmpty(meta?.Rarity) &&
-                !string.Equals(entry.Rarity, meta.Rarity, StringComparison.Ordinal))
-            {
-                entry.Rarity = meta.Rarity;
-                _rarityDirty = true;
             }
 
             row.Metrics = metrics;
@@ -1957,24 +2430,14 @@ namespace TaimisToolbench.Views
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             if (RecomputeBandWidths())
             {
-                // A wider coin cell moves the Ready and Days columns for
-                // EVERY row, so they all have to follow rather than drifting
-                // out of alignment as results land one at a time.
-                foreach (var each in _rows)
-                {
-                    if (each.Index < Entries.Count)
-                    {
-                        RenderRowContent(each, Entries[each.Index], barWidth);
-                    }
-                }
-
+                RelayoutTable(barWidth);
                 return;
             }
 
             RenderRowContent(row, entry, barWidth);
         }
 
-        private void FinishRefresh(int myGen, int updated, string failure, bool cancelled)
+        private void FinishRefresh(int myGen, RankerMode mode, int updated, string failure, bool cancelled)
         {
             if (myGen != _refreshGeneration)
             {
@@ -2033,14 +2496,20 @@ namespace TaimisToolbench.Views
             _addButton.Enabled = enabled && _pendingItemId.HasValue;
             _searchBox.Enabled = enabled;
             _quantityBox.Enabled = enabled;
-            _modeDropdown.Enabled = enabled;
+            foreach (var radio in _modeRadios)
+            {
+                radio.Indicator.Enabled = enabled;
+                radio.Text.Enabled = enabled;
+            }
+
+            UpdateModeRadios();
             _refreshButton.Enabled = enabled && Entries.Count > 0;
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
-                row.Up.Enabled = reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-                row.Down.Enabled = reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
-                row.Remove.Enabled = enabled;
+                SetRowButtonEnabled(row.Up, reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Down, reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Remove, enabled);
             }
         }
 

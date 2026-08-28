@@ -88,16 +88,11 @@ jobs:
               if line:
                   allowed.add(int(line, 16))
 
-          # Views/RankerTabContent.cs shipped three of the same broken
-          # glyphs and is being repaired on its own branch; waiving them
-          # here keeps the two changes from colliding. Every waiver is
-          # checked for staleness below, so the day that branch lands this
-          # step fails until the dead entries are deleted.
-          waived = {
-              ('Views/RankerTabContent.cs', 0x25B2),
-              ('Views/RankerTabContent.cs', 0x25BC),
-              ('Views/RankerTabContent.cs', 0x2715),
-          }
+          # Empty, and it should stay that way: the Ranker's three broken
+          # glyphs - the last waived entries - are gone, replaced by the
+          # game's own art. A waiver is a promise to come back, and this one
+          # was kept. Entries here are checked for staleness below.
+          waived = set()
 
           files = subprocess.run(
               ['git', 'ls-files', 'Models/*.cs', 'Services/*.cs', 'Views/*.cs',

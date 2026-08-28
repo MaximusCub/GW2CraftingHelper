@@ -277,6 +277,7 @@
     <Compile Include="Models\RankerWatchlistEntry.cs" />
     <Compile Include="Models\RankerSlotAvailability.cs" />
     <Compile Include="Models\RankerRowMetrics.cs" />
+    <Compile Include="Services\RankerRarityAdoption.cs" />
     <Compile Include="Services\RankerStore.cs" />
     <Compile Include="Services\RankerWatchlistLimits.cs" />
     <Compile Include="Services\RankerPriorityOrdering.cs" />
@@ -284,6 +285,7 @@
     <Compile Include="Services\RankerReadinessWeights.cs" />
     <Compile Include="Services\RankerReadinessCalculator.cs" />
     <Compile Include="Services\RankerRowLayout.cs" />
+    <Compile Include="Services\RankerResultCache.cs" />
     <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
     <Compile Include="Views\RankerTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
