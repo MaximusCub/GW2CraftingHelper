@@ -402,7 +402,13 @@ namespace TaimisToolbench.Tests.Services
                 Availability(), 0);
 
             Assert.False(GateApplies(metrics, RankerGate.TimeGates));
-            Assert.Equal(RankerReadinessCalculator.DashText, RankerReadinessCalculator.FormatDays(metrics));
+
+            // A MEASURED absence of any daily gate reads as zero, not as the
+            // dash a never-solved row gets - the two used to be the same
+            // mark in the same column.
+            Assert.Equal(RankerReadinessCalculator.ZeroDaysText, RankerReadinessCalculator.FormatDays(metrics));
+            Assert.Equal(RankerReadinessCalculator.DashText, RankerReadinessCalculator.FormatDays(null));
+            Assert.NotEqual(RankerReadinessCalculator.DashText, RankerReadinessCalculator.ZeroDaysText);
         }
 
         [Fact]

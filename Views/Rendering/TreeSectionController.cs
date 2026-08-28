@@ -568,7 +568,7 @@ namespace TaimisToolbench.Views.Rendering
                     s.IsExpanded = true;
                     _nodeExpansion[s.Node.NodeId] = true;
                     s.ChildContainer.Visible = true;
-                    s.ArrowLabel.Text = "v";
+                    s.ArrowLabel.Text = UiGlyphs.ExpandCaret(true, UiFonts.GlyphsAvailable);
                 }
 
                 RefreshTreeContainerHeights();
@@ -846,8 +846,8 @@ namespace TaimisToolbench.Views.Rendering
                 Color arrowColor = dimmed ? Color.White * 0.35f : Color.White;
                 arrowLabel = new Label()
                 {
-                    Font = UiFonts.Body,
-                    Text = shape.CaretGlyph,
+                    Font = UiFonts.BodyGlyphs,
+                    Text = UiGlyphs.ExpandCaret(shape.IsExpanded, UiFonts.GlyphsAvailable),
                     TextColor = arrowColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
@@ -1201,7 +1201,8 @@ namespace TaimisToolbench.Views.Rendering
                         state.IsExpanded = !state.IsExpanded;
                         _nodeExpansion[state.Node.NodeId] = state.IsExpanded;
                         state.ChildContainer.Visible = state.IsExpanded;
-                        state.ArrowLabel.Text = state.IsExpanded ? "v" : ">";
+                        state.ArrowLabel.Text =
+                            UiGlyphs.ExpandCaret(state.IsExpanded, UiFonts.GlyphsAvailable);
                         RefreshTreeContainerHeights();
                     });
                     // A caret click builds or hides the rows directly

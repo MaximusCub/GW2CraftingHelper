@@ -28,8 +28,22 @@ namespace TaimisToolbench.Services
         // 60: the 54px tier-1 icon frame plus 3px of clearance each side.
         public const int RowHeight = 60;
 
-        /// <summary>A text-only sub-line: the gate strip, and a note.</summary>
+        /// <summary>A text-only sub-line: a note.</summary>
         public const int SubLineHeight = 20;
+
+        /// <summary>
+        /// The gate strip's own pitch. Taller than a text sub-line because
+        /// each cell now carries a painted bar rather than a bare number,
+        /// and the bar has to hold a Body line box with the percentage
+        /// centred inside it.
+        /// </summary>
+        public const int GateLineHeight = 22;
+
+        /// <summary>Height of a gate cell's bar inside <see cref="GateLineHeight"/>.</summary>
+        public const int GateBarHeight = 20;
+
+        /// <summary>Gap between a gate's label band and its bar.</summary>
+        public const int GateLabelGap = 8;
 
         /// <summary>
         /// A currency line carries a wallet-LIST-tier icon (the game's own
@@ -62,12 +76,35 @@ namespace TaimisToolbench.Services
         // to the width of a dash.
 
         /// <summary>
-        /// Fits the bold "Ready" header (~50px) and the readiness figure,
-        /// which draws one tier above the rest of the row (UiFonts.Status,
-        /// 18 bold): "100%" measures wider there than the Body 16 this cell
-        /// was first sized for.
+        /// Fits the bold "Ready" header (~50px) and the readiness BAR, whose
+        /// centred "100%" draws one tier above the rest of the row
+        /// (UiFonts.Status, 18 bold) and measures ~46px there. This is the
+        /// cell's floor, not its width: under distribution the bar takes its
+        /// whole track.
         /// </summary>
         public const int ReadyCellWidth = 66;
+
+        /// <summary>
+        /// Height of the headline readiness bar. 24, so a Status line box
+        /// (23) centres inside it with a pixel to spare; the bar itself
+        /// centres in <see cref="RowHeight"/>.
+        /// </summary>
+        public const int ReadyBarHeight = 24;
+
+        /// <summary>
+        /// Floor for the headline bar. Below this the centred "100%" it
+        /// carries (bold 18, ~46px) has no plate left around it; the packed
+        /// fallback's ReadyCellWidth - CellGap is 54, so nothing at a
+        /// supported width goes under it.
+        /// </summary>
+        public const int MinReadinessBarWidth = 50;
+
+        /// <summary>
+        /// Floor for the affordability chip's column, applied inside
+        /// Compute: fits the bold "Status" header (~62px) and the narrower
+        /// of the two chips. Rows may measure wider; never narrower.
+        /// </summary>
+        public const int MinStatusCellWidth = 120;
 
         /// <summary>Fits bold "Days" (~46px) and body "999d".</summary>
         public const int DaysCellWidth = 54;
@@ -92,7 +129,19 @@ namespace TaimisToolbench.Services
             public readonly int NameX;
             public readonly int NameWidth;
 
-            /// <summary>Right edge of the right-aligned readiness percentage.</summary>
+            /// <summary>Left edge of the Status column's chip - the one cell that is left-aligned.</summary>
+            public readonly int StatusX;
+
+            /// <summary>Width the Status chip may fill before it runs into Ready.</summary>
+            public readonly int StatusWidth;
+
+            /// <summary>Left edge of the headline readiness bar.</summary>
+            public readonly int ReadyBarX;
+
+            /// <summary>Width of that bar, or 0 at a width that cannot hold one.</summary>
+            public readonly int ReadyBarWidth;
+
+            /// <summary>Right edge of the Ready track - the bar's right edge, and the header's.</summary>
             public readonly int ReadyRightEdge;
 
             /// <summary>Right edge of the right-aligned days cell.</summary>
@@ -100,6 +149,13 @@ namespace TaimisToolbench.Services
 
             /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
             public readonly int RemainingRightEdge;
+
+            /// <summary>
+            /// Whether the four data columns are DISTRIBUTED over equal
+            /// tracks or packed right-to-left. False is the narrow-panel
+            /// fallback; see <see cref="Compute"/>.
+            /// </summary>
+            public readonly bool Distributed;
 
             /// <summary>Left edge of the move-up button, or -1 when the row has none.</summary>
             public readonly int UpX;
@@ -117,8 +173,10 @@ namespace TaimisToolbench.Services
 
             public Bands(
                 int rowWidth, int rankX, int iconX, int nameX, int nameWidth,
-                int readyRightEdge, int daysRightEdge,
-                int remainingRightEdge, int upX, int downX, int removeX,
+                int statusX, int statusWidth,
+                int readyBarX, int readyBarWidth, int readyRightEdge,
+                int daysRightEdge, int remainingRightEdge, bool distributed,
+                int upX, int downX, int removeX,
                 int subLineX, int subLineWidth)
             {
                 RowWidth = rowWidth;
@@ -126,9 +184,14 @@ namespace TaimisToolbench.Services
                 IconX = iconX;
                 NameX = nameX;
                 NameWidth = nameWidth;
+                StatusX = statusX;
+                StatusWidth = statusWidth;
+                ReadyBarX = readyBarX;
+                ReadyBarWidth = readyBarWidth;
                 ReadyRightEdge = readyRightEdge;
                 DaysRightEdge = daysRightEdge;
                 RemainingRightEdge = remainingRightEdge;
+                Distributed = distributed;
                 UpX = upX;
                 DownX = downX;
                 RemoveX = removeX;
@@ -138,17 +201,73 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// Columns the row is divided into between the item name's left edge
+        /// and the last data column's right edge: the name takes
+        /// <see cref="NameTrackSpan"/> of them, then Status, Ready, Days and
+        /// Remaining take one each.
+        /// <para>
+        /// This is SummarySectionLayoutMath's currency-table idiom, applied
+        /// for the reason the owner gave for asking: the four data columns
+        /// used to huddle against the buttons at the right edge, leaving the
+        /// centre of a 2400px row empty and the eye with nothing to follow
+        /// from a row's name to its numbers.
+        /// </para>
+        /// <para>
+        /// The name gets two tracks rather than one because it is the row's
+        /// subject and now draws one tier up the ramp (bold 18); a single
+        /// track at the 1378px window floor leaves it about 200px, which
+        /// ellipsizes ordinary legendary names, and two leaves it about 320.
+        /// </para>
+        /// </summary>
+        public const int TrackCount = 6;
+
+        /// <summary>
+        /// Tracks the item name spans; see <see cref="TrackCount"/>. The two
+        /// constants are COUPLED - Compute reads the four data columns off
+        /// tracks NameTrackSpan..TrackCount, so TrackCount has to stay
+        /// NameTrackSpan plus <see cref="DataColumnCount"/>. Asserted rather
+        /// than left to be noticed.
+        /// </summary>
+        public const int NameTrackSpan = 2;
+
+        /// <summary>Status, Ready, Days, Remaining - one track each.</summary>
+        public const int DataColumnCount = 4;
+
+        /// <summary>
+        /// Right edge of track <paramref name="index"/> (0-based) of
+        /// <see cref="TrackCount"/> equal tracks spanning trackSpan px from
+        /// nameX. Integer-exact off the span rather than accumulated from a
+        /// rounded track width - the same shape GateCell and
+        /// SummarySectionLayoutMath.TrackRightEdge use - so the last track's
+        /// edge lands exactly on the span's own end instead of a rounding
+        /// pixel short of it.
+        /// </summary>
+        private static int TrackEdge(int nameX, int trackSpan, int index)
+        {
+            return nameX + (int)((long)trackSpan * index / TrackCount);
+        }
+
+        /// <summary>
         /// rowWidth is the SCROLLING panel's width minus
         /// WindowSizing.ScrollbarAllowance, never the container's width.
-        /// The affordability chip is NOT a band here: seated between the
-        /// Ready and Days rails it broke the header-over-column mapping the
-        /// field test flagged, so it now trails the item name inside the
-        /// name band (see the view's chip placement).
+        /// <para>
+        /// The affordability chip is a COLUMN here, with a header of its
+        /// own. It used to trail the item name, which put it at a different
+        /// x on every row and made the one badge the table exists to be
+        /// scanned for the only thing in it that could not be scanned.
+        /// </para>
+        /// <para>
+        /// statusCellWidth and remainingCellWidth are the widest measured
+        /// cell across the WHOLE table, not this row's - the columns are
+        /// table-wide or the header labels nothing.
+        /// </para>
         /// </summary>
-        public static Bands Compute(int rowWidth, int remainingCellWidth, bool showReorder = true)
+        public static Bands Compute(
+            int rowWidth, int remainingCellWidth, int statusCellWidth = 0, bool showReorder = true)
         {
             rowWidth = Math.Max(0, rowWidth);
             remainingCellWidth = Math.Max(MinRemainingCellWidth, remainingCellWidth);
+            statusCellWidth = Math.Max(MinStatusCellWidth, statusCellWidth);
 
             int rightEdge = Math.Max(0, rowWidth - Inset);
 
@@ -161,19 +280,63 @@ namespace TaimisToolbench.Services
             int downX = showReorder ? removeX - ButtonGap - ButtonWidth : -1;
             int upX = showReorder ? downX - ButtonGap - ButtonWidth : -1;
 
-            int remainingRightEdge = (showReorder ? upX : removeX) - CellGap;
-            int daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
-            int readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
-
             int rankX = Inset;
             int iconX = rankX + RankWidth;
             int nameX = iconX + IconTotal + IconGap;
 
-            // The name band ends at the Ready CELL's left edge, not at the
-            // Ready text's right edge - the right-aligned "100%" extends
-            // ReadyCellWidth's worth of pixels left of readyRightEdge, and a
-            // name allowed to run under it would collide.
-            int nameWidth = readyRightEdge - ReadyCellWidth - CellGap - nameX;
+            int dataRightEdge = (showReorder ? upX : removeX) - CellGap;
+            int trackSpan = dataRightEdge - nameX;
+
+            // A track has to hold the widest cell any of the four data
+            // columns will draw, plus the gap that keeps it off its
+            // neighbour. Below that there is nothing to distribute and the
+            // row falls back to the packed right-to-left stack, which fits
+            // in less: on a narrow panel a legible cramped table beats an
+            // evenly spaced illegible one. Same trade, and the same test,
+            // as SummarySectionLayoutMath.EdgesFromRightEdge.
+            int widestCell = Math.Max(
+                Math.Max(statusCellWidth, remainingCellWidth),
+                Math.Max(ReadyCellWidth, DaysCellWidth));
+            bool distributed = trackSpan > 0 && trackSpan / TrackCount >= widestCell + CellGap;
+
+            int statusX;
+            int statusWidth;
+            int readyRightEdge;
+            int daysRightEdge;
+            int remainingRightEdge;
+            int readyTrackWidth;
+
+            if (distributed)
+            {
+                int nameTrackEnd = TrackEdge(nameX, trackSpan, NameTrackSpan);
+                statusX = nameTrackEnd;
+                statusWidth = TrackEdge(nameX, trackSpan, NameTrackSpan + 1) - statusX - CellGap;
+                readyRightEdge = TrackEdge(nameX, trackSpan, NameTrackSpan + 2);
+                daysRightEdge = TrackEdge(nameX, trackSpan, NameTrackSpan + 3);
+                remainingRightEdge = TrackEdge(nameX, trackSpan, TrackCount);
+                readyTrackWidth = readyRightEdge - TrackEdge(nameX, trackSpan, NameTrackSpan + 1);
+            }
+            else
+            {
+                remainingRightEdge = dataRightEdge;
+                daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
+                readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
+                statusX = readyRightEdge - ReadyCellWidth - CellGap - statusCellWidth;
+                statusWidth = statusCellWidth;
+                readyTrackWidth = ReadyCellWidth;
+            }
+
+            // The bar FILLS its track. A capped bar would strand the rest of
+            // it, which is the dead space distribution exists to retire, and
+            // the clearance to the Status chip on its left is already paid
+            // for out of that column's own band.
+            int readyBarWidth = Math.Max(0, readyTrackWidth);
+            int readyBarX = readyRightEdge - readyBarWidth;
+
+            // The name band ends a gap short of the Status chip's left edge:
+            // the chip is left-aligned there, so a name allowed to run to it
+            // would touch it.
+            int nameWidth = statusX - CellGap - nameX;
 
             // A window narrow enough to squeeze the name out clamps rather
             // than emitting a negative width the view would hand to a
@@ -188,9 +351,24 @@ namespace TaimisToolbench.Services
 
             return new Bands(
                 rowWidth, rankX, iconX, nameX, nameWidth,
-                readyRightEdge, daysRightEdge,
-                remainingRightEdge, upX, downX, removeX,
+                statusX, Math.Max(0, statusWidth),
+                readyBarX, readyBarWidth, readyRightEdge,
+                daysRightEdge, remainingRightEdge, distributed,
+                upX, downX, removeX,
                 subLineX, subLineWidth);
+        }
+
+        /// <summary>
+        /// Y of a line box of <paramref name="lineHeight"/> centred in the
+        /// main line. The row's height is set by its tier-1 item icon
+        /// (<see cref="RowHeight"/>), so every font that draws on the main
+        /// line - the bold-18 name and readiness bar, the body-16 days and
+        /// coin cells, the caption rank - centres against the ICON rather
+        /// than sharing a top edge with a taller neighbour.
+        /// </summary>
+        public static int MainLineY(int lineHeight)
+        {
+            return Math.Max(0, (RowHeight - lineHeight) / 2);
         }
 
         /// <summary>
@@ -213,6 +391,27 @@ namespace TaimisToolbench.Services
             int right = bands.SubLineX + (int)((long)bands.SubLineWidth * (index + 1) / GateCellCount);
             x = left;
             width = Math.Max(0, right - left);
+        }
+
+        /// <summary>
+        /// The painted bar inside gate cell <paramref name="index"/>: it
+        /// starts past a label band wide enough for the widest of the five
+        /// gate names (measured by the caller, since that is a
+        /// MeasureString) and runs to a gap short of the cell's own end.
+        /// <para>
+        /// The label band is one width for all five cells rather than each
+        /// cell's own label width, so the bars start at the same offset in
+        /// every cell and the strip reads as five gauges rather than five
+        /// sentences. The gap it fills is exactly the dead space the owner
+        /// flagged between a gate's name and its right-aligned percentage.
+        /// </para>
+        /// </summary>
+        public static void GateBar(
+            in Bands bands, int index, int labelBandWidth, out int barX, out int barWidth)
+        {
+            GateCell(bands, index, out int cellX, out int cellWidth);
+            barX = cellX + Math.Max(0, labelBandWidth) + GateLabelGap;
+            barWidth = Math.Max(0, cellX + cellWidth - CellGap - barX);
         }
 
         /// <summary>
@@ -263,7 +462,7 @@ namespace TaimisToolbench.Services
             {
                 y += GateTopGap;
                 gateY = y;
-                y += SubLineHeight;
+                y += GateLineHeight;
             }
 
             if (currencyLines > 0)
