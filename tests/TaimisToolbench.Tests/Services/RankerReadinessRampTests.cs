@@ -76,6 +76,45 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TheTrackIsVisibleAgainstThePanelItSitsOn()
+        {
+            // The obligation the track was first chosen without. A track
+            // that matches its background is not a bar: the fill reads as a
+            // floating block with no scale, and the centred percentage
+            // reads as detached from it. Measured in game before the fix,
+            // the track scored 1.05:1 against the panel while the panel's
+            // own texture varies by 1.076:1 - less distinguishable from the
+            // surface than the surface is from itself, which is the floor
+            // this asserts against.
+            double vsPanel = RankerReadinessRamp.ContrastRatio(
+                RankerReadinessRamp.Track, RankerReadinessRamp.PanelReference);
+
+            // Compared as EXCESS OVER UNITY, not as the ratios themselves:
+            // a contrast ratio starts at 1.0, so 1.076 and 1.351 are 0.076
+            // and 0.351 of separation, not numbers to multiply directly.
+            // Going darker cannot exceed 1.42:1 against this panel at all,
+            // so a threshold stated the naive way is unreachable.
+            Assert.True(
+                (vsPanel - 1.0) > (PanelTextureNoise - 1.0) * 3.0,
+                "track vs panel " + vsPanel.ToString("0.000")
+                    + " must clear the panel's own texture noise "
+                    + PanelTextureNoise.ToString("0.000") + " by 3x its margin");
+
+            // Darker, not lighter: lighter enough to separate would breach
+            // the white-text floor the centred percentage depends on.
+            Assert.True(
+                RankerReadinessRamp.RelativeLuminance(RankerReadinessRamp.Track)
+                    < RankerReadinessRamp.RelativeLuminance(RankerReadinessRamp.PanelReference));
+        }
+
+        /// <summary>
+        /// Contrast between the two panel samples taken in game,
+        /// Rgb(38, 36, 34) and Rgb(42, 42, 41) - how much the surface
+        /// varies on its own, and so the floor any marking on it must beat.
+        /// </summary>
+        private const double PanelTextureNoise = 1.076;
+
+        [Fact]
         public void TheMidRangeIsOrangeAndOlive_NotBrown()
         {
             // The measurement that says OKLCh is earning its keep. An sRGB

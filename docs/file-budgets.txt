@@ -173,7 +173,7 @@ Services/RankerPriorityCascade.cs                                               
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                         87
 Services/RankerReadinessCalculator.cs                                                   681
-Services/RankerReadinessRamp.cs                                                         226
+Services/RankerReadinessRamp.cs                                                         265
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
 Services/RankerRowLayout.cs                                                             651
@@ -472,7 +472,7 @@ tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs              
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                   256
 tests/TaimisToolbench.Tests/Services/RankerRarityAdoptionTests.cs                     130
 tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs                747
-tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      186
+tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      225
 tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
 tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          746
 tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                              272

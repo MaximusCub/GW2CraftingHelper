@@ -72,12 +72,37 @@ namespace TaimisToolbench.Services
         public static readonly Rgb Full = new Rgb(42, 124, 48);
 
         /// <summary>
-        /// The unfilled part of a bar. White percentages are centred in the
-        /// bar and a low fill leaves most of that text over the TRACK rather
-        /// than over the ramp, so the track carries the same contrast
-        /// obligation as the fill does - it measures 15.47:1.
+        /// The unfilled part of a bar, which carries TWO contrast
+        /// obligations, not one. Against white, because a low fill leaves
+        /// the centred percentage sitting over the track rather than over
+        /// the ramp: 19.42:1. Against the PANEL BEHIND IT, because a track
+        /// nobody can see is not a bar - it is a floating coloured block
+        /// with no scale, and the percentage beside it reads as detached.
+        /// <para>
+        /// The second obligation is the one this constant was first chosen
+        /// without: at Rgb(38, 36, 34) the track scored 1.05:1 against the
+        /// panel while the panel's own texture varies by 1.076:1, so it was
+        /// literally less distinguishable from the surface than the surface
+        /// is from itself. Measured in game at 3440x1440.
+        /// </para>
+        /// <para>
+        /// Darker is the only direction that serves both: reaching 3:1
+        /// against the panel needs roughly Rgb(110), which drops white-text
+        /// contrast to ~3.5:1, under <see cref="WhiteTextContrastFloor"/>.
+        /// Pure black is the ceiling at 1.42:1; this sits at 1.32:1.
+        /// </para>
         /// </summary>
-        public static readonly Rgb Track = new Rgb(38, 36, 34);
+        public static readonly Rgb Track = new Rgb(14, 13, 12);
+
+        /// <summary>
+        /// The Blish window panel a readiness bar is drawn on, sampled in
+        /// game at 3440x1440 beside and behind the Ranker's bars. Not a
+        /// colour this module paints - a measurement of the surface it
+        /// paints onto, kept so <c>Track</c> can be held apart from it.
+        /// The two samples were Rgb(38, 36, 34) and Rgb(42, 42, 41); this
+        /// is the lighter, which is the harder case for a dark track.
+        /// </summary>
+        public static readonly Rgb PanelReference = new Rgb(42, 42, 41);
 
         /// <summary>
         /// Ramp colour for a 0..1 readiness fraction, clamped. Two OKLCh
@@ -154,6 +179,20 @@ namespace TaimisToolbench.Services
         public static double ContrastWithWhite(Rgb background)
         {
             return 1.05 / (RelativeLuminance(background) + 0.05);
+        }
+
+        /// <summary>
+        /// WCAG contrast between any two colours, lighter over darker. Used
+        /// for the track-against-panel obligation, where neither side is
+        /// white and <see cref="ContrastWithWhite"/> cannot answer.
+        /// </summary>
+        public static double ContrastRatio(Rgb a, Rgb b)
+        {
+            double la = RelativeLuminance(a);
+            double lb = RelativeLuminance(b);
+            double hi = la > lb ? la : lb;
+            double lo = la > lb ? lb : la;
+            return (hi + 0.05) / (lo + 0.05);
         }
 
         private static Rgb Blend(Rgb from, Rgb to, double u)
