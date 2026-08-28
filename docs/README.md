@@ -31,6 +31,11 @@ are in tells you whether a page is safe to edit.
   checks resolves to a real heading.
 - [`RELEASING.md`](RELEASING.md) - what packaging and release actually do
   today, measured, including what still does not exist.
+- [`RENAMING.md`](RENAMING.md) - the runbook for the finale of the
+  Taimi's Toolbench rename: GitHub repo rename, local folder and
+  junction gymnastics, and the owner's Blish install migration. Current
+  state until those steps are executed and verified; a frozen record
+  after.
 - [`gw2e-parity-spec.md`](gw2e-parity-spec.md) - the normative
   gw2efficiency behavior the solver targets, per rule.
 - [`gw2e-considerations.md`](gw2e-considerations.md) - the maintainer's
