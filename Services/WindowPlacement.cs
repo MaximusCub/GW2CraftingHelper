@@ -27,6 +27,8 @@ namespace TaimisToolbench.Services
     /// position saved against a wide client leaves an arbitrary amount of
     /// the window's right-hand side - cost column, Generate button, resize
     /// grip - past the edge of a narrower one, with no way to drag it back.
+    /// A restored SIZE gets no clamp at all on that same path, which is
+    /// what <see cref="ClampExtent"/> is for.
     /// </para>
     /// </summary>
     internal static class WindowPlacement
@@ -61,6 +63,44 @@ namespace TaimisToolbench.Services
 
             int max = screenExtent - windowExtent;
             return position > max ? max : position;
+        }
+
+        /// <summary>
+        /// The extent one axis of a window may take, given the minimum that
+        /// axis enforces and the screen's own extent - the ceiling to
+        /// <see cref="WindowSizing.EffectiveMinWindowWidth"/>'s floor.
+        /// <para>
+        /// A window larger than the screen is the one shape the position
+        /// clamp above cannot rescue: the grip is off the trailing edge at
+        /// every position the title bar is reachable from, and the grip is
+        /// the only way to shrink it. Blish restores a persisted size
+        /// verbatim - WindowBase2.Show writes it from settings with no
+        /// clamp of any kind (BlishHUD 1.3.0, decompiled) - so a size
+        /// dragged out on a 3440-wide client comes back whole on a
+        /// 1080-wide one.
+        /// </para>
+        /// <para>
+        /// Where the two converge the FLOOR wins, and it has to: on a
+        /// client below <see cref="WindowSizing.NarrowScreenFloorWidth"/>
+        /// the effective minimum is already wider than the screen, and the
+        /// window's own layout pass re-applies that minimum, so a ceiling
+        /// that undercut it would be grown straight back and the window
+        /// would oscillate instead of fitting. Such a client is the
+        /// leading-edge case in the class summary above.
+        /// </para>
+        /// <para>
+        /// A screen extent of 0 or less - not settled yet - applies the
+        /// floor and no ceiling, which is what this axis did before there
+        /// was a ceiling at all.
+        /// </para>
+        /// </summary>
+        public static int ClampExtent(int windowExtent, int minExtent, int screenExtent)
+        {
+            int fitted = screenExtent > 0 && windowExtent > screenExtent
+                ? screenExtent
+                : windowExtent;
+
+            return fitted < minExtent ? minExtent : fitted;
         }
     }
 }
