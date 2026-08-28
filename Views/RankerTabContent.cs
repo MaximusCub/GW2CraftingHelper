@@ -8,7 +8,6 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using TaimisToolbench.Contracts;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
@@ -56,23 +55,39 @@ namespace TaimisToolbench.Views
         private const int CheckboxTextInset = 20;
         private const int BannerHeight = 30;
 
-        // Vertical centring inside the 60px tier-1 main line (see
-        // RankerRowLayout.RowHeight): a Body text line, the rank caption,
-        // the 22px chip, the 28px row buttons and the 54px icon frame.
-        private const int MainLineTextY = 20;
-        private const int MainLineRankY = 22;
-        private const int MainLineChipY = 19;
-        private const int MainLineButtonY = 16;
+        // Vertical rhythm of the 60px main line, DERIVED rather than
+        // listed. The row's height is set by its tier-1 item icon
+        // (RankerRowLayout.RowHeight), and every face and every box on the
+        // line centres against that icon - which is what makes the type ramp
+        // a choice this row can change without re-picking five literals.
+        private static int MainLineTextY => RankerRowLayout.MainLineY(TypeRampMetrics.BodyInk.LineHeight);
+
+        private static int MainLineNameY => RankerRowLayout.MainLineY(TypeRampMetrics.StatusInk.LineHeight);
+
+        private static int MainLineRankY => RankerRowLayout.MainLineY(TypeRampMetrics.CaptionInk.LineHeight);
+
+        private static int MainLineChipY => RankerRowLayout.MainLineY(LabelHelpers.SmallTagHeight);
+
+        private static int MainLineButtonY => RankerRowLayout.MainLineY(UiMetrics.ButtonHeight);
+
+        private static int MainLineBarY => RankerRowLayout.MainLineY(RankerRowLayout.ReadyBarHeight);
+
         private const int MainLineIconY = 3;
 
-        /// <summary>
-        /// The promoted readiness figure sits one tier above the rest of the
-        /// main line, so it is centred against the Body text beside it rather
-        /// than sharing its top edge - a taller line box on the same y reads
-        /// as a row that sags.
-        /// </summary>
+        /// <summary>The readiness percentage, centred inside its own bar.</summary>
         private static int ReadyLineY =>
-            MainLineTextY - (UiFonts.Status.LineHeight - UiFonts.Body.LineHeight) / 2;
+            MainLineBarY + ((RankerRowLayout.ReadyBarHeight - TypeRampMetrics.StatusInk.LineHeight) / 2);
+
+        /// <summary>A gate's label and its bar, centred in the gate strip's pitch.</summary>
+        private static int GateTextY =>
+            (RankerRowLayout.GateLineHeight - TypeRampMetrics.BodyInk.LineHeight) / 2;
+
+        private static int GateBarOffsetY =>
+            (RankerRowLayout.GateLineHeight - RankerRowLayout.GateBarHeight) / 2;
+
+        /// <summary>The percentage centred inside a gate's bar.</summary>
+        private static int GateValueY =>
+            GateBarOffsetY + ((RankerRowLayout.GateBarHeight - TypeRampMetrics.BodyInk.LineHeight) / 2);
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
@@ -96,23 +111,16 @@ namespace TaimisToolbench.Views
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
         private static readonly Color AffordableChipFill = AffordableChipBorder * 0.15f;
 
-        // Row action art, by GW2 .dat asset id (the mechanism the module
-        // already uses for its tab and coin icons):
-        //   155953 - Blish's own 32px section-header caret, a cream DOWN
-        //            triangle. The up arrow is the same asset flipped, so
-        //            the pair can never disagree about weight or colour.
-        //   733269 - the matched 16px grey X of Blish's own remove pair.
-        private const int ReorderArrowAssetId = 155953;
+        /// <summary>The matched 16px X of Blish's own remove pair, by .dat asset id.</summary>
         private const int RemoveMarkAssetId = 733269;
 
-        // The plate a row action sits on, and the three states its art
-        // takes. Dim by default so a table of them reads as one quiet
-        // column rather than as a wall of arrows.
-        private static readonly Color RowButtonFill = new Color(0, 0, 0) * 0.25f;
-        private static readonly Color RowButtonHoverFill = new Color(255, 255, 255) * 0.12f;
-        private static readonly Color RowButtonTint = new Color(210, 210, 210);
-        private static readonly Color RowButtonHoverTint = Color.White;
-        private static readonly Color RowButtonDisabledTint = new Color(255, 255, 255) * 0.25f;
+        /// <summary>
+        /// Dark ink for a row button's icon. 733269 is authored white for a
+        /// dark window and the button plate under it is parchment, so an
+        /// untinted blit is invisible on it - the measured case
+        /// FeedbackButton.IconTint exists for.
+        /// </summary>
+        private static readonly Color RowButtonIconTint = new Color(45, 42, 38);
 
         // The comparison-mode radio indicator: 157330 is the small green dot
         // the game uses for "on"; its "-cantint" twin is the grey dot for
@@ -175,6 +183,7 @@ namespace TaimisToolbench.Views
         // would put those columns in a different place on every row and
         // leave the header labelling nothing.
         private int _remainingBandWidth;
+        private int _statusBandWidth;
         private int _refreshGeneration;
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
@@ -673,7 +682,7 @@ namespace TaimisToolbench.Views
             _columnHeaderPanel = HeaderBands.CreateColumnHeaderBand(
                 container, width, 0, AddRowHeight + ToolbarHeight);
 
-            foreach (string text in new[] { "#", "Item", "Ready", "Days", "Remaining" })
+            foreach (string text in ColumnHeaders)
             {
                 _columnHeaderLabels.Add(new Label
                 {
@@ -687,6 +696,33 @@ namespace TaimisToolbench.Views
                 });
             }
         }
+
+        /// <summary>
+        /// The table's columns, left to right. Status is a column of its own
+        /// rather than a badge trailing the item name: trailing the name put
+        /// it at a different x on every row, so the one mark the table exists
+        /// to be scanned for was the only thing in it that could not be
+        /// scanned (owner report, 2026-08-28).
+        /// </summary>
+        private static readonly string[] ColumnHeaders =
+        {
+            "#", "Item", "Status", "Ready", "Days", "Remaining",
+        };
+
+        /// <summary>
+        /// One short sentence per column, saying what its number MEANS. The
+        /// "#" entry is the only mode-dependent one and is written in
+        /// <see cref="UpdateColumnHeaderTooltips"/>; the rest are fixed.
+        /// </summary>
+        private static readonly string[] ColumnHeaderTooltips =
+        {
+            null,
+            "The item you are working toward, and how many of it - hover for its full details.",
+            "Whether you can afford everything this item still needs right now, or how much coin you are short of it.",
+            "How close this item is to finished: the five barriers under the row, blended into one figure.",
+            "The shortest possible wait in days, set by once-per-day crafts that no amount of coin can shorten.",
+            "The coin still to spend, for the materials this item needs that you do not already hold.",
+        };
 
         private void PositionChrome(Container container, int width)
         {
@@ -732,9 +768,15 @@ namespace TaimisToolbench.Views
 
             SetHeaderLabel(0, bands.RankX);
             SetHeaderLabel(1, bands.NameX);
-            SetHeaderLabelRight(2, bands.ReadyRightEdge);
-            SetHeaderLabelRight(3, bands.DaysRightEdge);
-            SetHeaderLabelRight(4, bands.RemainingRightEdge);
+
+            // Status is the one LEFT-aligned data column: its content is a
+            // variable-width badge, and a badge that shares a right edge
+            // down the column starts at a different x on every row, which is
+            // the alignment the column was asked for in the first place.
+            SetHeaderLabel(2, bands.StatusX);
+            SetHeaderLabelRight(3, bands.ReadyRightEdge);
+            SetHeaderLabelRight(4, bands.DaysRightEdge);
+            SetHeaderLabelRight(5, bands.RemainingRightEdge);
         }
 
         /// <summary>
@@ -752,6 +794,11 @@ namespace TaimisToolbench.Views
             TooltipFacility.ApplyPlain(_columnHeaderLabels[0], Mode == RankerMode.Independent
                 ? "Rank by readiness, worked out from the numbers on the right. Your own priority order is kept, and comes back when you switch to \"" + CascadeModeItem + "\"."
                 : "Your priority order. The row above has first claim on your materials, currencies, coin and daily crafts - use the arrows to change it.");
+
+            for (int i = 1; i < _columnHeaderLabels.Count && i < ColumnHeaderTooltips.Length; i++)
+            {
+                TooltipFacility.ApplyPlain(_columnHeaderLabels[i], ColumnHeaderTooltips[i]);
+            }
         }
 
         private void SetHeaderLabel(int index, int x)
@@ -855,18 +902,38 @@ namespace TaimisToolbench.Views
             public Panel Panel;
             public Label RankLabel;
             public IconNameRowHelpers.IconNameHandle IconName;
+            /// <summary>The percentage centred in the bar, or the measured non-numeric verdict.</summary>
             public Label ReadyLabel;
-            public Panel Chip;
-            public int ChipWidth;
+
+            /// <summary>The bar's plate, and the painted part inside it. Null on an unmeasured row.</summary>
+            public Panel ReadyBarTrack;
+            public Panel ReadyBarFill;
+
+            /// <summary>Readiness the bar was painted at, so a resize can repaint without re-solving.</summary>
+            public double ReadyFraction;
+
+            public Panel StatusChip;
+            public Label StatusPlaceholder;
+            public int StatusCellWidth;
             public Label DaysLabel;
             public CoinCurrencyRenderer.ValueCellHandle RemainingCell;
             public Label RemainingDash;
             public int RemainingCellWidth;
-            public Image Up;
-            public Image Down;
-            public Image Remove;
+            public FeedbackButton Up;
+            public FeedbackButton Down;
+            public FeedbackButton Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
+            public readonly List<Panel> GateBarTracks = new List<Panel>();
+            public readonly List<Panel> GateBarFills = new List<Panel>();
+
+            /// <summary>
+            /// Each gate's completion, or -1 for a gate this item does not
+            /// have. Kept beside the controls so a width change repaints the
+            /// bars from the same numbers rather than re-reading metrics
+            /// that may have been replaced under it.
+            /// </summary>
+            public readonly List<double> GateFractions = new List<double>();
             public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
             public readonly List<Label> CurrencyNameLabels = new List<Label>();
             public readonly List<string> CurrencyNameFulls = new List<string>();
@@ -1073,16 +1140,23 @@ namespace TaimisToolbench.Views
         private bool RecomputeBandWidths()
         {
             int remaining = MeasureDashWidth();
+            int status = 0;
             foreach (var row in _rows)
             {
                 if (row.RemainingCellWidth > remaining)
                 {
                     remaining = row.RemainingCellWidth;
                 }
+
+                if (row.StatusCellWidth > status)
+                {
+                    status = row.StatusCellWidth;
+                }
             }
 
-            bool changed = remaining != _remainingBandWidth;
+            bool changed = remaining != _remainingBandWidth || status != _statusBandWidth;
             _remainingBandWidth = remaining;
+            _statusBandWidth = status;
             return changed;
         }
 
@@ -1117,7 +1191,8 @@ namespace TaimisToolbench.Views
 
         private RankerRowLayout.Bands BandsFor(int barWidth)
         {
-            return RankerRowLayout.Compute(barWidth, _remainingBandWidth, ReorderVisible);
+            return RankerRowLayout.Compute(
+                barWidth, _remainingBandWidth, _statusBandWidth, ReorderVisible);
         }
 
         /// <summary>
@@ -1183,7 +1258,14 @@ namespace TaimisToolbench.Views
             row.CurrencyNameFulls.Clear();
             row.CurrencyValueLabels.Clear();
             row.NoteLabels.Clear();
-            row.Chip = null;
+            row.GateBarTracks.Clear();
+            row.GateBarFills.Clear();
+            row.GateFractions.Clear();
+            row.StatusChip = null;
+            row.StatusPlaceholder = null;
+            row.ReadyBarTrack = null;
+            row.ReadyBarFill = null;
+            row.ReadyLabel = null;
             row.RemainingCell = null;
             row.RemainingDash = null;
 
@@ -1202,52 +1284,35 @@ namespace TaimisToolbench.Views
                 Parent = row.Panel,
             };
 
-            // The chip trails the name inside the name band (see
-            // RankerRowLayout.Compute's comment), so the name's budget
-            // reserves the chip's width first.
+            // The name band is the name's alone now that the chip has a
+            // column: it runs to the Status column's own left edge.
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 row.Panel, entry.IconUrl, entry.Rarity,
-                bands.IconX, MainLineIconY, row.FullName, UiFonts.Body,
-                NameBudgetRightEdge(bands, row.ChipWidth), 0, 0, bands.NameX, MainLineTextY,
+                bands.IconX, MainLineIconY, row.FullName, UiFonts.Status,
+                bands.NameX + bands.NameWidth, 0, 0, bands.NameX, MainLineNameY,
                 iconSize: RankerRowLayout.IconSize);
             ApplyItemTooltip(row, entry);
 
             if (chipText != null)
             {
                 ChipColors(metrics, out Color chipBorder, out Color chipFill);
-                row.Chip = LabelHelpers.CreateSmallTag(
-                    row.Panel, chipText, ChipXFor(row), MainLineChipY, chipBorder, chipFill);
-                LabelHelpers.ApplyTagTooltip(row.Chip, ChipTooltip(metrics));
+                row.StatusChip = LabelHelpers.CreateSmallTag(
+                    row.Panel, chipText, bands.StatusX, MainLineChipY, chipBorder, chipFill);
+                LabelHelpers.ApplyTagTooltip(row.StatusChip, ChipTooltip(metrics));
+            }
+            else
+            {
+                row.StatusPlaceholder = CreateUnknownCell(
+                    row.Panel, bands.StatusX, MainLineTextY, StatusPlaceholderTooltip(metrics));
             }
 
-            // THE ROW'S TYPE RAMP. Two reading sizes exist (Caption 14,
-            // Body 16) and the promoted tiers above them are bold rather
-            // than merely bigger - see Views/Rendering/UiFonts. The item
-            // name and this percentage are what the table is FOR, so the
-            // percentage takes the Status tier; Days and the coin cell stay
-            // at Body; the gate strip, the currency detail and the notes sit
-            // at Caption, separated from each other by rhythm and indent
-            // rather than by a fourth size the ramp does not have.
-            row.ReadyLabel = new Label
-            {
-                Font = UiFonts.Status,
-                Text = metrics == null ? RankerReadinessCalculator.DashText : RankerReadinessCalculator.FormatReadiness(metrics),
-                TextColor = metrics == null
-                    ? RankerReadinessColors.Neutral
-                    : metrics.Kind != RankerReadinessKind.Measured
-                        ? ValueTextColor
-                        : RankerReadinessColors.ForReadiness(metrics.Readiness),
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(0, ReadyLineY),
-                Parent = row.Panel,
-            };
-            TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
+            RenderReadyCell(row, bands, metrics);
 
-            // Measured absences render at ValueTextColor: the field test
-            // showed the Neutral dash disappearing into the background
-            // under its own column header. Neutral is only for "not yet
-            // calculated".
+            // Measured absences render at ValueTextColor and as a real zero;
+            // only a row that has never been solved gets the Neutral dash.
+            // That is the whole distinction: an unmeasured cell says "-" in
+            // grey and hovers "not yet calculated", and a measured cell
+            // always shows a number, even when the number is nothing.
             row.DaysLabel = new Label
             {
                 Font = UiFonts.Body,
@@ -1264,25 +1329,29 @@ namespace TaimisToolbench.Views
             };
             TooltipFacility.ApplyPlain(row.DaysLabel, DaysTooltip(metrics));
 
-            if (metrics == null || metrics.RemainingCoinCost <= 0)
+            if (metrics == null)
             {
-                // The coin renderer's own zero-value cell is the gw2e-style
-                // "not sold or crafted" em dash, which claims unpriceable.
-                // A refreshed row's zero is a measured zero, so it gets the
-                // module's plain dash and says why on hover instead.
-                row.RemainingDash = new Label
+                row.RemainingDash = CreateUnknownCell(
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
+            }
+            else if (metrics.RemainingCoinCost <= 0)
+            {
+                // A solved row that owes nothing has a real answer, so it
+                // draws the game's own zero rather than a dash. The coin
+                // renderer's plain zero-value cell is reserved for the
+                // gw2e-style "not sold or craftable" case and would claim
+                // something this row is not saying.
+                row.RemainingCell = CoinCurrencyRenderer.RenderZeroValueCellRightAligned(
+                    row.Panel, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
+                foreach (var segment in row.RemainingCell.CoinSegments.Controls)
                 {
-                    Font = UiFonts.Body,
-                    Text = RankerReadinessCalculator.DashText,
-                    TextColor = metrics == null ? RankerReadinessColors.Neutral : ValueTextColor,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(0, MainLineTextY),
-                    Parent = row.Panel,
-                };
-                TooltipFacility.ApplyPlain(row.RemainingDash, metrics == null
-                    ? "Not yet calculated - press Refresh."
-                    : "Nothing left to buy - the materials you hold cover this item's coin cost.");
+                    // The NUMBER only. The coin beside it already carries its
+                    // denomination's own hover from the renderer, and Blish
+                    // resolves a tooltip on the deepest control under the
+                    // cursor, so overwriting it would trade a fact for a
+                    // sentence the number is already saying.
+                    TooltipFacility.ApplyPlain(segment.Label, ZeroRemainingTooltip);
+                }
             }
             else
             {
@@ -1296,17 +1365,21 @@ namespace TaimisToolbench.Views
 
             if (ReorderVisible)
             {
-                row.Up = CreateRowButton(row.Panel, ReorderArrowAssetId, true, bands.UpX, MoveUpTooltip());
-                row.Down = CreateRowButton(row.Panel, ReorderArrowAssetId, false, bands.DownX, MoveDownTooltip());
-                SetRowButtonEnabled(row.Up, CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
-                SetRowButtonEnabled(row.Down, CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+                row.Up = CreateGlyphRowButton(
+                    row.Panel, UiGlyphs.CaretUp, bands.UpX, MoveUpTooltip());
+                row.Down = CreateGlyphRowButton(
+                    row.Panel, UiGlyphs.CaretDown, bands.DownX, MoveDownTooltip());
+                row.Up.Enabled = CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
+                row.Down.Enabled = CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
                 row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
                 row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             }
 
-            row.Remove = CreateRowButton(row.Panel, RemoveMarkAssetId, false, bands.RemoveX,
-                "Remove this item from your list.");
-            SetRowButtonEnabled(row.Remove, !_isRefreshing);
+            row.Remove = CreateRowButton(row.Panel, bands.RemoveX, "Remove this item from your list.");
+            row.Remove.Icon = AsyncTexture2D.FromAssetId(RemoveMarkAssetId);
+            row.Remove.ResizeIcon = true;
+            row.Remove.IconTint = RowButtonIconTint;
+            row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
             var subLines = RenderSubLines(row, bands);
@@ -1319,82 +1392,213 @@ namespace TaimisToolbench.Views
         private static void MeasureRowCells(RenderedRow row)
         {
             string chipText = ChipText(row.Metrics);
-            row.ChipWidth = chipText == null ? 0 : LabelHelpers.MeasureSmallTagWidth(chipText);
-            row.RemainingCellWidth = row.Metrics == null || row.Metrics.RemainingCoinCost <= 0
+            row.StatusCellWidth = chipText == null
                 ? MeasureDashWidth()
-                : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
+                : LabelHelpers.MeasureSmallTagWidth(chipText);
+            row.RemainingCellWidth = row.Metrics == null
+                ? MeasureDashWidth()
+                : row.Metrics.RemainingCoinCost <= 0
+                    ? CoinCurrencyRenderer.MeasureZeroValueWidth(UiFonts.Body)
+                    : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
         }
 
         /// <summary>
-        /// A row action, drawn as ART rather than as a text glyph. The three
-        /// buttons used to be StandardButtons labelled U+25B2, U+25BC and
-        /// U+2715; Blish's Menomonia is a bitmap font carrying 226
-        /// codepoints (ASCII, Latin-1 and about thirty punctuation marks)
-        /// and none of those three is among them, so all three rendered as
-        /// literally nothing - the field shot's blank grey rectangles. A
-        /// missing codepoint also measures zero width, which is why no
-        /// layout test caught it.
+        /// Seats the readiness cell at the table's current bands, and
+        /// repaints the fill: the bar's WIDTH is a table-wide band, so a
+        /// resize changes how many pixels a given percentage is worth.
+        /// </summary>
+        private static void LayoutReadyCell(RenderedRow row, in RankerRowLayout.Bands bands)
+        {
+            if (row.ReadyBarTrack != null)
+            {
+                int barX = Math.Max(0, bands.ReadyBarX);
+                row.ReadyBarTrack.Location = new Point(barX, MainLineBarY);
+                row.ReadyBarTrack.Size = new Point(bands.ReadyBarWidth, RankerRowLayout.ReadyBarHeight);
+                row.ReadyBarFill.Size = new Point(
+                    RankerReadinessRamp.FillWidth(bands.ReadyBarWidth, row.ReadyFraction),
+                    RankerRowLayout.ReadyBarHeight);
+
+                row.ReadyLabel.Location = new Point(
+                    barX + Math.Max(0, (bands.ReadyBarWidth - row.ReadyLabel.Width) / 2), ReadyLineY);
+                return;
+            }
+
+            // No bar: the unmeasured dash and the non-numeric verdict both
+            // right-align on the column's rail, under its header.
+            row.ReadyLabel.Location = new Point(
+                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
+        }
+
+        /// <summary>
+        /// A row action, and a REAL BUTTON. The three used to be Images
+        /// wearing game art, which was itself a repair: before that they
+        /// were StandardButtons labelled U+25B2/U+25BC/U+2715, none of which
+        /// Menomonia carries, so all three rendered as literally nothing.
         /// <para>
-        /// An Image, not a StandardButton with an Icon: the up arrow is the
-        /// down arrow flipped (Blish's own Panel/MenuItem carets do the same
-        /// with a rotation), and only Image exposes SpriteEffects.
+        /// Art on a bare Image reads as decoration and answers a hover with
+        /// whatever the view hand-rolls. A <see cref="FeedbackButton"/> is a
+        /// StandardButton, so it inherits Blish's own affordance:
+        /// OnMouseEntered/OnMouseLeft tween the public AnimationState 0 -&gt; 8
+        /// over 0.25s (Glide, linear, and rate-preserving on a reversal),
+        /// and Paint blits frame AnimationState of the nine-frame
+        /// "common/button-states" atlas into the plate - the left-to-right
+        /// sweep is painted INTO the artwork, not computed. Nothing here has
+        /// to reproduce it; deriving from the button is what buys it.
         /// </para>
         /// </summary>
-        private Image CreateRowButton(Panel parent, int assetId, bool flipVertically, int x, string tooltip)
+        private static FeedbackButton CreateRowButton(Panel parent, int x, string tooltip)
         {
-            var button = new Image(AsyncTexture2D.FromAssetId(assetId))
+            var button = new FeedbackButton
             {
                 Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
-                SpriteEffects = flipVertically ? SpriteEffects.FlipVertically : SpriteEffects.None,
-                BackgroundColor = RowButtonFill,
-                Tint = RowButtonTint,
                 Parent = parent,
             };
-
-            // Hover feedback in the button's own vocabulary: the art
-            // brightens and the plate lifts. StandardButton's atlas walk is
-            // not available to an Image, and a row action that answers a
-            // hover with nothing reads as decoration.
-            button.MouseEntered += (_, __) => ApplyRowButtonTint(button, hover: true);
-            button.MouseLeft += (_, __) => ApplyRowButtonTint(button, hover: false);
-
             TooltipFacility.ApplyPlain(button, tooltip);
             return button;
         }
 
         /// <summary>
-        /// Enabled state is a click gate AND a visual one: Blish's Control
-        /// blocks the Click on a disabled control but draws it unchanged, and
-        /// an arrow that looks live but does nothing is worse than one that
-        /// looks spent. Independent mode disables both reorder arrows on
-        /// every row, so this is the common state, not the rare one.
+        /// A row action whose whole label is one glyph from the module's own
+        /// atlas. StandardButton exposes no Font, which is exactly why the
+        /// reorder pair could not be a button before FeedbackButton: an
+        /// up/down pair needs two symmetric triangles, and the one face
+        /// Blish ships has none. The standalone glyph face centres its ink
+        /// in the line box rather than seating it on a baseline, which is
+        /// what a button with no neighbouring text wants.
         /// </summary>
-        private static void SetRowButtonEnabled(Image button, bool enabled)
+        private static FeedbackButton CreateGlyphRowButton(
+            Panel parent, string glyph, int x, string tooltip)
         {
-            if (button == null)
+            var button = CreateRowButton(parent, x, tooltip);
+            bool available = UiFonts.GlyphsAvailable;
+            button.Font = available ? UiFonts.Glyphs : UiFonts.Caption;
+            button.Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
+            return button;
+        }
+
+        /// <summary>
+        /// The headline readiness cell: a painted bar with the percentage
+        /// centred inside it in white.
+        /// <para>
+        /// THREE STATES, and they must not be confusable. An unmeasured row
+        /// draws no bar at all - a grey dash, and a hover that says to press
+        /// Refresh. A measured row with nothing scoreable draws its verdict
+        /// as text. Only a measured percentage draws a bar, so a 0% bar (a
+        /// full plate with nothing painted on it and a white "0%") can never
+        /// be mistaken for a row that has not been solved.
+        /// </para>
+        /// </summary>
+        private void RenderReadyCell(
+            RenderedRow row, in RankerRowLayout.Bands bands, RankerRowMetrics metrics)
+        {
+            row.ReadyFraction = -1;
+
+            if (metrics == null)
             {
+                row.ReadyLabel = CreateUnknownCell(
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
                 return;
             }
 
-            button.Enabled = enabled;
-            ApplyRowButtonTint(button, hover: false);
-        }
-
-        private static void ApplyRowButtonTint(Image button, bool hover)
-        {
-            if (button == null)
+            if (metrics.Kind != RankerReadinessKind.Measured)
             {
+                row.ReadyLabel = new Label
+                {
+                    Font = UiFonts.Body,
+                    Text = RankerReadinessCalculator.FormatReadiness(metrics),
+                    TextColor = ValueTextColor,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                    Location = new Point(0, MainLineTextY),
+                    Parent = row.Panel,
+                };
+                TooltipFacility.ApplyPlain(row.ReadyLabel, ReadyTooltip(metrics));
                 return;
             }
 
-            button.Tint = !button.Enabled
-                ? RowButtonDisabledTint
-                : hover ? RowButtonHoverTint : RowButtonTint;
-            button.BackgroundColor = button.Enabled && hover ? RowButtonHoverFill : RowButtonFill;
+            row.ReadyFraction = metrics.Readiness;
+            row.ReadyBarTrack = CreateBar(
+                row.Panel, Math.Max(0, bands.ReadyBarX), MainLineBarY, bands.ReadyBarWidth,
+                RankerRowLayout.ReadyBarHeight, metrics.Readiness, out row.ReadyBarFill);
+
+            row.ReadyLabel = new Label
+            {
+                Font = UiFonts.Status,
+                Text = RankerReadinessCalculator.FormatReadiness(metrics),
+                TextColor = Color.White,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, ReadyLineY),
+                Parent = row.Panel,
+            };
+
+            string tooltip = ReadyTooltip(metrics);
+            TooltipFacility.ApplyPlain(row.ReadyLabel, tooltip);
+            TooltipFacility.ApplyPlain(row.ReadyBarTrack, tooltip);
+            TooltipFacility.ApplyPlain(row.ReadyBarFill, tooltip);
         }
 
-        /// <summary>Returns the number of sub-lines rendered.</summary>
+        /// <summary>
+        /// A bar: a dark plate with the ramp painted across part of it. The
+        /// fill is a CHILD of the plate, so a relayout that moves the plate
+        /// moves both and only the fill's width is ever rewritten.
+        /// </summary>
+        private static Panel CreateBar(
+            Panel parent, int x, int y, int width, int height, double fraction, out Panel fill)
+        {
+            var track = new Panel
+            {
+                Size = new Point(Math.Max(0, width), height),
+                Location = new Point(x, y),
+                BackgroundColor = RankerReadinessColors.BarTrack,
+                Parent = parent,
+            };
+            fill = new Panel
+            {
+                Size = new Point(RankerReadinessRamp.FillWidth(Math.Max(0, width), fraction), height),
+                Location = new Point(0, 0),
+                BackgroundColor = RankerReadinessColors.BarFill(fraction),
+                Parent = track,
+            };
+            return track;
+        }
+
+        /// <summary>
+        /// The one placeholder every column uses for "this row has never
+        /// been solved": the module's dash at the standing neutral grey,
+        /// hovering the reason. A MEASURED emptiness is never drawn like
+        /// this - it draws a real 0, 0% or zero coin value in the row's own
+        /// value colour, which is what keeps the two apart at a glance
+        /// rather than only on hover.
+        /// </summary>
+        private static Label CreateUnknownCell(Panel parent, int x, int y, string tooltip)
+        {
+            var label = new Label
+            {
+                Font = UiFonts.Body,
+                Text = RankerReadinessCalculator.DashText,
+                TextColor = RankerReadinessColors.Neutral,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x, y),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(label, tooltip);
+            return label;
+        }
+
+        private const string ZeroRemainingTooltip =
+            "Nothing left to buy - the materials you hold cover this item's coin cost.";
+
+        private static string StatusPlaceholderTooltip(RankerRowMetrics metrics)
+        {
+            return metrics == null
+                ? "Not yet calculated - press Refresh."
+                : "Your account snapshot has not loaded, so what you can afford is not known yet.";
+        }
+
+        /// <summary>Returns the number of sub-lines rendered.</summary>        /// <summary>Returns the number of sub-lines rendered.</summary>
         /// <summary>
         /// The row's breakdown, under its headline. Returns the block the
         /// row's height is taken from.
@@ -1432,29 +1636,52 @@ namespace TaimisToolbench.Views
             // sentence with dead space to its right.
             int gateY = block.GateY;
             int gateCount = hasGates ? metrics.Gates.Count : 0;
+            int labelBand = GateLabelBandWidth();
             for (int i = 0; i < gateCount && i < RankerRowLayout.GateCellCount; i++)
             {
                 var gate = metrics.Gates[i];
                 row.GateNameLabels.Add(new Label
                 {
-                    Font = UiFonts.Caption,
+                    Font = UiFonts.Body,
                     Text = RankerReadinessCalculator.GateLabel(gate.Gate),
                     TextColor = Color.White,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, gateY),
+                    Location = new Point(0, gateY + GateTextY),
                     Parent = row.Panel,
                 });
+
+                RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
+
+                // A gate this item does not have gets NO bar. An empty bar
+                // would be a 0% reading, and "this item needs no recipe
+                // unlocks" is not the same claim as "you have unlocked none
+                // of the recipes it needs".
+                double fraction = gate.Applies ? gate.Completion : -1;
+                row.GateFractions.Add(fraction);
+                Panel track = null;
+                Panel fill = null;
+                if (gate.Applies)
+                {
+                    track = CreateBar(
+                        row.Panel, barX, gateY + GateBarOffsetY, barWidth,
+                        RankerRowLayout.GateBarHeight, gate.Completion, out fill);
+                }
+
+                row.GateBarTracks.Add(track);
+                row.GateBarFills.Add(fill);
                 row.GateValueLabels.Add(new Label
                 {
-                    Font = UiFonts.Caption,
+                    Font = UiFonts.Body,
+
+                    // White over the bar, at 5.07:1 or better at every point
+                    // on the ramp (Services/RankerReadinessRamp) - which is
+                    // the constraint that made the ramp as deep as it is.
                     Text = RankerReadinessCalculator.FormatGate(gate),
-                    TextColor = gate.Applies
-                        ? RankerReadinessColors.ForReadiness(gate.Completion)
-                        : ValueTextColor,
+                    TextColor = gate.Applies ? Color.White : ValueTextColor,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
-                    Location = new Point(0, gateY),
+                    Location = new Point(0, gateY + GateValueY),
                     Parent = row.Panel,
                 });
             }
@@ -1521,6 +1748,37 @@ namespace TaimisToolbench.Views
 
         private static readonly IReadOnlyList<string> EmptyNotes = new List<string>();
 
+        private static int _gateLabelBandWidth = -1;
+
+        /// <summary>
+        /// Width reserved for a gate's NAME inside its cell - the widest of
+        /// the five, so every bar in the strip starts at the same offset in
+        /// its own cell and the five read as one rack of gauges. Measured
+        /// once: the five labels are fixed strings and the face does not
+        /// change while the module is loaded.
+        /// </summary>
+        private static int GateLabelBandWidth()
+        {
+            if (_gateLabelBandWidth >= 0)
+            {
+                return _gateLabelBandWidth;
+            }
+
+            var measure = LabelHelpers.MeasureWith(UiFonts.Body);
+            int widest = 0;
+            foreach (RankerGate gate in Enum.GetValues(typeof(RankerGate)))
+            {
+                int width = measure(RankerReadinessCalculator.GateLabel(gate));
+                if (width > widest)
+                {
+                    widest = width;
+                }
+            }
+
+            _gateLabelBandWidth = widest;
+            return widest;
+        }
+
         private void LayoutRow(RenderedRow row, in RankerRowLayout.Bands bands, bool measureText)
         {
             row.Panel.Size = new Point(bands.RowWidth, row.Panel.Height);
@@ -1530,20 +1788,24 @@ namespace TaimisToolbench.Views
             {
                 // The rich deferred tooltip already carries the full name,
                 // so a truncation change needs no re-stamp here.
-                IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Body,
-                    NameBudgetRightEdge(bands, row.ChipWidth), 0, 0);
+                IconNameRowHelpers.ReellipsizeName(row.IconName, UiFonts.Status,
+                    bands.NameX + bands.NameWidth, 0, 0);
             }
 
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
-            row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), ReadyLineY);
-
-            if (row.Chip != null)
+            if (row.StatusChip != null)
             {
-                row.Chip.Location = new Point(ChipXFor(row), MainLineChipY);
+                row.StatusChip.Location = new Point(bands.StatusX, MainLineChipY);
             }
+
+            if (row.StatusPlaceholder != null)
+            {
+                row.StatusPlaceholder.Location = new Point(bands.StatusX, MainLineTextY);
+            }
+
+            LayoutReadyCell(row, bands);
 
             row.DaysLabel.Location = new Point(
                 Math.Max(0, bands.DaysRightEdge - row.DaysLabel.Width), MainLineTextY);
@@ -1567,14 +1829,29 @@ namespace TaimisToolbench.Views
 
             row.Remove.Location = new Point(bands.RemoveX, MainLineButtonY);
 
+            int labelBand = GateLabelBandWidth();
             for (int i = 0; i < row.GateNameLabels.Count; i++)
             {
-                RankerRowLayout.GateCell(bands, i, out int cellX, out int cellWidth);
+                RankerRowLayout.GateCell(bands, i, out int cellX, out _);
                 row.GateNameLabels[i].Location = new Point(cellX, row.GateNameLabels[i].Location.Y);
+
+                RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
+                var track = row.GateBarTracks[i];
+                if (track != null)
+                {
+                    track.Location = new Point(barX, track.Location.Y);
+                    track.Size = new Point(barWidth, RankerRowLayout.GateBarHeight);
+                    row.GateBarFills[i].Size = new Point(
+                        RankerReadinessRamp.FillWidth(barWidth, row.GateFractions[i]),
+                        RankerRowLayout.GateBarHeight);
+                }
+
+                // Centred in the bar's own span whether or not a bar was
+                // drawn, so an inapplicable gate's dash sits where every
+                // other cell's number sits rather than trailing its label.
                 var value = row.GateValueLabels[i];
                 value.Location = new Point(
-                    Math.Max(cellX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap),
-                    value.Location.Y);
+                    barX + Math.Max(0, (barWidth - value.Width) / 2), value.Location.Y);
             }
 
             for (int i = 0; i < row.CurrencyNameLabels.Count; i++)
@@ -1710,19 +1987,6 @@ namespace TaimisToolbench.Views
             }
 
             PillColors.GetPillColors(PillKind.Locked, false, out border, out fill);
-        }
-
-        /// <summary>Chip x: trailing the name label, inside the name band.</summary>
-        private static int ChipXFor(RenderedRow row)
-        {
-            return row.IconName.NameLabel.Location.X + row.IconName.NameLabel.Width + 8;
-        }
-
-        /// <summary>The name's right budget, with the chip's width reserved out of it.</summary>
-        private static int NameBudgetRightEdge(in RankerRowLayout.Bands bands, int chipWidth)
-        {
-            int rightEdge = bands.NameX + bands.NameWidth;
-            return chipWidth > 0 ? Math.Max(bands.NameX, rightEdge - chipWidth - 8) : rightEdge;
         }
 
         /// <summary>
@@ -2469,9 +2733,17 @@ namespace TaimisToolbench.Views
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
-                SetRowButtonEnabled(row.Up, reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
-                SetRowButtonEnabled(row.Down, reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
-                SetRowButtonEnabled(row.Remove, enabled);
+                // FeedbackButton draws its own disabled state - a flat
+                // plate, Blish's disabled ink and a dimmed icon - so this is
+                // a click gate only, not a click gate plus a hand-rolled
+                // repaint the way the Image pair needed.
+                if (row.Up != null)
+                {
+                    row.Up.Enabled = reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
+                    row.Down.Enabled = reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
+                }
+
+                row.Remove.Enabled = enabled;
             }
         }
 
