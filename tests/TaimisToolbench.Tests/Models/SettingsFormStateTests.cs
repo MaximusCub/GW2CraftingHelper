@@ -56,6 +56,36 @@ namespace TaimisToolbench.Tests.Models
         }
 
         [Fact]
+        public void BarterItemKeys_NeverCollideWithCurrencyKeysOnTheSameNumber()
+        {
+            // An item id and a currency id are different id spaces that
+            // collide numerically. Sharing a key would collapse the two
+            // rows into one comparison and silently stop reporting edits to
+            // whichever lost - AddField rejects a duplicate rather than
+            // overwriting, so this would be a hard failure at capture time.
+            var state = new SettingsFormState();
+
+            state.AddText(SettingsFormState.CurrencyAmountKey(39), "3600");
+            state.AddFlag(SettingsFormState.CurrencyIgnoreKey(39), false);
+            state.AddText(SettingsFormState.BarterItemAmountKey(39), "7");
+            state.AddFlag(SettingsFormState.BarterItemIgnoreKey(39), true);
+
+            Assert.Equal(4, state.FieldCount);
+        }
+
+        [Fact]
+        public void BarterItemAmount_EditIsReportedAsAChange()
+        {
+            var baseline = new SettingsFormState();
+            baseline.AddText(SettingsFormState.BarterItemAmountKey(19925), "667");
+
+            var edited = new SettingsFormState();
+            edited.AddText(SettingsFormState.BarterItemAmountKey(19925), "900");
+
+            Assert.Contains(SettingsFormState.BarterItemAmountKey(19925), edited.ChangedKeys(baseline));
+        }
+
+        [Fact]
         public void FullState_CoversEveryCurrencyRowPlusIgnoreFlagAndTheOtherSections()
         {
             var state = BuildFullState();

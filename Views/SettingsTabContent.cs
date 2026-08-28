@@ -11,9 +11,10 @@ using TaimisToolbench.Views.Rendering;
 namespace TaimisToolbench.Views
 {
     /// <summary>
-    /// Settings tab content: lets the user set the coin value of
-    /// non-coin currencies (see Models/CurrencyValuation.cs) used to
-    /// compare vendor offers, persisted through ModuleSettings. Plan-level
+    /// Settings tab content: lets the user set the coin value of the
+    /// non-coin currencies and untradeable barter items a vendor takes
+    /// (see Models/CurrencyValuation.cs), used to compare vendor offers
+    /// and persisted through ModuleSettings. Plan-level
     /// defaults (price basis, own materials) remain on the Crafting Plan
     /// tab - only informational text about them is shown here.
     /// </summary>
@@ -72,6 +73,25 @@ namespace TaimisToolbench.Views
             var result = new int[ids.Count];
             ids.CopyTo(result);
             return result;
+        }
+
+        // BarterItemDecisionDefaults is the single source of truth for
+        // which barter items get a row, exactly as CurrencyDecisionDefaults
+        // is for currencies: every defaulted item must be inspectable and
+        // clearable, and adding an entry there adds a row here with no
+        // second list to keep in sync. Sorted by NAME, not id - an id the
+        // user never sees is a meaningless sort key, and these rows arrive
+        // with their names already curated beside their values.
+        private static readonly int[] CuratedBarterItemIds = BuildCuratedBarterItemIds();
+
+        private static int[] BuildCuratedBarterItemIds()
+        {
+            var ids = new List<int>(BarterItemDecisionDefaults.Defaults.Keys);
+            ids.Sort((a, b) => string.Compare(
+                BarterItemDecisionDefaults.Defaults[a].Name,
+                BarterItemDecisionDefaults.Defaults[b].Name,
+                StringComparison.Ordinal));
+            return ids.ToArray();
         }
 
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
@@ -193,7 +213,12 @@ namespace TaimisToolbench.Views
 
         private class CurrencyRow
         {
-            public int CurrencyId;
+            // A wallet currency id, or - when IsBarterItem - a GW2 item id.
+            // The two are different id spaces that collide numerically, so
+            // every lookup below has to pick its table off IsBarterItem
+            // rather than off the number alone.
+            public int Id;
+            public bool IsBarterItem;
             public bool HasDefault;
             public long DefaultCopperPerUnit;
 
@@ -263,8 +288,8 @@ namespace TaimisToolbench.Views
         private FlowPanel _rootPanel;
 
         // The four short sections, packed into as many min-width columns as
-        // the panel holds (see LayoutSectionBoard). Currency Valuations is
-        // NOT one of them - it is a full-width grid below the board.
+        // the panel holds (see LayoutSectionBoard). Vendor Cost Valuations
+        // is NOT one of them - it is a full-width grid below the board.
         private Panel _boardPanel;
         private readonly List<SectionBlock> _sections = new List<SectionBlock>();
 
@@ -620,10 +645,14 @@ namespace TaimisToolbench.Views
             foreach (var row in _rows)
             {
                 state.AddText(
-                    SettingsFormState.CurrencyAmountKey(row.CurrencyId),
+                    row.IsBarterItem
+                        ? SettingsFormState.BarterItemAmountKey(row.Id)
+                        : SettingsFormState.CurrencyAmountKey(row.Id),
                     row.Input?.Text);
                 state.AddFlag(
-                    SettingsFormState.CurrencyIgnoreKey(row.CurrencyId),
+                    row.IsBarterItem
+                        ? SettingsFormState.BarterItemIgnoreKey(row.Id)
+                        : SettingsFormState.CurrencyIgnoreKey(row.Id),
                     row.ClearCheckbox != null && row.ClearCheckbox.Checked);
             }
 
@@ -1208,14 +1237,16 @@ namespace TaimisToolbench.Views
         private void BuildCurrencyValuationsSection(int panelWidth)
         {
             AddSectionHeader(
-                "Currency Valuations", panelWidth,
+                "Vendor Cost Valuations", panelWidth,
                 "Price basis and both \"own materials\" choices are set per plan in the Crafting Plan tab.");
-            AddInfoLine("Coin value per unit of each currency, used to compare vendor offers.", panelWidth);
+            AddInfoLine(
+                "Coin value per unit of each currency and barter item a vendor takes, used to compare vendor offers.",
+                panelWidth);
             // The one sentence that names the interaction. Field test, bug
             // 2: with the unit inside the box and only a grey "default N"
             // beside it, the row read as three read-only labels - nothing
             // said an amount could be typed over the default at all.
-            AddInfoLine("Type a whole number of copper in a currency's box and press Save to override its default.", panelWidth);
+            AddInfoLine("Type a whole number of copper in a row's box and press Save to override its default.", panelWidth);
             // "Leave a currency unset..." and "Some currencies show a
             // default estimate..." used to sit here. Both are carried by the
             // hovers of the controls they describe (the amount box's own
@@ -1237,6 +1268,14 @@ namespace TaimisToolbench.Views
             // grid rather than below it because the grid is deliberately the
             // last thing in the panel - see SetCurrencyGridHeight.
             AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
+            // The same posture, for the same reason, on the barter-item
+            // side: the Black Lion family is gem-store RNG-chest currency
+            // and every listed row would need a gem-to-gold opinion the
+            // module has no business making for the user. Left out of the
+            // grid entirely rather than shown blank - an unlisted item is
+            // simply unvalued, and its vendor offers still appear, just
+            // honestly unranked.
+            AddInfoLine("Black Lion tickets, statuettes and vouchers come from gem-store chests - their value is personal too, so they are not listed.", panelWidth);
 
             AddCurrencyFilterRow(panelWidth);
             AddCurrencyGridHeader(panelWidth);
@@ -1251,6 +1290,17 @@ namespace TaimisToolbench.Views
             foreach (int currencyId in CuratedCurrencyIds)
             {
                 AddCurrencyRow(currencyId, columnWidth);
+            }
+
+            // Barter items share the grid rather than getting a second one:
+            // to the user these rows do the same job (what is one unit of
+            // this worth), the filter box searches both with one keystroke,
+            // and a second grid would need its own header, filter and
+            // count. They follow the currencies rather than interleaving
+            // with them so the two id spaces stay visibly separate.
+            foreach (int itemId in CuratedBarterItemIds)
+            {
+                AddCurrencyRow(itemId, columnWidth, isBarterItem: true);
             }
 
             _currencyForceVisible = new bool[_rows.Count];
@@ -1379,7 +1429,7 @@ namespace TaimisToolbench.Views
         /// Three per-material efficiency
         /// tier rows (Fiber/Metal/Wood), each an integer 0/1/2 entered as
         /// text and validated on Save - same TextBox+Save shape as the
-        /// Currency Valuations section above (a plain Checkbox's immediate-
+        /// Vendor Cost Valuations section above (a plain Checkbox's immediate-
         /// apply pattern doesn't fit a 3-valued integer, and no Dropdown/
         /// stepper control is otherwise used in this codebase's Views).
         /// Labels name the material family only - no raw item/vendor ids
@@ -1675,7 +1725,7 @@ namespace TaimisToolbench.Views
             return invalidCount;
         }
 
-        // The full-width Currency Valuations section's own header and notes.
+        // The full-width Vendor Cost Valuations section's own header and notes.
         // The board sections build their own (BeginSection); this shape is
         // for the one section that is a grid rather than a block.
         private readonly List<Panel> _currencyProsePanels = new List<Panel>();
@@ -1796,7 +1846,7 @@ namespace TaimisToolbench.Views
                 // "Search {scope}..." - the one placeholder shape the
                 // module's other three search boxes use; this box was the
                 // lone "Filter ..." spelling.
-                PlaceholderText = "Search currencies...",
+                PlaceholderText = "Search valuations...",
                 Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             _currencyFilterInput.TextChanged += (_, __) => ApplyCurrencyFilter();
@@ -1886,7 +1936,7 @@ namespace TaimisToolbench.Views
             // is cheaper to hide than to rebuild on the next resize tick.
             while (_currencyHeaderNames.Count < columnCount)
             {
-                _currencyHeaderNames.Add(CreateCurrencyHeaderLabel("Currency"));
+                _currencyHeaderNames.Add(CreateCurrencyHeaderLabel("Currency or item"));
                 _currencyHeaderUnits.Add(CreateCurrencyHeaderLabel("Copper per unit"));
             }
 
@@ -1908,9 +1958,11 @@ namespace TaimisToolbench.Views
             }
         }
 
-        private void AddCurrencyRow(int currencyId, int columnWidth)
+        private void AddCurrencyRow(int id, int columnWidth, bool isBarterItem = false)
         {
-            string name = Gw2Constants.ResolveCurrencyName(currencyId);
+            string name = isBarterItem
+                ? BarterItemDecisionDefaults.ResolveName(id)
+                : Gw2Constants.ResolveCurrencyName(id);
 
             var cellPanel = new Panel()
             {
@@ -1931,7 +1983,14 @@ namespace TaimisToolbench.Views
                 Parent = cellPanel,
             };
 
-            bool hasDefault = CurrencyDecisionDefaults.TryGetDefault(currencyId, out long defaultCopperPerUnit);
+            bool hasDefault = isBarterItem
+                ? BarterItemDecisionDefaults.TryGetDefault(id, out long defaultCopperPerUnit)
+                : CurrencyDecisionDefaults.TryGetDefault(id, out defaultCopperPerUnit);
+
+            // One noun for both kinds of row. "Currency" would be wrong on
+            // an item row and "item" wrong on a currency one, and the boxes
+            // behave identically.
+            string kindNoun = isBarterItem ? "item" : "currency";
 
             var input = new TextBox()
             {
@@ -1964,9 +2023,15 @@ namespace TaimisToolbench.Views
             // the four currencies it matters most for (the ones with no
             // default, so no default tag and no default-tag hover) would
             // otherwise carry it nowhere at all.
+            // A currency default is adapted from gw2efficiency; a barter
+            // item's is derived here from a vendor exchange, so the two
+            // rows cite different sources rather than one wrong one.
+            string defaultSource = isBarterItem
+                ? "derived from the cheapest vendor exchange we can price"
+                : "adapted from gw2efficiency";
             TooltipFacility.ApplyPlain(input, hasDefault
-                ? $"Default estimate {defaultCopperPerUnit} copper per unit, adapted from gw2efficiency (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it. Left blank and not ignored, it keeps the default."
-                : "Coin value of one unit, in copper. Type an amount here and press Save, or leave it blank to keep this currency out of price comparisons.");
+                ? $"Default estimate {defaultCopperPerUnit} copper per unit, {defaultSource} (decision-only). Type your own amount here and press Save to override it, or tick Ignore to suppress it. Left blank and not ignored, it keeps the default."
+                : $"Coin value of one unit, in copper. Type an amount here and press Save, or leave it blank to keep this {kindNoun} out of price comparisons.");
 
             var defaultLabel = new Label()
             {
@@ -1979,7 +2044,7 @@ namespace TaimisToolbench.Views
                 Parent = cellPanel,
             };
             TooltipFacility.ApplyPlain(defaultLabel, hasDefault
-                ? "This currency is valued automatically at its default estimate unless you type your own amount or tick Ignore."
+                ? $"This {kindNoun} is valued automatically at its default estimate unless you type your own amount or tick Ignore."
                 : null);
 
             var errorLabel = new Label()
@@ -2022,7 +2087,7 @@ namespace TaimisToolbench.Views
                 clearCheckbox.CheckedChanged += (_, __) => RefreshDirtyState();
                 TooltipFacility.ApplyPlain(
                     clearCheckbox,
-                    "Ignore this currency's default estimate - it will not be valued unless you enter your own amount.");
+                    $"Ignore this {kindNoun}'s default estimate - it will not be valued unless you enter your own amount.");
             }
 
             // Appended in the same step as the row it names - the filter
@@ -2030,7 +2095,8 @@ namespace TaimisToolbench.Views
             _currencyNames.Add(name);
             var row = new CurrencyRow
             {
-                CurrencyId = currencyId,
+                Id = id,
+                IsBarterItem = isBarterItem,
                 Name = name,
                 HasDefault = hasDefault,
                 DefaultCopperPerUnit = defaultCopperPerUnit,
@@ -2103,14 +2169,18 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void EnsureCurrencyRowIcon(CurrencyRow row)
         {
-            if (_currencyMetadata == null || row.Icon != null)
+            // A barter-item row has no icon source: the tab holds only the
+            // one /v2/currencies fetch, and item icons would need a second
+            // one for a handful of rows. The cell reserves the band either
+            // way, so an iconless row lines up with its neighbours.
+            if (_currencyMetadata == null || row.Icon != null || row.IsBarterItem)
             {
                 return;
             }
 
             row.Icon = IconControls.CreateItemIcon(
                 row.Cell,
-                CurrencyDisplayResolver.ResolveIconUrl(row.CurrencyId, _currencyMetadata),
+                CurrencyDisplayResolver.ResolveIconUrl(row.Id, _currencyMetadata),
                 // A currency has no rarity to resolve: neutral by intent,
                 // the same call ItemIconFrame.NotAnItem() records at the
                 // Snapshot tab's wallet rows.
@@ -2201,7 +2271,7 @@ namespace TaimisToolbench.Views
             if (_currencyCountLabel != null)
             {
                 _currencyCountLabel.Text = grid.VisibleCount == _rows.Count
-                    ? StatusText.Count(_rows.Count, "currency", "currencies")
+                    ? StatusText.Count(_rows.Count, "row", "rows")
                     : $"{grid.VisibleCount} of {_rows.Count} shown";
                 LayoutCurrencyFilterRow();
             }
@@ -2226,8 +2296,12 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            bool isCleared = valuation.IsCleared(row.CurrencyId);
-            bool hasOverride = valuation.TryGetCopperValue(row.CurrencyId, out _);
+            bool isCleared = row.IsBarterItem
+                ? valuation.IsItemCleared(row.Id)
+                : valuation.IsCleared(row.Id);
+            bool hasOverride = row.IsBarterItem
+                ? valuation.TryGetItemCopperValue(row.Id, out _)
+                : valuation.TryGetCopperValue(row.Id, out _);
 
             row.ClearCheckbox.Checked = isCleared;
 
@@ -2570,7 +2644,10 @@ namespace TaimisToolbench.Views
 
             foreach (var row in _rows)
             {
-                row.Input.Text = valuation.TryGetCopperValue(row.CurrencyId, out long copperPerUnit)
+                bool hasValue = row.IsBarterItem
+                    ? valuation.TryGetItemCopperValue(row.Id, out long copperPerUnit)
+                    : valuation.TryGetCopperValue(row.Id, out copperPerUnit);
+                row.Input.Text = hasValue
                     ? copperPerUnit.ToString(CultureInfo.InvariantCulture)
                     : "";
                 SetCurrencyRowError(row, "");
@@ -2607,6 +2684,17 @@ namespace TaimisToolbench.Views
 
             var cleared = new HashSet<int>(persisted.ClearedCurrencyIds);
 
+            // The barter-item side of the same seeded-from-persisted
+            // treatment, kept in its own pair of collections because item
+            // and currency ids share no id space.
+            var itemEntries = new Dictionary<int, long>();
+            foreach (var kvp in persisted.ItemCopperPerUnit)
+            {
+                itemEntries[kvp.Key] = kvp.Value;
+            }
+
+            var itemCleared = new HashSet<int>(persisted.ClearedItemIds);
+
             invalidCount = 0;
 
             foreach (var row in _rows)
@@ -2623,14 +2711,16 @@ namespace TaimisToolbench.Views
                     // which is the ONLY thing that persists a genuine
                     // suppression (see CurrencyValuation's own doc comment
                     // on the three-state precedence).
-                    entries.Remove(row.CurrencyId);
+                    var rowEntries = row.IsBarterItem ? itemEntries : entries;
+                    var rowCleared = row.IsBarterItem ? itemCleared : cleared;
+                    rowEntries.Remove(row.Id);
                     if (row.HasDefault && row.ClearCheckbox != null && row.ClearCheckbox.Checked)
                     {
-                        cleared.Add(row.CurrencyId);
+                        rowCleared.Add(row.Id);
                     }
                     else
                     {
-                        cleared.Remove(row.CurrencyId);
+                        rowCleared.Remove(row.Id);
                     }
 
                     continue;
@@ -2638,11 +2728,13 @@ namespace TaimisToolbench.Views
 
                 if (SettingsInputParser.TryParseCopperValue(text, out long copperPerUnit))
                 {
-                    entries[row.CurrencyId] = copperPerUnit;
+                    var rowEntries = row.IsBarterItem ? itemEntries : entries;
+                    var rowCleared = row.IsBarterItem ? itemCleared : cleared;
+                    rowEntries[row.Id] = copperPerUnit;
                     // An explicit value always wins over a stale cleared
-                    // marker - CurrencyValuation's constructor rejects a
-                    // currency id that is both valued and cleared at once.
-                    cleared.Remove(row.CurrencyId);
+                    // marker - CurrencyValuation's constructor rejects an
+                    // id that is both valued and cleared at once.
+                    rowCleared.Remove(row.Id);
                 }
                 else
                 {
@@ -2665,7 +2757,7 @@ namespace TaimisToolbench.Views
             CurrencyValuation saved;
             try
             {
-                saved = new CurrencyValuation(entries, cleared);
+                saved = new CurrencyValuation(entries, cleared, itemEntries, itemCleared);
                 _settings.SetCurrencyValuation(saved);
             }
             catch (Exception ex)

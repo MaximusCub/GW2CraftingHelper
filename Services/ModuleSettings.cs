@@ -10,8 +10,11 @@ namespace TaimisToolbench.Services
 
         public SettingEntry<int> ModalDialogY { get; private set; }
 
-        // User-provided coin valuations for non-coin currencies (karma,
-        // laurels, ...), stored as JSON (currencyId -> copper per unit).
+        // User-provided coin valuations for the non-coin currencies (karma,
+        // laurels, ...) and untradeable barter items a vendor takes, stored
+        // as JSON (see CurrencyValuationSerializer for the shape). The
+        // setting KEY stays "CurrencyValuationsJson": renaming it would
+        // orphan every already-persisted value.
         // SettingCollection has no built-in support for a CurrencyValuation
         // object, so it is persisted as a raw string; CurrencyValuationSerializer
         // (Blish-free) does the actual conversion so that logic is unit-testable.
@@ -135,8 +138,8 @@ namespace TaimisToolbench.Services
 
             CurrencyValuationsJson = settings.DefineSetting(
                 "CurrencyValuationsJson", string.Empty,
-                () => "Currency Valuations",
-                () => "User-provided coin values for non-coin currencies (JSON)");
+                () => "Vendor Cost Valuations",
+                () => "User-provided coin values for non-coin currencies and barter items (JSON)");
 
             ValueOwnMaterials = settings.DefineSetting(
                 "ValueOwnMaterials", true,
