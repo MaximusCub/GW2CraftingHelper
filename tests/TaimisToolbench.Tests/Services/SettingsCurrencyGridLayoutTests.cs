@@ -17,16 +17,16 @@ namespace TaimisToolbench.Tests.Services
             "Pristine Fractal Relics",
         };
 
-        // Two columns of the re-derived 490px cell. The old pair (907/908)
-        // moved with MinColumnWidth, which grew when the cell stopped
-        // holding a fixed 190px name and started flexing - see
+        // Two columns of the re-derived 530px cell. The old pair (979/980)
+        // moved with MinColumnWidth, which grew again when the cell gained
+        // its leading currency icon - see
         // MinColumnWidth_CoversTheWholeCellItSizes for the derivation.
         private const int TwoColumnPanelWidth = 2 * SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth;
 
         [Theory]
-        [InlineData(979, 1)]
-        [InlineData(980, 2)]
-        [InlineData(1000, 2)]
+        [InlineData(1059, 1)]
+        [InlineData(1060, 2)]
+        [InlineData(1100, 2)]
         [InlineData(0, 1)]
         [InlineData(-40, 1)]
         public void ComputeColumnCount_SwitchesAtTwiceMinColumnWidth(int panelWidth, int expected)
@@ -228,8 +228,8 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Theory]
-        [InlineData(980, 490)]
-        [InlineData(981, 490)]
+        [InlineData(1060, 530)]
+        [InlineData(1061, 530)]
         [InlineData(800, 800)]
         [InlineData(0, 0)]
         [InlineData(-40, 0)]
@@ -242,10 +242,10 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Theory]
-        [InlineData(47, 980, 720)]
+        [InlineData(47, 1060, 720)]
         [InlineData(47, 800, 1410)]
-        [InlineData(0, 980, 0)]
-        [InlineData(-3, 980, 0)]
+        [InlineData(0, 1060, 0)]
+        [InlineData(-3, 1060, 0)]
         public void ComputeHeight_IsTheUnfilteredGridHeight(int count, int panelWidth, int expected)
         {
             Assert.Equal(expected, SettingsCurrencyGridLayout.ComputeHeight(count, panelWidth, 30));
@@ -319,22 +319,98 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void MinColumnWidth_CoversTheWholeCellItSizes()
         {
+            Assert.Equal(56, SettingsCurrencyGridLayout.CellNameX);
             Assert.Equal(198, SettingsCurrencyGridLayout.CellNameFloor);
             Assert.Equal(256, SettingsCurrencyGridLayout.CellControlBlockWidth);
-            Assert.Equal(490, SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth);
+            Assert.Equal(530, SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth);
         }
 
         [Fact]
-        public void Grid_TurnsOverToTwoColumnsBetween979And980Pixels()
+        public void Grid_TurnsOverToTwoColumnsBetween1059And1060Pixels()
         {
             // The boundary MinColumnWidth exists to place, in literal
             // pixels: one short of two floors the grid stays single-column.
-            Assert.Equal(1, SettingsCurrencyGridLayout.ComputeColumnCount(979));
-            Assert.Equal(2, SettingsCurrencyGridLayout.ComputeColumnCount(980));
+            Assert.Equal(1, SettingsCurrencyGridLayout.ComputeColumnCount(1059));
+            Assert.Equal(2, SettingsCurrencyGridLayout.ComputeColumnCount(1060));
+        }
+
+        [Fact]
+        public void IconBand_SitsAheadOfTheNameAtTheListTier()
+        {
+            // The cell's leading icon is the wallet LIST tier, the size the
+            // module's other one-row-per-currency tables draw, and the name
+            // starts past it plus the module's icon-to-name gap.
+            Assert.Equal(
+                CurrencyIconTiers.WalletListIconSize, SettingsCurrencyGridLayout.CellIconSize);
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyIconSize, SettingsCurrencyGridLayout.CellIconSize);
+            Assert.Equal(
+                SettingsCurrencyGridLayout.CellIconX
+                    + SettingsCurrencyGridLayout.CellIconSize
+                    + SettingsCurrencyGridLayout.CellIconToNameGap,
+                SettingsCurrencyGridLayout.CellNameX);
+        }
+
+        [Fact]
+        public void IconBand_DidNotCostTheNameItsFloor()
+        {
+            // The band went into MinColumnWidth at the same time it went
+            // into the cell, so the name budget at the narrowest supported
+            // column is still exactly the floor - the icon took none of it.
+            Assert.Equal(
+                SettingsCurrencyGridLayout.CellNameFloor,
+                SettingsCurrencyGridLayout.CellNameMaxWidth(
+                    SettingsCurrencyGridLayout.SettingsCurrencyMinColumnWidth));
+        }
+
+        [Fact]
+        public void RowHeight_IsTheListTierIconPlusItsMeasuredClearance()
+        {
+            // The row grew from 32 to hold a list-tier icon with the same
+            // clearance the game's own wallet list keeps, which is the
+            // height the module already derives for that tier.
+            Assert.Equal(
+                SettingsCurrencyGridLayout.CellIconSize
+                    + (2 * PlanContentHeightMath.CurrencyRowIconPad),
+                SettingsCurrencyGridLayout.CurrencyRowHeight);
+            Assert.Equal(
+                PlanContentHeightMath.CurrencyRowHeight,
+                SettingsCurrencyGridLayout.CurrencyRowHeight);
+
+            // The icon sits inside the row, clear of the rule along its
+            // bottom.
+            Assert.Equal(
+                SettingsCurrencyGridLayout.CurrencyRowHeight
+                    - SettingsCurrencyGridLayout.CellIconY
+                    - SettingsCurrencyGridLayout.CellIconSize,
+                SettingsCurrencyGridLayout.CellIconY);
+            Assert.True(
+                SettingsCurrencyGridLayout.CellIconY + SettingsCurrencyGridLayout.CellIconSize
+                    < SettingsCurrencyGridLayout.CurrencyRowHeight
+                        - PlanContentHeightMath.RowDividerHeight
+                        - SettingsCurrencyGridLayout.CellDividerClearance);
+        }
+
+        [Fact]
+        public void RowContents_ShareTheIconsCentreRatherThanTheRowsTop()
+        {
+            // A 42px row with everything pinned at the old y=6 would strand
+            // ten pixels under the text. Both the name's line box and the
+            // amount box centre on the same line the icon does.
+            int iconCentre = (2 * SettingsCurrencyGridLayout.CellIconY
+                + SettingsCurrencyGridLayout.CellIconSize) / 2;
+
+            Assert.Equal(
+                iconCentre,
+                (2 * SettingsCurrencyGridLayout.CellTextY + TypeRampMetrics.BodyInk.LineHeight) / 2);
+            Assert.Equal(
+                iconCentre,
+                (2 * SettingsCurrencyGridLayout.CellControlY(26) + 26) / 2);
+            Assert.Equal(0, SettingsCurrencyGridLayout.CellControlY(1000));
         }
 
         [Theory]
-        [InlineData(490)]
+        [InlineData(530)]
         [InlineData(616)]
         [InlineData(1210)]
         public void Cell_ControlBlockPinsToTheCellsOwnRightEdge(int columnWidth)
@@ -507,7 +583,7 @@ namespace TaimisToolbench.Tests.Services
             // Width-invariant: the block is pinned as a unit, so the gap
             // between the input's x and the tag's x is the same at every
             // column width.
-            foreach (int columnWidth in new[] { 490, 616, 1210 })
+            foreach (int columnWidth in new[] { 530, 616, 1210 })
             {
                 int headerRegion = SettingsCurrencyGridLayout.CellTagX(columnWidth)
                     - SettingsCurrencyGridLayout.CellInputX(columnWidth);

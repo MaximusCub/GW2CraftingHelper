@@ -75,6 +75,20 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(RankerRowLayout.CurrencyLineHeight >= RankerRowLayout.CurrencyIconSize);
         }
 
+        [Fact]
+        public void SettingsCurrencyValuationRows_DrawAtTheListTier()
+        {
+            // Owner ruling, 2026-08-28: the config panel's Currency
+            // Valuations grid is the same one-row-per-currency table, so its
+            // icon reads at the same size as the Summary's, and the row was
+            // grown to hold it rather than the icon shrunk to fit the row.
+            Assert.Equal(
+                CurrencyIconTiers.WalletListIconSize, SettingsCurrencyGridLayout.CellIconSize);
+            Assert.Equal(
+                PlanContentHeightMath.CurrencyRowHeight,
+                SettingsCurrencyGridLayout.CurrencyRowHeight);
+        }
+
         // --- The heights that carry them ---
         [Fact]
         public void CurrencyRowHeight_HoldsItsListTierIcon_CentredAsTheGameCentresIt()
