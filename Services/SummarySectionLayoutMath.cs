@@ -50,8 +50,9 @@ namespace GW2CraftingHelper.Services
         ///   - at most one CostTileRowHeight-tall row for the profit
         ///     formula band (present only when ProfitFormulaTile rows
         ///     exist - always exactly 3 when present);
-        ///   - one ColumnHeaderRowHeight header plus one CurrencyRowHeight
-        ///     row per CurrencyCost row, only when at least one exists;
+        ///   - one CurrencyTableTopGap spacer plus one
+        ///     ColumnHeaderRowHeight header plus one CurrencyRowHeight row
+        ///     per CurrencyCost row, only when at least one exists;
         ///   - one FallbackTextRowHeight row per MultiItemNote row;
         ///   - one FallbackTextRowHeight row for the SummaryFootnote row
         ///     (always exactly one in practice, but summed rather than
@@ -103,7 +104,8 @@ namespace GW2CraftingHelper.Services
 
             if (currencyRowCount > 0)
             {
-                height += PlanContentHeightMath.ColumnHeaderRowHeight
+                height += CurrencyTableTopGap
+                    + PlanContentHeightMath.ColumnHeaderRowHeight
                     + currencyRowCount * PlanContentHeightMath.CurrencyRowHeight;
             }
 
@@ -155,34 +157,49 @@ namespace GW2CraftingHelper.Services
         public const int CostBandAmountBottomPad = CostBandBoxPadY + CostBandBoxMarginY;
 
         /// <summary>
-        /// Height reserved for one caption line, deliberately above what
-        /// the font actually measures: the renderer places the caption from
-        /// real font metrics and clamps the amount below it, so this
-        /// reserve has to cover the tallest plausible metric or the band
-        /// clips its own amount (the renderer's DEBUG assert is what
-        /// catches that). 32, not 25: the tile captions moved to
-        /// TypeRampMetrics.ColumnHeaderInk and its measured line height
-        /// with them, 18 -> 25, so the reserve carries the same 7px of
-        /// slack over the real metric as before.
+        /// Height reserved for one caption line. Aliased, not duplicated:
+        /// both bands reserve the same line and PlanContentHeightMath owns
+        /// the number, beside the row height it is a term of.
         /// </summary>
-        public const int CostBandCaptionLineHeight = 32;
-
-        /// <summary>Gap between the caption block and the amount run.</summary>
-        public const int CostBandCaptionToAmountGap = 4;
+        public const int CostBandCaptionLineHeight = PlanContentHeightMath.CostTileCaptionLineHeight;
 
         /// <summary>
-        /// Extra band height reserved for the disclosure line. 23, not 18,
-        /// for the same measured 13 -> 18 caption line-height move as
-        /// <see cref="CostBandCaptionLineHeight"/>.
+        /// Gap between the caption line and the amount run under it -
+        /// aliased from PlanContentHeightMath.CostTileLabelToValueGap, the
+        /// ONE label-to-value distance both bands use, so the cost band and
+        /// the profit band cannot drift apart.
+        /// </summary>
+        public const int CostBandCaptionToAmountGap = PlanContentHeightMath.CostTileLabelToValueGap;
+
+        /// <summary>
+        /// Gap between the result tile's amount run and the disclosure line
+        /// hanging under it. Half <see cref="CostBandCaptionToAmountGap"/>,
+        /// on the same 4pt scale and deliberately tighter: the disclosure
+        /// is a footnote ON that amount, so it has to bind to the number
+        /// above it more closely than the number binds to its own caption.
+        /// </summary>
+        public const int CostBandAmountToNoteGap = 4;
+
+        /// <summary>
+        /// Extra band height the disclosure line costs, now that it hangs
+        /// BELOW the amount rather than sitting between the caption and it
+        /// (see <see cref="CurrencyRequirementNote"/>): the gap above it
+        /// plus the Caption tier's lowest ink (TypeRampMetrics.CaptionInk,
+        /// 19 - one past its own 18px line box, so a descender on this line
+        /// still lands inside the band).
         /// </summary>
         public const int CostBandCurrencyNoteHeight = 23;
 
         /// <summary>
         /// Height of the cost formula band's single tile row: the highlight
-        /// box's margin+padding, a caption line, the disclosure line when
-        /// there is one, the gap, and one amount run (a coin run is never
-        /// shorter than CoinSegmentMath.CoinIconSize, which is what makes
-        /// that the amount block's reserved height).
+        /// box's margin+padding, a caption line, the gap, one amount run (a
+        /// coin run is never shorter than CoinSegmentMath.CoinIconSize,
+        /// which is what makes that the amount block's reserved height),
+        /// and the disclosure line hanging under the amount when there is
+        /// one. That line used to be counted BETWEEN the caption and a
+        /// bottom-anchored amount, which dropped all three tiles' coin runs
+        /// by its height while only the result tile had anything in the
+        /// space it left - the dead band the field report saw.
         /// hasCurrencyNote must be "this Summary section has at least one
         /// CurrencyCost row" - the same condition
         /// Views/Rendering/SummarySectionRenderer.Render uses to decide
@@ -192,25 +209,37 @@ namespace GW2CraftingHelper.Services
         {
             return CostBandCaptionY
                 + CostBandCaptionLineHeight
-                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
                 + CostBandCaptionToAmountGap
                 + CoinSegmentMath.CoinIconSize
+                + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
                 + CostBandAmountBottomPad;
         }
 
         /// <summary>
-        /// Top y of an amountHeight-tall amount run inside a band of
-        /// rowHeight: bottom-anchored above bottomPad, never allowed above
-        /// the caption block. rowHeight is a fixed constant while
-        /// captionBlockBottom comes from whatever font metrics Blish
-        /// loaded, so a font taller than the band was sized for overflows
-        /// downward (loud - the renderer's DEBUG assert catches it) rather
-        /// than silently overprinting the caption.
+        /// Top y of an amount run: one
+        /// <see cref="CostBandCaptionToAmountGap"/> under the bottom of the
+        /// caption block above it, in EVERY band. captionBlockBottom is
+        /// measured from whatever font Blish loaded while the band height
+        /// is a constant, so a font taller than
+        /// PlanContentHeightMath.CostTileCaptionLineHeight pushes the
+        /// amount out of the band (loud - the renderer's DEBUG assert
+        /// catches it) rather than silently overprinting the caption.
         /// </summary>
-        public static int BandAmountY(int rowHeight, int amountHeight, int captionBlockBottom, int bottomPad)
+        public static int BandAmountY(int captionBlockBottom)
         {
-            int y = rowHeight - bottomPad - amountHeight;
-            return y > captionBlockBottom ? y : captionBlockBottom;
+            return captionBlockBottom + CostBandCaptionToAmountGap;
+        }
+
+        /// <summary>
+        /// Top y of the result tile's disclosure line: one
+        /// <see cref="CostBandAmountToNoteGap"/> under the amount run it
+        /// footnotes. Only the result tile of a highlighted band has one -
+        /// every other tile's content ends at the amount, which is what
+        /// keeps all three coin runs on one line.
+        /// </summary>
+        public static int BandNoteY(int amountY, int amountHeight)
+        {
+            return amountY + amountHeight + CostBandAmountToNoteGap;
         }
 
         /// <summary>
@@ -221,15 +250,19 @@ namespace GW2CraftingHelper.Services
         public const int CostBandBoxTop = CostBandCaptionY - CostBandBoxPadY;
 
         /// <summary>
-        /// Height of the highlight box around an amountHeight-tall amount
-        /// run whose top sits at band-space amountY: from
-        /// <see cref="CostBandBoxTop"/> down to one pad below the amount.
-        /// The box is the band's lowest ink, so this - not the amount run -
-        /// is what has to fit inside <see cref="CostBandHeight"/>.
+        /// Height of the highlight box around a result tile whose lowest
+        /// content ends at band-space contentBottom: from
+        /// <see cref="CostBandBoxTop"/> down to one pad below it. The box
+        /// is the band's lowest ink, so this - not the amount run - is what
+        /// has to fit inside <see cref="CostBandHeight"/>. contentBottom is
+        /// the DISCLOSURE line's bottom on a tile that has one
+        /// (<see cref="BandNoteY"/>) and the amount's otherwise: Blish
+        /// clips a container's children, so a box measured off the amount
+        /// alone would crop its own footnote.
         /// </summary>
-        public static int CostBandBoxHeight(int amountY, int amountHeight)
+        public static int CostBandBoxHeight(int contentBottom)
         {
-            return amountY + amountHeight + CostBandBoxPadY - CostBandBoxTop;
+            return contentBottom + CostBandBoxPadY - CostBandBoxTop;
         }
 
         /// <summary>
@@ -302,6 +335,20 @@ namespace GW2CraftingHelper.Services
 
         // --- Currency table column geometry ---
         //
+        // The row from the name's left edge to the last numeric column's
+        // right edge is CurrencyTrackCount EQUAL tracks - name, Required,
+        // Have, Needed - each number right-aligned on its own track's right
+        // edge. Distribution, not the packed right-hand stack this table
+        // used to draw: at the plan panel's real width that stack left
+        // ~1000px of nothing between a currency's name and its first
+        // number, with no anchor for the eye between them, and the field
+        // report could not track a row across it. The idiom is
+        // RankerRowLayout.GateCell's, which already divides a row's full
+        // width into N equal cells for the same reason.
+        //
+        // Right-alignment stays: it is what keeps digits aligned down a
+        // column and every header label over the numbers it names.
+        //
         // Required/Have/Needed columns reserve CurrencyNumberColumnWidth by
         // default, widened per-render when an actual value needs more room
         // (EffectiveCurrencyNumberColumnWidth/ComputeCurrencyColumnEdges'
@@ -315,7 +362,19 @@ namespace GW2CraftingHelper.Services
         // player's wallet, which can plausibly exceed the 60px floor. Since
         // CreateRightAlignedLabel grows a label LEFTWARD from the column's
         // own right edge, an unreserved overlong value would visually
-        // intrude into its left neighbor's column rather than clip.
+        // intrude into its left neighbor's column rather than clip. Under
+        // distribution that reserve is what decides whether the row is wide
+        // enough to distribute at all - see EdgesFromRightEdge.
+
+        /// <summary>
+        /// Open space between the last formula band and the currency
+        /// table's header band, which is a filled dark rectangle and
+        /// without this reads as part of the band above it.
+        /// 12: one 4pt step BELOW the 16px CraftingPlanView.SectionSpacing
+        /// puts between two whole sections, because this is a boundary
+        /// INSIDE one and has to separate less than a boundary between two.
+        /// </summary>
+        public const int CurrencyTableTopGap = 12;
 
         /// <summary>Left x of the currency icon.</summary>
         public const int CurrencyIconX = 8;
@@ -336,6 +395,14 @@ namespace GW2CraftingHelper.Services
 
         /// <summary>Reserved band width for the full-coverage marker.</summary>
         public const int CurrencyMarkerWidth = 34;
+
+        /// <summary>
+        /// Columns the row's width is divided evenly between: the currency
+        /// name, then Required, Have and Needed. The trailing coverage
+        /// marker is NOT one of them - it is a per-row badge pinned outside
+        /// the table's own right edge, and it has no header label.
+        /// </summary>
+        public const int CurrencyTrackCount = 4;
 
         public readonly struct CurrencyColumnEdges
         {
@@ -367,14 +434,14 @@ namespace GW2CraftingHelper.Services
         }
 
         /// <summary>
-        /// Right-to-left column layout for the currency table's Required/
-        /// Have/Needed numeric columns plus the trailing full-coverage
-        /// marker, derived from panelWidth plus (optionally) this render's
-        /// actual widest Required/Have/Needed value width. Mirrors
-        /// ShoppingColumnMath.ComputeEdges' "derive right-to-left off a
-        /// fixed right edge, using an effective (floor-or-measured) column
-        /// width" shape so header and data rows built from the same
-        /// panelWidth/widestNumberWidth pair always agree by construction.
+        /// Column layout for the currency table's Required/Have/Needed
+        /// numeric columns plus the trailing full-coverage marker, derived
+        /// from panelWidth plus (optionally) this render's actual widest
+        /// Required/Have/Needed value width. Both regimes anchor on the
+        /// same pinned right edge and the same effective (floor-or-
+        /// measured) column width ShoppingColumnMath.ComputeEdges uses, so
+        /// header and data rows built from the same panelWidth/
+        /// widestNumberWidth pair always agree by construction.
         /// widestNumberWidth defaults to 0 (i.e. the fixed
         /// CurrencyNumberColumnWidth floor, unchanged prior
         /// behavior) for callers - existing tests among them - that don't
@@ -387,10 +454,45 @@ namespace GW2CraftingHelper.Services
                 EffectiveCurrencyNumberColumnWidth(widestNumberWidth));
         }
 
+        /// <summary>
+        /// Right edge of track <paramref name="index"/> (0-based) of
+        /// <see cref="CurrencyTrackCount"/> equal tracks spanning
+        /// trackSpan px from <see cref="CurrencyNameX"/>. Integer-exact off
+        /// the span rather than accumulated from a rounded track width -
+        /// the same shape RankerRowLayout.GateCell uses - so the last
+        /// track's edge lands exactly on the span's own end instead of a
+        /// rounding pixel short of it.
+        /// </summary>
+        private static int TrackRightEdge(int trackSpan, int index)
+        {
+            return CurrencyNameX + (int)((long)trackSpan * (index + 1) / CurrencyTrackCount);
+        }
+
         private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
         {
             int markerX = rightEdge - CurrencyMarkerWidth;
+
+            // Needed is the table's own right edge in BOTH regimes below -
+            // the marker trails it, and every plan table pins its rightmost
+            // column to the panel edge (PlanRelayoutMath.PinnedRightEdge).
             int neededRightEdge = markerX - CurrencyColumnGap;
+
+            // A track has to hold its own reserved number band plus the gap
+            // that keeps a wide value (a 7-digit Karma balance) out of the
+            // column to its left. Below that width there is nothing to
+            // distribute, and the row falls back to the packed right-to-
+            // left stack, which fits in less: on a narrow panel a legible
+            // cramped table beats an evenly spaced illegible one.
+            int trackSpan = neededRightEdge - CurrencyNameX;
+            if (trackSpan / CurrencyTrackCount >= numberColumnWidth + CurrencyColumnGap)
+            {
+                return new CurrencyColumnEdges(
+                    TrackRightEdge(trackSpan, 1),
+                    TrackRightEdge(trackSpan, 2),
+                    neededRightEdge,
+                    markerX);
+            }
+
             int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);

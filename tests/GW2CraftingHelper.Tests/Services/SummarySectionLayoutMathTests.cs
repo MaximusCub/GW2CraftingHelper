@@ -90,6 +90,7 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
+                + SummarySectionLayoutMath.CurrencyTableTopGap
                 + PlanContentHeightMath.ColumnHeaderRowHeight + 3 * PlanContentHeightMath.CurrencyRowHeight
                 + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
@@ -146,6 +147,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
                 + PlanContentHeightMath.CostTileRowHeight
+                + SummarySectionLayoutMath.CurrencyTableTopGap
                 + PlanContentHeightMath.ColumnHeaderRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight
                 + 2 * PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
@@ -166,20 +168,172 @@ namespace GW2CraftingHelper.Tests.Services
         [Fact]
         public void CostBandHeight_NoCurrencyNote_IsTheBoxedCaptionPlusAmountBand()
         {
-            // 6 margin + 6 pad + 32 caption line + 4 gap + 20 coin run
-            // + 6 pad + 6 margin. The caption line is 32, not the 25 it was
-            // at Caption: the tile captions moved to the ColumnHeader tier,
-            // whose measured line height is 25 rather than 18.
-            Assert.Equal(80, SummarySectionLayoutMath.CostBandHeight(false));
+            // 6 margin + 6 pad + 29 caption line + 8 label-to-value gap
+            // + 20 coin run + 6 pad + 6 margin.
+            Assert.Equal(81, SummarySectionLayoutMath.CostBandHeight(false));
         }
 
         [Fact]
         public void CostBandHeight_WithCurrencyNote_AddsExactlyOneNoteLine()
         {
-            Assert.Equal(80 + 23, SummarySectionLayoutMath.CostBandHeight(true));
+            Assert.Equal(81 + 23, SummarySectionLayoutMath.CostBandHeight(true));
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandHeight(false) + SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
                 SummarySectionLayoutMath.CostBandHeight(true));
+        }
+
+        // --- The label-to-value gap (defect: "'Sell Value' and the gold
+        // line are a little cramped") ---
+        [Fact]
+        public void LabelToValueGap_IsOneConstantSharedByBothBands()
+        {
+            // The whole point of the constant: the cost band and the profit
+            // band read the SAME number, so no future edit can leave one
+            // breathing and the other cramped.
+            Assert.Equal(
+                PlanContentHeightMath.CostTileLabelToValueGap,
+                SummarySectionLayoutMath.CostBandCaptionToAmountGap);
+        }
+
+        [Fact]
+        public void LabelToValueGap_IsSizedFromTheCaptionTiersOwnMetrics()
+        {
+            // Derived, not eyeballed: a label and its value read as one
+            // group while the space between them stays under about one cap
+            // height, and read as touching well below half of it. The gap
+            // is the 4pt-scale step at half the caption tier's cap height.
+            var caption = TypeRampMetrics.ColumnHeaderInk;
+            int gap = PlanContentHeightMath.CostTileLabelToValueGap;
+
+            // Half the tier's cap height, snapped down to the 4pt scale.
+            Assert.Equal(caption.CapHeight / 2 / 4 * 4, gap);
+
+            // And it must actually clear the caption's descenders, which
+            // hang one pixel past its own line box at this tier.
+            Assert.True(
+                gap > caption.LowestInk - caption.LineHeight,
+                $"a {gap}px gap does not clear a {caption.LowestInk - caption.LineHeight}px descender overhang");
+        }
+
+        [Fact]
+        public void BandAmountY_HangsTheAmountTheGapUnderTheCaption_WhateverTheBandIs()
+        {
+            // Both bands call this with their own measured caption bottom
+            // and get the same distance - it takes no row height and no
+            // bottom pad, which is exactly what made the two drift apart
+            // when each bottom-anchored inside its own fixed row.
+            Assert.Equal(
+                31 + PlanContentHeightMath.CostTileLabelToValueGap,
+                SummarySectionLayoutMath.BandAmountY(31));
+            Assert.Equal(
+                12 + PlanContentHeightMath.CostTileLabelToValueGap,
+                SummarySectionLayoutMath.BandAmountY(12));
+        }
+
+        // --- The disclosure line moved BELOW the amount (defect: "the dead
+        // space between 'Total Materials Value' and the currency data below
+        // it looks odd") ---
+        [Fact]
+        public void BandNoteY_HangsTheDisclosureUnderTheAmount_NotAboveIt()
+        {
+            int amountY = SummarySectionLayoutMath.BandAmountY(37);
+            int noteY = SummarySectionLayoutMath.BandNoteY(amountY, CoinSegmentMath.CoinIconSize);
+
+            Assert.Equal(
+                amountY + CoinSegmentMath.CoinIconSize + SummarySectionLayoutMath.CostBandAmountToNoteGap,
+                noteY);
+            Assert.True(noteY > amountY + CoinSegmentMath.CoinIconSize);
+        }
+
+        [Fact]
+        public void CurrencyNote_DoesNotMoveTheAmountRun_SoAllThreeTilesShareOneCoinLine()
+        {
+            // The defect this replaced: the note was counted between the
+            // caption and a BOTTOM-anchored amount, so a currency-bearing
+            // plan pushed every tile's coin run down by the note's height
+            // while only the result tile had anything in the space it left.
+            // BandAmountY now has no note term to pass - the structural
+            // guarantee - and the band grows DOWNWARD for the note instead.
+            int amountBottom = SummarySectionLayoutMath.BandAmountY(
+                SummarySectionLayoutMath.CostBandCaptionY + TypeRampMetrics.ColumnHeaderInk.LineHeight)
+                + CoinSegmentMath.CoinIconSize;
+
+            Assert.True(
+                amountBottom + SummarySectionLayoutMath.CostBandAmountBottomPad
+                    <= SummarySectionLayoutMath.CostBandHeight(false),
+                "the note-free band must already hold the amount run at the shared y");
+            Assert.True(
+                amountBottom + SummarySectionLayoutMath.CostBandCurrencyNoteHeight
+                    + SummarySectionLayoutMath.CostBandAmountBottomPad
+                    <= SummarySectionLayoutMath.CostBandHeight(true),
+                "the note-bearing band holds the same run PLUS the footnote under it");
+            Assert.Equal(
+                SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
+                SummarySectionLayoutMath.CostBandHeight(true) - SummarySectionLayoutMath.CostBandHeight(false));
+        }
+
+        [Fact]
+        public void CostBandBoxHeight_MeasuredOffTheNote_EnclosesIt()
+        {
+            // Blish clips a container's children, so a box measured off the
+            // amount alone would crop the footnote hanging under it.
+            int amountY = SummarySectionLayoutMath.BandAmountY(37);
+            int amountBottom = amountY + CoinSegmentMath.CoinIconSize;
+            int noteBottom = SummarySectionLayoutMath.BandNoteY(amountY, CoinSegmentMath.CoinIconSize)
+                + TypeRampMetrics.CaptionInk.LineHeight;
+
+            int amountOnlyBox = SummarySectionLayoutMath.CostBandBoxHeight(amountBottom);
+            int withNoteBox = SummarySectionLayoutMath.CostBandBoxHeight(noteBottom);
+
+            Assert.True(withNoteBox > amountOnlyBox);
+            Assert.Equal(noteBottom - amountBottom, withNoteBox - amountOnlyBox);
+        }
+
+        // --- The section-separation gap above the currency table (defect:
+        // "there isn't enough padding or open space between the bottom of
+        // the Total cost section before the currency table's header row") ---
+        [Fact]
+        public void CurrencyTableTopGap_SeparatesLessThanAWholeSectionBoundary()
+        {
+            // On the 4pt scale, and deliberately one step under the 16px
+            // CraftingPlanView.SectionSpacing puts between two SECTIONS:
+            // this is a boundary inside one, so it must read as the lesser
+            // of the two. (16 is aliased here rather than referenced - a
+            // Blish-free Services test may not reach into a view.)
+            const int sectionSpacing = 16;
+
+            Assert.Equal(0, SummarySectionLayoutMath.CurrencyTableTopGap % 4);
+            Assert.InRange(SummarySectionLayoutMath.CurrencyTableTopGap, 8, sectionSpacing - 4);
+        }
+
+        [Fact]
+        public void BodyHeight_CurrencyTable_ReservesItsSeparationGapExactlyOnce()
+        {
+            var oneRow = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.CurrencyCost),
+            };
+            var threeRows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.CurrencyCost),
+                Row(PlanRowType.CurrencyCost),
+                Row(PlanRowType.CurrencyCost),
+            };
+
+            // The gap is a property of the BOUNDARY, not of the rows: two
+            // more currency rows add two row heights and nothing else.
+            Assert.Equal(
+                2 * PlanContentHeightMath.CurrencyRowHeight,
+                SummarySectionLayoutMath.BodyHeight(threeRows) - SummarySectionLayoutMath.BodyHeight(oneRow));
+
+            Assert.Equal(
+                SummarySectionLayoutMath.CostBandHeight(true)
+                    + SummarySectionLayoutMath.CurrencyTableTopGap
+                    + PlanContentHeightMath.ColumnHeaderRowHeight
+                    + PlanContentHeightMath.CurrencyRowHeight,
+                SummarySectionLayoutMath.BodyHeight(oneRow));
         }
 
         [Fact]
@@ -196,11 +350,13 @@ namespace GW2CraftingHelper.Tests.Services
                 $"caption line box {TypeRampMetrics.ColumnHeaderInk.LineHeight} exceeds the "
                     + $"{SummarySectionLayoutMath.CostBandCaptionLineHeight}px reserve");
 
-            // The disclosure line under it stays Caption, and its own
-            // reserve has to cover that tier rather than the caption's.
-            Assert.True(
-                TypeRampMetrics.CaptionInk.LineHeight
-                    <= SummarySectionLayoutMath.CostBandCurrencyNoteHeight);
+            // The disclosure line under the AMOUNT stays Caption, and its
+            // own reserve is that tier's lowest ink plus the gap above it,
+            // so a descender on "+ 2 currencies required" lands inside the
+            // band rather than on the row under it.
+            Assert.Equal(
+                SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
+                SummarySectionLayoutMath.CostBandAmountToNoteGap + TypeRampMetrics.CaptionInk.LowestInk);
         }
 
         [Fact]
@@ -208,8 +364,11 @@ namespace GW2CraftingHelper.Tests.Services
         {
             // The whole reason the cost band is still the taller of the
             // two: its result tile is boxed and the box needs its own
-            // margin and padding, top and bottom. Nothing about the
-            // amount font differs between the bands any more.
+            // margin and padding, top and bottom. Nothing about the amount
+            // font differs between the bands any more, and since the
+            // label-to-value gap became one shared constant, nothing about
+            // their internal spacing does either - the two bands now differ
+            // by exactly the box's own room.
             Assert.True(SummarySectionLayoutMath.CostBandHeight(false) > PlanContentHeightMath.CostTileRowHeight);
             Assert.Equal(
                 2 * (SummarySectionLayoutMath.CostBandBoxMarginY + SummarySectionLayoutMath.CostBandBoxPadY),
@@ -217,28 +376,37 @@ namespace GW2CraftingHelper.Tests.Services
                     - (SummarySectionLayoutMath.CostBandCaptionLineHeight
                         + SummarySectionLayoutMath.CostBandCaptionToAmountGap
                         + CoinSegmentMath.CoinIconSize));
+
+            Assert.Equal(
+                2 * SummarySectionLayoutMath.CostBandBoxMarginY
+                    + 2 * SummarySectionLayoutMath.CostBandBoxPadY
+                    - PlanContentHeightMath.CostTileCaptionY
+                    - PlanContentHeightMath.CostTileAmountBottomPad,
+                SummarySectionLayoutMath.CostBandHeight(false) - PlanContentHeightMath.CostTileRowHeight);
         }
 
         [Fact]
         public void CostBandHeight_LeavesTheHighlightBoxInsideTheBand()
         {
             // The geometry the renderer actually builds, through the same
-            // functions it calls: BandAmountY places the amount, the box
-            // spans CostBandBoxTop to one pad below it, and that bottom
-            // edge - the band's lowest ink - must sit inside the height the
-            // math reserved. The renderer's DEBUG assert fails loud
-            // otherwise, but only at runtime and only in DEBUG.
+            // functions it calls: BandAmountY hangs the amount under the
+            // measured caption, BandNoteY hangs the footnote under that,
+            // the box spans CostBandBoxTop to one pad below the lowest of
+            // them, and that bottom edge - the band's lowest ink - must sit
+            // inside the height the math reserved. The renderer's DEBUG
+            // assert fails loud otherwise, but only at runtime and only in
+            // DEBUG.
             //
             // captionBlockBottom is a MEASURED input (the caption font's
             // real metrics), so it is swept from the tightest plausible
-            // value up to the full reserve rather than assumed: the clamp
-            // inside BandAmountY is exactly what has to hold across it.
+            // value up to the full reserve rather than assumed. The reserve
+            // is what the band's own height was sized from, so a caption
+            // anywhere inside it must still leave the box enclosed.
             foreach (bool hasNote in new[] { false, true })
             {
                 int rowHeight = SummarySectionLayoutMath.CostBandHeight(hasNote);
                 int reserve = SummarySectionLayoutMath.CostBandCaptionY
-                    + SummarySectionLayoutMath.CostBandCaptionLineHeight
-                    + (hasNote ? SummarySectionLayoutMath.CostBandCurrencyNoteHeight : 0);
+                    + SummarySectionLayoutMath.CostBandCaptionLineHeight;
 
                 Assert.True(SummarySectionLayoutMath.CostBandBoxTop >= 0);
 
@@ -246,18 +414,24 @@ namespace GW2CraftingHelper.Tests.Services
                     captionBlockBottom <= reserve;
                     captionBlockBottom++)
                 {
-                    int amountY = SummarySectionLayoutMath.BandAmountY(
-                        rowHeight,
-                        CoinSegmentMath.CoinIconSize,
-                        captionBlockBottom,
-                        SummarySectionLayoutMath.CostBandAmountBottomPad);
-                    int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(
-                        amountY, CoinSegmentMath.CoinIconSize);
+                    int amountY = SummarySectionLayoutMath.BandAmountY(captionBlockBottom);
+                    int contentBottom = amountY + CoinSegmentMath.CoinIconSize;
+                    if (hasNote)
+                    {
+                        contentBottom = SummarySectionLayoutMath.BandNoteY(
+                            amountY, CoinSegmentMath.CoinIconSize)
+                            + TypeRampMetrics.CaptionInk.LineHeight;
+                    }
+
+                    int boxHeight = SummarySectionLayoutMath.CostBandBoxHeight(contentBottom);
 
                     // The caption block must clear the amount run rather
                     // than be overprinted by it.
                     Assert.True(amountY >= captionBlockBottom);
-                    Assert.True(SummarySectionLayoutMath.CostBandBoxTop + boxHeight <= rowHeight);
+                    Assert.True(
+                        SummarySectionLayoutMath.CostBandBoxTop + boxHeight <= rowHeight,
+                        $"box overflows a {rowHeight}px band (hasNote={hasNote}, "
+                            + $"captionBlockBottom={captionBlockBottom})");
                 }
             }
         }
@@ -316,7 +490,9 @@ namespace GW2CraftingHelper.Tests.Services
             };
 
             int currencyTableHeight =
-                PlanContentHeightMath.ColumnHeaderRowHeight + PlanContentHeightMath.CurrencyRowHeight;
+                SummarySectionLayoutMath.CurrencyTableTopGap
+                + PlanContentHeightMath.ColumnHeaderRowHeight
+                + PlanContentHeightMath.CurrencyRowHeight;
 
             Assert.Equal(
                 SummarySectionLayoutMath.BodyHeight(withoutCurrency)
@@ -380,23 +556,121 @@ namespace GW2CraftingHelper.Tests.Services
         // values below are hard-coded pixel numbers for two panel widths -
         // a conscious re-baseline point. If a deliberate geometry change
         // moves these, recompute by hand from SummarySectionLayoutMath.cs's
-        // CurrencyMarkerWidth/CurrencyColumnGap/CurrencyNumberColumnWidth
-        // constants (widestNumberWidth defaults to 0) and update the
-        // literals here.
+        // CurrencyMarkerWidth/CurrencyColumnGap/CurrencyNameX/
+        // CurrencyTrackCount constants (widestNumberWidth defaults to 0)
+        // and update the literals here.
         [Fact]
-        public void ComputeCurrencyColumnEdges_DerivesRightToLeftFromPanelWidth()
+        public void ComputeCurrencyColumnEdges_DistributesTheColumnsAcrossThePanel()
         {
+            // 800: pinned right edge 792, marker 758, Needed 744. The name
+            // starts at 34, so 710px carry four equal tracks and each
+            // column's right edge is its own quarter's end.
             var edges800 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            Assert.Equal(596, edges800.RequiredRightEdge);
-            Assert.Equal(670, edges800.HaveRightEdge);
+            Assert.Equal(389, edges800.RequiredRightEdge);
+            Assert.Equal(566, edges800.HaveRightEdge);
             Assert.Equal(744, edges800.NeededRightEdge);
             Assert.Equal(758, edges800.MarkerX);
 
             var edges1200 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
-            Assert.Equal(996, edges1200.RequiredRightEdge);
-            Assert.Equal(1070, edges1200.HaveRightEdge);
+            Assert.Equal(589, edges1200.RequiredRightEdge);
+            Assert.Equal(866, edges1200.HaveRightEdge);
             Assert.Equal(1144, edges1200.NeededRightEdge);
             Assert.Equal(1158, edges1200.MarkerX);
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_TracksAreEvenlySpaced_NotPackedRight()
+        {
+            // The defect: "the currency name all the way left aligned with
+            // the columns with their data all the way right aligned.. its
+            // hard to track which label belongs to which row with so much
+            // wide distance in between". The fix is a regular pitch - the
+            // three numeric anchors sit one track apart, so the eye has
+            // something to land on between the name and the last column.
+            foreach (int panelWidth in new[] { 800, 1200, 1310, 1920 })
+            {
+                var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+
+                int firstPitch = edges.HaveRightEdge - edges.RequiredRightEdge;
+                int secondPitch = edges.NeededRightEdge - edges.HaveRightEdge;
+                int namePitch = edges.RequiredRightEdge - SummarySectionLayoutMath.CurrencyNameX
+                    - firstPitch;
+
+                // Integer division puts at most a pixel between tracks.
+                Assert.InRange(firstPitch - secondPitch, -1, 1);
+                Assert.InRange(namePitch - firstPitch, -1, 1);
+
+                // And the first number lands near the middle of the row
+                // rather than out at its right edge, which is what the
+                // packed stack did.
+                Assert.InRange(
+                    edges.RequiredRightEdge,
+                    panelWidth / 4,
+                    panelWidth / 2 + SummarySectionLayoutMath.CurrencyNameX);
+            }
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_NameColumnStaysReadable()
+        {
+            // Even distribution is only right while the name keeps a real
+            // budget: a quarter of the row, less the Required column's own
+            // reserve. At every width the plan panel can present, that is
+            // several times the widest currency name the API returns
+            // ("Legendary Insight" measures well under 200px at Body).
+            foreach (int panelWidth in new[] { 800, 1310, 1920 })
+            {
+                var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+                int nameBudget = PlanRelayoutMath.NameMaxWidthBeforeColumn(
+                    edges.RequiredRightEdge,
+                    SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0),
+                    SummarySectionLayoutMath.CurrencyColumnGap,
+                    SummarySectionLayoutMath.CurrencyNameX);
+
+                Assert.True(nameBudget >= 200, $"name budget {nameBudget} at panel {panelWidth}");
+            }
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_NarrowPanel_FallsBackToThePackedStack()
+        {
+            // Below the width a track can hold a reserved number band plus
+            // its gap there is nothing to distribute, and spreading anyway
+            // would overlap the columns. 300: right edge 292, marker 258,
+            // Needed 244, and 210px of span cannot give four tracks 74px
+            // each - so the columns pack right-to-left as they always did.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(300);
+
+            Assert.Equal(258, edges.MarkerX);
+            Assert.Equal(244, edges.NeededRightEdge);
+            Assert.Equal(170, edges.HaveRightEdge);
+            Assert.Equal(96, edges.RequiredRightEdge);
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_EveryRegime_KeepsColumnsOutOfEachOther()
+        {
+            // The invariant both regimes exist to hold: a value right-
+            // aligned on its own edge grows LEFTWARD by up to the reserved
+            // band width, and must never reach the column to its left. Swept
+            // across the regime boundary and across a reserve wide enough
+            // for a 7-digit Karma balance.
+            foreach (int widest in new[] { 0, 60, 90, 140 })
+            {
+                int band = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widest);
+                for (int panelWidth = 200; panelWidth <= 2000; panelWidth += 7)
+                {
+                    var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, widest);
+
+                    Assert.True(
+                        edges.HaveRightEdge - band >= edges.RequiredRightEdge,
+                        $"Have intrudes on Required at panel {panelWidth}, band {band}");
+                    Assert.True(
+                        edges.NeededRightEdge - band >= edges.HaveRightEdge,
+                        $"Needed intrudes on Have at panel {panelWidth}, band {band}");
+                    Assert.True(edges.NeededRightEdge < edges.MarkerX);
+                }
+            }
         }
 
         [Fact]
@@ -433,19 +707,25 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdges_WiderPanel_MovesTheWholeBlockByTheFullIncrease()
+        public void ComputeCurrencyColumnEdges_WiderPanel_SharesTheIncreaseAcrossEveryTrack()
         {
+            // The right-hand block used to move by the whole increase with
+            // the name column absorbing all of it. Under distribution every
+            // track takes an equal share, so a wider panel spreads the
+            // columns rather than dragging them further from the name: the
+            // last column moves by the full 400, the one before it by
+            // three quarters, the first by half.
             var narrow = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
             var wide = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1600, 90);
 
             Assert.Equal(400, wide.MarkerX - narrow.MarkerX);
             Assert.Equal(400, wide.NeededRightEdge - narrow.NeededRightEdge);
-            Assert.Equal(400, wide.HaveRightEdge - narrow.HaveRightEdge);
-            Assert.Equal(400, wide.RequiredRightEdge - narrow.RequiredRightEdge);
+            Assert.Equal(300, wide.HaveRightEdge - narrow.HaveRightEdge);
+            Assert.Equal(200, wide.RequiredRightEdge - narrow.RequiredRightEdge);
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdges_NameBudgetAbsorbsTheWidthIncrease()
+        public void ComputeCurrencyColumnEdges_NameBudgetTakesItsOwnShareOfTheIncrease()
         {
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
 
@@ -460,7 +740,11 @@ namespace GW2CraftingHelper.Tests.Services
                 SummarySectionLayoutMath.CurrencyColumnGap,
                 nameX);
 
-            Assert.Equal(400, wide - narrow);
+            // Half of the 400px increase - the name track's own quarter
+            // plus the Required track's, which is the space the Required
+            // column's right edge moves across. The other half goes to the
+            // two tracks right of it.
+            Assert.Equal(200, wide - narrow);
         }
 
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
@@ -493,41 +777,41 @@ namespace GW2CraftingHelper.Tests.Services
         }
 
         [Fact]
-        public void ComputeCurrencyColumnEdges_NoWidestNumberWidthArg_ProducesFixedFloorGeometry()
+        public void ComputeCurrencyColumnEdges_WidestNumberWidth_DoesNotMoveADistributedTrack()
         {
-            // Omitting widestNumberWidth must reproduce the fixed-60px
-            // geometry, pinned absolutely: rightEdge = 800 - 8 = 792,
-            // MarkerX = 792 - 34, NeededRightEdge = MarkerX - gap(14),
-            // then each further column steps left by gap(14) + width(60).
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-
-            Assert.Equal(758, edges.MarkerX);
-            Assert.Equal(744, edges.NeededRightEdge);
-            Assert.Equal(670, edges.HaveRightEdge);
-            Assert.Equal(596, edges.RequiredRightEdge);
-        }
-
-        [Fact]
-        public void ComputeCurrencyColumnEdges_WidestNumberWidthExceedsFloor_WidensRequiredAndHaveColumns()
-        {
+            // Under distribution the reserve decides only whether the row
+            // is wide enough to distribute at all - a track already holds
+            // its band plus the gap, so a wider value grows leftward INSIDE
+            // its own track and no edge moves. That is the difference from
+            // the packed stack, where every wider value shoved the columns
+            // to its left further left again.
             const int panelWidth = 800;
             var fixedFloor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
             var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, 120);
 
-            // Right-to-left layout: NeededRightEdge/MarkerX sit to the
-            // right of the widened Have/Required bands, so they are
-            // unaffected. Widening those bands pushes HaveRightEdge and
-            // RequiredRightEdge further LEFT (smaller x) to make room for
-            // the wider reserved space to their own right.
-            Assert.Equal(fixedFloor.NeededRightEdge, widened.NeededRightEdge);
             Assert.Equal(fixedFloor.MarkerX, widened.MarkerX);
-            Assert.True(widened.HaveRightEdge < fixedFloor.HaveRightEdge);
-            Assert.True(widened.RequiredRightEdge < fixedFloor.RequiredRightEdge);
+            Assert.Equal(fixedFloor.NeededRightEdge, widened.NeededRightEdge);
+            Assert.Equal(fixedFloor.HaveRightEdge, widened.HaveRightEdge);
+            Assert.Equal(fixedFloor.RequiredRightEdge, widened.RequiredRightEdge);
+        }
 
-            // Exact widening amount: both columns grow by (120 - 60).
-            int extra = 120 - SummarySectionLayoutMath.CurrencyNumberColumnWidth;
-            Assert.Equal(fixedFloor.HaveRightEdge - extra, widened.HaveRightEdge);
-            Assert.Equal(fixedFloor.RequiredRightEdge - 2 * extra, widened.RequiredRightEdge);
+        [Fact]
+        public void ComputeCurrencyColumnEdges_WidestNumberWidth_PacksTheStackWhenATrackCannotHoldIt()
+        {
+            // The reserve DOES decide the geometry at the boundary: a band
+            // wide enough that four equal tracks can no longer each hold
+            // one drops the row back to the packed stack, where the widened
+            // bands push Have and Required left exactly as they always did.
+            const int panelWidth = 500;
+            var floor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
+            var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, 140);
+
+            Assert.Equal(floor.MarkerX, widened.MarkerX);
+            Assert.Equal(floor.NeededRightEdge, widened.NeededRightEdge);
+            Assert.Equal(widened.NeededRightEdge - 140 - SummarySectionLayoutMath.CurrencyColumnGap,
+                widened.HaveRightEdge);
+            Assert.Equal(widened.HaveRightEdge - 140 - SummarySectionLayoutMath.CurrencyColumnGap,
+                widened.RequiredRightEdge);
         }
     }
 }
