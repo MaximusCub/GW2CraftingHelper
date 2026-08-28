@@ -180,9 +180,10 @@ namespace GW2CraftingHelper.Services
         /// <summary>
         /// Height of the cost formula band's single tile row: the highlight
         /// box's margin+padding, a caption line, the disclosure line when
-        /// there is one, the gap, and one amount run (a coin run is never
-        /// shorter than CoinSegmentMath.CoinIconSize, which is what makes
-        /// that the amount block's reserved height).
+        /// there is one, the gap, and one amount run
+        /// (PlanContentHeightMath.AmountRunHeight - the taller of the amount
+        /// text's line box and the coin icon beside it, which since the coin
+        /// runs moved onto the wallet BAR tier is the text, not the icon).
         /// hasCurrencyNote must be "this Summary section has at least one
         /// CurrencyCost row" - the same condition
         /// Views/Rendering/SummarySectionRenderer.Render uses to decide
@@ -194,7 +195,7 @@ namespace GW2CraftingHelper.Services
                 + CostBandCaptionLineHeight
                 + (hasCurrencyNote ? CostBandCurrencyNoteHeight : 0)
                 + CostBandCaptionToAmountGap
-                + CoinSegmentMath.CoinIconSize
+                + PlanContentHeightMath.AmountRunHeight
                 + CostBandAmountBottomPad;
         }
 
@@ -320,8 +321,16 @@ namespace GW2CraftingHelper.Services
         /// <summary>Left x of the currency icon.</summary>
         public const int CurrencyIconX = 8;
 
-        /// <summary>Icon size for the currency table's leading icon.</summary>
-        public const int CurrencyIconSize = 18;
+        /// <summary>
+        /// Icon size for the currency table's leading icon. This IS the
+        /// in-game wallet list - one row per currency, name then amounts,
+        /// icon as the row's subject - so it takes the list tier
+        /// (<see cref="CurrencyIconTiers.WalletListIconSize"/>), not the bar
+        /// tier the inline coin runs above it use. The renderer insets the
+        /// art by the module's 1px frame either side, so the framed box
+        /// occupies exactly the measured 32px window.
+        /// </summary>
+        public const int CurrencyIconSize = CurrencyIconTiers.WalletListIconSize;
 
         /// <summary>
         /// Left x of the currency name label - past the icon plus a gap.

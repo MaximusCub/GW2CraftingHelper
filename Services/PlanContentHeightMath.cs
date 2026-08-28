@@ -157,12 +157,31 @@ namespace GW2CraftingHelper.Services
         // is gone with the sublabel.
         public const int RecipeRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
 
-        // 58, not 56: the cost tiles' captions moved to the ColumnHeader
-        // tier, whose 25px line box puts the caption block's bottom at
-        // CostTileCaptionY 4 + 25 + 2 = 31, one past the y=30 a 56px band
-        // bottom-anchored its 20px coin run at. 58 restores the clearance
-        // (amount y = 58 - 6 - 20 = 32).
-        public const int CostTileRowHeight = 58;
+        // Reserved height of a formula band's amount run: the taller of the
+        // amount text's own line box (Regular16, 20 - TypeRampMetrics) and
+        // the coin icon beside it, which is what SummarySectionRenderer.
+        // AmountBlockHeight measures at render time.
+        //
+        // Spelled as CoinSegmentMath.CoinIconSize alone until the wallet BAR
+        // tier made the icon the SHORTER of the pair: that only ever agreed
+        // with the text by coincidence, and a reserve named after the icon
+        // now under-reserves by 4px and stops the band bottom-anchoring its
+        // own amount.
+        public const int AmountTextLineHeight = 20;
+        public const int AmountRunHeight =
+            CoinSegmentMath.CoinIconSize > AmountTextLineHeight
+                ? CoinSegmentMath.CoinIconSize
+                : AmountTextLineHeight;
+
+        // The cost tiles' captions sit on the ColumnHeader tier, whose 25px
+        // line box puts the caption block's bottom at CostTileCaptionY 4 + 25
+        // + 2 = 31, so the amount run must start no higher than 32. The band
+        // bottom-anchors that run, hence caption block + one amount run + the
+        // bottom pad: 32 + 20 + 6 = 58, the height this row already shipped
+        // at, as its derivation rather than as a literal.
+        public const int CostTileAmountY = 32;
+        public const int CostTileRowHeight =
+            CostTileAmountY + AmountRunHeight + CostTileAmountBottomPad;
 
         // Caption y and amount bottom pad of an UNHIGHLIGHTED formula band
         // (the profit band; a highlighted one uses
@@ -178,7 +197,17 @@ namespace GW2CraftingHelper.Services
         // font and is highlighted with a tinted box instead, so its height
         // is the box's own geometry - Services/SummarySectionLayoutMath.
         // CostBandHeight. The profit band still uses CostTileRowHeight.
-        public const int CurrencyRowHeight = 28;
+        //
+        // The Summary's currency table mirrors the in-game wallet list, so
+        // its row geometry is measured from the same capture as the icon it
+        // carries: the list's row band is 42px with a 32px icon box centred
+        // in it, i.e. 5px of clearance above and below
+        // (Services/CurrencyIconTiers). Icon-plus-pad, not the old literal
+        // 28, which predated the tier and could not hold a list-tier icon.
+        public const int CurrencyRowIconPad = 5;
+        public const int CurrencyRowHeight =
+            CurrencyIconTiers.WalletListIconSize + (2 * CurrencyRowIconPad);
+
         public const int FallbackTextRowHeight = 28;
 
         /// <summary>Clearance above and below a tree row's icon frame. The
