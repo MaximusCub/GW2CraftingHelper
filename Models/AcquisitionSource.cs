@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// The solver's own acquisition vocabulary - what <see cref="Services.PlanSolver"/>

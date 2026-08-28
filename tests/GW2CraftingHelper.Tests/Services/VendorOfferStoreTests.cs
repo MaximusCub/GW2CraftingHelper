@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class VendorOfferStoreTests : IDisposable
     {
@@ -20,7 +20,7 @@ namespace GW2CraftingHelper.Tests.Services
         {
             _tempDir = Path.Combine(
                 Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + Guid.NewGuid());
+                "TaimisToolbench_Tests_" + Guid.NewGuid());
             Directory.CreateDirectory(_tempDir);
             _loader = new VendorOfferLoader();
         }

@@ -1,17 +1,17 @@
-using Blish_HUD;
-using Blish_HUD.Controls;
-using Blish_HUD.Input;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
-using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Blish_HUD;
+using Blish_HUD.Controls;
+using Blish_HUD.Input;
+using Microsoft.Xna.Framework;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     internal class ItemSelectedEventArgs : EventArgs
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Short-lived session cache in front of another

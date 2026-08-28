@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// Whole-result goldens for the solver's economic decisions, captured
@@ -32,8 +32,8 @@ namespace GW2CraftingHelper.Tests.Services
     /// A difference here is never a reason to re-baseline. Investigate the
     /// difference; the golden is the record of what the solver decided.
     /// To regenerate deliberately (a real, reviewed behaviour change), set
-    /// GW2CH_REGEN_PLAN_GOLDENS=1 and run this class - it rewrites the
-    /// files in tests/GW2CraftingHelper.Tests/Goldens/plan-solver/ and
+    /// TTB_REGEN_PLAN_GOLDENS=1 and run this class - it rewrites the
+    /// files in tests/TaimisToolbench.Tests/Goldens/plan-solver/ and
     /// fails, so the rewrite can never pass unnoticed in CI.
     /// </para>
     /// </summary>
@@ -163,8 +163,8 @@ namespace GW2CraftingHelper.Tests.Services
                     .Build();
 
                 var valuation = copperPerUnit > 0
-                    ? new GW2CraftingHelper.Models.CurrencyValuation(new Dictionary<int, long> { { 2, copperPerUnit } })
-                    : GW2CraftingHelper.Models.CurrencyValuation.None;
+                    ? new TaimisToolbench.Models.CurrencyValuation(new Dictionary<int, long> { { 2, copperPerUnit } })
+                    : TaimisToolbench.Models.CurrencyValuation.None;
 
                 var result = await pipeline.GenerateStructuredAsync(
                     1, 3, null, CancellationToken.None,
@@ -258,16 +258,16 @@ namespace GW2CraftingHelper.Tests.Services
             string relative = Path.Combine("Goldens", "plan-solver", scenario + ".txt");
             string goldenPath = Path.Combine(AppContext.BaseDirectory, relative);
 
-            if (Environment.GetEnvironmentVariable("GW2CH_REGEN_PLAN_GOLDENS") == "1")
+            if (Environment.GetEnvironmentVariable("TTB_REGEN_PLAN_GOLDENS") == "1")
             {
                 string source = RepoFileLocator.FindRepoFile(
-                    Path.Combine("tests", "GW2CraftingHelper.Tests", relative));
+                    Path.Combine("tests", "TaimisToolbench.Tests", relative));
                 Assert.True(source != null, "Cannot regenerate: no source golden at " + relative);
                 File.WriteAllText(source, actual);
 
                 // Never a silent pass: a regeneration run is a deliberate
                 // act that must be reviewed, so it reports as a failure.
-                Assert.Fail("Regenerated " + relative + " - review the diff, then unset GW2CH_REGEN_PLAN_GOLDENS.");
+                Assert.Fail("Regenerated " + relative + " - review the diff, then unset TTB_REGEN_PLAN_GOLDENS.");
             }
 
             Assert.True(File.Exists(goldenPath), "Golden not found at " + goldenPath);

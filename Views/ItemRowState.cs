@@ -1,6 +1,6 @@
 using Blish_HUD.Controls;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// One row of the multi-item input strip (gw2efficiency

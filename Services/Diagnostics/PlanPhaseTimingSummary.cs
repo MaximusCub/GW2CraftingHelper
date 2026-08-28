@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace GW2CraftingHelper.Services.Diagnostics
+namespace TaimisToolbench.Services.Diagnostics
 {
     /// <summary>
     /// Formats a compact, coarse-phase timing summary for the

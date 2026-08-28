@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// Settings tab content: lets the user set the coin value of

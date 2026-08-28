@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The closed vocabulary of framed-icon sizes: what a call site names

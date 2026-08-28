@@ -5,11 +5,11 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Models
+namespace TaimisToolbench.Tests.Models
 {
     // B1 (quality-phase1-bugs, quality-audit follow-up): the original guard
     // only snapshotted 4 hand-picked types (PersistedPlan/CraftingPlanResult/
@@ -31,7 +31,7 @@ namespace GW2CraftingHelper.Tests.Models
     // couples the two - see PersistedPlan.SchemaShapeHash.
     public class PersistedPlanSchemaMemberSetTests
     {
-        private const string ModelsNamespace = "GW2CraftingHelper.Models";
+        private const string ModelsNamespace = "TaimisToolbench.Models";
 
         private const string SnapshotRelativePath = "tests/shared/persisted_plan_schema.txt";
 

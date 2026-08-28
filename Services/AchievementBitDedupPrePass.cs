@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Achievement-bit ingredient dedup (KNOWN-ISSUES #26, gw2e

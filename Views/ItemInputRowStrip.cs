@@ -1,12 +1,12 @@
-using Blish_HUD.Controls;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Views.Rendering;
-using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using Blish_HUD.Controls;
+using Microsoft.Xna.Framework;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The multi-item request editor at the top of the Crafting Plan tab

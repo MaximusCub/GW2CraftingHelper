@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// File-IO half of the module logging system (dev/proposals/d2-log-system.md Section

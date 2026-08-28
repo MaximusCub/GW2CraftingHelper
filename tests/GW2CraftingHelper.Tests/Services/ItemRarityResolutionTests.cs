@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The one rarity-resolution policy both the Snapshot tab and the

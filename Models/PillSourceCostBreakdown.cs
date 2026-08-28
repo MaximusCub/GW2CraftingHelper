@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// A per-node, per-source raw cost decomposition, computed for EVERY

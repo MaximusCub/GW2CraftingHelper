@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Persists one gzipped PersistedPlan per Plan History entry under

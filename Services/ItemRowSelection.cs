@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Contracts;
+using TaimisToolbench.Contracts;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure decisions that keep an input row's resolved item in step with

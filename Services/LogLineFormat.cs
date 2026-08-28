@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Text;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Splits one <see cref="ModuleLogEntry"/> into the two columns the Log

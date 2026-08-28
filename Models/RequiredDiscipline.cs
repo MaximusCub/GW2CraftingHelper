@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     internal class RequiredDiscipline
     {

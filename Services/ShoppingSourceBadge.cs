@@ -1,6 +1,6 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The short source badge a Shopping List row carries next to its name

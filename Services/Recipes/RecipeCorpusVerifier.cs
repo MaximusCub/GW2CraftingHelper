@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace GW2CraftingHelper.Services.Recipes
+namespace TaimisToolbench.Services.Recipes
 {
     internal enum CorpusVerificationStatus
     {

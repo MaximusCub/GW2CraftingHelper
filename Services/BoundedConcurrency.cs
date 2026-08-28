@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal static class BoundedConcurrency
     {

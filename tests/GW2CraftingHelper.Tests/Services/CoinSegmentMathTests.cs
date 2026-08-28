@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // TotalCoinSegmentsWidth/TotalCurrencySegmentsWidth, their plain data
     // specs (CoinSegmentSpec/CurrencySegmentSpec), and the geometry

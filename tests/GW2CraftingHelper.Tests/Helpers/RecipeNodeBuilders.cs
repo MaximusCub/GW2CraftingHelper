@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// Shared RecipeNode/RecipeOption tree-builder helpers.

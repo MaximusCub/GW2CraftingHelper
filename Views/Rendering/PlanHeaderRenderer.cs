@@ -1,10 +1,10 @@
-using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using Microsoft.Xna.Framework;
 using System;
+using Blish_HUD.Controls;
+using Microsoft.Xna.Framework;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The plan's page title: the rarity-framed item icon, the item name,

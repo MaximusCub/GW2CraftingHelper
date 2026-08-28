@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The Recipe Tree actions and per-plan state, handed from

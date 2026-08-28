@@ -1,8 +1,8 @@
 using System;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // NotesSectionLayoutMath is the Plan Notes section's own wrap/height
     // arithmetic - the production seam Views/Rendering/NotesSectionRenderer

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // The three tooltip composers now build structure once and expose a
     // plain-text view of it. Two properties are worth pinning: the gold

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using Blish_HUD.Settings;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class ModuleSettings
     {

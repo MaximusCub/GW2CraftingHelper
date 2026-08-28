@@ -1,8 +1,8 @@
 using System;
 using System.IO;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class SnapshotStore
     {

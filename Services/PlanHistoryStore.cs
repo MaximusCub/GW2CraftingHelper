@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Persists the Plan History index to data/plan_history.json - the

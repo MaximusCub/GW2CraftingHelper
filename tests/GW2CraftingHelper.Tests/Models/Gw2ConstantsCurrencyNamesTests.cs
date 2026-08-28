@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Models
+namespace TaimisToolbench.Tests.Models
 {
     /// <summary>
     /// Audit row 56 PART B #2: pins Gw2Constants.KnownCurrencyNames' id-to-

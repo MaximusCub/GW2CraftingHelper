@@ -1,10 +1,10 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // A leaf: nothing here refers back to CraftingPlanView (CreateSmallTag's
     // pill colors are resolved by the caller and passed in).

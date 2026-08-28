@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// UI-bundle milestone, Feature A (wiki links) - this module's FIRST

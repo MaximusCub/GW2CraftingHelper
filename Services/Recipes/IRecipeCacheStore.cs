@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace GW2CraftingHelper.Services.Recipes
+namespace TaimisToolbench.Services.Recipes
 {
     internal class RecipeCacheStats
     {

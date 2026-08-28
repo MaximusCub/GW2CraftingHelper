@@ -91,7 +91,7 @@ namespace MysticForgeSeeder
 
             using var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "GW2CraftingHelper-MysticForgeSeeder/1.0");
+                "TaimisToolbench-MysticForgeSeeder/1.0");
 
             var client = new WikiRecipeClient(
                 httpClient, delayMs, maxRequests);
@@ -321,13 +321,13 @@ namespace MysticForgeSeeder
             Console.WriteLine("Next steps:");
             Console.WriteLine(
                 "  dotnet run --project " +
-                "tools/GW2CraftingHelper.RecipeSeeder/" +
-                "GW2CraftingHelper.RecipeSeeder.csproj");
+                "tools/TaimisToolbench.RecipeSeeder/" +
+                "TaimisToolbench.RecipeSeeder.csproj");
             Console.WriteLine(
-                "  dotnet build GW2CraftingHelper.csproj -p:Platform=x64");
+                "  dotnet build TaimisToolbench.csproj -p:Platform=x64");
             Console.WriteLine(
-                "  dotnet test tests/GW2CraftingHelper.Tests/" +
-                "GW2CraftingHelper.Tests.csproj");
+                "  dotnet test tests/TaimisToolbench.Tests/" +
+                "TaimisToolbench.Tests.csproj");
 
             return 0;
         }

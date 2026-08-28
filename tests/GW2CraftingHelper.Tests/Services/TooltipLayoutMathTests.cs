@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // The rich tooltip surface's arithmetic. The placement half is the
     // interesting one: it exists because BlishHUD 1.3.0's own

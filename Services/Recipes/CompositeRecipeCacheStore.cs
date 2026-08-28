@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Services.Recipes
+namespace TaimisToolbench.Services.Recipes
 {
     internal class CompositeRecipeCacheStore : IRecipeCacheStore
     {

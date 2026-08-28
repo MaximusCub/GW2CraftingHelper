@@ -7,14 +7,14 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // Plan persistence across module restarts. Mirrors
     // SnapshotStoreTests' shape (a real store against a real temp
@@ -35,7 +35,7 @@ namespace GW2CraftingHelper.Tests.Services
 
         public PlanStoreTests()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "GW2CraftingHelper_Tests_" + Guid.NewGuid().ToString("N"));
+            _tempDir = Path.Combine(Path.GetTempPath(), "TaimisToolbench_Tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_tempDir);
             _store = new PlanStore(_tempDir);
         }

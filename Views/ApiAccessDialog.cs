@@ -3,11 +3,11 @@ using System.Linq;
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Views.Rendering;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The "GW2 API access not ready" walkthrough dialog for the
@@ -45,7 +45,7 @@ namespace GW2CraftingHelper.Views
     /// </summary>
     internal class ApiAccessDialog : IDisposable
     {
-        private const string WindowId = "GW2CraftingHelper_ApiAccessDialog_7d2c31";
+        private const string WindowId = "TaimisToolbench_ApiAccessDialog_7d2c31";
 
         // 480 before: at that width the title ran into the title bar's
         // close X and was clipped mid-word ("GW2 API access is not read|y|X").
@@ -73,7 +73,7 @@ namespace GW2CraftingHelper.Views
         {
             "1. You are logged into a character in the game world (not the character-select screen) - Blish only learns which account is active once you are in-world.",
             "2. A Guild Wars 2 API key is added in Blish HUD settings.",
-            "3. This module has permission to use the API key (Blish settings > Manage Modules > GW2 Crafting Helper).",
+            "3. This module has permission to use the API key (Blish settings > Manage Modules > Taimi's Toolbench).",
         };
 
         private readonly StandardWindow _window;

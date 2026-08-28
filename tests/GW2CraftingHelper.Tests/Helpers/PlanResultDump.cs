@@ -5,9 +5,9 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// A whole <see cref="CraftingPlanResult"/> rendered as deterministic

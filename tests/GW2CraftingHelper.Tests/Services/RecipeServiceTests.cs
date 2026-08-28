@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class RecipeServiceTests
     {
@@ -794,11 +794,11 @@ namespace GW2CraftingHelper.Tests.Services
         public async Task RecipeId_404sOnDetailLookup_SkipsOptionAndDoesNotPoisonPersistentCache()
         {
             string tempDir = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(), "gw2ch-test-" + System.Guid.NewGuid());
+                System.IO.Path.GetTempPath(), "ttb-test-" + System.Guid.NewGuid());
             try
             {
                 const int buildId = 205780;
-                var cacheStore = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
+                var cacheStore = new TaimisToolbench.Services.Recipes.OverlayRecipeCacheStore(tempDir);
                 cacheStore.Load();
                 cacheStore.SetCurrentBuildId(buildId);
 
@@ -834,7 +834,7 @@ namespace GW2CraftingHelper.Tests.Services
                 // entry in _recipes.
                 cacheStore.Flush(force: true);
 
-                var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tempDir);
+                var reloaded = new TaimisToolbench.Services.Recipes.OverlayRecipeCacheStore(tempDir);
                 reloaded.Load();
                 var persistedRecipe = reloaded.TryGetRecipe(10);
                 Assert.NotNull(persistedRecipe);
@@ -862,7 +862,7 @@ namespace GW2CraftingHelper.Tests.Services
             using (var tmp = new TempDirectory())
             {
                 const int buildId = 205780;
-                var overlay = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
+                var overlay = new TaimisToolbench.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
                 overlay.Load();
                 overlay.SetCurrentBuildId(buildId);
 
@@ -898,7 +898,7 @@ namespace GW2CraftingHelper.Tests.Services
                 Assert.False(persistedBeforeReturn);
                 Assert.Single(node.Recipes);
 
-                var reloaded = new GW2CraftingHelper.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
+                var reloaded = new TaimisToolbench.Services.Recipes.OverlayRecipeCacheStore(tmp.Path);
                 reloaded.Load();
                 Assert.NotNull(reloaded.TryGetRecipe(10));
                 Assert.NotNull(reloaded.TryGetSearch(1));
@@ -907,15 +907,15 @@ namespace GW2CraftingHelper.Tests.Services
 
         // Every call reaches a real OverlayRecipeCacheStore; the gate only
         // holds Flush at the door so a test can see whether its caller waits.
-        private sealed class GatedFlushStore : GW2CraftingHelper.Services.Recipes.IRecipeCacheStore
+        private sealed class GatedFlushStore : TaimisToolbench.Services.Recipes.IRecipeCacheStore
         {
-            private readonly GW2CraftingHelper.Services.Recipes.IRecipeCacheStore _inner;
+            private readonly TaimisToolbench.Services.Recipes.IRecipeCacheStore _inner;
             private readonly TaskCompletionSource<bool> _release =
                 new TaskCompletionSource<bool>();
 
             private int _flushCompleted;
 
-            public GatedFlushStore(GW2CraftingHelper.Services.Recipes.IRecipeCacheStore inner)
+            public GatedFlushStore(TaimisToolbench.Services.Recipes.IRecipeCacheStore inner)
             {
                 _inner = inner;
             }
@@ -924,7 +924,7 @@ namespace GW2CraftingHelper.Tests.Services
 
             public void Release() => _release.TrySetResult(true);
 
-            public GW2CraftingHelper.Services.Recipes.RecipeCacheStats Stats => _inner.Stats;
+            public TaimisToolbench.Services.Recipes.RecipeCacheStats Stats => _inner.Stats;
 
             public IReadOnlyList<int> TryGetSearch(int outputItemId) =>
                 _inner.TryGetSearch(outputItemId);

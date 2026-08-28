@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class CraftableItemSearchProviderTests
     {

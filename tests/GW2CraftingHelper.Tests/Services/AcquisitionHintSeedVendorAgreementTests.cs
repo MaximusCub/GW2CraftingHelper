@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RecipeNodeBuilders;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RecipeNodeBuilders;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// ref/acquisition_hints_seed.json is hand-maintained prose while

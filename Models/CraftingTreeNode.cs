@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     internal class CraftingTreeNode
     {

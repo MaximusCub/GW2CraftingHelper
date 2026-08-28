@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Globalization;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class SettingsCurrencyGridLayoutTests
     {

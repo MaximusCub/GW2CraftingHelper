@@ -9,10 +9,10 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
 
-namespace GW2CraftingHelper.RecipeSeeder
+namespace TaimisToolbench.RecipeSeeder
 {
     internal class Program
     {
@@ -313,7 +313,7 @@ namespace GW2CraftingHelper.RecipeSeeder
 
         // Internal (not private) + the
         // matching InternalsVisibleTo in this project's .csproj so
-        // GW2CraftingHelper.RecipeSeeder.Tests can assert the schema-
+        // TaimisToolbench.RecipeSeeder.Tests can assert the schema-
         // version query parameter on the actual outgoing request, mirroring
         // Gw2RecipeApiClientHttpTests' StubHandler coverage of the runtime
         // client's own identical fix.

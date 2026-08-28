@@ -7,12 +7,12 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services.Recipes
+namespace TaimisToolbench.Tests.Services.Recipes
 {
     /// <summary>
     /// The corpus probe over a REAL OverlayRecipeCacheStore in a temp

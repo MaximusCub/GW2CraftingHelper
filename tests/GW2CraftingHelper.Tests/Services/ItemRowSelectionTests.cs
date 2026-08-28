@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Contracts;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Contracts;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The row-state decisions CraftingPlanView's search-box TextChanged

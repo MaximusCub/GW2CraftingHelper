@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The icon-tier vocabulary is what stops a call site inventing a pixel

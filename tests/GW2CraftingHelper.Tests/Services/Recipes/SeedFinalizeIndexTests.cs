@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services.Recipes
+namespace TaimisToolbench.Tests.Services.Recipes
 {
     /// <summary>
     /// Runs SeededRecipeCacheStore.FinalizeIndex over the REAL shipped

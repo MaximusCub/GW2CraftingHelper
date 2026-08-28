@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// One node where the automatic comparison would have picked Craft on

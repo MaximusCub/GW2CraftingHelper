@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Models
+namespace TaimisToolbench.Tests.Models
 {
     public class SettingsFormStateTests
     {

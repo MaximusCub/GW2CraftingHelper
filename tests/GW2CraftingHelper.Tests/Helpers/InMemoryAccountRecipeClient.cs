@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     internal class InMemoryAccountRecipeClient : IAccountRecipeClient
     {

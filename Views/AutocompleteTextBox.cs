@@ -1,7 +1,7 @@
 using Blish_HUD.Controls;
 using System;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     internal class AutocompleteEnterEventArgs : EventArgs
     {

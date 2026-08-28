@@ -1,8 +1,8 @@
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// One header row's cells, described once and re-split on demand: the

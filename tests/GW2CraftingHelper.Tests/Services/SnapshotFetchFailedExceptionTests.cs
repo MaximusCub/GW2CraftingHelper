@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // KNOWN-ISSUES #31/api-degradation F1: Gw2AccountSnapshotService itself is
     // Blish/Gw2Sharp-coupled (constructed from Blish_HUD.Modules.Managers.

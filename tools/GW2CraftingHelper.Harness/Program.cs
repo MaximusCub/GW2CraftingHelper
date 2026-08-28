@@ -8,12 +8,12 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Diagnostics;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Diagnostics;
+using TaimisToolbench.Services.Recipes;
 
-namespace GW2CraftingHelper.Harness
+namespace TaimisToolbench.Harness
 {
     // --- Null API clients for offline mode ---
     internal class NullRecipeApiClient : IRecipeApiClient
@@ -178,7 +178,7 @@ namespace GW2CraftingHelper.Harness
             if (profile < 0 && itemOverrides == null)
             {
                 Console.Error.WriteLine(
-                    "Usage: GW2CraftingHelper.Harness --profile <n> " +
+                    "Usage: TaimisToolbench.Harness --profile <n> " +
                     "[--iterations <n>] [--live] [--raw] " +
                     "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree] " +
                     "[--homestead-tier <0|1|2>] " +

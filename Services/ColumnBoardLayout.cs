@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Packs variable-height blocks into as many equal min-width columns as

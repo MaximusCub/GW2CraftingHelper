@@ -5,10 +5,10 @@ namespace VendorOfferUpdater.Tests.Helpers
 {
     /// <summary>
     /// Locates real repo files from the running test assembly's output
-    /// directory. Mirrors GW2CraftingHelper.Tests' Helpers/RepoFileLocator.cs
+    /// directory. Mirrors TaimisToolbench.Tests' Helpers/RepoFileLocator.cs
     /// exactly; duplicated rather than shared because this
     /// project (net8.0, VendorOfferUpdater.Tests) does not reference
-    /// GW2CraftingHelper.Tests (net48, ProjectReference to the Blish
+    /// TaimisToolbench.Tests (net48, ProjectReference to the Blish
     /// module) - the two test assemblies are intentionally kept from
     /// depending on each other so this project stays Blish-free.
     /// </summary>

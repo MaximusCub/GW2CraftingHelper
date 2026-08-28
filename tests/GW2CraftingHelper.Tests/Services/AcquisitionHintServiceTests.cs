@@ -1,11 +1,11 @@
 using System;
 using System.IO;
 using System.Text;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
-using static GW2CraftingHelper.Tests.Helpers.RepoFileLocator;
+using static TaimisToolbench.Tests.Helpers.RepoFileLocator;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     public class AcquisitionHintServiceTests
     {

@@ -1,9 +1,9 @@
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 using System;
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Everything <see cref="TreeSectionController"/> needs from

@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Slots on the Settings tab's non-scrolling save bar (Blish-free,

@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure decision for whether a queued generation-status update should

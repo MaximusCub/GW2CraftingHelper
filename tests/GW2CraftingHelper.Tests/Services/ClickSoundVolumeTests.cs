@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // The percent -> SoundEffect volume mapping the click player and the
     // Settings tab slider both run through. It lives apart from the

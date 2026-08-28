@@ -1,6 +1,6 @@
 using Blish_HUD.Controls;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// A <see cref="StandardButton"/> that answers a press. Every button in

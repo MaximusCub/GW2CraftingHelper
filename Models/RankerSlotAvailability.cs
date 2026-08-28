@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// What one slot of the Crafting Ranker's priority list is allowed to

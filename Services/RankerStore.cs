@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Persists the Crafting Ranker's priority list to data/ranker.json.

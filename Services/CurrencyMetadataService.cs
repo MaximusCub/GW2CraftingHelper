@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
 using Newtonsoft.Json.Linq;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Fetches name/icon metadata for GW2 wallet currencies from

@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Services;
-using GW2CraftingHelper.Services.Recipes;
-using GW2CraftingHelper.Tests.Helpers;
+using TaimisToolbench.Services;
+using TaimisToolbench.Services.Recipes;
+using TaimisToolbench.Tests.Helpers;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The stat side cache rides the metadata fetch the plan path already

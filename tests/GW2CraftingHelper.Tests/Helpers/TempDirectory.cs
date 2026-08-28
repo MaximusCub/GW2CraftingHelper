@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace GW2CraftingHelper.Tests.Helpers
+namespace TaimisToolbench.Tests.Helpers
 {
     /// <summary>
     /// A scratch directory for tests that exercise real file I/O
@@ -23,7 +23,7 @@ namespace GW2CraftingHelper.Tests.Helpers
         {
             Path = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
-                "GW2CraftingHelper_Tests_" + Guid.NewGuid().ToString("N"));
+                "TaimisToolbench_Tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
 

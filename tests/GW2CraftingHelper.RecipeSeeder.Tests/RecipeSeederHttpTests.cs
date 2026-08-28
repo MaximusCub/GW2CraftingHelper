@@ -4,19 +4,19 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.RecipeSeeder;
+using TaimisToolbench.RecipeSeeder;
 using Xunit;
 
-namespace GW2CraftingHelper.RecipeSeeder.Tests
+namespace TaimisToolbench.RecipeSeeder.Tests
 {
-    // Tools/GW2CraftingHelper.RecipeSeeder
+    // Tools/TaimisToolbench.RecipeSeeder
     // previously had no test project at all (tests/VendorOfferUpdater.Tests
     // is this repo's own precedent for testing a tool), so its half of the
     // schema-version fix - identical in spirit to
     // Gw2RecipeApiClientHttpTests' runtime-client coverage - had zero
     // regression coverage. FetchAllRecipeIdsAsync/FetchRecipeBatchAsync are
     // internal (not private) specifically so this project's
-    // InternalsVisibleTo (see GW2CraftingHelper.RecipeSeeder.csproj) can
+    // InternalsVisibleTo (see TaimisToolbench.RecipeSeeder.csproj) can
     // reach them with a real HttpClient + stub handler, exercising the
     // actual production code path rather than re-deriving the URL string
     // by hand.

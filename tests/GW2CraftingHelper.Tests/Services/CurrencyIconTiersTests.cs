@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using Xunit;
 
-namespace GW2CraftingHelper.Tests.Services
+namespace TaimisToolbench.Tests.Services
 {
     // The currency counterpart of the item-icon tier pins: the two sizes
     // themselves, which module surface is on which tier, and the height

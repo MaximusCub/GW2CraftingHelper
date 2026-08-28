@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     internal class RecipeNode
     {

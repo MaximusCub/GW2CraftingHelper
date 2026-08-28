@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The module window's size floor and the chrome between that window and
