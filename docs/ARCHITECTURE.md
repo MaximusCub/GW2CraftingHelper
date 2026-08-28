@@ -692,6 +692,25 @@ out of a bad overlay is Clear Cache. Where:
 `Services/Recipes/RecipeCorpusVerifier.cs` (the probe),
 `Services/Recipes/OverlayRecipeCacheStore.cs` (keep-forever overlay).
 
+That probe answers "does a recipe exist", not "what does it consume": it
+only ever fetches ids the corpus lacks, so a recipe whose id never moved
+but whose ingredients changed in place would be served stale forever.
+Recipe 14025's rift essences turning from items into wallet currencies
+(KNOWN-ISSUES #48) is the case that actually happened. A second, lazy
+phase closes it - `Services/Recipes/RecipeCorpusRefresher.cs` refetches
+the content of every held positive recipe once per game build, in batches
+of 200 with a pause between them, and stores what comes back rather than
+diffing to decide whether to believe it. The response IS the current
+shape; the one comparison in that class decides only whether the row needs
+*writing*, which keeps the overlay from becoming a 10 MB duplicate of the
+shipped seed. It walks ids ascending after a priority pass over the recipes
+reachable from the Ranker watchlist, the restored plan and plan history
+(`Services/Recipes/PriorityRecipeIds.cs`), so an interrupted sweep resumes
+from a single cursor in the overlay manifest and has already repaired what
+the user was most likely to hit. Nothing waits on it: the verifier licenses
+negatives, this repairs positives, and plan generation uses the best corpus
+it has while this improves it underneath.
+
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
 `Services/Recipes/RecipeCacheSerializer.cs`,
 `Services/Recipes/ItemNameSeedData.cs`; wiki
