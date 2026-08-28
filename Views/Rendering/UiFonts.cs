@@ -53,9 +53,27 @@ namespace TaimisToolbench.Views.Rendering
     {
         private static BitmapFont _glyphs;
         private static BitmapFont _columnHeader;
+        private static BitmapFont _bodyGlyphs;
 
         /// <summary>Row text, table cells, tooltips - the module's prose.</summary>
         internal static BitmapFont Body => GameService.Content.DefaultFont16;
+
+        /// <summary>
+        /// <see cref="Body"/> plus the module's own glyphs, for the
+        /// reading-size affordances that draw a caret beside or instead of
+        /// body text: the recipe tree's expand/collapse column and the
+        /// plan's section headers.
+        /// <para>
+        /// A MERGED face rather than <see cref="Glyphs"/> on its own,
+        /// because these seats sit on layouts measured against Body: the
+        /// merge inherits Body's line height, letter spacing and baseline
+        /// exactly (GlyphFont.Merged), so a caret label that swaps to it
+        /// keeps every y and every band height it already had. Falls back to
+        /// plain Body before <see cref="InstallGlyphs"/> has run, which is
+        /// the same degraded path <see cref="GlyphsAvailable"/> gates.
+        /// </para>
+        /// </summary>
+        internal static BitmapFont BodyGlyphs => _bodyGlyphs ?? Body;
 
         /// <summary>Sublabels, pills, tags, footnotes - one step under Body.</summary>
         internal static BitmapFont Caption => GameService.Content.DefaultFont14;
@@ -115,9 +133,16 @@ namespace TaimisToolbench.Views.Rendering
                 TypeRampMetrics.ColumnHeaderInk.BaselineY,
                 descriptor,
                 page);
+            var bodyGlyphs = GlyphFont.Merged(
+                "Menomonia-Regular16+GwchGlyphs",
+                Body,
+                TypeRampMetrics.BodyInk.BaselineY,
+                descriptor,
+                page);
 
             _glyphs = glyphs;
             _columnHeader = columnHeader;
+            _bodyGlyphs = bodyGlyphs;
         }
 
         /// <summary>
@@ -130,6 +155,7 @@ namespace TaimisToolbench.Views.Rendering
         {
             _glyphs = null;
             _columnHeader = null;
+            _bodyGlyphs = null;
         }
 
         /// <summary>Every section title in the module.</summary>

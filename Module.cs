@@ -87,6 +87,14 @@ namespace TaimisToolbench
         // do. Never a fetch (see ItemMetadataService.GetCachedStatBlock).
         private Func<int, ItemStatBlock> _getItemStatBlock;
 
+        // Its twin, and the half a tab needs to show the same item tooltip
+        // the game does rather than the identity-only fallback: the
+        // accessor above only ever reports what the session already holds,
+        // so a tab that draws items nothing has fetched has to ask for them
+        // (Views/Rendering/ItemStatWarmer.cs). Carried alongside it so a
+        // tab built in BuildTabs can take both.
+        private Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
+
         // Plan History: the index is held in memory for the module's
         // lifetime and mutated under _planHistoryLock from two sides -
         // the capture path's ThreadPool continuation
@@ -768,6 +776,7 @@ namespace TaimisToolbench
             _modalDialog = new ModalDialog(_settings, () => _mainWindow);
             _apiAccessDialog = new ApiAccessDialog();
             _getItemStatBlock = itemMetadataService.GetCachedStatBlock;
+            _warmItemStatsAsync = ids => itemMetadataService.WarmStatBlocksAsync(ids, lifetimeToken);
 
             _snapshotContent = new MainView(
                 _currentSnapshot,
@@ -811,7 +820,7 @@ namespace TaimisToolbench
                 // all. Fills only the session stat side table - see
                 // ItemMetadataService.WarmStatBlocksAsync for why it is
                 // not GetMetadataAsync.
-                ids => itemMetadataService.WarmStatBlocksAsync(ids, lifetimeToken),
+                _warmItemStatsAsync,
                 () => lifetimeToken
             );
 
@@ -951,7 +960,12 @@ namespace TaimisToolbench
                 OpenHistoryEntry,
                 ResolveHistoryEntryAsync,
                 _modalDialog,
-                _settings);
+                _settings,
+                _getItemStatBlock,
+                // The same top-up the Crafting Plan tab gets (Q13). Without
+                // it every history hover degrades to the identity-only
+                // form, because the accessor above never fetches.
+                _warmItemStatsAsync);
 
             _planHistoryTab = new Tab(
                 AsyncTexture2D.FromAssetId(156691),

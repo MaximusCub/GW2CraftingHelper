@@ -90,7 +90,7 @@ namespace TaimisToolbench.Views
         // Q13: fills the session stat cache for a restored plan's items in
         // the background. Never on the hover path - see
         // ItemMetadataService.GetCachedStatBlock.
-        private readonly Func<IReadOnlyList<int>, Task<int>> _warmItemStatsAsync;
+        private readonly ItemStatWarmer _statWarmer;
 
         // Supplier rather than a stored CancellationToken so this view takes
         // no dependency on when the module's source is created - the view is
@@ -702,7 +702,7 @@ namespace TaimisToolbench.Views
             _statusBoard = statusBoard ?? throw new ArgumentNullException(nameof(statusBoard));
             _resolveOverridesSync = resolveOverridesSync;
             _getItemStatBlock = getItemStatBlock;
-            _warmItemStatsAsync = warmItemStatsAsync;
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "plan");
             _moduleLifetimeToken = moduleLifetimeToken;
 
             // Before anything that could read the row count:
@@ -913,30 +913,12 @@ namespace TaimisToolbench.Views
         /// </summary>
         private void StartRestoredStatWarmup(CraftingPlanResult result)
         {
-            if (_warmItemStatsAsync == null || result?.ItemMetadata == null || result.ItemMetadata.Count == 0)
+            if (result?.ItemMetadata == null || result.ItemMetadata.Count == 0)
             {
                 return;
             }
 
-            var ids = new List<int>(result.ItemMetadata.Keys);
-            _ = WarmRestoredStatsAsync(ids);
-        }
-
-        private async Task WarmRestoredStatsAsync(IReadOnlyList<int> ids)
-        {
-            try
-            {
-                int filled = await _warmItemStatsAsync(ids).ConfigureAwait(false);
-                if (filled > 0)
-                {
-                    MainThreadMarshal.Run(TooltipFacility.RefreshCurrent);
-                }
-            }
-            catch (Exception ex)
-            {
-                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan",
-                    $"Restored-plan stat top-up did not complete: {ex.GetType().Name} - {ex.Message}");
-            }
+            _statWarmer.Start(new List<int>(result.ItemMetadata.Keys));
         }
 
         /// <summary>
@@ -4528,15 +4510,15 @@ namespace TaimisToolbench.Views
             headerPanel.MouseLeft += (_, __) => headerPanel.BackgroundColor = Color.Transparent;
             PressFeedback.Wire(headerPanel, suppressPress);
 
-            // ASCII "v"/">" rather than the U+25BC/U+25B6 triangle glyphs:
-            // pixel-level screenshot scans showed the triangles failing to
-            // render here (and even on the tree's own row caret), so ASCII
-            // is the only glyph confirmed to render. Do not re-attempt
-            // Unicode without a fresh render check.
+            // The module's own filled caret from ref/glyphs.fnt, drawn in the
+            // Body face it was merged into. NOT U+25BC/U+25B6: Menomonia
+            // carries neither, and a codepoint it lacks draws nothing and
+            // advances zero pixels. UiGlyphs.ExpandCaret is also what
+            // degrades to the old ASCII pair if the atlas fails to load.
             var headerArrow = new Label()
             {
-                Font = UiFonts.Body,
-                Text = expanded ? "v" : ">",
+                Font = UiFonts.BodyGlyphs,
+                Text = UiGlyphs.ExpandCaret(expanded, UiFonts.GlyphsAvailable),
                 TextColor = Color.White,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
@@ -4614,7 +4596,8 @@ namespace TaimisToolbench.Views
                 {
                     contentFlow.Visible = !contentFlow.Visible;
                     _sectionExpansion[sectionKey] = contentFlow.Visible;
-                    headerArrow.Text = contentFlow.Visible ? "v" : ">";
+                    headerArrow.Text =
+                        UiGlyphs.ExpandCaret(contentFlow.Visible, UiFonts.GlyphsAvailable);
                     _contentPanel.Invalidate();
                 });
             };
@@ -4745,7 +4728,8 @@ namespace TaimisToolbench.Views
                     // Row rendering (including the TimegatedNotice
                     // informational rows) moved to
                     // Views/Rendering/CraftStepsSectionRenderer.
-                    new CraftStepsSectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    new CraftStepsSectionRenderer(this, _getItemStatBlock)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.RequiredDisciplines:
                     // Row rendering lives in
@@ -4908,7 +4892,8 @@ namespace TaimisToolbench.Views
                     Rows = visibleRows,
                     IsDefaultExpanded = section.IsDefaultExpanded,
                 };
-                new RecipesSectionRenderer(this).Render(filteredSection, contentFlow, panelWidth);
+                new RecipesSectionRenderer(this, _getItemStatBlock)
+                    .Render(filteredSection, contentFlow, panelWidth);
             }
 
 #if DEBUG

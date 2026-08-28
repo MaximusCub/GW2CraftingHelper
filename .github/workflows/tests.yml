@@ -366,7 +366,7 @@ jobs:
           fi
           echo "Public top-level types: $actual (pin: $pinned)."
 
-      - name: Every item icon renders at a named tier
+      - name: Every item icon names its tier and what it shows on hover
         shell: bash
         run: |
           # The owner's report: "tons of items in account snapshot dont have
@@ -377,7 +377,40 @@ jobs:
           # eleven call sites each chose their own numbers. The defaults are
           # gone and the tier is now a required ItemIconTier; this is what
           # stops the pre-tier overloads growing a twelfth caller while the
-          # four below wait for their branches to land.
+          # two below wait for their branches to land.
+          #
+          # The tooltip was the same hole one parameter along: an optional
+          # trailing string plus a separate opt-in stamping call, so an icon
+          # that answered nothing on hover looked exactly like one that had
+          # decided against answering. Plan History shipped with a whole tab
+          # of them. It is now a required ItemIconTooltip: a silent icon has
+          # to name its reason through ItemIconTooltip.None(ItemIconSilence.X).
+          #
+          # SCOPE is the other half, and the owner's second report: "the
+          # entire row - even just the deadspace for an item in the ranker
+          # pops up the item tooltip - it should just be the icon." The
+          # module used to stamp the row panel and every label on it,
+          # precisely BECAUSE Blish resolves on the deepest control and
+          # never bubbles so the gaps otherwise answered nothing. The gaps
+          # SHOULD answer nothing. ItemIconTooltip therefore exposes no seam
+          # that takes a Label or a bare Control - only the icon tree it
+          # builds and a Panel overlaid on that icon - and this step pins
+          # that member list so widening it back out is a visible diff here
+          # as well as there.
+          #
+          # The COMPILER is what stops the argument being omitted, and
+          # ItemIconTooltip's private constructor is what stops one being
+          # built without a factory. What is left for this step is the
+          # laundering: a `default` slid into the slot, or an intent
+          # forwarded in from a parameter so no reviewer of the call site
+          # ever sees which one it is. So it asks two things of every file
+          # that builds a framed item icon - no call passes `default`, and
+          # the file names at least one ItemIconTooltip factory itself.
+          #
+          # Scope is the FRAMED item icon. CreateUnframedIcon and
+          # CreateAssetIcon are the two documented non-item paths (a coin
+          # denomination, a tooltip's own inline art) and keep their plain
+          # string; see IconControls' class comment.
           python3 - <<'PY'
           import re, subprocess, sys
 
@@ -387,6 +420,14 @@ jobs:
           ALLOWED = {
               'Views/RankerTabContent.cs': 'the Ranker rarity branch owns this file',
               'Views/Rendering/IconNameRowHelpers.cs': 'carries the legacy shim for the row builder above',
+          }
+
+          # The ONE file that may pass an ItemIconTooltip it did not name:
+          # the shared row builder, which forwards the intent its own caller
+          # was required to name. Nothing else forwards one.
+          FORWARDS = {
+              'Views/Rendering/IconNameRowHelpers.cs':
+                  'forwards the intent its own caller named',
           }
           CALLS = ('IconControls.CreateItemIcon(',
                    'IconNameRowHelpers.CreateIconAndEllipsizedName(')
@@ -413,19 +454,36 @@ jobs:
                   i += 1
               return None
 
-          bad, unused = [], []
+          def last_argument(args):
+              # Top-level split: a nested call's own commas are not ours.
+              depth, start = 0, 0
+              for i, ch in enumerate(args):
+                  if ch in '([':
+                      depth += 1
+                  elif ch in ')]':
+                      depth -= 1
+                  elif ch == ',' and depth == 0:
+                      start = i + 1
+              return args[start:].strip()
+
+          bad, silent, unused = [], [], []
           seen = set()
           for f in files:
               text = open(f, encoding='utf-8').read()
+              names_a_factory = 'ItemIconTooltip.' in text
               for marker in CALLS:
                   for m in re.finditer(re.escape(marker), text):
                       args = arguments(text, m.end() - 1)
-                      if args is not None and 'ItemIconTier.' in args:
-                          continue
                       line = text.count('\n', 0, m.start()) + 1
-                      seen.add(f)
-                      if f not in ALLOWED:
-                          bad.append(f'{f}:{line}')
+                      if args is None or 'ItemIconTier.' not in args:
+                          seen.add(f)
+                          if f not in ALLOWED:
+                              bad.append(f'{f}:{line}')
+                      if f in FORWARDS:
+                          continue
+                      tail = '' if args is None else last_argument(args)
+                      if args is None or tail.startswith('default') or not names_a_factory:
+                          silent.append(f'{f}:{line}')
 
           for path, why in sorted(ALLOWED.items()):
               if path not in files:
@@ -433,17 +491,47 @@ jobs:
               elif path not in seen:
                   unused.append(f'{path} ({why})')
 
+          for path, why in sorted(FORWARDS.items()):
+              if path not in files:
+                  silent.append(f'{path}: forward-listed but not in the tree ({why})')
+
+          # The stamping seams, pinned by name and by parameter type. A new
+          # one, or one widened to Control/Label, is how the whole-row
+          # stamping would come back.
+          SEAMS = {
+              'internal void StampOnIconOverlay(Panel overlay)',
+              'internal void StampOnIconTree(Control iconTree)',
+          }
+          intent = open('Views/Rendering/ItemIconTooltip.cs', encoding='utf-8').read()
+          declared = set(re.findall(r'^        (internal void Stamp\w+\([^)]*\))', intent, re.M))
+          if declared != SEAMS:
+              print('ItemIconTooltip\'s stamping seams changed.')
+              print('  pinned:   ' + '; '.join(sorted(SEAMS)))
+              print('  declared: ' + '; '.join(sorted(declared)))
+              print('An item tooltip is carried by the item ICON and nothing else - no')
+              print('name label, no row panel, no value cell. Widening this set puts the')
+              print('hover back on dead space; if that is genuinely intended, change the')
+              print('pin here in the same commit and say why in the message.')
+              silent.append('Views/Rendering/ItemIconTooltip.cs: seam set')
+
           if bad:
               print('These item icons are built without a named ItemIconTier:')
               print('\n'.join(sorted(bad)))
               print('Pass a tier from Services/ItemIconTiers.cs. Every framed item icon')
               print('in the module traces to one; a new size is a new named tier there.')
+          if silent:
+              print('These item icons are built without a named ItemIconTooltip:')
+              print('\n'.join(sorted(silent)))
+              print('Pass one from Views/Rendering/ItemIconTooltip.cs: ForItem/Composed for')
+              print('the standard item hover, Naming for a currency, or None(ItemIconSilence.X)')
+              print('to say out loud that this icon shows nothing and why.')
+          if bad or silent:
               sys.exit(1)
           if unused:
               print('NOTE: these files no longer call a pre-tier overload - drop them')
               print('from this step\'s allow-list to bank the migration:')
               print('\n'.join(sorted(unused)))
-          print('Every item icon outside the allow-list names its tier.')
+          print('Every item icon names its tier and its hover.')
           PY
 
       - name: Module source cites no out-of-repo spec sections

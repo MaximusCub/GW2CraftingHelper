@@ -2118,7 +2118,7 @@ namespace TaimisToolbench.Views
                 SettingsCurrencyGridLayout.CellIconX,
                 SettingsCurrencyGridLayout.CellIconY,
                 ItemIconTier.CurrencyListRow,
-                row.Name);
+                ItemIconTooltip.Naming(row.Name));
         }
 
         /// <summary>

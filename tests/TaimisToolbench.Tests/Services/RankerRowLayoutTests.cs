@@ -1,3 +1,4 @@
+using System;
 using TaimisToolbench.Services;
 using Xunit;
 
@@ -42,6 +43,8 @@ namespace TaimisToolbench.Tests.Services
         {
             var bands = RankerRowLayout.Compute(rowWidth, remainingCellWidth: 120);
 
+            Assert.True(bands.NameX + bands.NameWidth <= bands.StatusX);
+            Assert.True(bands.StatusX + bands.StatusWidth <= bands.ReadyRightEdge);
             Assert.True(bands.ReadyRightEdge <= bands.DaysRightEdge - RankerRowLayout.DaysCellWidth);
             Assert.True(bands.DaysRightEdge <= bands.RemainingRightEdge - 120);
             Assert.True(bands.RemainingRightEdge <= bands.UpX);
@@ -242,11 +245,16 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void AWiderMeasuredCellStillBeatsTheFloor()
+        public void InThePackedRegime_AWiderMeasuredCellStillBeatsTheFloor()
         {
-            var floored = RankerRowLayout.Compute(1200, 8);
-            var wide = RankerRowLayout.Compute(1200, 180);
+            // 700 is narrow enough that no coin band distributes, so both
+            // rows are laid out by the packed right-to-left stack, which is
+            // the regime this reserve arithmetic belongs to.
+            var floored = RankerRowLayout.Compute(700, 8);
+            var wide = RankerRowLayout.Compute(700, 180);
 
+            Assert.False(floored.Distributed);
+            Assert.False(wide.Distributed);
             Assert.Equal(RankerRowLayout.MinRemainingCellWidth + RankerRowLayout.CellGap,
                 floored.RemainingRightEdge - floored.DaysRightEdge);
             Assert.Equal(180 + RankerRowLayout.CellGap,
@@ -262,26 +270,28 @@ namespace TaimisToolbench.Tests.Services
             // right-aligned header must clear the cell to its left even then.
             var bands = RankerRowLayout.Compute(rowWidth, 8);
 
+            int statusCellRight = bands.StatusX + RankerRowLayout.MinStatusCellWidth;
             int readyCellLeft = bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth;
             int daysCellLeft = bands.DaysRightEdge - RankerRowLayout.DaysCellWidth;
             int remainingCellLeft = bands.RemainingRightEdge - RankerRowLayout.MinRemainingCellWidth;
 
-            Assert.True(bands.NameX + bands.NameWidth <= readyCellLeft);
+            Assert.True(bands.NameX + bands.NameWidth <= bands.StatusX);
+            Assert.True(statusCellRight <= readyCellLeft);
             Assert.True(bands.ReadyRightEdge <= daysCellLeft);
             Assert.True(bands.DaysRightEdge <= remainingCellLeft);
             Assert.True(bands.RemainingRightEdge < bands.UpX);
         }
 
-        [Fact]
-        public void TheReadyCellIsActuallyReserved_NotJustDeclared()
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void TheNameBandStopsAGapShortOfTheStatusColumn(int rowWidth)
         {
-            // The gate's other header collision: ReadyCellWidth existed but
-            // nothing subtracted it, so the name band ran under the
-            // right-aligned "100%".
-            var bands = RankerRowLayout.Compute(1200, 120);
+            // The Status chip is LEFT-aligned on its own rail, so the name
+            // that used to reserve the chip's width out of its own budget
+            // now simply ends before it.
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
 
-            Assert.Equal(bands.ReadyRightEdge - RankerRowLayout.ReadyCellWidth - RankerRowLayout.CellGap,
-                bands.NameX + bands.NameWidth);
+            Assert.Equal(bands.StatusX - RankerRowLayout.CellGap, bands.NameX + bands.NameWidth);
         }
 
         // ---------------------------------------------------------------
@@ -413,14 +423,41 @@ namespace TaimisToolbench.Tests.Services
         // content below" (measured at 37px in the 2026-08-27 capture).
         [Theory]
         [MemberData(nameof(RealWidths))]
-        public void AWiderCoinBand_MovesTheReadyAndDaysRailsButNotTheCoinRail(int rowWidth)
+        public void UnderDistribution_AWiderCoinBandMovesNoRailAtAll(int rowWidth)
         {
+            // The reported "Ready/Days/Remaining are poorly aligned with the
+            // content below" was this: the rails were walked LEFT from the
+            // coin band, so the first refresh's real coin cell moved them by
+            // 37px while the header stayed put. Equal tracks retire the
+            // mechanism rather than re-fixing it - a track's width is a
+            // fraction of the row, not a function of the widest cell in it.
+            // The coin band now decides only WHETHER the row distributes.
             var narrow = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth);
             var wide = RankerRowLayout.Compute(rowWidth, RankerRowLayout.MinRemainingCellWidth + 37);
 
+            Assert.True(narrow.Distributed);
+            Assert.True(wide.Distributed);
             Assert.Equal(narrow.RemainingRightEdge, wide.RemainingRightEdge);
-            Assert.Equal(narrow.DaysRightEdge - 37, wide.DaysRightEdge);
-            Assert.Equal(narrow.ReadyRightEdge - 37, wide.ReadyRightEdge);
+            Assert.Equal(narrow.DaysRightEdge, wide.DaysRightEdge);
+            Assert.Equal(narrow.ReadyRightEdge, wide.ReadyRightEdge);
+            Assert.Equal(narrow.StatusX, wide.StatusX);
+            Assert.Equal(narrow.NameWidth, wide.NameWidth);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void ACellTooWideForATrack_FallsBackToThePackedStack(int rowWidth)
+        {
+            // The documented narrow-panel escape: on a row where one column
+            // needs more than its share, an evenly spaced illegible table is
+            // worse than a cramped legible one.
+            var packed = RankerRowLayout.Compute(rowWidth, rowWidth);
+
+            Assert.False(packed.Distributed);
+            Assert.True(packed.DaysRightEdge < packed.RemainingRightEdge);
+            Assert.True(packed.ReadyRightEdge < packed.DaysRightEdge);
+            Assert.True(packed.StatusX < packed.ReadyRightEdge);
+            Assert.True(packed.NameWidth >= 0);
         }
 
         [Theory]
@@ -454,17 +491,256 @@ namespace TaimisToolbench.Tests.Services
 
         [Theory]
         [MemberData(nameof(RealWidths))]
-        public void WithNoReorderButtons_EveryBandToTheirLeftGainsTheirWidth(int rowWidth)
+        public void WithNoReorderButtons_TheReclaimedWidthIsSpreadAcrossTheTracks(int rowWidth)
         {
+            // The rails the arrows leave behind are not stranded. Under
+            // distribution the whole span widens by their width, so every
+            // track - the name's two included - takes a share of it rather
+            // than the last column taking all of it.
             var withArrows = RankerRowLayout.Compute(rowWidth, 137, showReorder: true);
             var without = RankerRowLayout.Compute(rowWidth, 137, showReorder: false);
 
             int reclaimed = 2 * (RankerRowLayout.ButtonWidth + RankerRowLayout.ButtonGap);
-            Assert.Equal(withArrows.RemainingRightEdge + reclaimed, without.RemainingRightEdge);
-            Assert.Equal(withArrows.DaysRightEdge + reclaimed, without.DaysRightEdge);
-            Assert.Equal(withArrows.ReadyRightEdge + reclaimed, without.ReadyRightEdge);
-            Assert.Equal(withArrows.NameWidth + reclaimed, without.NameWidth);
             Assert.Equal(withArrows.RemoveX, without.RemoveX);
+            Assert.Equal(withArrows.RemainingRightEdge + reclaimed, without.RemainingRightEdge);
+            Assert.True(without.DaysRightEdge > withArrows.DaysRightEdge);
+            Assert.True(without.ReadyRightEdge > withArrows.ReadyRightEdge);
+            Assert.True(without.StatusX > withArrows.StatusX);
+            Assert.True(without.NameWidth > withArrows.NameWidth);
+
+            // Every gain is a share of the same reclaimed span, so none of
+            // them can exceed it.
+            Assert.True(without.NameWidth - withArrows.NameWidth <= reclaimed);
+        }
+
+        // ---------------------------------------------------------------
+        // THE DISTRIBUTED TRACKS. The four data columns divide the span
+        // from the item name's left edge to the last column's right edge
+        // into TrackCount equal tracks, the name taking NameTrackSpan of
+        // them - SummarySectionLayoutMath's currency-table idiom, applied
+        // because the four columns used to huddle against the buttons and
+        // leave the middle of a wide row empty.
+        //
+        // Compact mode changes a row's HEIGHT and nothing else, so the
+        // horizontal sweeps below are mode-independent by construction and
+        // the vertical ones are swept over both.
+        // ---------------------------------------------------------------
+        public static readonly object[][] RealWidthsBothOrderings =
+            Cross(RealWidths, new object[] { true, false });
+
+        public static readonly object[][] RealWidthsBothDensities =
+            Cross(RealWidths, new object[] { true, false });
+
+        private static object[][] Cross(object[][] left, object[] right)
+        {
+            var rows = new object[left.Length * right.Length][];
+            int at = 0;
+            foreach (var l in left)
+            {
+                foreach (var r in right)
+                {
+                    rows[at++] = new[] { l[0], r };
+                }
+            }
+
+            return rows;
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidthsBothOrderings))]
+        public void AtEveryRealWidth_TheFourDataColumnsAreEqualTracks(int rowWidth, bool showReorder)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130, showReorder);
+            Assert.True(bands.Distributed);
+
+            // Each track's width, read off the edges the view actually uses.
+            // Status is the left-aligned one, so its track is its band plus
+            // the gap that keeps the chip off the bar beside it.
+            int status = bands.StatusWidth + RankerRowLayout.CellGap;
+            int ready = bands.ReadyRightEdge - bands.StatusX - status;
+            int days = bands.DaysRightEdge - bands.ReadyRightEdge;
+            int remaining = bands.RemainingRightEdge - bands.DaysRightEdge;
+
+            // Integer-exact off the span, so no two tracks differ by more
+            // than the one pixel a remainder can leave.
+            Assert.True(Math.Abs(status - ready) <= 1, status + " vs " + ready);
+            Assert.True(Math.Abs(ready - days) <= 1, ready + " vs " + days);
+            Assert.True(Math.Abs(days - remaining) <= 1, days + " vs " + remaining);
+
+            // And the name really does take NameTrackSpan of them.
+            int nameSpan = bands.StatusX - bands.NameX;
+            Assert.True(Math.Abs(nameSpan - (RankerRowLayout.NameTrackSpan * days)) <= RankerRowLayout.NameTrackSpan);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidthsBothOrderings))]
+        public void AtEveryRealWidth_TheLastTrackEndsExactlyOnTheDataSpansOwnEnd(int rowWidth, bool showReorder)
+        {
+            // What integer-exact track edges buy: the Remaining column's
+            // rail lands on the pixel the pinned block starts at, never a
+            // rounding pixel short of it.
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130, showReorder);
+            int pinned = showReorder ? bands.UpX : bands.RemoveX;
+
+            Assert.Equal(pinned - RankerRowLayout.CellGap, bands.RemainingRightEdge);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidthsBothOrderings))]
+        public void AtEveryRealWidth_EveryTrackHoldsItsOwnWidestCell(int rowWidth, bool showReorder)
+        {
+            const int WidestStatusChip = 130;
+            var bands = RankerRowLayout.Compute(rowWidth, 137, WidestStatusChip, showReorder);
+
+            Assert.True(bands.StatusWidth >= WidestStatusChip);
+            Assert.True(bands.DaysRightEdge - bands.ReadyRightEdge >= RankerRowLayout.ReadyCellWidth);
+            Assert.True(bands.RemainingRightEdge - bands.DaysRightEdge >= 137);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidthsBothOrderings))]
+        public void AtEveryRealWidth_TheReadinessBarFitsInsideItsOwnTrack(int rowWidth, bool showReorder)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130, showReorder);
+
+            // Wide enough for the centred "100%" it carries at bold 18, and
+            // it FILLS its track rather than leaving part of it stranded.
+            Assert.True(bands.ReadyBarWidth >= RankerRowLayout.MinReadinessBarWidth);
+            Assert.Equal(bands.ReadyRightEdge, bands.ReadyBarX + bands.ReadyBarWidth);
+            Assert.Equal(bands.StatusX + bands.StatusWidth + RankerRowLayout.CellGap, bands.ReadyBarX);
+            Assert.True(bands.ReadyBarWidth > RankerRowLayout.ReadyCellWidth);
+        }
+
+        [Fact]
+        public void ThePackedFallbackStillLeavesRoomForABar()
+        {
+            var packed = RankerRowLayout.Compute(700, 137);
+
+            Assert.False(packed.Distributed);
+            Assert.True(packed.ReadyBarWidth >= RankerRowLayout.MinReadinessBarWidth);
+            Assert.Equal(packed.ReadyRightEdge, packed.ReadyBarX + packed.ReadyBarWidth);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(120)]
+        public void DegenerateWidths_LeaveNoNegativeBarOrStatusBand(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
+
+            Assert.True(bands.ReadyBarWidth >= 0);
+            Assert.True(bands.StatusWidth >= 0);
+            Assert.True(bands.NameWidth >= 0);
+        }
+
+        // ---------------------------------------------------------------
+        // The gate strip's bars. Each cell is a fixed label band, then a
+        // bar filling the rest of the cell - the dead space the owner
+        // flagged between a gate's name and its right-aligned percentage.
+        // ---------------------------------------------------------------
+        private const int GateLabelBand = 84;
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void EveryGateBarStartsAtTheSameOffsetInsideItsOwnCell(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130);
+
+            for (int i = 0; i < RankerRowLayout.GateCellCount; i++)
+            {
+                RankerRowLayout.GateCell(bands, i, out int cellX, out int cellWidth);
+                RankerRowLayout.GateBar(bands, i, GateLabelBand, out int barX, out int barWidth);
+
+                Assert.Equal(cellX + GateLabelBand + RankerRowLayout.GateLabelGap, barX);
+                Assert.True(barWidth > 0);
+                Assert.Equal(cellX + cellWidth - RankerRowLayout.CellGap, barX + barWidth);
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AGateBarNeverRunsIntoTheCellBesideIt(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130);
+
+            for (int i = 0; i < RankerRowLayout.GateCellCount - 1; i++)
+            {
+                RankerRowLayout.GateBar(bands, i, GateLabelBand, out int barX, out int barWidth);
+                RankerRowLayout.GateCell(bands, i + 1, out int nextX, out _);
+                Assert.True(barX + barWidth <= nextX);
+            }
+        }
+
+        [Fact]
+        public void AGateBarCannotGoNegativeWhenTheLabelBandSwallowsTheCell()
+        {
+            var bands = RankerRowLayout.Compute(400, 137);
+
+            RankerRowLayout.GateBar(bands, 0, 9999, out _, out int barWidth);
+            Assert.Equal(0, barWidth);
+
+            RankerRowLayout.GateBar(bands, 0, -50, out int barX, out _);
+            RankerRowLayout.GateCell(bands, 0, out int cellX, out _);
+            Assert.Equal(cellX + RankerRowLayout.GateLabelGap, barX);
+        }
+
+        // ---------------------------------------------------------------
+        // The row's vertical rhythm, derived from the tier-1 icon that sets
+        // RowHeight rather than listed as five literals. Both densities:
+        // compact is the same main line with the detail blocks dropped.
+        // ---------------------------------------------------------------
+        [Theory]
+        [MemberData(nameof(RealWidthsBothDensities))]
+        public void EveryMainLineBoxIsCentredOnTheIconThatSetsTheRowHeight(int rowWidth, bool compact)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130);
+            Assert.True(bands.RowWidth > 0);
+
+            foreach (int lineHeight in new[]
+            {
+                TypeRampMetrics.CaptionInk.LineHeight,
+                TypeRampMetrics.BodyInk.LineHeight,
+                TypeRampMetrics.StatusInk.LineHeight,
+                RankerRowLayout.ReadyBarHeight,
+            })
+            {
+                int y = RankerRowLayout.MainLineY(lineHeight);
+                Assert.Equal(RankerRowLayout.RowHeight - y - lineHeight, y + ((RankerRowLayout.RowHeight - lineHeight) % 2));
+                Assert.True(y >= 0);
+                Assert.True(y + lineHeight <= RankerRowLayout.RowHeight);
+            }
+
+            var block = RankerRowLayout.SubLines(hasGates: true, currencyLines: compact ? 0 : 2, noteLines: compact ? 0 : 1);
+            Assert.Equal(RankerRowLayout.RowHeight + RankerRowLayout.GateTopGap, block.GateY);
+            Assert.True(block.TotalHeight >= block.GateY + RankerRowLayout.GateLineHeight);
+        }
+
+        [Fact]
+        public void TheGateStripsPitchHoldsItsBar()
+        {
+            // The strip grew a painted bar per cell, so its pitch is no
+            // longer a text sub-line's.
+            Assert.True(RankerRowLayout.GateLineHeight >= RankerRowLayout.GateBarHeight);
+            Assert.True(TypeRampMetrics.BodyInk.LineHeight <= RankerRowLayout.GateBarHeight);
+            Assert.True(TypeRampMetrics.StatusInk.LineHeight <= RankerRowLayout.ReadyBarHeight);
+        }
+
+        [Fact]
+        public void TheNameSpanAndTheTrackCountAreOneDecision()
+        {
+            // Compute reads Status, Ready, Days and Remaining off tracks
+            // NameTrackSpan..TrackCount. Widening the name band by moving
+            // NameTrackSpan alone would silently drop the Remaining column
+            // off the end of the span rather than fail to build.
+            Assert.Equal(RankerRowLayout.TrackCount,
+                RankerRowLayout.NameTrackSpan + RankerRowLayout.DataColumnCount);
+        }
+
+        [Fact]
+        public void MainLineY_ClampsRatherThanGoingNegative()
+        {
+            Assert.Equal(0, RankerRowLayout.MainLineY(RankerRowLayout.RowHeight + 100));
         }
     }
 }

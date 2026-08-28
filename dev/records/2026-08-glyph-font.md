@@ -166,3 +166,61 @@ question with no OFL "changing formats" argument to have. `ref/THIRD-PARTY-
 NOTICES.txt` carries the notice, and the packaging claim was verified rather
 than assumed: `BuildBlishHUDModule`'s `ref\**` glob puts all three files in the
 `.bhm` with no csproj change, confirmed by unzipping the Release artifact.
+
+---
+
+## Amendment - 2026-08-28 (branch `ranker-columns`): the reading-size caret trio
+
+The maintainer asked whether the atlas could retire the remaining ASCII
+affordances: *"now that we have some glyph things to work with are we able to
+use those instead of v ^ and > in other places?"*
+
+**Verdict: yes, measured.** Three rows added to `tools/build-glyph-font.py`'s
+`GLYPHS` table, regenerated with `--fetch --preview`:
+
+| Codepoint | Bootstrap icon | ink | advance | coverage |
+|---|---|---|---|---|
+| U+E102 `CaretUp` | `caret-up-fill` | 12x8 | 13 | solid, peak alpha 255, no sub-pixel edge |
+| U+E103 `CaretDown` | `caret-down-fill` | 12x8 | 13 | solid |
+| U+E104 `CaretRight` | `caret-right-fill` | 8x12 | 9 | solid |
+
+They pass for the same reason the sort pair passed and `x-lg` failed: Bootstrap's
+carets are **flattened fills**, so scaling down loses area rather than coverage.
+The `--preview` ramp shows a solid `@` interior at every row for all three; the
+stroke-based icons this font was originally scoped against (`x-lg`, `check-lg`,
+the chevrons, `plus-lg`, `dash-lg`) still measure well under one pixel of
+coverage at these sizes and are still absent.
+
+**A separate SIZE, therefore separate codepoints.** The sort pair is 9x6 of ink,
+authored to sit inside a Menomonia Bold 20 column header's own `Label.Text`
+beside a 17px cap. The trio above is authored for body-size seats - a 28px
+button and the recipe tree's 18px caret column - where 6px of ink is a speck.
+Their `rise` differs for the same reason: `rise` is the ink centre's height above
+the BASELINE of whichever face the glyph is merged into, and Bold 20 puts its cap
+centre 8px up while Regular 16 puts its own 7px up (`Services/TypeRampMetrics`).
+
+`U+E104` is authored 8x12 rather than 12x8 so it carries the **same ink area** as
+its expanded partner. Sized by height it came out 5x8, which read as the lighter
+of the two states on a toggle where both states have to feel equal.
+
+### Seats replaced
+
+| Seat | Was | Now |
+|---|---|---|
+| Recipe tree expand/collapse column | `"v"` / `">"` | `UiGlyphs.ExpandCaret` |
+| Crafting Plan section headers | `"v"` / `">"` | `UiGlyphs.ExpandCaret` |
+| Crafting Ranker reorder buttons | 155953 art on a bare `Image` | `UiGlyphs.CaretUp` / `CaretDown` on a `FeedbackButton` |
+
+The first two draw in a THIRD font: `UiFonts.BodyGlyphs`, Menomonia Regular 16
+merged with the atlas. Merged rather than standalone because those two seats sit
+on layouts measured against Body - the merge inherits Body's line height, letter
+spacing and baseline exactly, so the caret labels kept every y and every band
+height they already had and no golden moved. `TreeRowShapePlanner.CaretGlyph`
+therefore stays ASCII: it is the token the seat degrades to, not the string that
+is drawn, which is what keeps `tree-row-shape-sweep.txt` byte-identical.
+
+The Ranker's buttons draw in `UiFonts.Glyphs` standalone, which centres ink in
+the line box rather than seating it on a baseline - what a button with no
+neighbouring text wants. That seat is only possible at all because
+`FeedbackButton` (PR #210) gave a `StandardButton` a `Font`: an up/down pair
+needs two symmetric triangles and the one face Blish ships has none.

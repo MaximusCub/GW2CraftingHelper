@@ -480,17 +480,14 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Right edge of track <paramref name="index"/> (0-based) of
-        /// <see cref="CurrencyTrackCount"/> equal tracks spanning
-        /// trackSpan px from <see cref="CurrencyNameX"/>. Integer-exact off
-        /// the span rather than accumulated from a rounded track width -
-        /// the same shape RankerRowLayout.GateCell uses - so the last
-        /// track's edge lands exactly on the span's own end instead of a
-        /// rounding pixel short of it.
+        /// This table's tracks, through the module's shared distribution
+        /// law - see <see cref="JustifiedColumnTracks"/>, which Plan
+        /// History's own column band computes from as well.
         /// </summary>
         private static int TrackRightEdge(int trackSpan, int index)
         {
-            return CurrencyNameX + (int)((long)trackSpan * (index + 1) / CurrencyTrackCount);
+            return JustifiedColumnTracks.RightEdge(
+                CurrencyNameX, trackSpan, CurrencyTrackCount, index);
         }
 
         private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
@@ -504,12 +501,11 @@ namespace TaimisToolbench.Services
 
             // A track has to hold its own reserved number band plus the gap
             // that keeps a wide value (a 7-digit Karma balance) out of the
-            // column to its left. Below that width there is nothing to
-            // distribute, and the row falls back to the packed right-to-
-            // left stack, which fits in less: on a narrow panel a legible
-            // cramped table beats an evenly spaced illegible one.
+            // column to its left; below that the row falls back to the
+            // packed right-to-left stack. See JustifiedColumnTracks.
             int trackSpan = neededRightEdge - CurrencyNameX;
-            if (trackSpan / CurrencyTrackCount >= numberColumnWidth + CurrencyColumnGap)
+            if (JustifiedColumnTracks.FitsDistributed(
+                    trackSpan, CurrencyTrackCount, numberColumnWidth, CurrencyColumnGap))
             {
                 return new CurrencyColumnEdges(
                     TrackRightEdge(trackSpan, 1),
