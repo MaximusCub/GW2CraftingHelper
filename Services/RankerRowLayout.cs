@@ -227,6 +227,51 @@ namespace GW2CraftingHelper.Services
             return new ToolbarSlots(refreshX, Inset, Math.Max(0, statusRight - Inset));
         }
 
+        public readonly struct ModeStripSlots
+        {
+            /// <summary>Left edge of the "Compare:" caption, or -1 when it does not fit.</summary>
+            public readonly int LabelX;
+
+            /// <summary>Left edge of the first option's indicator.</summary>
+            public readonly int FirstX;
+
+            /// <summary>Left edge of the second option's indicator.</summary>
+            public readonly int SecondX;
+
+            public ModeStripSlots(int labelX, int firstX, int secondX)
+            {
+                LabelX = labelX;
+                FirstX = firstX;
+                SecondX = secondX;
+            }
+        }
+
+        /// <summary>
+        /// The right-anchored comparison-mode strip: caption, then the two
+        /// options in reading order, laid out from the right edge so the
+        /// last one ends where the table does.
+        /// <para>
+        /// The caption is the only droppable part. At a width where it
+        /// would run under whatever sits to its left (<paramref name="minX"/>
+        /// is that control's right edge) it is dropped rather than
+        /// overlapped - the two options are self-describing, the word
+        /// "Compare:" is not load-bearing, and BOTH options staying legible
+        /// is the whole point of the control.
+        /// </para>
+        /// </summary>
+        public static ModeStripSlots ModeStrip(
+            int barWidth, int labelWidth, int firstWidth, int secondWidth, int gap, int minX)
+        {
+            barWidth = Math.Max(0, barWidth);
+            minX = Math.Max(0, minX);
+
+            int secondX = Math.Max(minX, barWidth - Inset - secondWidth);
+            int firstX = Math.Max(minX, secondX - gap - firstWidth);
+            int labelX = firstX - gap - labelWidth;
+
+            return new ModeStripSlots(labelX < minX ? -1 : labelX, firstX, secondX);
+        }
+
         /// <summary>
         /// Currency shortfalls deliberately do NOT share the gate strip's
         /// rails any more. On the shared grid an entry rendered directly

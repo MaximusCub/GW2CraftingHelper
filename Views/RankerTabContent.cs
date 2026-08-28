@@ -5,12 +5,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
+using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using GW2CraftingHelper.Contracts;
 using GW2CraftingHelper.Models;
 using GW2CraftingHelper.Services;
 using GW2CraftingHelper.Views.Rendering;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace GW2CraftingHelper.Views
 {
@@ -43,7 +45,7 @@ namespace GW2CraftingHelper.Views
         private const int SearchBoxWidth = 260;
         private const int QuantityBoxWidth = 56;
         private const int AddButtonWidth = 72;
-        private const int ModeDropdownWidth = 150;
+        /// <summary>Clearance between the mode strip and the Add button to its left.</summary>
         private const int ModeGap = 8;
         private const int BannerHeight = 30;
 
@@ -78,6 +80,33 @@ namespace GW2CraftingHelper.Views
         // the pill chrome borrows the proven badge combination.
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
         private static readonly Color AffordableChipFill = AffordableChipBorder * 0.15f;
+
+        // Row action art, by GW2 .dat asset id (the mechanism the module
+        // already uses for its tab and coin icons):
+        //   155953 - Blish's own 32px section-header caret, a cream DOWN
+        //            triangle. The up arrow is the same asset flipped, so
+        //            the pair can never disagree about weight or colour.
+        //   733269 - the matched 16px grey X of Blish's own remove pair.
+        private const int ReorderArrowAssetId = 155953;
+        private const int RemoveMarkAssetId = 733269;
+
+        // The plate a row action sits on, and the three states its art
+        // takes. Dim by default so a table of them reads as one quiet
+        // column rather than as a wall of arrows.
+        private static readonly Color RowButtonFill = new Color(0, 0, 0) * 0.25f;
+        private static readonly Color RowButtonHoverFill = new Color(255, 255, 255) * 0.12f;
+        private static readonly Color RowButtonTint = new Color(210, 210, 210);
+        private static readonly Color RowButtonHoverTint = Color.White;
+        private static readonly Color RowButtonDisabledTint = new Color(255, 255, 255) * 0.25f;
+
+        // The comparison-mode radio indicator: 157330 is the small green dot
+        // the game uses for "on"; its "-cantint" twin is the grey dot for
+        // "off". Art, not a U+25CF/U+25CB pair - neither exists in the font.
+        private const int RadioOnAssetId = 157330;
+        private const string RadioOffTextureName = "157330-cantint";
+        private const int RadioIndicatorSize = 16;
+        private const int RadioIndicatorGap = 6;
+        private const int RadioOptionGap = 16;
 
         private readonly CraftingPlanPipeline _pipeline;
         private readonly IItemSearchProvider _itemSearchProvider;
@@ -115,8 +144,7 @@ namespace GW2CraftingHelper.Views
         private FeedbackButton _addButton;
         private FeedbackButton _refreshButton;
         private Label _modeLabel;
-        private Dropdown _modeDropdown;
-        private bool _suppressModeChange;
+        private readonly List<ModeRadio> _modeRadios = new List<ModeRadio>();
         private Label _statusLabel;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
@@ -319,7 +347,7 @@ namespace GW2CraftingHelper.Views
 
             _watchlist.Mode = mode;
             Persist();
-            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(mode));
+            UpdateModeRadios();
             RebuildRows();
 
             bool anyStale = false;
@@ -466,42 +494,132 @@ namespace GW2CraftingHelper.Views
             TooltipFacility.ApplyPlain(_addButton, "Add this item to the bottom of your priority list.");
             _addButton.Click += (_, __) => AddPendingItem();
 
-            // The comparison-mode selector, right-anchored on this row (the
-            // toolbar row below is the status band's full width). Same
-            // labelled-Dropdown shape as the plan tab's "Prices:" control -
-            // the module's established two-way mode switch.
+            // The comparison mode is a two-option, mutually exclusive
+            // choice and BOTH options should read at all times, which a
+            // dropdown cannot do - it hides the alternative behind a click
+            // (owner ruling, 2026-08-27). Blish ships no radio control, so
+            // this is the smallest honest one: the game's own indicator dot
+            // plus a label, both clickable, both always visible. The dot is
+            // art rather than a U+25CF/U+25CB pair, neither of which exists
+            // in the bitmap font (see CreateRowButton).
             _modeLabel = new Label
             {
                 Font = UiFonts.Body,
                 Text = "Compare:",
+                TextColor = DimColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(0, 10),
                 Parent = _addPanel,
             };
-            _modeDropdown = new Dropdown
+
+            _modeRadios.Clear();
+            _modeRadios.Add(CreateModeRadio(RankerMode.Cascade));
+            _modeRadios.Add(CreateModeRadio(RankerMode.Independent));
+            UpdateModeRadios();
+        }
+
+        /// <summary>One option of the comparison-mode radio pair.</summary>
+        private sealed class ModeRadio
+        {
+            public RankerMode Mode;
+            public Image Indicator;
+            public Label Text;
+
+            /// <summary>Indicator, gap and label - what the strip has to fit.</summary>
+            public int Width;
+        }
+
+        private ModeRadio CreateModeRadio(RankerMode mode)
+        {
+            var indicator = new Image(AsyncTexture2D.FromAssetId(RadioOnAssetId))
             {
-                Size = new Point(ModeDropdownWidth, 28),
-                Location = new Point(0, 6),
+                Size = new Point(RadioIndicatorSize, RadioIndicatorSize),
+                Location = new Point(0, 12),
                 Parent = _addPanel,
             };
-            _modeDropdown.Items.Add(ModeItem(RankerMode.Cascade));
-            _modeDropdown.Items.Add(ModeItem(RankerMode.Independent));
-            _suppressModeChange = true;
-            _modeDropdown.SelectedItem = ModeItem(Mode);
-            _suppressModeChange = false;
-            TooltipFacility.ApplyPlain(_modeDropdown, ModeTooltip(Mode));
-            _modeDropdown.ValueChanged += (_, e) =>
-            {
-                if (_suppressModeChange)
-                {
-                    return;
-                }
 
-                OnModeChanged(e.CurrentValue == ModeItem(RankerMode.Independent)
-                    ? RankerMode.Independent
-                    : RankerMode.Cascade);
+            var label = new Label
+            {
+                Font = UiFonts.Body,
+                Text = ModeItem(mode),
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(0, 10),
+                Parent = _addPanel,
             };
+
+            // The label is as clickable as the dot: a 16px target is not a
+            // control, it is a dare.
+            indicator.Click += (_, __) => OnModeChanged(mode);
+            label.Click += (_, __) => OnModeChanged(mode);
+
+            string tooltip = ModeTooltip(mode);
+            TooltipFacility.ApplyPlain(indicator, tooltip);
+            TooltipFacility.ApplyPlain(label, tooltip);
+
+            return new ModeRadio
+            {
+                Mode = mode,
+                Indicator = indicator,
+                Text = label,
+                Width = RadioIndicatorSize + RadioIndicatorGap
+                    + LabelHelpers.MeasureWith(UiFonts.Body)(ModeItem(mode)),
+            };
+        }
+
+        /// <summary>
+        /// Selection is carried by BOTH the dot and the label: the dot alone
+        /// is a 16px difference in a row of text, which the field test for
+        /// the tab's other indicators showed reads as no difference at all.
+        /// </summary>
+        private void UpdateModeRadios()
+        {
+            foreach (var radio in _modeRadios)
+            {
+                bool selected = radio.Mode == Mode;
+                bool enabled = radio.Indicator.Enabled;
+                radio.Indicator.Tint = selected
+                    ? (enabled ? Color.White : Color.White * 0.4f)
+                    : new Color(255, 255, 255) * (enabled ? 0.25f : 0.15f);
+                radio.Text.TextColor = selected
+                    ? (enabled ? Color.White : DimColor)
+                    : (enabled ? ValueTextColor * 0.8f : DimColor);
+            }
+        }
+
+        /// <summary>
+        /// Seats the mode strip against the row's right edge, never left of
+        /// the Add button. A hidden caption is moved off-panel rather than
+        /// left where it would be overlapped.
+        /// </summary>
+        private void PositionModeStrip(int barWidth)
+        {
+            if (_modeRadios.Count < 2)
+            {
+                return;
+            }
+
+            int addButtonRight = RankerRowLayout.Inset + SearchBoxWidth + QuantityBoxWidth + 16 + AddButtonWidth;
+            var slots = RankerRowLayout.ModeStrip(
+                barWidth, _modeLabel.Width, _modeRadios[0].Width, _modeRadios[1].Width,
+                RadioOptionGap, addButtonRight + ModeGap);
+
+            _modeLabel.Visible = slots.LabelX >= 0;
+            if (slots.LabelX >= 0)
+            {
+                _modeLabel.Location = new Point(slots.LabelX, _modeLabel.Location.Y);
+            }
+
+            PlaceModeRadio(_modeRadios[0], slots.FirstX);
+            PlaceModeRadio(_modeRadios[1], slots.SecondX);
+        }
+
+        private static void PlaceModeRadio(ModeRadio radio, int x)
+        {
+            radio.Indicator.Location = new Point(x, radio.Indicator.Location.Y);
+            radio.Text.Location = new Point(
+                x + RadioIndicatorSize + RadioIndicatorGap, radio.Text.Location.Y);
         }
 
         private void BuildToolbar(Container container, int width)
@@ -578,11 +696,7 @@ namespace GW2CraftingHelper.Views
             _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
-            _modeDropdown.Location = new Point(
-                Math.Max(0, barWidth - ModeDropdownWidth), _modeDropdown.Location.Y);
-            _modeLabel.Location = new Point(
-                Math.Max(0, _modeDropdown.Location.X - ModeGap - _modeLabel.Width),
-                _modeLabel.Location.Y);
+            PositionModeStrip(barWidth);
 
             PositionColumnHeader(barWidth);
 
@@ -711,9 +825,9 @@ namespace GW2CraftingHelper.Views
             public CoinCurrencyRenderer.ValueCellHandle RemainingCell;
             public Label RemainingDash;
             public int RemainingCellWidth;
-            public FeedbackButton Up;
-            public FeedbackButton Down;
-            public FeedbackButton Remove;
+            public Image Up;
+            public Image Down;
+            public Image Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
             public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
@@ -1046,14 +1160,14 @@ namespace GW2CraftingHelper.Views
                     row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
             }
 
-            row.Up = CreateRowButton(row.Panel, "\u25B2", bands.UpX, MoveUpTooltip());
-            row.Down = CreateRowButton(row.Panel, "\u25BC", bands.DownX, MoveDownTooltip());
-            row.Remove = CreateRowButton(row.Panel, "\u2715", bands.RemoveX,
+            row.Up = CreateRowButton(row.Panel, ReorderArrowAssetId, true, bands.UpX, MoveUpTooltip());
+            row.Down = CreateRowButton(row.Panel, ReorderArrowAssetId, false, bands.DownX, MoveDownTooltip());
+            row.Remove = CreateRowButton(row.Panel, RemoveMarkAssetId, false, bands.RemoveX,
                 "Remove this item from your list.");
 
-            row.Up.Enabled = CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-            row.Down.Enabled = CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
-            row.Remove.Enabled = !_isRefreshing;
+            SetRowButtonEnabled(row.Up, CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
+            SetRowButtonEnabled(row.Down, CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+            SetRowButtonEnabled(row.Remove, !_isRefreshing);
 
             int rowIndex = row.Index;
             row.Up.Click += (_, __) => MoveRow(rowIndex, up: true);
@@ -1076,17 +1190,73 @@ namespace GW2CraftingHelper.Views
                 : CoinCurrencyRenderer.MeasureValueWidth(row.Metrics.RemainingCoinCost, null, UiFonts.Body);
         }
 
-        private FeedbackButton CreateRowButton(Panel parent, string glyph, int x, string tooltip)
+        /// <summary>
+        /// A row action, drawn as ART rather than as a text glyph. The three
+        /// buttons used to be StandardButtons labelled U+25B2, U+25BC and
+        /// U+2715; Blish's Menomonia is a bitmap font carrying 226
+        /// codepoints (ASCII, Latin-1 and about thirty punctuation marks)
+        /// and none of those three is among them, so all three rendered as
+        /// literally nothing - the field shot's blank grey rectangles. A
+        /// missing codepoint also measures zero width, which is why no
+        /// layout test caught it.
+        /// <para>
+        /// An Image, not a StandardButton with an Icon: the up arrow is the
+        /// down arrow flipped (Blish's own Panel/MenuItem carets do the same
+        /// with a rotation), and only Image exposes SpriteEffects.
+        /// </para>
+        /// </summary>
+        private Image CreateRowButton(Panel parent, int assetId, bool flipVertically, int x, string tooltip)
         {
-            var button = new FeedbackButton
+            var button = new Image(AsyncTexture2D.FromAssetId(assetId))
             {
-                Text = glyph,
                 Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
+                SpriteEffects = flipVertically ? SpriteEffects.FlipVertically : SpriteEffects.None,
+                BackgroundColor = RowButtonFill,
+                Tint = RowButtonTint,
                 Parent = parent,
             };
+
+            // Hover feedback in the button's own vocabulary: the art
+            // brightens and the plate lifts. StandardButton's atlas walk is
+            // not available to an Image, and a row action that answers a
+            // hover with nothing reads as decoration.
+            button.MouseEntered += (_, __) => ApplyRowButtonTint(button, hover: true);
+            button.MouseLeft += (_, __) => ApplyRowButtonTint(button, hover: false);
+
             TooltipFacility.ApplyPlain(button, tooltip);
             return button;
+        }
+
+        /// <summary>
+        /// Enabled state is a click gate AND a visual one: Blish's Control
+        /// blocks the Click on a disabled control but draws it unchanged, and
+        /// an arrow that looks live but does nothing is worse than one that
+        /// looks spent. Independent mode disables both reorder arrows on
+        /// every row, so this is the common state, not the rare one.
+        /// </summary>
+        private static void SetRowButtonEnabled(Image button, bool enabled)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Enabled = enabled;
+            ApplyRowButtonTint(button, hover: false);
+        }
+
+        private static void ApplyRowButtonTint(Image button, bool hover)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Tint = !button.Enabled
+                ? RowButtonDisabledTint
+                : hover ? RowButtonHoverTint : RowButtonTint;
+            button.BackgroundColor = button.Enabled && hover ? RowButtonHoverFill : RowButtonFill;
         }
 
         /// <summary>Returns the number of sub-lines rendered.</summary>
@@ -2085,14 +2255,20 @@ namespace GW2CraftingHelper.Views
             _addButton.Enabled = enabled && _pendingItemId.HasValue;
             _searchBox.Enabled = enabled;
             _quantityBox.Enabled = enabled;
-            _modeDropdown.Enabled = enabled;
+            foreach (var radio in _modeRadios)
+            {
+                radio.Indicator.Enabled = enabled;
+                radio.Text.Enabled = enabled;
+            }
+
+            UpdateModeRadios();
             _refreshButton.Enabled = enabled && Entries.Count > 0;
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
-                row.Up.Enabled = reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
-                row.Down.Enabled = reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
-                row.Remove.Enabled = enabled;
+                SetRowButtonEnabled(row.Up, reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Down, reorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count));
+                SetRowButtonEnabled(row.Remove, enabled);
             }
         }
 

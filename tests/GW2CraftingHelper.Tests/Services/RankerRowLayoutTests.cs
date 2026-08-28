@@ -291,5 +291,66 @@ namespace GW2CraftingHelper.Tests.Services
             Assert.True(slots.RefreshX >= 0);
             Assert.True(slots.StatusWidth >= 0);
         }
+
+        // The comparison-mode radio strip. Measured footprints: the dot,
+        // its gap and the widest of the two option labels at UiFonts.Body,
+        // which the view measures for real; these stand in for them.
+        private const int RadioLabelWidth = 44;
+        private const int FirstOptionWidth = 130;
+        private const int SecondOptionWidth = 120;
+        private const int OptionGap = 16;
+        private const int AddButtonRight = 380;
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AtEveryRealWidth_BothModeOptionsFitInsideTheRowAndNeverOverlap(int rowWidth)
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                rowWidth, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth,
+                OptionGap, AddButtonRight);
+
+            Assert.True(slots.FirstX >= AddButtonRight);
+            Assert.True(slots.FirstX + FirstOptionWidth <= slots.SecondX);
+            Assert.True(slots.SecondX + SecondOptionWidth <= rowWidth - RankerRowLayout.Inset);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AtEveryRealWidth_TheCaptionClearsTheControlToItsLeft(int rowWidth)
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                rowWidth, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth,
+                OptionGap, AddButtonRight);
+
+            // Shown or dropped, never overlapped: -1 is the view's cue to
+            // hide it.
+            Assert.True(slots.LabelX == -1 || slots.LabelX >= AddButtonRight);
+            if (slots.LabelX >= 0)
+            {
+                Assert.True(slots.LabelX + RadioLabelWidth <= slots.FirstX);
+            }
+        }
+
+        [Fact]
+        public void WhenTheRowIsTooNarrowForTheCaption_ItIsDroppedRatherThanOverlapped()
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                AddButtonRight + FirstOptionWidth + OptionGap + SecondOptionWidth + RankerRowLayout.Inset,
+                RadioLabelWidth, FirstOptionWidth, SecondOptionWidth, OptionGap, AddButtonRight);
+
+            Assert.Equal(-1, slots.LabelX);
+            Assert.Equal(AddButtonRight, slots.FirstX);
+        }
+
+        [Fact]
+        public void AtAnAbsurdlyNarrowWidth_NothingIsPlacedLeftOfTheControlBeforeIt()
+        {
+            var slots = RankerRowLayout.ModeStrip(
+                120, RadioLabelWidth, FirstOptionWidth, SecondOptionWidth, OptionGap, AddButtonRight);
+
+            Assert.Equal(-1, slots.LabelX);
+            Assert.Equal(AddButtonRight, slots.FirstX);
+            Assert.Equal(AddButtonRight, slots.SecondX);
+        }
     }
 }
