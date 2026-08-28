@@ -44,8 +44,11 @@ namespace TaimisToolbench.Services
         public const int DimmedRuleWidth = 2;
         public const int DimmedRuleOffset = 8;
 
-        // ASCII, matching the section headers - the U+25BC/U+25B6 triangles
-        // do not render in Blish's font.
+        // The ASCII a caret DEGRADES to. What is normally drawn is the
+        // module's own filled caret from ref/glyphs.fnt - see
+        // UiGlyphs.ExpandCaret, which is where the renderer asks. Neither
+        // U+25BC nor U+25B6 renders in Blish's font, which is why these two
+        // are a lowercase letter and a greater-than sign.
         public const string ExpandedCaret = "v";
         public const string CollapsedCaret = ">";
 
@@ -98,7 +101,13 @@ namespace TaimisToolbench.Services
         public readonly bool HasChildren;
         public readonly bool IsExpanded;
 
-        /// <summary>Null when the row has no children to expand.</summary>
+        /// <summary>
+        /// Null when the row has no children to expand; otherwise the ASCII
+        /// this row's caret degrades to. The renderer draws the shipped
+        /// glyph font's filled caret instead whenever the atlas loaded, off
+        /// <see cref="IsExpanded"/> - a BitmapFont is not something a
+        /// Blish-free planner can see.
+        /// </summary>
         public readonly string CaretGlyph;
 
         /// <summary>Empty when the row shows no quantity.</summary>

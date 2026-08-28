@@ -199,6 +199,128 @@ namespace TaimisToolbench.Tests.Services
             }
         }
 
+        /// <summary>
+        /// The owner's report: Plan / Cost / Generated packed together and
+        /// left a stranded band before the action controls. The columns are
+        /// distributed now, on the same law the Crafting Plan tab's
+        /// currency table uses, and the property that says so is
+        /// geometric - Cost's right edge sits two thirds of the way across
+        /// the span, Generated's on its end - not a restatement of the
+        /// arithmetic that produced it.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(GateWidths))]
+        public void AtEveryGateWidth_TheColumnsAreJustifiedAcrossTheSpanRatherThanPacked(int rowWidth)
+        {
+            var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+
+            int spanEnd = bands.WhenRightEdge;
+            int beforeCost = bands.CostRightEdge - bands.NameX;
+            int afterCost = spanEnd - bands.CostRightEdge;
+
+            // Two tracks before Cost, one after: the label is the flexing
+            // column and takes the slack of the first data column's track.
+            Assert.InRange(beforeCost - (2 * afterCost), -2, 2);
+
+            // ...and every track is a real, usable width, not a sliver.
+            Assert.True(afterCost > WhenWidth);
+        }
+
+        /// <summary>
+        /// The defect this distribution was asked to remove: a wide dead
+        /// band between the last data column and the action cluster. The
+        /// cluster is right-anchored, so the columns' own right edge is one
+        /// cell gap clear of it at EVERY width.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(GateWidths))]
+        public void GeneratedEndsExactlyOneCellGapBeforeTheActionCluster(int rowWidth)
+        {
+            var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+
+            Assert.Equal(bands.ViewX - PlanHistoryRowLayout.CellGap, bands.WhenRightEdge);
+        }
+
+        /// <summary>
+        /// A header that computes its own right edge is how the Ranker's
+        /// drifted 37px off the column it named. Both seats read one
+        /// value per column, so they cannot disagree - this pins that the
+        /// value exists and is the cell's own edge.
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(GateWidths))]
+        public void EveryColumnHasOneRightEdgeForItsHeaderAndItsCell(int rowWidth)
+        {
+            var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+
+            Assert.Equal(bands.WhenX + bands.WhenWidth, bands.WhenRightEdge);
+
+            // Ordered and non-overlapping, in the order the headers read:
+            // Plan, then Cost, then Generated.
+            Assert.True(bands.NameX < bands.CostRightEdge - CostWidth);
+            Assert.True(bands.CostRightEdge < bands.WhenX);
+            Assert.True(bands.WhenRightEdge < bands.ViewX);
+        }
+
+        /// <summary>
+        /// Widening the window may not walk a column backwards - a column
+        /// that moves left as the row grows is the artifact distribution
+        /// exists to remove.
+        /// </summary>
+        [Fact]
+        public void EveryColumnEdgeMovesRightAsTheRowWidens()
+        {
+            int previousCost = int.MinValue;
+            int previousWhen = int.MinValue;
+
+            for (int rowWidth = 600; rowWidth <= 3000; rowWidth += 17)
+            {
+                var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+                Assert.True(bands.CostRightEdge >= previousCost, $"Cost went backwards at {rowWidth}");
+                Assert.True(bands.WhenRightEdge >= previousWhen, $"Generated went backwards at {rowWidth}");
+                previousCost = bands.CostRightEdge;
+                previousWhen = bands.WhenRightEdge;
+            }
+        }
+
+        /// <summary>
+        /// Below the width a track can hold its own band in, the row falls
+        /// back to the packed right-to-left stack rather than distributing
+        /// into slivers - the currency table's own rule. Cost then sits one
+        /// cell gap left of the Generated band, and nothing overlaps.
+        /// </summary>
+        [Fact]
+        public void ANarrowRowPacksInsteadOfDistributingIntoSlivers()
+        {
+            const int narrow = 620;
+            var bands = PlanHistoryRowLayout.Compute(narrow, CostWidth, WhenWidth);
+
+            Assert.Equal(bands.WhenX - PlanHistoryRowLayout.CellGap, bands.CostRightEdge);
+            Assert.True(bands.CostRightEdge < bands.WhenX);
+            Assert.True(bands.WhenRightEdge <= bands.ViewX);
+            Assert.True(bands.NameWidth >= 0);
+        }
+
+        /// <summary>
+        /// The distribution reads off the CONTENT width, so a wider row
+        /// gives the plan name more room rather than parking the extra
+        /// pixels somewhere the eye has to cross.
+        /// </summary>
+        [Fact]
+        public void TheNameBandGrowsWithTheRowButNeverSwallowsTheWholeSlack()
+        {
+            var narrow = PlanHistoryRowLayout.Compute(900, CostWidth, WhenWidth);
+            var wide = PlanHistoryRowLayout.Compute(1800, CostWidth, WhenWidth);
+
+            Assert.True(wide.NameWidth > narrow.NameWidth);
+
+            // Under the old packed law the name band took EVERY added
+            // pixel - 900 of them. Under distribution it takes the two
+            // tracks it owns and the Generated column keeps the third.
+            int addedToName = wide.NameWidth - narrow.NameWidth;
+            Assert.InRange(addedToName, 560, 640);
+        }
+
         [Fact]
         public void DetailHeight_AddsExactlyOneLinePerOptionalBlock()
         {

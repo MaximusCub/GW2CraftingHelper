@@ -11,11 +11,12 @@ namespace TaimisToolbench.Services
     /// hint).
     ///
     /// <para>
-    /// The stat block already OPENS with the item's full name in its rarity
-    /// colour, so a row whose label is ellipsized does NOT also prepend the
-    /// name - that would show it twice. The name line is emitted only when
-    /// there is no stat block to open with, which is the pre-stats fallback
-    /// every one of these surfaces had.
+    /// The tooltip ALWAYS opens on the icon+name header the game's own item
+    /// tooltip opens on. With a stat block that header is the stat block's
+    /// own first line; without one it is composed from the row's
+    /// <see cref="ItemTooltipIdentity"/>, which every surface that drew an
+    /// icon already holds. Reading the icon out of the stat block alone is
+    /// what made the header come and go per item - see that type.
     /// </para>
     /// <para>
     /// Blish-free (repo invariant), so the exact line-by-line contract each
@@ -33,8 +34,7 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static TooltipContent BuildRowContent(
             TooltipContent statContent,
-            string fullName,
-            bool nameTruncated,
+            ItemTooltipIdentity identity,
             TooltipContent extraContent)
         {
             var builder = new TooltipContentBuilder();
@@ -43,9 +43,9 @@ namespace TaimisToolbench.Services
             {
                 builder.Append(statContent);
             }
-            else if (nameTruncated && !string.IsNullOrEmpty(fullName))
+            else if (identity.HasSubject)
             {
-                builder.Text(fullName).EndLine();
+                builder.Header(identity.IconUrl, identity.Name, identity.Rarity);
             }
 
             if (extraContent != null && !extraContent.IsEmpty)
@@ -64,8 +64,7 @@ namespace TaimisToolbench.Services
         /// split).</summary>
         public static TooltipContent BuildRowContent(
             ItemStatBlock stats,
-            string fullName,
-            bool nameTruncated,
+            ItemTooltipIdentity identity,
             IReadOnlyList<string> extraLines)
         {
             var extras = new TooltipContentBuilder();
@@ -81,7 +80,7 @@ namespace TaimisToolbench.Services
             }
 
             return BuildRowContent(
-                ItemStatTooltipComposer.BuildContent(stats), fullName, nameTruncated, extras.Build());
+                ItemStatTooltipComposer.BuildContent(stats), identity, extras.Build());
         }
     }
 }

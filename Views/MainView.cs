@@ -2401,9 +2401,16 @@ namespace TaimisToolbench.Views
             // item list rendered neutral except for the two or three items
             // the last plan used.
             string rarity = ItemRarityResolution.Resolve(row.Rarity, RarityFor(row.ItemId));
-            var icon = IconControls.CreateItemIcon(
+
+            string breakdown = BreakdownText(row);
+
+            // The row's hover, composed once and stamped on every control
+            // over the row - the icon included, by CreateItemIcon itself.
+            var hover = ItemRowHover(row, rarity, breakdown);
+
+            IconControls.CreateItemIcon(
                 rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity), 2, 1,
-                ItemIconTier.BagSlot);
+                ItemIconTier.BagSlot, hover);
 
             // Never display raw item IDs (repo invariant) - row.Name is
             // already the resolved display name.
@@ -2425,34 +2432,17 @@ namespace TaimisToolbench.Views
             int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
             var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 4);
 
-            // NOT the Amount column's prefix notation, and the one
-            // deliberate exemption from M9's sweep: these labels are
-            // LOCATIONS. "20x Bank" parses as twenty banks, and "10x
-            // Character: Maximus Test" collides with the label's own colon.
-            string breakdown = row.Breakdown == null || row.Breakdown.Count == 0
-                ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
-
             // Runs UNDER the Amount column: that is one short line.
             var breakdownLabel = CreateRowTextLabel(
                 rowPanel, breakdown, SnapshotItemGridLayout.CellFullLineMaxWidth(columnWidth),
                 26, InfoTextColor, out _);
 
-            // The degrade path, stamped before the rich one takes the
-            // control over: Register captures this as the source's
-            // FallbackText, which is what a hover shows if the deferred
-            // builder throws (TooltipFacility.ResolveContent - the stat
-            // lookup runs inside Blish's mouse-moved handler). Width-
-            // independent, so the repack still owns no tooltip.
-            TooltipFacility.ApplyPlain(nameLabel, nameText);
-            TooltipFacility.ApplyPlain(breakdownLabel, breakdown);
-
-            // The plan's own rich item tooltip, composed at hover time so a
-            // stat block fetched later shows without a re-render. Stamped
-            // ONCE: it says the same at any width, so the repack leaves
-            // every tooltip on the row alone.
-            ApplyItemRowTooltip(
-                rowPanel, nameLabel, breakdownLabel, amountLabel, icon, row, nameText, breakdown);
+            // NOTHING else on the cell answers a hover: the item's tooltip
+            // is carried by its icon alone (ItemIconTooltip.StampOnIconTree),
+            // and the name, the amount, the source breakdown and the strip
+            // between them are not the item. The breakdown's full run is a
+            // line of that same tooltip, so nothing is lost by the column
+            // being too narrow to show it here.
 
             // The cell's own Size is the grid's to write (LayoutResultGrid),
             // so this closure only re-fits what the new column width changed.
@@ -2495,55 +2485,37 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One item row's tooltip, on the strip AND on every control over
-        /// it - Blish resolves a tooltip on the deepest control under the
-        /// cursor and never bubbles, so an unstamped label or icon is a
-        /// hole in the row's hover. Deferred, so a stat block fetched later
-        /// in the session shows without a re-render; the name and the whole
-        /// breakdown ride along either way, so this says the same thing at
-        /// every column width and is stamped once, at build.
+        /// One item row's hover: the item's own icon+name header, its stat
+        /// block if this session happens to hold one, and the whole source
+        /// breakdown - ALWAYS, not only when the line was shortened, since
+        /// the hover is where a reader goes for the run of it. A stat block
+        /// is the exception rather than the rule on this tab (see
+        /// RarityFor), which is why the identity carries the header.
         /// </summary>
-        private void ApplyItemRowTooltip(
-            Panel rowPanel, Label nameLabel, Label breakdownLabel, Label amountLabel, Panel icon,
-            SnapshotSearchRow row, string nameText, string breakdown)
+        private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity, string breakdown)
         {
-            Func<TooltipContent> build = () =>
-            {
-                // ALWAYS, not only when the line was shortened: the hover
-                // is where a reader goes for the whole run of it.
-                var extras = new List<string>();
-                if (!string.IsNullOrEmpty(breakdown))
-                {
-                    extras.Add(breakdown);
-                }
+            int itemId = row.ItemId;
+            return ItemIconTooltip.ForItem(
+                ItemTooltipIdentity.ForItem(row.Name ?? "", row.IconUrl, rarity),
+                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
+                    : () => _getItemStatBlock(itemId),
+                () => string.IsNullOrEmpty(breakdown)
+                    ? (IReadOnlyList<string>)null
+                    : new List<string> { breakdown });
+        }
 
-                // ...and so does the name: a stat block usually does not
-                // exist on this tab (see RarityFor), and a row answering
-                // nothing is the reported "no tooltips". With one, its own
-                // header wins instead.
-                const bool alwaysHeadWithTheName = true;
-
-                return ItemRowTooltipComposer.BuildRowContent(
-                    _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
-                    nameText,
-                    alwaysHeadWithTheName,
-                    extras);
-            };
-
-            TooltipFacility.ApplyRichDeferred(rowPanel, build);
-            TooltipFacility.ApplyRichDeferred(nameLabel, build);
-            TooltipFacility.ApplyRichDeferred(breakdownLabel, build);
-            TooltipFacility.ApplyRichDeferred(amountLabel, build);
-
-            // Only when the row has a real item id: a non-item row's icon
-            // names what it actually is, and an item builder has nothing
-            // better to say about it. (An EMPTY payload is no longer the
-            // hazard here - ApplyRichDeferredToIconTree keeps the control's
-            // own note as the builder's fallback.)
-            if (row.ItemId > 0)
-            {
-                IconControls.ApplyRichDeferredToIconTree(icon, build);
-            }
+        /// <summary>
+        /// The row's source breakdown as one line, or "". NOT the Amount
+        /// column's prefix notation, and the one deliberate exemption from
+        /// M9's sweep: these labels are LOCATIONS. "20x Bank" parses as
+        /// twenty banks, and "10x Character: Maximus Test" collides with
+        /// the label's own colon.
+        /// </summary>
+        private static string BreakdownText(SnapshotSearchRow row)
+        {
+            return row.Breakdown == null || row.Breakdown.Count == 0
+                ? ""
+                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
         }
 
         /// <summary>The rarity this tab can know for an item, or null -
@@ -2573,10 +2545,12 @@ namespace TaimisToolbench.Views
             // the icon takes the list tier, whose art is already inset by the
             // module's 1px frame so the framed box occupies exactly the
             // measured 32px window rather than overflowing it to 34.
-            var icon = IconControls.CreateItemIcon(
+            string currencyName = string.IsNullOrEmpty(entry.CurrencyName)
+                ? "Unknown Currency"
+                : entry.CurrencyName;
+            IconControls.CreateItemIcon(
                 rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
-                ItemIconTier.CurrencyListRow,
-                string.IsNullOrEmpty(entry.CurrencyName) ? null : entry.CurrencyName);
+                ItemIconTier.CurrencyListRow, ItemIconTooltip.Naming(currencyName));
 
             // Never display raw currency IDs (repo invariant). Same two
             // columns as the item run above, so one header pair shape
@@ -2584,38 +2558,20 @@ namespace TaimisToolbench.Views
             // thousands
             // separator stays: wallet balances run to seven figures where
             // an item count does not.
-            string name = string.IsNullOrEmpty(entry.CurrencyName) ? "Unknown Currency" : entry.CurrencyName;
+            string name = currencyName;
             string amountText = AmountText(entry.Value);
             var label = CreateRowTextLabel(
                 rowPanel, name, SnapshotItemGridLayout.CellNameMaxWidth(columnWidth, chrome.AmountBand),
-                6, null, out bool shortened);
+                6, null, out _);
             int amountWidth = (int)Math.Ceiling(UiFonts.Body.MeasureString(amountText).Width);
             var amountLabel = CreateAmountLabel(rowPanel, amountText, amountWidth, columnWidth, 6);
 
-            // Width-invariant, so stamped here and not from the repack.
-            // Re-stated over the component's resolution, which took the raw
-            // CurrencyName where this is the fallback.
-            IconControls.ApplyPlainToIconTree(icon, name);
-            StampWalletRowTooltip(rowPanel, label, name, shortened);
-
             _walletCells.Add(new ResultCell(rowPanel, w =>
             {
-                bool nowShortened = FitRowTextLabel(
+                FitRowTextLabel(
                     label, name, SnapshotItemGridLayout.CellNameMaxWidth(w, chrome.AmountBand));
                 PlaceAmountLabel(amountLabel, amountWidth, w, 6);
-                StampWalletRowTooltip(rowPanel, label, name, nowShortened);
             }));
-        }
-
-        /// <summary>A wallet row's hover: the full currency name wherever
-        /// the line shortened, on the panel AND the label (a tooltip
-        /// resolves on the deepest control and never bubbles). The icon is
-        /// stamped once at build.</summary>
-        private static void StampWalletRowTooltip(
-            Panel rowPanel, Label nameLabel, string name, bool shortened)
-        {
-            TooltipFacility.ApplyPlain(rowPanel, shortened ? name : null);
-            TooltipFacility.ApplyPlain(nameLabel, shortened ? name : null);
         }
 
         // Builds its CoinSegmentSpec list through the shared

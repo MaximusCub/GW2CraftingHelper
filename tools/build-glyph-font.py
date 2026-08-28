@@ -79,10 +79,21 @@ BASE = 18
 # dev/records/2026-08-glyph-font.md, along with which entries the stroke-weight
 # measurement disqualified. Adding a glyph is a row here plus a constant in
 # UiGlyphs; do that when a seat exists and the artwork survives --preview.
+# The two SIZES are two seats, not a duplication. The sort pair rides inside a
+# Menomonia Bold 20 column header's own Label.Text, where 6px of ink beside a
+# 17px cap is an indicator; the reading pair is drawn at body size - in a 28px
+# button and in a tree row's 18px caret column - where 6px would be a speck.
+# Their rises differ for the same reason: rise is the ink centre's height above
+# the BASELINE of whichever face the glyph is merged into, and Bold 20 puts its
+# cap centre 8px up while Regular 16 puts its own 7px up
+# (Services/TypeRampMetrics).
 GLYPHS = [
     # codepoint, bootstrap icon, ink_h, rise, advance, role
     (0xE100, "caret-up-fill",         6,    8,       9, "sort ascending"),
     (0xE101, "caret-down-fill",       6,    8,       9, "sort descending"),
+    (0xE102, "caret-up-fill",         8,    7,      13, "caret up"),
+    (0xE103, "caret-down-fill",       8,    7,      13, "caret down"),
+    (0xE104, "caret-right-fill",     12,    7,       9, "caret right"),
 ]
 
 ATLAS_PADDING = 1

@@ -290,7 +290,8 @@ namespace TaimisToolbench.Views
                 // tier's frame is IconSize on the nose.
                 IconControls.CreateItemIcon(
                     row, item.IconUrl, ItemIconFrame.UnknownRarity(), 2,
-                    (RowHeight - IconSize) / 2, ItemIconTier.SearchSuggestion);
+                    (RowHeight - IconSize) / 2, ItemIconTier.SearchSuggestion,
+                    ItemIconTooltip.None(ItemIconSilence.WouldCoverTheListItSitsIn));
 
                 // Item name. Centred against the FONT's own line box rather
                 // than a hand-tuned stand-in for it: these rows stack flush

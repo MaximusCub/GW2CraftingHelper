@@ -37,14 +37,13 @@ namespace TaimisToolbench.Services
         /// which is why every item-hover surface in the module now goes
         /// through <see cref="ItemRowTooltipComposer"/> instead. A null
         /// <paramref name="stats"/> - a row whose item has not been fetched
-        /// this session - degrades to exactly the tooltip this row had
-        /// before, never to an empty box.
+        /// this session - still opens on the icon+name header composed from
+        /// <paramref name="identity"/>, and never on an empty box.
         /// </para>
         /// </summary>
         public static TooltipContent BuildRowContent(
             ItemStatBlock stats,
-            string fullName,
-            bool nameTruncated,
+            ItemTooltipIdentity identity,
             string hintText,
             IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
         {
@@ -56,7 +55,7 @@ namespace TaimisToolbench.Services
 
             extras.AddRange(BuildCurrencyLines(currencyCosts));
 
-            return ItemRowTooltipComposer.BuildRowContent(stats, fullName, nameTruncated, extras);
+            return ItemRowTooltipComposer.BuildRowContent(stats, identity, extras);
         }
 
         /// <summary>

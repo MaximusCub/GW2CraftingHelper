@@ -305,28 +305,6 @@ namespace TaimisToolbench.Views.Rendering
         // comment. Segment counts are always small (one row's worth of
         // coin/currency denominations), so this is cheap even called on
         // every BuildTooltip rebuild.
-        private static void SetValueCellTooltip(
-            CoinCurrencyRenderer.ValueCellHandle cell, Func<TooltipContent> build)
-        {
-            if (cell.DashLabel != null)
-            {
-                TooltipFacility.ApplyRichDeferred(cell.DashLabel, build);
-                return;
-            }
-
-            foreach (var (label, icon) in cell.CoinSegments.Controls)
-            {
-                TooltipFacility.ApplyRichDeferred(label, build);
-                TooltipFacility.ApplyRichDeferred(icon, build);
-            }
-
-            foreach (var (label, icon) in cell.CurrencySegments.Controls)
-            {
-                TooltipFacility.ApplyRichDeferred(label, build);
-                TooltipFacility.ApplyRichDeferred(icon, build);
-            }
-        }
-
         private void CreateShoppingRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, ColumnScan scan, bool isLast)
         {
@@ -349,10 +327,24 @@ namespace TaimisToolbench.Views.Rendering
             // the name and no longer has to be reserved out of it.
             string fullName = row.Label ?? "";
             string hintText = row.HintText;
+
+            // Composed at HOVER time (see UsedMaterialsSectionRenderer's
+            // matching note): a stat block that lands after this render
+            // (Q13) is picked up on the next hover, and the compose work
+            // stays off the render path.
+            int itemId = row.ItemId;
+            var hover = ItemIconTooltip.Composed(
+                ItemTooltipIdentity.ForItem(fullName, row.IconUrl, row.Rarity),
+                () => ShoppingRowTooltipFormatter.BuildRowContent(
+                    _getItemStatBlock == null || itemId <= 0 ? null : _getItemStatBlock(itemId),
+                    ItemTooltipIdentity.ForItem(fullName, row.IconUrl, row.Rarity),
+                    hintText,
+                    row.CurrencyCosts));
+
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
                 edges.SourceX, 0, NameToQtyGap, NameX, RowTextY,
-                ItemIconTier.BagSidebar);
+                ItemIconTier.BagSidebar, hover);
             var nameLabel = nameHandle.NameLabel;
 
             string sourceTag = ShoppingSourceBadge.ForRow(row);
@@ -401,44 +393,15 @@ namespace TaimisToolbench.Views.Rendering
             // covers the hover point - the row's children (the icon,
             // nameLabel, qtyLabel, the Each/Total cells) all capture the
             // mouse before rowPanel's own tooltip is reached, so every one
-            // of them carries the row's tooltip. Stamped AFTER those
-            // controls exist, which is why this sits here. The source
-            // badge is the one child that carries something else - its
-            // own prose, below.
-            //
-            // Composed at HOVER time (see UsedMaterialsSectionRenderer's
-            // matching note): the row's ellipsis state is read when the
-            // box is drawn, so the AddReellipsis rebuild that used to
-            // re-stamp four controls is gone, and a stat block that lands
-            // after this render (Q13) is picked up on the next hover.
-            Func<TooltipContent> buildTooltip = () => ShoppingRowTooltipFormatter.BuildRowContent(
-                _getItemStatBlock == null || row.ItemId <= 0 ? null : _getItemStatBlock(row.ItemId),
-                fullName,
-                nameLabel.Text != fullName,
-                hintText,
-                row.CurrencyCosts);
-            TooltipFacility.ApplyRichDeferred(rowPanel, buildTooltip);
-            TooltipFacility.ApplyRichDeferred(nameLabel, buildTooltip);
-            TooltipFacility.ApplyRichDeferred(qtyLabel, buildTooltip);
-
+            // of them carries the row's tooltip. The icon and the name are
+            // stamped by the row builder above; the rest is stamped here,
+            // after those controls exist. The source badge is the one
+            // child that carries something else - its own prose, below.
             // The badge gets its OWN hover, not the row's: four capital
             // letters name the source only to a reader who already knows
             // the vocabulary, and the badge is the one control on the row
             // whose whole job is to answer "where do I get this?".
             LabelHelpers.ApplyTagTooltip(tagPanel, ShoppingSourceBadge.TooltipForRow(row));
-
-            // The icon only when the row has a real item id: a currency
-            // row's icon names its own currency, and an item builder has
-            // nothing better to say about it. (An EMPTY payload is no
-            // longer the hazard here - ApplyRichDeferredToIconTree keeps
-            // the control's own note as the builder's fallback.)
-            if (row.ItemId > 0)
-            {
-                IconControls.ApplyRichDeferredToIconTree(nameHandle.IconFrame, buildTooltip);
-            }
-
-            SetValueCellTooltip(eachCell, buildTooltip);
-            SetValueCellTooltip(totalCell, buildTooltip);
 
             // Source badge + qty + Each/Total cells reposition every drag
             // tick (no MeasureString - the badge's width is data-fixed, and
