@@ -172,6 +172,7 @@ Services/RankerPriorityCascade.cs                                               
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                         87
 Services/RankerReadinessCalculator.cs                                                   666
+Services/RankerReadinessRamp.cs                                                         226
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
 Services/RankerRowLayout.cs                                                             642
@@ -289,7 +290,7 @@ Views/Rendering/NotesSectionRenderer.cs                                         
 Views/Rendering/PillColors.cs                                                           125
 Views/Rendering/PlanHeaderRenderer.cs                                                   178
 Views/Rendering/PressFeedback.cs                                                        118
-Views/Rendering/RankerReadinessColors.cs                                                 75
+Views/Rendering/RankerReadinessColors.cs                                                 99
 Views/Rendering/RarityColors.cs                                                         147
 Views/Rendering/RecipesSectionRenderer.cs                                               339
 Views/Rendering/RichTooltipSurface.cs                                                   613
@@ -467,6 +468,7 @@ tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs              
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                   256
 tests/TaimisToolbench.Tests/Services/RankerRarityAdoptionTests.cs                     130
 tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs                741
+tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      186
 tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
 tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                          735
 tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                              272

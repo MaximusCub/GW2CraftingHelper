@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
 namespace TaimisToolbench.Views.Rendering
 {
@@ -41,6 +42,29 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>The module's standing neutral, for a figure that is not a measurement.</summary>
         internal static readonly Color Neutral = new Color(150, 150, 150);
+
+        /// <summary>
+        /// The painted bar's fill at this readiness, and the plate it is
+        /// painted on. Continuous where the TEXT bands above are stepped,
+        /// and that is not a contradiction: a bar's LENGTH already carries
+        /// the reading a scanning eye needs, so its colour is free to be a
+        /// smooth ombre, while a bare percentage has only its colour and
+        /// needs the three legible steps. The arithmetic, the anchors and
+        /// the white-text contrast floor all live Blish-free in
+        /// <see cref="RankerReadinessRamp"/>.
+        /// </summary>
+        internal static Color BarFill(double readiness)
+        {
+            return Rgb(RankerReadinessRamp.Fill(readiness));
+        }
+
+        /// <summary>The unpainted part of a bar. See RankerReadinessRamp.Track.</summary>
+        internal static readonly Color BarTrack = Rgb(RankerReadinessRamp.Track);
+
+        private static Color Rgb(RankerReadinessRamp.Rgb color)
+        {
+            return new Color(color.R, color.G, color.B);
+        }
 
         internal static Color ForReadiness(double readiness)
         {

@@ -288,6 +288,7 @@
     <Compile Include="Services\RankerPriorityCascade.cs" />
     <Compile Include="Services\RankerReadinessWeights.cs" />
     <Compile Include="Services\RankerReadinessCalculator.cs" />
+    <Compile Include="Services\RankerReadinessRamp.cs" />
     <Compile Include="Services\RankerRowLayout.cs" />
     <Compile Include="Services\RankerResultCache.cs" />
     <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
