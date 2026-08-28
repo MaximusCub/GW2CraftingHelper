@@ -1,7 +1,7 @@
 # Releasing
 
 This document describes the current, actual state of packaging and release
-for GW2 Crafting Helper - not an aspirational process.
+for Taimi's Toolbench - not an aspirational process.
 
 **What the project actually practices today** (the v0.2.x field-test era):
 a release is a CHANGELOG entry, a `manifest.json` version bump, and a
@@ -12,7 +12,7 @@ pushed to origin (measured 2026-08-25: `git ls-remote --tags origin`).
 
 **What changed since:** `.github/workflows/release.yml` now builds
 Release/x64 on any pushed `v*` tag and publishes
-`bin/x64/Release/GW2CraftingHelper.bhm` as a GitHub Release asset, with the
+`bin/x64/Release/TaimisToolbench.bhm` as a GitHub Release asset, with the
 matching `CHANGELOG.md` section as the body. It refuses to publish if the
 tag does not match `manifest.json`'s version, or if `CHANGELOG.md` has no
 section for it. Pushing a tag is therefore the whole release action.
@@ -35,7 +35,7 @@ labelled otherwise.
    `ref/` seeds:
 
    ```
-   dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+   dotnet run --project tools/TaimisToolbench.RecipeSeeder/TaimisToolbench.RecipeSeeder.csproj -- --output-dir ref --force
    ```
 
    Roughly 1-2 minutes against the live API (measured 2026-08-25: 1m53s
@@ -76,7 +76,7 @@ labelled otherwise.
    `.github/workflows/release.yml`, which rebuilds Release/x64 on CI and
    publishes the `.bhm` to GitHub Releases. Check the run succeeded and the
    asset is attached.
-9. Copy `bin/x64/Release/GW2CraftingHelper.bhm` into the live Blish HUD
+9. Copy `bin/x64/Release/TaimisToolbench.bhm` into the live Blish HUD
    install's `modules` directory and reload Blish HUD.
 
 Because every deployed build has a tag, any two shipped builds can be
@@ -91,7 +91,7 @@ What remains after the field-test pass:
 
 ```
 # 1. Refresh the recipe seeds (protocol step 2); commit if anything moved.
-dotnet run --project tools/GW2CraftingHelper.RecipeSeeder/GW2CraftingHelper.RecipeSeeder.csproj -- --output-dir ref --force
+dotnet run --project tools/TaimisToolbench.RecipeSeeder/TaimisToolbench.RecipeSeeder.csproj -- --output-dir ref --force
 
 # 2. If release day differs from the staged CHANGELOG date, update the
 #    "## 0.3.0 - <date>" line and commit.
@@ -111,9 +111,9 @@ changed and two new tabs shipped since the README screenshots were taken.
 ### Verified without a tag (2026-08-26)
 
 - The release job's build steps were replicated locally in a clean
-  worktree of `master`: `dotnet build GW2CraftingHelper.csproj
+  worktree of `master`: `dotnet build TaimisToolbench.csproj
   -p:Platform=x64 -c Release` produced
-  `bin/x64/Release/GW2CraftingHelper.bhm` - exactly the path the
+  `bin/x64/Release/TaimisToolbench.bhm` - exactly the path the
   workflow asserts and uploads - and the file is a valid zip (38
   entries) containing `manifest.json` with the matching version and
   none of the four excluded `ref/` cache files (measured by listing the
@@ -210,7 +210,7 @@ That imported `BlishHUD.targets` file (installed under
 `packages/BlishHUD.1.3.0/build/BlishHUD.targets` once NuGet packages are
 restored) defines an `AfterTargets="Build"` target named
 `BuildBlishHUDModule` that runs automatically **on every build**. As of
-M38/WP-29, `GW2CraftingHelper.csproj` redeclares that same-named target
+M38/WP-29, `TaimisToolbench.csproj` redeclares that same-named target
 after the import (the one and only hand-written pack/zip logic in this
 repo's own csproj) so its own version wins, purely to add a four-file
 `Exclude` - see the addendum below. Otherwise it does exactly this,
@@ -221,23 +221,23 @@ unconditionally:
    into `$(OutDir)ref/`.
 3. Copies the whole output directory into a temp subfolder and zips it into
    `<OutDir>\<ProjectName>.bhm` (e.g.
-   `bin\x64\Release\GW2CraftingHelper.bhm`), overwriting any previous
+   `bin\x64\Release\TaimisToolbench.bhm`), overwriting any previous
    `.bhm`.
 
 This was verified directly (not inferred) by running:
 
 ```
-dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release
+dotnet build TaimisToolbench.csproj -p:Platform=x64 -c Release
 ```
 
-which produced `bin/x64/Release/GW2CraftingHelper.bhm` (a zip), and then
+which produced `bin/x64/Release/TaimisToolbench.bhm` (a zip), and then
 listing its contents. There is currently **no other step required** to
 produce a `.bhm` - building the module in Release is sufficient.
 
 ### Measured finding: the packed `.bhm` includes files that never ship via `<Content Include>`
 
 The `BuildBlishHUDModule` target copies `ref/**` wholesale, independent of
-which `ref/*.json` files are wired into `GW2CraftingHelper.csproj` via
+which `ref/*.json` files are wired into `TaimisToolbench.csproj` via
 `<Content Include>`/`CopyToOutputDirectory`. Inspecting the actual `.bhm`
 produced by the build above shows it contains, under `ref/`:
 
@@ -272,14 +272,14 @@ produced by the build above shows it contains, under `ref/`:
   bytes) - but it is still bytes a player downloads and Blish HUD extracts
   for a file with zero runtime consumer in the shipped module. This was a
   real packaging gap at the time this finding was recorded. **Update
-  (M38/WP-29): fixed.** `GW2CraftingHelper.csproj` now overrides the
+  (M38/WP-29): fixed.** `TaimisToolbench.csproj` now overrides the
   imported `BuildBlishHUDModule` target with an `Exclude` on its `ref/**`
   copy for `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json`, so
   neither file is ever copied into the output directory or the `.bhm`,
   regardless of whether they exist in the working copy. See the addendum
   below for details. The list is **three** files today: `MysticForgeSeeder`
   later added `ref/mf_item_id_cache.json` to the same `Exclude`
-  (`GW2CraftingHelper.csproj:449`, measured).
+  (`TaimisToolbench.csproj:449`, measured).
 
 ## `manifest.json` fields
 
@@ -320,8 +320,8 @@ in-app Blish HUD module-repository listing, so the download is manual.
 Building it locally instead produces the identical artifact:
 
 1. Clear `bin/` and `obj/`, then build in Release, `x64`:
-   `dotnet build GW2CraftingHelper.csproj -p:Platform=x64 -c Release`.
-2. Locate the produced `.bhm` (e.g. `bin\x64\Release\GW2CraftingHelper.bhm`).
+   `dotnet build TaimisToolbench.csproj -p:Platform=x64 -c Release`.
+2. Locate the produced `.bhm` (e.g. `bin\x64\Release\TaimisToolbench.bhm`).
 3. Copy it into your Blish HUD installation's `modules` directory and
    (re)load Blish HUD.
 
@@ -357,7 +357,7 @@ errors or behavior difference, confirming these two files have no runtime
 consumer in the shipped module at all.
 
 **Fixed (M38/WP-29):** the csproj exclusion described as a follow-up item
-above has landed. `GW2CraftingHelper.csproj` now redeclares the imported
+above has landed. `TaimisToolbench.csproj` now redeclares the imported
 `BuildBlishHUDModule` target (same name, declared after the `BlishHUD.targets`
 import, so it wins) with an `Exclude` added to the `ref/**` copy for
 `ref/wiki_vendor_cache.json` and `ref/item_id_cache.json` - and, since

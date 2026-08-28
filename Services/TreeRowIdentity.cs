@@ -1,7 +1,7 @@
 using System;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Whether a built recipe-tree row may be repainted onto a freshly

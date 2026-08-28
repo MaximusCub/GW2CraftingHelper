@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Builds a Recipe Tree row's extra tooltip lines (unit-price line(s),

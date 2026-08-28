@@ -1,7 +1,7 @@
 using Blish_HUD.Controls;
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Press feedback for this module's own click targets: the control dims

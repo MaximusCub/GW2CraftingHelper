@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Percent (0-100) to MonoGame SoundEffect volume (0.0-1.0) for the

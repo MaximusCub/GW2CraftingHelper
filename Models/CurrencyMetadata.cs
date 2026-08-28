@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Name/icon metadata for a GW2 wallet currency, fetched from

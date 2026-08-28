@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Converts a CurrencyValuation to/from the JSON string persisted by

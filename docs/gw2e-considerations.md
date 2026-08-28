@@ -9,7 +9,7 @@ Date: 2026-08-15
 > re-litigated under the new rule.
 
 This is a living document, not a to-do list. Every entry below is a place
-where GW2CraftingHelper does something differently from gw2efficiency (gw2e)
+where TaimisToolbench does something differently from gw2efficiency (gw2e)
 on purpose, or where matching gw2e exactly is blocked by one of this repo's
 hard rules, and where reasonable people could land in different places. None
 of these are bugs - the full list of concrete fixes (things gw2e does better
@@ -41,7 +41,7 @@ renumber them.*
 **The question**: gw2e ships a hardcoded table of ~46 currencies (Karma=1,
 Spirit Shard=3600, Badge of Honor=23, etc, all in copper-equivalent terms) so
 that currencies immediately affect craft-vs-buy decisions with zero setup.
-GW2CraftingHelper ships with none - every currency is worth nothing to the
+TaimisToolbench ships with none - every currency is worth nothing to the
 solver until you type a value in yourself.
 
 - **gw2e**: `static/currencyDecisionPrices.ts`, a 46-entry table applied

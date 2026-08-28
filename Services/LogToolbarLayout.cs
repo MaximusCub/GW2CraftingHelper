@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The Log tab's toolbar row (Blish-free, unit-testable): a left cluster

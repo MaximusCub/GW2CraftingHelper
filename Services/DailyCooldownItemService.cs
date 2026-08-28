@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Loads the wiki-verified daily-craft-cooldown seed data

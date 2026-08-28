@@ -1,6 +1,6 @@
 using Microsoft.Xna.Framework;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Chrome for the Crafting Ranker's readiness percentages.

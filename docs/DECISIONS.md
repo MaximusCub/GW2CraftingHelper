@@ -96,7 +96,7 @@ section 5.
 
 **Not executed.** None of the six directories exists; `Services/` is 141
 flat files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
-for other reasons. Because `GW2CraftingHelper.csproj` lists every file
+for other reasons. Because `TaimisToolbench.csproj` lists every file
 explicitly, each move is also a csproj path edit, and the plan's own
 sequencing note flagged high merge-conflict potential against the branches
 in flight at the time. The branches kept arriving, the move never had a

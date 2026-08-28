@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Reads the Mystic Forge recipe seed from a file on disk, for the
@@ -9,8 +9,8 @@ namespace GW2CraftingHelper.Services
     /// arrives through Blish's ContentsManager, not the filesystem, which
     /// is what Module.cs's own ContentsManagerRecipeSource does.
     /// <para>
-    /// Compiled into GW2CraftingHelper.Harness and
-    /// GW2CraftingHelper.RecipeSeeder by source link rather than living in
+    /// Compiled into TaimisToolbench.Harness and
+    /// TaimisToolbench.RecipeSeeder by source link rather than living in
     /// the module's csproj, so the shipped module does not carry a class
     /// nothing in it calls. Both tools already ProjectReference the module
     /// for <see cref="IMysticForgeRecipeSource"/> itself; only this

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Where a Crafting Ranker row's rarity comes from, and when it is worth

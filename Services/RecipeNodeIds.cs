@@ -1,6 +1,6 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Deterministic pre-order DFS NodeId assignment (root, then each

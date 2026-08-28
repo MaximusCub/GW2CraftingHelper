@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GW2CraftingHelper.Contracts
+namespace TaimisToolbench.Contracts
 {
     /// <summary>
     /// Represents an item that <see cref="IItemSearchProvider"/> has identified as a

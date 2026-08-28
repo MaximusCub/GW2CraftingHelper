@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The single-fetch slot the account-snapshot refresh runs in: at most

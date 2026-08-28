@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using GW2CraftingHelper.Models;
 using Newtonsoft.Json;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal static class SnapshotHelpers
     {

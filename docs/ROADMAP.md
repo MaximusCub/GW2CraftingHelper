@@ -1,4 +1,4 @@
-# GW2CraftingHelper - Roadmap
+# TaimisToolbench - Roadmap
 
 > Supersedes all prior roadmap revisions (the detailed per-milestone
 > planning template this document used through M17 is preserved in git

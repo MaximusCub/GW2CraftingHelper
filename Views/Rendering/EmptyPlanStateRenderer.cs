@@ -2,7 +2,7 @@ using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using System;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// What the plan tab draws when it holds no plan. Stateless and

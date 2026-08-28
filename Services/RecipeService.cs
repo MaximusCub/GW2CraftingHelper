@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services.Recipes;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services.Recipes;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     internal class RecipeService
     {

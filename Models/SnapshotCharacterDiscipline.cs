@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// One learned crafting discipline on one character, captured at

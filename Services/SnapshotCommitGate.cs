@@ -1,6 +1,6 @@
 using System;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// KNOWN-ISSUES #31/31a-F1 audit-of-the-fix: the original fix captured

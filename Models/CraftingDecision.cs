@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// The display-layer vocabulary for a <see cref="Models.CraftingTreeNode"/> - what the

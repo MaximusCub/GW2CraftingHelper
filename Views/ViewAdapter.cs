@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views
+namespace TaimisToolbench.Views
 {
     /// <summary>
     /// Bridges plain Build(Container) classes to the IView interface

@@ -1,10 +1,10 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
-using GW2CraftingHelper.Services;
+using TaimisToolbench.Services;
 using System;
 using System.Runtime.CompilerServices;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The module's single choke point for tooltips. Sizing, wrapping,

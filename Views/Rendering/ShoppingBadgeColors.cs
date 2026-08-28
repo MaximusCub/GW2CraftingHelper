@@ -1,8 +1,8 @@
-using GW2CraftingHelper.Models;
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Models;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Chrome for the Shopping List's source badges, now that they are an

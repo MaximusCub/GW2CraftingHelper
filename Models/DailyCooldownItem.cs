@@ -1,4 +1,4 @@
-namespace GW2CraftingHelper.Models
+namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Wiki-verified record of a craftable item whose RECIPE ITSELF is

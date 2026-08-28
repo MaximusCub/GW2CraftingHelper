@@ -1,7 +1,7 @@
-using GW2CraftingHelper.Services;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     // GetPillColors lives here rather than on either caller because it is
     // shared by the Shopping List section's source-tag panel and by

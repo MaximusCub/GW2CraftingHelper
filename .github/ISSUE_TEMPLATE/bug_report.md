@@ -9,7 +9,7 @@ assignees: ""
 ## Module version
 
 Open the module's "About" tab in Blish HUD and copy the version shown
-there (e.g. "GW2CraftingHelper v0.1.0").
+there (e.g. "Taimi's Toolbench v0.1.0").
 
 ## Blish HUD version
 

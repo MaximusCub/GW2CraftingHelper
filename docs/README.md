@@ -31,6 +31,11 @@ are in tells you whether a page is safe to edit.
   checks resolves to a real heading.
 - [`RELEASING.md`](RELEASING.md) - what packaging and release actually do
   today, measured, including what still does not exist.
+- [`RENAMING.md`](RENAMING.md) - the runbook for the finale of the
+  Taimi's Toolbench rename: GitHub repo rename, local folder and
+  junction gymnastics, and the owner's Blish install migration. Current
+  state until those steps are executed and verified; a frozen record
+  after.
 - [`gw2e-parity-spec.md`](gw2e-parity-spec.md) - the normative
   gw2efficiency behavior the solver targets, per rule.
 - [`gw2e-considerations.md`](gw2e-considerations.md) - the maintainer's
@@ -74,7 +79,7 @@ In short:
 
 ## Where the code lives
 
-`GW2CraftingHelper.csproj` is a classic non-SDK project that lists every
+`TaimisToolbench.csproj` is a classic non-SDK project that lists every
 file explicitly, so folders are navigation only - they are not namespaces
 and not compilation units. File counts measured with `ls <dir>/*.cs | wc -l`.
 
@@ -87,9 +92,9 @@ and not compilation units. File counts measured with `ls <dir>/*.cs | wc -l`.
 | `Views/` (17) | The Blish-bound layer: one file per tab, the window, and the two main-thread primitives. | `CraftingPlanView.cs` (4,987 lines - the plan tab), `MainView.cs` (Snapshot), `SettingsTabContent.cs`, `MainThreadMarshal.cs` |
 | `Views/Rendering/` (37) | Per-section renderers, the two seams they reach the view through, plus the shared drawing primitives (fonts, coin rows, rarity colors, tooltips). | `TreeSectionController.cs`, `ITreePlanHost.cs`, `SummarySectionRenderer.cs`, `UiFonts.cs`, `CoinCurrencyRenderer.cs` |
 | `Contracts/` (1) | The item-search seam (`IItemSearchProvider` plus its result type) and nothing else - a directory for one file. | `IItemSearchProvider.cs` |
-| `tools/` | Offline console apps that produce `ref/`. Never run by the module. | `VendorOfferUpdater/`, `GW2CraftingHelper.RecipeSeeder/`, `MysticForgeSeeder/` |
+| `tools/` | Offline console apps that produce `ref/`. Never run by the module. | `VendorOfferUpdater/`, `TaimisToolbench.RecipeSeeder/`, `MysticForgeSeeder/` |
 | `ref/` | Committed seed data the module reads at runtime, produced by `tools/`. | `vendor_offers.json` (14.8MB, one line), `recipes_seed.json` |
-| `tests/` | Three test projects; see `CONTRIBUTING.md`. | `GW2CraftingHelper.Tests/`, `VendorOfferUpdater.Tests/` |
+| `tests/` | Three test projects; see `CONTRIBUTING.md`. | `TaimisToolbench.Tests/`, `VendorOfferUpdater.Tests/` |
 | `Module.cs` (root) | Blish HUD entry point: `Initialize`, tab wiring, service construction, `Unload`. | - |
 
 **The one rule that makes all of this work:** `Models/` is entirely

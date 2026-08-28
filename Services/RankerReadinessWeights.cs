@@ -1,6 +1,6 @@
-using GW2CraftingHelper.Models;
+using TaimisToolbench.Models;
 
-namespace GW2CraftingHelper.Services
+namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The Crafting Ranker's headline is a weighted mean of five gate

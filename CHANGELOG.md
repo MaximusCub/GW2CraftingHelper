@@ -11,6 +11,11 @@ Two new tabs land - a craftability ranker and a plan history - and the
 recipe cache stops forgetting what it already knows.
 
 ### Added
+- **GW2 Crafting Helper is now Taimi's Toolbench.** The module, its
+  namespace, assemblies and repository all carry the new name from this
+  version on. This is a rename only - no behaviour changes ride along
+  with it. (The old name in this entry is the one deliberate mention
+  the rename leaves behind.)
 - **Crafting Ranker tab**: a persistent watchlist that ranks the items
   you track by how close each is to craftable. Higher-priority items
   claim your shared coin, currencies and materials first, and every row

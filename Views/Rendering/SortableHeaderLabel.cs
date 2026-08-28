@@ -1,6 +1,6 @@
 using Blish_HUD.Controls;
 
-namespace GW2CraftingHelper.Views.Rendering
+namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// A sortable column header's TEXT: the sort indicator is part of it,
