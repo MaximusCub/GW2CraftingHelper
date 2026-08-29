@@ -163,6 +163,15 @@ namespace TaimisToolbench.Views.Rendering
             /// </summary>
             internal readonly List<Panel> Pills = new List<Panel>();
 
+            /// <summary>
+            /// Each pill's x measured from the pill column's own left edge,
+            /// in step with <see cref="Pills"/>. The resize pass replays
+            /// these rather than re-flowing the run, so the IGNORE toggle's
+            /// reserved slot (Services/TreePillRunLayout) stays anchored at
+            /// every window width.
+            /// </summary>
+            internal readonly List<int> PillOffsets = new List<int>();
+
             internal CoinCurrencyRenderer.ValueCellHandle CostCell;
             internal bool RowDrawsCurrency;
 
@@ -222,6 +231,14 @@ namespace TaimisToolbench.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
+        // The widest sub-columns any render of THIS plan has already
+        // reserved. Unlike _costColumnWidths it survives the per-pass
+        // reset, and only a fresh Generate clears it, so an in-session
+        // ignore cannot narrow the cost column and slide every row's pills
+        // sideways under the cursor - see Services/TreeCostColumnFloor.
+        private TreeCostColumnMath.CostColumnWidths _planCostColumnFloor =
+            TreeCostColumnMath.CostColumnWidths.Empty;
+
         // This render's Recipe Tree section header - the element
         // CollapseAll re-anchors the viewport to.
         private Panel _treeHeaderPanel;
@@ -270,6 +287,10 @@ namespace TaimisToolbench.Views.Rendering
             _nodeOverrides.Clear();
             _ignoredItemIds.Clear();
             _nodeExpansion.Clear();
+
+            // The cost column's no-narrowing floor is a property of the
+            // plan on screen; a new one re-derives it from its own scan.
+            _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
             _lastResult = result;
         }
 
@@ -348,7 +369,8 @@ namespace TaimisToolbench.Views.Rendering
             // walk. It reads nothing the header
             // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
-            _costColumnWidths = scan.CostWidths;
+            _costColumnWidths = TreeCostColumnFloor.Widen(_planCostColumnFloor, scan.CostWidths);
+            _planCostColumnFloor = _costColumnWidths;
             _scannedNodeCount = scan.NodeCount;
 
             // Parenthesised count, like every other countable section
@@ -1086,8 +1108,7 @@ namespace TaimisToolbench.Views.Rendering
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
             // single locked/HAVE/CURRENCY pill when there is no choice.
-            var pillPanels = handle.Pills;
-            RenderDecisionPills(rowPanel, node, pillColX, TreeRowPillY, dimmed, pillPanels);
+            RenderDecisionPills(handle, node, pillColX, TreeRowPillY, dimmed);
 
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
@@ -1119,7 +1140,7 @@ namespace TaimisToolbench.Views.Rendering
             RenderCostCell(handle, node, edges.CostRightEdge, dimmed);
 
             FlowPanel childFlow = RenderChildContainer(
-                node, parent, panelWidth, depth, shape, rowPanel, arrowLabel, pillPanels, handle);
+                node, parent, panelWidth, depth, shape, rowPanel, arrowLabel, handle);
 
             RegisterRowResizeHandlers(handle, rowPanel, childFlow, nameFont);
         }
@@ -1199,7 +1220,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private FlowPanel RenderChildContainer(
             CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, TreeRowShape shape,
-            Panel rowPanel, Label arrowLabel, List<Panel> pillPanels, TreeRowHandle handle)
+            Panel rowPanel, Label arrowLabel, TreeRowHandle handle)
         {
             bool hasChildren = shape.HasChildren;
             bool isExpanded = shape.IsExpanded;
@@ -1263,7 +1284,7 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     // Pills have their own click actions; do not also treat
                     // a pill click as an expand/collapse toggle.
-                    if (AnyPillHovered(pillPanels))
+                    if (AnyPillHovered(handle.Pills))
                     {
                         return;
                     }
@@ -1303,7 +1324,7 @@ namespace TaimisToolbench.Views.Rendering
                 // Same pill guard as toggleHandler, for the same reason: a
                 // press on a pill reaches this row panel too, and the row
                 // must not answer a click it is about to ignore.
-                PressFeedback.Wire(rowPanel, () => AnyPillHovered(pillPanels));
+                PressFeedback.Wire(rowPanel, () => AnyPillHovered(handle.Pills));
                 rowPanel.Click += toggleHandler;
             }
 
@@ -1329,14 +1350,12 @@ namespace TaimisToolbench.Views.Rendering
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = RowEdges(handle, w);
 
-                if (handle.Pills.Count > 0)
+                int placed = handle.Pills.Count < handle.PillOffsets.Count
+                    ? handle.Pills.Count
+                    : handle.PillOffsets.Count;
+                for (int i = 0; i < placed; i++)
                 {
-                    int x = e.PillColX;
-                    foreach (var pill in handle.Pills)
-                    {
-                        pill.Location = new Point(x, TreeRowPillY);
-                        x += pill.Width + PillGap;
-                    }
+                    handle.Pills[i].Location = new Point(e.PillColX + handle.PillOffsets[i], TreeRowPillY);
                 }
 
                 if (handle.CostCell != null)
@@ -1455,7 +1474,12 @@ namespace TaimisToolbench.Views.Rendering
                 return false;
             }
 
-            if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths))
+            // Against the floored widths, not the raw scan: a re-solve
+            // that only REMOVES the tree's widest cost run keeps the
+            // reservation it already made, so that click no longer forces
+            // a full rebuild either.
+            if (!TreeCostColumnFloor.Equal(
+                TreeCostColumnFloor.Widen(_planCostColumnFloor, scan.CostWidths), _costColumnWidths))
             {
                 return false;
             }
@@ -1537,15 +1561,6 @@ namespace TaimisToolbench.Views.Rendering
             return true;
         }
 
-        private static bool CostWidthsEqual(
-            TreeCostColumnMath.CostColumnWidths a, TreeCostColumnMath.CostColumnWidths b)
-        {
-            return a.GoldTextWidth == b.GoldTextWidth
-                && a.SilverTextWidth == b.SilverTextWidth
-                && a.CopperTextWidth == b.CopperTextWidth
-                && a.CurrencyRunWidth == b.CurrencyRunWidth;
-        }
-
         /// <summary>
         /// Re-renders the parts of one row a re-solve can change - the qty
         /// prefix, the pill column, the cost cell and the tooltip - into
@@ -1589,8 +1604,8 @@ namespace TaimisToolbench.Views.Rendering
                 handle.NameLabel.Text = displayName;
             }
 
-            DisposePills(handle.Pills);
-            RenderDecisionPills(handle.RowPanel, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed, handle.Pills);
+            DisposePills(handle);
+            RenderDecisionPills(handle, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed);
 
             DisposeValueCell(handle.CostCell);
             RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);
@@ -1605,14 +1620,20 @@ namespace TaimisToolbench.Views.Rendering
             }
         }
 
-        private static void DisposePills(List<Panel> pills)
+        /// <summary>
+        /// Drops the row's pills and the offsets that placed them, which
+        /// are refilled together by the next RenderDecisionPills call and
+        /// must never be left describing controls that no longer exist.
+        /// </summary>
+        private static void DisposePills(TreeRowHandle handle)
         {
-            foreach (var pill in pills)
+            foreach (var pill in handle.Pills)
             {
                 pill.Dispose();
             }
 
-            pills.Clear();
+            handle.Pills.Clear();
+            handle.PillOffsets.Clear();
         }
 
         /// <summary>
@@ -1756,9 +1777,12 @@ namespace TaimisToolbench.Views.Rendering
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RenderDecisionPills(
-            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed,
-            List<Panel> pillPanels)
+            TreeRowHandle handle, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
         {
+            var rowPanel = handle.RowPanel;
+            var pillPanels = handle.Pills;
+            var pillOffsets = handle.PillOffsets;
+
             // Plan-scope currency facts
             // for the new HAVE/TOTAL pill - see PlanViewModel.
             // CurrencyPlanTotals/OwnedCurrencyAmounts' own doc comments.
@@ -1766,26 +1790,60 @@ namespace TaimisToolbench.Views.Rendering
             var specs = DecisionPillPlanner.BuildPillSpecs(node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
             var font = UiFonts.Caption;
             pillPanels.Clear();
+            pillOffsets.Clear();
             int x = pillColX;
 
-            var pillWidths = new List<int>(specs.Count);
-            foreach (var spec in specs)
+            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
+
+            // The Ignore toggle leaves the flowed run for a slot pinned to
+            // the column's right edge - only when it is last, which is
+            // where DecisionPillPlanner emits it; anywhere else it stays in
+            // the run rather than letting the pills after it be dropped.
+            int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
+                ? specs.Count - 1
+                : -1;
+            int anchoredWidth = anchoredIndex >= 0 ? ReservedIgnorePillWidth(font) : 0;
+            int leadingCount = anchoredIndex >= 0 ? anchoredIndex : specs.Count;
+
+            var pillWidths = new List<int>(leadingCount);
+            for (int specIndex = 0; specIndex < leadingCount; specIndex++)
             {
-                pillWidths.Add((int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding);
+                pillWidths.Add(
+                    (int)System.Math.Ceiling(font.MeasureString(specs[specIndex].Text).Width) + PillPadding);
             }
 
-            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
             var fit = PlanRelayoutMath.ComputePillFit(
-                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX, maxRightEdge,
+                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX,
+                TreePillRunLayout.LeadingLimitX(maxRightEdge, anchoredWidth, PillGap),
                 MeasureOverflowPillWidth);
 
             int chosenPadding = PillPadding - fit.WidthReduction;
 
+            // Where every pill goes, decided before any is built: the
+            // flowed leading run, then the anchored toggle. The overflow
+            // pill is rendered after the loop, from the x the run left.
+            var placements = new List<PillPlacement>(fit.VisibleCount + 1);
             for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
-                var spec = specs[specIndex];
-                int pillWidth = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
-                int textWidth = pillWidth - chosenPadding;
+                int width = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
+                placements.Add(new PillPlacement(specIndex, x, width, width - chosenPadding));
+                x += width + PillGap;
+            }
+
+            if (anchoredIndex >= 0)
+            {
+                placements.Add(new PillPlacement(
+                    anchoredIndex,
+                    TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
+                    anchoredWidth,
+                    (int)System.Math.Ceiling(font.MeasureString(specs[anchoredIndex].Text).Width)));
+            }
+
+            foreach (var placement in placements)
+            {
+                var spec = specs[placement.SpecIndex];
+                int pillWidth = placement.Width;
+                int textWidth = placement.TextWidth;
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
@@ -1811,7 +1869,7 @@ namespace TaimisToolbench.Views.Rendering
                     textColor *= PillColors.DimmedPillFactor;
                 }
 
-                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
+                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, placement.X, pillY,
                     borderColor, fillColor, textColor, out Panel inner, out Label label);
 
                 // The dimmed-only difference between this and the two flags
@@ -1956,13 +2014,53 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 pillPanels.Add(outer);
-                x += pillWidth + PillGap;
+                pillOffsets.Add(placement.X - pillColX);
             }
 
             if (fit.HiddenCount > 0)
             {
-                RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed, pillPanels);
+                pillPanels.Add(
+                    RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed));
+                pillOffsets.Add(x - pillColX);
             }
+        }
+
+        /// <summary>
+        /// One pill's resolved geometry: which spec it draws, where it
+        /// sits, and how wide its slot and its text are. Text width is
+        /// carried separately because the anchored IGNORE slot is wider
+        /// than the text currently in it (Services/TreePillRunLayout), so
+        /// the label cannot be centred from the slot's padding alone.
+        /// </summary>
+        private readonly struct PillPlacement
+        {
+            internal readonly int SpecIndex;
+            internal readonly int X;
+            internal readonly int Width;
+            internal readonly int TextWidth;
+
+            internal PillPlacement(int specIndex, int x, int width, int textWidth)
+            {
+                SpecIndex = specIndex;
+                X = x;
+                Width = width;
+                TextWidth = textWidth;
+            }
+        }
+
+        /// <summary>
+        /// The slot the IGNORE toggle is drawn into, wide enough for
+        /// either of its two texts so a click cannot resize or move it -
+        /// see <see cref="TreePillRunLayout"/>. Measured per row rather
+        /// than cached: two MeasureString calls on constant strings, on a
+        /// path that already measures every pill it draws.
+        /// </summary>
+        private static int ReservedIgnorePillWidth(BitmapFont font)
+        {
+            return TreePillRunLayout.ReservedSlotWidth(
+                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnorePillText).Width),
+                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnoredPillText).Width),
+                PillPadding);
         }
 
         /// <summary>
@@ -1978,9 +2076,9 @@ namespace TaimisToolbench.Views.Rendering
         /// Why it is not wired to a popup offering the hidden options:
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
-        private static void RenderOverflowPill(
+        private static Panel RenderOverflowPill(
             Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,
-            BitmapFont font, int x, int pillY, bool dimmed, List<Panel> pillPanels)
+            BitmapFont font, int x, int pillY, bool dimmed)
         {
             string text = OverflowPillText(fit.HiddenCount);
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
@@ -1994,8 +2092,11 @@ namespace TaimisToolbench.Views.Rendering
                 textColor *= PillColors.DimmedPillFactor;
             }
 
+            // Bounded by the fit, not by specs.Count: the anchored IGNORE
+            // toggle is the last spec and was never part of the run this
+            // fit was computed over, so it is not one of the hidden ones.
             var hiddenTexts = new List<string>(fit.HiddenCount);
-            for (int i = fit.VisibleCount; i < specs.Count; i++)
+            for (int i = fit.VisibleCount; i < fit.VisibleCount + fit.HiddenCount; i++)
             {
                 hiddenTexts.Add(specs[i].Text);
             }
@@ -2010,7 +2111,7 @@ namespace TaimisToolbench.Views.Rendering
             TooltipFacility.ApplyPlain(inner, tooltipText);
             TooltipFacility.ApplyPlain(label, tooltipText);
 
-            pillPanels.Add(outer);
+            return outer;
         }
 
         private static string OverflowPillText(int hiddenCount)
