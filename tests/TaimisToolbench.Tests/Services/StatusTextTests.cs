@@ -257,39 +257,15 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(expected, StatusText.Stamp("   ", new DateTime(2026, 8, 8, 15, 0, 0)));
         }
 
-        // ---- ForSnapshotAgeSuffix (audit batch J, M10): the age suffix
-        // names its subject, so a failure timestamp followed by a snapshot
-        // age can no longer read as one moment. ----
+        // ---- ForSnapshotAgeSuffix: an elapsed time, which the caller
+        // punctuates apart from the refresh timestamp it follows. ----
         [Fact]
-        public void ForSnapshotAgeSuffix_Days_NamesItsSubject()
+        public void ForSnapshotAgeSuffix_SubMinute_ReadsAsCapturedNotJustNow()
         {
-            Assert.Equal("snapshot 29d old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromDays(29)));
-        }
-
-        [Fact]
-        public void ForSnapshotAgeSuffix_Minutes_NamesItsSubject()
-        {
-            Assert.Equal("snapshot 2m old", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(2)));
-        }
-
-        [Fact]
-        public void ForSnapshotAgeSuffix_Hours_KeepsTheMinutesComponent()
-        {
-            Assert.Equal(
-                "snapshot 3h 20m old",
-                StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(200)));
-        }
-
-        [Fact]
-        public void ForSnapshotAgeSuffix_SubMinute_ReadsAsCapturedNotZeroOld()
-        {
-            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(30)));
-        }
-
-        [Fact]
-        public void ForSnapshotAgeSuffix_Zero_ReadsAsCaptured()
-        {
-            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.Zero));
+            // Its one departure from ForAgeAgo: "just now" straight after a
+            // refresh timestamp reads as a restatement of that instant.
+            Assert.Equal("just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(30)));
+            Assert.Equal("just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.Zero));
         }
 
         [Fact]
@@ -297,32 +273,47 @@ namespace TaimisToolbench.Tests.Services
         {
             // CapturedAt momentarily ahead of the local clock (minor clock
             // skew) must never render as a negative duration.
-            Assert.Equal("snapshot just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(-5)));
+            Assert.Equal("just captured", StatusText.ForSnapshotAgeSuffix(TimeSpan.FromSeconds(-5)));
         }
 
-        // The bucket ladder, boundary by boundary - the coverage that used
-        // to sit on a second, caller-less age wording.
+        // The bucket ladder, boundary by boundary. Every bucket carries the
+        // coarsest unit the age has reached and at most one finer term.
         [Theory]
-        [InlineData(0.5, "snapshot just captured")]
-        [InlineData(1, "snapshot 1m old")]
-        [InlineData(59, "snapshot 59m old")]
-        [InlineData(60, "snapshot 1h 0m old")]
-        [InlineData(65, "snapshot 1h 5m old")]
-        [InlineData(1439, "snapshot 23h 59m old")]
-        [InlineData(1440, "snapshot 1d old")]
-        [InlineData(2880, "snapshot 2d old")]
+        [InlineData(0.5, "just captured")]
+        [InlineData(1, "1m ago")]
+        [InlineData(59, "59m ago")]
+        [InlineData(60, "1h 0m ago")]
+        [InlineData(65, "1h 5m ago")]
+        [InlineData(1439, "23h 59m ago")]
+        [InlineData(1440, "1d ago")]
+        [InlineData(2880, "2d ago")]
+        [InlineData(41760, "29d ago")]
+        [InlineData(43199, "29d ago")]
+        [InlineData(43200, "1mo ago")]
+        [InlineData(86400, "2mo ago")]
+        [InlineData(525600, "12mo ago")]
         public void ForSnapshotAgeSuffix_BucketLadder(double minutes, string expected)
         {
             Assert.Equal(expected, StatusText.ForSnapshotAgeSuffix(TimeSpan.FromMinutes(minutes)));
         }
 
-        // ForAgeAgo rides the SAME ladder with a plain "ago" framing -
-        // the Plan History detail panel's cost-delta line.
+        [Fact]
+        public void ForSnapshotAgeSuffix_MaxTimeSpan_StillFormats()
+        {
+            // The top bucket divides TotalDays, so even TimeSpan.MaxValue
+            // stays inside int - no overflow, no negative month count.
+            Assert.EndsWith("mo ago", StatusText.ForSnapshotAgeSuffix(TimeSpan.MaxValue));
+        }
+
+        // ForAgeAgo rides the SAME ladder and the same framing - the Plan
+        // History detail panel's cost-delta line - and differs only below a
+        // minute.
         [Theory]
         [InlineData(0.5, "just now")]
         [InlineData(1, "1m ago")]
         [InlineData(65, "1h 5m ago")]
         [InlineData(2880, "2d ago")]
+        [InlineData(43200, "1mo ago")]
         public void ForAgeAgo_BucketLadder(double minutes, string expected)
         {
             Assert.Equal(expected, StatusText.ForAgeAgo(TimeSpan.FromMinutes(minutes)));
@@ -332,6 +323,19 @@ namespace TaimisToolbench.Tests.Services
         public void ForAgeAgo_Negative_ClampedToZero()
         {
             Assert.Equal("just now", StatusText.ForAgeAgo(TimeSpan.FromSeconds(-5)));
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(59)]
+        [InlineData(60)]
+        [InlineData(1440)]
+        [InlineData(43200)]
+        [InlineData(525600)]
+        public void ForSnapshotAgeSuffixAndForAgeAgo_AgreeAboveAMinute(double minutes)
+        {
+            var age = TimeSpan.FromMinutes(minutes);
+            Assert.Equal(StatusText.ForAgeAgo(age), StatusText.ForSnapshotAgeSuffix(age));
         }
     }
 }

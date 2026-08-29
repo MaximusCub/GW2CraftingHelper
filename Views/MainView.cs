@@ -1443,9 +1443,9 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// Composes the header status label's text (base status text plus
         /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
-        /// (snapshot 2m old)" - the suffix names its subject so it cannot
-        /// be misread as a restatement of the timestamp beside it, see
-        /// StatusText.ForSnapshotAgeSuffix) and recolors it once the
+        /// (2m ago)" - the parentheses are this method's, and are what keep
+        /// the elapsed time from reading as part of the timestamp beside
+        /// it, see StatusText.ForSnapshotAgeSuffix) and recolors it once the
         /// snapshot is older than the
         /// SnapshotRefreshIntervalMinutes setting - the same threshold
         /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
