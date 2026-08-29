@@ -38,7 +38,7 @@ namespace TaimisToolbench.Views.Rendering
         /// near-black ring, so a dimmed row's pill set was unreadable as a
         /// set - which is the opposite of what dimming should say ("this
         /// whole branch is inactive"). At 0.6 the hues survive, and the
-        /// left-indent rule TreeSectionController draws does the
+        /// row's 0.35 text, neutral icon frame and icon scrim do the
         /// "one inactive block" work the crush was doing badly.
         /// </summary>
         internal const float DimmedPillFactor = 0.6f;
