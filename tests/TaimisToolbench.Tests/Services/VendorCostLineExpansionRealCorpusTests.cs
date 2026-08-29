@@ -161,6 +161,13 @@ namespace TaimisToolbench.Tests.Services
             // of Ectoplasm, so taking it must cost exactly the craft plus that
             // fee - not the fee on its own, which is what the module used to
             // report and what made buying look 634x cheaper than crafting.
+            //
+            // The final assertion is also what makes the two guards
+            // (PlanSolver's barter rule, VendorOfferDomination) stop being
+            // load-bearing here: once the offer's own coin figure exceeds the
+            // craft's, the terminal fallback's plain coin comparison picks
+            // craft with neither guard consulted. Measured: with both
+            // disabled, this item still commits Craft.
             var forced = Solve(f, new Dictionary<int, AcquisitionSource> { { 0, AcquisitionSource.BuyFromVendor } });
             var vendorDecision = forced.Decisions[0];
 

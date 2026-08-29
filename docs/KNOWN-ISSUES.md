@@ -719,9 +719,16 @@ Post price gets a per-unit acquisition cost from the same
 `PlanSolver.Evaluate` a recipe ingredient gets, run over a quantity-1
 subtree, and folds into the offer's real coin cost by the same
 `unit x count` multiplication a TP-priced line already used. Only a line
-nothing can price at all stays a barter line, so the guard above is no
-longer what produces the right answer here - it is the fallback for the
-cases pricing genuinely cannot reach. The cost-line graph's cycles are
+nothing can price at all stays a barter line.
+
+The guard above is no longer what produces the right answer here, and
+that was measured rather than assumed: with BOTH the barter guard and the
+domination check disabled, 101521 still commits Craft, because the offer's
+own coin figure now exceeds the craft it mirrors. Both routes are still
+fallback-tier for this item (legendary crafting bottoms out in Spirit
+Shards and Karma, which carry no valuation by default), so the terminal
+fallback branch is still REACHED - the guards simply no longer decide it.
+They remain the answer for the cases pricing genuinely cannot reach. The cost-line graph's cycles are
 cut by a visiting set and every id is memoized on first ask, resolved or
 not, which makes the work linear in the number of cost items. Design,
 bounds and the (i)-not-(ii) display decision: `docs/ARCHITECTURE.md`
