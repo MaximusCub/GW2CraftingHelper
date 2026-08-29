@@ -438,13 +438,34 @@ namespace TaimisToolbench.Services
             public readonly int NeededRightEdge;
             public readonly int MarkerX;
 
-            public CurrencyColumnEdges(int requiredRightEdge, int haveRightEdge, int neededRightEdge, int markerX)
+            /// <summary>
+            /// The band all three number columns reserve - what each
+            /// header centres over
+            /// (JustifiedColumnTracks.CenteredInBand). Floored at the
+            /// widest of the three header labels
+            /// (SummarySectionRenderer.WidestCurrencyHeaderLabel), so a
+            /// header always fits the band it centres in.
+            /// </summary>
+            public readonly int NumberColumnWidth;
+
+            public CurrencyColumnEdges(
+                int requiredRightEdge, int haveRightEdge, int neededRightEdge, int markerX,
+                int numberColumnWidth)
             {
                 RequiredRightEdge = requiredRightEdge;
                 HaveRightEdge = haveRightEdge;
                 NeededRightEdge = neededRightEdge;
                 MarkerX = markerX;
+                NumberColumnWidth = numberColumnWidth;
             }
+
+            /// <summary>Left edge of the band each column's numbers grow
+            /// leftward into.</summary>
+            public int RequiredBandX => RequiredRightEdge - NumberColumnWidth;
+
+            public int HaveBandX => HaveRightEdge - NumberColumnWidth;
+
+            public int NeededBandX => NeededRightEdge - NumberColumnWidth;
         }
 
         /// <summary>
@@ -503,20 +524,6 @@ namespace TaimisToolbench.Services
                 + numberColumnWidth;
         }
 
-        /// <summary>
-        /// Left edge of a number-column header centred over the band its
-        /// own numbers occupy, which ends at
-        /// <paramref name="bandRightEdge"/>. The band is floored at the
-        /// widest of the three header labels
-        /// (SummarySectionRenderer.WidestCurrencyHeaderLabel), so a header
-        /// always fits the band it centres in.
-        /// </summary>
-        public static int CurrencyHeaderX(int bandRightEdge, int numberColumnWidth, int headerWidth)
-        {
-            return JustifiedColumnTracks.CenteredInBand(
-                bandRightEdge - numberColumnWidth, numberColumnWidth, headerWidth);
-        }
-
         private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
         {
             int markerX = rightEdge - CurrencyMarkerWidth;
@@ -539,12 +546,14 @@ namespace TaimisToolbench.Services
                     TrackBandRightEdge(trackSpan, 1, numberColumnWidth),
                     TrackBandRightEdge(trackSpan, 2, numberColumnWidth),
                     TrackBandRightEdge(trackSpan, 3, numberColumnWidth),
-                    markerX);
+                    markerX,
+                    numberColumnWidth);
             }
 
             int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
-            return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
+            return new CurrencyColumnEdges(
+                requiredRightEdge, haveRightEdge, neededRightEdge, markerX, numberColumnWidth);
         }
     }
 }

@@ -282,16 +282,16 @@ namespace TaimisToolbench.Views.Rendering
                 var e = scan.EdgesFor(w);
                 rowPanel.Size = new Point(w, HeaderBands.RowHeight);
                 sourceLabel.Location = new Point(
-                    ShoppingColumnMath.HeaderX(e.SourceX, e.SourceBandWidth, sourceHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(e.SourceX, e.SourceBandWidth, sourceHeaderWidth),
                     HeaderBands.LabelY);
                 amountLabel.Location = new Point(
-                    ShoppingColumnMath.HeaderX(e.QtyBandX, e.QtyBandWidth, amountHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(e.QtyBandX, e.QtyBandWidth, amountHeaderWidth),
                     HeaderBands.LabelY);
                 eachLabel.Location = new Point(
-                    ShoppingColumnMath.HeaderX(e.EachBandX, e.EachBandWidth, eachHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(e.EachBandX, e.EachBandWidth, eachHeaderWidth),
                     HeaderBands.LabelY);
                 totalLabel.Location = new Point(
-                    ShoppingColumnMath.HeaderX(e.TotalBandX, e.TotalBandWidth, totalHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(e.TotalBandX, e.TotalBandWidth, totalHeaderWidth),
                     HeaderBands.LabelY);
 
                 // Four of the five columns are pinned off the panel edge,
@@ -318,7 +318,7 @@ namespace TaimisToolbench.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(
-                    ShoppingColumnMath.HeaderX(bandX, bandWidth, headerWidth), HeaderBands.LabelY),
+                    JustifiedColumnTracks.CenteredInBand(bandX, bandWidth, headerWidth), HeaderBands.LabelY),
                 Parent = parent,
             });
         }

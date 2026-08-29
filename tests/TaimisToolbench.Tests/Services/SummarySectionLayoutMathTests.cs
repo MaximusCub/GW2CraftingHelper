@@ -589,36 +589,33 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void CurrencyHeaderX_CentresTheHeaderOverTheBandItsNumbersOccupy()
+        public void CurrencyColumnEdges_CarryTheBandEveryHeaderCentresOver()
         {
-            // The band is floored at the widest of the three header labels,
-            // so the header always fits: a 60px band ending at 339 runs
-            // 279..339, and a 40px header centres 10px into it.
-            Assert.Equal(289, SummarySectionLayoutMath.CurrencyHeaderX(339, 60, 40));
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
 
-            // A header exactly as wide as the band fills it - no offset,
-            // and the same x a right-aligned header would have taken. That
-            // is the case the old right-alignment got right and the reason
-            // the defect only showed on the columns whose numbers are
-            // narrower than their own header.
-            Assert.Equal(279, SummarySectionLayoutMath.CurrencyHeaderX(339, 60, 60));
+            // Floored at the widest of the three header labels by the
+            // caller's pre-scan; widened here to 90, which is what a
+            // 7-digit Karma balance measures.
+            Assert.Equal(90, edges.NumberColumnWidth);
+            Assert.Equal(edges.RequiredRightEdge - 90, edges.RequiredBandX);
+            Assert.Equal(edges.HaveRightEdge - 90, edges.HaveBandX);
+            Assert.Equal(edges.NeededRightEdge - 90, edges.NeededBandX);
         }
 
         [Fact]
-        public void CurrencyHeaderX_AndTheNumbersUnderIt_ShareTheTracksCentreLine()
+        public void CurrencyHeader_AndTheNumbersUnderIt_ShareTheTracksCentreLine()
         {
             // The law: header and cells centre on the same axis. The
             // numbers right-align inside the band, so the band's centre is
             // the axis both have to agree on.
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
-            int band = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
             const int headerWidth = 44;
 
-            int headerX = SummarySectionLayoutMath.CurrencyHeaderX(
-                edges.HaveRightEdge, band, headerWidth);
+            int headerX = JustifiedColumnTracks.CenteredInBand(
+                edges.HaveBandX, edges.NumberColumnWidth, headerWidth);
 
             Assert.Equal(
-                edges.HaveRightEdge - (band / 2),
+                edges.HaveRightEdge - (edges.NumberColumnWidth / 2),
                 headerX + (headerWidth / 2));
         }
 

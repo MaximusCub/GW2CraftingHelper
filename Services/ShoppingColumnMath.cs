@@ -94,7 +94,10 @@ namespace TaimisToolbench.Services
 
             /// <summary>
             /// Each column's reserved BAND width - what its header has to
-            /// centre over (<see cref="HeaderX"/>). Carried on the edges
+            /// centre over (JustifiedColumnTracks.CenteredInBand; every one
+            /// of these bands is floored at its own header label, so a
+            /// header always fits the band it centres in). Carried on the
+            /// edges
             /// rather than re-derived by the caller: the header row and the
             /// data rows both read them off one instance, so neither can
             /// centre over a band the other did not reserve.
@@ -139,20 +142,6 @@ namespace TaimisToolbench.Services
             public int EachBandX => EachRightEdge - EachBandWidth;
 
             public int TotalBandX => TotalRightEdge - TotalBandWidth;
-        }
-
-        /// <summary>
-        /// Left edge of a column header centred over the band its own cells
-        /// occupy - the module's centred column law, see
-        /// <see cref="JustifiedColumnTracks"/>. Every band here is floored
-        /// at its own header (the Source and Amount bands explicitly, in
-        /// ShoppingListSectionRenderer's pre-scan; Each and Total by their
-        /// fixed minimums, both far wider than the words over them), so a
-        /// header always fits the band it centres in.
-        /// </summary>
-        public static int HeaderX(int bandX, int bandWidth, int headerWidth)
-        {
-            return JustifiedColumnTracks.CenteredInBand(bandX, bandWidth, headerWidth);
         }
 
         /// <summary>

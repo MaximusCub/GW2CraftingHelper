@@ -769,8 +769,6 @@ namespace TaimisToolbench.Views.Rendering
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
                 panelWidth, widestNumberWidth);
-            int numberColumnWidth =
-                SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
 
             // Each header centres over the band its own numbers occupy, not
             // against that band's right edge - see JustifiedColumnTracks.
@@ -782,13 +780,13 @@ namespace TaimisToolbench.Views.Rendering
             int neededHeaderWidth = MeasureHeader(font, NeededHeaderText);
             var requiredLabel = CreateCurrencyHeaderLabel(
                 band, RequiredHeaderText, font,
-                edges.RequiredRightEdge, numberColumnWidth, requiredHeaderWidth);
+                edges.RequiredBandX, edges.NumberColumnWidth, requiredHeaderWidth);
             var haveLabel = CreateCurrencyHeaderLabel(
                 band, HaveHeaderText, font,
-                edges.HaveRightEdge, numberColumnWidth, haveHeaderWidth);
+                edges.HaveBandX, edges.NumberColumnWidth, haveHeaderWidth);
             var neededLabel = CreateCurrencyHeaderLabel(
                 band, NeededHeaderText, font,
-                edges.NeededRightEdge, numberColumnWidth, neededHeaderWidth);
+                edges.NeededBandX, edges.NumberColumnWidth, neededHeaderWidth);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -800,16 +798,16 @@ namespace TaimisToolbench.Views.Rendering
                 band.Size = new Point(w, HeaderBands.RowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(
-                    SummarySectionLayoutMath.CurrencyHeaderX(
-                        e.RequiredRightEdge, numberColumnWidth, requiredHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.RequiredBandX, e.NumberColumnWidth, requiredHeaderWidth),
                     HeaderBands.LabelY);
                 haveLabel.Location = new Point(
-                    SummarySectionLayoutMath.CurrencyHeaderX(
-                        e.HaveRightEdge, numberColumnWidth, haveHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.HaveBandX, e.NumberColumnWidth, haveHeaderWidth),
                     HeaderBands.LabelY);
                 neededLabel.Location = new Point(
-                    SummarySectionLayoutMath.CurrencyHeaderX(
-                        e.NeededRightEdge, numberColumnWidth, neededHeaderWidth),
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.NeededBandX, e.NumberColumnWidth, neededHeaderWidth),
                     HeaderBands.LabelY);
             });
         }
@@ -821,7 +819,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private static Label CreateCurrencyHeaderLabel(
             Panel band, string text, BitmapFont font,
-            int bandRightEdge, int numberColumnWidth, int headerWidth)
+            int bandX, int numberColumnWidth, int headerWidth)
         {
             return LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -831,8 +829,7 @@ namespace TaimisToolbench.Views.Rendering
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(
-                    SummarySectionLayoutMath.CurrencyHeaderX(
-                        bandRightEdge, numberColumnWidth, headerWidth),
+                    JustifiedColumnTracks.CenteredInBand(bandX, numberColumnWidth, headerWidth),
                     HeaderBands.LabelY),
                 Parent = band,
             });

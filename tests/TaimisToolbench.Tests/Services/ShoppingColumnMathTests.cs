@@ -154,18 +154,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void HeaderX_CentresTheHeaderInItsBand()
-        {
-            // A 40px word in a 150px band starts 55px in - not at 110,
-            // where right-aligning it to the band's edge would have put it.
-            Assert.Equal(155, ShoppingColumnMath.HeaderX(100, 150, 40));
-
-            // A header exactly as wide as its band fills it.
-            Assert.Equal(100, ShoppingColumnMath.HeaderX(100, 150, 150));
-        }
-
-        [Fact]
-        public void HeaderX_AndTheCellsUnderIt_ShareTheBandsCentreLine()
+        public void HeaderCentring_AndTheCellsUnderIt_ShareTheBandsCentreLine()
         {
             // The law: a header and its cells centre on one axis. The Total
             // column's values right-align inside their band, so the band's
@@ -175,7 +164,7 @@ namespace TaimisToolbench.Tests.Services
                 maxQtyWidth: 79, sourceColumnWidth: 96);
             const int headerWidth = 44;
 
-            int headerX = ShoppingColumnMath.HeaderX(
+            int headerX = JustifiedColumnTracks.CenteredInBand(
                 edges.TotalBandX, edges.TotalBandWidth, headerWidth);
 
             Assert.Equal(
