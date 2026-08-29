@@ -27,24 +27,17 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The two outputs of ComputeForceBuyOnlyNodeIds, kept distinct.
-        /// ForceBuyOnlyNodeIds alone can be competency-CAUSED (the
-        /// pre-pass's craft diagnostic is competency-resolved, so an
+        /// ForceBuyOnlyNodeIds alone can be competency-CAUSED, so an
         /// untrained cheap recipe can be forced only because competency
-        /// demoted the diagnostic). CompetencyIndependentForceBuyNodeIds
-        /// is the subset forced under BOTH that evaluation and a second,
+        /// demoted the diagnostic. CompetencyIndependentForceBuyNodeIds is
+        /// the subset forced under BOTH that evaluation and a second,
         /// competency-blind one using the raw cheapest recipe; it gates
         /// Decision.CheapestCraftUntrained, while solve behavior itself
         /// still uses ForceBuyOnlyNodeIds.
         /// <para>
-        /// Nuance: "competency-blind" applies only at the node's own
-        /// recipe choice - ingredient costs are still the normal
-        /// competency-resolved figures, which can only inflate the raw
-        /// craft cost and therefore only ADD nodes to this set, never
-        /// drop them. The residual risk: a parent whose untrained recipe
-        /// would survive a true blind evaluation can be pulled in by an
-        /// inflated child contribution, falsely excluding a real training
-        /// opportunity at the parent (the child's own opportunity is still
-        /// reported at the child's node).
+        /// "Competency-blind" applies only at the node's own recipe choice,
+        /// which bounds the error in one direction and leaves one residual -
+        /// see docs/ARCHITECTURE.md section 8.2.
         /// </para>
         /// </summary>
         public readonly struct ForceBuyPrePassResult

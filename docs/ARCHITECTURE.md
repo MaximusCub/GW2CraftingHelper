@@ -753,6 +753,179 @@ there is a finding to investigate, never a file to re-baseline.
 parity waves); `docs/gw2e-parity-spec.md` for the researched gw2efficiency
 behavior itself.
 
+### 8.1 Achievement-bit ingredient dedup
+
+`Services/AchievementBitDedupPrePass.cs` echoes gw2efficiency's own
+two-part mechanism (`initialTreeChecks` plus `calculateTreeQuantity`'s
+`achievement_bit` check -
+[`docs/research/m37-r3-achievement-dedup.md`](research/m37-r3-achievement-dedup.md)
+sections 1.1/1.2) for a small handful of real recipes: the WvW "Infinite
+[siege weapon] Blueprint" achievement rewards, whose ingredients name a
+specific achievement *bit* - a one-time reward item that must never be
+counted twice just because it also happens to be needed directly
+elsewhere in the same plan. The rule itself is ported 1:1 from the
+ground-truth gw2e unit test quoted in that report (section 1.4) and is
+stated in the class's own doc comment.
+
+**Zeroing clears `Recipes`, not just `Quantity`.** Unlike gw2e's nested
+tree - which stores a small per-edge ratio and resolves every absolute
+quantity in one downstream pass - this module bakes each `RecipeNode`'s
+absolute `Quantity` once, at tree-build time
+(`RecipeService.BuildNodeAsync`, report sections 3.3/4.2). Zeroing a
+duplicate occurrence here therefore also clears that occurrence's own
+`Recipes`, mirroring `InventoryReducer.ReduceNodeSourced`'s identical
+"`Quantity <= 0` -> `Recipes.Clear()`" treatment of a genuinely
+fully-owned node, so `PlanSolver.Evaluate` has no craft path left to
+consider and the ordinary zero-quantity Buy/Have collapse takes over
+cleanly. Without clearing `Recipes`, a duplicate occurrence with no
+TP/vendor price but a real craft recipe could still resolve to Craft -
+using its own, un-deduped children's costs - purely because nothing
+cheaper competed, re-introducing exactly the double count this pass
+exists to remove. That is a deliberate departure from literally "zeroing
+hits `Quantity` only".
+
+**It runs once and never again.** The pass fires right after the tree is
+built, before inventory reduction and before Solve
+(`CraftingPlanPipeline`), and never again for that tree's lifetime - not
+even across local override/Ignore re-solves, which reuse the same tree
+object. gw2e's own equivalent interactive-update path (`updateTree.ts`)
+does not re-run its classification pass and can let a "shared with a
+normal occurrence" dedup silently un-zero itself after a manual pill click
+(report section 1.5, an upstream fragility). Running once and never again
+avoids that class of bug entirely, which is strictly safer than upstream
+rather than a parity gap.
+
+**Both walks descend only the primary option.** `CollectItemIdsForDedup`
+and `ZeroDuplicateBitOccurrences` each follow `node.Recipes[0]` only,
+mirroring `InventoryReducer.ReduceNodeSourced`'s precedent for the
+identical ambiguity: `PlanSolver` has not run at pre-pass time, so which
+of a node's alternate `RecipeOption`s will actually be chosen is
+unknowable here, and gw2efficiency's own nested tree never has this
+ambiguity at all (recipe-nesting resolves exactly one recipe per node
+before pricing). Walking every option - the pre-fix behaviour - could
+classify an achievement-bit occurrence living only in an option
+`PlanSolver` never chooses as "seen", corrupting the zeroing decision for
+a sibling option's occurrence of the same id that *is* on the solved path.
+On the zeroing side the stake is higher still: zeroing an occurrence in a
+never-chosen option would silently discard that option's true cost from
+`Evaluate`'s comparison (which sums each option's own ingredient costs
+independently), making an objectively worse option look artificially
+cheap enough to be picked over the honest primary one.
+
+Descending stops at a zeroed occurrence. Everything below one is dead
+weight the ordinary zero-quantity path already hides, and - per the
+verified 7-recipe/28-ingredient dataset this pass targets - never itself
+contains a further achievement-bit id needing independent zeroing.
+
+The pass is pure, Blish-free and does no I/O; it mutates the passed-in
+tree in place, the same seam `OwnedMaterialsForceBuyPrePass` occupies
+conceptually, though this one needs no `NodeId`s and no throwaway solve.
+
+### 8.2 Owned materials: decision-guided reduction
+
+`Models/OwnMaterialsMode` picks how the plan values materials the player
+already owns. An owned unit is always consumed first, at zero acquisition
+cost, in either mode - the enum never makes an owned unit *cost*
+anything. What `Valued` adds is three things: a zero-owned decision pass
+before the real solve (reusing the force-buy pre-pass baseline) that
+excludes a node from crafting when buying it outright costs less than 85%
+of what its own components would cost to buy fresh, gw2e's
+`getCheaperToBuyItemIds`; a decision-*guided* rather than merely gated
+reduction; and a deduction of owned materials' trading-post sell
+opportunity cost from `CraftingProfit`, computed from the decision-guided
+`UsedMaterials` list. `Free` falls back to the legacy
+primary-recipe-option heuristic unchanged. All of it is inert unless an
+account snapshot actually drove reduction.
+
+**What "decision-guided" buys.** In `InventoryReducer.ReduceNodeSourced`,
+when the guide contains a node's `NodeId`, only the recipe option whose
+`Source == Craft && RecipeId` matches may let its descendants consume the
+pool; every sibling option is left at full zero-owned cost. If the node's
+zero-owned decision was anything other than Craft, no option consumes the
+pool for its descendants - an un-crafted branch never demands its own
+ingredients, mirroring `PlanSolver.Evaluate`'s own `ignoredItemIds`/
+`Quantity == 0` handling. Since discounting only ever lowers a cost, and
+only along the path the zero-owned pass already declared the winner,
+owned ingredient stock further down the tree can never pull the real
+post-reduction `Solve()` toward a *different* recipe option than the
+guide chose for that node.
+
+Without a guide, the legacy heuristic is true only along the single
+chosen-recipe-candidate chain: the root, then recursively each node's
+primary option. Which option the solver will actually choose is unknowable
+at reduction time, and walking every option while letting each drain the
+shared pool would let an option the solver never picks steal owned stock
+from a branch that *is* chosen. Once an option's descendants are excluded
+they stay excluded for the whole subtree below, however deep - the branch
+is hypothetical, or provably not the winning path, from there down.
+
+Every option's `CraftsNeeded`/ingredient `Quantity` is still rescaled
+regardless of `consumeFromPool`. That arithmetic reflects the node's own
+already-decided, pool-independent `Quantity` and is required for
+`PlanSolver`'s cost comparison across recipe options to stay internally
+consistent, since every ingredient of every recipe is always evaluated -
+even one the solver ultimately does not choose.
+
+**The residual (KNOWN-ISSUES #20, not guarded or tested).** None of this
+guarantees the guide's own Craft-vs-Buy decision for a node still holds
+after reduction. The guide is computed on the unreduced tree, but a node's
+own `Quantity` can still shrink from owned stock of its own item id - and
+because craft cost is non-linear in quantity (`ComputeCraftsNeeded`'s
+ceiling division, `VendorBatchSolver`'s per-batch math), shrinking it can
+raise the effective per-unit cost enough to flip the real solve's decision
+away from what the guide assumed, after that node's ingredients were
+already discounted into `UsedMaterials` against a Craft assumption. It
+takes a node with owned stock of itself plus owned stock of its own
+ingredients, and a recipe or vendor batch whose output count exceeds 1.
+
+`OwnedMaterialsForceBuyPrePass`'s competency-blind second evaluation
+carries a residual of the same shape. "Competency-blind" applies only at
+the node's own recipe choice; ingredient costs stay the normal
+competency-resolved figures, which can only inflate the raw craft cost and
+therefore only *add* nodes to `CompetencyIndependentForceBuyNodeIds`,
+never drop them. The risk left is a parent whose untrained recipe would
+survive a true blind evaluation being pulled in by an inflated child
+contribution, falsely excluding a real training opportunity at the parent
+- the child's own opportunity is still reported at the child's node.
+
+### 8.3 Decision-only valuations: currencies and barter items
+
+Two curated tables answer "what is this non-coin cost worth, for
+comparison purposes only": `Models/CurrencyDecisionDefaults.cs` for wallet
+currencies and `Models/BarterItemDecisionDefaults.cs` for untradeable
+barter items. They are separate tables because a GW2 item id and a GW2
+currency id are different id spaces that collide numerically - currency 39
+and item 39 are unrelated things - so a single int-keyed map would answer
+the wrong question for one of them. `Models/CurrencyValuation.cs` holds
+the user's own overrides and clears over the top of both.
+
+The currency table is adapted from gw2efficiency's
+`CURRENCY_DECISION_PRICES` (`@gw2efficiency/recipe-calculation`,
+`src/static/currencyDecisionPrices.ts`, MIT, Copyright (c) 2016
+queicherius / David Reess). Shipping it as defaults is an explicit,
+one-time waiver of the repo's "do not invent data" rule for that table
+only: every value is sourced and attributed to the upstream MIT package
+rather than invented, and the permission notice the licence requires is
+reproduced verbatim in the source file itself. Research notes live in
+[`docs/research/gw2e-currency-decision-prices.md`](research/gw2e-currency-decision-prices.md).
+
+The barter table has no upstream to adapt - gw2efficiency values wallet
+currencies only - so each entry is derived here under a single stated
+rule, recorded per entry in the file: the cheapest repeatable vendor
+exchange in `ref/vendor_offers.json` whose entire cost is coin or a
+currency that already carries a `CurrencyDecisionDefaults` value, divided
+by that offer's output count.
+
+That rule is deliberately conservative in one direction. It can only ever
+name a route we can see, so it is an *upper* bound on what the item really
+costs to obtain, and an over-valued barter token makes its offer look
+dearer than it is: such a token can lose a comparison it should have won,
+but can never win one it should have lost. An item whose cheapest visible
+route bottoms out in another untradeable item, an RNG chest, or a
+time-gated daily craft is absent on purpose. Absent is a supported state,
+not an unfinished one - the offer still reaches the user, as an honestly
+unranked fallback (section 8's barter-offer rule).
+
 ---
 
 ## 9. Data pipeline: seeds, wiki scrapes, dev-only caches

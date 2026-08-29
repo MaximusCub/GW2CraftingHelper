@@ -4,41 +4,23 @@ namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Curated default DECISION-ONLY valuations (copper per unit) for
-    /// untradeable barter items - the account-bound tokens a vendor takes
-    /// in place of coin. The Item-line counterpart of
-    /// CurrencyDecisionDefaults, which does the same job for wallet
-    /// currencies; the two are separate tables because a GW2 item id and a
-    /// GW2 currency id are different id spaces that collide numerically
-    /// (currency 39 and item 39 are unrelated things).
-    ///
-    /// DECISION-ONLY, exactly as CurrencyDecisionDefaults is: a value here
-    /// may tip a vendor-vs-TP comparison but is never spent, never folded
-    /// into a displayed gold total, and never committed to a plan. See
-    /// CurrencyValuation.TryGetEffectiveItemCopperValue for the
-    /// user-override/cleared/default precedence, which is the same
-    /// three-state precedence currencies already use.
-    ///
-    /// Unlike CurrencyDecisionDefaults, these numbers have no upstream
-    /// source to adapt - gw2efficiency values wallet currencies only. Each
-    /// one is DERIVED here under a single stated rule: the cheapest
-    /// repeatable vendor exchange in ref/vendor_offers.json whose entire
-    /// cost is coin or a currency that already carries a
-    /// CurrencyDecisionDefaults value, divided by that offer's output
-    /// count. The derivation is recorded per entry below.
-    ///
-    /// That rule is deliberately conservative in one direction: it can
-    /// only ever name a route we can see, so it is an upper bound on what
-    /// the item really costs to obtain, and an over-valued barter token
-    /// makes its offer look DEARER than it is. An over-valued token can
-    /// therefore lose a comparison it should have won, but can never win
-    /// one it should have lost.
-    ///
-    /// An item whose cheapest visible route bottoms out in another
-    /// untradeable item, an RNG chest, or a time-gated daily craft is
-    /// absent here on purpose - see docs/ARCHITECTURE.md section 8 for
-    /// what an absent entry means to the solver. Absent is a supported
-    /// state, not an unfinished one: the offer still reaches the user, as
-    /// an honestly unranked fallback.
+    /// untradeable barter items - the account-bound tokens a vendor takes in
+    /// place of coin. The Item-line counterpart of CurrencyDecisionDefaults,
+    /// a separate table because a GW2 item id and a GW2 currency id are
+    /// different id spaces that collide numerically (item 39 and currency 39
+    /// are unrelated things).
+    /// <para>
+    /// DECISION-ONLY: a value here may tip a vendor-vs-TP comparison but is
+    /// never spent, never folded into a displayed gold total and never
+    /// committed to a plan. CurrencyValuation.TryGetEffectiveItemCopperValue
+    /// holds the user-override/cleared/default precedence.
+    /// Adding an entry: each value is DERIVED under one stated rule - the
+    /// cheapest repeatable vendor exchange in ref/vendor_offers.json whose
+    /// entire cost is coin or an already-valued currency, divided by that
+    /// offer's output count, recorded per entry below. An item with no such
+    /// route is absent on purpose; absent is a supported state, not an
+    /// unfinished one. Derivation: docs/ARCHITECTURE.md section 8.3.
+    /// </para>
     /// </summary>
     internal static class BarterItemDecisionDefaults
     {

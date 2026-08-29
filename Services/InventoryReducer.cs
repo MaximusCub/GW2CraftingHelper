@@ -70,73 +70,21 @@ namespace TaimisToolbench.Services
         /// Reduces <paramref name="node"/> and its descendants against the
         /// shared <paramref name="pool"/>, lazily initialized per
         /// item/source from <paramref name="index"/>.
-        ///
+        /// <para>
         /// <paramref name="consumeFromPool"/> decides whether THIS node's
-        /// own Quantity may be discounted (inherited from the caller/parent,
-        /// unchanged by this design) and, together with
-        /// <paramref name="zeroOwnedDecisions"/> below, which recipe
-        /// option's descendants get to consume the pool:
-        ///
-        /// - Decision-guided mode: when
-        ///   <paramref name="zeroOwnedDecisions"/> is non-null and contains
-        ///   this node's NodeId, the recipe option that decision's
-        ///   Source == Craft &amp;&amp; RecipeId matches is the one whose
-        ///   descendants may consume the pool - every sibling option is left
-        ///   at full zero-owned cost. If the node's zero-owned decision was
-        ///   anything other than Craft (BuyFromTp/BuyFromVendor/
-        ///   UnknownSource), NO option consumes the pool for its
-        ///   descendants: an un-crafted branch never demands its own
-        ///   ingredients, mirroring PlanSolver.Evaluate's own
-        ///   ignoredItemIds/Quantity==0 handling elsewhere in this codebase.
-        ///   Since discounting only ever lowers a cost, and only along the
-        ///   path the zero-owned pass already declared the winner, owned
-        ///   ingredient stock further down the tree can never pull the real
-        ///   (post-reduction) Solve() toward a DIFFERENT recipe option than
-        ///   the guide chose for this node.
-        ///
-        ///   KNOWN RESIDUAL (not guarded/tested - see KNOWN-ISSUES #20):
-        ///   this does NOT guarantee the guide's Source/Craft-vs-Buy
-        ///   decision for THIS node itself still holds after reduction. The
-        ///   guide is computed on the UNREDUCED tree, but this node's OWN
-        ///   Quantity (above, via consumeFromPool on the CALLER's side) can
-        ///   still shrink here from owned stock of the node's own item id -
-        ///   and because craft cost is non-linear in quantity
-        ///   (ComputeCraftsNeeded's ceiling division, and
-        ///   VendorBatchSolver's per-batch math), shrinking a node's own
-        ///   Quantity can raise its effective per-unit cost enough to flip
-        ///   the REAL solve's decision for this node away from what the
-        ///   guide assumed (e.g. Craft -&gt; Buy) - after this node's
-        ///   ingredients were already discounted and written into
-        ///   UsedMaterials against the guide's Craft assumption. Requires a
-        ///   node with owned stock of ITSELF plus owned stock of its own
-        ///   ingredients, and a recipe/vendor batch whose output count is
-        ///   greater than 1.
-        /// - Legacy heuristic: used
-        ///   whenever <paramref name="zeroOwnedDecisions"/> is null (every
-        ///   caller/test) OR does not contain this node's NodeId
-        ///   (defensive fallback) - true only along the single
-        ///   chosen-recipe-candidate chain, the root, then recursively only
-        ///   each node's PRIMARY option (node.Recipes[0], the option
-        ///   RecipeService/the upstream recipe source puts first). Without a
-        ///   guide, which recipe option will actually be chosen is
-        ///   unknowable at reduction time; walking every option and letting
-        ///   each one drain the shared pool
-        ///   would let a recipe option the solver never picks steal owned
-        ///   stock from a branch that IS chosen.
-        ///
-        /// Once an option's descendants are excluded from pool consumption,
-        /// that stays false for the whole subtree below it - nothing under a
-        /// non-chosen/non-primary option should ever touch the pool, no
-        /// matter how deep, since the whole branch is hypothetical (or,
-        /// under the guide, provably not the winning path) from here down.
-        ///
-        /// Every option's CraftsNeeded/ingredient Quantity is still rescaled
-        /// here regardless of consumeFromPool - that math reflects THIS
-        /// node's own (already-decided, pool-independent) Quantity and is
-        /// required for PlanSolver's cost comparison across recipe options
-        /// to stay internally consistent (every ingredient of every recipe
-        /// is always evaluated, even one the solver ultimately doesn't
-        /// choose).
+        /// own Quantity may be discounted (inherited from the caller) and,
+        /// with <paramref name="zeroOwnedDecisions"/>, which recipe option's
+        /// descendants may consume the pool. Under a decision guide only the
+        /// option that guide chose to Craft may; a node it decided
+        /// Buy/Vendor/Unknown lets NO option consume. With no guide (null,
+        /// or this node absent from it) the legacy heuristic applies: the
+        /// root, then each node's PRIMARY option only. Once an option is
+        /// excluded, that holds for its whole subtree. Every option's
+        /// CraftsNeeded/ingredient Quantity is still rescaled regardless,
+        /// because PlanSolver evaluates every option.
+        /// KNOWN RESIDUAL, not guarded or tested: KNOWN-ISSUES #20.
+        /// Derivation: docs/ARCHITECTURE.md section 8.2.
+        /// </para>
         /// </summary>
         private void ReduceNodeSourced(
             RecipeNode node,
