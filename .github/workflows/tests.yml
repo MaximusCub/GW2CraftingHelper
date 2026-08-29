@@ -631,6 +631,15 @@ jobs:
           }
           intent = open('Views/Rendering/ItemIconTooltip.cs', encoding='utf-8').read()
           declared = set(re.findall(r'^        (internal void Stamp\w+\([^)]*\))', intent, re.M))
+          if declared != SEAMS:
+              print('ItemIconTooltip\'s stamping seams changed.')
+              print('  pinned:   ' + '; '.join(sorted(SEAMS)))
+              print('  declared: ' + '; '.join(sorted(declared)))
+              print('An item tooltip is carried by the item ICON and nothing else - no')
+              print('name label, no row panel, no value cell. Widening this set puts the')
+              print('hover back on dead space; if that is genuinely intended, change the')
+              print('pin here in the same commit and say why in the message.')
+              silent.append('Views/Rendering/ItemIconTooltip.cs: seam set')
 
           # The factory set, pinned the same way and for the same reason.
           # Naming() - a subject's name and nothing else, no icon, no wallet
@@ -652,15 +661,6 @@ jobs:
               print('If it is genuinely a fifth kind, change the pin here in the same')
               print('commit and say why; a factory that yields a bare name is not one.')
               silent.append('Views/Rendering/ItemIconTooltip.cs: factory set')
-          if declared != SEAMS:
-              print('ItemIconTooltip\'s stamping seams changed.')
-              print('  pinned:   ' + '; '.join(sorted(SEAMS)))
-              print('  declared: ' + '; '.join(sorted(declared)))
-              print('An item tooltip is carried by the item ICON and nothing else - no')
-              print('name label, no row panel, no value cell. Widening this set puts the')
-              print('hover back on dead space; if that is genuinely intended, change the')
-              print('pin here in the same commit and say why in the message.')
-              silent.append('Views/Rendering/ItemIconTooltip.cs: seam set')
 
           if bad:
               print('These item icons are built without a named ItemIconTier:')
