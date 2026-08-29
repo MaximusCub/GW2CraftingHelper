@@ -282,6 +282,11 @@ namespace TaimisToolbench.Views
 
         private readonly ModuleSettings _settings;
         private readonly ModalDialog _modalDialog;
+
+        // The session item-stat cache the barter rows' hovers read, from
+        // the module's one ItemMetadataService. Never a fetch.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
         private readonly List<CurrencyRow> _rows = new List<CurrencyRow>();
 
         // Row names in _rows order, held so the filter keystroke path does
@@ -301,10 +306,6 @@ namespace TaimisToolbench.Views
         // item id and a currency id are different id spaces - see
         // CurrencyRow.Id.
         private IReadOnlyDictionary<int, ItemMetadata> _barterItemMetadata;
-
-        // The session item-stat cache the barter rows' hovers read, from
-        // the module's one ItemMetadataService.
-        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;

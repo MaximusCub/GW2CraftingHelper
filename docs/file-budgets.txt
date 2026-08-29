@@ -318,7 +318,7 @@ Views/Rendering/GlyphFont.cs                                                    
 Views/Rendering/UiMetrics.cs                                                            60
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         217
 Views/ResizableTabbedWindow.cs                                                          250
-Views/SettingsTabContent.cs                                                             2873
+Views/SettingsTabContent.cs                                                             2874
 Views/SuggestionPanel.cs                                                                 495
 Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
