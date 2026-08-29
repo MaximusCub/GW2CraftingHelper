@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
+using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
@@ -41,6 +42,17 @@ namespace TaimisToolbench.Views
 
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int ClearButtonWidth = 120;
+
+        /// <summary>The matched 16px X of Blish's own remove pair, by .dat asset id.</summary>
+        private const int RemoveMarkAssetId = 733269;
+
+        /// <summary>
+        /// Dark ink for the row's remove button. 733269 is authored white
+        /// for a dark window and the button plate under it is parchment, so
+        /// an untinted blit is invisible on it - the measured case
+        /// FeedbackButton.IconTint exists for.
+        /// </summary>
+        private static readonly Color RemoveIconTint = new Color(45, 42, 38);
 
         // The one row seat that cannot live in PlanHistoryRowLayout beside
         // the others: the module's button height is Views-layer geometry,
@@ -546,18 +558,15 @@ namespace TaimisToolbench.Views
                     + "Replaces the plan currently shown there. Manual decision overrides are not restored.");
             row.Resolve.Click += (_, __) => OnResolveClicked(entry);
 
-            // Both seats used to carry geometric glyphs the shipped font
-            // does not have - U+25CF/U+25CB for the pin, U+2715 for the
-            // delete - which draw nothing and advance zero pixels, so the
-            // pinned state had no representation at all. KNOWN-ISSUES #64.
-            // A Checkbox rather than a button wearing an icon: StandardButton
-            // blits its Icon untinted onto light button art, where Blish's
-            // white affordance textures disappear just as surely.
+            // The pin seat used to carry U+25CF/U+25CB, which the shipped
+            // font does not have - they draw nothing and advance zero
+            // pixels, so the pinned state had no representation at all
+            // (KNOWN-ISSUES #64). A Checkbox rather than a button wearing
+            // an icon, because a Checkbox brings its own state art.
             row.Pin = CreatePinToggle(row.Panel, entry.Pinned, bands.PinX);
             row.Pin.CheckedChanged += (_, __) => OnPinClicked(entry);
 
-            row.Delete = CreateIconButton(row.Panel, "\u00D7", bands.DeleteX,
-                "Remove this entry from the history.");
+            row.Delete = CreateRemoveButton(row.Panel, bands.DeleteX);
             row.Delete.Click += (_, __) => OnDeleteClicked(entry);
 
             if (_isResolving)
@@ -660,16 +669,23 @@ namespace TaimisToolbench.Views
             return button;
         }
 
-        private FeedbackButton CreateIconButton(Panel parent, string glyph, int x, string tooltip)
+        // Art, not text: the row's remove mark was U+00D7, and although
+        // Menomonia carries that codepoint, StandardButton forces black ink
+        // over parchment plate art and the multiplication sign vanished
+        // into it. Blish's own X texture with FeedbackButton's tint is what
+        // the Ranker's identical control already draws.
+        private FeedbackButton CreateRemoveButton(Panel parent, int x)
         {
             var button = new FeedbackButton
             {
-                Text = glyph,
                 Size = new Point(PlanHistoryRowLayout.IconButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
-            TooltipFacility.ApplyPlain(button, tooltip);
+            button.Icon = AsyncTexture2D.FromAssetId(RemoveMarkAssetId);
+            button.ResizeIcon = true;
+            button.IconTint = RemoveIconTint;
+            TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
         }
 
