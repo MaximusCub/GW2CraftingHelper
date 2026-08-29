@@ -87,9 +87,17 @@ sentence beats `UnknownSource` plus a curated hint table with ten rows in
 it.** It does not need to cost these routes. It needs to stop pretending it
 does not know what they are.
 
-Note this is also the honest fix for the Gift of Battle case, where the
-module currently deletes the item's only vendor row by hand
-(`ref/vendor_offer_exclusions.json`) because the real route is inexpressible.
+Gift of Battle is the case to reason from, but NOT for the reason an earlier
+draft of this document gave. `ref/vendor_offer_exclusions.json` does remove a
+Battle Master vendor row by hand - and the recorded reason is that the sale was
+removed from the game in the Spring 2016 Quarterly Update, hand-verified with a
+source. That exclusion is a correct claim that the wiki is stale, it is right on
+its own merits, and P1 must NOT revert it: doing so would reintroduce pricing
+for a vendor path that has not existed for a decade. What Gift of Battle
+actually demonstrates is the gap AFTER the exclusion is applied - with no vendor
+row and no recipe, the item resolves to `UnknownSource` carrying a `WVW` text
+badge, which is the whole of what the module can say about a component every
+legendary weapon of every generation requires.
 
 ### P2. Vendor-side required-item gate (SMALL, already scoped)
 

@@ -246,11 +246,16 @@ rules are in ARCHITECTURE section 8 and are not restated here.
 **What is not representable at all**, because there is no enum member and
 no data field to carry it:
 
-- A reward track (WvW, PvP). Gift of Battle is the documented case: its
-  only vendor row was removed from the corpus by hand
-  (`ref/vendor_offer_exclusions.json`) precisely because the real route is
-  a WvW reward track the module cannot express, and the item now resolves
-  to `UnknownSource` with a `WVW` text badge.
+- A reward track (WvW, PvP). Gift of Battle is the documented case, though
+  its hand-exclusion is often mis-described (including in an earlier draft
+  of this audit). `ref/vendor_offer_exclusions.json` removes a Battle Master
+  row because that 500-Badge sale was REMOVED FROM THE GAME in the Spring
+  2016 Quarterly Update, hand-verified with a source - a correct claim that
+  the wiki is stale, not a workaround for an inexpressible route. The gap is
+  what remains once it is applied: with no vendor row and no recipe, the item
+  resolves to `UnknownSource` with a `WVW` text badge, and that badge is the
+  entirety of what the module can say about a component every legendary
+  weapon of every generation requires.
 - Salvaging. `SALVAGE` is a badge string on one hint, not a source.
 - A container, chest or RNG drop, including precursor forging. KNOWN-ISSUES
   #17 records that probabilistic forge content never reaches the solved
