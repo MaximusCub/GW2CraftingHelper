@@ -627,9 +627,9 @@ has a valuation. Its comparison value is then coin part +
 `sum(count * copperPerUnit)` over those valued lines, reported via
 `VendorOfferEvaluation.BestComparableValue`. The winning comparable
 offer's real coin part and (if any) currency lines are reported
-separately, via `BestComparableCoinCost` and `BestComparableCurrencyCosts`
-- the valuation affects comparison only, never the amounts committed to
-the plan. A barter line's own scaled quantity rides on
+separately, via `BestComparableCoinCost` and `BestComparableCurrencyCosts`;
+the valuation affects comparison only, never the amounts committed to the
+plan. A barter line's own scaled quantity rides on
 `BestComparableItemCosts` with a null `GoldValue`, for the same reason.
 
 An offer with at least one non-coin line that has **no** valuation
@@ -1111,8 +1111,8 @@ way - red to green goes through brown - because sRGB's axes are not
 perceptual. OKLab (Bjorn Ottosson, 2020) is a perceptual space whose polar
 form OKLCh separates lightness, chroma and hue, so walking the hue angle
 keeps chroma up all the way across and the intermediate colours stay orange
-and olive rather than mud. The 25% sample is `(159, 76, 0)` - a real orange
-- which is the measurement that says the space is doing its job.
+and olive rather than mud. The 25% sample is `(159, 76, 0)`, a real orange,
+which is the measurement that says the space is doing its job.
 
 **`RankerReadinessRamp.Track` - the second contrast obligation.** The track
 constant was first chosen against white alone. At `Rgb(38, 36, 34)` it
@@ -1262,9 +1262,9 @@ prose string of 55 characters or more that this module builds (73 of them,
 swept out of `Services/` and `Views/`) was measured against the installed
 Menomonia 14 XNB with MonoGame.Extended's own advance / `XOffset+Width`
 rule - the same parse behind
-[`docs/research/minimum-window-width.md`](research/minimum-window-width.md)
-- and averages 7.03px per character. 500px is therefore 71 characters, not
-the 76 the original 6.5px/char estimate assumed. Per-string the spread is
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+They average 7.03px per character, so 500px is 71 characters, not the 76 the
+original 6.5px/char estimate assumed. Per-string the spread is
 6.7 to 7.5px/char, so prose at the wide end still crosses 500px inside a
 71-character line; Blish's own space wrap takes those, which costs a break
 it would have made anyway and never loses text. The one case only this seam
