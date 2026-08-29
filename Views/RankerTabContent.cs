@@ -1530,10 +1530,8 @@ namespace TaimisToolbench.Views
                 row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             }
 
-            row.Remove = CreateRowButton(row.Panel, bands.RemoveX, "Remove this item from your list.");
-            row.Remove.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
-            row.Remove.ResizeIcon = true;
-            row.Remove.IconTint = UiMetrics.RowButtonIconTint;
+            row.Remove = CreateGlyphRowButton(
+                row.Panel, UiGlyphs.RemoveMark, bands.RemoveX, "Remove this item from your list.");
             row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
@@ -1617,20 +1615,24 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// A row action whose whole label is one glyph from the module's own
-        /// atlas. StandardButton exposes no Font, which is exactly why the
-        /// reorder pair could not be a button before FeedbackButton: an
-        /// up/down pair needs two symmetric triangles, and the one face
-        /// Blish ships has none. The standalone glyph face centres its ink
-        /// in the line box rather than seating it on a baseline, which is
-        /// what a button with no neighbouring text wants.
+        /// atlas. StandardButton exposes no Font, which is exactly why these
+        /// could not be buttons before FeedbackButton: they need symmetric
+        /// triangles and a cross, and the one face Blish ships has none. The
+        /// standalone glyph face centres its ink in the line box rather than
+        /// seating it on a baseline, which is what a button with no
+        /// neighbouring text wants.
+        /// <para>
+        /// All THREE row actions come through here, and that is the point:
+        /// glyph text takes the button's own enabled/disabled ink, so the
+        /// set cannot drift into two weights the way a tinted icon beside
+        /// black text did (Services/UiGlyphs.RemoveMark).
+        /// </para>
         /// </summary>
         private static FeedbackButton CreateGlyphRowButton(
             Panel parent, string glyph, int x, string tooltip)
         {
             var button = CreateRowButton(parent, x, tooltip);
-            bool available = UiFonts.GlyphsAvailable;
-            button.Font = available ? UiFonts.Glyphs : UiFonts.Caption;
-            button.Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
+            button.SetGlyph(glyph);
             return button;
         }
 

@@ -32,6 +32,7 @@ namespace TaimisToolbench.Tests.Services
         private const int CaretUp = 0xE102;
         private const int CaretDown = 0xE103;
         private const int CaretRight = 0xE104;
+        private const int RemoveMark = 0xE105;
 
         /// <summary>Fragments for the malformed-input cases below.</summary>
         private const string Common = "common lineHeight=24 base=18 scaleW=21 scaleH=8\n";
@@ -57,17 +58,19 @@ namespace TaimisToolbench.Tests.Services
             // and no code names is a vocabulary nothing re-measures when it
             // drifts. Services/UiGlyphs is the list, and the "UI glyph
             // escapes" CI step is the other half of the same gate.
-            Assert.Equal(5, font.Count);
+            Assert.Equal(6, font.Count);
             Assert.True(font.TryGet(SortAscending, out _));
             Assert.True(font.TryGet(SortDescending, out _));
             Assert.True(font.TryGet(CaretUp, out _));
             Assert.True(font.TryGet(CaretDown, out _));
             Assert.True(font.TryGet(CaretRight, out _));
+            Assert.True(font.TryGet(RemoveMark, out _));
             Assert.Equal(UiGlyphs.SortAscending, char.ConvertFromUtf32(SortAscending));
             Assert.Equal(UiGlyphs.SortDescending, char.ConvertFromUtf32(SortDescending));
             Assert.Equal(UiGlyphs.CaretUp, char.ConvertFromUtf32(CaretUp));
             Assert.Equal(UiGlyphs.CaretDown, char.ConvertFromUtf32(CaretDown));
             Assert.Equal(UiGlyphs.CaretRight, char.ConvertFromUtf32(CaretRight));
+            Assert.Equal(UiGlyphs.RemoveMark, char.ConvertFromUtf32(RemoveMark));
         }
 
         [Fact]
@@ -95,6 +98,48 @@ namespace TaimisToolbench.Tests.Services
             // separate pair of codepoints - see UiGlyphs.CaretUp.
             Assert.True(font.TryGet(SortAscending, out var sortUp));
             Assert.True(up.Height > sortUp.Height);
+        }
+
+        [Fact]
+        public void TheRemoveMark_IsSquareAndBigEnoughToStayASolidCross()
+        {
+            var font = Shipped();
+            Assert.True(font.TryGet(RemoveMark, out var mark));
+
+            // A cross is symmetric in both axes, so a non-square box means
+            // the rasterizer scaled one axis and the mark is no longer the
+            // artwork that was measured.
+            Assert.Equal(mark.Width, mark.Height);
+
+            // 16, and shrinking it is a regression rather than a tidy-up.
+            // Bootstrap's x-lg is a ONE-unit stroke on a 16-unit grid, so
+            // its diagonal thins with the box: at 8px of ink it measures
+            // 0.66px and peaks at alpha 183, which is the measurement that
+            // kept every stroked icon out of this atlas
+            // (tools/build-glyph-font.py). At 16 it peaks at 255.
+            Assert.Equal(16, mark.Height);
+
+            // Ink taller than the reading carets, because a diagonal cross
+            // spends its coverage over a longer path and would otherwise
+            // read as the light one of the three marks on the same row of
+            // buttons.
+            Assert.True(font.TryGet(CaretUp, out var caret));
+            Assert.True(mark.Height > caret.Height);
+        }
+
+        [Fact]
+        public void TheRemoveMark_SeatsItselfInAButtonWithoutClipping()
+        {
+            var font = Shipped();
+            Assert.True(font.TryGet(RemoveMark, out var mark));
+
+            // Its only seat is a FeedbackButton whose whole label is this
+            // glyph, drawn in the standalone face - so the two things that
+            // decide whether it lands centred are the box-centred offset
+            // and an advance that pays for all of the ink.
+            int top = font.BoxCentredYOffset(mark);
+            Assert.Equal(font.LineHeight - top - mark.Height, top);
+            Assert.True(mark.XAdvance >= mark.XOffset + mark.Width);
         }
 
         [Theory]

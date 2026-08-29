@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
-using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
@@ -686,11 +685,11 @@ namespace TaimisToolbench.Views
             return button;
         }
 
-        // Art, not text: the row's remove mark was U+00D7, and although
-        // Menomonia carries that codepoint, StandardButton forces black ink
-        // over parchment plate art and the multiplication sign vanished
-        // into it. Blish's own X texture with FeedbackButton's tint is what
-        // the Ranker's identical control already draws.
+        // The marks this seat has worn, in order: U+00D7, which Menomonia
+        // does carry but draws too faint to read as an action; then Blish's
+        // own X texture tinted dark, which landed within nine units of the
+        // ink this button paints DISABLED text in; now the module's own
+        // cross, which is what the Ranker's identical control draws.
         private FeedbackButton CreateRemoveButton(Panel parent, int x)
         {
             var button = new FeedbackButton
@@ -699,9 +698,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
-            button.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
-            button.ResizeIcon = true;
-            button.IconTint = UiMetrics.RowButtonIconTint;
+            button.SetGlyph(UiGlyphs.RemoveMark);
             TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
         }

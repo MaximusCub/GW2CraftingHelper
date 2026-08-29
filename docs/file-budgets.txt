@@ -241,7 +241,7 @@ Services/StatusText.cs                                                          
 Services/StatusUpdateGuard.cs                                                            38
 Services/SummarySectionLayoutMath.cs                                                    583
 Services/TableSortState.cs                                                              114
-Services/UiGlyphs.cs                                                                    106
+Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
 Services/TooltipContent.cs                                                              495
@@ -280,7 +280,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1424
-Views/RankerTabContent.cs                                                               2995
+Views/RankerTabContent.cs                                                               2997
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  607
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
@@ -543,7 +543,7 @@ tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                         
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1013
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
-tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      287
+tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                   215
 tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                           152
