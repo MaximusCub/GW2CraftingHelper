@@ -271,8 +271,8 @@ Views/ApiAccessDialog.cs                                                        
 Views/AutocompleteTextBox.cs                                                             45
 Views/CraftingPlanView.cs                                                               5028
 Views/FocusRelease.cs                                                                   159
-Views/ItemInputRowStrip.cs                                                              381
-Views/ItemRowState.cs                                                                    31
+Views/ItemInputRowStrip.cs                                                              465
+Views/ItemRowState.cs                                                                    39
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
 Views/MainView.cs                                                                       2770

@@ -65,14 +65,19 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// This view's own binding of TopRegionLayoutMath.Compute: the
-        /// row count and the tree toolbar's visibility are view state, the
-        /// arithmetic is not. Every caller goes through here so no call
-        /// site can lay the strip out against a different answer to "is the
-        /// toolbar row showing".
+        /// strip's row count and the tree toolbar's visibility are view
+        /// state, the arithmetic is not. Every caller goes through here so
+        /// no call site can lay the strip out against a different answer to
+        /// "is the toolbar row showing".
+        /// <para>
+        /// The strip's rows are grid rows, not item rows - four items share
+        /// one at the window minimum - so the width has to be passed in:
+        /// there is no strip height without it.
+        /// </para>
         /// </summary>
-        private TopRegionLayout ComputeTopRegionLayout()
+        private TopRegionLayout ComputeTopRegionLayout(int w)
         {
-            return TopRegionLayoutMath.Compute(_inputRows.Rows.Count, _treeToolbarVisible);
+            return TopRegionLayoutMath.Compute(_inputRows.RowCountFor(w), _treeToolbarVisible);
         }
 
         // phaseProgress carries live coarse-phase events for the status
@@ -706,8 +711,8 @@ namespace TaimisToolbench.Views
             _moduleLifetimeToken = moduleLifetimeToken;
 
             // Before anything that could read the row count:
-            // ComputeTopRegionLayout asks the strip how many rows there
-            // are, and an unbuilt view is still allowed to be asked.
+            // ComputeTopRegionLayout asks the strip how many grid rows its
+            // items fill, and an unbuilt view is still allowed to be asked.
             _inputRows = new ItemInputRowStrip(
                 itemSearchProvider, () => ReflowTopRegion(rebuildItemRows: true));
 
@@ -1906,7 +1911,7 @@ namespace TaimisToolbench.Views
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
-            var layout = ComputeTopRegionLayout();
+            var layout = ComputeTopRegionLayout(w);
 
             int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
             int previousContentHeight = _contentPanel?.Height ?? 0;
@@ -1990,7 +1995,7 @@ namespace TaimisToolbench.Views
             _treeRelayoutActions.Clear();
             _treeReellipsisActions.Clear();
 
-            var layout = ComputeTopRegionLayout();
+            var layout = ComputeTopRegionLayout(w);
 
             // Input rows: search box + quantity per requested item.
             _inputPanel = new Panel()
@@ -2777,12 +2782,12 @@ namespace TaimisToolbench.Views
             // Update widths of layout panels. Top-strip controls keep their
             // pre-existing direct updates - these were
             // never part of the dispose+rebuild problem the relayout
-            // registry below replaces. The input strip is N rows
-            // (the strip's row count) rather than a fixed one, so its own and
-            // every row panel's width need updating too, and the Y offsets
-            // below it come from the same ComputeTopRegionLayout formula
-            // Build()/ReflowTopRegion use rather than fixed constants.
-            var layout = ComputeTopRegionLayout();
+            // registry below replaces. The input strip is a grid whose
+            // column count is a function of this width, so a drag can move
+            // a cell sideways and onto another row - ResizeRows re-seats
+            // them - and the Y offsets below it come from the same
+            // ComputeTopRegionLayout formula Build()/ReflowTopRegion use.
+            var layout = ComputeTopRegionLayout(w);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             _inputRows.ResizeRows(w);
 
