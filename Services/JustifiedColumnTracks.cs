@@ -97,20 +97,20 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// X at which content centres in an already-computed band. The same
-        /// arithmetic as the track overload, for callers that hold a rect
-        /// rather than a track index; without it they pass a track count of
-        /// one and an index of zero to say "this band", which reads as
-        /// arithmetic rather than as intent.
+        /// X at which content centres in a column's own reserved BAND rather
+        /// than in an equal track: the same law, for the columns whose band -
+        /// not an equal share of the row - is what a header has to sit over.
+        /// Content wider than its band pins left, exactly as it does in a
+        /// track.
         /// </summary>
-        public static int CenteredX(int x, int width, int contentWidth)
+        public static int CenteredInBand(int bandX, int bandWidth, int contentWidth)
         {
-            if (contentWidth >= width)
+            if (contentWidth >= bandWidth)
             {
-                return x;
+                return bandX;
             }
 
-            return x + (width - contentWidth) / 2;
+            return bandX + (bandWidth - contentWidth) / 2;
         }
 
         /// <summary>

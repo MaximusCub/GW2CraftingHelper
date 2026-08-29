@@ -116,16 +116,29 @@ namespace TaimisToolbench.Views.Rendering
             int levelHeaderWidth = MeasureWidth(HeaderBands.Font, LevelHeaderText);
             int levelColumnWidth = maxLevelWidth > levelHeaderWidth ? maxLevelWidth : levelHeaderWidth;
 
+            // Both data headers centre over the band their own cells
+            // occupy rather than sharing an edge with them - the module's
+            // centred column law, see Services/JustifiedColumnTracks. The
+            // Discipline column is the flexing one and keeps its left rule.
+            Func<int, int> levelLabelX = w => JustifiedColumnTracks.CenteredInBand(
+                PlanRelayoutMath.PinnedRightEdge(w) - levelColumnWidth,
+                levelColumnWidth,
+                levelHeaderWidth);
+
             if (anyCharacterText)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
-                    CharactersHeaderText, charX);
+                    CharactersHeaderText,
+                    JustifiedColumnTracks.CenteredInBand(
+                        charX, maxCharWidth, MeasureWidth(HeaderBands.Font, CharactersHeaderText)),
+                    rightLabelXForWidth: levelLabelX);
             }
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink);
+                    contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
+                    rightLabelXForWidth: levelLabelX);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)

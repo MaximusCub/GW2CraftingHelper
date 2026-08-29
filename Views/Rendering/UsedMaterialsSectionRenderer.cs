@@ -102,12 +102,20 @@ namespace TaimisToolbench.Views.Rendering
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
             // same way. No rightXForWidth: the Amount column is pinned to
             // the panel edge, which is ColumnHeaderRowRenderer's own default.
+            // rightLabelXForWidth, though: the band is pinned but the WORD
+            // over it centres on it (Services/JustifiedColumnTracks), which
+            // is what puts "Amount" over the quantities rather than over the
+            // panel's right margin.
+            int amountHeaderWidth =
+                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
                 SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
                 amountHeaderText, _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),
+                rightLabelXForWidth: w => JustifiedColumnTracks.CenteredInBand(
+                    PlanRelayoutMath.PinnedRightEdge(w) - maxQtyWidth, maxQtyWidth, amountHeaderWidth),
                 // The Item column is everything left of the Amount band -
                 // the name's own ellipsis terms, with the gap split.
                 leftColumnEndForWidth: w => PlanRelayoutMath.HeaderSplitBeforeColumn(

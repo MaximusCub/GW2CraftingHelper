@@ -856,7 +856,7 @@ namespace TaimisToolbench.Views
             in RankerRowLayout.Bands bands, int column, int contentWidth)
         {
             bands.DataTrack(column, out int trackX, out int trackWidth);
-            return Math.Max(0, JustifiedColumnTracks.CenteredX(
+            return Math.Max(0, JustifiedColumnTracks.CenteredInBand(
                 trackX, trackWidth, contentWidth));
         }
 

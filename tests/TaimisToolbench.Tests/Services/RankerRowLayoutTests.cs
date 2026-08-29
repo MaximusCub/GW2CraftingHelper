@@ -753,9 +753,9 @@ namespace TaimisToolbench.Tests.Services
             for (int column = 0; column < RankerRowLayout.DataColumnCount; column++)
             {
                 bands.DataTrack(column, out int trackX, out int trackWidth);
-                int header = JustifiedColumnTracks.CenteredX(
-                    trackX, trackWidth, 1, 0, HeaderWidth);
-                int cell = JustifiedColumnTracks.CenteredX(trackX, trackWidth, 1, 0, CellWidth);
+                int header = JustifiedColumnTracks.CenteredInBand(
+                    trackX, trackWidth, HeaderWidth);
+                int cell = JustifiedColumnTracks.CenteredInBand(trackX, trackWidth, CellWidth);
 
                 // Integer halving can leave one pixel between two centres.
                 Assert.True(

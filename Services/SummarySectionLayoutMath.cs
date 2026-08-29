@@ -336,19 +336,21 @@ namespace TaimisToolbench.Services
 
         // --- Currency table column geometry ---
         //
-        // The row from the name's left edge to the last numeric column's
-        // right edge is CurrencyTrackCount EQUAL tracks - name, Required,
-        // Have, Needed - each number right-aligned on its own track's right
-        // edge. Distribution, not the packed right-hand stack this table
-        // used to draw: at the plan panel's real width that stack left
-        // ~1000px of nothing between a currency's name and its first
-        // number, with no anchor for the eye between them, and the field
-        // report could not track a row across it. The idiom is
-        // RankerRowLayout.GateCell's, which already divides a row's full
-        // width into N equal cells for the same reason.
+        // The row from the name's left edge to the table's own right edge
+        // is CurrencyTrackCount EQUAL tracks - name, Required, Have, Needed
+        // - each number band CENTRED on its own track. Distribution, not
+        // the packed right-hand stack this table used to draw: at the plan
+        // panel's real width that stack left ~1000px of nothing between a
+        // currency's name and its first number, with no anchor for the eye
+        // between them, and the field report could not track a row across
+        // it. The idiom is RankerRowLayout.GateCell's, which already
+        // divides a row's full width into N equal cells for the same
+        // reason.
         //
-        // Right-alignment stays: it is what keeps digits aligned down a
-        // column and every header label over the numbers it names.
+        // Numbers right-align INSIDE their band - that is what keeps digits
+        // aligned down a column - and the band, header included, centres on
+        // the track. See JustifiedColumnTracks for why a shared edge is not
+        // enough.
         //
         // Required/Have/Needed columns reserve CurrencyNumberColumnWidth by
         // default, widened per-render when an actual value needs more room
@@ -436,13 +438,34 @@ namespace TaimisToolbench.Services
             public readonly int NeededRightEdge;
             public readonly int MarkerX;
 
-            public CurrencyColumnEdges(int requiredRightEdge, int haveRightEdge, int neededRightEdge, int markerX)
+            /// <summary>
+            /// The band all three number columns reserve - what each
+            /// header centres over
+            /// (JustifiedColumnTracks.CenteredInBand). Floored at the
+            /// widest of the three header labels
+            /// (SummarySectionRenderer.WidestCurrencyHeaderLabel), so a
+            /// header always fits the band it centres in.
+            /// </summary>
+            public readonly int NumberColumnWidth;
+
+            public CurrencyColumnEdges(
+                int requiredRightEdge, int haveRightEdge, int neededRightEdge, int markerX,
+                int numberColumnWidth)
             {
                 RequiredRightEdge = requiredRightEdge;
                 HaveRightEdge = haveRightEdge;
                 NeededRightEdge = neededRightEdge;
                 MarkerX = markerX;
+                NumberColumnWidth = numberColumnWidth;
             }
+
+            /// <summary>Left edge of the band each column's numbers grow
+            /// leftward into.</summary>
+            public int RequiredBandX => RequiredRightEdge - NumberColumnWidth;
+
+            public int HaveBandX => HaveRightEdge - NumberColumnWidth;
+
+            public int NeededBandX => NeededRightEdge - NumberColumnWidth;
         }
 
         /// <summary>
@@ -480,23 +503,35 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// This table's tracks, through the module's shared distribution
-        /// law - see <see cref="JustifiedColumnTracks"/>, which Plan
-        /// History's own column band computes from as well.
+        /// Right edge of the number band CENTRED on track
+        /// <paramref name="index"/>, through the module's shared
+        /// distribution law - see <see cref="JustifiedColumnTracks"/>, which
+        /// Plan History's own column band computes from as well.
+        /// <para>
+        /// Centred, not right-aligned on the track's own edge: a header and
+        /// its numbers then share the track's centre line rather than only
+        /// its right edge, which is what puts "Required" over the required
+        /// amounts instead of over the gap before Have. The band's centre is
+        /// the track's centre whatever
+        /// <paramref name="numberColumnWidth"/> is, so a wider value grows
+        /// symmetrically about the column rather than dragging it sideways.
+        /// </para>
         /// </summary>
-        private static int TrackRightEdge(int trackSpan, int index)
+        private static int TrackBandRightEdge(int trackSpan, int index, int numberColumnWidth)
         {
-            return JustifiedColumnTracks.RightEdge(
-                CurrencyNameX, trackSpan, CurrencyTrackCount, index);
+            return JustifiedColumnTracks.CenteredX(
+                CurrencyNameX, trackSpan, CurrencyTrackCount, index, numberColumnWidth)
+                + numberColumnWidth;
         }
 
         private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
         {
             int markerX = rightEdge - CurrencyMarkerWidth;
 
-            // Needed is the table's own right edge in BOTH regimes below -
-            // the marker trails it, and every plan table pins its rightmost
-            // column to the panel edge (PlanRelayoutMath.PinnedRightEdge).
+            // The table's own right edge, which the marker trails: the
+            // packed stack's Needed column, and the last track's end under
+            // distribution (where Needed's band centres on that track and so
+            // stops short of it by half the track's slack).
             int neededRightEdge = markerX - CurrencyColumnGap;
 
             // A track has to hold its own reserved number band plus the gap
@@ -508,15 +543,17 @@ namespace TaimisToolbench.Services
                     trackSpan, CurrencyTrackCount, numberColumnWidth, CurrencyColumnGap))
             {
                 return new CurrencyColumnEdges(
-                    TrackRightEdge(trackSpan, 1),
-                    TrackRightEdge(trackSpan, 2),
-                    neededRightEdge,
-                    markerX);
+                    TrackBandRightEdge(trackSpan, 1, numberColumnWidth),
+                    TrackBandRightEdge(trackSpan, 2, numberColumnWidth),
+                    TrackBandRightEdge(trackSpan, 3, numberColumnWidth),
+                    markerX,
+                    numberColumnWidth);
             }
 
             int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
-            return new CurrencyColumnEdges(requiredRightEdge, haveRightEdge, neededRightEdge, markerX);
+            return new CurrencyColumnEdges(
+                requiredRightEdge, haveRightEdge, neededRightEdge, markerX, numberColumnWidth);
         }
     }
 }

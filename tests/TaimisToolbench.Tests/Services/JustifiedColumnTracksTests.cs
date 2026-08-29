@@ -84,5 +84,25 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(JustifiedColumnTracks.FitsDistributed(600, 6, 80, 12));
             Assert.False(JustifiedColumnTracks.FitsDistributed(600, 6, 90, 12));
         }
+
+        [Fact]
+        public void CenteredInBand_IsTheSameLawAgainstOneColumnsOwnBand()
+        {
+            // The form every table's HEADER uses: the band, not an equal
+            // share of the row, is what the word has to sit over.
+            Assert.Equal(155, JustifiedColumnTracks.CenteredInBand(100, 150, 40));
+            // A band is a one-track row: the two forms must not drift apart.
+            Assert.Equal(
+                JustifiedColumnTracks.CenteredX(100, 150, 1, 0, 40),
+                JustifiedColumnTracks.CenteredInBand(100, 150, 40));
+        }
+
+        [Fact]
+        public void CenteredInBand_ContentAtLeastAsWideAsTheBand_PinsLeft()
+        {
+            Assert.Equal(100, JustifiedColumnTracks.CenteredInBand(100, 150, 150));
+            Assert.Equal(100, JustifiedColumnTracks.CenteredInBand(100, 150, 400));
+            Assert.Equal(100, JustifiedColumnTracks.CenteredInBand(100, 0, 40));
+        }
     }
 }
