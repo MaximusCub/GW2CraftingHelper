@@ -295,7 +295,7 @@ Views/Rendering/InlineSpinner.cs                                                
 Views/Rendering/LabelHelpers.cs                                                         273
 Views/Rendering/NotesSectionRenderer.cs                                                 222
 Views/Rendering/PillColors.cs                                                           125
-Views/Rendering/PlanHeaderRenderer.cs                                                   169
+Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
 Views/Rendering/RarityColors.cs                                                         147
