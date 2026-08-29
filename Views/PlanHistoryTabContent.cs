@@ -44,17 +44,6 @@ namespace TaimisToolbench.Views
         private const int ScrollbarAllowance = WindowSizing.ScrollbarAllowance;
         private const int ClearButtonWidth = 120;
 
-        /// <summary>The matched 16px X of Blish's own remove pair, by .dat asset id.</summary>
-        private const int RemoveMarkAssetId = 733269;
-
-        /// <summary>
-        /// Dark ink for the row's remove button. 733269 is authored white
-        /// for a dark window and the button plate under it is parchment, so
-        /// an untinted blit is invisible on it - the measured case
-        /// FeedbackButton.IconTint exists for.
-        /// </summary>
-        private static readonly Color RemoveIconTint = new Color(45, 42, 38);
-
         // The one row seat that cannot live in PlanHistoryRowLayout beside
         // the others: the module's button height is Views-layer geometry,
         // and Services does not reach into Views. Same centring rule.
@@ -697,9 +686,9 @@ namespace TaimisToolbench.Views
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
-            button.Icon = AsyncTexture2D.FromAssetId(RemoveMarkAssetId);
+            button.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
             button.ResizeIcon = true;
-            button.IconTint = RemoveIconTint;
+            button.IconTint = UiMetrics.RowButtonIconTint;
             TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
         }

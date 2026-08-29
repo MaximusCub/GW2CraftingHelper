@@ -111,17 +111,6 @@ namespace TaimisToolbench.Views
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
         private static readonly Color AffordableChipFill = AffordableChipBorder * 0.15f;
 
-        /// <summary>The matched 16px X of Blish's own remove pair, by .dat asset id.</summary>
-        private const int RemoveMarkAssetId = 733269;
-
-        /// <summary>
-        /// Dark ink for a row button's icon. 733269 is authored white for a
-        /// dark window and the button plate under it is parchment, so an
-        /// untinted blit is invisible on it - the measured case
-        /// FeedbackButton.IconTint exists for.
-        /// </summary>
-        private static readonly Color RowButtonIconTint = new Color(45, 42, 38);
-
         // The comparison-mode radio indicator: 157330 is the small green dot
         // the game uses for "on"; its "-cantint" twin is the grey dot for
         // "off". Art, not a U+25CF/U+25CB pair - neither exists in the font.
@@ -868,7 +857,7 @@ namespace TaimisToolbench.Views
         {
             bands.DataTrack(column, out int trackX, out int trackWidth);
             return Math.Max(0, JustifiedColumnTracks.CenteredX(
-                trackX, trackWidth, 1, 0, contentWidth));
+                trackX, trackWidth, contentWidth));
         }
 
         /// <summary>
@@ -1480,9 +1469,9 @@ namespace TaimisToolbench.Views
             }
 
             row.Remove = CreateRowButton(row.Panel, bands.RemoveX, "Remove this item from your list.");
-            row.Remove.Icon = AsyncTexture2D.FromAssetId(RemoveMarkAssetId);
+            row.Remove.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
             row.Remove.ResizeIcon = true;
-            row.Remove.IconTint = RowButtonIconTint;
+            row.Remove.IconTint = UiMetrics.RowButtonIconTint;
             row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
@@ -2875,7 +2864,7 @@ namespace TaimisToolbench.Views
             var snapshot = _getSnapshot();
             if (snapshot != null)
             {
-                text += " - " + StatusText.ForSnapshotAgeSuffix(DateTime.UtcNow - snapshot.CapturedAt);
+                text += " (" + StatusText.ForSnapshotAgeSuffix(DateTime.UtcNow - snapshot.CapturedAt) + ")";
             }
 
             ApplyStatusText(text, isError: false);

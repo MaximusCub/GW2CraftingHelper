@@ -97,6 +97,23 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// X at which content centres in an already-computed band. The same
+        /// arithmetic as the track overload, for callers that hold a rect
+        /// rather than a track index; without it they pass a track count of
+        /// one and an index of zero to say "this band", which reads as
+        /// arithmetic rather than as intent.
+        /// </summary>
+        public static int CenteredX(int x, int width, int contentWidth)
+        {
+            if (contentWidth >= width)
+            {
+                return x;
+            }
+
+            return x + (width - contentWidth) / 2;
+        }
+
+        /// <summary>
         /// Whether a span is wide enough to distribute at all. A track has
         /// to hold its own reserved band plus the gap that keeps a wide
         /// value out of the column to its left; below that width there is
