@@ -9,7 +9,7 @@
 1. `"/mnt/c/Program Files/dotnet/dotnet.exe"` (WSL)
 2. `dotnet` (native Windows / on PATH)
 
-When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths** (e.g., `C:/Dev/Blish/GW2CraftingHelper/...`) -- MSBuild cannot resolve `/mnt/` paths.
+When invoking Windows `dotnet.exe` from WSL, pass **Windows-style project paths** (e.g., `C:/Dev/Blish/TaimisToolbench/...`) -- MSBuild cannot resolve `/mnt/` paths.
 
 ### gh (GitHub CLI)
 
