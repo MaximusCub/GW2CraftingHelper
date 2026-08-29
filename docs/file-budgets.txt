@@ -304,7 +304,7 @@ Views/Rendering/ShoppingBadgeColors.cs                                          
 Views/Rendering/ShoppingListSectionRenderer.cs                                          453
 Views/Rendering/SortableHeaderCells.cs                                                  230
 Views/Rendering/SortableHeaderLabel.cs                                                   69
-Views/Rendering/SummarySectionRenderer.cs                                               943
+Views/Rendering/SummarySectionRenderer.cs                                               957
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2029

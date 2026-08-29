@@ -355,7 +355,7 @@ namespace TaimisToolbench.Tests.Services
 
             // The disclosure line under the AMOUNT stays Caption, and its
             // own reserve is that tier's lowest ink plus the gap above it,
-            // so a descender on "+ 2 currencies required" lands inside the
+            // so a descender on "+ 2 Currencies Required" lands inside the
             // band rather than on the row under it.
             Assert.Equal(
                 SummarySectionLayoutMath.CostBandCurrencyNoteHeight,
@@ -462,7 +462,7 @@ namespace TaimisToolbench.Tests.Services
                 SummarySectionLayoutMath.CostBandBoxWidth(0));
 
             // The widest run a real result tile carries is the disclosure
-            // line ("+ N currencies required") at the caption font, which
+            // line ("+ N Currencies Required") at the caption font, which
             // measures well under 160px; the box must clear that with both
             // pads even in the narrowest tile slice.
             Assert.True(SummarySectionLayoutMath.CostBandBoxWidth(160) <= geometry.TileWidth);
@@ -514,14 +514,14 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void CurrencyRequirementNote_OneCurrency_ReadsSingular()
         {
-            Assert.Equal("+ 1 currency required",
+            Assert.Equal("+ 1 Currency Required",
                 SummarySectionLayoutMath.CurrencyRequirementNote(1));
         }
 
         [Fact]
         public void CurrencyRequirementNote_ManyCurrencies_StatesTheCount()
         {
-            Assert.Equal("+ 3 currencies required",
+            Assert.Equal("+ 3 Currencies Required",
                 SummarySectionLayoutMath.CurrencyRequirementNote(3));
         }
 
