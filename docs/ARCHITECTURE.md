@@ -916,3 +916,178 @@ case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
 request-only restore), `Models/PlanHistoryEntry.cs` and
 `Services/PlanHistoryStore.cs` (the index's readable range and the
 additive-only row graph behind it).
+
+---
+
+## V. Views: relocated design narrative
+
+The `Views/` tree carries a lot of hard-won reasoning: decompiled Blish HUD
+1.3.0 behaviour, pixel simulations, bug post-mortems, and the arguments
+behind choices that look arbitrary from the outside. That reasoning is
+worth keeping, but a forty-line XML doc comment stops being read. This
+section is where the derivations live. Each member's own doc comment keeps
+the part a caller can violate - the invariant, the measured constant, the
+Blish quirk you need to know to use it - and points here for the rest.
+
+The subsections below are ordered by file, top-level `Views/` first, then
+`Views/Rendering/`.
+
+### V.1 `AboutTabContent`: rebuilt per visit, and the SemVer reflection
+
+The About tab is the same shape as `LogTabContent`: one
+`FlowPanel(CanScroll)`, a `Build(Container)` that populates it once, and no
+relayout registry. Nothing on it is interactive beyond plain
+selectable/copyable text, so there is no state worth keeping "sticky"
+across a tab revisit and the rebuild-per-visit cost buys correctness for
+free. `MainView` carries the cross-cutting note on that rebuild policy.
+
+The manifest read cannot fail under normal operation: `ModuleParameters.Manifest`
+is the exact object Blish HUD itself already parsed and validated in order
+to load this module at all. The hand-parse of the packaged `manifest.json`
+exists for the cases where it somehow does anyway - a null `Manifest`, an
+unexpectedly blank `Name`, or any exception - and mirrors the
+try/catch-with-graceful-fallback shape `Module.Initialize()` already uses
+four times for seed files.
+
+`Manifest.Version` and a dependency's `VersionRange` are typed
+`SemVer.Version` / `SemVer.Range`, from the external "SemVer" NuGet package
+Blish HUD embeds via Costura at runtime. This project has no compile-time
+reference to it, so a direct property access does not compile. Reflection
+(`ToString()` only) avoids adding a package reference for a two-field,
+display-only read.
+
+### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
+
+It follows the same `StandardWindow` construction technique as
+`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
+`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
+class rather than a generalization of it. `ModalDialog`'s shape is one
+short sentence, a fixed "Confirm" title, and a caller-named confirm button
+beside a fixed Cancel; this dialog is a multi-line numbered checklist under
+a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
+is also not wrapped at all, which is fine for its own short sentence and
+wrong for full-sentence checklist items.
+
+It deliberately skips `ModalDialog`'s settings-backed drag position
+persistence. This is a rare error-path dialog, not a workflow a user
+repeatedly opens and repositions, so it simply centers on every `Show()`
+and needs no new `ModuleSettings` entries.
+
+The failure it explains is real and was reported: at character select,
+Blish has not yet resolved the game's Mumble identity, every account data
+source call fails with an invalid or missing API key, and the Snapshot
+tab's Refresh Now used to show only the unhelpful "Refresh Failed -
+{time}".
+
+### V.3 `FocusRelease`: how Blish's focus slot gets orphaned
+
+`TextInputBase.Focused`'s setter assigns
+`GameService.Input.Keyboard.FocusedControl = this` on every change, a
+change to `false` included. Blish itself soft-unfocuses in two places: the
+click-away handler (`Focused = _mouseOver && _enabled`) and
+`DisposeControl`. The second runs after `Control.Dispose` has already
+cleared `Parent`, so a box disposed while focused leaves that one global
+slot holding an orphan whose `GetAncestors()` is empty - which
+`KeyboardHandler`'s ancestor-visibility sweep can therefore never heal.
+
+A slot naming one box while another still holds focus is what the user
+feels. Escape is consumed clearing the slot instead of the box, and
+re-clicking the live box cannot repair it, because the setter's
+change-detection skips the assignment when `_focused` is already true. That
+is why the release has to go through `UnsetFocus()` and why it retries.
+
+### V.4 `ItemInputRowStrip`: why it is not under `Views/Rendering/`
+
+Its controls are `AutocompleteTextBox`, `SuggestionPanel` and
+`FocusRelease`, all of which are `Views` types. Putting the strip under
+`Views/Rendering/` would make that folder reference `Views` and reverse the
+one-way dependency section 5 above states.
+
+### V.5 `LogTabContent`: the three-column row split, and the follow poll
+
+`LogRow` splits each entry into four controls (panel plus three labels)
+where the previous shape used three, and pays one more `EllipsizeToWidth`
+per row per refit. Both are bounded by the ring cap (2000) and by what the
+filter admits, the refit loop is `SuspendLayout`-wrapped, and on a resize
+the ellipsize half runs once per drag rather than once per drag event.
+
+One divergence is accepted rather than fixed: timestamps do not align
+pixel-for-pixel between an `[INFO]` row and a `[DEBUG]` one, because the
+level word and the stamp share the Time label. Fixing it costs a fifth
+control per row on the module's heaviest render path. The Tag and Message
+columns - the two a reader actually scans - do align.
+
+`PollForUpdates` is the "plus a poll" half of the refresh design in
+[`dev/proposals/d2-log-system.md`](../dev/proposals/d2-log-system.md)
+section 4.3, layered on top of the `TabChanged`-driven `Refresh`. That
+design is also what calls for the append-only incremental update rather
+than a full-rebuild `Refresh()` on every version bump.
+
+### V.6 `MainView`: Clear Cache, Refresh Now, status, and the result repack
+
+Interposing a confirm dialog in front of Clear Cache opens a window in
+which a refresh can start, which the old single-click version could not:
+Refresh Now disables Clear Cache for its whole duration, but not the
+reverse. Both buttons are therefore disabled for the dialog's lifetime, and
+because `Build()` recreates them on every tab visit - which would re-enable
+them mid-dialog - the confirm also bumps `_clearGeneration`.
+
+`RefreshNowAsync` is a method rather than an inline lambda because the
+`ApiAccessDialog`'s Retry button invokes it too. Both entry points are
+Blish UI event handlers (a `Click`, or the dialog's own `Click`-driven
+Retry callback), so both always start on the main thread - the same
+argument `CraftingPlanView.TriggerGenerate` makes about its own
+confirm-modal callback.
+
+`ApplyStatusDisplay`'s parentheses around the elapsed time are the method's
+own, and they are what keep the age from reading as part of the timestamp
+beside it ("Updated - Aug 15, 2026 3:41 PM (2m ago)"). The `_statusLabel`
+now lives in its own full-width `_statusPanel` row beneath the header
+rather than in the header's shared, button-crowded run, which is why the
+composed text is not truncated: a full-width row is far less likely to run
+out of space, and truncating a status message is worse than letting a rare
+long one reach the edge.
+
+`RefitResultRows` keeps the scroll position across a repack that KEEPS the
+column count - the grid panel's width moves, its height does not. A repack
+that CHANGES the column count writes a new grid-panel height, and Blish's
+`Scrollbar` zeroes the scroll position a frame after any content-height
+change (measured: KNOWN-ISSUES #55, "The grid panel holds its unfiltered
+height"), so the list snaps to top. That is not defended against: this tab
+has no scroll-restore machinery - `CraftingPlanView.PreserveScrollAcross`
+is the module's only one - and a column-count change re-flows every row
+anyway, so there is no old position left to hold.
+
+### V.7 `ModalBackdrop`: what it is for, and what it must not block
+
+Before it existed, a confirm was only visually on top: with the Clear Cache
+confirm open, a click on the Crafting Plan tab's "+" add-row button behind
+it still registered.
+
+It covers the module window rather than the screen because a capturing
+control also stops the GAME from seeing the click. A screen-wide blocker
+would mean a confirm left open swallows every click in Guild Wars 2, which
+is not a trade a HUD overlay should make for a two-button confirm. The
+finding is about the surface the dialog belongs to, so that is exactly what
+is blocked.
+
+The Z-order arithmetic behind the lazy construction: a window's effective
+`ZIndex` is `5 + Screen.WINDOW_BASEZINDEX + its rank among windows ordered
+by (TopMost, LastInteraction)`, so it is not a compile-time constant and a
+`TopMost` dialog can land exactly one above a non-`TopMost` module window.
+On the tie that arithmetic can produce with the blocked window, the
+sibling-index tiebreak in `Container.TriggerMouseInput` decides - which is
+why the backdrop is constructed on the first `Show()`, after every window
+exists, so it is always the later child.
+
+### V.8 `SettingsTabContent.EnsureCurrencyRowIcon`: two different readiness tests
+
+A currency row is held to the currency LIST having resolved; a barter item
+row is held to the ITEM ID it resolved. The asymmetry is deliberate,
+because the two fetches answer different questions. Once the currency list
+has resolved, every currency row gets an icon control, and a currency the
+list carries with no icon URL of its own gets `IconControls`' empty-slot
+placeholder - which is the state it really is in. The item fetch answers
+per id, so an id absent from the reply is one nobody has an icon for yet,
+not one the API says has none; holding a barter row to "the fetch happened"
+would draw the placeholder over the first case.

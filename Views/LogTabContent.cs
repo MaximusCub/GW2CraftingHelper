@@ -158,18 +158,9 @@ namespace TaimisToolbench.Views
         /// per-render change guard in ApplyRowLayout can compare against it
         /// directly.
         /// <para>
-        /// Cost of the split, stated: four controls per row against three,
-        /// and one more EllipsizeToWidth per row per refit. Both are bounded
-        /// by the ring cap (2000) and by what the filter admits, the refit
-        /// loop is SuspendLayout-wrapped, and on a resize the ellipsize half
-        /// runs once per drag rather than once per drag event.
-        /// </para>
-        /// <para>
-        /// Accepted divergence: timestamps still do not align pixel-for-pixel
-        /// between an [INFO] row and a [DEBUG] one, because the level word
-        /// and the stamp share the Time label. Fixing it costs a FIFTH
-        /// control per row on the module's heaviest render path. The Tag and
-        /// Message columns - the two a reader scans - do align.
+        /// What the four-controls-per-row split costs, and the timestamp
+        /// alignment it accepts in exchange: docs/ARCHITECTURE.md, "Views:
+        /// relocated design narrative".
         /// </para>
         /// </summary>
         private sealed class LogRow
@@ -443,28 +434,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Called from Module.Update() only while this tab is the selected
-        /// one (a cheap Version compare when nothing changed, and a no-op
-        /// at all while Follow is unchecked) - the "PLUS a poll" half of d2
-        /// Section 4.3's refresh design, on top of the TabChanged-driven
-        /// <see cref="Refresh"/> below. An unchecked Follow freezes the
-        /// current view exactly like a paused `tail -f`, even though new
-        /// entries keep arriving in the ring underneath it. Also a no-op
-        /// until <see cref="_buildComplete"/> is set - see that field's own
-        /// doc comment for what this guards against.
+        /// Called from Module.Update() only while this tab is the selected one
+        /// (a cheap Version compare when nothing changed, and a no-op while
+        /// Follow is unchecked - an unchecked Follow freezes the view like a
+        /// paused `tail -f` even though entries keep arriving in the ring
+        /// underneath it). Also a no-op until <see cref="_buildComplete"/> is
+        /// set - see that field's own doc comment for what this guards against.
         /// <para>
         /// When Follow IS checked and new entries arrived, this uses the
-        /// incremental <see cref="AppendNewRows"/> path (d2 Section 4.3:
-        /// "append-only incremental update... rather than the full-rebuild
-        /// Refresh() on every version bump") instead of tearing down and
-        /// recreating every already-visible row - unless the panel is
+        /// incremental <see cref="AppendNewRows"/> path, unless the panel is
         /// currently showing the empty-state Label instead of real rows
-        /// (<see cref="_hasRenderedAnyRow"/> false), which has no
-        /// incremental equivalent and still falls back to a full
-        /// <see cref="RebuildRows"/>. Full rebuild otherwise stays reserved
-        /// for the filter-changed paths (level dropdown / search box /
-        /// Clear View) and for <see cref="Refresh"/>'s own tab-switch case.
+        /// (<see cref="_hasRenderedAnyRow"/> false), which has no incremental
+        /// equivalent and still falls back to a full <see cref="RebuildRows"/>.
+        /// Full rebuild otherwise stays reserved for the filter-changed paths
+        /// (level dropdown / search box / Clear View) and for
+        /// <see cref="Refresh"/>'s own tab-switch case.
         /// </para>
+        /// The refresh design this implements: docs/ARCHITECTURE.md, "Views:
+        /// relocated design narrative".
         /// </summary>
         public void PollForUpdates()
         {

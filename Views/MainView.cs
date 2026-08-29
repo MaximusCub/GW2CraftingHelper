@@ -1147,28 +1147,22 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// The Clear Cache button's click flow, behind the same ModalDialog
         /// confirm the Log tab's Delete Log File and the Crafting Plan tab's
-        /// regenerate gate use. The confirm is unconditional: clearing
-        /// deletes the only copy of the account snapshot, and rebuilding it
-        /// requires a reachable GW2 API - the exact condition a user is
-        /// often already stuck on when they reach for this button.
+        /// regenerate gate use. The confirm is unconditional: clearing deletes
+        /// the only copy of the account snapshot, and rebuilding it needs a
+        /// reachable GW2 API.
         /// <para>
-        /// Unlike Delete Log File, the destructive work stays inline on the
-        /// main thread: ClearCache is a token cancel plus a single
-        /// SnapshotStore.Delete and three field resets under
-        /// SnapshotCommitGate's lock - no queue drain, no lock a background
-        /// loop can hold - and SetSnapshot/SetStatus below are control
-        /// mutations that must run on the main thread anyway.
+        /// The destructive work stays inline on the main thread: ClearCache is
+        /// a token cancel plus a single SnapshotStore.Delete and three field
+        /// resets under SnapshotCommitGate's lock - no queue drain, no lock a
+        /// background loop can hold - and SetSnapshot/SetStatus below are
+        /// control mutations that must run on the main thread anyway.
         /// </para>
         /// <para>
-        /// Interposing a dialog opens a window in which a refresh can start,
-        /// which the single-click version could not: Refresh Now disables
-        /// Clear Cache for its whole duration, but not the reverse. Both
-        /// buttons are therefore disabled for the dialog's lifetime, and
-        /// because Build() recreates them on every tab visit (which would
-        /// re-enable them mid-dialog), the confirm also bumps
-        /// _clearGeneration so an already-in-flight refresh drops its own
+        /// Both buttons are disabled for the dialog's lifetime, and the confirm
+        /// bumps _clearGeneration so an already-in-flight refresh drops its own
         /// tail instead of repainting the snapshot the user just discarded.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void ConfirmClearCache()
         {
@@ -1230,29 +1224,23 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// The Refresh Now button's full click flow - also invoked by the
-        /// ApiAccessDialog's Retry button,
-        /// so this is a method rather than an inline lambda: both entry
-        /// points are Blish UI event handlers (Click, or the dialog's own
-        /// Click-driven Retry callback), so both always start on the main
-        /// thread, matching CraftingPlanView.TriggerGenerate's own doc
-        /// comment on why its own confirm-modal callback needs no extra
+        /// ApiAccessDialog's Retry button. Both entry points are Blish UI event
+        /// handlers, so both start on the main thread and need no extra
         /// synchronization here.
         /// <para>
-        /// On failure, classifies the exception via
-        /// SnapshotFailureClassifier (Blish-free, real-unit-tested) and:
-        /// ApiAccessNotReady pops the ApiAccessDialog walkthrough (the
-        /// character-select incident this exists for); every other kind
-        /// just gets a more specific status label than the old bare
-        /// "Refresh failed" - see StatusText.ForRefreshFailure.
+        /// On failure, SnapshotFailureClassifier (Blish-free, real-unit-tested)
+        /// decides what the user sees: ApiAccessNotReady pops the
+        /// ApiAccessDialog walkthrough, every other kind gets a specific status
+        /// label from StatusText.ForRefreshFailure.
         /// </para>
         /// <para>
         /// A Clear Cache that completes while this fetch is in flight wins:
         /// Module.ClearCache cancels the refresh token and deletes the store
-        /// under SnapshotCommitGate, but this continuation is outside that
-        /// gate, so the captured _clearGeneration is what keeps it from
-        /// repainting a discarded snapshot or overwriting "Cache cleared"
-        /// with a cancellation status.
+        /// under SnapshotCommitGate, but this continuation is outside that gate,
+        /// so the captured _clearGeneration keeps it from repainting a discarded
+        /// snapshot or overwriting "Cache cleared" with a cancellation status.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private async Task RefreshNowAsync()
         {
@@ -1450,28 +1438,23 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Composes the header status label's text (base status text plus
-        /// a staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM
-        /// (2m ago)" - the parentheses are this method's, and are what keep
-        /// the elapsed time from reading as part of the timestamp beside
-        /// it, see StatusText.ForSnapshotAgeSuffix) and recolors it once the
-        /// snapshot is older than the
-        /// SnapshotRefreshIntervalMinutes setting - the same threshold
-        /// Module.Update()'s auto-refresh gate reads, re-read (clamped)
-        /// on every call here just like that gate does, so a Settings tab
-        /// save is picked up by the next call rather than needing a
-        /// rebuild. Called from every place the
-        /// status text or the snapshot itself changes (Build's initial
-        /// render, SetSnapshot, SetStatus) so the two can never drift out
-        /// of sync with each other.
+        /// Composes the header status label's text (base status text plus a
+        /// staleness-age suffix, e.g. "Updated - Aug 15, 2026 3:41 PM (2m ago)"
+        /// - see StatusText.ForSnapshotAgeSuffix) and recolors it once the
+        /// snapshot is older than the SnapshotRefreshIntervalMinutes setting -
+        /// the same threshold Module.Update()'s auto-refresh gate reads, re-read
+        /// (clamped) on every call here just like that gate does, so a Settings
+        /// tab save is picked up by the next call rather than needing a rebuild.
+        /// Called from every place the status text or the snapshot itself
+        /// changes (Build's initial render, SetSnapshot, SetStatus) so the two
+        /// can never drift out of sync.
         /// <para>
-        /// _statusLabel lives in its own full-width _statusPanel row
-        /// beneath the header, so a long status string has no button run
-        /// to collide with. This
-        /// method still intentionally does not truncate the composed text;
-        /// the full-width row is simply far less likely to run out of
-        /// space than the header's old shared, button-crowded run was.
+        /// The composed text is deliberately not truncated; _statusLabel owns a
+        /// full-width row of its own beneath the header, with no button run to
+        /// collide with.
         /// </para>
+        /// Why the parentheses and the full-width row: docs/ARCHITECTURE.md,
+        /// "Views: relocated design narrative".
         /// </summary>
         private void ApplyStatusDisplay()
         {
@@ -1534,29 +1517,21 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Repacks the rows already on screen against the content panel's
-        /// current width, in place: the grid is recomputed (a wider window
-        /// can gain a column, a narrower one drop back to the single-column
+        /// current width, in place: the grid is recomputed (a wider window can
+        /// gain a column, a narrower one drop back to the single-column
         /// fallback), every cell moves to its new slot, and each of its text
-        /// lines is re-ellipsized against the new COLUMN width - not the
-        /// panel width - with its amount re-pinned. Text and position only:
-        /// an item row's tooltips are stamped once at build and say the same
-        /// at any width, and the one exception is the wallet row, whose
-        /// plain note exists only where the name had to shorten and so is
-        /// re-decided here (StampWalletRowTooltip). No search re-run and no
-        /// dispose-and-recreate, which is why a width change no longer goes
-        /// through RebuildContent.
+        /// lines is re-ellipsized against the new COLUMN width - not the panel
+        /// width - with its amount re-pinned. Text and position only: an item
+        /// row's tooltips are stamped once at build and say the same at any
+        /// width, and the one exception is the wallet row, whose plain note
+        /// exists only where the name had to shorten and so is re-decided here
+        /// (StampWalletRowTooltip). No search re-run and no dispose-and-recreate,
+        /// which is why a width change no longer goes through RebuildContent.
         /// <para>
-        /// The scroll position survives a repack that KEEPS the column count
-        /// - the grid panel's width moves, its height does not. A repack that
-        /// changes the column count writes a new grid-panel height, and
-        /// Blish's Scrollbar zeroes the scroll position a frame after any
-        /// content-height change (measured: KNOWN-ISSUES #55, "The grid panel holds its
-        /// unfiltered height"), so the list snaps to top.
-        /// Not defended against here: the tab has no scroll-restore
-        /// machinery (CraftingPlanView.PreserveScrollAcross is the module's
-        /// only one), and a column-count change re-flows every row anyway, so
-        /// there is no old position left to hold.
+        /// A repack that changes the column count snaps the list to top, and
+        /// that is not defended against here.
         /// </para>
+        /// Why not: docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RefitResultRows()
         {
