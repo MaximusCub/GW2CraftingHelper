@@ -234,45 +234,17 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Solve-invariant state threaded through every Evaluate()
-        /// recursion, constructed once per Solve() call. Only the node
-        /// under evaluation varies per call and stays a plain parameter.
-        /// Fields hold the locals Solve() previously threaded into
-        /// Evaluate(), already normalized where Solve() normalizes them.
-        /// </summary>
-        /// <summary>
         /// Everything one Solve() call needs to price vendor cost lines by
         /// solving them: the prebuilt quantity-1 subtrees, a memo keyed by
         /// item id, the sibling <see cref="EvaluateContext"/> those subtrees
         /// are evaluated into, and the three guards that make the recursion
-        /// provably terminate.
+        /// terminate. Why the work is linear, and why a cut answers
+        /// Unresolved rather than a partial figure:
+        /// docs/ARCHITECTURE.md section 7.4.
         /// <para>
         /// The subtrees are evaluated into their OWN memo, never the plan
         /// tree's: every entry of that memo becomes a public SolverDecision,
         /// and a subtree node is not a node of the plan.
-        /// </para>
-        /// <para>
-        /// Termination, and why the work is linear. Every id is written to
-        /// <see cref="Memo"/> the first time it is asked for - a resolved
-        /// value, or Unresolved when the attempt was cut - so no id is ever
-        /// evaluated twice and the total number of subtree evaluations is at
-        /// most <see cref="Subtrees"/>.Count. <see cref="Budget"/> is set to
-        /// exactly that number, so it is a redundant check rather than a
-        /// behavioural cap. <see cref="Visiting"/> holds the item ids
-        /// currently being resolved and refuses re-entry, which is what cuts
-        /// a cost-line cycle - the shipped corpus has them, 86094 and 91232
-        /// among others - instead of following it forever;
-        /// <see cref="MaxDepth"/> bounds a long acyclic chain the same way.
-        /// </para>
-        /// <para>
-        /// A cut answers Unresolved rather than a partial figure, and that
-        /// answer is memoized. Both halves matter. A partial figure looks
-        /// like money and could win a comparison it should lose, whereas
-        /// Unresolved leaves the line a barter line - the pre-expansion
-        /// treatment, which no route can win on. Memoizing it is what keeps
-        /// a cycle from re-resolving its members combinatorially. The
-        /// precision given up is real (an id cut once stays uncosted for the
-        /// rest of the solve) and is given up in the safe direction.
         /// </para>
         /// </summary>
         private sealed class CostLineResolutionState
@@ -321,6 +293,13 @@ namespace TaimisToolbench.Services
             public EvaluateContext Context { get; set; }
         }
 
+        /// <summary>
+        /// Solve-invariant state threaded through every Evaluate()
+        /// recursion, constructed once per Solve() call. Only the node
+        /// under evaluation varies per call and stays a plain parameter.
+        /// Fields hold the locals Solve() previously threaded into
+        /// Evaluate(), already normalized where Solve() normalizes them.
+        /// </summary>
         private sealed class EvaluateContext
         {
             public IReadOnlyDictionary<int, ItemPrice> Prices { get; }

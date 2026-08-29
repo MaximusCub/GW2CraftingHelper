@@ -44,15 +44,27 @@ namespace TaimisToolbench.Services
             RecipeNode node,
             IReadOnlyDictionary<string, int> bestRatingByDiscipline)
         {
-            if (offer == null || offer.OutputCount <= 0 || offer.CostLines == null ||
-                node == null || node.Recipes == null || bestRatingByDiscipline == null)
+            // Ordered cheapest-first: bestRatingByDiscipline is null on every
+            // account without a snapshot, and node.Recipes is empty for most
+            // vendor-purchasable items, so the common calls cost one branch
+            // and allocate nothing. This runs per offer per node, and a
+            // single item id can carry hundreds of offers.
+            if (bestRatingByDiscipline == null ||
+                node == null || node.Recipes == null || node.Recipes.Count == 0 ||
+                offer == null || offer.OutputCount <= 0 || offer.CostLines == null)
+            {
+                return false;
+            }
+
+            var offerItemCounts = SumItemCostLines(offer, out bool offerHasNonItemCost);
+            if (offerItemCounts == null)
             {
                 return false;
             }
 
             for (int i = 0; i < node.Recipes.Count; i++)
             {
-                if (IsDominatedBy(offer, node.Recipes[i], bestRatingByDiscipline))
+                if (IsDominatedBy(node.Recipes[i], offerItemCounts, offerHasNonItemCost, offer.OutputCount, bestRatingByDiscipline))
                 {
                     return true;
                 }
@@ -62,8 +74,10 @@ namespace TaimisToolbench.Services
         }
 
         private static bool IsDominatedBy(
-            VendorOffer offer,
             RecipeOption recipe,
+            Dictionary<int, long> offerItemCounts,
+            bool offerHasNonItemCost,
+            int offerOutputCount,
             IReadOnlyDictionary<string, int> bestRatingByDiscipline)
         {
             if (recipe == null ||
@@ -81,18 +95,16 @@ namespace TaimisToolbench.Services
                 return false;
             }
 
-            var offerItemCounts = SumItemCostLines(offer, out bool offerHasNonItemCost);
-            if (offerItemCounts == null)
-            {
-                return false;
-            }
-
             // How many crafts one batch of this offer replaces.
-            long crafts = ((long)offer.OutputCount + recipe.OutputCount - 1) / recipe.OutputCount;
+            long crafts = ((long)offerOutputCount + recipe.OutputCount - 1) / recipe.OutputCount;
 
-            bool offerChargesMore = offerHasNonItemCost;
-            var coveredIds = new HashSet<int>();
-
+            // Totalled per item id BEFORE anything is compared. A Mystic Forge
+            // recipe fills four slots and may fill two of them with the same
+            // item, and comparing each entry against the offer's whole count
+            // separately would call a 1x charge sufficient for a 2x
+            // requirement - domination claimed for an offer that is genuinely
+            // the cheaper route.
+            var needed = new Dictionary<int, long>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
                 if (ingredient == null ||
@@ -114,30 +126,32 @@ namespace TaimisToolbench.Services
                     return false;
                 }
 
-                long needed = crafts * (ingredient.Quantity / recipe.CraftsNeeded);
-                if (!offerItemCounts.TryGetValue(ingredient.Id, out long charged) || charged < needed)
+                needed.TryGetValue(ingredient.Id, out long running);
+                needed[ingredient.Id] = running + (crafts * (ingredient.Quantity / recipe.CraftsNeeded));
+            }
+
+            bool offerChargesMore = offerHasNonItemCost;
+
+            foreach (var requirement in needed)
+            {
+                if (!offerItemCounts.TryGetValue(requirement.Key, out long charged) ||
+                    charged < requirement.Value)
                 {
                     return false;
                 }
 
-                if (charged > needed)
+                if (charged > requirement.Value)
                 {
                     offerChargesMore = true;
                 }
-
-                coveredIds.Add(ingredient.Id);
             }
 
-            if (!offerChargesMore)
+            // A cost line the recipe never asked for. Counting suffices: every
+            // requirement matched a distinct entry above, so more entries than
+            // requirements means at least one line is extra.
+            if (!offerChargesMore && offerItemCounts.Count > needed.Count)
             {
-                foreach (var kvp in offerItemCounts)
-                {
-                    if (!coveredIds.Contains(kvp.Key))
-                    {
-                        offerChargesMore = true;
-                        break;
-                    }
-                }
+                offerChargesMore = true;
             }
 
             // An offer charging EXACTLY the recipe's ingredients and nothing

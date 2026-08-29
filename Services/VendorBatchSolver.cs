@@ -132,21 +132,18 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Splits vendor offers into comparable and fallback tiers on their NON-COIN
-        /// cost lines (a non-coin wallet currency, or a BARTER line - an Item cost
-        /// line whose item has no Trading Post price; an Item line that HAS a TP
-        /// price is money, folds into the offer's real coin cost, and consults no
-        /// valuation). COMPARABLE means no non-coin lines at all, or a valuation for
-        /// every one of them; any unvalued non-coin line makes the offer
-        /// fallback-only. A valuation moves the comparison value alone - the coin,
-        /// currency and barter amounts committed to the plan are never scaled by it.
-        /// A fallback coin-part tie breaks on unit count ONLY when both offers cost
-        /// the same single non-coin line, kind included; across different lines
-        /// there is no exchange rate, so their unit counts must never be compared
-        /// and the first-listed offer keeps the tie.
-        /// An Item line the Trading Post cannot price is still money whenever
-        /// <paramref name="costLineResolver"/> can cost it by solving it (section
-        /// 7.4): only a line nothing can price at all stays a barter line.
-        /// Tiers: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
+        /// cost lines: a non-coin wallet currency, or a BARTER line - an Item cost
+        /// line neither the Trading Post nor <paramref name="costLineResolver"/>
+        /// (which costs a line by solving it) can price - an Item line either can
+        /// price is money, folding into real coin and consulting no valuation.
+        /// COMPARABLE means no non-coin lines at all, or a valuation for every
+        /// one; any unvalued one makes the offer fallback-only. A valuation moves
+        /// the comparison value alone - the coin, currency and barter amounts
+        /// committed to the plan are never scaled by it. A fallback coin-part tie
+        /// breaks on unit count ONLY when both offers cost the same single
+        /// non-coin line, kind included - across different lines there is no
+        /// exchange rate to compare their unit counts through.
+        /// Tiers: docs/ARCHITECTURE.md sections 7.1 and 7.4.
         /// </summary>
         /// <remarks>
         /// A DailyCap/WeeklyCap/SeasonalCap NEVER excludes an offer or affects its
@@ -340,11 +337,10 @@ namespace TaimisToolbench.Services
                         }
                         else if (cost.Count > 0)
                         {
-                            // No Trading Post price. Before asking the solver
-                            // to cost the line, this was the end of the road:
-                            // a barter line, folded into no coin at all, which
-                            // is how an offer that mirrors a recipe and adds a
-                            // fee came to look cheaper than the recipe.
+                            // No Trading Post price - which used to be the end
+                            // of the road, and is why an offer that mirrors a
+                            // recipe and adds a fee looked cheaper than the
+                            // recipe (docs/ARCHITECTURE.md section 7.4).
                             var solved = costLineResolver?.Invoke(cost.Id);
 
                             long lineCoin = 0L;
@@ -379,16 +375,13 @@ namespace TaimisToolbench.Services
                                 // the 1,032 item ids used as costs in
                                 // ref/vendor_offers.json have no TP price at
                                 // all, nearly all AccountBound) that nothing
-                                // could cost - no acquisition subtree, a cut
-                                // recursion, or no priceable route under it.
-                                // Its units are the cost, so nothing is folded
-                                // into coinCost - it is valued for COMPARISON
-                                // only, exactly like a non-coin currency line,
-                                // and leaves the offer fallback-tier when it
-                                // has no valuation. Discarding the whole offer
-                                // here instead would report "no vendor route"
-                                // for an item that is genuinely purchasable,
-                                // just not with gold.
+                                // could cost either. Its units are the cost,
+                                // so nothing folds into coinCost - it is
+                                // valued for COMPARISON only, exactly like a
+                                // non-coin currency line. Discarding the offer
+                                // instead would report "no vendor route" for
+                                // an item that is genuinely purchasable, just
+                                // not with gold.
                                 barterLineCount++;
                                 (itemCostRaw ?? (itemCostRaw = NewItemCostRaw()))
                                     .Add((cost.Id, cost.Count, 0L, false, 0L));

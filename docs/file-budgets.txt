@@ -54,7 +54,7 @@ Models/PersistedPlanLoad.cs                                                     
 Models/PillSourceCostBreakdown.cs                                                        76
 Models/PlanHistoryEntry.cs                                                              146
 Models/PlanRequestItem.cs                                                                26
-Models/PlanSolveContext.cs                                                              196
+Models/PlanSolveContext.cs                                                              212
 Models/PlanStatus.cs                                                                     11
 Models/PlanStep.cs                                                                       51
 Models/PlanViewModel.cs                                                                 431
@@ -96,7 +96,7 @@ Services/CompositeRecipeApiClient.cs                                            
 Services/CostLineValuation.cs                                                           105
 Services/CraftCompetencyEvaluator.cs                                                    125
 Services/CraftableItemSearchProvider.cs                                                 127
-Services/CraftingPlanPipeline.cs                                                       1406
+Services/CraftingPlanPipeline.cs                                                       1607
 Services/CraftingTreeBuilder.cs                                                         626
 Services/CurrencyDisplayResolver.cs                                                     236
 Services/CurrencyMetadataService.cs                                                     159
@@ -168,7 +168,7 @@ Services/PlanHistoryStore.cs                                                    
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
 Services/PlanResultBuilder.cs                                                           375
-Services/PlanSolver.cs                                                                 2076
+Services/PlanSolver.cs                                                                 2304
 Services/PlanStore.cs                                                                   219
 Services/PlanStoreHelpers.cs                                                            374
 Services/PlanStripStatusBoard.cs                                                        307
@@ -189,7 +189,7 @@ Services/RankerStore.cs                                                         
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
 Services/RecipeClientFactory.cs                                                          66
-Services/RecipeNodeIds.cs                                                                45
+Services/RecipeNodeIds.cs                                                                56
 Services/RecipeService.cs                                                               555
 Services/RecipeSheetItemSeedService.cs                                                   78
 Services/RecipeSheetSavingsCalculator.cs                                                326
@@ -233,7 +233,7 @@ Services/SnapshotResultLayout.cs                                                
 Services/SnapshotSearchResultBuilder.cs                                                 501
 Services/SnapshotStore.cs                                                                98
 Services/SnapshotTableSorter.cs                                                          99
-Services/SolveResult.cs                                                                  12
+Services/SolveResult.cs                                                                  21
 Services/SolverDecision.cs                                                              124
 Services/SourceFilterFlowLayout.cs                                                       85
 Services/StaticItemSearchProvider.cs                                                     42
@@ -260,7 +260,7 @@ Services/TreeToolbarRowLayout.cs                                                
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                    53
 Services/ValueDetailTooltipBuilder.cs                                                   159
-Services/VendorBatchSolver.cs                                                           990
+Services/VendorBatchSolver.cs                                                          1052
 Services/VendorOfferLoader.cs                                                            51
 Services/VendorOfferStore.cs                                                            218
 Services/WheelDeltaSanitizer.cs                                                          92

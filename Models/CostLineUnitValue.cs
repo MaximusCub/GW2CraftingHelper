@@ -3,26 +3,15 @@ namespace TaimisToolbench.Models
     /// <summary>
     /// What one unit of a vendor offer's Item cost line costs to acquire,
     /// once the solver has run the same craft/TP/vendor comparison over it
-    /// that a recipe ingredient already gets.
+    /// that a recipe ingredient already gets - docs/ARCHITECTURE.md 7.4.
     /// <para>
-    /// A NULL reference is the unresolved answer - no acquisition subtree, a
-    /// cut recursion, or no priceable route under the line - and the caller
-    /// then treats the line exactly as it did before cost lines were solved:
-    /// a barter line worth no coin.
-    /// </para>
-    /// <para>
-    /// The two figures are the solver's own pair and must not be conflated:
-    /// <see cref="RealCoin"/> is coin actually spent and is what reaches a
-    /// plan total, while <see cref="ComparisonExtra"/> is the decision-only
-    /// remainder (a valued wallet currency somewhere under the line) that may
-    /// move a comparison and must never be reported as gold.
+    /// A NULL reference is the unresolved answer, and the caller then treats
+    /// the line exactly as it did before cost lines were solved: a barter
+    /// line worth no coin.
     /// </para>
     /// <para>
     /// A mutable class with settable properties because it round-trips
-    /// through PersistedPlan: PlanSolveContext snapshots the resolved values
-    /// rather than the subtrees they came from, which is a few dozen small
-    /// rows instead of several thousand RecipeNodes on a path that
-    /// re-serializes on every override click.
+    /// through PersistedPlan - see PlanSolveContext.VendorCostLineValues.
     /// </para>
     /// </summary>
     internal class CostLineUnitValue

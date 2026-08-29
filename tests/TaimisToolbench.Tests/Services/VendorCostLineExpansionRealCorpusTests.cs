@@ -16,19 +16,14 @@ namespace TaimisToolbench.Tests.Services
     /// VendorOfferLoader and PlanSolver.
     /// <para>
     /// Lyhr, in the Wizard's Tower, sells the Obsidian Heavy Breastplate for
-    /// the four Gifts its recipe calls for plus 10 Globs of Ectoplasm. The
-    /// tree expanded recipe INGREDIENTS into solved nodes but vendor COST
-    /// LINES into unpriced leaves, so those same four Gifts cost their real
-    /// price on the craft path and nothing at all on the vendor path, and the
-    /// module recommended buying at 2g95s10c - the ectoplasm, and nothing
-    /// else. See docs/KNOWN-ISSUES.md item 44 and docs/ARCHITECTURE.md
-    /// section 7.4.
+    /// the four Gifts its recipe calls for plus 10 Globs of Ectoplasm, and
+    /// the module recommended buying at 2g95s10c - the ectoplasm, and nothing
+    /// else. docs/KNOWN-ISSUES.md item 44, docs/ARCHITECTURE.md section 7.4.
     /// </para>
     /// <para>
     /// Only Globs of Ectoplasm carry a price here, the same single input the
     /// original report was measured with, so the figures below are directly
-    /// comparable with it. Every other coin figure in the tree is derived by
-    /// the solver from that one price through the real corpus.
+    /// comparable with it.
     /// </para>
     /// </summary>
     public class VendorCostLineExpansionRealCorpusTests

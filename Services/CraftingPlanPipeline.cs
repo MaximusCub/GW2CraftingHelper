@@ -803,8 +803,30 @@ namespace TaimisToolbench.Services
             var mergedPrices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
 
             sw.Restart();
-            var expansion = await ExpandVendorCostLinesAsync(
-                allItemIds, vendorOffers, mergedPrices, priceBasis, ct);
+            VendorCostLineExpansion expansion;
+            try
+            {
+                expansion = await ExpandVendorCostLinesAsync(
+                    allItemIds, vendorOffers, mergedPrices, priceBasis, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Expansion makes an existing plan MORE honest; it must never
+                // be the reason there is no plan. Its own price and offer
+                // lookups are extra calls this method did not used to make, so
+                // a failure here degrades to no subtrees - the solver's
+                // pre-expansion behaviour - rather than losing the generation.
+                _moduleLog.Write(
+                    ModuleLogLevel.Warn,
+                    "plan",
+                    $"Vendor cost-line expansion failed; vendor cost lines will not be costed: {ex.GetType().Name} - {ex.Message}");
+                expansion = new VendorCostLineExpansion(vendorOffers, mergedPrices, null);
+            }
+
             sw.Stop();
             timingLog.Add(
                 $"Expand vendor cost lines: {sw.ElapsedMilliseconds}ms ({expansion.Subtrees?.Count ?? 0} items)");

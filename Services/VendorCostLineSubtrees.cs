@@ -47,21 +47,14 @@ namespace TaimisToolbench.Services
 
         private readonly Dictionary<int, RecipeNode> _byItemId;
 
-        private VendorCostLineSubtrees(Dictionary<int, RecipeNode> byItemId, int nextNodeId)
+        private VendorCostLineSubtrees(Dictionary<int, RecipeNode> byItemId)
         {
             _byItemId = byItemId;
-            NodeIdCeiling = nextNodeId;
         }
 
         public IReadOnlyDictionary<int, RecipeNode> ByItemId => _byItemId;
 
         public int Count => _byItemId.Count;
-
-        /// <summary>
-        /// One past the highest NodeId handed out here. Every subtree shares
-        /// one id sequence because they are all evaluated into one memo.
-        /// </summary>
-        public int NodeIdCeiling { get; }
 
         /// <summary>
         /// Takes ownership of <paramref name="subtreesByItemId"/> and numbers
@@ -93,7 +86,7 @@ namespace TaimisToolbench.Services
                 owned[itemId] = root;
             }
 
-            return owned.Count == 0 ? null : new VendorCostLineSubtrees(owned, nextNodeId);
+            return owned.Count == 0 ? null : new VendorCostLineSubtrees(owned);
         }
 
         /// <summary>
