@@ -1339,3 +1339,134 @@ labels stay unmatched (Feature 1 Open Question 2, resolved in favour of
 source-label matching). A row surfaced by a character match reports the
 account-wide total rather than the matched character's share, so the total
 keeps meaning the same thing on every row in the list.
+
+### S2.6 Receipt captions and the multi-item tree wrapper
+
+**`ReceiptCaptionHelper` - where the stacked shape comes from.** The stack
+this helper detects is produced by one branch of
+`CraftingTreeBuilder.BuildNode`: `componentLeaves != null &&
+wantsReferenceBranch`. That branch synthesizes the cost-component leaves,
+appends the reference branch's own recipe ingredients after them, and sets
+`node.IsReferenceBranch` - which is why "IsReferenceBranch and the first
+child is a cost component" identifies the case from the node alone, with no
+new model field. The helper is Blish-free by design so it can be exercised
+by a real test over plain `CraftingTreeNode` objects, independently of the
+`Views/Rendering` pass that consumes it. The caution about never touching
+`Children` is not stylistic: row heights flow through
+`PlanContentHeightMath`'s tree arm, which counts exactly
+`node.Children.Count` rows per level, so a caption rendered as an extra
+row - rather than as an extra tooltip line on an existing child's row -
+would desync a height the view assigns synchronously.
+
+**`RecipeService.BuildMultiItemTreeAsync` - why a synthetic wrapper.** For
+2+ items the per-item trees are wrapped under a synthetic root `RecipeNode`
+the same way gw2efficiency's frontend does for its own Calculator (see
+[`docs/gw2e-parity-spec.md`](gw2e-parity-spec.md)): a reserved-id,
+never-rendered "recipe" whose `Ingredients` are the N real item trees, each
+already carrying its own requested amount as its own `Quantity` (set by
+`BuildTreeAsync` itself, exactly like an ordinary recipe ingredient's
+quantity). Feeding that wrapper through the unmodified
+`PlanSolver`/`InventoryReducer`/`CraftingTreeBuilder` pipeline is what gives
+merged shopping-list, steps and currency totals for free, via the existing
+per-item-id aggregation in `PlanSolver.Collect`'s `AggregateStep`: no
+multi-item-specific solver logic exists, or is needed. The single-entry
+short-circuit echoes gw2e's own `if (r.length === 1) return r[0]`.
+
+### S2.7 Recipe-tree row identity
+
+**`TreeRowIdentity` - why a shared `NodeId` is not enough.**
+`RecipeNodeIds` gives a real recipe node a stable pre-order id, so there the
+id does fix the item for the row's life. A vendor cost-component leaf's id
+is `CraftingTreeBuilder.SyntheticComponentNodeId(parentNodeId,
+componentIndex)` - the leaf's *position* in the chosen offer's cost lines -
+while its name, icon and rarity come from that line's own `ItemId`. A
+re-solve that picks a different offer of the same shape (`{item, currency}`
+becoming `{other item, currency}`) keeps every id and every structural fact
+and changes only which items the lines name, so an identity-blind refresh
+would repaint one item's quantity, cost cell and tooltip under another
+item's name and icon.
+
+### S2.8 The re-solve status line
+
+**`StatusText.ForOverrideResolve` - why the count left the line.** The line
+used to carry the standing override count - "Decisions updated (3
+override(s))" - which is a different kind of fact. How many decisions you
+have overridden is the plan's *state*, true until you change it; this line
+says what just happened and is replaced by the next thing that does. The two
+are not connected, and a line that mixed them made the count vanish the
+moment anything else happened. The count lives in the top strip's Overrides
+chip now, where it persists and can be acted on.
+
+### S2.9 Window placement and the measured width floor
+
+**`WindowPlacement` - why the arithmetic is split out.** It is split out of
+`Views/ResizableTabbedWindow` on the same terms as `WindowSizing` and
+`PanelChromeMath`: the arithmetic is the part that has to be pinned, and a
+Blish control cannot be constructed in a Blish-free test.
+
+**What Blish's own clamp does and does not do.** `WindowBase2.Show` reads
+the persisted position and applies `Clamp(x, 0, SpriteScreen.Width - 64)`
+per axis (BlishHUD 1.3.0, decompiled). Nothing on that path consults the
+window's size, so a position saved against a wide client leaves an arbitrary
+amount of the window's right-hand side - cost column, Generate button,
+resize grip - past the edge of a narrower one, with no way to drag it back.
+A restored *size* gets no clamp at all on that same path, which is what
+`ClampExtent` exists for.
+
+**`WindowSizing.MinWindowWidth` - the term-by-term chain.** Measured at
+Menomonia 16 against the installed XNBs
+([`docs/research/minimum-window-width.md`](research/minimum-window-width.md)
+section 9 reproduces the method and every anchor figure of that report's own
+1478-era derivation):
+
+```
+ 629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
+ +24  the designed name-to-pill gutter at the deepest row
++256  TreePillColumnWidth
++335  cost column: 181 worst-digit six-digit-gold coin run
+                   + 154 widest two-currency vendor run
+  +8  TableRightMargin
+---- 1252  tab panel
++126  WindowToTabPanelChrome
+==== 1378
+```
+
+1378, not the 1232 the like-for-like depth-14 arithmetic gives on its own:
+1232 accepts that a row combining a forced-craft dust chain with a vendor
+currency run ellipsizes, and the maintainer declined that trade - "we are
+designing for a minimum resolution of 1920x1080, so cramming down to a
+smaller min-size that will result in cramped renders seems bad". The +154
+rider is what buys "a two-currency vendor run always fits at the floor".
+
+Down from 1478, which fitted the depth-23 "+24 Agony Infusion" chain
+untruncated. That chain now ellipsizes from depth 20 - six levels past the
+deepest realistic plan, and exactly the idiom of record everywhere else in
+the view (ellipsis, full name on the tooltip).
+
+The other contributor to this floor is the controls row, which is subsumed:
+its widest arrangement is the "Value Own Materials" checkbox at x=350 (its
+label measures 145px at Blish's own Font14, plus the box) clearing the
+right-anchored 120px Generate Plan button and `WindowToTabPanelChrome`'s
+trailing padding - under 700px all told, half of what the tree needs.
+
+### S2.10 Wiki link launch
+
+**`WikiLinkLauncher` - the first external-URL launch.** This is the module's
+first launch of an external URL, a deliberate maintainer decision. The
+try/catch exists because ShellExecute can throw for reasons outside the
+module's control - `Win32Exception` for no registered URL handler, a
+locked-down environment, and so on. The `Task.Run` offload was a later
+fix-pass: `ShellExecuteEx` blocks the calling thread until the shell hands
+the URL off, and a cold browser start, DDE negotiation, or a "choose an app"
+prompt can stall that call for hundreds of milliseconds to seconds, freezing
+the whole overlay - scroll and relayout included - for as long as it runs.
+
+### S2.11 Recipe corpus refresh
+
+**`RecipeCorpusRefresher` - the case that motivates it.** Recipe 14025's
+rift-essence ingredients turned from items into wallet currencies without
+the recipe id changing (KNOWN-ISSUES #48), and `RecipeCorpusVerifier` cannot
+see such a change because it only ever fetches ids the corpus lacks. The one
+comparison the refresher does make - is the fetched row identical to the
+seed's? - exists to keep the overlay from becoming a 10 MB duplicate of the
+shipped seed for no gain.

@@ -52,27 +52,23 @@ namespace TaimisToolbench.Services.Recipes
     }
 
     /// <summary>
-    /// The corpus sweep: refetches every positive recipe the module holds
-    /// from <c>/v2/recipes?ids=</c> once per game build, so a recipe whose
-    /// id never changed but whose INGREDIENTS did is not served stale
-    /// forever. Recipe 14025's rift-essence ingredients turning from items
-    /// into wallet currencies (KNOWN-ISSUES #48) is the case that motivates
-    /// it; <see cref="RecipeCorpusVerifier"/> cannot see such a change,
-    /// because it only ever fetches ids the corpus lacks.
+    /// The corpus sweep: refetches every positive recipe the module holds from
+    /// <c>/v2/recipes?ids=</c> once per game build, so a recipe whose id never
+    /// changed but whose INGREDIENTS did is not served stale forever.
+    /// <see cref="RecipeCorpusVerifier"/> cannot see such a change, because it
+    /// only ever fetches ids the corpus lacks.
     /// <para>
-    /// What comes back is stored, not compared-then-stored: the response
-    /// IS the recipe's current shape, so there is nothing to validate it
-    /// against. The one comparison here decides whether the row needs
-    /// WRITING at all - a fetched row identical to the seed's would make
-    /// the overlay a 10 MB duplicate of the shipped seed for no gain - and
-    /// it can only suppress a write that would have changed nothing.
+    /// What comes back is stored, not compared-then-stored: the response IS the
+    /// recipe's current shape, so there is nothing to validate it against. The
+    /// one comparison here decides whether the row needs WRITING at all, and it
+    /// can only suppress a write that would have changed nothing.
     /// </para>
     /// <para>
-    /// Different guarantee from the verifier's, so it is sequenced after
-    /// it and gates nothing: the verifier licenses NEGATIVES ("no recipe
-    /// makes this"), this repairs POSITIVES ("here is what it consumes").
-    /// Plan generation never waits on either; the corpus improves
-    /// underneath it.
+    /// Different guarantee from the verifier's, so it is sequenced after it and
+    /// gates nothing: the verifier licenses NEGATIVES ("no recipe makes this"),
+    /// this repairs POSITIVES ("here is what it consumes"). Plan generation
+    /// never waits on either; the corpus improves underneath it. See
+    /// docs/ARCHITECTURE.md, S2.11.
     /// </para>
     /// </summary>
     internal class RecipeCorpusRefresher

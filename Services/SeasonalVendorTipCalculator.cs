@@ -5,26 +5,23 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Pure, Blish-free post-solve
-    /// annotation pass, same architectural role/placement precedent as
-    /// ExcessCraftOutputCalculator - walks the plan's own shopping/craft
-    /// steps (NOT the recipe tree - a seasonal offer is unconditionally
-    /// excluded from solving, see SeasonalOfferFilter, so it never shows up
-    /// as a chosen decision to walk) looking for an item where a
-    /// currently-active festival vendor's offer beats this plan's own
-    /// chosen unit price.
+    /// Pure, Blish-free post-solve annotation pass (docs/ARCHITECTURE.md
+    /// section 10): walks the plan's own shopping/craft steps - NOT the recipe
+    /// tree, since a seasonal offer is unconditionally excluded from solving
+    /// (see SeasonalOfferFilter) and so never shows up as a chosen decision -
+    /// looking for an item where a currently-active festival vendor's offer
+    /// beats this plan's own chosen unit price.
     ///
     /// vendorOffers here is the RAW (unfiltered) dictionary - the same one
-    /// SeasonalOfferFilter strips seasonal offers OUT OF before it ever
-    /// reaches the solver - so this is the one place in the pipeline that
-    /// still needs to see them. activeFestivalNames is the plain-string
-    /// projection Module.cs reads once from Blish's FestivalContext (see
-    /// that class's own doc comment); empty/null here simply means no
-    /// active festival, never a guess.
+    /// SeasonalOfferFilter strips seasonal offers OUT OF before the solver ever
+    /// sees it - so this is the one place in the pipeline that still needs to
+    /// see them. activeFestivalNames is the plain-string projection Module.cs
+    /// reads once from Blish's FestivalContext (see that class's own doc
+    /// comment); empty or null here simply means no active festival, never a
+    /// guess.
     ///
-    /// Writes only CraftingPlanResult.SeasonalVendorTips. Never mutates
-    /// Plan/any total - same "advisory" contract as
-    /// ExcessCraftOutputCalculator's own doc comment.
+    /// Writes only CraftingPlanResult.SeasonalVendorTips. Never mutates Plan or
+    /// any total.
     /// </summary>
     internal static class SeasonalVendorTipCalculator
     {
