@@ -384,6 +384,48 @@ exempt and is still read directly: `WindowBase2.OnResized` assigns it from
 the new size synchronously, before raising `Resized`, so it is never a
 layout pass behind.
 
+### 4.2 What the height constants absorbed
+
+**The convergence the arithmetic replaced.** These containers used to rely
+on Blish's `FlowPanel` `HeightSizingMode.AutoSize`, which converges only
+one nested level per real engine frame: `Container.DoUpdate` sizes a
+container from its children's *current* bounds before recursing into those
+children's own `Update` for that same frame. That is the root cause of
+KNOWN-ISSUES #12/#14's multi-frame flash/stutter window. Because every row
+height in the plan view is a fixed constant, the whole tree of heights is
+knowable synchronously instead, and `CraftingPlanView` uses the same
+constants for the AutoSize-replacement containers and for the individual
+row `Panel`s - the "one source of truth" shape `ShoppingColumnMath`
+already has.
+
+**`CostTileLabelToValueGap` used to be a residual.** Both Total Cost bands
+bottom-anchored their amount inside a fixed row height, so the space under
+the caption was whatever the height arithmetic happened to leave over - 1px
+on the profit band, which the field report called cramped ("'Sell Value'
+and the gold line are a little cramped"). Anchoring the amount *under* the
+caption instead makes that gap one named constant at every band, and the
+two bands can no longer drift apart. Its value, 8, is derived from the
+caption tier's own metrics rather than chosen by eye; the derivation is in
+the constant's own doc comment, because the number is the thing a caller
+has to get right.
+
+**`MultiRootTreeFlowHeight` and the multi-root render.** gw2efficiency
+renders N independent top-level recipe trees, its synthetic wrapper node
+never surfacing (`docs/gw2e-parity-spec.md`), and this module matches that.
+Each requested item's own root node already *is* a full
+icon/name/quantity/pill/cost row - the same `CraftingTreeNode` shape
+`TreeNodeHeight` sizes for a single-item plan - so the multi-root height is
+that same per-root arithmetic summed across every root, plus one divider
+per adjacent pair. The one column header sits above every root rather than
+per root: the tree's right-hand columns would otherwise be unlabelled,
+unlike every other column-header table in the plan.
+
+**`PanelChromeMath` belongs to this section too**, and its "why" is the
+last part of 4.1 above: a panel's `ContentRegion` cannot be read back after
+a resize that happened inside a layout pass, so the arithmetic is mirrored
+Blish-free instead. The class's own doc comment states the hazard and
+points here rather than restating the mechanism.
+
 **Full history:** KNOWN-ISSUES items 12, 14, 19, 65.
 
 ---

@@ -6,19 +6,12 @@ namespace TaimisToolbench.Services
     /// RESIZED a panel can size that panel's children without reading the
     /// panel's ContentRegion back.
     /// <para>
-    /// Reading it back is not safe, which is the whole reason this exists.
-    /// Panel writes ContentRegion only from RecalculateLayout, and
-    /// Control.UpdateLayout skips RecalculateLayout entirely while the
-    /// control's PARENT is layout-suspended - which a parent is for the
-    /// duration of its own RecalculateLayout. A window that resizes itself
-    /// from inside its own layout pass (Views/ResizableTabbedWindow's
-    /// minimum-size clamp does exactly that) therefore reaches its Resized
-    /// subscribers with the child panel's ContentRegion still describing the
-    /// PREVIOUS size, and nothing re-reads it afterwards: the sizes computed
-    /// from it stay wrong until the next real resize. That was the
-    /// first-paint truncation - the hosted view's viewport kept a
-    /// pre-clamp height, so the bottom of the content was simply not there
-    /// until the window got nudged (KNOWN-ISSUES #65).
+    /// Reading it back is not safe, which is the whole reason this exists: a
+    /// window that resizes itself from inside its own layout pass reaches
+    /// its Resized subscribers with the child panel's ContentRegion still
+    /// describing the PREVIOUS size, and nothing re-reads it afterwards, so
+    /// sizes computed from it stay wrong (KNOWN-ISSUES #65). Derivation:
+    /// docs/ARCHITECTURE.md section 4.1.
     /// </para>
     /// <para>
     /// The vendor constants are not duplicated here: the one caller
