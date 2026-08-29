@@ -26,6 +26,10 @@ namespace TaimisToolbench.Views
     {
         private const int MaxResults = 8;
         private const int RowHeight = 28;
+
+        /// <summary>Narrowest the list itself may be, whatever the box
+        /// under it measures - see RebuildRows.</summary>
+        private const int MinPanelWidth = 200;
         private const int IconSize = 24;
         private const int IconPad = 4;
 
@@ -263,7 +267,12 @@ namespace TaimisToolbench.Views
                 child.Dispose();
             }
 
-            int panelWidth = _textBox.Width;
+            // Not simply the box's width any more: the plan tab's input
+            // strip is a grid, so its search boxes narrow as columns are
+            // added, and a list that narrowed with them would clip item
+            // names the box itself never had to show. 200 is the width the
+            // list shipped at, held as a floor.
+            int panelWidth = Math.Max(_textBox.Width, MinPanelWidth);
 
             for (int i = 0; i < _results.Count; i++)
             {

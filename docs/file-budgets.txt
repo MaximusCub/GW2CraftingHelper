@@ -320,7 +320,7 @@ Views/Rendering/UiMetrics.cs                                                    
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         217
 Views/ResizableTabbedWindow.cs                                                          250
 Views/SettingsTabContent.cs                                                             2874
-Views/SuggestionPanel.cs                                                                 495
+Views/SuggestionPanel.cs                                                                 504
 Views/ViewAdapter.cs                                                                    247
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/TaimisToolbench.Tests/Helpers/CapturingProgress.cs                               22
