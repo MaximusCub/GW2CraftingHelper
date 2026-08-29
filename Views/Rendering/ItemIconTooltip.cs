@@ -138,26 +138,6 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// A subject that is neither an item nor a wallet currency and so
-        /// has no tooltip of its own to compose - its name in plain prose,
-        /// which is all there is to say about it.
-        /// <para>
-        /// RETIRING. It was the one seam through which an item or a
-        /// currency could reach the screen as a bare name, and that is what
-        /// every currency hover in the module used to be. Items take
-        /// <see cref="ForItem(ItemTooltipIdentity, Func{ItemStatBlock})"/>
-        /// and currencies take <see cref="ForCurrency"/>; the tests
-        /// workflow's "Every item icon names its tier and what it shows on
-        /// hover" step holds the remaining callers to a named list and
-        /// fails the build on a new one.
-        /// </para>
-        /// </summary>
-        internal static ItemIconTooltip Naming(string subject)
-        {
-            return new ItemIconTooltip(null, subject);
-        }
-
-        /// <summary>
         /// Deliberately silent, with the reason named at the call site.
         /// Adding a reason to <see cref="ItemIconSilence"/> is the act of
         /// the commit that needs one.
@@ -207,8 +187,8 @@ namespace TaimisToolbench.Views.Rendering
 
             // The icon's own note ("no icon available for this entry") is
             // already on the tree and is worth more than silence, so a
-            // silent or plain-only intent leaves the plain layer alone
-            // rather than clearing it.
+            // silent intent leaves the plain layer alone rather than
+            // clearing it.
             if (_build == null)
             {
                 return;
