@@ -62,6 +62,23 @@ namespace TaimisToolbench.Services
         internal const string CaretRight = "\uE104";
 
         /// <summary>
+        /// The remove mark on a row's delete button. Was a 16px texture
+        /// (Blish asset 733269) tinted (45,42,38) - a thin antialiased
+        /// stroke in a grey within nine units of the 51,51,51 Blish paints
+        /// DISABLED button ink in, next to two carets drawn as text in pure
+        /// black. Same button, same state, two pipelines, and it read as
+        /// permanently greyed out.
+        /// <para>
+        /// 16x16 of ink where the carets are 12x8, because a diagonal cross
+        /// spends its ink over a longer path: at 16 it sums to 58 pixels of
+        /// coverage against the reading carets' 61, which is what makes the
+        /// three marks one weight. tools/build-glyph-font.py carries the
+        /// measurement and the sizes it fails at.
+        /// </para>
+        /// </summary>
+        internal const string RemoveMark = "\uE105";
+
+        /// <summary>
         /// The caret an expand/collapse affordance draws, already degraded
         /// when the atlas is not there. Every tree and section-header seat
         /// asks here rather than choosing between a glyph and an ASCII
@@ -75,12 +92,14 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// What a seat drew before the glyph font existed, for the one case
-        /// where the font is not there: a corrupt install whose ref/glyphs.fnt
-        /// or ref/glyphs_0.png failed to load. A codepoint with no region
-        /// renders as nothing AND advances zero pixels, so degrading to the
-        /// mismatched ASCII pair is strictly better than degrading to a header
-        /// that silently loses its only sort indicator.
+        /// What a seat draws when the font is not there: a corrupt install
+        /// whose ref/glyphs.fnt or ref/glyphs_0.png failed to load. A
+        /// codepoint with no region renders as nothing AND advances zero
+        /// pixels, so degrading to the mismatched ASCII pair is strictly
+        /// better than degrading to a header that silently loses its only
+        /// sort indicator. Each caret gets back the character it replaced;
+        /// <see cref="RemoveMark"/> replaced a texture and has no such
+        /// character, so it takes the closest ASCII shape instead.
         /// <para>
         /// Total over every constant above, which is what makes the degraded
         /// path safe; an unmapped string comes back unchanged rather than
@@ -97,6 +116,7 @@ namespace TaimisToolbench.Services
                 case CaretUp: return "^";
                 case CaretDown: return "v";
                 case CaretRight: return ">";
+                case RemoveMark: return "x";
                 default: return glyph;
             }
         }

@@ -1,5 +1,3 @@
-using Microsoft.Xna.Framework;
-
 namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
@@ -29,16 +27,5 @@ namespace TaimisToolbench.Views.Rendering
         /// narrative".
         /// </summary>
         internal const int ButtonHeight = 28;
-
-        /// <summary>The matched 16px X of Blish's own remove pair, by .dat asset id.</summary>
-        internal const int RowRemoveMarkAssetId = 733269;
-
-        /// <summary>
-        /// Dark ink for a row button's icon. 733269 is authored white for a
-        /// dark window and the button plate under it is parchment, so an
-        /// untinted blit is invisible on it - the measured case
-        /// FeedbackButton.IconTint exists for.
-        /// </summary>
-        internal static readonly Color RowButtonIconTint = new Color(45, 42, 38);
     }
 }

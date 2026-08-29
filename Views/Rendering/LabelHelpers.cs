@@ -159,6 +159,36 @@ namespace TaimisToolbench.Views.Rendering
             return outer;
         }
 
+        // Full coverage - "you have all of this currency" - wherever the
+        // module says it: the plan Summary's currency table and the Crafting
+        // Ranker's per-row currency breakdown. ONE tag, not two lookalikes.
+        //
+        // ASCII inside a pill rather than a check mark: Menomonia has no
+        // U+2713, and a stroked check is the artwork the module's own atlas
+        // measured at under a pixel of coverage at this size
+        // (tools/build-glyph-font.py). Green is PillKind.Selected's, without
+        // adding a PillKind for a mark that is not a pill state.
+        private static readonly Color FullCoverageBorder = new Color(31, 143, 12);
+        private static readonly Color FullCoverageFill = FullCoverageBorder * 0.15f;
+        private const string FullCoverageMarkerText = "OK";
+
+        /// <summary>
+        /// The full-coverage marker. Sized by
+        /// <see cref="FullCoverageMarkerWidth"/> and
+        /// <see cref="SmallTagHeight"/>, which is what a caller reserving
+        /// room for it reads.
+        /// </summary>
+        internal static Panel CreateFullCoverageMarker(Panel parent, int x, int y)
+        {
+            return CreateSmallTag(parent, FullCoverageMarkerText, x, y, FullCoverageBorder, FullCoverageFill);
+        }
+
+        /// <summary>Width <see cref="CreateFullCoverageMarker"/> will take, without building it.</summary>
+        internal static int FullCoverageMarkerWidth()
+        {
+            return MeasureSmallTagWidth(FullCoverageMarkerText);
+        }
+
         /// <summary>
         /// One tag's hover, stamped on the outer panel, its inset fill
         /// panel and the label inside that. Blish resolves a tooltip on the

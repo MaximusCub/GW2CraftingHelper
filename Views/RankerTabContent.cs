@@ -1051,7 +1051,13 @@ namespace TaimisToolbench.Views
             public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
             public readonly List<Label> CurrencyNameLabels = new List<Label>();
             public readonly List<string> CurrencyNameFulls = new List<string>();
-            public readonly List<Label> CurrencyValueLabels = new List<Label>();
+            /// <summary>
+            /// A shortfall's amount as a Label, or full coverage as
+            /// LabelHelpers' shared marker panel - so this is typed at the
+            /// Control the layout pass actually needs (a Location and a
+            /// Width), not at the one the common case happens to be.
+            /// </summary>
+            public readonly List<Control> CurrencyValues = new List<Control>();
             public readonly List<Label> NoteLabels = new List<Label>();
             public RankerRowMetrics Metrics;
         }
@@ -1402,7 +1408,7 @@ namespace TaimisToolbench.Views
             row.CurrencyIconFrames.Clear();
             row.CurrencyNameLabels.Clear();
             row.CurrencyNameFulls.Clear();
-            row.CurrencyValueLabels.Clear();
+            row.CurrencyValues.Clear();
             row.NoteLabels.Clear();
             row.GateBarTracks.Clear();
             row.GateBarFills.Clear();
@@ -1530,10 +1536,8 @@ namespace TaimisToolbench.Views
                 row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             }
 
-            row.Remove = CreateRowButton(row.Panel, bands.RemoveX, "Remove this item from your list.");
-            row.Remove.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
-            row.Remove.ResizeIcon = true;
-            row.Remove.IconTint = UiMetrics.RowButtonIconTint;
+            row.Remove = CreateGlyphRowButton(
+                row.Panel, UiGlyphs.RemoveMark, bands.RemoveX, "Remove this item from your list.");
             row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
@@ -1617,20 +1621,24 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// A row action whose whole label is one glyph from the module's own
-        /// atlas. StandardButton exposes no Font, which is exactly why the
-        /// reorder pair could not be a button before FeedbackButton: an
-        /// up/down pair needs two symmetric triangles, and the one face
-        /// Blish ships has none. The standalone glyph face centres its ink
-        /// in the line box rather than seating it on a baseline, which is
-        /// what a button with no neighbouring text wants.
+        /// atlas. StandardButton exposes no Font, which is exactly why these
+        /// could not be buttons before FeedbackButton: they need symmetric
+        /// triangles and a cross, and the one face Blish ships has none. The
+        /// standalone glyph face centres its ink in the line box rather than
+        /// seating it on a baseline, which is what a button with no
+        /// neighbouring text wants.
+        /// <para>
+        /// All THREE row actions come through here, and that is the point:
+        /// glyph text takes the button's own enabled/disabled ink, so the
+        /// set cannot drift into two weights the way a tinted icon beside
+        /// black text did (Services/UiGlyphs.RemoveMark).
+        /// </para>
         /// </summary>
         private static FeedbackButton CreateGlyphRowButton(
             Panel parent, string glyph, int x, string tooltip)
         {
             var button = CreateRowButton(parent, x, tooltip);
-            bool available = UiFonts.GlyphsAvailable;
-            button.Font = available ? UiFonts.Glyphs : UiFonts.Caption;
-            button.Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
+            button.SetGlyph(glyph);
             return button;
         }
 
@@ -1872,16 +1880,27 @@ namespace TaimisToolbench.Views
                     Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
-                row.CurrencyValueLabels.Add(new Label
-                {
-                    Font = UiFonts.Caption,
-                    Text = FormatShortfall(shortfall),
-                    TextColor = shortfall.Short > 0 ? ValueTextColor : RankerReadinessColors.ForReadiness(1.0),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(0, textY),
-                    Parent = row.Panel,
-                });
+
+                // Fully covered says the same thing here as it does in the
+                // plan Summary's currency table, so it says it with the same
+                // control (LabelHelpers.CreateFullCoverageMarker) rather than
+                // a green word only this tab uses. Seated on the ICON like
+                // the text beside it, but off the tag's own height.
+                row.CurrencyValues.Add(shortfall.Short > 0
+                    ? (Control)new Label
+                    {
+                        Font = UiFonts.Caption,
+                        Text = ShortfallText(shortfall),
+                        TextColor = ValueTextColor,
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(0, textY),
+                        Parent = row.Panel,
+                    }
+                    : LabelHelpers.CreateFullCoverageMarker(
+                        row.Panel,
+                        0,
+                        y + ((RankerRowLayout.CurrencyIconSize - LabelHelpers.SmallTagHeight) / 2)));
             }
 
             for (int i = 0; i < notes.Count; i++)
@@ -2025,7 +2044,7 @@ namespace TaimisToolbench.Views
 
                 var icon = row.CurrencyIconFrames[i];
                 var name = row.CurrencyNameLabels[i];
-                var value = row.CurrencyValueLabels[i];
+                var value = row.CurrencyValues[i];
                 // No border term: CurrencyIconSize is the FRAMED box at the
                 // wallet-list tier, art inset inside it (ItemIconTiers).
                 int nameX = cellX + RankerRowLayout.CurrencyIconSize
@@ -2276,13 +2295,13 @@ namespace TaimisToolbench.Views
             return null;
         }
 
-        private static string FormatShortfall(RankerCurrencyShortfall shortfall)
+        /// <summary>
+        /// What a currency line still owes. Full coverage never reaches here
+        /// - it draws the shared marker instead of a word - so this only
+        /// ever formats a real shortfall.
+        /// </summary>
+        private static string ShortfallText(RankerCurrencyShortfall shortfall)
         {
-            if (shortfall.Short <= 0)
-            {
-                return "covered";
-            }
-
             return shortfall.Short.ToString("N0", CultureInfo.InvariantCulture) + " short";
         }
 

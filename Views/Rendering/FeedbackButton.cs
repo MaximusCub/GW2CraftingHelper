@@ -3,6 +3,7 @@ using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
 
 namespace TaimisToolbench.Views.Rendering
 {
@@ -49,10 +50,12 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Color DisabledInk = Color.FromNonPremultiplied(51, 51, 51, 255);
 
         /// <summary>
-        /// How far a disabled icon is dimmed. The Ranker disables its reorder
-        /// controls in one ordering mode, so a disabled icon has to read as
-        /// disabled rather than as absent - Blish draws a disabled Control's
-        /// children unchanged and leaves that entirely to the control.
+        /// How far a disabled icon is dimmed, so it reads as disabled rather
+        /// than as absent - Blish draws a disabled Control's children
+        /// unchanged and leaves that entirely to the control. No module
+        /// button currently carries an Icon; this and <see cref="IconTint"/>
+        /// are here because the class promises StandardButton's whole
+        /// surface, not because a caller is using them.
         /// </summary>
         private const float DisabledIconDim = 0.4f;
 
@@ -106,6 +109,28 @@ namespace TaimisToolbench.Views.Rendering
         {
             get => _iconTint;
             set => SetProperty(ref _iconTint, value, false, nameof(IconTint));
+        }
+
+        /// <summary>
+        /// Labels the button with one glyph from the module's own atlas, and
+        /// with the ASCII stand-in when that atlas failed to load. The one
+        /// seam that pairs a glyph with the font that can draw it, for the
+        /// same reason <see cref="Services.UiGlyphs.ExpandCaret"/> is one:
+        /// a call site that chose the glyph and the font separately could
+        /// seat a PUA codepoint on Menomonia, where it draws nothing and
+        /// advances nothing.
+        /// <para>
+        /// Glyph TEXT, not an <see cref="StandardButton.Icon"/>: text takes
+        /// the enabled/disabled ink this button already paints, so a set of
+        /// row actions cannot end up half black text and half tinted
+        /// texture (Services/UiGlyphs.RemoveMark).
+        /// </para>
+        /// </summary>
+        internal void SetGlyph(string glyph)
+        {
+            bool available = UiFonts.GlyphsAvailable;
+            Font = available ? UiFonts.Glyphs : UiFonts.Caption;
+            Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
         }
 
         private static Texture2D Face =>
