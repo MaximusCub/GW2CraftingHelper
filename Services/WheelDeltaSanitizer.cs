@@ -57,24 +57,16 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Windows' "one screen at a time" mouse-wheel-lines setting
-        /// (Control Panel/Settings mouse wheel option) reports
-        /// SystemInformation.MouseWheelScrollLines as -1, not a usable
-        /// line count. Used directly, that sign
-        /// flips CraftingPlanView.ApplyWheelWrapCorrection's corrective
-        /// pixel delta for every wrapped up-flick (Blish's own
-        /// Scrollbar.HandleWheelScroll has the identical defect - its
-        /// Math.Sign(...) * -30 * MouseWheelScrollLines scrolls the WRONG
-        /// direction for every wheel event, wrapped or not, under that
-        /// setting - this sanitizer cannot fix Blish's own arithmetic).
-        /// This substitutes Windows' documented out-of-box default of 3
-        /// lines whenever the raw value is not a usable positive count
-        /// (covers -1 and any other non-positive/unexpected value
-        /// defensively), which at least keeps OUR correction's direction
-        /// right; it does not attempt to reproduce Blish's own step size
-        /// under that setting, since Blish's step is itself wrong there -
-        /// direction-correctness is chosen over an unreachable exact-step
-        /// match for this one OS setting value.
+        /// Windows' "one screen at a time" mouse-wheel-lines setting reports
+        /// SystemInformation.MouseWheelScrollLines as -1, not a usable line
+        /// count. Used directly, that sign flips
+        /// CraftingPlanView.ApplyWheelWrapCorrection's corrective pixel delta
+        /// for every wrapped up-flick. This substitutes Windows' documented
+        /// out-of-box default of 3 lines whenever the raw value is not a
+        /// usable positive count. It does not reproduce Blish's own step size
+        /// under that setting - Blish's step is itself wrong there, and this
+        /// sanitizer cannot fix Blish's arithmetic. See
+        /// docs/ARCHITECTURE.md section 2.
         /// </summary>
         /// <param name="rawLines">
         /// The raw value read from

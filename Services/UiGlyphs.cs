@@ -1,24 +1,22 @@
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The codepoints the module's own shipped glyph font draws, and the
-    /// ASCII each one replaced. Blish-free: these are plain strings, and the
-    /// font that turns them into pixels is assembled in
-    /// Views/Rendering/GlyphFont.
+    /// The codepoints the module's own shipped glyph font draws, and the ASCII
+    /// each one replaced. Blish-free: these are plain strings, and the font
+    /// that turns them into pixels is assembled in Views/Rendering/GlyphFont.
     /// <para>
     /// Blish HUD 1.3.0 ships one text face carrying 226 codepoints and no
-    /// runtime font baking, so anything geometric has to arrive in a BMFont
-    /// we author (tools/build-glyph-font.py) and package in ref/. These
-    /// codepoints are BMP private use from U+E100 up - U+E000 is skipped
-    /// because Menomonia already defines it, and merging a glyph over a real
-    /// one would shadow it.
+    /// runtime font baking, so anything geometric has to arrive in a BMFont we
+    /// author (tools/build-glyph-font.py) and package in ref/. These codepoints
+    /// are BMP private use from U+E100 up - U+E000 is skipped because Menomonia
+    /// already defines it, and merging a glyph over a real one would shadow it.
     /// </para>
     /// <para>
-    /// NOTHING else in the module may write a PUA escape. The "UI glyph
-    /// escapes exist in the shipped font" step in .github/workflows/tests.yml
-    /// allows U+E1xx in THIS FILE ONLY, and checks each one against
-    /// ref/glyphs.fnt, so a constant naming a glyph the atlas does not carry
-    /// fails the build rather than drawing nothing at all.
+    /// NOTHING else in the module may write a PUA escape. The "UI glyph escapes
+    /// exist in the shipped font" step in .github/workflows/tests.yml allows
+    /// U+E1xx in THIS FILE ONLY, and checks each one against ref/glyphs.fnt, so
+    /// a constant naming a glyph the atlas does not carry fails the build
+    /// rather than drawing nothing at all.
     /// </para>
     /// </summary>
     internal static class UiGlyphs

@@ -26,15 +26,12 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Applies a pixel-space scroll delta to a scrollbar's current
-        /// ratio, returning the resulting ratio (wheel-wrap fix -
-        /// KNOWN-ISSUES #12 reopened). Blish's own Scrollbar.
-        /// HandleWheelScroll/ScrollAnimated operate in pixel space (a
-        /// fixed per-notch pixel step added to the current pixel offset),
-        /// not ratio space directly, so correcting a wrapped multi-notch
-        /// wheel event has to convert to pixels, apply the delta, and
-        /// convert back - working in ratio space directly would not
-        /// compose the same way across a changing scrollable range.
+        /// Applies a pixel-space scroll delta to a scrollbar's current ratio,
+        /// returning the resulting ratio (wheel-wrap fix - KNOWN-ISSUES #12
+        /// reopened). Blish's own Scrollbar.HandleWheelScroll/ScrollAnimated
+        /// operate in pixel space, not ratio space, so a correction has to
+        /// convert to pixels, apply the delta, and convert back.
+        /// See docs/ARCHITECTURE.md section 3.
         /// </summary>
         /// <param name="currentRatio">
         /// The scrollbar's current ScrollDistance (0..1); clamped

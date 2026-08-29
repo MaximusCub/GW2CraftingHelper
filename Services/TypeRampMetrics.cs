@@ -1,34 +1,22 @@
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The measured Menomonia glyph metrics behind every vertical constant
-    /// in the plan view, and the ramp tier each chrome role sits in
-    /// (Blish-free, unit-testable). Views resolve the actual BitmapFont
-    /// objects through Views/Rendering/UiFonts; the arithmetic that decides
-    /// how tall a band has to be to hold one lives here, with the numbers
-    /// it is decided from.
+    /// The measured Menomonia glyph metrics behind every vertical constant in
+    /// the plan view, and the ramp tier each chrome role sits in (Blish-free,
+    /// unit-testable). Views resolve the actual BitmapFont objects through
+    /// Views/Rendering/UiFonts; the arithmetic that decides how tall a band
+    /// has to be to hold one lives here, with the numbers it is decided from.
     ///
-    /// <para>
-    /// Method: the installed
-    /// <c>C:\Blish.HUD\Content\fonts\menomonia\menomonia-{size}-{style}.xnb</c>
-    /// files are uncompressed MonoGame XNB containers holding one
-    /// BitmapFontReader asset (lineHeight, then 9 int32 per glyph region).
-    /// Widths follow MG.Extended's own MeasureString rule, which is what a
-    /// Blish Label's autosize calls. The parse reproduces the figures
-    /// docs/research/minimum-window-width.md published, glyph for glyph.
-    /// </para>
+    /// Two defects in the shipped font inventory constrain every choice below
+    /// and must not be re-litigated by measurement-free reasoning: 18-REGULAR
+    /// is unusable for prose (its space glyph advances 4px, against 7 at
+    /// 16-regular and 9 at 18-bold, so word gaps collapse), and 22-REGULAR is
+    /// metrically identical to 24-regular, so there is no regular-weight step
+    /// between 20 and 24 and 22-regular must never be loaded. 22-BOLD is a
+    /// genuine intermediate.
     ///
-    /// <para>
-    /// Two defects in the shipped font inventory constrain every choice
-    /// below and must not be re-litigated by measurement-free reasoning:
-    /// 18-REGULAR's space glyph advances 4px (against 7 at 16-regular and 9
-    /// at 18-bold), so any multi-word string at 18-regular renders with
-    /// collapsed word gaps - 18-regular is unusable for prose; and
-    /// 22-REGULAR is metrically identical to 24-regular (same lineHeight,
-    /// cap and advances, different file bytes), so there is no
-    /// regular-weight step between 20 and 24 and 22-regular must never be
-    /// loaded. 22-BOLD is a genuine intermediate.
-    /// </para>
+    /// Measurement method and the rest of the ramp: docs/ARCHITECTURE.md
+    /// section 11.
     /// </summary>
     internal static class TypeRampMetrics
     {

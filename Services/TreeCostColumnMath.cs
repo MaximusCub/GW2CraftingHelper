@@ -5,34 +5,23 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Pure arithmetic (Blish-free, unit-testable) for the recipe tree's
-    /// cost column, which used to right-align one ragged run per row: a
-    /// gold/silver/copper row and a currency row both ended at the same x
-    /// but shared no interior alignment, so no two coin icons in the whole
-    /// tree lined up vertically.
+    /// Pure arithmetic (Blish-free, unit-testable) for the recipe tree's cost
+    /// column: four right-aligned sub-columns - gold, silver, copper, then any
+    /// non-coin currency - each wide enough for the widest value ANY row in the
+    /// tree puts in it. Every segment is "number, gap, icon" and each is
+    /// right-aligned to its own sub-column's right edge, so the fixed-width
+    /// icons land on the same x on every row that fills the same bands. Which
+    /// bands a given row fills is <see cref="ComputeRowEdges"/>'s business.
     ///
-    /// The column is now four right-aligned sub-columns - gold, silver,
-    /// copper, then any non-coin currency - each wide enough for the
-    /// widest value ANY row in the tree puts in it. Because every segment
-    /// is "number, gap, icon" and each is right-aligned to its own
-    /// sub-column's right edge, the fixed-width icons land on the same x
-    /// on every row that fills the same bands: straight vertical rules
-    /// down the column. Which bands a given row fills is
-    /// <see cref="ComputeRowEdges"/>'s business.
+    /// Scanned over the WHOLE tree, not just the currently expanded rows: rows
+    /// are built lazily (TreeSectionController.RenderTreeNode's toggle handler
+    /// builds a node's children on first expand), so a visible-rows-only scan
+    /// would miss those rows' widths or have to re-anchor the whole column
+    /// mid-interaction. That same walk reports the tree's node count
+    /// (<see cref="ScanColumns"/>), which the section header shows.
     ///
-    /// Scanned over the WHOLE tree, not just the currently expanded rows.
-    /// Rows are built lazily (TreeSectionController.RenderTreeNode's
-    /// toggle handler builds a node's children on first expand), so a
-    /// visible-rows-only scan would either miss those rows' widths or have
-    /// to re-scan and re-anchor the entire column mid-interaction. Scanning
-    /// everything once per render pass costs one walk of an
-    /// already-materialised tree and buys a column that never shifts
-    /// under the user.
-    ///
-    /// That same walk reports the tree's node count
-    /// (<see cref="ScanColumns"/>), which the section header shows - same
-    /// stability argument, same single pass.
-    /// <para>See docs/ARCHITECTURE.md section 4.</para>
+    /// <para>See docs/ARCHITECTURE.md section 4, and "Services Q-Z: relocated
+    /// design narrative" for what the column looked like before.</para>
     /// </summary>
     internal static class TreeCostColumnMath
     {

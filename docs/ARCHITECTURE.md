@@ -256,6 +256,22 @@ notch arithmetic, while `MouseWheelScrollLines` is read live: 120 is Win32's
 for that same constant and is not user-configurable, unlike
 `MouseWheelScrollLines`, which is.
 
+**The second Windows defect, `MouseWheelScrollLines = -1`:** Windows' "one
+screen at a time" mouse-wheel setting (Control Panel / Settings mouse wheel
+option) reports `SystemInformation.MouseWheelScrollLines` as `-1`, not a
+usable line count. Blish's own `Scrollbar.HandleWheelScroll` has the
+identical defect - its `Math.Sign(...) * -30 * MouseWheelScrollLines`
+scrolls the *wrong direction* for every wheel event, wrapped or not, under
+that setting - and this module cannot fix Blish's arithmetic.
+`WheelDeltaSanitizer.SanitizeScrollLines` substitutes Windows' documented
+out-of-box default of 3 lines whenever the raw value is not a usable
+positive count (covering `-1` and any other non-positive or unexpected
+value defensively), which at least keeps *this module's* correction
+pointing the right way. It deliberately does not try to reproduce Blish's
+own step size under that setting, since Blish's step is itself wrong there:
+direction-correctness is chosen over an unreachable exact-step match for
+this one OS setting value.
+
 **Where:** `Services/WheelDeltaSanitizer.cs` (pure, Blish-free,
 unit-tested); consumed by `CraftingPlanView.ApplyWheelWrapCorrection`.
 
@@ -289,6 +305,14 @@ contest safe rather than janky:
   event, rather than requiring the content height to have stopped
   changing first - so a user scrolling during a live restore is never
   contested.
+
+**Why the correction is computed in pixel space:**
+`Services/ScrollMath.ApplyPixelDelta` converts a scrollbar ratio to pixels,
+applies the delta, and converts back, rather than working in ratio space
+directly. Blish's own `Scrollbar.HandleWheelScroll`/`ScrollAnimated` operate
+in pixel space (a fixed per-notch pixel step added to the current pixel
+offset), so a correction expressed in ratios would not compose the same way
+across a changing scrollable range.
 
 **Where:** `Views/CraftingPlanView.cs`, region "Scroll preserve/restore/verify"
 (`PreserveScrollAcross`, `StartScrollVerify`, the `PanelScrollbarField`
@@ -899,9 +923,11 @@ expensive way, in a live desktop session:
 
 The metrics come from parsing the installed
 `Content/fonts/menomonia/menomonia-{size}-{style}.xnb` files directly -
-uncompressed MonoGame XNB containers holding one BitmapFont asset - and
-they reproduce, glyph for glyph, the figures published in
-[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+uncompressed MonoGame XNB containers holding one `BitmapFontReader` asset
+(lineHeight, then nine int32 per glyph region). Widths follow
+MonoGame.Extended's own `MeasureString` rule, which is what a Blish `Label`'s
+autosize calls. The parse reproduces, glyph for glyph, the figures published
+in [`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
 The atlas covers 8-36 regular and 8-24 plus 36 bold, reached via
 `ContentService.GetFont`, not only the five Blish defaults.
 
@@ -1124,3 +1150,65 @@ different questions about the same rows, and a row's answer under one says
 nothing about its answer under the other. Keeping only the last mode's set
 made every toggle a full recompute, including a toggle straight back to
 numbers the session had already paid for (owner ruling, 2026-08-27).
+
+### S2.3 Column and section geometry (Q-Z)
+
+**`RecipesColumnMath` - why discipline is a column.** The discipline used to
+be a second `Caption` line *under* the recipe name, which forced the
+section to carry two row heights and put a name and its discipline on
+different reading lines. As a column, every recipe row is one line at
+`PlanContentHeightMath.RecipeRowHeight`.
+
+**`ShoppingColumnMath` - why the bands are distributed.** Distributing the
+bands over equal tracks rather than packing them against the panel's right
+edge is what stops a short item name being stranded far left with the
+middle of the row empty. Each header centres over its band rather than
+sharing an edge with it; `JustifiedColumnTracks` carries the argument for
+why a shared edge is not enough.
+
+**`SnapshotHeaderLayout` - what the shared row buys and costs.** The header
+used five sparse rows to say what four can, and the widest of them - the
+search row - was empty for everything right of the content-type dropdown.
+Sharing that row halves the width the source-filter run has to flow into,
+so a roster that used to fit inside the 4-row cap can wrap past it and hide
+filters behind a scrollbar: a third of the filter set for 38px of header.
+That is why the sharing is conditional on the whole run fitting in one row,
+and why the fallback is exactly the full-width row the flow had before.
+
+**`SummarySectionLayoutMath` - why it is its own class.** Its role is the
+same kind of thing `Services/PlanContentHeightMath.cs` and
+`Services/PlanRelayoutMath.cs` already do for every other section, and it
+is deliberately kept out of both: they are shared infrastructure several
+other sections' row builders depend on, and they are high-evidence zones
+(see [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md#policy-high-evidence-zones)) -
+off-limits for the broader fold-back this class's existence sidesteps.
+KNOWN-ISSUES #46 carries the original rationale.
+
+**`TreeChipStripLayout` - what the slot held before, and why zero hides.**
+The slot the state chips occupy used to hold a grey "Recipe Tree:" caption:
+small *and* grey, labelling five buttons whose own verbs and tooltips
+already said what they act on. Real information replaces a caption that
+named nothing. A chip is hidden entirely at zero rather than shown reading
+zero because a standing "Overrides: 0" spends attention on the absence of a
+thing, and a permanently-disabled clear button beside it invites "why is
+this disabled?".
+
+**`TreeToolbarRowLayout` - why the button widths live in the class.** A
+width that can only be read off a `PlaceRight` argument is a width no test
+can assert the boundary cases against without re-typing it, and a re-typed
+width is one a later rename silently invalidates.
+
+**`TreeCostColumnMath` - what the column looked like before.** It used to
+right-align one ragged run per row: a gold/silver/copper row and a currency
+row both ended at the same x but shared no interior alignment, so no two
+coin icons in the whole tree lined up vertically. Scanning the whole tree
+once per render pass costs one walk of an already-materialised tree and
+buys a column that never shifts under the user; the node count the section
+header shows rides on the same walk for the same stability reason.
+
+**`UiSpacing` - the coincidences on record.** 8px also ships as
+`LogToolbarLayout.Gap` and `LogRowLayout.RightPad`, and 20px as both
+`SettingsFormLayout.SectionGap` (vertical, between section blocks) and
+`TreeToolbarRowLayout.GroupGap` (horizontal, between button groups). Those
+are coincidences, they stay where they are, and coupling them would make a
+deliberate change to one silently move the others.
