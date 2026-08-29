@@ -104,7 +104,7 @@ Services/CurrencyTooltipComposer.cs                                             
 Services/CurrencyTooltipFacts.cs                                                         80
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                     77
-Services/DecisionPillPlanner.cs                                                         431
+Services/DecisionPillPlanner.cs                                                         440
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
 Services/DisciplinesColumnMath.cs                                                       121
@@ -312,7 +312,7 @@ Views/Rendering/SortableHeaderLabel.cs                                          
 Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
-Views/Rendering/TreeSectionController.cs                                                2063
+Views/Rendering/TreeSectionController.cs                                                2186
 Views/Rendering/TreeToolbarCommands.cs                                                   81
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
