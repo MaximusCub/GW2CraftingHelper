@@ -20,8 +20,14 @@ document says so rather than averaging them.
 The module is a **cost engine for transactional acquisition**: craft it, buy
 it on the Trading Post, or buy it from a vendor. Within that vocabulary it is
 well built. Legendary crafting is **substantially non-transactional**. Gift of
-Battle comes from a WvW reward track and is required by every legendary weapon
-of every generation. Gift of Exploration is world completion, once per
+Gift of Battle comes from a WvW reward track. It is required by Gen 1, Gen 2
+and Gen 3 weapons (via Gift of Mastery) and by several trinkets and back items
+(Aurora, Conflux, Warbringer) - but NOT universally: a dependency-closure walk
+over `ref/recipes_seed.json` finds it absent from Nyr Hrammr (a Janthir Wilds
+weapon), Obsidian armour, Perfected Envoy armour, Ad Infinitum and the
+Legendary Rune. Measured 7 of 18 trees in the harness sweep. Presence is proof;
+absence is weaker, since a recipe missing from our seed looks identical to a
+genuine absence. Gift of Exploration is world completion, once per
 character ever. Legendary Insights are raid boss kills. Spirit Shards are
 level-80 XP overflow, and a Bloodstone Shard costs 200 of them. Provisioner
 Tokens are weekly-capped trade-ins. None of these has a price, and no amount

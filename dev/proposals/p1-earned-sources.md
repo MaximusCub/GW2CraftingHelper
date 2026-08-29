@@ -201,8 +201,8 @@ most important input to the model, so it comes before the types.
 Two conclusions follow, and both are structural:
 
 - **Tier 3 is small, enumerable, and contains the most important item in the
-  game.** Gift of Battle is required by every legendary weapon of every
-  generation. A model that assumes progress is fetchable, and treats a null
+  game.** Gift of Battle is required by Gen 1, Gen 2 and Gen 3 weapons, and by
+  Aurora, Conflux and Warbringer - 7 of 18 trees measured, not all of them. A model that assumes progress is fetchable, and treats a null
   as "not fetched yet", will be silently wrong about it forever.
 - **Therefore the tier must be an explicit, curated field on the route, not
   an inference from whether a lookup returned null.** The two states the UI

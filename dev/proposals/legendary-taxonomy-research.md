@@ -528,8 +528,13 @@ being economically inert because Astral Acclaim cannot be valued.
 A gold-denominated planner will either price these at zero or refuse to plan.
 Neither is right. The list, all MEASURED as account bound and unpurchasable:
 
-- **Gift of Battle** - WvW reward track only, and required by every legendary
-  weapon of every generation via Gift of Mastery. There is no PvE substitute.
+- **Gift of Battle** - WvW reward track only. Required by Gen 1, Gen 2 and Gen 3
+  weapons via Gift of Mastery, and by Aurora, Conflux and Warbringer. NOT
+  universal: a closure walk over ref/recipes_seed.json finds it absent from Nyr
+  Hrammr, Obsidian armour, Perfected Envoy armour, Ad Infinitum and the
+  Legendary Rune (7 of 18 trees in the harness sweep). An earlier draft of this
+  document called it universal on a single source; that was wrong. There is no
+  PvE substitute where it IS required.
 - **Gift of Exploration** - 100 percent world completion, twice per character,
   once per character ever.
 - **Legendary Insights** - raid boss kills. Coalescence and Perfected Envoy.
