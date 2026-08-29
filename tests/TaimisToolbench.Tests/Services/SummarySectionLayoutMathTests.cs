@@ -565,21 +565,61 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void ComputeCurrencyColumnEdges_DistributesTheColumnsAcrossThePanel()
         {
-            // 800: pinned right edge 792, marker 758, Needed 744. The name
-            // starts at CurrencyNameX 48 (8 gutter + the 32px wallet-LIST
-            // icon + 8), so 696px carry four equal tracks and each column's
-            // right edge is its own quarter's end.
+            // 800: pinned right edge 792, marker 758, table right edge 744.
+            // The name starts at CurrencyNameX 48 (8 gutter + the 32px
+            // wallet-LIST icon + 8), so 696px carry four equal 174px tracks.
+            // A 60px band CENTRED on a 174px track starts (174-60)/2 = 57
+            // into it and ends 117 into it, so Required ends at 48+174+117
+            // = 339, Have one track later at 513 and Needed at 687 - half a
+            // track short of the last track's own end, which is where a
+            // centred band stops.
             var edges800 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(800);
-            Assert.Equal(396, edges800.RequiredRightEdge);
-            Assert.Equal(570, edges800.HaveRightEdge);
-            Assert.Equal(744, edges800.NeededRightEdge);
+            Assert.Equal(339, edges800.RequiredRightEdge);
+            Assert.Equal(513, edges800.HaveRightEdge);
+            Assert.Equal(687, edges800.NeededRightEdge);
             Assert.Equal(758, edges800.MarkerX);
 
+            // 1200: table right edge 1144, span 1096, tracks 274, a 60px
+            // band 107 into each one.
             var edges1200 = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
-            Assert.Equal(596, edges1200.RequiredRightEdge);
-            Assert.Equal(870, edges1200.HaveRightEdge);
-            Assert.Equal(1144, edges1200.NeededRightEdge);
+            Assert.Equal(489, edges1200.RequiredRightEdge);
+            Assert.Equal(763, edges1200.HaveRightEdge);
+            Assert.Equal(1037, edges1200.NeededRightEdge);
             Assert.Equal(1158, edges1200.MarkerX);
+        }
+
+        [Fact]
+        public void CurrencyHeaderX_CentresTheHeaderOverTheBandItsNumbersOccupy()
+        {
+            // The band is floored at the widest of the three header labels,
+            // so the header always fits: a 60px band ending at 339 runs
+            // 279..339, and a 40px header centres 10px into it.
+            Assert.Equal(289, SummarySectionLayoutMath.CurrencyHeaderX(339, 60, 40));
+
+            // A header exactly as wide as the band fills it - no offset,
+            // and the same x a right-aligned header would have taken. That
+            // is the case the old right-alignment got right and the reason
+            // the defect only showed on the columns whose numbers are
+            // narrower than their own header.
+            Assert.Equal(279, SummarySectionLayoutMath.CurrencyHeaderX(339, 60, 60));
+        }
+
+        [Fact]
+        public void CurrencyHeaderX_AndTheNumbersUnderIt_ShareTheTracksCentreLine()
+        {
+            // The law: header and cells centre on the same axis. The
+            // numbers right-align inside the band, so the band's centre is
+            // the axis both have to agree on.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200);
+            int band = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
+            const int headerWidth = 44;
+
+            int headerX = SummarySectionLayoutMath.CurrencyHeaderX(
+                edges.HaveRightEdge, band, headerWidth);
+
+            Assert.Equal(
+                edges.HaveRightEdge - (band / 2),
+                headerX + (headerWidth / 2));
         }
 
         [Fact]
@@ -623,14 +663,33 @@ namespace TaimisToolbench.Tests.Services
             {
                 var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
 
+                int band = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
                 int firstPitch = edges.HaveRightEdge - edges.RequiredRightEdge;
                 int secondPitch = edges.NeededRightEdge - edges.HaveRightEdge;
-                int namePitch = edges.RequiredRightEdge - SummarySectionLayoutMath.CurrencyNameX
-                    - firstPitch;
 
                 // Integer division puts at most a pixel between tracks.
                 Assert.InRange(firstPitch - secondPitch, -1, 1);
-                Assert.InRange(namePitch - firstPitch, -1, 1);
+
+                // And each band sits on its own track's CENTRE line - the
+                // name takes track 0, so the band of column i (1-based)
+                // centres (2i+1) half-tracks past the name's left edge.
+                // Doubled rather than halved so a half-track stays an
+                // integer; the span is the table's own, not a pitch, so the
+                // only slack left is what integer division costs.
+                int span = edges.MarkerX - SummarySectionLayoutMath.CurrencyColumnGap
+                    - SummarySectionLayoutMath.CurrencyNameX;
+                int[] bandRightEdges = new[]
+                {
+                    edges.RequiredRightEdge, edges.HaveRightEdge, edges.NeededRightEdge,
+                };
+                for (int i = 0; i < bandRightEdges.Length; i++)
+                {
+                    int centre = bandRightEdges[i] - (band / 2);
+                    Assert.InRange(
+                        2 * (centre - SummarySectionLayoutMath.CurrencyNameX)
+                            - (((2 * (i + 1)) + 1) * span / SummarySectionLayoutMath.CurrencyTrackCount),
+                        -2, 2);
+                }
 
                 // And the first number lands near the middle of the row
                 // rather than out at its right edge, which is what the
@@ -751,16 +810,19 @@ namespace TaimisToolbench.Tests.Services
             // The right-hand block used to move by the whole increase with
             // the name column absorbing all of it. Under distribution every
             // track takes an equal share, so a wider panel spreads the
-            // columns rather than dragging them further from the name: the
-            // last column moves by the full 400, the one before it by
-            // three quarters, the first by half.
+            // columns rather than dragging them further from the name.
+            // 400px of panel is 100px of track: a band centred on track i
+            // moves by i whole tracks plus HALF of its own track's growth,
+            // so 150, 250 and 350 - the marker alone still tracks the panel
+            // edge by the full 400, because it is pinned to that edge
+            // rather than centred on a track.
             var narrow = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
             var wide = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1600, 90);
 
             Assert.Equal(400, wide.MarkerX - narrow.MarkerX);
-            Assert.Equal(400, wide.NeededRightEdge - narrow.NeededRightEdge);
-            Assert.Equal(300, wide.HaveRightEdge - narrow.HaveRightEdge);
-            Assert.Equal(200, wide.RequiredRightEdge - narrow.RequiredRightEdge);
+            Assert.Equal(350, wide.NeededRightEdge - narrow.NeededRightEdge);
+            Assert.Equal(250, wide.HaveRightEdge - narrow.HaveRightEdge);
+            Assert.Equal(150, wide.RequiredRightEdge - narrow.RequiredRightEdge);
         }
 
         [Fact]
@@ -779,11 +841,11 @@ namespace TaimisToolbench.Tests.Services
                 SummarySectionLayoutMath.CurrencyColumnGap,
                 nameX);
 
-            // Half of the 400px increase - the name track's own quarter
-            // plus the Required track's, which is the space the Required
-            // column's right edge moves across. The other half goes to the
-            // two tracks right of it.
-            Assert.Equal(200, wide - narrow);
+            // The name's budget stops one gap before the Required BAND, and
+            // that band is centred on track 1: it moves by the name track's
+            // own 100px share plus half of its own track's growth. The rest
+            // of the 400px increase goes to the two tracks right of it.
+            Assert.Equal(150, wide - narrow);
         }
 
         // --- Regression: EffectiveCurrencyNumberColumnWidth / widened
@@ -820,18 +882,31 @@ namespace TaimisToolbench.Tests.Services
         {
             // Under distribution the reserve decides only whether the row
             // is wide enough to distribute at all - a track already holds
-            // its band plus the gap, so a wider value grows leftward INSIDE
-            // its own track and no edge moves. That is the difference from
-            // the packed stack, where every wider value shoved the columns
-            // to its left further left again.
+            // its band plus the gap, so a wider value grows SYMMETRICALLY
+            // about its track's centre line and the column itself does not
+            // move. That is the difference from the packed stack, where
+            // every wider value shoved the columns to its left further left
+            // again.
             const int panelWidth = 800;
             var fixedFloor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth);
             var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, 120);
+            int floorBand = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(0);
+            int widerBand = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(120);
 
             Assert.Equal(fixedFloor.MarkerX, widened.MarkerX);
-            Assert.Equal(fixedFloor.NeededRightEdge, widened.NeededRightEdge);
-            Assert.Equal(fixedFloor.HaveRightEdge, widened.HaveRightEdge);
-            Assert.Equal(fixedFloor.RequiredRightEdge, widened.RequiredRightEdge);
+            Assert.Equal(
+                fixedFloor.NeededRightEdge - (floorBand / 2),
+                widened.NeededRightEdge - (widerBand / 2));
+            Assert.Equal(
+                fixedFloor.HaveRightEdge - (floorBand / 2),
+                widened.HaveRightEdge - (widerBand / 2));
+            Assert.Equal(
+                fixedFloor.RequiredRightEdge - (floorBand / 2),
+                widened.RequiredRightEdge - (widerBand / 2));
+
+            // The band really did widen - the assertion above would also
+            // hold if nothing had changed at all.
+            Assert.True(widened.RequiredRightEdge > fixedFloor.RequiredRightEdge);
         }
 
         [Fact]
@@ -846,7 +921,16 @@ namespace TaimisToolbench.Tests.Services
             var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(panelWidth, 140);
 
             Assert.Equal(floor.MarkerX, widened.MarkerX);
-            Assert.Equal(floor.NeededRightEdge, widened.NeededRightEdge);
+
+            // Packed, the last column IS the table's right edge (marker
+            // less one gap); distributed, it centres on the last track and
+            // stops short of it. That gap is how the two regimes are told
+            // apart from the outside.
+            Assert.Equal(
+                widened.MarkerX - SummarySectionLayoutMath.CurrencyColumnGap,
+                widened.NeededRightEdge);
+            Assert.True(floor.NeededRightEdge < widened.NeededRightEdge);
+
             Assert.Equal(widened.NeededRightEdge - 140 - SummarySectionLayoutMath.CurrencyColumnGap,
                 widened.HaveRightEdge);
             Assert.Equal(widened.HaveRightEdge - 140 - SummarySectionLayoutMath.CurrencyColumnGap,

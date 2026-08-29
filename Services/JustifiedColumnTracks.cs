@@ -97,6 +97,18 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// <see cref="CenteredX"/> against a column's own reserved BAND
+        /// rather than against a track: the same law, for the columns whose
+        /// band - not an equal share of the row - is what a header has to
+        /// sit over. A band narrower than its content pins left, exactly as
+        /// a track does.
+        /// </summary>
+        public static int CenteredInBand(int bandX, int bandWidth, int contentWidth)
+        {
+            return CenteredX(bandX, bandWidth, 1, 0, contentWidth);
+        }
+
+        /// <summary>
         /// Whether a span is wide enough to distribute at all. A track has
         /// to hold its own reserved band plus the gap that keeps a wide
         /// value out of the column to its left; below that width there is

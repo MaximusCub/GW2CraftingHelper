@@ -678,7 +678,7 @@ namespace TaimisToolbench.Views.Rendering
             int widest = 0;
             for (int i = 0; i < CurrencyHeaderLabels.Length; i++)
             {
-                int width = (int)System.Math.Ceiling(font.MeasureString(CurrencyHeaderLabels[i]).Width);
+                int width = MeasureHeader(font, CurrencyHeaderLabels[i]);
                 if (width > widest)
                 {
                     widest = width;
@@ -769,15 +769,26 @@ namespace TaimisToolbench.Views.Rendering
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
                 panelWidth, widestNumberWidth);
-            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, RequiredHeaderText, font, HeaderBands.LabelColor,
-                edges.RequiredRightEdge, HeaderBands.LabelY);
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, HaveHeaderText, font, HeaderBands.LabelColor,
-                edges.HaveRightEdge, HeaderBands.LabelY);
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, NeededHeaderText, font, HeaderBands.LabelColor,
-                edges.NeededRightEdge, HeaderBands.LabelY);
+            int numberColumnWidth =
+                SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
+
+            // Each header centres over the band its own numbers occupy, not
+            // against that band's right edge - see JustifiedColumnTracks.
+            // Measured from the strings, which are fixed, so the resize
+            // closure below neither measures nor reads a Blish Label's Width
+            // (not settled until its next layout pass).
+            int requiredHeaderWidth = MeasureHeader(font, RequiredHeaderText);
+            int haveHeaderWidth = MeasureHeader(font, HaveHeaderText);
+            int neededHeaderWidth = MeasureHeader(font, NeededHeaderText);
+            var requiredLabel = CreateCurrencyHeaderLabel(
+                band, RequiredHeaderText, font,
+                edges.RequiredRightEdge, numberColumnWidth, requiredHeaderWidth);
+            var haveLabel = CreateCurrencyHeaderLabel(
+                band, HaveHeaderText, font,
+                edges.HaveRightEdge, numberColumnWidth, haveHeaderWidth);
+            var neededLabel = CreateCurrencyHeaderLabel(
+                band, NeededHeaderText, font,
+                edges.NeededRightEdge, numberColumnWidth, neededHeaderWidth);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -789,11 +800,41 @@ namespace TaimisToolbench.Views.Rendering
                 band.Size = new Point(w, HeaderBands.RowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), HeaderBands.LabelY);
+                    SummarySectionLayoutMath.CurrencyHeaderX(
+                        e.RequiredRightEdge, numberColumnWidth, requiredHeaderWidth),
+                    HeaderBands.LabelY);
                 haveLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), HeaderBands.LabelY);
+                    SummarySectionLayoutMath.CurrencyHeaderX(
+                        e.HaveRightEdge, numberColumnWidth, haveHeaderWidth),
+                    HeaderBands.LabelY);
                 neededLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), HeaderBands.LabelY);
+                    SummarySectionLayoutMath.CurrencyHeaderX(
+                        e.NeededRightEdge, numberColumnWidth, neededHeaderWidth),
+                    HeaderBands.LabelY);
+            });
+        }
+
+        private static int MeasureHeader(BitmapFont font, string text)
+        {
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        private static Label CreateCurrencyHeaderLabel(
+            Panel band, string text, BitmapFont font,
+            int bandRightEdge, int numberColumnWidth, int headerWidth)
+        {
+            return LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Text = text,
+                Font = font,
+                TextColor = HeaderBands.LabelColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(
+                    SummarySectionLayoutMath.CurrencyHeaderX(
+                        bandRightEdge, numberColumnWidth, headerWidth),
+                    HeaderBands.LabelY),
+                Parent = band,
             });
         }
 
