@@ -348,6 +348,29 @@ namespace TaimisToolbench.Tests.Services
             Assert.InRange(addedToName, 445, 455);
         }
 
+        /// <summary>
+        /// The owner's report: expanding a one-item plan redrew the icon
+        /// and name the collapsed row above it was already showing. A
+        /// single-item plan draws no item list at all, and the panel's
+        /// height is measured from the same count so it cannot reserve
+        /// space for lines nobody draws.
+        /// </summary>
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(1, 0)]
+        [InlineData(2, 2)]
+        [InlineData(7, 7)]
+        public void ASingleItemPlanRepeatsTheRowAboveIt_SoItsDetailListIsEmpty(
+            int itemCount, int expectedLines)
+        {
+            Assert.Equal(expectedLines, PlanHistoryRowLayout.DetailItemLineCount(itemCount));
+
+            Assert.Equal(
+                PlanHistoryRowLayout.DetailHeight(0, false, false, false, false),
+                PlanHistoryRowLayout.DetailHeight(
+                    PlanHistoryRowLayout.DetailItemLineCount(1), false, false, false, false));
+        }
+
         [Fact]
         public void DetailHeight_AddsExactlyOneLinePerOptionalBlock()
         {

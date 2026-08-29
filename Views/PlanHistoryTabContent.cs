@@ -787,8 +787,9 @@ namespace TaimisToolbench.Views
             long sampleDelta = SampleDelta(entry, out DateTime previousSampleAtUtc);
             bool hasSampleLine = sampleDelta != 0;
 
+            int itemLineCount = PlanHistoryRowLayout.DetailItemLineCount(itemLines.Count);
             int height = PlanHistoryRowLayout.DetailHeight(
-                itemLines.Count, hasChips, hasSampleLine, hasBlobNote, hasOverridesNote);
+                itemLineCount, hasChips, hasSampleLine, hasBlobNote, hasOverridesNote);
 
             // A direct sibling inserted after the row inside the same
             // FlowPanel, so the flow handles the reflow.
@@ -802,7 +803,12 @@ namespace TaimisToolbench.Views
             int x = bands.NameX;
             int y = PlanHistoryRowLayout.DetailPadding / 2;
 
-            var summaries = entry.ItemSummaries ?? new List<PlanHistoryItemSummary>();
+            // Empty for a single-item plan, which the row above already
+            // headlines - PlanHistoryRowLayout.DetailItemLineCount, which
+            // the panel's height was measured from.
+            var summaries = itemLineCount > 0 && entry.ItemSummaries != null
+                ? entry.ItemSummaries
+                : new List<PlanHistoryItemSummary>();
             int line = 0;
             foreach (var summary in summaries)
             {

@@ -288,8 +288,21 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Height of the expanded detail panel: one line per item summary,
-        /// the settings line, the chip strip (only when either count is
+        /// Item lines the expanded panel draws for a plan of
+        /// <paramref name="itemCount"/> items. A single-item plan draws
+        /// NONE: the collapsed row above it already headlines that item's
+        /// icon and name, so the list would repeat the row it hangs off and
+        /// add nothing. Read by both the height math and the render loop,
+        /// so a panel cannot be sized for lines it does not draw.
+        /// </summary>
+        public static int DetailItemLineCount(int itemCount)
+        {
+            return itemCount <= 1 ? 0 : itemCount;
+        }
+
+        /// <summary>
+        /// Height of the expanded detail panel: one line per item line
+        /// (<see cref="DetailItemLineCount"/>), the settings line, the chip strip (only when either count is
         /// non-zero), the Generated caption (always), and up to three
         /// optional note/sample lines, plus padding. Computed, not
         /// guessed, so the FlowPanel reflow is exact.
