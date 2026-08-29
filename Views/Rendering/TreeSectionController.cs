@@ -367,6 +367,10 @@ namespace TaimisToolbench.Views.Rendering
             // side actually has. Both track the panel width now (the
             // pill+cost block's x is width-derived), hence
             // middleXForWidth/rightXForWidth rather than build-time x's.
+            // Both are CENTRED over what they name rather than pinned to
+            // its edge (Services/JustifiedColumnTracks): "Source" at the
+            // left of a 256px pill column, and "Cost" at the right of the
+            // cost column, each read as belonging to the column beside it.
             // Counted by
             // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
             // treeFlow height assignment goes through.
@@ -377,13 +381,29 @@ namespace TaimisToolbench.Views.Rendering
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
+
+                // Captured by value beside headerCostColumnWidth: an
+                // in-place refresh that would change either one bails out
+                // and rebuilds (TryRefreshInPlace), so a live field read
+                // here could only ever disagree with the rows.
+                var headerCostWidths = _costColumnWidths;
+                int sourceHeaderWidth = MeasureHeaderLabel(SourceHeaderText);
+                int costHeaderWidth = MeasureHeaderLabel(CostHeaderText);
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, "Cost", _sink,
-                    middleLabel: "Source",
-                    middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
+                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
+                    middleLabel: SourceHeaderText,
+                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
+                        PlanRelayoutMath.ComputeTreeColumnEdges(
+                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
+                        TreePillColumnWidth,
+                        sourceHeaderWidth),
                     rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge);
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
+                    rightLabelXForWidth: w => TreeCostColumnMath.HeaderX(
+                        PlanRelayoutMath.ComputeTreeColumnEdges(
+                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
+                        headerCostWidths,
+                        costHeaderWidth));
             }
 
 #if DEBUG
@@ -664,6 +684,9 @@ namespace TaimisToolbench.Views.Rendering
         // 12 -> 16, pills 10 -> 14). The icon itself stays top-padded by
         // PlanContentHeightMath.TreeRowIconPad, which is the height law's
         // own term.
+        private const string SourceHeaderText = "Source";
+        private const string CostHeaderText = "Cost";
+
         private const int TreeRowTextY = 16;
         private const int TreeRowPillY = 14;
         private const int TreePillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
@@ -702,6 +725,17 @@ namespace TaimisToolbench.Views.Rendering
         /// decision pills and the name budget left - which is the point:
         /// before, a wide cost run silently overprinted the pills.
         /// </summary>
+        /// <summary>
+        /// A header label's width at the header band's own font - measured
+        /// from the string, because a Blish Label's Width is not settled
+        /// until its next layout pass and the centring closures run before
+        /// then.
+        /// </summary>
+        private static int MeasureHeaderLabel(string text)
+        {
+            return (int)Math.Ceiling(HeaderBands.Font.MeasureString(text ?? "").Width);
+        }
+
         private int EffectiveCostColumnWidth()
         {
             int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
