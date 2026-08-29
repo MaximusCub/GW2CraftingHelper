@@ -2334,6 +2334,30 @@ cells then reads as belonging to the column on its right, which is why the
 tracks centre instead. `Services/PlanHistoryRowLayout.cs` is that law applied
 to one row.
 
+`JustifiedColumnTracks.CenteredOverContent` is the second half of that same
+law, and the correction to the first attempt at it. Centring each header on
+its column's reserved *band* was shipped first and read wrong on the plan
+panel: a band is invisible, so a header centred in one drifts off the ink it
+names by half of however much the band exceeds it, and a band routinely
+exceeds it - a fixed floor (`ShoppingColumnMath.TotalMinWidth`), a
+header-width floor (every band in the module is floored at its own label so
+the label fits), or a reserve shared by several columns and sized by the
+widest of them (`SummarySectionLayoutMath`'s one `NumberColumnWidth` across
+Required/Have/Needed). Measured on the owner's 2026-08-28 capture: the
+Recipe Tree's "Source" header centred at x~797 over a badge run occupying
+700..765, and the currency table's "Have" header sat over neither its own
+numbers' right edge nor their centre.
+
+The cells were never the problem and do not move: badges stay left so their
+left edges rule down the column, numbers stay right so their digits line up.
+Only the header moves, onto the centre of the extent the cells actually
+cover. The caller derives that extent from the cells' own justification
+(`bandX` for a left-ruled column, `rightEdge - contentWidth` for a
+right-aligned one) and the result is clamped back into the band, so a header
+wider than the content it names pins to the band's near edge rather than
+overhanging a neighbour or the panel margin - which is exactly where the
+plain shared-edge rule used to put it.
+
 `Services/LogGutterLayout.cs` replaced one worst-case prefix *template* -
 the widest level word, a widest-digit stamp, and a fourteen-`w` tag
 allowance, measured once and applied to every row at every width whatever
