@@ -364,20 +364,15 @@ namespace TaimisToolbench.Views.Rendering
             _treeFlow = treeFlow;
 
             // Column headers over the two columns a tree row's right-hand
-            // side actually has. Both track the panel width now (the
-            // pill+cost block's x is width-derived), hence
-            // middleXForWidth/rightXForWidth rather than build-time x's.
-            // Both are CENTRED over what they name rather than pinned to
-            // its edge (Services/JustifiedColumnTracks): "Source" at the
-            // left of a 256px pill column, and "Cost" at the right of the
-            // cost column, each read as belonging to the column beside it.
-            // Counted by
-            // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
-            // treeFlow height assignment goes through.
-            // Guarded on the same "is there a tree at all" condition
-            // MultiRootTreeFlowHeight counts the header under: a header
-            // drawn over zero roots would be a row the section's own
-            // height math reserves nothing for.
+            // side actually has. Both track the panel width (the pill+cost
+            // block's x is width-derived), hence middleXForWidth/
+            // rightXForWidth rather than build-time x's, and both centre
+            // over what they name (JustifiedColumnTracks.CenteredInBand).
+            // Counted by PlanContentHeightMath.MultiRootTreeFlowHeight,
+            // which every treeFlow height assignment goes through, and
+            // guarded on the same "is there a tree at all" condition that
+            // math counts the header under: a header over zero roots would
+            // be a row the section's own height math reserves nothing for.
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
