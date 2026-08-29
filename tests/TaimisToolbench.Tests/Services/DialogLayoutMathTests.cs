@@ -105,27 +105,51 @@ namespace TaimisToolbench.Tests.Services
 
         // --- The button row ---
         [Fact]
-        public void Measure_TwoButtons_CentresTheRowAtItsMeasuredWidths()
+        public void Measure_TwoButtons_CentresTheRowAtTheWiderLabelsWidth()
         {
             var layout = Measure("Short", confirmLabelWidth: 130, cancelLabelWidth: 70);
 
-            int confirmWidth = 130 + DialogLayoutMath.ButtonSidePadding;
-            int cancelWidth = 70 + DialogLayoutMath.ButtonSidePadding;
-            int row = confirmWidth + DialogLayoutMath.ButtonGap + cancelWidth;
+            int seat = 130 + DialogLayoutMath.ButtonSidePadding;
+            int row = (2 * seat) + DialogLayoutMath.ButtonGap;
 
-            Assert.Equal(confirmWidth, layout.ConfirmWidth);
-            Assert.Equal(cancelWidth, layout.CancelWidth);
+            Assert.Equal(seat, layout.ConfirmWidth);
+            Assert.Equal(seat, layout.CancelWidth);
             Assert.Equal((layout.ContentWidth - row) / 2, layout.ConfirmX);
-            Assert.Equal(layout.ConfirmX + confirmWidth + DialogLayoutMath.ButtonGap, layout.CancelX);
+            Assert.Equal(layout.ConfirmX + seat + DialogLayoutMath.ButtonGap, layout.CancelX);
         }
 
         [Fact]
-        public void Measure_ShortLabels_KeepTheirFloorWidths()
+        public void Measure_ShortConfirmBesideLongCancel_StillProducesTwoEqualButtons()
+        {
+            // The reported defect, from the other side: a short confirm verb
+            // ("Clear") beside a longer cancel label must not leave the
+            // shorter word on the wider button. The seat is the LARGER of
+            // the two, whichever label happens to need it.
+            var layout = Measure("Short", confirmLabelWidth: 20, cancelLabelWidth: 160);
+
+            Assert.Equal(160 + DialogLayoutMath.ButtonSidePadding, layout.ConfirmWidth);
+            Assert.Equal(layout.ConfirmWidth, layout.CancelWidth);
+        }
+
+        [Fact]
+        public void Measure_EitherLabelLongest_GivesTheSamePairOfWidths()
+        {
+            var confirmLonger = Measure("Short", confirmLabelWidth: 160, cancelLabelWidth: 20);
+            var cancelLonger = Measure("Short", confirmLabelWidth: 20, cancelLabelWidth: 160);
+
+            Assert.Equal(confirmLonger.ConfirmWidth, cancelLonger.ConfirmWidth);
+            Assert.Equal(confirmLonger.CancelWidth, cancelLonger.CancelWidth);
+            Assert.Equal(confirmLonger.ConfirmX, cancelLonger.ConfirmX);
+            Assert.Equal(confirmLonger.CancelX, cancelLonger.CancelX);
+        }
+
+        [Fact]
+        public void Measure_ShortLabels_ShareTheOneFloorWidth()
         {
             var layout = Measure("Short", confirmLabelWidth: 10, cancelLabelWidth: 10);
 
-            Assert.Equal(DialogLayoutMath.MinConfirmButtonWidth, layout.ConfirmWidth);
-            Assert.Equal(DialogLayoutMath.MinCancelButtonWidth, layout.CancelWidth);
+            Assert.Equal(DialogLayoutMath.MinButtonWidth, layout.ConfirmWidth);
+            Assert.Equal(DialogLayoutMath.MinButtonWidth, layout.CancelWidth);
         }
 
         [Fact]
@@ -135,7 +159,21 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(0, layout.CancelWidth);
             Assert.Equal(0, layout.CancelX);
+            Assert.Equal(DialogLayoutMath.MinButtonWidth, layout.ConfirmWidth);
             Assert.Equal((layout.ContentWidth - layout.ConfirmWidth) / 2, layout.ConfirmX);
+        }
+
+        [Fact]
+        public void Measure_OneButton_IsNotWidenedToAPairsSeat()
+        {
+            // A lone acknowledgement has nothing to match, so a long cancel
+            // label on some OTHER dialog must not reach it. It takes its own
+            // label or the floor, and no more.
+            var lone = Measure("Short", confirmLabelWidth: 20, cancelLabelWidth: -1);
+            var paired = Measure("Short", confirmLabelWidth: 20, cancelLabelWidth: 160);
+
+            Assert.True(lone.ConfirmWidth < paired.ConfirmWidth);
+            Assert.Equal(DialogLayoutMath.MinButtonWidth, lone.ConfirmWidth);
         }
 
         [Fact]
@@ -144,6 +182,7 @@ namespace TaimisToolbench.Tests.Services
             var layout = Measure("Short", confirmLabelWidth: 300, cancelLabelWidth: 300);
 
             int row = layout.ConfirmWidth + DialogLayoutMath.ButtonGap + layout.CancelWidth;
+            Assert.Equal(layout.ConfirmWidth, layout.CancelWidth);
             Assert.True(
                 layout.ContentWidth >= row + (2 * DialogLayoutMath.ButtonRowSideMargin),
                 "a dialog must never be narrower than its own buttons need");
