@@ -38,12 +38,33 @@ namespace TaimisToolbench.Services
             public readonly int CopperTextWidth;
             public readonly int CurrencyRunWidth;
 
-            public CostColumnWidths(int goldTextWidth, int silverTextWidth, int copperTextWidth, int currencyRunWidth)
+            /// <summary>
+            /// Widest run of INK any single row draws, measured back from
+            /// the column's right edge - what the "Cost" header centres
+            /// over (<see cref="HeaderX"/>). Strictly narrower than
+            /// <see cref="TotalWidth"/> whenever the sub-column maxima come
+            /// from different rows, and much narrower when the currency
+            /// band exists at all: a coin-only row collapses that band for
+            /// itself (<see cref="ComputeRowEdges"/>), so no row's ink ever
+            /// reaches the reserve's left edge. 0 when no row is priced.
+            /// <para>
+            /// Not derivable from the four widths above, so a caller that
+            /// compares two scans field by field to decide whether a
+            /// re-solve can refresh rows in place has to compare this one
+            /// too, or leave the header on a stale x.
+            /// </para>
+            /// </summary>
+            public readonly int WidestRowRunWidth;
+
+            public CostColumnWidths(
+                int goldTextWidth, int silverTextWidth, int copperTextWidth, int currencyRunWidth,
+                int widestRowRunWidth = 0)
             {
                 GoldTextWidth = goldTextWidth;
                 SilverTextWidth = silverTextWidth;
                 CopperTextWidth = copperTextWidth;
                 CurrencyRunWidth = currencyRunWidth;
+                WidestRowRunWidth = widestRowRunWidth;
             }
 
             public static readonly CostColumnWidths Empty = new CostColumnWidths(0, 0, 0, 0);
@@ -186,20 +207,20 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Left edge of the "Cost" header, centred over the band the
-        /// column's values actually occupy - which ends at
-        /// <paramref name="costRightEdge"/> and is
-        /// <see cref="TotalWidth"/> wide, not the wider floor the tree
-        /// reserves for the column (TreeSectionController.
-        /// EffectiveCostColumnWidth). A header centred over the reserve
-        /// would drift off its own numbers by half of whatever the reserve
-        /// exceeds them by.
+        /// Left edge of the "Cost" header, centred over the INK -
+        /// <see cref="CostColumnWidths.WidestRowRunWidth"/>, ending at
+        /// <paramref name="costRightEdge"/> - and not over either reserve
+        /// around it: neither the tree's fixed column floor
+        /// (TreeSectionController.EffectiveCostColumnWidth) nor
+        /// <see cref="TotalWidth"/>, which sums per-denomination maxima
+        /// that no one row draws together. On the owner's 2026-08-28
+        /// capture the two differed by 106px - the whole width of a
+        /// currency band every coin-only row collapses.
         /// <para>
-        /// The band is floored at the header's own width, so a tree whose
-        /// every value is a single copper - or one in which nothing is
-        /// priced at all - right-aligns the header on the column's edge
-        /// rather than centring it over a band too narrow to hold it and
-        /// letting the word overhang the panel margin.
+        /// The clamp band is TotalWidth floored at the header's own width,
+        /// so a header wider than the ink under it right-aligns on the
+        /// column's edge rather than overhanging the panel margin - which
+        /// is where a tree with nothing priced at all leaves it.
         /// </para>
         /// </summary>
         public static int HeaderX(int costRightEdge, CostColumnWidths widths, int headerWidth)
@@ -210,7 +231,8 @@ namespace TaimisToolbench.Services
                 band = headerWidth;
             }
 
-            return JustifiedColumnTracks.CenteredInBand(costRightEdge - band, band, headerWidth);
+            return JustifiedColumnTracks.CenteredOverContentRightAligned(
+                costRightEdge, band, widths.WidestRowRunWidth, headerWidth);
         }
 
         /// <summary>
@@ -312,16 +334,75 @@ namespace TaimisToolbench.Services
                 throw new ArgumentNullException(nameof(measureCurrencyRunWidth));
             }
 
-            int gold = 0, silver = 0, copper = 0, currency = 0, nodeCount = 0;
+            var acc = new ScanAccumulator();
             foreach (var root in roots)
             {
-                ScanNode(
-                    root, measureText, measureCurrencyRunWidth,
-                    ref gold, ref silver, ref copper, ref currency, ref nodeCount);
+                ScanNode(root, measureText, measureCurrencyRunWidth, acc);
             }
 
+            var widths = new CostColumnWidths(acc.Gold, acc.Silver, acc.Copper, acc.Currency);
             return new TreeColumnScan(
-                new CostColumnWidths(gold, silver, copper, currency), nodeCount);
+                new CostColumnWidths(
+                    acc.Gold, acc.Silver, acc.Copper, acc.Currency, WidestRowRun(widths, acc)),
+                acc.NodeCount);
+        }
+
+        /// <summary>
+        /// One walk's running maxima. The four sub-column widths are the
+        /// column's RESERVE; the seven Lead* fields are what the ink
+        /// extent needs on top of it - the widest FIRST segment any row
+        /// draws, per denomination, in each of the two regimes
+        /// <see cref="ComputeRowEdges"/> lays a row out in. A row's ink
+        /// starts at its leading segment's sub-column edge, so those are
+        /// the only per-row measurements the extent depends on, and one
+        /// walk can carry them without holding the rows.
+        /// </summary>
+        private sealed class ScanAccumulator
+        {
+            public int Gold;
+            public int Silver;
+            public int Copper;
+            public int Currency;
+            public int NodeCount;
+            public int LeadGoldCoinOnly;
+            public int LeadSilverCoinOnly;
+            public int LeadCopperCoinOnly;
+            public int LeadGoldMixed;
+            public int LeadSilverMixed;
+            public int LeadCopperMixed;
+            public int LeadCurrency;
+        }
+
+        /// <summary>
+        /// Widest ink run of any single row, in pixels back from the
+        /// column's right edge. Resolved after the walk because a row's
+        /// segments right-align into sub-columns whose edges are not known
+        /// until every row has been measured.
+        /// </summary>
+        private static int WidestRowRun(CostColumnWidths widths, ScanAccumulator acc)
+        {
+            var mixed = ComputeEdges(0, widths);
+            var coinOnly = ComputeRowEdges(0, widths, rowDrawsCurrency: false);
+
+            int run = Reach(coinOnly.GoldRightEdge, acc.LeadGoldCoinOnly);
+            run = Max(run, Reach(coinOnly.SilverRightEdge, acc.LeadSilverCoinOnly));
+            run = Max(run, Reach(coinOnly.CopperRightEdge, acc.LeadCopperCoinOnly));
+            run = Max(run, Reach(mixed.GoldRightEdge, acc.LeadGoldMixed));
+            run = Max(run, Reach(mixed.SilverRightEdge, acc.LeadSilverMixed));
+            run = Max(run, Reach(mixed.CopperRightEdge, acc.LeadCopperMixed));
+            return Max(run, Reach(mixed.CurrencyRightEdge, acc.LeadCurrency));
+        }
+
+        /// <summary>
+        /// How far left of the column's right edge a row reaches when its
+        /// first segment is leadSegmentWidth wide and right-aligns on
+        /// <paramref name="subColumnRightEdge"/>, which is itself <= 0
+        /// because <see cref="WidestRowRun"/> computes the edges off a
+        /// right edge of 0. No such row means no reach.
+        /// </summary>
+        private static int Reach(int subColumnRightEdge, int leadSegmentWidth)
+        {
+            return leadSegmentWidth > 0 ? leadSegmentWidth - subColumnRightEdge : 0;
         }
 
         // Explicit stack rather than recursion: a solver tree's depth is
@@ -330,8 +411,7 @@ namespace TaimisToolbench.Services
         // state ever reveals.
         private static void ScanNode(
             CraftingTreeNode root, Func<string, int> measureText, Func<CraftingTreeNode, int> measureCurrencyRunWidth,
-            ref int gold, ref int silver, ref int copper, ref int currency,
-            ref int nodeCount)
+            ScanAccumulator acc)
         {
             if (root == null)
             {
@@ -348,7 +428,9 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
-                nodeCount++;
+                acc.NodeCount++;
+
+                int goldSegment = 0, silverSegment = 0, copperSegment = 0;
 
                 // > 0, not merely HasValue: a genuinely zero-and-uncosted
                 // decision renders the unpriceable dash instead of coin
@@ -358,24 +440,34 @@ namespace TaimisToolbench.Services
                     var (goldText, silverText, copperText) = CoinSegmentMath.FormatSegmentTexts(node.SubtreeCost.Value);
                     if (goldText != null)
                     {
-                        gold = Max(gold, measureText(goldText));
+                        int width = measureText(goldText);
+                        acc.Gold = Max(acc.Gold, width);
+                        goldSegment = SegmentWidth(width);
                     }
 
                     if (silverText != null)
                     {
-                        silver = Max(silver, measureText(silverText));
+                        int width = measureText(silverText);
+                        acc.Silver = Max(acc.Silver, width);
+                        silverSegment = SegmentWidth(width);
                     }
 
                     if (copperText != null)
                     {
-                        copper = Max(copper, measureText(copperText));
+                        int width = measureText(copperText);
+                        acc.Copper = Max(acc.Copper, width);
+                        copperSegment = SegmentWidth(width);
                     }
                 }
 
+                int currencyRun = 0;
                 if (node.SubtreeCost.HasValue && ShowsCurrencySegments(node))
                 {
-                    currency = Max(currency, measureCurrencyRunWidth(node));
+                    currencyRun = measureCurrencyRunWidth(node);
+                    acc.Currency = Max(acc.Currency, currencyRun);
                 }
+
+                RecordLeadingSegment(acc, goldSegment, silverSegment, copperSegment, currencyRun);
 
                 var children = node.Children;
                 if (children == null)
@@ -387,6 +479,58 @@ namespace TaimisToolbench.Services
                 {
                     pending.Push(children[i]);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Files this row's LEFTMOST drawn segment under the denomination
+        /// it belongs to. The regime is the same one
+        /// <see cref="ComputeRowEdges"/> uses (a row with no currency ink
+        /// collapses the shared currency band for itself), and matches the
+        /// view's own rowDrawsCurrency, which is likewise "the resolved
+        /// currency run is non-empty" rather than the predicate that
+        /// reserves the band.
+        /// </summary>
+        private static void RecordLeadingSegment(
+            ScanAccumulator acc, int goldSegment, int silverSegment, int copperSegment, int currencyRun)
+        {
+            bool mixed = currencyRun > 0;
+            if (goldSegment > 0)
+            {
+                if (mixed)
+                {
+                    acc.LeadGoldMixed = Max(acc.LeadGoldMixed, goldSegment);
+                }
+                else
+                {
+                    acc.LeadGoldCoinOnly = Max(acc.LeadGoldCoinOnly, goldSegment);
+                }
+            }
+            else if (silverSegment > 0)
+            {
+                if (mixed)
+                {
+                    acc.LeadSilverMixed = Max(acc.LeadSilverMixed, silverSegment);
+                }
+                else
+                {
+                    acc.LeadSilverCoinOnly = Max(acc.LeadSilverCoinOnly, silverSegment);
+                }
+            }
+            else if (copperSegment > 0)
+            {
+                if (mixed)
+                {
+                    acc.LeadCopperMixed = Max(acc.LeadCopperMixed, copperSegment);
+                }
+                else
+                {
+                    acc.LeadCopperCoinOnly = Max(acc.LeadCopperCoinOnly, copperSegment);
+                }
+            }
+            else if (mixed)
+            {
+                acc.LeadCurrency = Max(acc.LeadCurrency, currencyRun);
             }
         }
 

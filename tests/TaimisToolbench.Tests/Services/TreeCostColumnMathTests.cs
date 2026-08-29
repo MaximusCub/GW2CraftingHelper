@@ -455,58 +455,119 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(costOnly.CopperTextWidth, both.CostWidths.CopperTextWidth);
         }
 
-        // --- HeaderX (the "Cost" header centres over the band its values
-        // occupy, rather than right-aligning on the column's own edge) ---
+        // --- WidestRowRunWidth (the ink extent, which is what the header
+        // centres over - see HeaderX below) ---
         [Fact]
-        public void HeaderX_CentresTheHeaderOverThePopulatedBand()
+        public void Scan_OneCoinOnlyRow_ReachesTheWholeReserve()
         {
-            // One gold sub-column: 30px of text plus the label-icon gap and
-            // the coin icon. A 40px header centres in whatever that comes
-            // to, half of the surplus in from the band's left edge.
-            var widths = new TreeCostColumnMath.CostColumnWidths(30, 0, 0, 0);
-            int band = TreeCostColumnMath.TotalWidth(widths);
+            // 12g34s56c -> "12"/"34"/"56", one pixel per character. With a
+            // single row the sub-column maxima all come from it, so its own
+            // ink does fill the reserve and the two agree.
+            var widths = Scan(new[] { Node(1, subtreeCost: 12345656) });
 
-            int x = TreeCostColumnMath.HeaderX(1000, widths, 40);
-
-            Assert.Equal((1000 - band) + ((band - 40) / 2), x);
-            Assert.True(x + 40 < 1000, "a centred header ends inside its own band");
+            Assert.Equal(TreeCostColumnMath.TotalWidth(widths), widths.WidestRowRunWidth);
         }
 
         [Fact]
-        public void HeaderX_IsIndependentOfTheColumnsWiderReserve()
+        public void Scan_ACurrencyBandNoCoinRowFills_LeavesTheInkShortOfTheReserve()
         {
-            // TreeSectionController reserves max(TotalWidth, its 150px
-            // floor) for the column. Centring over the RESERVE would leave
-            // the header up to half that surplus left of the values it
-            // names; centring over the band cannot, because the band is all
-            // this function is given.
-            var narrow = new TreeCostColumnMath.CostColumnWidths(20, 0, 0, 0);
-            var wide = new TreeCostColumnMath.CostColumnWidths(20, 20, 20, 60);
+            // The reported shape: coin-only rows collapse the currency band
+            // for themselves (ComputeRowEdges), and the currency row draws
+            // no coin, so NOTHING ever reaches the reserve's left edge. The
+            // reserve is still correct - it is what keeps a wide row off the
+            // decision pills - it is just not what a reader sees.
+            var roots = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 0, vendorCurrencyCosts: OneCurrencyLine()),
+            };
 
-            Assert.NotEqual(
+            var widths = Scan(roots, currencyRunWidth: 88);
+
+            // "123"/"45"/"67" -> segments 21/20/20, two 6px gaps: 73px of
+            // coin ink, against 88px of currency ink one band to its right.
+            Assert.Equal(88, widths.WidestRowRunWidth);
+            Assert.Equal(167, TreeCostColumnMath.TotalWidth(widths));
+        }
+
+        [Fact]
+        public void Scan_ARowThatLeadsWithSilver_ReachesOnlyItsOwnSubColumn()
+        {
+            // Under a gold sub-column reserved by a richer row, a sub-gold
+            // value starts one whole band further right. Its ink extent is
+            // measured from where it actually starts, not from the reserve.
+            var roots = new[] { Node(1, subtreeCost: 10000000), Node(2, subtreeCost: 4567) };
+
+            var widths = Scan(roots);
+
+            // Row 2 is "45"/"67", starting at the silver sub-column's own
+            // edge: 20 + 6 + 20 = 46. Row 1's "1000"/"00"/"00" run is
+            // 22 + 6 + 20 + 6 + 20 = 74, which wins.
+            Assert.Equal(74, widths.WidestRowRunWidth);
+        }
+
+        [Fact]
+        public void Scan_NothingPriced_HasNoInkAtAll()
+        {
+            var widths = Scan(new[] { Node(1), Node(2) });
+
+            Assert.Equal(0, widths.WidestRowRunWidth);
+        }
+
+        // --- HeaderX (the "Cost" header centres over the INK, not over
+        // either reserve around it - see JustifiedColumnTracks) ---
+        [Fact]
+        public void HeaderX_CentresTheHeaderOverTheInk_NotOverTheReserve()
+        {
+            // 48 + 6 + 38 + 6 + 38 = 136px of coin ink, then a 6px gap and
+            // an 88px currency band no coin row ever fills: a 230px reserve
+            // over 136px of ink. Centring in the reserve puts the word 47px
+            // left of the numbers, which is the reported defect.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88, 136);
+
+            int x = TreeCostColumnMath.HeaderX(1000, widths, 40);
+
+            Assert.Equal(912, x);
+            Assert.Equal(
+                865,
+                JustifiedColumnTracks.CenteredInBand(1000 - 230, 230, 40));
+        }
+
+        [Fact]
+        public void HeaderX_IsIndependentOfEveryReserveTheInkDoesNotFill()
+        {
+            // TreeSectionController reserves max(TotalWidth, its own floor)
+            // for the column, and TotalWidth itself sums per-denomination
+            // maxima no one row draws together. Neither may move the header
+            // while the ink under it is unchanged.
+            var narrow = new TreeCostColumnMath.CostColumnWidths(20, 0, 0, 0, 38);
+            var wide = new TreeCostColumnMath.CostColumnWidths(20, 20, 20, 60, 38);
+
+            Assert.Equal(
                 TreeCostColumnMath.HeaderX(1000, narrow, 40),
                 TreeCostColumnMath.HeaderX(1000, wide, 40));
         }
 
         [Fact]
-        public void HeaderX_BandNarrowerThanTheHeader_RightAlignsInstead()
+        public void HeaderX_HeaderWiderThanTheInk_RightAlignsInstead()
         {
-            // Nothing priced, and a band too narrow to hold the word: both
-            // fall back to the column's right edge, so the header can never
-            // overhang the panel margin to the right of it.
+            // Nothing priced, and a single-copper tree whose ink is narrower
+            // than the word: both fall back to the column's right edge, so
+            // the header can never overhang the panel margin to the right of
+            // it, nor drift left off a one-character value.
             Assert.Equal(
                 960,
                 TreeCostColumnMath.HeaderX(1000, TreeCostColumnMath.CostColumnWidths.Empty, 40));
             Assert.Equal(
                 960,
                 TreeCostColumnMath.HeaderX(
-                    1000, new TreeCostColumnMath.CostColumnWidths(1, 0, 0, 0), 40));
+                    1000, new TreeCostColumnMath.CostColumnWidths(1, 0, 0, 0, 19), 40));
         }
 
         [Fact]
         public void HeaderX_TracksTheColumnsRightEdge()
         {
-            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 0);
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 0, 130);
 
             Assert.Equal(
                 TreeCostColumnMath.HeaderX(1000, widths, 40) + 200,
