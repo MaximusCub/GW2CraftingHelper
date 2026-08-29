@@ -29,8 +29,8 @@ namespace TaimisToolbench.Views
     /// </summary>
     internal sealed class ItemInputRowStrip
     {
-        // A cell's controls, left to right: search box, "Qty:" label,
-        // quantity field, remove button. Their X offsets and widths are the
+        // A cell's controls, left to right: "Qty:" label, quantity field,
+        // search box, remove button. Their X offsets and widths are the
         // grid's (ItemInputGridLayout) - only the in-row Y offsets and the
         // input height are this file's, because only this file knows which
         // Blish control goes where.
@@ -273,6 +273,7 @@ namespace TaimisToolbench.Views
 
             if (row.SearchBox != null)
             {
+                row.SearchBox.Location = new Point(grid.SearchBoxX, InputY);
                 row.SearchBox.Size = new Point(grid.SearchBoxWidth, InputHeight);
             }
 
@@ -310,7 +311,7 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One input cell's controls: search box + qty, and a Remove button
+        /// One input cell's controls: qty + search box, and a Remove button
         /// (gw2e's own 2+-rows gate). The Add button is not one of them -
         /// it belongs to the strip, not to a cell; see
         /// <see cref="CreateAddButton"/>.
@@ -339,7 +340,6 @@ namespace TaimisToolbench.Views
                     ? RestoredRequestInputs.UnnamedRowPlaceholder
                     : "Search items...",
                 Text = text,
-                Location = new Point(0, InputY),
                 Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             row.SearchBox = searchBox;

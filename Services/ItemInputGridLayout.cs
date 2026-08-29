@@ -9,56 +9,86 @@ namespace TaimisToolbench.Services
     /// where the add button goes.
     /// <para>
     /// The strip used to spend one full-width row per item, so a five-item
-    /// plan pinned 175px of header above content that has the rest of the
-    /// window to fit in. Cells are laid out in reading order instead -
-    /// row-major, left to right - which is the fill order with the fewest
-    /// rows at every item count: filling a column first would spend a
-    /// second row on the second item, where row-major spends one row on
-    /// the first <see cref="ColumnCount"/> items.
+    /// plan pinned 175px of header above the content. Cells fill in
+    /// reading order - row-major - which is the order with the fewest rows
+    /// at every item count: filling a column first spends a second row on
+    /// the second item, where row-major spends one on the first
+    /// <see cref="ColumnCount"/>.
     /// </para>
-    /// <para>Column count comes from <see cref="GridLayout"/>, the module's
-    /// one column-grid law.</para>
+    /// <para>
+    /// A cell reads [Qty: label] [quantity box] [name box] [remove
+    /// button]; why quantity leads is on <see cref="NameToButtonGap"/>.
+    /// Column count comes from <see cref="GridLayout"/>, the module's one
+    /// column-grid law.
+    /// </para>
     /// </summary>
     internal static class ItemInputGridLayout
     {
         /// <summary>Gap between one cell's remove button and the next
-        /// cell's search box. Wider than any gap inside a cell so the eye
+        /// cell's "Qty:" label. Wider than any gap inside a cell so the eye
         /// groups a cell's own controls before it groups the cells.</summary>
         public const int ColumnGap = 12;
 
-        /// <summary>Gap between the search box and the "Qty:" label. The
-        /// spacing the one-row-per-item strip shipped with: a 200px box
-        /// then a label at x=210.</summary>
-        public const int SearchToQtyGap = 10;
+        /// <summary>Ink width of the "Qty:" label at the body face
+        /// (Menomonia 16 regular with Blish's LetterSpacing of -1), read
+        /// off the shipped XNB glyph advances.</summary>
+        public const int QtyLabelInk = 28;
 
-        /// <summary>Band the "Qty:" label occupies - its ink plus the gap
-        /// to the quantity box. 30 is the shipped allotment (label at
-        /// x=210, quantity box at x=240).</summary>
-        public const int QtyLabelBand = 30;
+        /// <summary>Gap between the "Qty:" label and the box it
+        /// names.</summary>
+        public const int LabelToQtyGap = 6;
 
-        /// <summary>Shipped quantity-box width; four digits of headroom on
-        /// a field whose ordinary contents are one or two.</summary>
-        public const int QtyBoxWidth = 50;
-
-        /// <summary>
-        /// Gap between the quantity box and the cell's remove button, kept
-        /// wide enough that a button beside a number does not read as its
-        /// stepper. 14 rather than the strip's original 30: the four
-        /// columns below are only bought by spending that difference on
-        /// the search box instead.
-        /// </summary>
-        public const int QtyToButtonGap = 14;
+        /// <summary>Band the leading "Qty:" label occupies - its ink plus
+        /// the gap to the quantity box.</summary>
+        public const int QtyLabelBand = QtyLabelInk + LabelToQtyGap;
 
         /// <summary>
-        /// Narrowest a cell's search box may get, and therefore what sets
-        /// the column count. 150px is 16 characters at the 9px-per-character
-        /// upper bound the body font is measured at elsewhere in this layer
-        /// (SnapshotItemGridLayout.MaxCharWidthPx), and it is the largest
-        /// floor that still seats four cells in the 1192px this strip is
-        /// left by the 1378px window minimum: four cells at
-        /// <see cref="MinCellWidth"/> come to 1176.
+        /// Blish's own <c>TextBox.TEXT_HORIZONTALPADDING</c>, read off the
+        /// shipped assembly: the inset between a text box's edge and its
+        /// text, budgeted for BOTH sides because that is the reading that
+        /// can only leave headroom, never take it.
         /// </summary>
-        public const int MinSearchBoxWidth = 150;
+        public const int TextBoxSidePadding = 10;
+
+        /// <summary>
+        /// Widest three-digit run at the quantity box's face - a text box
+        /// paints in Menomonia 14 regular, whose widest digit advances 9px
+        /// and 8px after letter spacing, so "000" measures 26.
+        /// </summary>
+        public const int QtyDigitRunWidth = 26;
+
+        /// <summary>
+        /// Quantity box, sized to the digits it must hold rather than to a
+        /// round number: <see cref="QtyDigitRunWidth"/> plus the box's own
+        /// padding a side. That is a three-digit quantity in the widest
+        /// digits and more in narrower ones - the capacity the 50px box
+        /// this replaces actually had, at 4px less width.
+        /// </summary>
+        public const int QtyBoxWidth = QtyDigitRunWidth + (2 * TextBoxSidePadding);
+
+        /// <summary>Gap between the quantity box and the name box after
+        /// it.</summary>
+        public const int QtyToNameGap = 8;
+
+        /// <summary>
+        /// Gap between the name box and the cell's remove button. The
+        /// button pair used to sit beside the QUANTITY box, where "-" and
+        /// "+" read as its stepper rather than as row controls; leading
+        /// with quantity is what moved them off it, so this gap no longer
+        /// has to carry that separation on its own.
+        /// </summary>
+        public const int NameToButtonGap = 8;
+
+        /// <summary>
+        /// Narrowest a cell's name box may get, and therefore what sets the
+        /// column count. Derived from the shipped item corpus
+        /// (ref/item_name_seed.json, 14,766 names) measured at the box's own
+        /// face: 250px shows 97.5% of them whole, against 62% at the 154px
+        /// a fourth column would leave. Three cells at
+        /// <see cref="MinCellWidth"/> come to 1158 of the 1192 the 1378px
+        /// window minimum leaves this strip; a fourth needs a 1730px window.
+        /// </summary>
+        public const int MinSearchBoxWidth = 250;
 
         /// <summary>
         /// A cell is one strip row tall, so a grid row is exactly the row
@@ -74,19 +104,20 @@ namespace TaimisToolbench.Services
         private const int DegenerateControlWidth = 20;
 
         /// <summary>
-        /// Everything in a cell that is not the search box: the two inner
-        /// gaps, the "Qty:" band, the quantity box and the remove button.
+        /// Everything in a cell that is not the name box: the leading
+        /// "Qty:" band, the quantity box, the two gaps around the name box
+        /// and the remove button.
         /// <paramref name="buttonSize"/> is the caller's measurement - the
         /// Views layer owns the module's button height and this layer may
         /// not name it.
         /// </summary>
         public static int CellChromeWidth(int buttonSize)
         {
-            return SearchToQtyGap + QtyLabelBand + QtyBoxWidth + QtyToButtonGap
+            return QtyLabelBand + QtyBoxWidth + QtyToNameGap + NameToButtonGap
                 + (buttonSize > 0 ? buttonSize : 0);
         }
 
-        /// <summary>Narrowest whole column: a floor-width search box, the
+        /// <summary>Narrowest whole column: a floor-width name box, the
         /// cell chrome beside it, and the gap to the next column.</summary>
         public static int MinCellWidth(int buttonSize)
         {
@@ -186,11 +217,16 @@ namespace TaimisToolbench.Services
             /// </summary>
             public int CellPanelWidth { get; }
 
-            public int SearchBoxWidth { get; }
-
+            /// <summary>Leading control in a cell: the label names the box
+            /// beside it, which a bare number box at the cell's head would
+            /// not.</summary>
             public int QtyLabelX { get; }
 
             public int QtyBoxX { get; }
+
+            public int SearchBoxX { get; }
+
+            public int SearchBoxWidth { get; }
 
             /// <summary>Where the remove button sits in a cell. Reserved
             /// even on the single row that has none, so adding a second
@@ -218,7 +254,7 @@ namespace TaimisToolbench.Services
 
             internal Grid(
                 IReadOnlyList<CellPlacement> cells, int columnCount, int columnWidth, int cellWidth,
-                int searchBoxWidth, int qtyLabelX, int qtyBoxX, int removeButtonX,
+                int searchBoxX, int searchBoxWidth, int qtyLabelX, int qtyBoxX, int removeButtonX,
                 int rowCount, int height, int addButtonX, int addButtonY)
             {
                 Cells = cells;
@@ -226,6 +262,7 @@ namespace TaimisToolbench.Services
                 ColumnWidth = columnWidth;
                 CellWidth = cellWidth;
                 CellPanelWidth = columnWidth > cellWidth ? columnWidth : cellWidth;
+                SearchBoxX = searchBoxX;
                 SearchBoxWidth = searchBoxWidth;
                 QtyLabelX = qtyLabelX;
                 QtyBoxX = qtyBoxX;
@@ -257,9 +294,10 @@ namespace TaimisToolbench.Services
             }
 
             int cellWidth = searchBoxWidth + chrome;
-            int qtyLabelX = searchBoxWidth + SearchToQtyGap;
+            const int qtyLabelX = 0;
             int qtyBoxX = qtyLabelX + QtyLabelBand;
-            int removeButtonX = qtyBoxX + QtyBoxWidth + QtyToButtonGap;
+            int searchBoxX = qtyBoxX + QtyBoxWidth + QtyToNameGap;
+            int removeButtonX = searchBoxX + searchBoxWidth + NameToButtonGap;
 
             var cells = new CellPlacement[safeCount];
             for (int i = 0; i < safeCount; i++)
@@ -275,7 +313,7 @@ namespace TaimisToolbench.Services
             int addButtonY = safeCount == 0 ? 0 : (lastIndex / columnCount) * RowHeight;
 
             return new Grid(
-                cells, columnCount, columnWidth, cellWidth, searchBoxWidth,
+                cells, columnCount, columnWidth, cellWidth, searchBoxX, searchBoxWidth,
                 qtyLabelX, qtyBoxX, removeButtonX, rowCount, rowCount * RowHeight,
                 addButtonX, addButtonY);
         }

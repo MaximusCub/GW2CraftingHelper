@@ -28,21 +28,33 @@ namespace TaimisToolbench.Tests.Services
             return ItemInputGridLayout.Compute(itemCount, PanelAtWindowMinimum, ButtonSize);
         }
 
-        // ---- The requirement: four cells across at the window minimum ----
+        // ---- The requirement: three cells across at the window minimum ----
         [Fact]
-        public void FourCellsFitTheStripTheWindowMinimumLeaves()
+        public void ThreeCellsFitTheStripTheWindowMinimumLeaves()
         {
-            Assert.Equal(4, ItemInputGridLayout.ColumnCount(PanelAtWindowMinimum, ButtonSize));
+            Assert.Equal(3, ItemInputGridLayout.ColumnCount(PanelAtWindowMinimum, ButtonSize));
         }
 
         [Fact]
-        public void FourCellsAreWhatTheStripWidthActuallyPaysFor()
+        public void ThreeCellsAreWhatTheStripWidthActuallyPaysFor()
         {
             int strip = ItemInputGridLayout.ColumnStripWidth(PanelAtWindowMinimum, ButtonSize);
             int cell = ItemInputGridLayout.MinCellWidth(ButtonSize);
 
-            Assert.True(4 * cell <= strip, $"four cells ({4 * cell}) must fit {strip}px");
-            Assert.True(5 * cell > strip, $"a fifth cell ({5 * cell}) must not fit {strip}px");
+            Assert.True(3 * cell <= strip, $"three cells ({3 * cell}) must fit {strip}px");
+            Assert.True(4 * cell > strip, $"a fourth cell ({4 * cell}) must not fit {strip}px");
+        }
+
+        [Fact]
+        public void TheThirdColumnHoldsWellBelowTheWindowMinimum()
+        {
+            // The count must not be one drag tick from collapsing at the
+            // narrowest window the module allows: 34px of the 1192 the
+            // minimum leaves is slack over the three cells' 1158.
+            int strip = ItemInputGridLayout.ColumnStripWidth(PanelAtWindowMinimum, ButtonSize);
+            int slack = strip - (3 * ItemInputGridLayout.MinCellWidth(ButtonSize));
+
+            Assert.True(slack >= 30, $"only {slack}px of slack under the third column");
         }
 
         [Fact]
@@ -55,7 +67,7 @@ namespace TaimisToolbench.Tests.Services
                 $"column {grid.ColumnWidth} is narrower than its own minimum");
             Assert.True(
                 grid.SearchBoxWidth >= ItemInputGridLayout.MinSearchBoxWidth,
-                $"search box {grid.SearchBoxWidth} is under the floor the column count assumes");
+                $"name box {grid.SearchBoxWidth} is under the floor the column count assumes");
         }
 
         // ---- Height, which is the whole point of the change ----
@@ -63,12 +75,12 @@ namespace TaimisToolbench.Tests.Services
         [InlineData(1, 1)]
         [InlineData(2, 1)]
         [InlineData(3, 1)]
-        [InlineData(4, 1)]
+        [InlineData(4, 2)]
         [InlineData(5, 2)]
-        [InlineData(8, 2)]
+        [InlineData(8, 3)]
         [InlineData(9, 3)]
-        [InlineData(20, 5)]
-        public void RowCountAtTheWindowMinimumGrowsOnlyEveryFourthItem(int itemCount, int expectedRows)
+        [InlineData(20, 7)]
+        public void RowCountAtTheWindowMinimumGrowsOnlyEveryThirdItem(int itemCount, int expectedRows)
         {
             Assert.Equal(
                 expectedRows,
@@ -80,13 +92,15 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void EightItemsCostLessThanAThirdOfTheHeightEightRowsDid()
+        public void AFiveItemPlanCostsTwoRowsWhereItOnceCostFive()
         {
-            int stacked = 8 * ItemInputGridLayout.RowHeight;
-            int gridded = ItemInputGridLayout.BlockHeight(8, PanelAtWindowMinimum, ButtonSize);
+            // The screenshot that started this: five stacked rows squeezing
+            // the plan below into a strip.
+            int stacked = 5 * ItemInputGridLayout.RowHeight;
+            int gridded = ItemInputGridLayout.BlockHeight(5, PanelAtWindowMinimum, ButtonSize);
 
             Assert.Equal(2 * ItemInputGridLayout.RowHeight, gridded);
-            Assert.True(gridded * 3 < stacked, $"{gridded} is not a real saving on {stacked}");
+            Assert.True(gridded * 2 < stacked, $"{gridded} is not a real saving on {stacked}");
         }
 
         [Fact]
@@ -105,15 +119,15 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void CellsFillLeftToRightThenDown()
         {
-            var grid = AtWindowMinimum(6);
+            var grid = AtWindowMinimum(7);
 
-            Assert.Equal(4, grid.ColumnCount);
-            for (int i = 0; i < 6; i++)
+            Assert.Equal(3, grid.ColumnCount);
+            for (int i = 0; i < 7; i++)
             {
-                Assert.Equal(i % 4, grid.Cells[i].Column);
-                Assert.Equal(i / 4, grid.Cells[i].Row);
-                Assert.Equal((i % 4) * grid.ColumnWidth, grid.Cells[i].X);
-                Assert.Equal((i / 4) * ItemInputGridLayout.RowHeight, grid.Cells[i].Y);
+                Assert.Equal(i % 3, grid.Cells[i].Column);
+                Assert.Equal(i / 3, grid.Cells[i].Row);
+                Assert.Equal((i % 3) * grid.ColumnWidth, grid.Cells[i].X);
+                Assert.Equal((i / 3) * ItemInputGridLayout.RowHeight, grid.Cells[i].Y);
             }
         }
 
@@ -137,6 +151,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(2, after.RowCount);
             Assert.Equal(before.Cells[5].X, after.AddButtonX);
             Assert.Equal(before.Cells[5].Y, after.AddButtonY);
+            Assert.Equal(3, after.ColumnCount);
         }
 
         // ---- The add button ----
@@ -180,7 +195,7 @@ namespace TaimisToolbench.Tests.Services
         {
             // A full last row is the case the gutter exists for: the button
             // has no column after its own cell to sit in.
-            var grid = AtWindowMinimum(4);
+            var grid = AtWindowMinimum(3);
 
             Assert.Equal(grid.ColumnCount * grid.ColumnWidth, grid.AddButtonX);
             Assert.True(
@@ -190,16 +205,39 @@ namespace TaimisToolbench.Tests.Services
 
         // ---- Cell interior ----
         [Fact]
-        public void CellControlsRunInOrderAndFitTheCell()
+        public void CellControlsRunQtyFirstThenNameThenTheRemoveButton()
         {
             var grid = AtWindowMinimum(3);
 
-            Assert.Equal(grid.SearchBoxWidth + ItemInputGridLayout.SearchToQtyGap, grid.QtyLabelX);
-            Assert.Equal(grid.QtyLabelX + ItemInputGridLayout.QtyLabelBand, grid.QtyBoxX);
+            Assert.Equal(0, grid.QtyLabelX);
+            Assert.Equal(ItemInputGridLayout.QtyLabelBand, grid.QtyBoxX);
             Assert.Equal(
-                grid.QtyBoxX + ItemInputGridLayout.QtyBoxWidth + ItemInputGridLayout.QtyToButtonGap,
+                grid.QtyBoxX + ItemInputGridLayout.QtyBoxWidth + ItemInputGridLayout.QtyToNameGap,
+                grid.SearchBoxX);
+            Assert.Equal(
+                grid.SearchBoxX + grid.SearchBoxWidth + ItemInputGridLayout.NameToButtonGap,
                 grid.RemoveButtonX);
             Assert.Equal(grid.RemoveButtonX + ButtonSize, grid.CellWidth);
+        }
+
+        [Fact]
+        public void TheRemoveButtonIsSeparatedFromBothQuantityBoxesAroundIt()
+        {
+            // The whole reason quantity leads the cell: a button touching a
+            // number box reads as its stepper. Its own cell's box is a name
+            // box away, and the NEXT cell's is behind that cell's label.
+            var grid = AtWindowMinimum(6);
+
+            int buttonRight = grid.RemoveButtonX + ButtonSize;
+            int ownQtyBoxRight = grid.QtyBoxX + ItemInputGridLayout.QtyBoxWidth;
+            Assert.True(
+                grid.RemoveButtonX - ownQtyBoxRight >= grid.SearchBoxWidth,
+                "the remove button must sit a whole name box away from its own quantity field");
+
+            int nextCellQtyBoxX = grid.ColumnWidth + grid.QtyBoxX;
+            Assert.True(
+                nextCellQtyBoxX - buttonRight >= ItemInputGridLayout.QtyLabelBand,
+                "the next cell's label, not its box, is what the button abuts");
         }
 
         [Fact]
@@ -234,12 +272,17 @@ namespace TaimisToolbench.Tests.Services
 
         // ---- Degrading on a narrow panel, growing on a wide one ----
         [Fact]
-        public void NarrowScreenFloorStillSeatsTwoCells()
+        public void BelowTheWindowMinimumTheGridJustFallsBackToOneWideCell()
         {
-            Assert.Equal(
-                2,
-                ItemInputGridLayout.ColumnCount(
-                    PanelWidthFor(WindowSizing.NarrowScreenFloorWidth), ButtonSize));
+            // Not a supported width - the module enforces MinWindowWidth and
+            // the narrow-screen floor exists only for a client too small to
+            // honour it. All that is asked of it is that it still lays out.
+            int panel = PanelWidthFor(WindowSizing.NarrowScreenFloorWidth);
+            var grid = ItemInputGridLayout.Compute(3, panel, ButtonSize);
+
+            Assert.Equal(1, ItemInputGridLayout.ColumnCount(panel, ButtonSize));
+            Assert.Equal(3, grid.RowCount);
+            Assert.True(grid.SearchBoxWidth >= ItemInputGridLayout.MinSearchBoxWidth);
         }
 
         [Theory]
@@ -261,9 +304,19 @@ namespace TaimisToolbench.Tests.Services
         {
             int wide = PanelWidthFor(2540);
 
-            Assert.Equal(8, ItemInputGridLayout.ColumnCount(wide, ButtonSize));
-            Assert.Equal(1, ItemInputGridLayout.RowCount(8, wide, ButtonSize));
-            Assert.Equal(2, ItemInputGridLayout.RowCount(9, wide, ButtonSize));
+            Assert.Equal(6, ItemInputGridLayout.ColumnCount(wide, ButtonSize));
+            Assert.Equal(1, ItemInputGridLayout.RowCount(6, wide, ButtonSize));
+            Assert.Equal(2, ItemInputGridLayout.RowCount(7, wide, ButtonSize));
+        }
+
+        [Fact]
+        public void TheFourthColumnArrivesOnlyOnAWindowWideEnoughToPayForIt()
+        {
+            // Four cells of the shipped MinCellWidth need a 1730px window.
+            // Stated here so a chrome trim that silently re-crosses the
+            // 1378px minimum back into four narrow columns fails.
+            Assert.Equal(3, ItemInputGridLayout.ColumnCount(PanelWidthFor(1729), ButtonSize));
+            Assert.Equal(4, ItemInputGridLayout.ColumnCount(PanelWidthFor(1730), ButtonSize));
         }
 
         [Fact]
