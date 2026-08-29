@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -81,6 +81,8 @@ namespace TaimisToolbench.Harness
             bool printCacheStats = false;
             bool clearOverlayCache = false;
             bool dumpTree = false;
+            bool classify = false;
+            bool forceCraftRoot = false;
             bool alloc = false;
             int drift = 0;
             bool startupTiming = false;
@@ -124,6 +126,12 @@ namespace TaimisToolbench.Harness
                         break;
                     case "--dump-tree":
                         dumpTree = true;
+                        break;
+                    case "--classify":
+                        classify = true;
+                        break;
+                    case "--force-craft-root":
+                        forceCraftRoot = true;
                         break;
                     case "--alloc":
                         alloc = true;
@@ -181,6 +189,7 @@ namespace TaimisToolbench.Harness
                     "Usage: TaimisToolbench.Harness --profile <n> " +
                     "[--iterations <n>] [--live] [--raw] " +
                     "[--print-cache-stats] [--clear-overlay-cache] [--dump-tree] " +
+                    "[--classify] [--force-craft-root] " +
                     "[--homestead-tier <0|1|2>] " +
                     "[--alloc] [--drift <n>] [--startup-timing] [--items <id,id,...>]");
                 return 1;
@@ -204,7 +213,7 @@ namespace TaimisToolbench.Harness
             }
             else
             {
-                items = GetProfileItems(profile, live);
+                items = HarnessProfiles.GetProfileItems(profile, live);
             }
 
             if (items == null || items.Count == 0)
@@ -407,13 +416,25 @@ namespace TaimisToolbench.Harness
                     Console.WriteLine();
                 }
 
+                // ModuleSettings.GetEffectiveCurrencyValuation materializes
+                // the curated defaults before handing a CurrencyValuation to
+                // the solver; a raw instance (what a null argument becomes)
+                // silently yields ZERO curated valuations, which is not what
+                // any running module does. See CurrencyValuation.WithDefaults.
+                var valuation = CurrencyValuation.WithDefaults(CurrencyValuation.None);
+
                 if (alloc)
                 {
                     await AllocBench.RunAsync(pipeline, items[0], solver);
                 }
                 else if (drift > 0)
                 {
-                    await RunDrift(pipeline, items, drift, homesteadTiers);
+                    await RunDrift(pipeline, items, drift, valuation, homesteadTiers);
+                }
+                else if (classify)
+                {
+                    await TerminalClassifier.RunAsync(
+                        pipeline, items, mode, valuation, homesteadTiers, forceCraftRoot);
                 }
                 else
                 {
@@ -422,11 +443,12 @@ namespace TaimisToolbench.Harness
                     {
                         if (dumpTree)
                         {
-                            await DumpItemTree(pipeline, item, mode, homesteadTiers);
+                            await DumpItemTree(pipeline, item, mode, valuation, homesteadTiers);
                         }
                         else
                         {
-                            await RunItemProfile(pipeline, item, iterations, raw, mode, homesteadTiers);
+                            await RunItemProfile(
+                                pipeline, item, iterations, raw, mode, valuation, homesteadTiers);
                         }
 
                         Console.WriteLine();
@@ -451,68 +473,6 @@ namespace TaimisToolbench.Harness
             return 0;
         }
 
-        private static List<ProfileItem> GetProfileItems(int profile, bool live)
-        {
-            switch (profile)
-            {
-                case 1:
-                    var items = new List<ProfileItem>
-                    {
-                        new ProfileItem
-                        {
-                            Name = "Gift of Fortune",
-                            ItemId = 19626,
-                            Quantity = 1,
-                            RequiresLive = false,
-                        },
-                    };
-                    if (live)
-                    {
-                        items.Add(new ProfileItem
-                        {
-                            Name = "Zojja's Claymore",
-                            ItemId = 46762,
-                            Quantity = 1,
-                            RequiresLive = true,
-                        });
-                    }
-
-                    return items;
-                case 2:
-                    return new List<ProfileItem>
-                    {
-                        new ProfileItem
-                        {
-                            Name = "Exordium",
-                            ItemId = 90551,
-                            Quantity = 1,
-                            RequiresLive = false,
-                        },
-                    };
-                case 3:
-                    // Klobjarne Geirr is the
-                    // concrete, currently-generatable plan the milestone's
-                    // research report identified as reaching Homestead
-                    // Refinement - via Gift of the Homesteader -> Gift of
-                    // Embracing Refuge -> 250 each Refined Homestead
-                    // Metal/Wood/Fiber (docs/research/m37-r1-homestead.md
-                    // Section 3.6). Use with --homestead-tier to compare
-                    // decisions/quantities at tier 0 vs tier 2.
-                    return new List<ProfileItem>
-                    {
-                        new ProfileItem
-                        {
-                            Name = "Klobjarne Geirr",
-                            ItemId = 103815,
-                            Quantity = 1,
-                            RequiresLive = false,
-                        },
-                    };
-                default:
-                    return null;
-            }
-        }
-
         /// <summary>
         /// Runs a single generation and prints the raw pre-solve RecipeNode
         /// tree (recipe availability, independent of pricing) next to the
@@ -524,6 +484,7 @@ namespace TaimisToolbench.Harness
         /// </summary>
         private static async Task DumpItemTree(
             CraftingPlanPipeline pipeline, ProfileItem item, string mode,
+            CurrencyValuation valuation,
             HomesteadEfficiencyTiers homesteadTiers = null)
         {
             Console.WriteLine($"=== {item.Name} ({item.ItemId}) x{item.Quantity} -- tree dump [{mode}] ===");
@@ -531,7 +492,7 @@ namespace TaimisToolbench.Harness
 
             var result = await pipeline.GenerateStructuredAsync(
                 item.ItemId, item.Quantity, null, CancellationToken.None,
-                homesteadTiers: homesteadTiers);
+                currencyValuation: valuation, homesteadTiers: homesteadTiers);
 
             Console.WriteLine("--- Raw pre-solve recipe tree (node.Recipes.Count = seed coverage) ---");
             if (result.SolveContext != null && result.SolveContext.Tree != null)
@@ -644,6 +605,7 @@ namespace TaimisToolbench.Harness
             int iterations,
             bool raw,
             string mode,
+            CurrencyValuation valuation,
             HomesteadEfficiencyTiers homesteadTiers = null)
         {
             Console.WriteLine($"=== {item.Name} ({item.ItemId}) x{item.Quantity} -- {iterations} iteration(s) [{mode}] ===");
@@ -654,7 +616,7 @@ namespace TaimisToolbench.Harness
             {
                 var result = await pipeline.GenerateStructuredAsync(
                     item.ItemId, item.Quantity, null, CancellationToken.None,
-                    homesteadTiers: homesteadTiers);
+                    currencyValuation: valuation, homesteadTiers: homesteadTiers);
 
                 // Extract timing lines (everything before the summary header)
                 var timingLines = new List<string>();
@@ -790,6 +752,7 @@ namespace TaimisToolbench.Harness
             CraftingPlanPipeline pipeline,
             List<ProfileItem> items,
             int count,
+            CurrencyValuation valuation,
             HomesteadEfficiencyTiers homesteadTiers)
         {
             Console.WriteLine($"=== Drift run: {count} back-to-back solves ===");
@@ -809,7 +772,7 @@ namespace TaimisToolbench.Harness
                 {
                     await pipeline.GenerateStructuredAsync(
                         item.ItemId, item.Quantity, null, CancellationToken.None,
-                        homesteadTiers: homesteadTiers);
+                        currencyValuation: valuation, homesteadTiers: homesteadTiers);
                 }
 
                 sw.Stop();
