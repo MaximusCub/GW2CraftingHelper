@@ -61,5 +61,29 @@ namespace TaimisToolbench.Services
         {
             return reservedWidth > 0 ? maxRightEdge - reservedWidth - gap : maxRightEdge;
         }
+
+        /// <summary>
+        /// Left edge of the "Source" header, centred over the INK the
+        /// pill runs cover rather than over the column's fixed reserve
+        /// (PlanRelayoutMath.TreePillColumnWidth). The pills stay
+        /// left-ruled at <paramref name="pillColX"/>, so the ink starts
+        /// there and <paramref name="inkRunWidth"/> is how far right the
+        /// widest row on screen reaches.
+        /// <para>
+        /// The two rules agree once any row reserves the anchored IGNORE
+        /// slot, which pins to the column's right edge - but a freshly
+        /// generated tree shows only plan roots, which never get that
+        /// toggle (DecisionPillPlanner.AppendOwnershipPills), and there
+        /// the reserve overstates the ink by most of its width: measured
+        /// 2026-08-28, a header centred at x=797 over a badge run
+        /// occupying 700-765. Derivation: docs/ARCHITECTURE.md section
+        /// S1.2.
+        /// </para>
+        /// </summary>
+        public static int HeaderX(int pillColX, int pillColumnWidth, int inkRunWidth, int headerWidth)
+        {
+            return JustifiedColumnTracks.CenteredOverContent(
+                pillColX, pillColumnWidth, pillColX, inkRunWidth, headerWidth);
+        }
     }
 }

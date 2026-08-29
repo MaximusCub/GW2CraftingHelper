@@ -243,6 +243,23 @@ namespace TaimisToolbench.Views.Rendering
         // CollapseAll re-anchors the viewport to.
         private Panel _treeHeaderPanel;
 
+        // The column-header row's own relayout closure, held so the
+        // "Source" header can be re-placed the moment a newly built row
+        // widens the pill ink under it - see NoteSourceHeaderInk. Withdrawn
+        // by the per-pass reset with the controls it moves.
+        private Action<int> _treeHeaderRelayout;
+
+        // Widest pill run any row of THIS plan has drawn, measured from the
+        // pill column's own left edge, and the thing the "Source" header
+        // centres over (Services/TreePillRunLayout.HeaderX). Rows are built
+        // lazily, so this is only ever known for the rows built so far;
+        // it is therefore a one-way high-water mark cleared by a fresh
+        // Generate, exactly as the cost column's reserve is
+        // (Services/TreeCostColumnFloor) - an expand may widen it, a
+        // collapse or a narrower re-solve may not move it back and slide
+        // the header out from under the reader's eye.
+        private int _sourceHeaderInkWidth;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -264,6 +281,7 @@ namespace TaimisToolbench.Views.Rendering
             _treeRoots = null;
             _treeFlow = null;
             _treeHeaderPanel = null;
+            _treeHeaderRelayout = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
 
             // Withdrawn with the render pass that published them: the tree
@@ -290,7 +308,10 @@ namespace TaimisToolbench.Views.Rendering
 
             // The cost column's no-narrowing floor is a property of the
             // plan on screen; a new one re-derives it from its own scan.
+            // The pill column's ink high-water mark is the same kind of
+            // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
+            _sourceHeaderInkWidth = 0;
             _lastResult = result;
         }
 
@@ -393,7 +414,8 @@ namespace TaimisToolbench.Views.Rendering
             // side actually has. Both track the panel width (the pill+cost
             // block's x is width-derived), hence middleXForWidth/
             // rightXForWidth rather than build-time x's, and both centre
-            // over what they name (JustifiedColumnTracks.CenteredInBand).
+            // over the INK their cells cover rather than over the bands
+            // reserved for them (JustifiedColumnTracks.CenteredOverContent).
             // Counted by PlanContentHeightMath.MultiRootTreeFlowHeight,
             // which every treeFlow height assignment goes through, and
             // guarded on the same "is there a tree at all" condition that
@@ -410,13 +432,20 @@ namespace TaimisToolbench.Views.Rendering
                 var headerCostWidths = _costColumnWidths;
                 int sourceHeaderWidth = MeasureHeaderLabel(SourceHeaderText);
                 int costHeaderWidth = MeasureHeaderLabel(CostHeaderText);
-                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
+
+                // _sourceHeaderInkWidth is read LIVE, unlike everything
+                // else this closure holds: no row exists yet, so the ink
+                // the header centres over is not knowable until the loop
+                // below has run and NoteSourceHeaderInk has re-placed the
+                // header behind it.
+                _treeHeaderRelayout = ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
                     middleLabel: SourceHeaderText,
-                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
+                    middleXForWidth: w => TreePillRunLayout.HeaderX(
                         PlanRelayoutMath.ComputeTreeColumnEdges(
                             w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
                         TreePillColumnWidth,
+                        _sourceHeaderInkWidth,
                         sourceHeaderWidth),
                     rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
                         w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
@@ -1839,11 +1868,23 @@ namespace TaimisToolbench.Views.Rendering
                     (int)System.Math.Ceiling(font.MeasureString(specs[anchoredIndex].Text).Width)));
             }
 
+            // Right edge of this row's INK, which the "Source" header
+            // centres over. Taken off the resolved placements rather than
+            // off the column's reserve: the anchored IGNORE slot is
+            // already among them at the column's own right edge, so a row
+            // that has one reports the full column and a root row that
+            // does not reports just its badges.
+            int inkRightEdge = pillColX;
+
             foreach (var placement in placements)
             {
                 var spec = specs[placement.SpecIndex];
                 int pillWidth = placement.Width;
                 int textWidth = placement.TextWidth;
+                if (placement.X + pillWidth > inkRightEdge)
+                {
+                    inkRightEdge = placement.X + pillWidth;
+                }
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
@@ -2022,6 +2063,47 @@ namespace TaimisToolbench.Views.Rendering
                 pillPanels.Add(
                     RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed));
                 pillOffsets.Add(x - pillColX);
+                if (x + fit.OverflowPillWidth > inkRightEdge)
+                {
+                    inkRightEdge = x + fit.OverflowPillWidth;
+                }
+            }
+
+            NoteSourceHeaderInk(inkRightEdge - pillColX);
+        }
+
+        /// <summary>
+        /// Records a freshly built row's pill-run width and re-places the
+        /// "Source" header when it widens the plan's high-water mark (see
+        /// <see cref="_sourceHeaderInkWidth"/>). Called from the ONE place
+        /// every row's pills are laid out, so a lazy expand, an Expand All
+        /// and an in-place refresh all reach it without each remembering
+        /// to.
+        /// <para>
+        /// Bounded work: only a strict increase re-places anything, and
+        /// the widths are monotone, so a whole tree costs at most a
+        /// handful of header moves. The re-place is the header row's own
+        /// relayout closure, which is position-only by contract
+        /// (ISectionRelayoutSink.AddRelayout).
+        /// </para>
+        /// </summary>
+        private void NoteSourceHeaderInk(int inkRunWidth)
+        {
+            if (inkRunWidth <= _sourceHeaderInkWidth)
+            {
+                return;
+            }
+
+            _sourceHeaderInkWidth = inkRunWidth;
+
+            // A width of 0 is the "no content panel" answer
+            // (CraftingPlanView.GetCurrentPanelWidth); placing the header
+            // off that would strand it until the next resize, and the
+            // field above is already updated for whoever asks next.
+            int panelWidth = _host.PanelWidth;
+            if (panelWidth > 0)
+            {
+                _treeHeaderRelayout?.Invoke(panelWidth);
             }
         }
 

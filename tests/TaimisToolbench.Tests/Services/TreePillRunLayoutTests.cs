@@ -177,5 +177,113 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(visible > 0);
             Assert.True(runEnd - Gap <= TreePillRunLayout.AnchoredSlotX(ColumnRightEdge, reserved));
         }
+
+        // --- The "Source" header (HeaderX): centred over the pill INK,
+        // never over the 256px reserve behind it.
+        private const int ColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
+
+        /// <summary>The header word at the stand-in face, so it stays in
+        /// proportion to the badge runs it is compared against.</summary>
+        private static readonly int SourceHeaderWidth = MeasureByLength("Source");
+
+        /// <summary>Right edge the flowed run reaches, from the specs the
+        /// real planner emitted - the same left-packed walk the renderer
+        /// does, with the one-pixel-per-character face.</summary>
+        private static int FlowedRunRightEdge(System.Collections.Generic.List<PillSpec> specs)
+        {
+            int x = ColumnStart;
+            for (int i = 0; i < specs.Count; i++)
+            {
+                x += MeasureByLength(specs[i].Text) + Padding + Gap;
+            }
+
+            return x - Gap;
+        }
+
+        private static CraftingTreeNode TwoSourceRoot()
+        {
+            var node = TwoSourceNode();
+            node.IsPlanRoot = true;
+            return node;
+        }
+
+        /// <summary>
+        /// The reported defect: a freshly generated tree shows only its
+        /// plan roots, which get no IGNORE toggle, so their badges occupy
+        /// a fraction of the column and the header floats right of every
+        /// one of them. Centring over the ink puts it back.
+        /// </summary>
+        [Fact]
+        public void SourceHeader_CentresOverTheBadgeRun_NotOverTheReserve()
+        {
+            var specs = DecisionPillPlanner.BuildPillSpecs(TwoSourceRoot());
+            Assert.DoesNotContain(specs, spec => spec.Kind == PillKind.Ignore);
+
+            int ink = FlowedRunRightEdge(specs) - ColumnStart;
+            Assert.True(ink < ColumnWidth / 2);
+
+            int headerX = TreePillRunLayout.HeaderX(
+                ColumnStart, ColumnWidth, ink, SourceHeaderWidth);
+
+            Assert.Equal(ColumnStart + ((ink - SourceHeaderWidth) / 2), headerX);
+            Assert.True(
+                headerX < JustifiedColumnTracks.CenteredInBand(
+                    ColumnStart, ColumnWidth, SourceHeaderWidth));
+        }
+
+        /// <summary>
+        /// A row that reserves the anchored toggle draws ink all the way
+        /// to the column's right edge, so there the band IS the content
+        /// and the two rules agree - the header does not lurch left the
+        /// moment such a row is built.
+        /// </summary>
+        [Fact]
+        public void SourceHeader_MatchesTheBand_OnceARowReachesTheColumnsRightEdge()
+        {
+            var specs = DecisionPillPlanner.BuildPillSpecs(TwoSourceNode());
+            Assert.Equal(PillKind.Ignore, specs[specs.Count - 1].Kind);
+
+            // The anchored slot ends on the column's right edge whatever
+            // the run to its left does, so the row's ink is the column.
+            int ink = TreePillRunLayout.AnchoredSlotX(ColumnWidth, ReservedWidth()) + ReservedWidth();
+
+            Assert.Equal(
+                JustifiedColumnTracks.CenteredInBand(ColumnStart, ColumnWidth, SourceHeaderWidth),
+                TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, ink, SourceHeaderWidth));
+        }
+
+        /// <summary>
+        /// No pills built yet (the header is created before the first row)
+        /// and no pills at all are the same case, and neither may produce
+        /// an x outside the column.
+        /// </summary>
+        [Fact]
+        public void SourceHeader_WithNoInk_PinsToTheColumnsLeftEdge()
+        {
+            Assert.Equal(
+                ColumnStart, TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, 0, SourceHeaderWidth));
+            Assert.Equal(
+                ColumnStart, TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, -5, SourceHeaderWidth));
+        }
+
+        /// <summary>
+        /// The high-water rule the view applies (TreeSectionController.
+        /// NoteSourceHeaderInk) is monotone, so the header only ever moves
+        /// one way as rows are built - never back and forth under a
+        /// collapse.
+        /// </summary>
+        [Fact]
+        public void SourceHeader_MovesRightAsTheInkWidens_AndNeverPastTheColumn()
+        {
+            int previous = TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, 0, SourceHeaderWidth);
+            for (int ink = 1; ink <= ColumnWidth; ink++)
+            {
+                int x = TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, ink, SourceHeaderWidth);
+                Assert.True(x >= previous);
+                Assert.True(x >= ColumnStart);
+                Assert.True(x + SourceHeaderWidth <= ColumnStart + ColumnWidth);
+                previous = x;
+            }
+        }
     }
 }

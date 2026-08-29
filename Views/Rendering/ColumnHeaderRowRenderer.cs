@@ -65,9 +65,15 @@ namespace TaimisToolbench.Views.Rendering
     // sort indicator (SortableHeaderLabel.Decorate), so the right label's
     // x-tracking below - which right-aligns off the control's own Width -
     // accounts for the indicator without knowing about it.
+    // The registered relayout closure is also RETURNED, for the one caller
+    // that has to re-run the header's placement between resizes: the
+    // Recipe Tree's "Source" header centres over the ink its decision
+    // pills cover, and that is only known once the rows below it have
+    // been built. Re-running it repositions from the same arithmetic a
+    // resize would, so there is no second placement path to keep in step.
     internal static class ColumnHeaderRowRenderer
     {
-        internal static void CreateColumnHeaderRow(
+        internal static Action<int> CreateColumnHeaderRow(
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
@@ -141,7 +147,7 @@ namespace TaimisToolbench.Views.Rendering
 
             plan.Sync(rowPanel.Width);
 
-            sink.AddRelayout(w =>
+            Action<int> relayout = w =>
             {
                 rowPanel.Size = new Point(BandWidth(rightXForWidth, w), HeaderBands.RowHeight);
                 int rightEdge = rightXForWidth != null ? rightXForWidth(w) : w - PlanRelayoutMath.TableRightMargin;
@@ -162,7 +168,9 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 plan.Sync(rowPanel.Width);
-            });
+            };
+            sink.AddRelayout(relayout);
+            return relayout;
         }
 
         /// <summary>Measured from the string, not read off the control: a

@@ -283,7 +283,7 @@ Views/PlanHistoryTabContent.cs                                                  
 Views/RankerTabContent.cs                                                               2995
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  607
-Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
+Views/Rendering/ColumnHeaderRowRenderer.cs                                              206
 Views/Rendering/CraftStepsSectionRenderer.cs                                             264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
 Views/Rendering/EmptyPlanStateRenderer.cs                                                81
@@ -313,7 +313,7 @@ Views/Rendering/SortableHeaderLabel.cs                                          
 Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
-Views/Rendering/TreeSectionController.cs                                                2186
+Views/Rendering/TreeSectionController.cs                                                2268
 Views/Rendering/TreeToolbarCommands.cs                                                   81
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
