@@ -222,6 +222,10 @@ namespace TaimisToolbench.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
+        // This render's Recipe Tree section header - the element
+        // CollapseAll re-anchors the viewport to.
+        private Panel _treeHeaderPanel;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -242,6 +246,7 @@ namespace TaimisToolbench.Views.Rendering
             _scannedNodeCount = 0;
             _treeRoots = null;
             _treeFlow = null;
+            _treeHeaderPanel = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
 
             // Withdrawn with the render pass that published them: the tree
@@ -360,6 +365,7 @@ namespace TaimisToolbench.Views.Rendering
                 title, PlanSectionType.RecipeTree, panelWidth, true, null);
             var treeFlow = header.ContentFlow;
             _treeFlow = treeFlow;
+            _treeHeaderPanel = header.HeaderPanel;
 
             // Column headers over the two columns a tree row's right-hand
             // side actually has. Both track the panel width (the pill+cost
@@ -591,19 +597,80 @@ namespace TaimisToolbench.Views.Rendering
 
         private void CollapseAll()
         {
-            _host.PreserveScrollAcross(() =>
+            try
             {
-                foreach (var s in _treeNodeStates)
+                _host.PreserveScrollAcross(() =>
                 {
-                    s.IsExpanded = false;
-                    _nodeExpansion[s.Node.NodeId] = false;
-                    s.ChildContainer.Visible = false;
-                    s.ArrowLabel.Text = ">";
-                }
+                    foreach (var s in _treeNodeStates)
+                    {
+                        s.IsExpanded = false;
+                        _nodeExpansion[s.Node.NodeId] = false;
+                        s.ChildContainer.Visible = false;
+                        s.ArrowLabel.Text = ">";
+                    }
 
-                RefreshTreeContainerHeights();
-            });
+                    RefreshTreeContainerHeights();
+                    RepointHiddenRowAnchors();
+                });
+            }
+            finally
+            {
+                // Every row's own anchor goes back once the restore has
+                // run: PreserveScrollAcross resolves synchronously, and
+                // the verify pass it may start re-applies the offset it
+                // resolved, never the anchor. In a finally so a throw
+                // mid-collapse cannot leave the registry pointing rows at
+                // the header for the rest of the session.
+                RepointRowAnchorsToRows();
+            }
+
             HoverChainResync.AfterRebuild();
+        }
+
+        /// <summary>
+        /// Hands the scroll anchors of the rows a Collapse All just hid to
+        /// the tree's section header, for the length of the restore.
+        /// <para>
+        /// The view captures its anchor BEFORE the collapse, so it holds a
+        /// tree row whenever the user was reading the tree; that row is
+        /// then invisible, the anchor resolves to nothing, and the restore
+        /// falls back to the raw offset - which now points past the
+        /// collapsed tree, into the Shopping List. Pointing those keys at
+        /// the header gives the restore an element that is still on screen
+        /// and puts the header on the line the row held: the top of the
+        /// viewport, since the click came from the toolbar, off the
+        /// scrolled panel.
+        /// </para>
+        /// </summary>
+        private void RepointHiddenRowAnchors()
+        {
+            if (_registerRowScrollAnchor == null || _treeHeaderPanel == null)
+            {
+                return;
+            }
+
+            foreach (var entry in _treeRowsByNodeId)
+            {
+                // Depth 0 survives a Collapse All, and its own row is a
+                // better anchor than the header above it.
+                if (entry.Value.Depth > 0)
+                {
+                    _registerRowScrollAnchor(entry.Key, _treeHeaderPanel);
+                }
+            }
+        }
+
+        private void RepointRowAnchorsToRows()
+        {
+            if (_registerRowScrollAnchor == null)
+            {
+                return;
+            }
+
+            foreach (var entry in _treeRowsByNodeId)
+            {
+                _registerRowScrollAnchor(entry.Key, entry.Value.RowPanel);
+            }
         }
 
         private void ApplyPreset(AcquisitionSource source)

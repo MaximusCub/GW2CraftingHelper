@@ -311,7 +311,7 @@ Views/Rendering/SortableHeaderLabel.cs                                          
 Views/Rendering/SummarySectionRenderer.cs                                               1005
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
-Views/Rendering/TreeSectionController.cs                                                2063
+Views/Rendering/TreeSectionController.cs                                                2085
 Views/Rendering/TreeToolbarCommands.cs                                                   81
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
