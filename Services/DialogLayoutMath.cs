@@ -104,7 +104,11 @@ namespace TaimisToolbench.Services
         /// the exit button plus the right title-bar section's own inset.
         /// Derived so the module's longest title reproduces its measured
         /// requirement - "GW2 API access not ready" clipped three characters
-        /// at a 480px window and renders whole at 560.
+        /// at a 480px window and renders whole at 560. This and
+        /// <see cref="TitleTextIndent"/> are window-coordinate quantities
+        /// applied to a CONTENT width, so the shell's side insets are slack
+        /// on top: deliberate, because the exit button's texture width is
+        /// not knowable from here.
         /// </summary>
         public const int TitleRightReserve = 80;
 
