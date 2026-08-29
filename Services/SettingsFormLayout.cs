@@ -76,12 +76,11 @@ namespace TaimisToolbench.Services
             + PlanRelayoutMath.TableRightMargin;
 
         /// <summary>
-        /// Widest a line of WRAPPED prose in a board section is allowed to
-        /// run: one board column's own content width, so a section's notes
-        /// and a row's description stay under the column they belong to
-        /// however wide that column grows. It does not bound the full-width
-        /// Vendor Cost Valuations section, whose notes are single lines that
-        /// never wrap (Views/SettingsTabContent.cs AddInfoLine).
+        /// Widest a line of WRAPPED prose in a board section may run: one
+        /// board column's own content width, so a section's notes and a
+        /// row's description stay under the column they belong to however
+        /// wide it grows. Not the full-width Vendor Cost Valuations section,
+        /// whose notes never wrap (SettingsTabContent.AddInfoLine).
         /// </summary>
         public const int ProseMeasure =
             SettingsFormMinColumnWidth - CellLeftPad - PlanRelayoutMath.TableRightMargin;

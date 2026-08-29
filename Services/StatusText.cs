@@ -153,19 +153,15 @@ namespace TaimisToolbench.Services
             return "Update failed: " + (message ?? "");
         }
 
-        /// <summary>
-        /// A month, for <see cref="AgeMagnitude"/>'s top bucket. Flat 30
-        /// days: TimeSpan carries no calendar, and an age that has reached
-        /// this bucket is read as "long dead", never counted back from.
-        /// </summary>
+        // A month, flat: TimeSpan carries no calendar, and an age this
+        // deep reads as "long dead" rather than a figure counted back from.
         private const int AgeDaysPerMonth = 30;
 
         /// <summary>
         /// How much time an age is, with no "ago" framing - the bucket
         /// ladder behind <see cref="ForAgeAgo"/>. Each bucket names the
-        /// coarsest unit the age has reached, so the string stays two
-        /// terms at most whatever the magnitude. The caller handles the
-        /// sub-minute case; below a minute this reports "0m".
+        /// coarsest unit reached plus at most one finer term. The caller
+        /// handles the sub-minute case; below a minute this reports "0m".
         /// </summary>
         private static string AgeMagnitude(TimeSpan age)
         {
@@ -190,9 +186,8 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The Snapshot header's age suffix: how long ago the snapshot on
         /// screen was captured, in <see cref="ForAgeAgo"/>'s framing and
-        /// over its ladder. The caller supplies the punctuation that keeps
-        /// it apart from the refresh timestamp it follows - Views/MainView.cs
-        /// parenthesises it.
+        /// over its ladder. The caller punctuates it apart from the refresh
+        /// timestamp it follows - Views/MainView.cs parenthesises it.
         /// <para>
         /// Sub-minute reads "just captured", not ForAgeAgo's "just now":
         /// the line pairs two moments - when the last refresh ATTEMPT
