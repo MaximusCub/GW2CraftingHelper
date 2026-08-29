@@ -107,6 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         431
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
+Services/DisciplinesColumnMath.cs                                                       121
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
 Services/GridLayout.cs                                                                   93
@@ -213,7 +214,7 @@ Services/SettingsCurrencyGridLayout.cs                                          
 Services/SettingsFormLayout.cs                                                          174
 Services/SettingsInputParser.cs                                                         239
 Services/SettingsSaveBarLayout.cs                                                        80
-Services/ShoppingColumnMath.cs                                                          361
+Services/ShoppingColumnMath.cs                                                          396
 Services/ShoppingRowTooltipFormatter.cs                                                 145
 Services/ShoppingSourceBadge.cs                                                          89
 Services/SnapshotCommitGate.cs                                                          102
@@ -237,7 +238,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    559
+Services/SummarySectionLayoutMath.cs                                                    583
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    106
 Services/GlyphFontDescriptor.cs                                                         316
@@ -249,7 +250,7 @@ Services/TopRegionLayoutMath.cs                                                 
 Services/TradingPostMath.cs                                                              57
 Services/TradingPostService.cs                                                          359
 Services/TreeChipStripLayout.cs                                                         202
-Services/TreeCostColumnMath.cs                                                          409
+Services/TreeCostColumnMath.cs                                                          542
 Services/TreeRowIdentity.cs                                                              94
 Services/TreeRowShapePlanner.cs                                                         133
 Services/TreeRowTooltipComposer.cs                                                      243
@@ -301,14 +302,14 @@ Views/Rendering/PlanHeaderRenderer.cs                                           
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
 Views/Rendering/RarityColors.cs                                                         147
-Views/Rendering/RecipesSectionRenderer.cs                                               338
+Views/Rendering/RecipesSectionRenderer.cs                                               340
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
 Views/Rendering/ShoppingBadgeColors.cs                                                   72
-Views/Rendering/ShoppingListSectionRenderer.cs                                          491
+Views/Rendering/ShoppingListSectionRenderer.cs                                          539
 Views/Rendering/SortableHeaderCells.cs                                                  230
 Views/Rendering/SortableHeaderLabel.cs                                                   69
-Views/Rendering/SummarySectionRenderer.cs                                               1005
+Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2063
@@ -387,6 +388,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                 209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
+tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                    131
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153
 tests/TaimisToolbench.Tests/Services/GridLawGoldenTests.cs                            100
@@ -517,7 +519,7 @@ tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs         
 tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                       268
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                      338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                    117
-tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         508
+tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         587
 tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs              197
 tests/TaimisToolbench.Tests/Services/ShoppingSourceBadgeTests.cs                      233
 tests/TaimisToolbench.Tests/Services/SnapshotCommitGateTests.cs                       239
@@ -537,7 +539,7 @@ tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs             
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                              116
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                               345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   937
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1013
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      287
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
@@ -550,7 +552,7 @@ tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                           70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                       507
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                      283
-tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         525
+tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         586
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                          246
 tests/TaimisToolbench.Tests/Services/TreeRowShapeGoldenTests.cs                       145
 tests/TaimisToolbench.Tests/Services/TreeRowTooltipComposerTests.cs                   538
