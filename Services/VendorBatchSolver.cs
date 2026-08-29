@@ -91,6 +91,16 @@ namespace TaimisToolbench.Services
             public readonly List<VendorItemCostLine> FallbackItemCosts;
             public readonly bool FallbackHasRawCoin;
 
+            /// <summary>
+            /// The fallback-tier offer charges everything a craftable recipe
+            /// of this node charges, and more (VendorOfferDomination), so it
+            /// cannot be the cheaper route however its coin part happens to
+            /// rank. It is still reported, still clickable, still the answer
+            /// when nothing else is - it simply cannot WIN a comparison
+            /// against the recipe it is a strictly worse copy of.
+            /// </summary>
+            public readonly bool FallbackIsDominatedByCraft;
+
             public VendorOfferEvaluation(
                 long? bestComparableValue,
                 long? bestComparableCoinCost,
@@ -102,7 +112,8 @@ namespace TaimisToolbench.Services
                 List<VendorItemCostLine> bestComparableItemCosts = null,
                 bool bestComparableHasRawCoin = false,
                 List<VendorItemCostLine> fallbackItemCosts = null,
-                bool fallbackHasRawCoin = false)
+                bool fallbackHasRawCoin = false,
+                bool fallbackIsDominatedByCraft = false)
             {
                 BestComparableValue = bestComparableValue;
                 BestComparableCoinCost = bestComparableCoinCost;
@@ -115,6 +126,7 @@ namespace TaimisToolbench.Services
                 BestComparableHasRawCoin = bestComparableHasRawCoin;
                 FallbackItemCosts = fallbackItemCosts;
                 FallbackHasRawCoin = fallbackHasRawCoin;
+                FallbackIsDominatedByCraft = fallbackIsDominatedByCraft;
             }
         }
 
@@ -154,7 +166,11 @@ namespace TaimisToolbench.Services
             // every such line a barter line, which is what this method did
             // before cost-line expansion existed. See
             // PlanSolver.ResolveCostLineUnitValue.
-            Func<int, CostLineUnitValue> costLineResolver = null)
+            Func<int, CostLineUnitValue> costLineResolver = null,
+            // Account competency, for the superset-domination check only
+            // (VendorOfferDomination). Null means competency is unknown and
+            // no offer is ever demoted for being dominated.
+            IReadOnlyDictionary<string, int> bestRatingByDiscipline = null)
         {
             long? bestComparableValue = null;
             long? bestComparableCoinCost = null;
@@ -174,6 +190,7 @@ namespace TaimisToolbench.Services
             bool bestComparableHasRawCoin = false;
             List<VendorItemCostLine> fallbackItemCosts = null;
             bool fallbackHasRawCoin = false;
+            bool fallbackIsDominatedByCraft = false;
 
             if (vendorOffers == null ||
                 !vendorOffers.TryGetValue(node.Id, out var offers))
@@ -207,6 +224,14 @@ namespace TaimisToolbench.Services
                 {
                     continue;
                 }
+
+                // Computed before any pricing, because it needs none: an
+                // offer that charges a craftable recipe's ingredients plus a
+                // fee is a strictly worse copy of that recipe whatever the
+                // numbers say, so it is barred from the comparable tier
+                // rather than left to be beaten on price.
+                bool dominated = VendorOfferDomination.IsDominatedByAnyRecipe(
+                    offer, node, bestRatingByDiscipline);
 
                 long coinCost = 0;
                 bool priceable = true;
@@ -580,7 +605,7 @@ namespace TaimisToolbench.Services
                         allValued = false;
                     }
 
-                    if (allValued)
+                    if (allValued && !dominated)
                     {
                         if (!bestComparableValue.HasValue ||
                             comparisonValue < bestComparableValue.Value)
@@ -627,6 +652,7 @@ namespace TaimisToolbench.Services
 
                 if (better)
                 {
+                    fallbackIsDominatedByCraft = dominated;
                     fallbackCoinCost = totalCoinCost;
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackNonCoinUnits = totalNonCoinUnits;
@@ -657,7 +683,8 @@ namespace TaimisToolbench.Services
                 bestComparableItemCosts,
                 bestComparableHasRawCoin,
                 fallbackItemCosts,
-                fallbackHasRawCoin);
+                fallbackHasRawCoin,
+                fallbackIsDominatedByCraft);
         }
 
         /// <summary>

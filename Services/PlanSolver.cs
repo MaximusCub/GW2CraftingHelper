@@ -956,7 +956,8 @@ namespace TaimisToolbench.Services
             // affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
                 node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers,
-                ctx.CostLineResolver);
+                ctx.CostLineResolver,
+                ctx.BestRatingByDiscipline);
 
             var candidates = SelectBestRecipes(node, ctx);
             var bestComparable = candidates.BestComparable;
@@ -1287,9 +1288,17 @@ namespace TaimisToolbench.Services
                 bool fallbackVendorOmitsItemCost =
                     HasBarterItemCost(vendorEvaluation.FallbackItemCosts);
 
+                // The second, price-free reason an offer cannot beat a craft
+                // route: it charges that route's own ingredients and a fee on
+                // top (VendorOfferDomination). Same treatment as an omitted
+                // cost - the route stays offered, it just cannot win here.
+                bool fallbackVendorIsWorseCopyOfCraft =
+                    vendorEvaluation.FallbackIsDominatedByCraft;
+
                 bool fallbackVendorWins = vendorEvaluation.FallbackCoinCost.HasValue &&
                     (!fallbackCraftCost.HasValue ||
                      (!fallbackVendorOmitsItemCost &&
+                      !fallbackVendorIsWorseCopyOfCraft &&
                       vendorEvaluation.FallbackCoinCost.Value <= fallbackCraftCost.Value));
 
                 if (fallbackVendorWins)
