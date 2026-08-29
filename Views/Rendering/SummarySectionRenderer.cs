@@ -163,7 +163,7 @@ namespace TaimisToolbench.Views.Rendering
         // hue - the eye lands on it without a second colour entering the
         // section. Both are scaled down from one tint rather than written
         // as two literals, the same premultiplied "Color * f" idiom
-        // FullCoverageFill below already uses: Blish composites a Panel's
+        // every pill fill in the module uses: Blish composites a Panel's
         // BackgroundColor over whatever is behind it, so the window's
         // parchment texture still reads through the fill at 86%. The frame
         // paints ON the fill (see CreateHighlightBox), so an edge lands at
@@ -677,7 +677,7 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             int band = Max(WidestCurrencyHeaderLabel(), Max(required, Max(have, needed)));
-            int markerInk = anyCovered ? LabelHelpers.MeasureSmallTagWidth(FullCoverageMarkerText) : 0;
+            int markerInk = anyCovered ? LabelHelpers.FullCoverageMarkerWidth() : 0;
             int markerBand = SummarySectionLayoutMath.EffectiveCurrencyMarkerWidth(
                 Max(markerInk, MeasureHeader(HeaderBands.Font, StatusHeaderText)));
 
@@ -888,25 +888,6 @@ namespace TaimisToolbench.Views.Rendering
             });
         }
 
-        // Full-coverage marker color: matches PillKind.Selected's green,
-        // without adding a new PillKind for this single non-tree use.
-        private static readonly Color FullCoverageBorder = new Color(31, 143, 12);
-        private static readonly Color FullCoverageFill = FullCoverageBorder * 0.15f;
-
-        // Glyph note: a "\u2713" check-mark marker was considered, but
-        // live desktop rendering has shown ASCII to be the reliable form
-        // for glyphs in the Blish font across
-        // sessions/machines - i.e. this exact font has already shown
-        // Unicode-glyph rendering is not something to assume without a
-        // live check. No live Blish HUD session was available to verify
-        // the check-mark glyph the same way, so this package takes the
-        // pre-authorized safe fallback rather than gambling on an
-        // unverified glyph: a
-        // small green "OK" pill (LabelHelpers.CreateSmallTag, the same
-        // helper the tree's Locked/Available pills and the shopping
-        // source tag already use), never a raw Unicode character.
-        private const string FullCoverageMarkerText = "OK";
-
         private void CreateCurrencyTableRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, CurrencyColumnScan scan)
         {
@@ -964,7 +945,7 @@ namespace TaimisToolbench.Views.Rendering
             if (row.CurrencyFullyCovered)
             {
                 int markerY = (rowHeight - LabelHelpers.SmallTagHeight) / 2;
-                marker = LabelHelpers.CreateSmallTag(rowPanel, FullCoverageMarkerText, edges.MarkerX, markerY, FullCoverageBorder, FullCoverageFill);
+                marker = LabelHelpers.CreateFullCoverageMarker(rowPanel, edges.MarkerX, markerY);
                 // No BasicTooltipText here: CreateSmallTag's inner fill
                 // panel + label cover almost the entire pill, so a
                 // tooltip on the returned outer Panel alone would be
