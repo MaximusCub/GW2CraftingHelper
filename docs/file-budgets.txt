@@ -278,7 +278,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1403
-Views/RankerTabContent.cs                                                               2898
+Views/RankerTabContent.cs                                                               2922
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  600
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
