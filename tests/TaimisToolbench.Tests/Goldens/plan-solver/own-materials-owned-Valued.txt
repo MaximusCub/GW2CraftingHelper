@@ -287,6 +287,7 @@ result.SolveContext.UsedMaterials[0].QuantityUsed = 3
 result.SolveContext.UsedMaterials[0].Sources.count = 1
 result.SolveContext.UsedMaterials[0].Sources[0].Quantity = 3
 result.SolveContext.UsedMaterials[0].Sources[0].Source = MaterialStorage
+result.SolveContext.VendorCostLineValues = null
 result.SolveContext.VendorOffers = null
 result.TargetUnitSellPrice = 1000
 result.UsedMaterials = <already dumped>

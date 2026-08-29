@@ -76,7 +76,12 @@ namespace TaimisToolbench.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
-            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null)
+            IReadOnlyList<SnapshotCharacterDiscipline> characterDisciplines = null,
+            // Threaded through so the throwaway diagnostic solve costs
+            // vendor cost lines the same way the real solve will; without
+            // it the 0.85 rule would compare a craft cost against a vendor
+            // cost the real solve never sees.
+            VendorCostLineSubtrees vendorCostSubtrees = null)
         {
             var diagnostics = new Dictionary<int, (long? BuyCost, long? CraftCost)>();
             // The competency-blind twin of diagnostics above, gathered
@@ -88,7 +93,8 @@ namespace TaimisToolbench.Services
                 overrides: null, currencyValuation: currencyValuation,
                 forceBuyOnlyNodeIds: null, costDiagnostics: diagnostics,
                 rawCraftCostDiagnostics: rawCraftCostDiagnostics,
-                characterDisciplines: characterDisciplines);
+                characterDisciplines: characterDisciplines,
+                vendorCostSubtrees: vendorCostSubtrees);
 
             var forced = new HashSet<int>();
             var competencyIndependentForced = new HashSet<int>();

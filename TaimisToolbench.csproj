@@ -214,7 +214,6 @@
     <Compile Include="Services\ItemRowTooltipComposer.cs" />
     <Compile Include="Services\ItemTooltipIdentity.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
-    <Compile Include="Services\CostLineUnitValue.cs" />
     <Compile Include="Services\CostLineValuation.cs" />
     <Compile Include="Services\SeasonalOfferFilter.cs" />
     <Compile Include="Services\RecipeSheetSavingsCalculator.cs" />
@@ -340,6 +339,7 @@
     <Compile Include="Services\LogRowLayout.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
+    <Compile Include="Models\CostLineUnitValue.cs" />
     <Compile Include="Models\PillSourceCostBreakdown.cs" />
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />

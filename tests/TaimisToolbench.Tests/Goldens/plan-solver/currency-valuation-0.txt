@@ -141,6 +141,7 @@ result.SolveContext.Tree.Quantity = 3
 result.SolveContext.Tree.Recipes.count = 0
 result.SolveContext.UnreducedTree = null
 result.SolveContext.UsedMaterials = null
+result.SolveContext.VendorCostLineValues = null
 result.SolveContext.VendorOffers.count = 1
 result.SolveContext.VendorOffers[1].count = 1
 result.SolveContext.VendorOffers[1][0].CostLines.count = 1

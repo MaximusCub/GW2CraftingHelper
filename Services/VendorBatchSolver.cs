@@ -320,12 +320,10 @@ namespace TaimisToolbench.Services
                             // a barter line, folded into no coin at all, which
                             // is how an offer that mirrors a recipe and adds a
                             // fee came to look cheaper than the recipe.
-                            var solved = costLineResolver != null
-                                ? costLineResolver(cost.Id)
-                                : CostLineUnitValue.Unresolved;
+                            var solved = costLineResolver?.Invoke(cost.Id);
 
                             long lineCoin = 0L;
-                            if (solved.IsResolved && solved.RealCoin > 0L)
+                            if (solved != null && solved.RealCoin > 0L)
                             {
                                 try
                                 {

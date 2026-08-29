@@ -263,6 +263,7 @@ result.SolveContext.UnreducedTree.Recipes[0].MinRating = 400
 result.SolveContext.UnreducedTree.Recipes[0].OutputCount = 1
 result.SolveContext.UnreducedTree.Recipes[0].RecipeId = 10
 result.SolveContext.UsedMaterials.count = 0
+result.SolveContext.VendorCostLineValues = null
 result.SolveContext.VendorOffers = null
 result.TargetUnitSellPrice = 1000
 result.UsedMaterials = <already dumped>
