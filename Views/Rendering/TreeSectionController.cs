@@ -817,10 +817,6 @@ namespace TaimisToolbench.Views.Rendering
         private const int PillPadding = 12;
         private const int TightPillPadding = 6;
 
-        // The rule's geometry lives in TreeRowShapePlanner; only its color
-        // is a palette decision, so only its color stays here.
-        private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
-
         // What a dead click on a dimmed pill means, and the one action
         // that makes it live again. Every dimmed row is somewhere under a
         // node the solver decided to buy, so switching that node to CRAFT
@@ -964,20 +960,6 @@ namespace TaimisToolbench.Views.Rendering
             {
                 rowPanel.BackgroundColor = Color.Transparent;
             };
-
-            // Left-indent rule (see TreeDimmedRuleColor). Drawn before
-            // every other child so nothing else in the row paints under it,
-            // and never on a live row.
-            if (dimmed)
-            {
-                new Panel()
-                {
-                    Size = new Point(TreeRowShapePlanner.DimmedRuleWidth, TreeRowHeight),
-                    Location = new Point(shape.DimmedRuleX, 0),
-                    BackgroundColor = TreeDimmedRuleColor,
-                    Parent = rowPanel,
-                };
-            }
 
             // Caret column: fixed width even for leaf rows (no children ->
             // no glyph, but the icon column still starts at the same x as

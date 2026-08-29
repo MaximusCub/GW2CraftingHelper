@@ -36,14 +36,6 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const int NameColumnOffset = CaretColumnWidth + IconFrameSize + NameGap;
 
-        // Left-indent rule down a dimmed subtree: 2px wide (1px is not
-        // guaranteed a physical scanline under Blish's non-integer UI scale
-        // - see LabelHelpers.CreateRowDivider), drawn in every dimmed row's
-        // own indent channel so consecutive rows at the same depth join into
-        // one continuous line.
-        public const int DimmedRuleWidth = 2;
-        public const int DimmedRuleOffset = 8;
-
         // The ASCII a caret DEGRADES to. What is normally drawn is the
         // module's own filled caret from ref/glyphs.fnt - see
         // UiGlyphs.ExpandCaret, which is where the renderer asks. Neither
@@ -63,15 +55,8 @@ namespace TaimisToolbench.Services
             // formula and cannot silently desync.
             bool isExpanded = PlanContentHeightMath.IsNodeExpanded(node.NodeId, depth, dimmed, expansionOverrides);
 
-            int ruleX = indent - DimmedRuleOffset;
-            if (ruleX < 0)
-            {
-                ruleX = 0;
-            }
-
             return new TreeRowShape(
                 indent: indent,
-                dimmedRuleX: ruleX,
                 iconX: indent + CaretColumnWidth,
                 nameX: indent + NameColumnOffset,
                 hasChildren: hasChildren,
@@ -89,13 +74,6 @@ namespace TaimisToolbench.Services
     internal readonly struct TreeRowShape
     {
         public readonly int Indent;
-
-        /// <summary>
-        /// x of the dimmed subtree's left rule, clamped at 0 so a depth-0
-        /// dimmed row draws it flush rather than off the panel.
-        /// </summary>
-        public readonly int DimmedRuleX;
-
         public readonly int IconX;
         public readonly int NameX;
         public readonly bool HasChildren;
@@ -116,11 +94,10 @@ namespace TaimisToolbench.Services
         public readonly bool ChildDimmed;
 
         public TreeRowShape(
-            int indent, int dimmedRuleX, int iconX, int nameX, bool hasChildren, bool isExpanded,
+            int indent, int iconX, int nameX, bool hasChildren, bool isExpanded,
             string caretGlyph, string quantityPrefix, bool childDimmed)
         {
             Indent = indent;
-            DimmedRuleX = dimmedRuleX;
             IconX = iconX;
             NameX = nameX;
             HasChildren = hasChildren;
