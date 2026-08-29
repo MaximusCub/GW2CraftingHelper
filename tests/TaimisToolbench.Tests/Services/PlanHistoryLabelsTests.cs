@@ -44,6 +44,67 @@ namespace TaimisToolbench.Tests.Services
             Assert.Empty(PlanHistoryLabels.ItemLineTexts(new PlanHistoryEntry()));
         }
 
+        // The owner's report was a Plan History hover that showed "just an
+        // icon and name". A one-item entry has no extra lines - its one
+        // item is the header - so the stat body is the whole rest of the
+        // tooltip, and this is what decides the row is owed one.
+        [Fact]
+        public void SingleItemId_OneItemEntry_ReturnsThatItemsId()
+        {
+            Assert.Equal(1, PlanHistoryLabels.SingleItemId(EntryWith(("Twilight", 1))));
+        }
+
+        [Fact]
+        public void SingleItemId_MultiItemEntry_ReturnsZero()
+        {
+            Assert.Equal(0, PlanHistoryLabels.SingleItemId(
+                EntryWith(("Twilight", 1), ("Mithril Ingot", 250))));
+        }
+
+        [Fact]
+        public void SingleItemId_NullEntrySummariesOrEmptyList_ReturnZero()
+        {
+            Assert.Equal(0, PlanHistoryLabels.SingleItemId(null));
+            Assert.Equal(0, PlanHistoryLabels.SingleItemId(new PlanHistoryEntry()));
+            Assert.Equal(0, PlanHistoryLabels.SingleItemId(EntryWith()));
+        }
+
+        // A capture that predates the id being recorded names its item but
+        // cannot key a stat lookup - 0, the same answer as a multi-item
+        // entry, rather than a lookup of id 0.
+        [Fact]
+        public void SingleItemId_SummaryWithNoUsableId_ReturnsZero()
+        {
+            var entry = new PlanHistoryEntry
+            {
+                ItemSummaries = new List<PlanHistoryItemSummary>
+                {
+                    new PlanHistoryItemSummary { ItemId = 0, Name = "Twilight", Quantity = 1 },
+                },
+            };
+
+            Assert.Equal(0, PlanHistoryLabels.SingleItemId(entry));
+        }
+
+        // Nulls are skipped by ItemLineTexts too, so the entry that renders
+        // one line is the entry that counts as one item.
+        [Fact]
+        public void SingleItemId_NullSummariesSkippedLikeItemLineTexts()
+        {
+            var entry = new PlanHistoryEntry
+            {
+                ItemSummaries = new List<PlanHistoryItemSummary>
+                {
+                    null,
+                    new PlanHistoryItemSummary { ItemId = 42, Name = "Twilight", Quantity = 1 },
+                    null,
+                },
+            };
+
+            Assert.Single(PlanHistoryLabels.ItemLineTexts(entry));
+            Assert.Equal(42, PlanHistoryLabels.SingleItemId(entry));
+        }
+
         [Fact]
         public void RowLabel_CapsAtThreeEntriesWithPlusNMore()
         {

@@ -159,7 +159,7 @@ Services/PillTooltipTextComposer.cs                                             
 Services/PlanContentHeightMath.cs                                                       495
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
-Services/PlanHistoryLabels.cs                                                            82
+Services/PlanHistoryLabels.cs                                                           118
 Services/PlanHistoryRetention.cs                                                        102
 Services/PlanHistoryRowLayout.cs                                                        323
 Services/PlanHistoryStore.cs                                                            155
@@ -277,7 +277,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                       2770
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
-Views/PlanHistoryTabContent.cs                                                          1402
+Views/PlanHistoryTabContent.cs                                                          1403
 Views/RankerTabContent.cs                                                               2898
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  600
@@ -435,7 +435,7 @@ tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs           
 tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                    604
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
-tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                         77
+tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                        138
 tests/TaimisToolbench.Tests/Services/PlanHistoryRetentionTests.cs                     139
 tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     389
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         323

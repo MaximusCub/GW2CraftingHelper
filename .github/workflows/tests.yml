@@ -640,16 +640,9 @@ jobs:
           # hover: an icon and a name, and nothing the game's own item
           # tooltip says. Every other call site passes a CONDITIONAL null -
           # "no stat block for THIS id, on this surface" - which is a
-          # different statement and stays allowed. Same rules as
-          # NAMING_PENDING: an entry is removed by the commit that converts
-          # its call.
-          STATLESS_PENDING = {
-              'Views/PlanHistoryTabContent.cs':
-                  'the Plan History branch owns this file - a one-item entry\'s row'
-                  ' header IS that item and is owed its stat block; a multi-item'
-                  ' entry keeps the null, because one item\'s stats are not the'
-                  ' request\'s',
-          }
+          # different statement and stays allowed. No file is exempt: the
+          # last one that was, Views/PlanHistoryTabContent.cs, is what the
+          # owner saw as "just an icon and name".
           statless = []
           for f in files:
               text = open(f, encoding='utf-8').read()
@@ -659,11 +652,8 @@ jobs:
                       continue
                   parts = split_arguments(args)
                   line = text.count('\n', 0, m.start()) + 1
-                  if len(parts) > 1 and parts[1] == 'null' and f not in STATLESS_PENDING:
+                  if len(parts) > 1 and parts[1] == 'null':
                       statless.append(f'{f}:{line}')
-          for path, why in sorted(STATLESS_PENDING.items()):
-              if path not in files:
-                  statless.append(f'{path}: listed as pending but not in the tree ({why})')
 
           # The stamping seams, pinned by name and by parameter type. A new
           # one, or one widened to Control/Label, is how the whole-row
