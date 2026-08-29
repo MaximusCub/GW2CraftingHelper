@@ -2557,10 +2557,14 @@ namespace TaimisToolbench.Views
             string currencyName = string.IsNullOrEmpty(entry.CurrencyName)
                 ? "Unknown Currency"
                 : entry.CurrencyName;
+            // Read out of the entry rather than closed over with it: the
+            // hover builder outlives this call and would otherwise retain
+            // the whole snapshot entry per row.
             int currencyId = entry.CurrencyId;
             int walletValue = entry.Value;
+            string currencyIconUrl = entry.IconUrl;
             IconControls.CreateItemIcon(
-                rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
+                rowPanel, currencyIconUrl, ItemIconFrame.NotAnItem(), 2, 2,
                 ItemIconTier.CurrencyListRow,
                 // A WALLET row is a wallet currency by construction - the
                 // id came out of /v2/account/wallet - so the kind needs no
@@ -2570,7 +2574,7 @@ namespace TaimisToolbench.Views
                     currencyName,
                     () => CurrencyTooltipFacts.For(
                         currencyName,
-                        entry.IconUrl,
+                        currencyIconUrl,
                         _getCurrencyMetadata == null
                             ? null : _getCurrencyMetadata(currencyId)?.Description,
                         walletValue)));
