@@ -14,22 +14,13 @@ namespace TaimisToolbench.Views
     /// Blish HUD 1.3.0: <c>TextInputBase.Focused</c>'s setter assigns
     /// <c>GameService.Input.Keyboard.FocusedControl = this</c> on EVERY
     /// change, a change to false included, so every soft unfocus leaves that
-    /// one global slot naming a box that is no longer focused. Blish itself
-    /// soft-unfocuses in two places - the click-away handler
-    /// (<c>Focused = _mouseOver &amp;&amp; _enabled</c>) and
-    /// <c>DisposeControl</c> - and the second runs after
-    /// <c>Control.Dispose</c> has already cleared <c>Parent</c>, so a box
-    /// disposed while focused leaves the slot holding an orphan whose
-    /// <c>GetAncestors()</c> is empty and which KeyboardHandler's
-    /// ancestor-visibility sweep can therefore never heal.
-    ///
-    /// A slot naming one box while another still holds focus is what the
-    /// user feels: Escape is consumed clearing the slot instead of the box,
-    /// re-clicking the live box cannot repair it (the setter's
-    /// change-detection skips the assignment when <c>_focused</c> is already
-    /// true), and the still-focused box keeps KeyboardHandler's
+    /// one global slot naming a box that is no longer focused - and a
+    /// still-focused box keeps KeyboardHandler's
     /// <c>_textInputDelegate</c>, which swallows every keystroke bound for
     /// the game.
+    ///
+    /// How Blish gets into that state, and why re-clicking cannot repair it:
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </remarks>
     internal static class FocusRelease
     {

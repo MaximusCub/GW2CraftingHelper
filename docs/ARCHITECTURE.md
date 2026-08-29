@@ -916,3 +916,767 @@ case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
 request-only restore), `Models/PlanHistoryEntry.cs` and
 `Services/PlanHistoryStore.cs` (the index's readable range and the
 additive-only row graph behind it).
+
+---
+
+## V. Views: relocated design narrative
+
+The `Views/` tree carries a lot of hard-won reasoning: decompiled Blish HUD
+1.3.0 behaviour, pixel simulations, bug post-mortems, and the arguments
+behind choices that look arbitrary from the outside. That reasoning is
+worth keeping, but a forty-line XML doc comment stops being read. This
+section is where the derivations live. Each member's own doc comment keeps
+the part a caller can violate - the invariant, the measured constant, the
+Blish quirk you need to know to use it - and points here for the rest.
+
+The subsections below are ordered by file, top-level `Views/` first, then
+`Views/Rendering/`.
+
+### V.1 `AboutTabContent`: rebuilt per visit, and the SemVer reflection
+
+The About tab is the same shape as `LogTabContent`: one
+`FlowPanel(CanScroll)`, a `Build(Container)` that populates it once, and no
+relayout registry. Nothing on it is interactive beyond plain
+selectable/copyable text, so there is no state worth keeping "sticky"
+across a tab revisit and the rebuild-per-visit cost buys correctness for
+free. `MainView` carries the cross-cutting note on that rebuild policy.
+
+The manifest read cannot fail under normal operation: `ModuleParameters.Manifest`
+is the exact object Blish HUD itself already parsed and validated in order
+to load this module at all. The hand-parse of the packaged `manifest.json`
+exists for the cases where it somehow does anyway - a null `Manifest`, an
+unexpectedly blank `Name`, or any exception - and mirrors the
+try/catch-with-graceful-fallback shape `Module.Initialize()` already uses
+four times for seed files.
+
+`Manifest.Version` and a dependency's `VersionRange` are typed
+`SemVer.Version` / `SemVer.Range`, from the external "SemVer" NuGet package
+Blish HUD embeds via Costura at runtime. This project has no compile-time
+reference to it, so a direct property access does not compile. Reflection
+(`ToString()` only) avoids adding a package reference for a two-field,
+display-only read.
+
+### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
+
+It follows the same `StandardWindow` construction technique as
+`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
+`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
+class rather than a generalization of it. `ModalDialog`'s shape is one
+short sentence, a fixed "Confirm" title, and a caller-named confirm button
+beside a fixed Cancel; this dialog is a multi-line numbered checklist under
+a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
+is also not wrapped at all, which is fine for its own short sentence and
+wrong for full-sentence checklist items.
+
+It deliberately skips `ModalDialog`'s settings-backed drag position
+persistence. This is a rare error-path dialog, not a workflow a user
+repeatedly opens and repositions, so it simply centers on every `Show()`
+and needs no new `ModuleSettings` entries.
+
+The failure it explains is real and was reported: at character select,
+Blish has not yet resolved the game's Mumble identity, every account data
+source call fails with an invalid or missing API key, and the Snapshot
+tab's Refresh Now used to show only the unhelpful "Refresh Failed -
+{time}".
+
+### V.3 `FocusRelease`: how Blish's focus slot gets orphaned
+
+`TextInputBase.Focused`'s setter assigns
+`GameService.Input.Keyboard.FocusedControl = this` on every change, a
+change to `false` included. Blish itself soft-unfocuses in two places: the
+click-away handler (`Focused = _mouseOver && _enabled`) and
+`DisposeControl`. The second runs after `Control.Dispose` has already
+cleared `Parent`, so a box disposed while focused leaves that one global
+slot holding an orphan whose `GetAncestors()` is empty - which
+`KeyboardHandler`'s ancestor-visibility sweep can therefore never heal.
+
+A slot naming one box while another still holds focus is what the user
+feels. Escape is consumed clearing the slot instead of the box, and
+re-clicking the live box cannot repair it, because the setter's
+change-detection skips the assignment when `_focused` is already true. That
+is why the release has to go through `UnsetFocus()` and why it retries.
+
+### V.4 `ItemInputRowStrip`: why it is not under `Views/Rendering/`
+
+Its controls are `AutocompleteTextBox`, `SuggestionPanel` and
+`FocusRelease`, all of which are `Views` types. Putting the strip under
+`Views/Rendering/` would make that folder reference `Views` and reverse the
+one-way dependency section 5 above states.
+
+### V.5 `LogTabContent`: the three-column row split, and the follow poll
+
+`LogRow` splits each entry into four controls (panel plus three labels)
+where the previous shape used three, and pays one more `EllipsizeToWidth`
+per row per refit. Both are bounded by the ring cap (2000) and by what the
+filter admits, the refit loop is `SuspendLayout`-wrapped, and on a resize
+the ellipsize half runs once per drag rather than once per drag event.
+
+One divergence is accepted rather than fixed: timestamps do not align
+pixel-for-pixel between an `[INFO]` row and a `[DEBUG]` one, because the
+level word and the stamp share the Time label. Fixing it costs a fifth
+control per row on the module's heaviest render path. The Tag and Message
+columns - the two a reader actually scans - do align.
+
+`PollForUpdates` is the "plus a poll" half of the refresh design in
+[`dev/proposals/d2-log-system.md`](../dev/proposals/d2-log-system.md)
+section 4.3, layered on top of the `TabChanged`-driven `Refresh`. That
+design is also what calls for the append-only incremental update rather
+than a full-rebuild `Refresh()` on every version bump.
+
+### V.6 `MainView`: Clear Cache, Refresh Now, status, and the result repack
+
+Interposing a confirm dialog in front of Clear Cache opens a window in
+which a refresh can start, which the old single-click version could not:
+Refresh Now disables Clear Cache for its whole duration, but not the
+reverse. Both buttons are therefore disabled for the dialog's lifetime, and
+because `Build()` recreates them on every tab visit - which would re-enable
+them mid-dialog - the confirm also bumps `_clearGeneration`.
+
+`RefreshNowAsync` is a method rather than an inline lambda because the
+`ApiAccessDialog`'s Retry button invokes it too. Both entry points are
+Blish UI event handlers (a `Click`, or the dialog's own `Click`-driven
+Retry callback), so both always start on the main thread - the same
+argument `CraftingPlanView.TriggerGenerate` makes about its own
+confirm-modal callback.
+
+`ApplyStatusDisplay`'s parentheses around the elapsed time are the method's
+own, and they are what keep the age from reading as part of the timestamp
+beside it ("Updated - Aug 15, 2026 3:41 PM (2m ago)"). The `_statusLabel`
+now lives in its own full-width `_statusPanel` row beneath the header
+rather than in the header's shared, button-crowded run, which is why the
+composed text is not truncated: a full-width row is far less likely to run
+out of space, and truncating a status message is worse than letting a rare
+long one reach the edge.
+
+`RefitResultRows` keeps the scroll position across a repack that KEEPS the
+column count - the grid panel's width moves, its height does not. A repack
+that CHANGES the column count writes a new grid-panel height, and Blish's
+`Scrollbar` zeroes the scroll position a frame after any content-height
+change (measured: KNOWN-ISSUES #55, "The grid panel holds its unfiltered
+height"), so the list snaps to top. That is not defended against: this tab
+has no scroll-restore machinery - `CraftingPlanView.PreserveScrollAcross`
+is the module's only one - and a column-count change re-flows every row
+anyway, so there is no old position left to hold.
+
+### V.7 `ModalBackdrop`: what it is for, and what it must not block
+
+Before it existed, a confirm was only visually on top: with the Clear Cache
+confirm open, a click on the Crafting Plan tab's "+" add-row button behind
+it still registered.
+
+It covers the module window rather than the screen because a capturing
+control also stops the GAME from seeing the click. A screen-wide blocker
+would mean a confirm left open swallows every click in Guild Wars 2, which
+is not a trade a HUD overlay should make for a two-button confirm. The
+finding is about the surface the dialog belongs to, so that is exactly what
+is blocked.
+
+The Z-order arithmetic behind the lazy construction: a window's effective
+`ZIndex` is `5 + Screen.WINDOW_BASEZINDEX + its rank among windows ordered
+by (TopMost, LastInteraction)`, so it is not a compile-time constant and a
+`TopMost` dialog can land exactly one above a non-`TopMost` module window.
+On the tie that arithmetic can produce with the blocked window, the
+sibling-index tiebreak in `Container.TriggerMouseInput` decides - which is
+why the backdrop is constructed on the first `Show()`, after every window
+exists, so it is always the later child.
+
+### V.8 `SettingsTabContent.EnsureCurrencyRowIcon`: two different readiness tests
+
+A currency row is held to the currency LIST having resolved; a barter item
+row is held to the ITEM ID it resolved. The asymmetry is deliberate,
+because the two fetches answer different questions. Once the currency list
+has resolved, every currency row gets an icon control, and a currency the
+list carries with no icon URL of its own gets `IconControls`' empty-slot
+placeholder - which is the state it really is in. The item fetch answers
+per id, so an id absent from the reply is one nobody has an icon for yet,
+not one the API says has none; holding a barter row to "the fetch happened"
+would draw the placeholder over the first case.
+
+### V.9 `CraftingPlanView.ApplyRestoredPlan` and `RollBackFailedPlanRender`
+
+`ApplyRestoredPlan` mirrors `TriggerGenerate`'s success-path shape: it adopts
+the restored `result` as the override loop's baseline, restores the user's
+prior decision-pill overrides, reseeds the request inputs (rows, checkboxes,
+price basis) that produced the plan, resets section expansion, rebuilds the
+view model, and seeds the status board with the staleness banner text.
+`RestoreOverrides` is not optional there - see V.17 for what a restored
+session loses without it.
+
+Two narrow try/catches guard the restore. `PlanStoreHelpers`' tolerance gate
+is only structural, so a degraded `plan.json` can still throw inside the view
+model build or inside `RenderPlan` - the builder copies the tree by
+reference, so a null child is only dereferenced when `RenderPlan` walks it.
+`RollBackFailedPlanRender` is shared with `Build()`'s guarded tail so a
+poisoned view model can never be committed on either path.
+
+Each thing the rollback restores is on the list for its own reason:
+
+- The tree controller's override/ignore/expansion baseline
+  (`ResetForNewPlan(null)`) and its per-render tree state, because the
+  restored result was adopted as `_lastResult` before the render was
+  attempted.
+- `_lastDebugLog` / `_currentPlan` / `_planGeneratedAt`, because a committed
+  view model that cannot render would re-throw out of `Build()`'s tail on
+  every later tab visit.
+- `_contentPanel`'s children, because a mid-build exception can leave a
+  partially-built plan parented in a live panel; `ResetContentPanelToEmpty`
+  sweeps it.
+- The status board's seeded staleness banner and its painted label text -
+  both skipped when `ClearRestoredSeed` reports a real Generate has raced
+  in, so a superseding generation's status is never clobbered.
+
+The catch is `catch (Exception)` on purpose: the rollback is the load-bearing
+part, and narrowing it would trade a vanished plan for a crash on every later
+tab visit.
+
+### V.10 `ApplyWheelWrapCorrection`: why cancel-then-direct-write
+
+Verified against the decompiled vendored Glide: `TweenerImpl.Tween` registers
+a new tween in the by-target dictionary synchronously, before returning - so
+by the time this handler runs, the wrong duration-0 tween is already
+registered and `TargetCancel` finds it immediately. `Tween.Cancel` nulls the
+`"ScrollDistance"` lerper slot synchronously, so even an `Update()` that runs
+before removal skips the write: the wrong step never lands, rather than being
+canceled one frame late.
+
+That is why the shape is cancel-then-direct-write rather than a counter-tween
+or a deferred correction, either of which would add a wrong frame this
+mechanism does not have. (`Scrollbar` itself never calls `TargetCancel`;
+rapid `ScrollAnimated` calls overwrite each other via `Tween`'s default
+overwrite parameter, an internal-only path.)
+
+Section 2 above covers the vendored `WheelDelta` defect this corrects.
+
+### V.11 `PlaceTreeToolbarRow`: the collapsed row, and publishing the cluster
+
+The strip's arithmetic collapses the toolbar row entirely when it is hidden,
+which puts its Y exactly on the status row. A full-height panel left there
+would sit over the top few pixels of the scrollable content area, so a hidden
+row is given zero height as well as `Visible = false` and cannot intercept
+anything even if Blish's hit-testing ever stopped honouring `Visible`.
+
+Publishing where the button cluster starts matters because the two clusters
+share one row and only this method knows its width. A left cluster laid out
+without that number is a left cluster laid out over the buttons - which is
+exactly what the chips did before `TreeChipStripLayout.Fit` existed.
+
+### V.12 `PreserveScrollAcrossResize`: why the reset lands a frame late
+
+Confirmed by decompiling the vendor assembly
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`,
+`Blish_HUD.Controls.Scrollbar` and `Panel`):
+
+`Scrollbar.RecalculateLayout` caches
+`_scrollbarPercent = ContentRegion.Height / containerLowestContent` and zeroes
+`ScrollDistance` (and, via `UpdateAssocContainer`, `VerticalScrollOffset`)
+whenever that ratio differs from the previously cached value.
+`RecalculateLayout` runs from two places:
+
+1. Synchronously, nested inside `Panel`'s own `"Height"` `PropertyChanged`
+   handler - `UpdatePanelScrollbarOnOwnPropertyChanged` sets
+   `_panelScrollbar.Height`, itself a `Control.Height` write that
+   invalidates/recalculates the scrollbar. But .NET's `PropertyChanged` event
+   fires BEFORE `Control.Size`'s own
+   `OnPropertyChanged("Height", invalidateLayout: true)` call to
+   `Invalidate()`, so this nested call runs before `Panel`'s own
+   `RecalculateLayout` has refreshed `ContentRegion` for the new size, reads
+   the STALE (pre-resize) `ContentRegion.Height`, and sees no change.
+2. Once every real engine frame, unconditionally, from `Scrollbar.DoUpdate`'s
+   own `Invalidate()` call. By the time THAT runs, `ContentRegion.Height` has
+   already been refreshed - the panel's own `RecalculateLayout` ran
+   synchronously earlier in the same `Height`-setter chain - so it now sees a
+   genuine change and resets.
+
+Net effect: the reset lands on a later real frame, typically the next one,
+not synchronously inside the tick's `Size` write. This is the same
+delayed-reset window `ApplySavedScrollSynchronously`'s class doc describes
+for rebuilds, and the reason `StartScrollVerify` exists there.
+
+A per-tick verify window is deliberately not used: it would spawn (or
+cancel-and-replace) a `FrameTicker` on every single drag frame, and the
+per-tick synchronous write already keeps each tick visually correct without
+one. The bounded window is armed once, at drag settle.
+
+### V.13 `ReplayRelayout` and `ResizeSettleStep`: the drag-frame budget
+
+`SuspendLayout`/`ResumeLayout` around the replay is about comparison cost.
+For a long shopping list or a deep tree, replaying dozens of per-row closures
+in a single tick without it would trigger that many redundant full sibling
+reflows in the same frame (the `O(rows^2)` risk raised as m2 risk 2). The
+coalesced reflow is a no-op for vertical position anyway, because these
+writes only ever touch `Width`/`X` - row heights stay fixed, and
+`SingleTopToBottom` flow positions children from cumulative `Height`.
+
+The perf caveat on `ReplayRelayout` is real and stated inline: this shape
+replaced a ONE-TIME dispose+rebuild 150ms after the drag settled with a full
+replay of `_relayoutActions` on EVERY real drag frame. That is a genuine
+change in perf character, not just a different trigger, and the mitigation
+above is reasoned rather than measured - no live drag-resize check on a
+large, fully-expanded plan (deep tree plus long shopping list) has been
+performed against a running Blish instance.
+
+`ResizeSettleStep` defers only the MEASURE half, and only because
+`MeasureString` is comparatively expensive to run on every tick across a long
+list or deep tree. The visible cost of deferring it is small: truncated text
+stays unchanged mid-drag and is corrected once the drag settles.
+
+### V.14 `TriggerGenerate`: why the resolution await lives in the wrapper
+
+The await could have gone inside `GenerateFromResolvedRows`, and that is the
+version this replaced. It cannot: `IItemSearchProvider` may complete
+asynchronously, Blish's host installs no `SynchronizationContext` (section 1
+above), and everything after such an await would therefore run on a
+ThreadPool thread - while the generate body touches controls from its first
+line. Keeping the await in a thin wrapper puts exactly one marshal hop
+between the resolution and a body that has no async seams of its own.
+
+### V.15 `SetGenerateInputsEnabled`: the run it was added for
+
+The Generate button used to be the only control disabled for the length of a
+run, which left "Use Own Materials" clickable while a plan was still
+generating - and its confirm callback starts another generation. Two runs
+then shared one `ItemMetadataService`, which is a data race, and
+`_generateSequence` does not help: it makes the last result win, it does not
+stop the redundant work. `ItemMetadataService` is now internally locked
+(`_cacheLock`), so this is no longer a crash guard; it is the single-flight
+rule that stops the redundant run from starting at all.
+
+### V.16 `SpinnerTick`, `CreateSectionHeader`, `CreateRequiredRecipesSection`
+
+`PlanStripTickAction.RenderFinalAndStop` is what makes "the board reports
+finished, so render final status and stop" true without any separate
+completion-callback write into this control ever being needed. The tick reads
+the board; nothing writes back into the tick.
+
+`CreateSectionHeader`'s `suppressToggle`/`suppressPress` pair has exactly one
+remaining user: Required Recipes' "Hide Unlocked" checkbox, the only
+interactive control left in any section header now that the Recipe Tree's
+five buttons moved to the non-scrolling strip (see `TreeToolbarCommands`).
+
+Toggling that checkbox re-renders through `RenderPlan(_currentPlan)` - the
+same full rebuild path a pill click's local re-solve and a fresh Generate
+both already use - rather than inventing a second, parallel relayout
+mechanism for one section.
+
+### V.17 `DisciplinesSectionRenderer`: one column X for the whole section
+
+A per-row X, varying with each discipline name's width, could never line up
+with a single header position - which is why the character-availability
+column had none. Computing one column X for the whole section fixes that
+without touching `rowHeight`, `PlanContentHeightMath` or `PlanRelayoutMath`:
+`NameMaxWidthBeforeColumn`'s existing 20px floor still clamps the ellipsis
+width on narrow panels exactly as it did before.
+
+The "Characters" header is added only when at least one row actually has
+availability text under it. In practice a section is never both null and
+non-null (see `BuildCharacterAvailabilityText`'s own doc comment), but the
+check walks all rows rather than assuming that.
+
+### V.18 `FeedbackButton`: what `StandardButton` measurably does not do
+
+Measured from the vendored Blish HUD 1.3.0 binary with `ilspycmd`:
+
+- **Hover works and is left alone.** `OnMouseEntered`/`OnMouseLeft` tween
+  `AnimationState` 0 to 8 over 0.25s, stepping through the
+  `common/button-states` atlas. The override paints from the same atlas via
+  the same public `AnimationState`.
+- **Press does nothing.** There is no `OnLeftMouseButtonPressed` override and
+  no pressed frame in the atlas walk, so the button looks identical held down
+  as hovered.
+- **Sound is silently dead.** `OnClick` calls
+  `PlaySoundEffectByName("audio\\button-click")`, but `ContentService`'s audio
+  reader is already rooted at `ref.dat`'s `audio` folder, so the lookup
+  becomes `audio/audio/button-click.wav`, fails the `FileExists` check, and
+  returns silently. `Checkbox` and `GlowButton`, which pass the unprefixed
+  `"button-click"`, are audible.
+
+The press and sound gap is supplied by `PressFeedback`. If a later Blish
+release fixes the double-prefixed path, this button will play the sound twice
+on a completed click and the `PlayClick` call in `PressFeedback.Wire` is what
+to drop.
+
+**Why the paint is overridden rather than the control replaced.** The four
+limits all live in `StandardButton.Paint` and `RecalculateLayout`, both
+virtual. Everything ABOVE them - the hover tween, the click event and its
+`Enabled` gate, the tooltip plumbing every one of this module's buttons
+relies on, focus, opacity, and the whole `Container`/`Control` lifecycle - is
+inherited free, and is the part that would have to be rebuilt, and kept
+rebuilt, by deriving from `Control` instead. The button art is Blish's own
+(`common/button-states` and `button-border`, both reachable through the
+public `GameService.Content.GetTexture`), so painting it costs two texture
+handles and no fidelity.
+
+The four limits in full:
+
+1. **No `Font`.** `StandardButton` draws in `DefaultFont14` and exposes no way
+   to change it, so a button could not sit on this module's type ramp and
+   could not carry a glyph from the shipped glyph font (`ref/glyphs.fnt`) at
+   all.
+2. **Text colour is forced.** `Paint` assigns `_textColor` on EVERY frame, so
+   a colour written from outside is overwritten before it is ever drawn.
+3. **Icon is blitted untinted**, onto button art whose face samples about
+   (200,193,175). Blish's own white affordance textures - 733269/733270, the
+   matched X pair - are therefore invisible on a button, which is the measured
+   reason Plan History reached for a `Checkbox` instead of a button wearing an
+   icon.
+4. **An icon-only button's icon is off centre by construction.** With no text,
+   `StandardButton` seats it at `Width / 2 + 8 - iconWidth - 4` - the `+8` is a
+   text gap being paid for when there is no text - so it sits 4px right of
+   centre at every width.
+
+### V.19 `GlyphFont.Merged`: why one font rather than two labels
+
+The sort indicator is part of the header's own `Label.Text`, which is what
+lets every right-aligned header keep tracking its column: the relayout
+closures right-align off a width that already includes the indicator. A
+separate glyph `Label` beside the title would have meant re-deriving nine call
+sites' worth of column arithmetic. One merged font means every existing
+`MeasureString` keeps measuring the whole string correctly and no call site
+learns anything new - which is worth the handful of extra texture switches per
+frame the split texture pages cost.
+
+### V.20 `HeaderBands`: why a band, and why a factory
+
+Four of the plan tab's five original headers already drew a band, so unifying
+the other way would have rewritten the majority to match the minority. Every
+table row in this module also carries a 2px divider and, in most tables, an
+icon, so an unbanded header in a lighter grey reads as a faint first data row
+rather than as a header.
+
+The factory shape is a response to a measured failure. `HeaderBands`'
+predecessor exposed the band colour as a constant and let eight call sites
+each build their own `Panel` from it; seven of the eight did, and only one
+went through a shared renderer - the same opt-in-helper failure the module
+already paid for on icon sizes.
+
+### V.21 `HoverChainResync`: the clicks it does and does not fix
+
+Every click in the plan view that rebuilds what it was clicked on hits the
+frozen hover chain: a decision pill re-solves and rebuilds its own row, a sort
+header re-renders the table it labels, a caret rebuilds the subtree under it.
+The replacement control lands under a stationary cursor with
+`MouseOver == false` and no `MouseEntered` fired, so the pill the user is
+pointing at reads as un-hovered until they jiggle the mouse - and this
+module's own `AnyPillHovered` guard, which asks the same question, answers
+wrongly in the meantime.
+
+A LOST click is a different, also-measured mechanism, and this section is the
+one place it is stated. `MouseHandler` buffers exactly ONE pending mouse event
+(`_mouseEvent`, overwritten by the hook thread and consumed once per
+`Update`), and `Control.OnLeftMouseButtonReleased` only raises `Click` when
+that same control INSTANCE was primed by its own press. A frame long enough to
+contain both halves of the next click drops the press, so the release finds
+nothing primed. The answer to that is to make the rebuild frame short, which
+is `TreeSectionController.TryRefreshInPlace`'s job - not this type's.
+
+### V.22 The `Views/Rendering` seams
+
+Shared row-construction helpers with several callers (`TextRowRenderer`,
+`ColumnHeaderRowRenderer`, `RowRelayoutHelpers`, `IconNameRowHelpers`) take
+`ISectionRelayoutSink` as a method parameter rather than as a
+constructor-injected field, because none of them is itself a section renderer
+and none of them has a per-render lifetime to hang a field on.
+
+`ITreePlanHost` is one named interface rather than a list of constructor
+delegates because the callbacks are semantically one collaborator, and because
+a named member is the only thing that makes a particular swap unexpressible:
+two of them used to share the type `Action<PlanViewModel>` with opposite
+meanings (render vs. assign-field), so transposing them compiled. It also
+gives a new tree feature one place to grow instead of four. `CraftingPlanView`
+implements it explicitly, the same way it implements `ISectionRelayoutSink`,
+so nothing there widens that class's public surface.
+
+### V.23 The icon contract: `IconControls`, `ItemIconTooltip`, `IconNameRowHelpers`
+
+All three halves of `CreateItemIcon`'s no-defaults rule exist because all
+three were opt-in before and all three silently drifted: eleven call sites
+each chose their own pixel size, a call site with no rarity to hand looked
+identical to one that had looked and found none, and an icon with no hover
+looked identical to one that had decided against showing one.
+
+`ItemIconTooltip` is the same treatment `ItemIconFrame` gives the frame colour
+and `ItemIconTier` gives the size. A trailing default could be omitted, and
+omission looked exactly like a deliberate decision not to show one - which is
+how the Plan History tab shipped with item icons that answered nothing at all.
+A factory name is what a diff shows.
+
+There is deliberately no eager or plain-text twin of
+`ApplyRichDeferredToIconTree`, because either would be a way to give an icon a
+hover without saying so at the call site.
+
+`IconNameRowHelpers.CreateIconAndEllipsizedName` threads
+`rightEdge`/`qtyWidth`/`nameGap` into `PlanRelayoutMath.NameMaxWidthBeforeColumn`
+exactly as each pre-extraction caller computed them inline; the helper changed
+where that arithmetic is called from, not the arithmetic.
+
+### V.24 `InlineSpinner`: the decompiled `LoadingSpinner`
+
+Measured from the vendored Blish HUD 1.3.0 binary
+(`packages/BlishHUD.1.3.0/lib/net472/"Blish HUD.exe"`, decompiled with
+`ilspycmd`): `Blish_HUD.Controls.LoadingSpinner` is a plain public `Control`
+with a parameterless constructor whose only body is `Size = 64x64`, and whose
+`Paint` hands its own bounds straight to
+`LoadingSpinnerUtil.DrawLoadingSpinner`. That helper draws one 64x64 source
+frame of the `spinner-atlas` texture (4096x64 in `ref.dat`, i.e. 64 frames)
+into whatever destination bounds it is given, so the control scales to any
+size. The frame index is
+`GameService.Overlay.CurrentGameTime.TotalGameTime.TotalSeconds * 21.333 % 64`
+- global game time, not per-control state, so the animation costs no ticker
+and starts mid-cycle rather than at frame 0.
+
+### V.25 `ItemStatWarmer`: the gap it closes
+
+Warming is what closes the gap between "this row knows its name, icon and
+rarity" and "this row shows the same tooltip the game does". Without it a tab
+handed only the pure-read cache accessor shows the identity-only fallback for
+every item no earlier plan happened to touch.
+
+### V.26 `LabelHelpers`: the row-divider scissor derivation, and `WithDescenderClearance`
+
+The 1px-to-2px change came first. Blish applies its UI scale (for example the
+"Normal" GW2 UI size's 0.897) as a real GPU scale matrix, not an
+integer-pixel-snapped one, so a 1px-tall quad rasterizes to 0.897 physical
+pixels - guaranteed physical coverage `floor(0.897) = 0`, i.e. it can
+disappear entirely depending on scroll-offset sub-pixel alignment
+(KNOWN-ISSUES #23). At 2px, `floor(2 * 0.897) = 1` guarantees at least one
+covered physical scanline for the divider's OWN quad-vs-scissor math analyzed
+in isolation.
+
+That isolated argument turned out to be necessary but not sufficient. The row
+panel is itself a `Container`, and every `Container.Paint()` performs a SECOND,
+independent floor/ceil round trip: it unscales the physical scissor it was just
+given back to logical space (`ScaleBy(1/UIScaleMultiplier)`) before
+re-intersecting and re-scaling it for its own children (`Container.cs:377-381`,
+`Control.cs:1176-1177` in the decompiled Blish HUD binary). That round trip can
+shrink the clip rectangle propagated to the divider by exactly 1 logical pixel,
+but provably only at the row's BOTTOM edge - the reconstructed START never
+exceeds the true start, since `floor(floor(Y*s)/s) <= Y` for any positive scale
+`s`.
+
+Whether that 1px shrink actually deletes the divider depends on `rowHeight`.
+Simulation across every `rowHeight` then in the file and all four GW2 UI Size
+scale factors (0.81 / 0.897 / 1.0 / 1.103) showed the pre-tier-2 44px rows
+(`CraftStepRowHeight` of the day) and 32px rows (`DisciplineRowHeight` of the
+day) vanish completely - 0 physical scanlines - at about 10.2% of scroll phases
+at the default scale, while the pre-tier-2 36px rows were immune at every
+tested scale.
+
+The fix is `bottomClearance`: an extra logical pixel of gap between the divider
+and `rowHeight`, so `Location.Y = rowHeight - 2 - bottomClearance`. That moves
+the divider's own interval entirely inside the worst-case-shrunk clip window,
+which simulation confirms is immune (0/5000 vanishes) for every
+(`rowHeight`, scale) pair tested - proven, not merely observed clean at one
+scale.
+
+The tier-2 re-run, after the owner icon ruling grew the plan tab's icon-led
+rows to 45px (Used Materials / Shopping / Required Recipes: flush tier-2 frame
+plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
+decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
+numbers above, shows BOTH new heights are in the vulnerable class at clearance
+0 (45px: 18.0% of phases at 0.81, 7.0% at 0.897; 52px: 10.3% at 0.897) and
+immune at clearance 1 at all four scales. The flush fit survives because the
+tier-2 heights absorb the clearance pixel in their own derivation:
+`42 + 2 + 1 = 45` puts the divider at 42..44, exactly under the 0..42 icon
+frame. The proof is executable - `RowDividerScissorSimulationTests` sweeps
+every shipped (`rowHeight`, `clearance`) pair at all four scales and fails on
+any vanish - so a future height change re-runs it by construction.
+
+`WithDescenderClearance` pins `VerticalAlignment` to `Top` for a related
+reason. `Blish_HUD.Controls.Label.VerticalAlignment` is a public settable
+property whose default this module does not control; if it were `Middle`,
+growing a box by 2 would push its glyphs down by 1 while an unswept sibling on
+the same row stayed put, and a ragged baseline inside one sentence ("Craft 12x
+" plus an item name) is worse than the clip the sweep fixes.
+
+### V.27 `PlanHeaderRenderer`: the three things that used to compete
+
+The header block was CENTRED while everything under it was left-aligned, so
+the plan had no single left edge. It carried a right-aligned "Generated: ..."
+panel duplicating - to the minute - the timestamp the fixed status strip 70px
+above already shows, so an opened plan said the same thing twice. And its
+title shared `DefaultFont18` with every collapsible section header, leaving
+the page with no typographic top level at all.
+
+So: the in-scroll timestamp is gone (the strip keeps it, and it never scrolls
+away), the title is left-aligned at `DefaultFont32`, and `CreateSectionHeader`
+drops to `DefaultFont16`. The "Crafting Plan for " prefix went with the
+timestamp - the tab is already titled "Crafting Plan" and the strip already
+says "Plan generated", so the prefix cost half the title's width to repeat
+what two other elements say.
+
+### V.28 `PressFeedback`: why `Opacity` and not the site's own colour
+
+A helper that wrote to the same properties the sites' own hover vocabularies
+use - `BackgroundColor` for a decision pill, `TextColor` for a sortable
+header, a different translucent wash for a tree row and for a section header -
+would have to capture and restore a resting value that the site's own
+`MouseLeft` handler is also writing, making correctness depend on which
+handler was subscribed first. `Opacity` is touched by nothing else on any of
+these controls.
+
+`AbsoluteOpacity()` walking the parent chain is also what makes the dim
+legible on a target whose own background is transparent: dimming the panel
+dims its label and icon children with it.
+
+### V.29 `RichTooltipSurface`: the measured canvas
+
+The 0.98 multiplier is Blish's own on the "tooltip" texture (decompiled 1.3.0)
+and independently the live client's: fitting
+`composite = s*artAlpha*artRGB + (1 - s*artAlpha)*scene` to two clean interior
+patches of `live2/k-2` puts `s` at 0.98 and 1.00, residual std about 1
+quantisation level (fidelity-audit, 8.4 closure). Those same patches correlate
+with the texture at `r = 0.983` at the predicted alignment, which is what
+settles that the background is textured rather than flat.
+
+The audit's F5 note suggested 0.82. That number belonged to the flat FILL,
+whose constant carries its own coverage; the texture's alpha channel (mean
+about 0.80) already supplies the transparency, so scaling it again would land
+the box near 0.66 coverage and fail audit H6's no-legible-bleed requirement.
+Measurement wins.
+
+### V.30 `ShoppingBadgeColors`: why only two hues
+
+Every badge used to render in `PillKind.Locked`'s recessed grey, so the column
+said WHICH source only to a reader who stopped to read four capital letters on
+every row. Two hues fix that without spending the accent budget. Reusing an arm
+of `PillColors` would have diluted a vocabulary the tree depends on - green
+means selected, blue owned, amber ignore-active, and none of those means "go to
+a vendor".
+
+### V.31 `SummarySectionRenderer.CreateFormulaBand`
+
+`PlanViewModelBuilder` groups `CostFormulaTile` and `ProfitFormulaTile`
+separately and `Render` re-groups by that same `RowType`, so two bands render
+as two stacked tile rows rather than one: the cost band at
+`SummarySectionLayoutMath.CostBandHeight`, the profit band at
+`PlanContentHeightMath.CostTileRowHeight`.
+
+A lone tile centred on a full-width band reads as a stray caption floating in
+whitespace, and it is the only tile in the section that aligns with nothing
+else in it - the currency table's icon column, the footnote and every section
+title all start at the left. So a collapsed one-tile band is left-aligned at
+the section's own content gutter, keeps the same band height as the three-tile
+case, and simply starts where everything else in the section starts.
+
+Every tile's amount renders at the SAME font; the result tile is picked out by
+`highlightResult` instead, with a tinted, semi-transparent box around its
+caption, note and amount. A promoted `DefaultFont32` was tried and broke the
+band's visual balance. The box is a real `Panel` and the result tile's controls
+are its CHILDREN, so the fill is painted behind them by the container's own
+paint order - no z-index games - and a resize moves one control instead of
+re-centring three runs. Amounts hang one
+`PlanContentHeightMath.CostTileLabelToValueGap` under the measured caption
+line, in every band, so the distance between a caption and the number it names
+is that constant rather than whatever a fixed row height happened to leave
+over.
+
+`currencyNoteText`, when non-null, draws a small disclosure line under the
+RESULT tile's AMOUNT: the plan has costs the coin figure does not include. It
+hangs below the run rather than sitting between caption and run, so it cannot
+push the other tiles' amounts down - they share one `amountY`.
+
+The `-` and `=` operators between tiles are small dim `Label`s centered on each
+boundary, with no tooltip so they never steal hover; without them, same-shaped
+tiles have no visible relationship. They are never drawn for a collapsed
+one-tile band. Only the FINAL boundary's symbol is conditional: there is only
+ever one non-final boundary (`tileCount == 3`), and the left two tiles' own
+subtraction is never in question - only whether the final result tile's
+displayed value is the true right-hand side, which it is not in the profit
+band's loss case.
+
+### V.32 `TooltipFacility`: one surface, and where content lives
+
+Measured, KNOWN-ISSUES #41: `Control.Dispose` does not dispose the control's
+`Tooltip`, and the `Tooltip` is not the control's child, so nothing in Blish
+ever tears one down. A per-control instance on controls this module rebuilds on
+every render would therefore leak one container plus its child tree per row per
+render - hence exactly one rich surface for the whole module, repointed on
+hover.
+
+Content is held in a `ConditionalWeakTable<TKey,TValue>` keyed by the control,
+so the facility never holds a control alive and a disposed row's content is
+collected with it.
+
+`ApplyPlain` routes through `TooltipTextFormat`, the wrap seam this facility
+inherits from the tier-1 tooltip work. `ApplyRich` exists for anything a string
+tooltip could only spell out as "1g 23s 45c", and for every item hover.
+
+### V.33 `TreeSectionController`: heights, in-place refresh, and the pill column
+
+`RefreshTreeContainerHeights` replaced `InvalidateUpToContentPanel`, which only
+repositioned siblings and relied on Blish's `AutoSize` convergence - one nested
+level per real frame - to eventually grow or shrink ancestor containers to
+match. That convergence window was the direct cause of KNOWN-ISSUES #12/#14's
+multi-frame windows.
+
+`TryRefreshInPlace` exists because of the mechanism stated in V.21 above:
+`MouseHandler` holds exactly one pending mouse event and
+`Control.OnLeftMouseButtonReleased` raises `Click` only when that same control
+INSTANCE was primed by its own press, so a frame long enough to contain both
+halves of the next click loses the press. A decision pill's click used to
+re-solve and rebuild every control in the plan, which is what turned into the
+reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
+common case, and the one the field report is about - passes the gate.
+
+The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
+unconditionally adds an "IGNORE" pill, plus "USING N OWNED" when applicable, to
+every ordinary node, on top of its 1-3 source pills. The row cannot grow to
+absorb them: `TreeRowHeight` is a fixed per-row height shared by every
+layout/scroll-height calculation in that file, so there is no wrap and no
+second line. Before `ComputePillFit`, trailing pills were simply dropped with
+nothing on the row to say they had existed - which is what the "+N" pill now
+says.
+
+That "+N" pill is deliberately not wired to a popup offering the hidden
+options. The hidden pills are almost always the trailing annotation and the
+IGNORE toggle, and a real affordance means a new popup or menu surface, with
+its own dismiss, focus and scroll behaviour, hanging off a case that tightened
+padding already resolves most of the time. The tooltip states the fact; the
+desktop gate decides whether the fact needs an affordance.
+
+### V.34 `TreeToolbarCommands`: why the buttons left the section header
+
+The Recipe Tree's action buttons used to sit in the tree's own section header,
+inside the scroll flow - so on a long plan, the moment Collapse All became
+useful was the moment it had scrolled off screen. The buttons moved out to the
+non-scrolling strip; the override/ignore state they act on could not follow,
+which is what this seam carries.
+
+The would-change predicates exist because a dialog that protects nothing
+teaches people to click through dialogs, and a click that changes nothing has
+to say so rather than silently re-solving.
+
+### V.35 `UiFonts`: the ramp and its Blish-facing edges
+
+The ramp is two reading sizes (`Caption` 14, `Body` 16) and three emphatic
+tiers above them (`ColumnHeader`, `SectionTitle`, `Display`), with weight doing
+as much of the work as size. Blish surfaces five sizes as `DefaultFontNN`
+properties; every other size in the installed Menomonia inventory (8-36, bold
+at 8-24 and 36) loads through `ContentService.GetFont`.
+
+Blish's own `Label` default is `DefaultFont14`, so a `Label` this module builds
+without an explicit `Font` renders one step below `Body`. Every label site
+therefore sets one. The three excluded control types stay at that default for
+their own reasons: `Checkbox` exposes no `Font` property at all, and `TextBox`
+and `Dropdown` have internal padding Blish authors against `DefaultFont14`
+while holding typed values rather than module prose.
+
+`FeedbackButton` used to be a fourth exclusion, because `StandardButton`
+exposes no `Font` either. It now declares `Caption` explicitly, so the button's
+size is a decision this ramp made rather than a Blish default it happened to
+match.
+
+### V.36 `UiMetrics.ButtonHeight`: how 28 was picked
+
+Three heights were in use across the tabs: 30 on the Snapshot tab's Clear Cache
+and Refresh Now, 28 on the Log tab's three buttons, Settings' Save and the
+plan's Generate Plan, and 24 on the plan's five Recipe Tree actions and its
+per-row +/- pair. 28 wins on button count, and it is the height of the one
+input row a button already shares - the plan's item row, whose
+`AutocompleteTextBox` and quantity `TextBox` are both 28, beside its +/- pair.
+
+It is not the module's input height, and the constant should not be read as
+having settled that question. `TextBox`es are 26 at nine of their eleven sites
+(Settings' six, the Snapshot and Log search boxes, About's), and the two
+`Dropdown`s outside the plan tab are 30, so the Log toolbar's run is three
+input heights wide before any button is placed.

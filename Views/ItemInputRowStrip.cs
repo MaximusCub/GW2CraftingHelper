@@ -14,14 +14,6 @@ namespace TaimisToolbench.Views
     /// Blish controls each row owns, and the +/- buttons that grow and
     /// shrink it.
     /// <para>
-    /// Lives in <c>Views/</c> rather than <c>Views/Rendering/</c> because
-    /// its controls are <c>AutocompleteTextBox</c>, <c>SuggestionPanel</c>
-    /// and <c>FocusRelease</c>, all of which are <c>Views</c> types -
-    /// putting the strip under <c>Views/Rendering</c> would make that
-    /// folder reference <c>Views</c> and reverse the one-way dependency
-    /// docs/ARCHITECTURE.md section 5 states.
-    /// </para>
-    /// <para>
     /// The strip owns row state and row controls and nothing else. It does
     /// not own the panel it draws into (<c>CraftingPlanView</c> creates and
     /// sizes that as part of the top strip's Y arithmetic) and it does not
@@ -30,6 +22,8 @@ namespace TaimisToolbench.Views
     /// <c>ReflowTopRegion</c>'s job, so the strip raises
     /// <c>onRowCountChanged</c> and lets the view decide what moves.
     /// </para>
+    /// Why it lives in <c>Views/</c> and not <c>Views/Rendering/</c>:
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal sealed class ItemInputRowStrip
     {

@@ -35,28 +35,21 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The per-character-availability column gets a real header: a
-        /// per-row X (varying with each discipline name's width) could
-        /// never line up with a single header position, fixed here by
-        /// computing ONE column X for the whole section - 8 + the widest
-        /// discipline name actually in this section's rows + charGap - and
-        /// passing it into CreateDisciplineRow instead of letting each row
-        /// measure its own nameLabel. Every row's charX is now <= that
-        /// fixed X by construction (it IS the max), so this can never make
-        /// a charLabel overlap its own nameLabel; the "Characters" header
-        /// is only added when at least one row actually has availability
-        /// text to show under it (never both null and non-null in the same
-        /// section in practice - see BuildCharacterAvailabilityText's doc
-        /// comment - but this checks all rows rather than assuming that).
-        /// No change to rowHeight, PlanContentHeightMath, or
-        /// PlanRelayoutMath - NameMaxWidthBeforeColumn's existing 20px
-        /// floor still clamps the ellipsis width on narrow panels exactly
-        /// as it did before.
-        ///
+        /// The per-character-availability column gets a real header, which needs
+        /// ONE column X for the whole section - 8 + the widest discipline name
+        /// actually in this section's rows + charGap - passed into
+        /// CreateDisciplineRow instead of letting each row measure its own
+        /// nameLabel. Every row's charX is &lt;= that fixed X by construction (it
+        /// IS the max), so this can never make a charLabel overlap its own
+        /// nameLabel. The "Characters" header is only added when at least one
+        /// row actually has availability text to show under it.
+        /// <para>
         /// The Level column is pinned to the panel edge
-        /// (PlanRelayoutMath.PinnedRightEdge) and the Characters column is
-        /// the one that flexes into whatever the Discipline column and the
-        /// Level band leave it.
+        /// (PlanRelayoutMath.PinnedRightEdge) and the Characters column is the
+        /// one that flexes into whatever the Discipline column and the Level
+        /// band leave it.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
         {

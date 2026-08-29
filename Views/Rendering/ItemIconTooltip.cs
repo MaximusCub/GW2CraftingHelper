@@ -9,33 +9,22 @@ namespace TaimisToolbench.Views.Rendering
     /// <summary>
     /// What an item icon says on hover, and WHY - the parameter
     /// <see cref="IconControls.CreateItemIcon"/> takes instead of an
-    /// optional trailing tooltip string.
-    ///
+    /// optional trailing tooltip string. The call site has to say which it
+    /// means, and a factory name is what a diff shows.
     /// <para>
-    /// A trailing default could be omitted, and omission looked exactly
-    /// like a deliberate decision not to show one. That is how the Plan
-    /// History tab shipped with item icons that answered nothing at all.
-    /// Here the call site has to say which it means, and a factory name is
-    /// what a diff shows - the same treatment
-    /// <see cref="ItemIconFrame"/> gives the frame colour and
-    /// <see cref="ItemIconTier"/> gives the size.
+    /// SCOPE is the other half of the contract, and this type is where it is
+    /// enforced: the hover belongs to the item's ICON and to nothing else.
+    /// There is no seam that takes a Label or a row Panel, so the only
+    /// control that can carry an item tooltip is the one
+    /// <see cref="IconControls.CreateItemIcon"/> builds - see StampOnIconTree.
     /// </para>
-    ///
     /// <para>
-    /// SCOPE is the other half of the contract, and this type is where it
-    /// is enforced: the hover belongs to the item's ICON and to nothing
-    /// else. There is no seam that takes a Label or a row Panel, so the
-    /// only control that can end up carrying an item tooltip is the one
-    /// <see cref="IconControls.CreateItemIcon"/> builds. See
-    /// <see cref="StampOnIconTree"/>.
-    /// </para>
-    ///
-    /// <para>
-    /// The rich half is always DEFERRED: a stat block can land after the
-    /// row was built (a plan restored from disk tops its stats up in the
+    /// The rich half is always DEFERRED: a stat block can land after the row
+    /// was built (a plan restored from disk tops its stats up in the
     /// background), and content snapshotted at render time could never show
     /// it. See <c>TooltipFacility.ApplyRichDeferred</c>.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal readonly struct ItemIconTooltip
     {

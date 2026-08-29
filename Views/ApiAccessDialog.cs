@@ -10,38 +10,22 @@ using TaimisToolbench.Views.Rendering;
 namespace TaimisToolbench.Views
 {
     /// <summary>
-    /// The "GW2 API access not ready" walkthrough dialog for the
-    /// ApiAccessNotReady snapshot-refresh failure kind (at CHARACTER
-    /// SELECT, Blish has not yet resolved the
-    /// game's Mumble identity, so every account data source call fails
-    /// with an invalid/missing API key, and the Snapshot tab's Refresh Now
-    /// used to show only the unhelpful "Refresh Failed - {time}"). Lists
-    /// the three things a user needs to check, then offers Retry/Close.
+    /// The "GW2 API access not ready" walkthrough for the ApiAccessNotReady
+    /// snapshot-refresh failure kind: at character select Blish has not yet
+    /// resolved the game's Mumble identity, so every account data source
+    /// call fails with an invalid/missing API key. Lists the three things to
+    /// check, then offers Retry/Close.
     /// <para>
-    /// Follows the same StandardWindow construction technique as the
-    /// existing ModalDialog (a 1x1 pixel background stretched to the
-    /// window's own size, TopMost, a stable Id, Show()/Hide() semantics) -
-    /// but is a SEPARATE class rather than a generalization of ModalDialog
-    /// itself: ModalDialog's shape (one short sentence, fixed "Confirm"
-    /// title, a caller-named confirm button beside a fixed Cancel) does
-    /// not fit a multi-line
-    /// numbered checklist with a different title and a Retry/Close pair,
-    /// and its message Label is not wrapped at all - fine for its own
-    /// short sentence, but this dialog's checklist items are full
-    /// sentences that need to wrap. Text is pre-wrapped with Blish HUD's
-    /// own DrawUtil.WrapText (the AboutTabContent.AddInfoLine pattern)
-    /// rather than the Label control's own WrapText property,
-    /// whose wrap width is pinned at the control's first internal layout
-    /// pass - a pass that fires before a later Width assignment in the
-    /// same object initializer would ever take effect (confirmed by
-    /// decompiling the shipped Blish HUD assembly).
+    /// Text is pre-wrapped with Blish HUD's own DrawUtil.WrapText rather
+    /// than the Label control's WrapText property, whose wrap width is
+    /// pinned at the control's first internal layout pass - a pass that
+    /// fires before a later Width assignment in the same object initializer
+    /// takes effect (confirmed by decompiling the shipped assembly).
     /// </para>
-    /// <para>
-    /// Deliberately skips ModalDialog's settings-backed drag position
-    /// persistence: this is a rare error-path dialog, not a workflow the
-    /// user repeatedly opens and repositions, so it simply centers on
-    /// every Show() call - no new ModuleSettings entries needed for it.
-    /// </para>
+    /// Centers on every Show(); it persists no drag position, so it needs no
+    /// ModuleSettings entries. Why this is a separate class rather than a
+    /// generalized ModalDialog: docs/ARCHITECTURE.md, "Views: relocated
+    /// design narrative".
     /// </summary>
     internal class ApiAccessDialog : IDisposable
     {

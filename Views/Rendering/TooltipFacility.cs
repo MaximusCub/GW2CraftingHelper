@@ -8,43 +8,23 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The module's single choke point for tooltips. Sizing, wrapping,
-    /// placement and opacity are solved here once instead of being
-    /// re-implemented, or silently not implemented, at each of the ~40
-    /// call sites that show one.
-    ///
-    /// Two paths, and the choice between them is about the CONTENT, not
-    /// the caller:
+    /// placement and opacity are solved here once instead of at each of the
+    /// ~40 call sites. Two paths, and the choice is about the CONTENT:
     /// <list type="bullet">
-    /// <item><description><see cref="ApplyPlain"/> - composed or long
-    /// prose. Routed through <see cref="TooltipTextFormat"/> (the wrap seam
-    /// this facility inherits from the tier-1 tooltip work) and handed to
-    /// Blish's <c>BasicTooltipText</c>. A bare one-line literal - a button
-    /// label - does not need the facility and may stay a direct
-    /// assignment.</description></item>
-    /// <item><description><see cref="ApplyRich"/> - anything containing a
-    /// coin amount, which a string tooltip can only spell out as
-    /// "1g 23s 45c", and every item hover. Rendered by
-    /// <see cref="RichTooltipSurface"/> with real coin icons (RIGHT of
-    /// their numbers), on the game's own tooltip canvas, with a four-edge
-    /// screen clamp Blish's own tooltip positioning does not
-    /// have.</description></item>
-    /// <item><description><see cref="ApplyRichDeferred"/> - the same
-    /// surface, for content whose INPUTS can change after the control was
-    /// built (an item's stat block arriving from a background fetch) or
-    /// that is not worth composing until someone points at the
-    /// row.</description></item>
+    /// <item><description><see cref="ApplyPlain"/> - composed or long prose,
+    /// routed through <see cref="TooltipTextFormat"/> into Blish's
+    /// <c>BasicTooltipText</c>. A bare literal may stay direct.</description></item>
+    /// <item><description><see cref="ApplyRich"/> - anything with a coin
+    /// amount, and every item hover. Rendered by
+    /// <see cref="RichTooltipSurface"/> on the game's own canvas with real
+    /// coin icons and a four-edge screen clamp Blish lacks.</description></item>
+    /// <item><description><see cref="ApplyRichDeferred"/> - the same surface,
+    /// for content whose INPUTS can change after the control was
+    /// built.</description></item>
     /// </list>
-    ///
-    /// LIFECYCLE (measured, see KNOWN-ISSUES #41):
-    /// there is exactly ONE rich surface for the whole module, repointed on
-    /// hover. <c>Control.Dispose</c> does not dispose the control's
-    /// <c>Tooltip</c>, and the Tooltip is not the control's child, so
-    /// nothing in Blish ever tears one down; a per-control instance on
-    /// controls this module rebuilds on every render would leak one
-    /// container plus its child tree per row per render. Content is held in
-    /// a <see cref="ConditionalWeakTable{TKey,TValue}"/> keyed by the
-    /// control, so the facility never holds a control alive and a disposed
-    /// row's content is collected with it.
+    /// There is exactly ONE rich surface for the whole module, repointed on
+    /// hover, because nothing in Blish ever tears a Tooltip down (measured,
+    /// KNOWN-ISSUES #41). docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class TooltipFacility
     {

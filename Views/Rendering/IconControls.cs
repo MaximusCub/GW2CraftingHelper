@@ -28,34 +28,24 @@ namespace TaimisToolbench.Views.Rendering
         // --- Icon helper ---
 
         /// <summary>
-        /// THE item icon. Every framed icon in the module is built here, at
-        /// a NAMED <see cref="ItemIconTier"/>, with an explicit
+        /// THE item icon. Every framed icon in the module is built here, at a
+        /// NAMED <see cref="ItemIconTier"/>, with an explicit
         /// <see cref="ItemIconFrame"/> and an explicit
-        /// <see cref="ItemIconTooltip"/> - no bare pixel size, no bare
-        /// rarity string, no optional trailing tooltip, no defaults. All
-        /// three halves of that rule exist because all three were opt-in
-        /// before and all three silently drifted: eleven call sites each
-        /// chose their own size, a call site with no rarity to hand looked
-        /// identical to one that had looked and found none, and an icon
-        /// with no hover looked identical to one that had decided against
-        /// showing one.
-        ///
+        /// <see cref="ItemIconTooltip"/> - no defaults of any kind.
         /// <para>
         /// The frame's thickness comes from the tier
-        /// (<c>ItemIconTiers.BorderThickness</c>), never from the caller, so
-        /// two icons at the same tier cannot differ. Reserve room with
-        /// <c>ItemIconTiers.FrameSize(tier)</c> - art plus both borders -
-        /// rather than restating the sum.
+        /// (<c>ItemIconTiers.BorderThickness</c>), never from the caller, so two
+        /// icons at the same tier cannot differ. Reserve room with
+        /// <c>ItemIconTiers.FrameSize(tier)</c> - art plus both borders.
         /// </para>
-        ///
         /// <para>
-        /// Returns the outer frame Panel so a caller whose icon position
-        /// depends on panelWidth (currently only the plan header's centered
-        /// title) can reposition it on relayout without recreating it. The
-        /// hover is stamped on the WHOLE tree here, so a caller cannot
-        /// build an icon and then forget it - it can only decide, out loud,
-        /// that the icon stays silent.
+        /// Returns the outer frame Panel so a caller whose icon position depends
+        /// on panelWidth (currently only the plan header's centered title) can
+        /// reposition it without recreating it. The hover is stamped on the
+        /// WHOLE tree here, so a caller cannot build an icon and forget it - it
+        /// can only decide, out loud, that the icon stays silent.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, ItemIconFrame frame, int x, int y,
@@ -242,26 +232,22 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Stamps a deferred rich builder on a framed icon AND everything
-        /// nested inside it. Blish resolves a tooltip on the deepest control
-        /// under the cursor and never bubbles to the parent, so stamping the
-        /// frame alone leaves the hover swallowed by the icon square that
-        /// covers all but its border - and the square swallowed in turn by
-        /// its missing-icon placeholder mark.
+        /// Stamps a deferred rich builder on a framed icon AND everything nested
+        /// inside it. Blish resolves a tooltip on the deepest control under the
+        /// cursor and never bubbles to the parent, so stamping the frame alone
+        /// leaves the hover swallowed by the icon square that covers all but its
+        /// border - and the square swallowed in turn by its missing-icon
+        /// placeholder mark.
         /// <para>
-        /// It cannot skip an empty payload, because nothing is composed yet
-        /// - a row having a real item id does NOT make its builder
-        /// non-empty. What keeps the icon's own note ("no icon available
-        /// for this entry", a currency name) from being replaced with
-        /// silence is <c>TooltipFacility</c>, which captures each control's
-        /// plain text as the builder's fallback.
+        /// It cannot skip an empty payload, because nothing is composed yet - a
+        /// row having a real item id does NOT make its builder non-empty. What
+        /// keeps the icon's own note from being replaced with silence is
+        /// <c>TooltipFacility</c>, which captures each control's plain text as
+        /// the builder's fallback.
         /// </para>
-        /// <para>
-        /// Reached through <see cref="ItemIconTooltip.StampOnIconTree"/>, which
-        /// is what call sites name; there is deliberately no eager or
-        /// plain-text twin, because either would be a way to give an icon a
-        /// hover without saying so at the call site.
-        /// </para>
+        /// Reached through <see cref="ItemIconTooltip.StampOnIconTree"/>; there
+        /// is deliberately no eager or plain-text twin. Why:
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal static void ApplyRichDeferredToIconTree(Control control, System.Func<TooltipContent> build)
         {

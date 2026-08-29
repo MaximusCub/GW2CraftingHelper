@@ -190,72 +190,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// A formula band - N equal-width stat tiles reading
-        /// left-to-right as a formula ("Total Materials Value - Your
-        /// Materials Used = Actual Cost to Craft", or "Sell Value - Total
-        /// Materials Value = Profit if Sold"). Callers pass exactly the
-        /// rows belonging to ONE band (PlanViewModelBuilder groups
-        /// CostFormulaTile/ProfitFormulaTile separately, and Render above
-        /// re-groups by that same RowType), so two bands render as two
-        /// stacked tile rows, not one - the cost band at
-        /// SummarySectionLayoutMath.CostBandHeight and the profit band at
-        /// PlanContentHeightMath.CostTileRowHeight. rowHeight is the
-        /// caller's, not this method's, so BodyHeight and the row panel
-        /// built here are always the same number by construction; see
-        /// Services/SummarySectionLayoutMath.BodyHeight.
-        ///
-        /// Geometry matches ComputeCostTileGeometry's tile layout - EXCEPT
-        /// for a collapsed one-tile band, which is left-aligned at the
-        /// section's own content gutter instead of centred. A lone tile
-        /// centred on a full-width band reads as a stray caption floating
-        /// in whitespace, and it is the only tile in this section that
-        /// does not align with anything else in it (the currency table's
-        /// icon column, the footnote and every section title all start at
-        /// the left). It gets the same band height as the three-tile case
-        /// and simply starts where everything else in the section starts.
-        ///
-        /// Every tile's amount renders at the SAME font; the result tile is
-        /// picked out by highlightResult instead - a tinted,
-        /// semi-transparent box around its caption+note+amount, which draws
-        /// the eye without breaking the band's visual balance (a promoted
-        /// DefaultFont32 was tried and did break it). The box is a real Panel
-        /// and the result
-        /// tile's controls are its CHILDREN, so the fill is painted behind
-        /// them by the container's own paint order (no z-index games) and a
-        /// resize moves one control instead of re-centring three runs.
-        /// Amounts hang one PlanContentHeightMath.CostTileLabelToValueGap
-        /// under the measured caption line, in every band, so the distance
-        /// between a caption and the number it names is that constant
-        /// rather than whatever a fixed row height happened to leave over.
-        ///
-        /// currencyNoteText, when non-null, draws a small disclosure line
-        /// under the RESULT tile's AMOUNT - the plan has costs the coin
-        /// figure does not include. It hangs below the run rather than
-        /// sitting between caption and run, so it cannot push the other
-        /// tiles' amounts down (they share one amountY). rowHeight must
-        /// already account for it
-        /// (SummarySectionLayoutMath.CostBandHeight).
-        ///
-        /// row.TooltipText is set directly on captionLabel itself, not on
-        /// rowPanel, so hovering the header text always shows it
-        /// regardless of overlapping controls.
-        ///
-        /// The "-"/"=" formula operators between tiles are drawn as small
-        /// dim Labels centered on each boundary (no tooltip, so they
-        /// never steal hover) - without them, same-shaped tiles have no
-        /// visible relationship. Never drawn for a collapsed 1-tile band.
-        ///
-        /// The final boundary's symbol is not an unconditional "=": it
-        /// reads the rightmost tile's PlanRowViewModel.FormulaResultIsExact
-        /// and draws NeutralResultSeparator when false - the profit band's
-        /// loss case, where the rightmost tile
-        /// deliberately shows Math.Abs(profit) under a "Loss if Sold"
-        /// caption, so "left - middle = <abs loss>" would be an
-        /// arithmetically false equation as drawn. Every other boundary
-        /// (there is only ever one non-final boundary, tileCount == 3)
-        /// keeps its unconditional "-": the left two tiles' own
-        /// subtraction is never in question, only whether the FINAL
-        /// result tile's displayed value is the true right-hand side.
+        /// A formula band - N equal-width stat tiles reading left-to-right as a
+        /// formula ("Sell Value - Total Materials Value = Profit if Sold").
+        /// Callers pass the rows of exactly ONE band, and rowHeight is the
+        /// caller's, so BodyHeight and the row panel built here are the same
+        /// number by construction - see SummarySectionLayoutMath.BodyHeight,
+        /// which must also account for currencyNoteText.
+        /// <para>
+        /// Geometry matches ComputeCostTileGeometry EXCEPT for a collapsed
+        /// one-tile band, left-aligned at the section's content gutter instead
+        /// of centred. row.TooltipText goes on captionLabel, not rowPanel.
+        /// </para>
+        /// <para>
+        /// The final boundary's symbol is not an unconditional "=": it reads the
+        /// rightmost tile's PlanRowViewModel.FormulaResultIsExact and draws
+        /// NeutralResultSeparator when false, because the profit band's loss
+        /// case shows Math.Abs(profit) and "=" would be false as drawn.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void CreateFormulaBand(
             List<PlanRowViewModel> tileRows, FlowPanel parent, int panelWidth,

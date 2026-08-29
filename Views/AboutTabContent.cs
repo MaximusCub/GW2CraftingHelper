@@ -16,37 +16,21 @@ using TaimisToolbench.Views.Rendering;
 namespace TaimisToolbench.Views
 {
     /// <summary>
-    /// The About tab: static,
-    /// mostly-derived information about the module itself - name, version,
-    /// author/contributors, source URL, the Blish HUD version it targets,
-    /// this repo's own license, a Blish HUD MIT-license credit line, and
-    /// the module's data directory (useful when a user needs to attach
-    /// snapshot.json/status.json/etc. to a bug report). Same shape as
-    /// LogTabContent.cs: one FlowPanel(CanScroll),
-    /// Build(Container) populates it once, no relayout registry
-    /// - nothing here is interactive beyond plain
-    /// selectable/copyable text, so there is nothing to keep "sticky"
-    /// across tab revisits (see MainView.cs's own cross-cutting note on
-    /// rebuild-per-visit).
+    /// The About tab: static, mostly-derived information about the module
+    /// itself - name, version, author/contributors, source URL, the Blish
+    /// HUD version it targets, this repo's own license, a Blish HUD MIT
+    /// credit line, and the module's data directory (which a user needs
+    /// when attaching snapshot.json/status.json to a bug report).
     /// <para>
-    /// Name/version/author/url/description/dependencies are read live from
-    /// ModuleParameters.Manifest - the exact same object Blish HUD itself
-    /// already parsed and validated in order to even load this module, so
-    /// under normal operation this read cannot fail - with a defensive
-    /// fallback to hand-parsing the packaged manifest.json if it ever does
-    /// (null Manifest, an unexpectedly blank Name, or any exception).
-    /// Mirrors the try/catch-with-graceful-fallback shape already used four
-    /// times in Module.Initialize() for seed files.
+    /// Manifest fields are read live from ModuleParameters.Manifest, with a
+    /// hand-parse of the packaged manifest.json as the fallback. Version
+    /// and a dependency's VersionRange are typed SemVer.Version/SemVer.Range
+    /// from a package Blish embeds via Costura and this project has no
+    /// compile-time reference to, so those two are read by reflection
+    /// (ToString() only) - a direct property access will not compile.
     /// </para>
-    /// <para>
-    /// Two of Manifest's own properties (Version, and a dependency's
-    /// VersionRange) are typed as SemVer.Version/SemVer.Range from the
-    /// external "SemVer" NuGet package that Blish HUD embeds via Costura at
-    /// runtime - this project has no compile-time reference to that
-    /// package, so those two fields are read via reflection (ToString()
-    /// only) instead of a direct property access, to avoid adding a new
-    /// package reference for a two-field, display-only read.
-    /// </para>
+    /// Why the fallback exists and why the tab rebuilds per visit:
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal class AboutTabContent
     {

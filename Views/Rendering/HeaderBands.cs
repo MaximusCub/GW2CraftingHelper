@@ -11,28 +11,16 @@ namespace TaimisToolbench.Views.Rendering
     /// band, and both are drawn from here: the TAB TITLE band a tab wears at
     /// the top of its view, and the COLUMN HEADER band a table wears above
     /// its rows. Section titles are the third tier and deliberately carry no
-    /// band at all - a rule and the SectionTitle face, so the tab title
+    /// band at all - a rule and the SectionTitle face - so the tab title
     /// still reads as the top of the hierarchy when six section headings are
     /// stacked in one scroll.
-    ///
     /// <para>
-    /// <b>This is a factory, not a vocabulary.</b> Its predecessor exposed
-    /// the band colour as a constant and let eight call sites each build
-    /// their own <c>Panel</c> from it; seven of the eight did, and only one
-    /// went through a shared renderer, which is the same opt-in-helper
-    /// failure the module already paid for on icon sizes. The colour and the
-    /// texture are private here, so there is nothing for a ninth site to
-    /// hand-roll a band out of.
+    /// This is a factory, not a vocabulary: the colour and the texture are
+    /// private here, so there is nothing for a ninth call site to hand-roll
+    /// a band out of.
     /// </para>
-    ///
-    /// <para>
-    /// <b>Why a band at all.</b> Four of the plan tab's five original
-    /// headers already drew one, so unifying the other way would have
-    /// rewritten the majority to match the minority; and every table row in
-    /// this module already carries a 2px divider and, in most tables, an
-    /// icon, so an unbanded header in a lighter grey reads as a faint first
-    /// data row rather than as a header.
-    /// </para>
+    /// Why a band at all, and what the opt-in-helper predecessor cost:
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class HeaderBands
     {
