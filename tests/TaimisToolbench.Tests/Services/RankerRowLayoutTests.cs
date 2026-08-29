@@ -635,6 +635,140 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // ---------------------------------------------------------------
+        // ONE TRACK PER DATA COLUMN, and the header centres on the same one
+        // its cells do. Right-aligning both lines them up only at that edge,
+        // so a short header over wide cells reads as belonging to the column
+        // on its right - reported twice against this table ("Status" nowhere
+        // near the chips, "Remaining" nowhere near the gold).
+        // ---------------------------------------------------------------
+        [Theory]
+        [MemberData(nameof(RealWidthsBothOrderings))]
+        public void EachDataColumnsTrackIsTheBandItsHeaderAndItsCellsShare(
+            int rowWidth, bool showReorder)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130, showReorder);
+
+            bands.DataTrack(RankerRowLayout.StatusColumn, out int statusX, out int statusWidth);
+            bands.DataTrack(RankerRowLayout.ReadyColumn, out int readyX, out int readyWidth);
+            bands.DataTrack(RankerRowLayout.DaysColumn, out int daysX, out int daysWidth);
+            bands.DataTrack(RankerRowLayout.RemainingColumn, out int coinX, out int coinWidth);
+
+            // Each track is the published band, so nothing can read the
+            // column's edges two ways.
+            Assert.Equal(bands.StatusX, statusX);
+            Assert.Equal(bands.StatusWidth, statusWidth);
+            Assert.Equal(bands.ReadyBarX, readyX);
+            Assert.Equal(bands.ReadyBarWidth, readyWidth);
+            Assert.Equal(bands.DaysTrackX, daysX);
+            Assert.Equal(bands.DaysRightEdge, daysX + daysWidth);
+            Assert.Equal(bands.RemainingTrackX, coinX);
+            Assert.Equal(bands.RemainingRightEdge, coinX + coinWidth);
+
+            // Left to right, in order, never overlapping.
+            Assert.True(statusX + statusWidth <= readyX);
+            Assert.True(readyX + readyWidth <= daysX);
+            Assert.True(daysX + daysWidth <= coinX);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void UnderDistribution_TheFourTracksTileTheDataSpanWithNoGapButTheirOwn(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130);
+            Assert.True(bands.Distributed);
+
+            // Status's track is its band plus the one CellGap that keeps a
+            // chip off the bar beside it; the other three meet edge to edge.
+            bands.DataTrack(RankerRowLayout.StatusColumn, out int statusX, out int statusWidth);
+            bands.DataTrack(RankerRowLayout.ReadyColumn, out int readyX, out _);
+            bands.DataTrack(RankerRowLayout.DaysColumn, out int daysX, out _);
+            bands.DataTrack(RankerRowLayout.RemainingColumn, out int coinX, out _);
+
+            Assert.Equal(statusX + statusWidth + RankerRowLayout.CellGap, readyX);
+            Assert.Equal(bands.ReadyRightEdge, daysX);
+            Assert.Equal(bands.DaysRightEdge, coinX);
+        }
+
+        [Theory]
+        [MemberData(nameof(RealWidths))]
+        public void AHeaderAndTheCellUnderIt_ShareOneCentreRatherThanOneEdge(int rowWidth)
+        {
+            // The reported miss, in arithmetic: a bold "Status" is ~62px and
+            // an "Affordable now" chip ~130, so the two agree on a centre and
+            // on nothing else. Both are placed by the ONE shared law.
+            var bands = RankerRowLayout.Compute(rowWidth, 137, 130);
+            const int HeaderWidth = 62;
+            const int CellWidth = 130;
+
+            for (int column = 0; column < RankerRowLayout.DataColumnCount; column++)
+            {
+                bands.DataTrack(column, out int trackX, out int trackWidth);
+                int header = JustifiedColumnTracks.CenteredX(
+                    trackX, trackWidth, 1, 0, HeaderWidth);
+                int cell = JustifiedColumnTracks.CenteredX(trackX, trackWidth, 1, 0, CellWidth);
+
+                // Integer halving can leave one pixel between two centres.
+                Assert.True(
+                    Math.Abs((header + (HeaderWidth / 2)) - (cell + (CellWidth / 2))) <= 1,
+                    "column " + column + ": " + header + " vs " + cell);
+
+                // And both sit inside the track they name.
+                Assert.True(header >= trackX);
+                Assert.True(header + HeaderWidth <= trackX + trackWidth);
+                Assert.True(cell >= trackX);
+                Assert.True(cell + CellWidth <= trackX + trackWidth);
+            }
+        }
+
+        [Fact]
+        public void InThePackedFallback_ATrackIsTheBandThatColumnReserves()
+        {
+            // Centring is regime-independent: the packed stack hands the view
+            // the same shape of track, just one measured off reserved widths
+            // instead of off equal shares.
+            var packed = RankerRowLayout.Compute(700, 180, 150);
+            Assert.False(packed.Distributed);
+
+            packed.DataTrack(RankerRowLayout.StatusColumn, out _, out int statusWidth);
+            packed.DataTrack(RankerRowLayout.ReadyColumn, out _, out int readyWidth);
+            packed.DataTrack(RankerRowLayout.DaysColumn, out _, out int daysWidth);
+            packed.DataTrack(RankerRowLayout.RemainingColumn, out _, out int coinWidth);
+
+            Assert.Equal(150, statusWidth);
+            Assert.Equal(RankerRowLayout.ReadyCellWidth, readyWidth);
+            Assert.Equal(RankerRowLayout.DaysCellWidth, daysWidth);
+            Assert.Equal(180, coinWidth);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(RankerRowLayout.DataColumnCount)]
+        [InlineData(99)]
+        public void DataTrack_OutOfRange_ReturnsZeroWidth(int column)
+        {
+            var bands = RankerRowLayout.Compute(1200, 137, 130);
+
+            bands.DataTrack(column, out _, out int width);
+
+            Assert.Equal(0, width);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(120)]
+        public void DegenerateWidths_LeaveNoNegativeTrack(int rowWidth)
+        {
+            var bands = RankerRowLayout.Compute(rowWidth, 120);
+
+            for (int column = 0; column < RankerRowLayout.DataColumnCount; column++)
+            {
+                bands.DataTrack(column, out _, out int width);
+                Assert.True(width >= 0);
+            }
+        }
+
+        // ---------------------------------------------------------------
         // The gate strip's bars. Each cell is a fixed label band, then a
         // bar filling the rest of the cell - the dead space the owner
         // flagged between a gate's name and its right-aligned percentage.

@@ -778,14 +778,54 @@ namespace TaimisToolbench.Views
             SetHeaderLabel(0, bands.RankX);
             SetHeaderLabel(1, bands.NameX);
 
-            // Status is the one LEFT-aligned data column: its content is a
-            // variable-width badge, and a badge that shares a right edge
-            // down the column starts at a different x on every row, which is
-            // the alignment the column was asked for in the first place.
-            SetHeaderLabel(2, bands.StatusX);
-            SetHeaderLabelRight(3, bands.ReadyRightEdge);
-            SetHeaderLabelRight(4, bands.DaysRightEdge);
-            SetHeaderLabelRight(5, bands.RemainingRightEdge);
+            // The four data columns centre their header on the same track
+            // their cells centre on, which is what puts a header over the
+            // values it names. The rank and the item name stay left-aligned:
+            // they are the row's index and its subject, and both read down
+            // the table from one rail.
+            for (int column = 0; column < RankerRowLayout.DataColumnCount; column++)
+            {
+                var label = _columnHeaderLabels.Count > FirstDataColumnHeader + column
+                    ? _columnHeaderLabels[FirstDataColumnHeader + column]
+                    : null;
+                if (label != null)
+                {
+                    label.Location = new Point(
+                        CenteredInColumn(bands, column, label.Width), ColumnHeaderLabelY);
+                }
+            }
+        }
+
+        /// <summary>Index of the Status header in <see cref="ColumnHeaders"/>.</summary>
+        private const int FirstDataColumnHeader = 2;
+
+        /// <summary>
+        /// X at which content of <paramref name="contentWidth"/> centres in
+        /// data column <paramref name="column"/>. One track, one centring
+        /// law (Services/JustifiedColumnTracks) for the header and for the
+        /// cells under it - a second copy is how the two drift apart, which
+        /// is the drift this replaced.
+        /// </summary>
+        private static int CenteredInColumn(
+            in RankerRowLayout.Bands bands, int column, int contentWidth)
+        {
+            bands.DataTrack(column, out int trackX, out int trackWidth);
+            return Math.Max(0, JustifiedColumnTracks.CenteredX(
+                trackX, trackWidth, 1, 0, contentWidth));
+        }
+
+        /// <summary>
+        /// The right edge that centres this row's coin run in the Remaining
+        /// column. CoinCurrencyRenderer lays a value cell out from its right
+        /// edge, and RemainingCellWidth is the very measurement it lays out
+        /// from (MeasureRowCells), so the two cannot disagree about where
+        /// the run starts.
+        /// </summary>
+        private static int RemainingCellRightEdge(in RankerRowLayout.Bands bands, RenderedRow row)
+        {
+            return CenteredInColumn(
+                bands, RankerRowLayout.RemainingColumn, row.RemainingCellWidth)
+                + row.RemainingCellWidth;
         }
 
         /// <summary>
@@ -816,17 +856,6 @@ namespace TaimisToolbench.Views
             {
                 _columnHeaderLabels[index].Location = new Point(x, ColumnHeaderLabelY);
             }
-        }
-
-        private void SetHeaderLabelRight(int index, int rightEdge)
-        {
-            if (index >= _columnHeaderLabels.Count)
-            {
-                return;
-            }
-
-            var label = _columnHeaderLabels[index];
-            label.Location = new Point(Math.Max(0, rightEdge - label.Width), ColumnHeaderLabelY);
         }
 
         // ---------------------------------------------------------------
@@ -1305,17 +1334,22 @@ namespace TaimisToolbench.Views
                 bands.NameX + bands.NameWidth, 0, 0, bands.NameX, MainLineNameY,
                 hover, iconSize: RankerRowLayout.IconSize);
 
+            // Chip and placeholder are both exactly StatusCellWidth wide
+            // (MeasureRowCells measures whichever of the two this row has),
+            // so one centred x serves both.
+            int statusX = CenteredInColumn(
+                bands, RankerRowLayout.StatusColumn, row.StatusCellWidth);
             if (chipText != null)
             {
                 ChipColors(metrics, out Color chipBorder, out Color chipFill);
                 row.StatusChip = LabelHelpers.CreateSmallTag(
-                    row.Panel, chipText, bands.StatusX, MainLineChipY, chipBorder, chipFill);
+                    row.Panel, chipText, statusX, MainLineChipY, chipBorder, chipFill);
                 LabelHelpers.ApplyTagTooltip(row.StatusChip, ChipTooltip(metrics));
             }
             else
             {
                 row.StatusPlaceholder = CreateUnknownCell(
-                    row.Panel, bands.StatusX, MainLineTextY, StatusPlaceholderTooltip(metrics));
+                    row.Panel, statusX, MainLineTextY, StatusPlaceholderTooltip(metrics));
             }
 
             RenderReadyCell(row, bands, metrics);
@@ -1354,7 +1388,7 @@ namespace TaimisToolbench.Views
                 // gw2e-style "not sold or craftable" case and would claim
                 // something this row is not saying.
                 row.RemainingCell = CoinCurrencyRenderer.RenderZeroValueCellRightAligned(
-                    row.Panel, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
+                    row.Panel, RemainingCellRightEdge(bands, row), MainLineTextY, UiFonts.Body);
                 foreach (var segment in row.RemainingCell.CoinSegments.Controls)
                 {
                     // The NUMBER only. The coin beside it already carries its
@@ -1368,7 +1402,8 @@ namespace TaimisToolbench.Views
             else
             {
                 row.RemainingCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
+                    row.Panel, metrics.RemainingCoinCost, null,
+                    RemainingCellRightEdge(bands, row), MainLineTextY, UiFonts.Body);
             }
 
             row.Up = null;
@@ -1436,9 +1471,11 @@ namespace TaimisToolbench.Views
             }
 
             // No bar: the unmeasured dash and the non-numeric verdict both
-            // right-align on the column's rail, under its header.
+            // centre on the column's track, where a bar's own percentage
+            // would have been.
             row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
+                CenteredInColumn(bands, RankerRowLayout.ReadyColumn, row.ReadyLabel.Width),
+                MainLineTextY);
         }
 
         /// <summary>
@@ -1810,28 +1847,39 @@ namespace TaimisToolbench.Views
 
             if (row.StatusChip != null)
             {
-                row.StatusChip.Location = new Point(bands.StatusX, MainLineChipY);
+                row.StatusChip.Location = new Point(
+                    CenteredInColumn(bands, RankerRowLayout.StatusColumn, row.StatusChip.Width),
+                    MainLineChipY);
             }
 
             if (row.StatusPlaceholder != null)
             {
-                row.StatusPlaceholder.Location = new Point(bands.StatusX, MainLineTextY);
+                row.StatusPlaceholder.Location = new Point(
+                    CenteredInColumn(
+                        bands, RankerRowLayout.StatusColumn, row.StatusPlaceholder.Width),
+                    MainLineTextY);
             }
 
             LayoutReadyCell(row, bands);
 
             row.DaysLabel.Location = new Point(
-                Math.Max(0, bands.DaysRightEdge - row.DaysLabel.Width), MainLineTextY);
+                CenteredInColumn(bands, RankerRowLayout.DaysColumn, row.DaysLabel.Width),
+                MainLineTextY);
 
             if (row.RemainingDash != null)
             {
                 row.RemainingDash.Location = new Point(
-                    Math.Max(0, bands.RemainingRightEdge - row.RemainingDash.Width), MainLineTextY);
+                    CenteredInColumn(
+                        bands, RankerRowLayout.RemainingColumn, row.RemainingDash.Width),
+                    MainLineTextY);
             }
             else if (row.RemainingCell != null)
             {
+                // The coin run is laid out from its RIGHT edge, so centring
+                // it means handing the renderer the right edge a centred run
+                // of this row's measured width would have.
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(
-                    row.RemainingCell, bands.RemainingRightEdge, MainLineTextY);
+                    row.RemainingCell, RemainingCellRightEdge(bands, row), MainLineTextY);
             }
 
             if (row.Up != null)
