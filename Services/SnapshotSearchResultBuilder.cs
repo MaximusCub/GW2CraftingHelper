@@ -34,29 +34,21 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The extra line the Snapshot tab's "No items match ..." message
-        /// carries when <see cref="MinCharacterSearchLength"/> is the reason
-        /// the list is empty, and null in every other case.
+        /// carries when <see cref="MinCharacterSearchLength"/> is the reason the
+        /// list is empty, and null in every other case.
         /// <para>
-        /// The hold-back is deliberate but invisible: a one-letter query
-        /// that a character's name does contain looks like a plain
-        /// no-results, so the user reads the tab as broken rather than as
-        /// waiting for a second letter. The line is emitted ONLY on that
-        /// exact case - a query shorter than the minimum, and a roster
-        /// character whose name really would match it at the next keystroke
-        /// - so it never appears as boilerplate under an ordinary empty
-        /// result.
-        /// </para>
-        /// <para>
-        /// A character the source filter has unchecked is not a match:
-        /// typing another letter would still not surface it, and a hint
+        /// Emitted ONLY on that exact case - a query shorter than the minimum,
+        /// and a roster character whose name really would match it at the next
+        /// keystroke - so it never appears as boilerplate under an ordinary
+        /// empty result. A character the source filter has unchecked is not a
+        /// match: typing another letter would still not surface it, and a hint
         /// that promises otherwise is worse than none. That is why the
-        /// exclusion set is a parameter rather than assumed empty - it is
-        /// the same set <see cref="SnapshotSourceFilter.UncheckedCharacters"/>
-        /// carries, taken directly so the caller need not build a whole
-        /// filter for a read. No id is involved: the hint names no
-        /// character at all, and this tab already shows character NAMES in
-        /// its own checkboxes and row breakdowns.
+        /// exclusion set is a parameter rather than assumed empty - it is the
+        /// same set <see cref="SnapshotSourceFilter.UncheckedCharacters"/>
+        /// carries. No id is involved: the hint names no character at all.
         /// </para>
+        /// <para>Why the hold-back needs a hint at all: docs/ARCHITECTURE.md,
+        /// "Services Q-Z: relocated design narrative".</para>
         /// </summary>
         public static string ShortQueryCharacterHint(
             string searchText, IReadOnlyList<string> characterNames,
@@ -146,42 +138,22 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
         /// <paramref name="itemsById"/> that (a) matches
-        /// <paramref name="searchText"/> by case-insensitive substring
-        /// against the item's own name OR - for queries of at least
-        /// <see cref="MinCharacterSearchLength"/> characters - against the
-        /// name of a character holding it (Feature 1 Open Question 2,
-        /// resolved in favor of source-label matching; storage-location
-        /// labels stay unmatched)
-        /// and (b) has a positive total once <paramref name="sourceFilter"/>
-        /// has excluded any unchecked sources. An item with zero quantity
-        /// across the checked sources drops out of the list entirely
-        /// rather than appearing as a zero-count row.
+        /// <paramref name="searchText"/> by case-insensitive substring against
+        /// the item's own name OR - for queries of at least
+        /// <see cref="MinCharacterSearchLength"/> characters - against the name
+        /// of a character holding it, and (b) has a positive total once
+        /// <paramref name="sourceFilter"/> has excluded any unchecked sources.
+        /// An item with zero quantity across the checked sources drops out.
         /// <para>
-        /// The two compose as a plain AND: only sources that survive the
-        /// filter are consulted for the character match, so an unchecked
-        /// character's rows stay hidden even when its own name is typed. A
-        /// row surfaced by a character match still reports the account-wide
-        /// total and full breakdown across the checked sources, not just the
-        /// matched character's share - the matched character appears in the
-        /// breakdown either way, and the total keeps meaning the same thing
-        /// on every row in the list.
+        /// The two compose as a plain AND: only sources that survive the filter
+        /// are consulted for the character match, so an unchecked character's
+        /// rows stay hidden even when its own name is typed. A row surfaced by
+        /// a character match still reports the account-wide total and full
+        /// breakdown across the checked sources. Rows are sorted by name
+        /// (ordinal, case-insensitive). Returns an empty list, never null.
         /// </para>
-        /// Rows are sorted by
-        /// name (ordinal, case-insensitive) for a stable, predictable
-        /// order across rebuilds. Returns an empty list, never null, for
-        /// null/empty <paramref name="itemsById"/> or a null
-        /// <paramref name="index"/>.
-        /// <para>
-        /// <paramref name="itemsById"/> is the already-deduped itemId -&gt;
-        /// representative-entry map (see <see cref="BuildRepresentativeIndex"/>)
-        /// - this method never re-scans the raw per-source entry list
-        /// itself, so it stays cheap to call on every keystroke as long as
-        /// the caller builds the map once per snapshot rather than once
-        /// per call. Character matching costs a full source walk for every
-        /// item whose name does not match, where a name-only search could
-        /// skip straight past it; that is bounded above by the empty-search
-        /// rebuild, which already walks every source of every item.
-        /// </para>
+        /// <para>What itemsById must be, and what character matching costs:
+        /// docs/ARCHITECTURE.md, S2.5.</para>
         /// </summary>
         public static List<SnapshotSearchRow> BuildItemRows(
             IReadOnlyDictionary<int, SnapshotItemEntry> itemsById,

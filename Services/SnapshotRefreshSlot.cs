@@ -3,33 +3,22 @@ using System.Threading;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The single-fetch slot the account-snapshot refresh runs in: at most
-    /// one refresh owns it at a time, and it owns that refresh's
+    /// The single-fetch slot the account-snapshot refresh runs in: at most one
+    /// refresh owns it at a time, and it owns that refresh's
     /// CancellationTokenSource.
-    /// <para>
-    /// Three threads reach Module's two refresh entry points - LoadAsync on a
-    /// ThreadPool task, Update() on the main thread, and OnSubtokenUpdated on
-    /// a thread the module does not control - and both entry points used to
-    /// gate on a check-then-set over a <c>volatile bool</c>. Volatile makes a
-    /// write VISIBLE; it does not make check-then-set ATOMIC, so two entrants
-    /// could both get past it. Each would then run the same three-statement
-    /// sequence (cancel the live source, dispose it, assign a fresh one) and
-    /// each could dispose the source the other had just published, after
-    /// which the loser's own <c>_refreshCts.Token</c> read threw
-    /// ObjectDisposedException - or NullReferenceException, if a Clear Cache
-    /// click nulled the field in the same window. Module's generic catch
-    /// reported that as "refresh failed" and armed a 60-second retry backoff
-    /// for a call that never reached the network.
-    /// </para>
     /// <para>
     /// The claim is an Interlocked.CompareExchange, the same pattern
     /// ModuleLog.ScheduleFlush uses, and the source swap is a single
     /// Interlocked.Exchange so exactly one caller ever owns the outgoing
-    /// source. <see cref="BeginFetch"/> hands back the token by value, before
-    /// the source is published, so a concurrent <see cref="CancelCurrent"/>
-    /// cancels the fetch (which is what it means) instead of racing a field
-    /// read the fetch would otherwise have to make.
+    /// source. A volatile bool cannot serve here: volatile makes a write
+    /// VISIBLE, it does not make check-then-set ATOMIC.
+    /// <see cref="BeginFetch"/> hands back the token by value, before the
+    /// source is published, so a concurrent <see cref="CancelCurrent"/> cancels
+    /// the fetch - which is what it means - instead of racing a field read the
+    /// fetch would otherwise have to make.
     /// </para>
+    /// <para>What the old check-then-set gate cost in practice:
+    /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".</para>
     /// </summary>
     internal sealed class SnapshotRefreshSlot
     {

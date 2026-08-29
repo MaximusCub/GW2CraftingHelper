@@ -3,30 +3,21 @@ using System;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES #31/31a-F1 audit-of-the-fix: the original fix captured
-    /// <c>myEpoch</c> before a snapshot fetch's await and re-checked it
-    /// against a bare <c>volatile int _snapshotEpoch</c> afterwards via
-    /// <see cref="SnapshotEpochGuard"/>, with the field commit that follows
-    /// (write _currentSnapshot/_pendingSnapshot/_snapshotDirty, Save to
-    /// disk) as several more unguarded instructions after that check.
-    /// Module.ClearCache bumps the same epoch and nulls those same fields
-    /// with no synchronization of its own. The check and the commit were
-    /// never atomic with respect to ClearCache - just narrowed from "the
-    /// whole fetch" down to "the few instructions between the check and the
-    /// last field write" - so a Clear Cache landing in that gap could still
-    /// resurrect a just-cleared snapshot, or (torn) leave
-    /// _currentSnapshot/_pendingSnapshot/_snapshotDirty in a combination
-    /// that never legitimately occurs.
+    /// Makes the account-snapshot epoch re-check and the field commit that
+    /// follows atomic with respect to Module.ClearCache: the epoch bump
+    /// (<see cref="Clear"/>) and the epoch re-check (<see cref="TryCommit"/>)
+    /// share one lock, so a caller of one always either fully precedes or
+    /// fully follows a caller of the other - no interleaving, and no torn
+    /// writes across _currentSnapshot/_pendingSnapshot/_snapshotDirty.
     ///
-    /// This gate closes the gap for real: the epoch bump (<see cref="Clear"/>)
-    /// and the epoch re-check (<see cref="TryCommit"/>) share one lock, so
-    /// a caller of one always either fully precedes or fully follows a
-    /// caller of the other - no interleaving, no torn field writes. Both
-    /// methods run their callback synchronously while holding the lock;
-    /// callers must never await inside the callback (there is nothing to
-    /// await in either Module.cs call site - the network fetch has already
-    /// completed by the time TryCommit is called, and ClearCache's own work
-    /// is all synchronous field/file writes).
+    /// Both methods run their callback synchronously while holding the lock;
+    /// callers must NEVER await inside the callback. Neither Module.cs call
+    /// site has anything to await - the network fetch has already completed by
+    /// the time TryCommit is called, and ClearCache's own work is all
+    /// synchronous field and file writes.
+    ///
+    /// What the narrower SnapshotEpochGuard left open: docs/ARCHITECTURE.md,
+    /// "Services Q-Z: relocated design narrative"; KNOWN-ISSUES #31/31a-F1.
     /// </summary>
     internal sealed class SnapshotCommitGate
     {

@@ -1289,3 +1289,53 @@ unit-testable, matching this repo's established pattern for tree-rendering
 logic (`DecisionPillPlanner`, `CoinSegmentMath`, and the rest). The
 divergence it surfaces can be an unpriceable descendant's own divergence
 rolled up recursively; see `DecisionValue`'s own doc comment.
+
+### S2.5 Account-snapshot concurrency and search
+
+**`SnapshotCommitGate` - what `SnapshotEpochGuard` alone left open.** The
+original KNOWN-ISSUES #31/31a-F1 fix captured `myEpoch` before a snapshot
+fetch's await and re-checked it afterwards against a bare
+`volatile int _snapshotEpoch`, with the field commit that follows (write
+`_currentSnapshot`/`_pendingSnapshot`/`_snapshotDirty`, save to disk) as
+several more unguarded instructions after that check. `Module.ClearCache`
+bumps the same epoch and nulls those same fields with no synchronization of
+its own. The check and the commit were never atomic with respect to
+`ClearCache` - just narrowed from "the whole fetch" down to "the few
+instructions between the check and the last field write" - so a Clear Cache
+landing in that gap could still resurrect a just-cleared snapshot, or leave
+the three fields in a combination that never legitimately occurs. The gate
+closes the gap for real by putting the bump and the re-check under one lock.
+
+**`SnapshotRefreshSlot` - what the check-then-set gate cost.** Three threads
+reach `Module`'s two refresh entry points - `LoadAsync` on a ThreadPool
+task, `Update()` on the main thread, and `OnSubtokenUpdated` on a thread the
+module does not control - and both entry points used to gate on a
+check-then-set over a `volatile bool`. Volatile makes a write *visible*; it
+does not make check-then-set *atomic*, so two entrants could both get past
+it. Each would then run the same three-statement sequence (cancel the live
+source, dispose it, assign a fresh one) and each could dispose the source
+the other had just published, after which the loser's own
+`_refreshCts.Token` read threw `ObjectDisposedException` - or
+`NullReferenceException`, if a Clear Cache click nulled the field in the
+same window. `Module`'s generic catch reported that as "refresh failed" and
+armed a 60-second retry backoff for a call that never reached the network.
+
+**`SnapshotSearchResultBuilder.ShortQueryCharacterHint` - why the hint
+exists.** The `MinCharacterSearchLength` hold-back is deliberate but
+invisible: a one-letter query that a character's name does contain looks
+like a plain no-results, so the user reads the tab as broken rather than as
+waiting for a second letter.
+
+**`SnapshotSearchResultBuilder.BuildItemRows` - inputs and cost.**
+`itemsById` is the already-deduped itemId -> representative-entry map (see
+`BuildRepresentativeIndex`); the method never re-scans the raw per-source
+entry list itself, so it stays cheap to call on every keystroke as long as
+the caller builds the map once per snapshot rather than once per call.
+Character matching costs a full source walk for every item whose name does
+not match, where a name-only search could skip straight past it; that is
+bounded above by the empty-search rebuild, which already walks every source
+of every item. The match is against character names only - storage-location
+labels stay unmatched (Feature 1 Open Question 2, resolved in favour of
+source-label matching). A row surfaced by a character match reports the
+account-wide total rather than the matched character's share, so the total
+keeps meaning the same thing on every row in the list.
