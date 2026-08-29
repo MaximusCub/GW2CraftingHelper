@@ -346,6 +346,47 @@ jobs:
           # times and leave the long blocks in place with nothing to notice.
           python3 tools/comment-budgets.py --check
 
+      - name: No doc comment left stranded on the wrong member
+        shell: bash
+        run: |
+          # Insert a member between a doc comment and the method it describes
+          # and the comment stays where it was: attached to whatever now
+          # follows it, with the inserted member undocumented. The compiler
+          # says nothing - a /// run is attached positionally, and a second
+          # <summary> inside one is not an error, just a doc build that picks
+          # one of them. Two <summary> tags in a single contiguous /// run is
+          # the signature, and it is mechanical rather than authorial: four
+          # instances were found on 2026-08-28 across three authors' work,
+          # one of them (CraftingPlanView) already on master.
+          python3 - <<'PY'
+          import subprocess, sys
+
+          files = subprocess.run(['git', 'ls-files', '*.cs'], capture_output=True,
+                                 text=True, check=True).stdout.split()
+          bad = []
+          for f in files:
+              start, count = 0, 0
+              # The sentinel closes a run that reaches end of file.
+              for n, line in enumerate(open(f, encoding='utf-8').read().splitlines() + [''], 1):
+                  if line.lstrip().startswith('///'):
+                      if count == 0:
+                          start = n
+                      # Counted per tag, not per line: one slip put both
+                      # summaries on the same physical line.
+                      count += line.count('<summary>')
+                      continue
+                  if count > 1:
+                      bad.append('%s:%d: %d <summary> tags in one /// run' % (f, start, count))
+                  count = 0
+          if bad:
+              print('A doc comment is stranded on a member it does not describe.')
+              print('Move it back above the member it was written for; the member')
+              print('now carrying it needs its own summary or none:')
+              print('\n'.join(bad))
+              sys.exit(1)
+          print('%d sources; every /// run documents exactly one member.' % len(files))
+          PY
+
       - name: Saved plans from older builds still load
         shell: bash
         run: |
