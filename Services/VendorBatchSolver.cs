@@ -483,36 +483,46 @@ namespace TaimisToolbench.Services
 
                 if (allValued)
                 {
-                    long comparisonValue;
+                    long comparisonValue = 0;
                     try
                     {
                         comparisonValue = checked(totalCoinCost + valuationCopper);
                     }
                     catch (OverflowException)
                     {
+                        // Demote, never drop - the same treatment the two
+                        // valuation-accumulation loops above already give
+                        // an overflowing valuation. Dropping the offer
+                        // outright reported "no vendor route" for a route
+                        // that genuinely exists and whose coin part is
+                        // still real, purely because a valuation the user
+                        // supplied was absurd.
+                        allValued = false;
+                    }
+
+                    if (allValued)
+                    {
+                        if (!bestComparableValue.HasValue ||
+                            comparisonValue < bestComparableValue.Value)
+                        {
+                            bestComparableValue = comparisonValue;
+                            bestComparableCoinCost = totalCoinCost;
+                            bestComparableCurrencyCosts = scaledCurrencyCosts;
+                            bestComparableItemCosts = scaledItemCosts;
+                            bestComparableHasRawCoin = hasRawCoin;
+                            bestComparableBatch = new VendorOfferBatch
+                            {
+                                OutputCount = offer.OutputCount,
+                                CoinCostPerBatch = coinCost,
+                                CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                                DailyCap = offer.DailyCap,
+                                WeeklyCap = offer.WeeklyCap,
+                                SeasonalCap = offer.SeasonalCap,
+                            };
+                        }
+
                         continue;
                     }
-
-                    if (!bestComparableValue.HasValue ||
-                        comparisonValue < bestComparableValue.Value)
-                    {
-                        bestComparableValue = comparisonValue;
-                        bestComparableCoinCost = totalCoinCost;
-                        bestComparableCurrencyCosts = scaledCurrencyCosts;
-                        bestComparableItemCosts = scaledItemCosts;
-                        bestComparableHasRawCoin = hasRawCoin;
-                        bestComparableBatch = new VendorOfferBatch
-                        {
-                            OutputCount = offer.OutputCount,
-                            CoinCostPerBatch = coinCost,
-                            CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
-                            DailyCap = offer.DailyCap,
-                            WeeklyCap = offer.WeeklyCap,
-                            SeasonalCap = offer.SeasonalCap,
-                        };
-                    }
-
-                    continue;
                 }
 
                 // The offer's single non-coin cost line, or -1 when it spans

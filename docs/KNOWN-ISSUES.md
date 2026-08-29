@@ -677,6 +677,42 @@ fallback cannot break more finely than its existing coin-tie rule. Full
 records: `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`,
 `...-adversarial.md`, `...-external.md`.
 
+**Follow-up (FIXED): a barter line is not worth zero.** That fix's fourth
+finding accepted, as a documented limitation, that the terminal fallback
+ranked a vendor offer's coin part against a craft route's real cost. Field
+use showed why that is not survivable once the unvalued line is an *item*
+rather than a wallet currency: Obsidian Heavy Breastplate (101521) was
+recommended as a 2g95s10c vendor purchase, that being the price of the
+10 Globs of Ectoplasm on Lyhr's offer, which also charges four
+account-bound Gifts that folded into no coin at all. The coin part is a
+partial accounting; the craft cost it was beating is a complete one. An
+offer carrying a barter line can no longer win that comparison, and the
+mirror-image case - an offer silently dropped from both tiers when its
+comparison value overflowed - now demotes to fallback instead. The
+currency-only ranking is unchanged.
+
+Measured against the shipped corpus (14,966 seeded recipes, the real
+`ref/vendor_offers.json`, Globs of Ectoplasm priced at 2,916c and nothing
+else): the plan for 101521 went from a single `BuyFromVendor` step at
+29,160c - the whole tree collapsed away - to `Craft` at 1,874,480c with
+630 Globs of Ectoplasm bought and every Gift named with a quantity. The
+vendor route stays selectable, and taking it reports 29,160c of coin
+*plus* four itemised lines carrying no gold value, with
+`VendorHasBarterItemCost` set so no consumer may read the coin figure as
+the whole cost.
+
+Two residuals. First, the ranking one above, unchanged. Second, and
+larger: a committed vendor decision's coin cost still omits its barter
+lines, so a plan total containing one is a LOWER BOUND. That is not for
+want of data - 100509 Arcanum of Astral Heartbeat has no recipe but does
+have an offer (1 Lesser Vision Crystal, item 49523, itself craftable) -
+but because the tree expands recipe ingredients into nodes and vendor
+cost lines into leaves, so a cost line is never itself solved. Closing it
+means expanding cost lines into priced subtrees, against a cost-line
+graph that is measurably cyclic (86094 <-> 91232 among 12 cycles found
+before the search was cut short). Coverage:
+`tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs`.
+
 ### 45. W3B: generation progress + rich logging
 
 The plan-strip status board and the phase-by-phase progress reporting a
