@@ -81,15 +81,24 @@ namespace TaimisToolbench.Services
         public const int ButtonRowSideMargin = 8;
 
         /// <summary>
-        /// Floor widths for the two button seats - the widths every caller
-        /// had before either label was configurable, kept so the existing
-        /// dialogs' buttons are unchanged and a short verb does not produce
-        /// a stub.
+        /// Floor for a button seat, and the only one. A confirm and a cancel
+        /// in one row share a SINGLE width - the larger of what the two
+        /// labels need - so the shorter label can never render as the wider
+        /// button. Two floors sat here first, 100 for the confirm seat and
+        /// 70 for the cancel, which inverted that relationship outright:
+        /// "Clear" floored up to 100 beside a longer "Cancel" that reached
+        /// only 70, and it was reported on sight once the boxes went tight.
+        /// <para>
+        /// 80 is the width of the Settings save bar's "Save"
+        /// (SettingsTabContent.SaveButtonWidth), the narrowest
+        /// free-standing word-labelled button the module ships, so a verb in
+        /// a dialog is never narrower than the same verb on a tab. A lone
+        /// acknowledgement button is not in a pair: it takes this floor or
+        /// its own label, whichever is wider, and is not stretched to the
+        /// width a second button would have wanted.
+        /// </para>
         /// </summary>
-        public const int MinConfirmButtonWidth = 100;
-
-        /// <summary>Floor width for the second (cancel/dismiss) seat.</summary>
-        public const int MinCancelButtonWidth = 70;
+        public const int MinButtonWidth = 80;
 
         /// <summary>
         /// Where WindowBase2 starts drawing the title inside the window
@@ -166,7 +175,11 @@ namespace TaimisToolbench.Services
             /// <summary>Left edge of the second button; 0 when there is none.</summary>
             public int CancelX { get; }
 
-            /// <summary>Width of the second button; 0 when there is none.</summary>
+            /// <summary>
+            /// Width of the second button; 0 when there is none. Equal to
+            /// <see cref="ConfirmWidth"/> whenever there is one - see
+            /// <see cref="MinButtonWidth"/> for why a pair shares a seat.
+            /// </summary>
             public int CancelWidth { get; }
         }
 
@@ -247,12 +260,13 @@ namespace TaimisToolbench.Services
             int wrapCap = Math.Min(PreferredMaxContentWidth, cap);
 
             bool hasCancel = cancelLabelWidth >= 0;
-            int confirmWidth = Math.Max(
-                MinConfirmButtonWidth, Math.Max(0, confirmLabelWidth) + ButtonSidePadding);
-            int cancelWidth = hasCancel
-                ? Math.Max(MinCancelButtonWidth, cancelLabelWidth + ButtonSidePadding)
-                : 0;
-            int rowWidth = confirmWidth + (hasCancel ? ButtonGap + cancelWidth : 0);
+            int seat = Math.Max(MinButtonWidth, Math.Max(0, confirmLabelWidth) + ButtonSidePadding);
+            if (hasCancel)
+            {
+                seat = Math.Max(seat, cancelLabelWidth + ButtonSidePadding);
+            }
+
+            int rowWidth = hasCancel ? (2 * seat) + ButtonGap : seat;
 
             int floor = Math.Max(MinContentWidth, rowWidth + (2 * ButtonRowSideMargin));
             floor = Math.Max(floor, TitleTextIndent + Math.Max(0, titleWidth) + TitleRightReserve);
@@ -271,8 +285,8 @@ namespace TaimisToolbench.Services
 
             return new Layout(
                 width, contentHeight, blocks, buttonY,
-                confirmX, confirmWidth,
-                hasCancel ? confirmX + confirmWidth + ButtonGap : 0, cancelWidth);
+                confirmX, seat,
+                hasCancel ? confirmX + seat + ButtonGap : 0, hasCancel ? seat : 0);
         }
 
         // A null or empty request is still one paragraph: TextWrapMath.Wrap

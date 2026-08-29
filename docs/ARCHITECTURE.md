@@ -2693,6 +2693,18 @@ that still reaches the same line count, found by binary search over
 shrinks, so the predicate is monotone and the search is exact. It runs once
 per `Show`, about ten wraps of one message, and never on a render path.
 
+**One seat for a pair.** A confirm and a cancel in the same row share one
+width, the larger of what the two labels need. The first cut kept the two
+floor widths the pre-sizing dialog happened to ship, 100 for the confirm
+seat and 70 for the cancel, and that inverted the relationship between the
+labels: "Clear" floored up to 100 sat beside a longer "Cancel" that reached
+only 70, so the shorter word rendered as the wider button. Invisible while
+every dialog was 560px of mostly empty space; reported on sight once the
+boxes went tight. The single floor that replaced them is 80, the width of
+the Settings save bar's "Save", so a verb in a dialog is never narrower than
+the same verb on a tab. A lone acknowledgement button is not in a pair and
+is not stretched to one: it takes its own label or the floor.
+
 **Order of operations.** Balance within the preferred wrap ceiling; raise to
 the largest of the button row, the title and the width floor; clamp to what
 the screen can actually hold. The screen wins last, which is why
