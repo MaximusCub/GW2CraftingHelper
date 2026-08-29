@@ -80,10 +80,12 @@ namespace TaimisToolbench.Services
         /// S1.2.
         /// </para>
         /// </summary>
-        public static int HeaderX(int pillColX, int pillColumnWidth, int inkRunWidth, int headerWidth)
+        public static int HeaderX(
+            int pillColX, int inkRunWidth, int headerWidth,
+            JustifiedColumnTracks.HeaderRoom room)
         {
             return JustifiedColumnTracks.CenteredOverContent(
-                pillColX, pillColumnWidth, pillColX, inkRunWidth, headerWidth);
+                pillColX, inkRunWidth, headerWidth, room);
         }
     }
 }

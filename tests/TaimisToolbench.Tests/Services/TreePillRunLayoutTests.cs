@@ -186,6 +186,22 @@ namespace TaimisToolbench.Tests.Services
         /// proportion to the badge runs it is compared against.</summary>
         private static readonly int SourceHeaderWidth = MeasureByLength("Source");
 
+        // The room the tree actually gives its "Source" header: the name
+        // column stops PlanRelayoutMath.TreeNameGap short of the pill rule,
+        // and the Cost column's coin runs start well to its right. The pill
+        // column's own fixed reserve is not a bound at all - clamping into
+        // it is the defect these tests pin.
+        private const int CostRightEdge = ColumnRightEdge + 200;
+        private const int CostInk = 120;
+
+        private static JustifiedColumnTracks.HeaderRoom SourceRoom(int ink)
+        {
+            PlanRelayoutMath.ComputeTreeHeaderRooms(
+                new PlanRelayoutMath.TreeColumnEdges(ColumnStart, CostRightEdge, 0),
+                ink, CostInk, out var source, out _);
+            return source;
+        }
+
         /// <summary>Right edge the flowed run reaches, from the specs the
         /// real planner emitted - the same left-packed walk the renderer
         /// does, with the one-pixel-per-character face.</summary>
@@ -223,7 +239,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(ink < ColumnWidth / 2);
 
             int headerX = TreePillRunLayout.HeaderX(
-                ColumnStart, ColumnWidth, ink, SourceHeaderWidth);
+                ColumnStart, ink, SourceHeaderWidth, SourceRoom(ink));
 
             Assert.Equal(ColumnStart + ((ink - SourceHeaderWidth) / 2), headerX);
             Assert.True(
@@ -249,21 +265,28 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(
                 JustifiedColumnTracks.CenteredInBand(ColumnStart, ColumnWidth, SourceHeaderWidth),
-                TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, ink, SourceHeaderWidth));
+                TreePillRunLayout.HeaderX(ColumnStart, ink, SourceHeaderWidth, SourceRoom(ink)));
         }
 
         /// <summary>
         /// No pills built yet (the header is created before the first row)
-        /// and no pills at all are the same case, and neither may produce
-        /// an x outside the column.
+        /// and no pills at all are the same case: the header centres on the
+        /// rule its badges would have used and the item name beside it is
+        /// what stops it going further, so it lands one pixel proud of the
+        /// column rather than half a word into the names.
         /// </summary>
         [Fact]
-        public void SourceHeader_WithNoInk_PinsToTheColumnsLeftEdge()
+        public void SourceHeader_WithNoInk_StopsAtTheNameColumnsBound()
         {
+            var room = SourceRoom(0);
+
+            Assert.Equal(ColumnStart - 1, room.Left);
             Assert.Equal(
-                ColumnStart, TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, 0, SourceHeaderWidth));
+                room.Left,
+                TreePillRunLayout.HeaderX(ColumnStart, 0, SourceHeaderWidth, room));
             Assert.Equal(
-                ColumnStart, TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, -5, SourceHeaderWidth));
+                room.Left,
+                TreePillRunLayout.HeaderX(ColumnStart, -5, SourceHeaderWidth, SourceRoom(-5)));
         }
 
         /// <summary>
@@ -275,13 +298,17 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void SourceHeader_MovesRightAsTheInkWidens_AndNeverPastTheColumn()
         {
-            int previous = TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, 0, SourceHeaderWidth);
+            int previous = TreePillRunLayout.HeaderX(
+                ColumnStart, 0, SourceHeaderWidth, SourceRoom(0));
             for (int ink = 1; ink <= ColumnWidth; ink++)
             {
-                int x = TreePillRunLayout.HeaderX(ColumnStart, ColumnWidth, ink, SourceHeaderWidth);
-                Assert.True(x >= previous);
-                Assert.True(x >= ColumnStart);
-                Assert.True(x + SourceHeaderWidth <= ColumnStart + ColumnWidth);
+                var room = SourceRoom(ink);
+                int x = TreePillRunLayout.HeaderX(ColumnStart, ink, SourceHeaderWidth, room);
+                Assert.True(x >= previous, $"ink {ink}: {x} < {previous}");
+                Assert.True(x >= room.Left, $"ink {ink}: {x} left of {room.Left}");
+                Assert.True(
+                    x + SourceHeaderWidth <= room.Right,
+                    $"ink {ink}: {x + SourceHeaderWidth} past {room.Right}");
                 previous = x;
             }
         }

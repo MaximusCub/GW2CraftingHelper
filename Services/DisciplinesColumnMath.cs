@@ -46,8 +46,8 @@ namespace TaimisToolbench.Services
 
             /// <summary>
             /// Room between that rule and the Level band - the character
-            /// run's ellipsis budget, and the band its header centres
-            /// inside. Never negative.
+            /// run's ellipsis budget. Never negative. NOT what its header
+            /// centres over or is bounded by; see <see cref="HeaderRooms"/>.
             /// </summary>
             public readonly int CharBandWidth;
 
@@ -111,6 +111,33 @@ namespace TaimisToolbench.Services
             int charBandWidth = levelRightEdge - levelColumnWidth - ColumnGap - charX;
             return new ColumnEdges(
                 levelRightEdge, charX, charBandWidth > 0 ? charBandWidth : 0, distributed);
+        }
+
+        /// <summary>
+        /// Where the two right-hand headers may sit: from the column on
+        /// their left to the column on their right, gutters split - never
+        /// their own reserve, which is floored at the header label itself
+        /// and so pins a header that should be centred. Level's right-hand
+        /// neighbour is the table's pinned edge. A table with no character
+        /// text at all reserves no Characters column, and Level's left
+        /// neighbour is then the discipline names.
+        /// </summary>
+        public static void HeaderRooms(
+            ColumnEdges edges, int nameInk, int charInk, int levelInk,
+            out JustifiedColumnTracks.HeaderRoom characters,
+            out JustifiedColumnTracks.HeaderRoom level)
+        {
+            int nameInkRight = NameX + nameInk;
+            int charInkRight = edges.CharX + charInk;
+            int levelInkX = edges.LevelRightEdge - levelInk;
+
+            characters = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(nameInkRight, edges.CharX),
+                JustifiedColumnTracks.RoomRightBound(charInkRight, levelInkX));
+            level = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(
+                    charInk > 0 ? charInkRight : nameInkRight, levelInkX),
+                edges.LevelRightEdge);
         }
 
         private static int Max(int a, int b)

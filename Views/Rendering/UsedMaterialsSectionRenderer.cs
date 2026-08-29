@@ -103,9 +103,8 @@ namespace TaimisToolbench.Views.Rendering
             // same way. No rightXForWidth: the Amount column is pinned to
             // the panel edge, ColumnHeaderRowRenderer's own default.
             // rightLabelXForWidth, though: the WORD centres on the
-            // quantities, not on the panel's right margin. CenteredInBand
-            // satisfies JustifiedColumnTracks.CenteredOverContent here only
-            // because this band carries no floor beyond its own header.
+            // quantities, not on the panel's right margin
+            // (JustifiedColumnTracks.CenteredOverContent).
             int amountHeaderWidth =
                 (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
@@ -114,8 +113,13 @@ namespace TaimisToolbench.Views.Rendering
                 amountHeaderText, _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),
-                rightLabelXForWidth: w => JustifiedColumnTracks.CenteredInBand(
-                    PlanRelayoutMath.PinnedRightEdge(w) - maxQtyWidth, maxQtyWidth, amountHeaderWidth),
+                // The quantities pin to the table's own edge, so a header
+                // wider than the widest of them has nowhere to centre and
+                // right-aligns on that edge - the bound a room never yields.
+                rightLabelXForWidth: w => JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, amountHeaderWidth,
+                    PlanRelayoutMath.TrailingColumnHeaderRoom(
+                        PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap)),
                 // The Item column is everything left of the Amount band -
                 // the name's own ellipsis terms, with the gap split.
                 leftColumnEndForWidth: w => PlanRelayoutMath.HeaderSplitBeforeColumn(

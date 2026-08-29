@@ -96,8 +96,14 @@ namespace TaimisToolbench.Views.Rendering
                 DisciplinesColumnMath.ComputeEdges(
                     w, disciplineColumnWidth, charColumnWidth, levelColumnWidth);
 
-            Func<int, int> levelLabelX = w => JustifiedColumnTracks.CenteredOverContentRightAligned(
-                edgesFor(w).LevelRightEdge, levelColumnWidth, maxLevelInk, levelHeaderWidth);
+            Func<int, int> levelLabelX = w =>
+            {
+                var e = edgesFor(w);
+                DisciplinesColumnMath.HeaderRooms(
+                    e, maxNameInk, maxCharInk, maxLevelInk, out _, out var levelRoom);
+                return JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    e.LevelRightEdge, maxLevelInk, levelHeaderWidth, levelRoom);
+            };
 
             if (anyCharacterText)
             {
@@ -107,8 +113,10 @@ namespace TaimisToolbench.Views.Rendering
                     middleXForWidth: w =>
                     {
                         var e = edgesFor(w);
+                        DisciplinesColumnMath.HeaderRooms(
+                            e, maxNameInk, maxCharInk, maxLevelInk, out var charRoom, out _);
                         return JustifiedColumnTracks.CenteredOverContent(
-                            e.CharX, e.CharBandWidth, e.CharX, maxCharInk, charHeaderWidth);
+                            e.CharX, maxCharInk, charHeaderWidth, charRoom);
                     },
                     rightLabelXForWidth: levelLabelX);
             }

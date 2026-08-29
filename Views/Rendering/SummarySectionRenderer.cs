@@ -600,10 +600,10 @@ namespace TaimisToolbench.Views.Rendering
             // handful of entries in practice) with the SAME font both the
             // header and every data row already use.
             // The number bands are never narrower than their own header
-            // labels: each header centres over its band, and at the
-            // ColumnHeader tier "Required"/"Have"/"Needed" routinely
-            // out-measure a short value, so a band sized to the value alone
-            // would let the currency name run under its own header.
+            // labels: at the ColumnHeader tier "Required"/"Have"/"Needed"
+            // routinely out-measure a short value, and a band sized to the
+            // value alone would let the currency name run under the header
+            // above it.
             var scan = ScanCurrencyColumns(rows);
 
             CreateCurrencyTableTopGap(parent, panelWidth);
@@ -621,9 +621,9 @@ namespace TaimisToolbench.Views.Rendering
         /// at another (ShoppingListSectionRenderer.ColumnScan's shape).
         /// <para>
         /// The three Ink widths are what each header centres OVER; the
-        /// shared band is only the clamp. They differ per column - a wallet
-        /// Have of 1,204,882 beside a Required of 40 - which is why one
-        /// shared width cannot place all three headers.
+        /// shared band places the cells and nothing else. They differ per
+        /// column - a wallet Have of 1,204,882 beside a Required of 40 -
+        /// which is why one shared width cannot place all three headers.
         /// </para>
         /// </summary>
         private readonly struct CurrencyColumnScan
@@ -803,8 +803,9 @@ namespace TaimisToolbench.Views.Rendering
 
             var edges = scan.EdgesFor(panelWidth);
 
-            // Each header centres over its OWN column's widest number, not
-            // over the band all three share - see JustifiedColumnTracks.
+            // Each header centres over its OWN column's widest number and
+            // is bounded by the gap to the column beside it, not by the
+            // band all three share - see JustifiedColumnTracks.HeaderRoom.
             // Header widths measured from the strings, which are fixed, so
             // the resize closure below neither measures nor reads a Blish
             // Label's Width (not settled until its next layout pass).
@@ -812,17 +813,12 @@ namespace TaimisToolbench.Views.Rendering
             int haveHeaderWidth = MeasureHeader(font, HaveHeaderText);
             int neededHeaderWidth = MeasureHeader(font, NeededHeaderText);
             int statusHeaderWidth = MeasureHeader(font, StatusHeaderText);
-            var requiredLabel = CreateHeaderLabelAt(
-                band, RequiredHeaderText, font,
-                NumberHeaderX(edges.RequiredRightEdge, edges, scan.RequiredInk, requiredHeaderWidth));
-            var haveLabel = CreateHeaderLabelAt(
-                band, HaveHeaderText, font,
-                NumberHeaderX(edges.HaveRightEdge, edges, scan.HaveInk, haveHeaderWidth));
-            var neededLabel = CreateHeaderLabelAt(
-                band, NeededHeaderText, font,
-                NumberHeaderX(edges.NeededRightEdge, edges, scan.NeededInk, neededHeaderWidth));
-            var statusLabel = CreateHeaderLabelAt(
-                band, StatusHeaderText, font, StatusHeaderX(edges, scan, statusHeaderWidth));
+            var xs = new CurrencyHeaderXs(
+                edges, scan, requiredHeaderWidth, haveHeaderWidth, neededHeaderWidth, statusHeaderWidth);
+            var requiredLabel = CreateHeaderLabelAt(band, RequiredHeaderText, font, xs.Required);
+            var haveLabel = CreateHeaderLabelAt(band, HaveHeaderText, font, xs.Have);
+            var neededLabel = CreateHeaderLabelAt(band, NeededHeaderText, font, xs.Needed);
+            var statusLabel = CreateHeaderLabelAt(band, StatusHeaderText, font, xs.Status);
 
             // The scan is data-derived, not panelWidth-derived, so it never
             // needs to re-run on resize (same reasoning as
@@ -830,43 +826,51 @@ namespace TaimisToolbench.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 band.Size = new Point(w, HeaderBands.RowHeight);
-                var e = scan.EdgesFor(w);
-                requiredLabel.Location = new Point(
-                    NumberHeaderX(e.RequiredRightEdge, e, scan.RequiredInk, requiredHeaderWidth),
-                    HeaderBands.LabelY);
-                haveLabel.Location = new Point(
-                    NumberHeaderX(e.HaveRightEdge, e, scan.HaveInk, haveHeaderWidth),
-                    HeaderBands.LabelY);
-                neededLabel.Location = new Point(
-                    NumberHeaderX(e.NeededRightEdge, e, scan.NeededInk, neededHeaderWidth),
-                    HeaderBands.LabelY);
-                statusLabel.Location = new Point(
-                    StatusHeaderX(e, scan, statusHeaderWidth), HeaderBands.LabelY);
+                var moved = new CurrencyHeaderXs(
+                    scan.EdgesFor(w), scan,
+                    requiredHeaderWidth, haveHeaderWidth, neededHeaderWidth, statusHeaderWidth);
+                requiredLabel.Location = new Point(moved.Required, HeaderBands.LabelY);
+                haveLabel.Location = new Point(moved.Have, HeaderBands.LabelY);
+                neededLabel.Location = new Point(moved.Needed, HeaderBands.LabelY);
+                statusLabel.Location = new Point(moved.Status, HeaderBands.LabelY);
             });
         }
 
         /// <summary>
-        /// One number column's header x: its own widest value is the ink,
-        /// the band the three columns share is only the clamp.
+        /// The four header x's of one render. Each centres over its own
+        /// column's widest value and is bounded by the columns either side
+        /// of it, never by the band the three number columns share - that
+        /// band ends on each column's own right edge, so bounding a header
+        /// by it right-aligns the word on its own numbers. Status is the
+        /// mirror case: its pills are LEFT-ruled on MarkerX, so its ink
+        /// runs rightward from there.
         /// </summary>
-        private static int NumberHeaderX(
-            int rightEdge, SummarySectionLayoutMath.CurrencyColumnEdges edges,
-            int inkWidth, int headerWidth)
+        private readonly struct CurrencyHeaderXs
         {
-            return JustifiedColumnTracks.CenteredOverContentRightAligned(
-                rightEdge, edges.NumberColumnWidth, inkWidth, headerWidth);
-        }
+            internal readonly int Required;
+            internal readonly int Have;
+            internal readonly int Needed;
+            internal readonly int Status;
 
-        /// <summary>
-        /// The Status header's x. Its pills are LEFT-ruled on MarkerX, so
-        /// the ink runs rightward from there - the mirror of the number
-        /// columns, and the reason this cannot go through NumberHeaderX.
-        /// </summary>
-        private static int StatusHeaderX(
-            SummarySectionLayoutMath.CurrencyColumnEdges edges, CurrencyColumnScan scan, int headerWidth)
-        {
-            return JustifiedColumnTracks.CenteredOverContent(
-                edges.MarkerX, edges.MarkerWidth, edges.MarkerX, scan.MarkerInk, headerWidth);
+            internal CurrencyHeaderXs(
+                SummarySectionLayoutMath.CurrencyColumnEdges edges, CurrencyColumnScan scan,
+                int requiredHeaderWidth, int haveHeaderWidth, int neededHeaderWidth,
+                int statusHeaderWidth)
+            {
+                var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(
+                    edges, scan.RequiredInk, scan.HaveInk, scan.NeededInk);
+                Required = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.RequiredRightEdge, scan.RequiredInk, requiredHeaderWidth, rooms.Required);
+                Have = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.HaveRightEdge, scan.HaveInk, haveHeaderWidth, rooms.Have);
+                Needed = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.NeededRightEdge, scan.NeededInk, neededHeaderWidth, rooms.Needed);
+                Status = JustifiedColumnTracks.CenteredOverContent(
+                    edges.MarkerX,
+                    SummarySectionLayoutMath.CurrencyStatusInk(edges, scan.MarkerInk),
+                    statusHeaderWidth,
+                    rooms.Status);
+            }
         }
 
         private static int MeasureHeader(BitmapFont font, string text)

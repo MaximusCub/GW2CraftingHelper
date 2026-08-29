@@ -217,22 +217,21 @@ namespace TaimisToolbench.Services
         /// capture the two differed by 106px - the whole width of a
         /// currency band every coin-only row collapses.
         /// <para>
-        /// The clamp band is TotalWidth floored at the header's own width,
-        /// so a header wider than the ink under it right-aligns on the
-        /// column's edge rather than overhanging the panel margin - which
-        /// is where a tree with nothing priced at all leaves it.
+        /// <paramref name="room"/> is the gap to the pill column on one
+        /// side and the table's pinned edge on the other
+        /// (PlanRelayoutMath.ComputeTreeHeaderRooms), so a header wider
+        /// than the ink under it overhangs its own reserve freely and only
+        /// right-aligns on the table edge when there is genuinely nowhere
+        /// left - which is where a tree with nothing priced at all leaves
+        /// it.
         /// </para>
         /// </summary>
-        public static int HeaderX(int costRightEdge, CostColumnWidths widths, int headerWidth)
+        public static int HeaderX(
+            int costRightEdge, CostColumnWidths widths, int headerWidth,
+            JustifiedColumnTracks.HeaderRoom room)
         {
-            int band = TotalWidth(widths);
-            if (band < headerWidth)
-            {
-                band = headerWidth;
-            }
-
             return JustifiedColumnTracks.CenteredOverContentRightAligned(
-                costRightEdge, band, widths.WidestRowRunWidth, headerWidth);
+                costRightEdge, widths.WidestRowRunWidth, headerWidth, room);
         }
 
         /// <summary>

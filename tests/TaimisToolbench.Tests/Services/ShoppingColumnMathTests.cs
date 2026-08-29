@@ -234,8 +234,9 @@ namespace TaimisToolbench.Tests.Services
             const int headerWidth = 44;
             const int totalInk = 100;
 
+            var rooms = ShoppingColumnMath.HeaderRoomsFor(edges, 12, 60, 79, 100, totalInk);
             int headerX = JustifiedColumnTracks.CenteredOverContentRightAligned(
-                edges.TotalRightEdge, edges.TotalBandWidth, totalInk, headerWidth);
+                edges.TotalRightEdge, totalInk, headerWidth, rooms.Total);
 
             Assert.Equal(150, edges.TotalBandWidth);
             Assert.Equal(
@@ -582,6 +583,48 @@ namespace TaimisToolbench.Tests.Services
                 panelWidth: 500, maxEachWidth: 0, maxTotalWidth: 0);
 
             Assert.Equal(500 - PlanRelayoutMath.TableRightMargin, edges.TotalRightEdge);
+        }
+
+        [Fact]
+        public void HeaderRooms_LeaveEveryDataHeaderFreeOfItsOwnBand()
+        {
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1000, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: 79, sourceColumnWidth: 96);
+            var rooms = ShoppingColumnMath.HeaderRoomsFor(edges, 12, 60, 20, 40, 100);
+
+            Assert.True(rooms.Source.Width > edges.SourceBandWidth);
+            Assert.True(rooms.Amount.Width > edges.QtyBandWidth);
+            Assert.True(rooms.Each.Width > 40);
+
+            // Adjacent rooms are a gutter apart and never overlap.
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Amount.Left - rooms.Source.Right);
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Each.Left - rooms.Amount.Right);
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Total.Left - rooms.Each.Right);
+
+            // Total closes the table, so its own bound is the pinned edge.
+            Assert.Equal(edges.TotalRightEdge, rooms.Total.Right);
+        }
+
+        [Fact]
+        public void HeaderRooms_NarrowAmountColumn_CentresTheHeaderRatherThanRightAligningIt()
+        {
+            // A list every row of which is "1x": 12px of ink under a 60px
+            // "Amount". The band clamp answered that by pinning the word's
+            // right edge to the quantities' - right-alignment.
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1000, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: 12, sourceColumnWidth: 96);
+            var rooms = ShoppingColumnMath.HeaderRoomsFor(edges, 12, 60, 12, 40, 100);
+
+            int x = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.QtyRightEdge, 12, 60, rooms.Amount);
+
+            Assert.Equal(2 * edges.QtyRightEdge - 12, 2 * x + 60);
+            Assert.NotEqual(edges.QtyRightEdge - 60, x);
         }
     }
 }
