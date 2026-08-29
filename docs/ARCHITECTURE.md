@@ -554,6 +554,92 @@ which is what closes the race regardless of drain order.
 
 **Full history:** KNOWN-ISSUES item 20.3 (M34-B1 #4).
 
+### 6.1 Out-of-order phase events: `PhaseOrdinalGuard`
+
+`Services/PhaseOrdinalGuard.cs` mirrors `StatusUpdateGuard`'s shape and
+spirit - a pure, Blish-free function `CraftingPlanView` calls at the
+moment each event actually drains - for a second race the guard above
+cannot see.
+
+`Progress<T>` with no `SynchronizationContext` installed (section 1: this
+module has none) posts every `Report` through an independent
+`ThreadPool.QueueUserWorkItem`, so two phase events reported milliseconds
+apart - a warm recipe/price cache, a small plan - can be executed out of
+order by different worker threads before either reaches the main-thread
+queue. `StatusUpdateGuard` alone cannot catch that: both events belong to
+the SAME generation, so its `myGen` check passes for both, and the
+later-draining older event can overwrite a newer phase's text.
+
+The fix rests on `PlanPhase`'s declaration order being the pipeline's
+actual emission order, so its int ordinal is a reliable monotonic sequence
+per generation. That order is `BuildingTree` -> `FetchingPrices` ->
+`SolvingDecisions` -> `FetchingItemDetails` -> `CheckingLearnedRecipes` ->
+`BuildingDisplay`, and `CraftingPlanPipeline`'s `phaseTracker.Start` call
+sites fire strictly in it on both the single-item and multi-item paths.
+An event whose ordinal is not strictly greater than the last one applied
+is therefore stale and dropped, regardless of drain order.
+
+### 6.2 The pull-based status board
+
+`Services/PlanStripStatusBoard.cs` holds the Crafting Plan tab's status
+state at module level rather than in the view (KNOWN-ISSUES #45, "tab
+switch strip freeze / lost completion status").
+
+`CraftingPlanView`'s status-strip fields and its `_statusLabel` control
+are rebuilt every time the tab's `Build()` runs, so a completion callback
+that writes directly to a control can target a since-discarded label or be
+skipped by a view-liveness check - and nothing about the next `Build()`
+cycle would know a finished generation's status text ever existed to
+restore. The board inverts that. Every write only ever updates pure state,
+so it can never be skipped by a liveness check and never race a rebuild;
+the strip is a pull consumer, reading the board every tick while armed and
+reading a fresh `Snapshot()` on every rebuild.
+
+It is constructed once by `Module` and passed into `CraftingPlanView`'s
+constructor, so the state outlives any single view build cycle - the
+module-level-state ownership pattern used for exactly this class of bug.
+
+Threading: writers run on whichever thread they naturally land on - the
+main thread for `Begin` (`TriggerGenerate`, before any await), a
+ThreadPool thread for `UpdatePhase` (the pipeline's
+`IProgress<PlanPhaseEvent>` callback) and for `Finish` (the pipeline's
+success/cancel/failure continuation). None of them marshal onto the main
+thread first, because nothing here touches a Blish HUD control. Only the
+pull side - the spinner ticker's `FrameTicker.DoUpdate` step, and `Build()`
+itself - runs on the main thread, and it is the only place a Blish control
+is ever touched from this board's data.
+
+`Finish` is rejected through the same `StatusUpdateGuard` `UpdatePhase`
+uses rather than a raw sequence-only check, which would otherwise accept a
+second `Finish()` for the same generation - silently overwriting the
+first-recorded wording - and would accept a `Finish(0, ...)` on a virgin,
+never-`Begin()`'d board. That last case is unreachable today only because
+the caller's `myGen` is always `++_generateSequence` and therefore never
+0, which is not an invariant this class should rely on its caller to hold.
+
+`SeedRestored` is the one write that deliberately bypasses both guards: it
+is the board's own one-time initial seed at module load, at sequence 0,
+which the view's `++_generateSequence` convention can never produce. Its
+own `_sequence == 0 && !_inFlight` check is enforcement, not decoration.
+`Module.LoadAsync`'s restore drain can lag well behind the module's
+`Update()` loop starting to tick - `LoadAsync` awaits a full
+account-snapshot network refresh after arming the restore flag but before
+returning, and Blish HUD does not call a module's `Update()` until
+`LoadAsync`'s Task completes - so a user can open the window and click
+Generate while `LoadAsync` is still in flight, and have that generation's
+`Begin(1)`/`UpdatePhase(1, ...)`/`Finish(1, ...)` all land *before* the
+seed finally runs. Unconditionally stomping `_sequence` back to 0 in that
+window would silently reject every subsequent write for that in-flight
+generation and freeze its spinner on the next tick
+(`PlanStripTickDecision.Decide` sees Sequence 0 != myGen 1 and stops) -
+exactly the lost-completion-status bug the board exists to prevent. The
+`_sequence == 0` half alone would suffice, since `Begin` only ever moves
+`_sequence` away from 0 and never back; the `_inFlight` half is kept as a
+self-documenting belt-and-braces guard rather than relying on that.
+
+`ClearRestoredSeed` undoes a seed whose downstream render then failed, and
+carries the same guard for the same reason.
+
 ---
 
 ## 7. Merged-ceil vendor batching
@@ -916,3 +1002,90 @@ case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
 request-only restore), `Models/PlanHistoryEntry.cs` and
 `Services/PlanHistoryStore.cs` (the index's readable range and the
 additive-only row graph behind it).
+
+### 12.1 Two verdicts, two severities
+
+`PlanStore` mirrors `SnapshotStore`'s shape - single-file JSON, atomic
+`.tmp`+`Replace` write - with one deliberate divergence: an unreadable
+file is not silently swallowed to null the way `SnapshotStore`'s
+`Deserialize` is. It is logged first. A missing file stays silent, because
+"fresh start with no plan" is the ordinary first-run case rather than a
+failure.
+
+The two unreadable-file verdicts carry two different severities because
+merging them once cost a full forensic investigation (2026-08-23). A
+corrupt or otherwise unparseable file goes to `onError` at Warn, the same
+as every I/O failure; a file written at an older *shipped* schema version
+- expected, benign, and repaired by the next Generate - goes to `onInfo`
+at Info. Any caller wiring one and not the other silently drops half the
+story.
+
+`PlanStoreHelpers.DeserializePersistedPlan` is what makes that split
+possible: unlike `SnapshotHelpers`' silent-null precedent it does not
+swallow a parse or schema failure itself, but lets the exception
+propagate to `PlanStore.LoadLatest`'s single `try`/`catch`, which owns
+both callbacks. Its formatting is compact rather than indented, for the
+reason `SerializePersistedPlan`'s own doc comment gives.
+
+### 12.2 The gzip container
+
+The on-disk container is gzip: a large plan's compact JSON runs ~700 KB,
+and this file is rewritten on every override-resolve pill click, not just
+once per Generate. The `plan.json` name is kept as-is with no `.gz`
+rename - `LoadLatest` sniffs the first two bytes for the gzip magic number
+(`0x1F 0x8B`), so an existing plain-JSON `plan.json` from before this
+change (PR #107) still loads, and `Save` always writes gzip going forward.
+The payload schema is completely unchanged; only the container encoding
+differs, so every existing tolerance guarantee (truncated or corrupt data,
+one Warn, return null, never partial) is preserved by construction -
+decompression and JSON parsing both happen inside that same single
+`try`/`catch`.
+
+`PlanStore.Save` takes an internal lock, unlike `SnapshotStore`/
+`StatusStore` whose callers are already serialized by a higher-level
+in-flight guard (`Module`'s `_refreshInProgress`). It has two genuinely
+independent call sites - a Generate's own post-await persist, and a
+pill-click override re-solve's fire-and-forget background persist (see
+`Module.cs`'s `PersistAfterGenerateAsync`/`PersistResolvedPlanInBackground`)
+- which can race, because a decision pill on an old plan stays clickable
+while a new Generate is in flight. The lock is what stops two overlapping
+writers being mid-write to the same `.tmp` path at once.
+
+`PlanHistoryStore` serializes indented, following `RankerStore`/
+`SnapshotHelpers` rather than `PlanStoreHelpers`' compact choice: the
+index is single-digit KB and rewritten once per Generate, not per pill
+click, so the compact decision's rationale does not apply to it.
+
+### 12.3 What the structural validator guarantees
+
+`Services/PlanStructuralValidator.cs` walks the entire object graph a
+deserialized `PersistedPlan` carries, at the deserialization boundary,
+before the file is accepted at all. Every check it makes exists because
+some production path dereferences that exact field with no null guard, on
+an assumption that holds for every solver-*built* `CraftingPlanResult`/
+`PlanSolveContext` - those are only ever constructed by `PlanSolver`/
+`PlanResultBuilder`/`CraftingTreeBuilder`. A restored plan is the one path
+that bypasses the solver and hands the same types straight from disk into
+that trusted code, so the invariants are re-established once, centrally,
+instead of at each call site.
+
+Centrally, because several of those sites sit outside any `try`/`catch`:
+Expand All and the per-node toggle call `RenderTreeNode` straight from a
+click handler, on nodes a guarded initial render never visited because
+they were collapsed, and Craft All/Buy All walk the whole tree through
+`BuildPresetOverrides` before `ApplyOverridesAndResolve`'s catch is
+reached.
+
+### 12.4 What the shape hash last moved for
+
+`PersistedPlan.SchemaShapeHash` last moved for the currency tooltip work,
+which is purely additive: one string, `CurrencyMetadata.Description`,
+absent from an older file and left null by Newtonsoft, which drops the
+tooltip's paragraph and nothing else. A plan written before it still
+deserializes and `CurrentSchemaVersion` stays at 3. A bump now costs a
+re-solve rather than the plan, but it still costs one.
+
+It does cost bytes. The persisted `CurrencyMetadata` is the whole
+`/v2/currencies` reply, so every saved plan grows by the descriptions of
+all 79 currencies - measured 2026-08-28 at 8.5 KB raw, ~2.5 KB gzipped,
+per plan blob.

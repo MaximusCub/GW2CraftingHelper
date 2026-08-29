@@ -45,32 +45,18 @@ namespace TaimisToolbench.Models
         /// per line, ordinal-sorted - the same list checked in at
         /// tests/shared/persisted_plan_schema.txt.
         /// <para>
-        /// It lives here, next to the version it describes, for one reason:
-        /// the snapshot test and the version assertion used to be
-        /// independent, so adding a property anywhere in the graph could be
-        /// made green by editing the test's own expected list alone, with
-        /// <see cref="CurrentSchemaVersion"/> left at its old value - which
-        /// is precisely the unbumped shape change that makes
-        /// PlanStoreHelpers.DeserializePersistedPlan accept a file it can no
-        /// longer read correctly. Changing the graph now forces an edit
-        /// here, one line from the version.
+        /// It lives here, next to the version it describes, so that
+        /// changing the graph forces an edit one line from
+        /// <see cref="CurrentSchemaVersion"/>. While the snapshot test and
+        /// the version assertion were independent, adding a property
+        /// anywhere in the graph could be made green by editing the test's
+        /// own expected list alone, leaving the version at its old value -
+        /// precisely the unbumped shape change that makes
+        /// PlanStoreHelpers.DeserializePersistedPlan accept a file it can
+        /// no longer read correctly.
         /// </para>
+        /// <para>Derivation: docs/ARCHITECTURE.md section 12.</para>
         /// </summary>
-        /// <remarks>
-        /// Last moved by the currency tooltip work, which is purely
-        /// ADDITIVE: one string, CurrencyMetadata.Description, absent from
-        /// an older file and left null by Newtonsoft - which drops the
-        /// tooltip's paragraph and nothing else. A plan written before it
-        /// still deserializes and <see cref="CurrentSchemaVersion"/> stays
-        /// at 3. A bump here now costs a re-solve rather than the plan, but
-        /// it still costs one.
-        /// <para>
-        /// It does cost bytes: the persisted CurrencyMetadata is the whole
-        /// /v2/currencies reply, so every saved plan grows by the
-        /// descriptions of all 79 currencies - measured 2026-08-28 at 8.5KB
-        /// raw, ~2.5KB gzipped, per plan blob.
-        /// </para>
-        /// </remarks>
         public const string SchemaShapeHash =
             "85bc46dd6078bfcc7216e1b1adeae667b4c178e7094a0f04c69a6033b2769796";
 
