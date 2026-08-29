@@ -95,16 +95,14 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// One pill per feasible acquisition source: 2-3 pills means a real
-        /// choice, exactly 1 pill means the source is locked - the pill
-        /// count itself is the affordance. HAVE/CURRENCY/GUILD UPGRADE/
+        /// choice, exactly 1 pill means the source is locked - the pill count
+        /// itself is the affordance. HAVE/CURRENCY/GUILD UPGRADE/
         /// UNRECOGNIZED are always single, non-interactive pills; UNKNOWN
         /// alone also gets the interactive IGNORE toggle, except on a plan
         /// root (see AppendOwnershipPills).
-        ///
         /// The selected pill always matches node.Decision - the solver's
         /// committed Source, never a guessed "cheapest looking" option.
-        /// The default arm is a non-crashing safety net for a future
-        /// regression, not a real code path.
+        /// Derivation: docs/ARCHITECTURE.md section S1.6.
         /// </summary>
         /// <param name="node">The tree node to build pills for.</param>
         /// <param name="currencyPlanTotals">

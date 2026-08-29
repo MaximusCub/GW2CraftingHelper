@@ -7,31 +7,20 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Short-lived session cache in front of another
-    /// <see cref="IAccountRecipeClient"/> (in production
-    /// <see cref="Gw2AccountRecipeClient"/>, i.e. /v2/account/recipes).
-    /// Every plan generation asks for the learned ids once
-    /// (CraftingPlanPipeline.FetchLearnedRecipeIdsAsync) and that round
-    /// trip was measured at 327-4557ms, on the warm path as well as the
-    /// cold one, so it is worth not repeating for back-to-back plans.
+    /// <see cref="IAccountRecipeClient"/>. Every plan generation asks for the
+    /// learned ids once, and that round trip was measured at 327-4557ms on
+    /// the warm path as well as the cold one, so it is worth not repeating
+    /// for back-to-back plans. A separate decorator rather than a field
+    /// inside <see cref="Gw2AccountRecipeClient"/>, which holds a Blish
+    /// Gw2ApiManager no test in this Blish-free repo can construct.
     /// <para>
-    /// A separate decorator rather than a field inside
-    /// <see cref="Gw2AccountRecipeClient"/>: that class holds a Blish
-    /// Gw2ApiManager, and tests in this repo are Blish-free, so caching
-    /// logic living there could never be exercised by a test.
-    /// </para>
-    /// <para>
-    /// STALENESS IS ADVISORY, NEVER A SOLVER INPUT. Learned recipe ids
-    /// never affect a craft-vs-buy decision, a quantity, or a cost - the
-    /// plan is solved before they are consulted. They have two consumers,
-    /// both downstream annotations: the "already known" flag on required
-    /// recipes (PlanResultBuilder's RecipeRequirement.IsMissing), and the
-    /// gate on RecipeSheetSavingsCalculator, which emits a note advising
-    /// the purchase of a recipe sheet the account does not own, carrying a
-    /// SavingsPerUnit coin figure. So a recipe learned in-game inside the
-    /// TTL window not only still reads as missing - the plan may keep
-    /// recommending the sheet that taught it, priced, until the window
-    /// passes. That is the cost of this cache; raising the TTL raises it
-    /// with it.
+    /// STALENESS IS ADVISORY, NEVER A SOLVER INPUT. Learned recipe ids never
+    /// affect a craft-vs-buy decision, a quantity or a cost - the plan is
+    /// solved before they are consulted. But a recipe learned in-game inside
+    /// the TTL window still reads as missing, and the plan may keep
+    /// recommending the priced recipe sheet that taught it until the window
+    /// passes. That is the cost of this cache; raising the TTL raises it.
+    /// Derivation: docs/ARCHITECTURE.md section S1.9.
     /// </para>
     /// </summary>
     internal class CachingAccountRecipeClient : IAccountRecipeClient

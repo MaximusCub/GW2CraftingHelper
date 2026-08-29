@@ -2,58 +2,22 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pull-based, thread-safe, module-level state for the Crafting Plan
-    /// tab's status strip ("tab-switch strip freeze/lost completion
-    /// status" - KNOWN-ISSUES #45).
-    ///
+    /// tab's status strip (KNOWN-ISSUES #45).
     /// <para>
-    /// CraftingPlanView's status-strip fields and its _statusLabel control
-    /// are rebuilt every time the tab's Build() runs, so a completion
-    /// callback that writes directly to a control can target a
-    /// since-discarded label or be skipped by a view-liveness check, and
-    /// nothing about the next Build() cycle would know a finished
-    /// generation's status text existed to restore. This board inverts
-    /// that: every write (Begin/UpdatePhase/Finish) only ever updates PURE
-    /// state here, never a Blish control, so it can never be skipped by a
-    /// liveness check and never race a rebuild. The status strip is a PULL
-    /// consumer - see Views/CraftingPlanView.cs's SpinnerTick/
-    /// RenderFromBoard (reads this board every tick while armed) and
-    /// Build()'s own re-arm block (reads a fresh Snapshot() on every
-    /// rebuild).
+    /// The rule the class rests on: every write (Begin/UpdatePhase/Finish)
+    /// only ever updates PURE state here and never touches a Blish control,
+    /// so no write can be skipped by a view-liveness check or race a
+    /// rebuild. The strip is a PULL consumer - see CraftingPlanView's
+    /// SpinnerTick/RenderFromBoard and Build()'s re-arm block. Module
+    /// constructs it once, so it outlives any single view build cycle.
     /// </para>
-    ///
     /// <para>
-    /// Ownership: constructed once by Module and passed into
-    /// CraftingPlanView's constructor, so the state outlives any single
-    /// view build cycle and stays with the module-level-state ownership
-    /// pattern used for exactly this class of bug.
-    /// </para>
-    ///
-    /// <para>
-    /// Threading: every write and the read both take one internal lock, so
-    /// a reader always observes a mutually consistent combination of
-    /// fields (never, for example, InFlight=true together with a
-    /// FinalStatusText left over from a previous generation). Writers run
-    /// on whichever thread they naturally land on - the main thread for
-    /// <see cref="Begin"/> (TriggerGenerate, before any await), a
-    /// ThreadPool thread for <see cref="UpdatePhase"/> (the pipeline's
-    /// IProgress&lt;PlanPhaseEvent&gt; callback - Progress&lt;T&gt; with no
-    /// SynchronizationContext installed posts through
-    /// ThreadPool.QueueUserWorkItem, see Views/MainThreadMarshal.cs's own
-    /// doc comment) and for <see cref="Finish"/> (the pipeline's
-    /// success/cancel/failure continuation) - none of them need to marshal
-    /// onto the main thread first, since nothing here touches a Blish HUD
-    /// control. Only the PULL side (the spinner ticker's FrameTicker.DoUpdate
-    /// step, and Build() itself) runs on the main thread and is the only
-    /// place a Blish control is ever touched from this board's data.
-    /// </para>
-    ///
-    /// <para>
-    /// Stale-write rejection reuses the same pure predicates
-    /// (<see cref="StatusUpdateGuard"/> for cross-generation/already-closed
-    /// staleness, <see cref="PhaseOrdinalGuard"/> for out-of-order phase
-    /// events within the same generation - see each guard's own doc
-    /// comment for the exact race it closes) - folded into this board's
-    /// write side instead of being re-checked by every caller.
+    /// Every write and the read take one internal lock, so a reader always
+    /// sees a mutually consistent set of fields. Writers may run on any
+    /// thread; only the pull side runs on the main thread, and only it ever
+    /// touches a Blish control. Stale-write rejection reuses
+    /// <see cref="StatusUpdateGuard"/> and <see cref="PhaseOrdinalGuard"/>.
+    /// Derivation: docs/ARCHITECTURE.md section 6.2.
     /// </para>
     /// </summary>
     internal sealed class PlanStripStatusBoard
@@ -124,25 +88,18 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Records generation <paramref name="sequence"/>'s final status
         /// text (success/cancel/failure wording, e.g. "Plan generated -
-        /// ..."/"Error: ...") and marks it no longer in flight. Unlike the
-        /// pre-fix direct-label-write path this replaces, this write is
-        /// NEVER skipped because some view's panel happens to be disposed
-        /// or detached at the moment it runs; that is precisely the bug
-        /// this board exists to close (a pull-based reader picks this text
-        /// up whenever it next asks, regardless of what the view was doing
-        /// when Finish ran). Rejected (no-op) via the same
-        /// <see cref="StatusUpdateGuard"/> UpdatePhase already uses, so
-        /// this is rejected in the same two cases: <paramref name="sequence"/>
-        /// is not the current generation (a superseded generation's own
-        /// completion must never overwrite a newer generation's in-progress
-        /// or already-finished state), or the current generation's status
-        /// is already closed (a raw sequence-only check would otherwise
-        /// accept a second Finish() for the same generation - silently
-        /// overwriting the first-recorded wording - and would accept a
-        /// Finish(0, ...) on a virgin, never-Begin()'d board, which is
-        /// unreachable today only because the caller's myGen is always
-        /// ++_generateSequence and therefore never 0 - not an invariant
-        /// this class should rely on its caller to hold).
+        /// ..."/"Error: ...") and marks it no longer in flight. Never
+        /// skipped because some view's panel happens to be disposed or
+        /// detached at the moment it runs - a pull-based reader picks this
+        /// text up whenever it next asks.
+        /// <para>
+        /// Rejected (no-op) via the same <see cref="StatusUpdateGuard"/>
+        /// UpdatePhase already uses, in its two cases:
+        /// <paramref name="sequence"/> is not the current generation, or
+        /// the current generation's status is already closed. A raw
+        /// sequence-only check is not a substitute - see
+        /// docs/ARCHITECTURE.md section 6.2.
+        /// </para>
         /// </summary>
         public void Finish(int sequence, string finalStatusText)
         {
@@ -159,44 +116,23 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Seeds this board with a restored plan's staleness-banner text
-        /// at module load (plan persistence across module restarts),
-        /// before any real Generate has run this session - see
-        /// Views/CraftingPlanView.cs's ApplyRestoredPlan and
-        /// Services/PlanStore.cs's own doc comment. Uses sequence 0, which
-        /// CraftingPlanView's own ++_generateSequence convention can never
-        /// produce (its first real generation is always sequence 1), so a
-        /// genuine Begin(1) always supersedes this seed exactly like it
-        /// would supersede any earlier generation's state - see Begin's own
-        /// doc comment ("always applies... unconditionally"). Deliberately
-        /// bypasses StatusUpdateGuard (unlike Begin/UpdatePhase/Finish
-        /// above): this is not a write racing an in-flight generation, it
-        /// is the board's own one-time initial seed - called at most once
-        /// per module session, before the strip has shown anything else.
+        /// Seeds this board with a restored plan's staleness-banner text at
+        /// module load, before any real Generate has run this session - see
+        /// Views/CraftingPlanView.cs's ApplyRestoredPlan. Uses sequence 0,
+        /// which CraftingPlanView's ++_generateSequence convention can never
+        /// produce, so a genuine Begin(1) always supersedes this seed.
+        /// Deliberately bypasses <see cref="StatusUpdateGuard"/>: this is
+        /// the board's own one-time initial seed, not a write racing an
+        /// in-flight generation.
         /// <para>
         /// No-op if a real generation has already Begin()'n this session
-        /// (_sequence != 0) or is currently in flight - "called at most once... before the
-        /// strip has shown anything else" above is a caller EXPECTATION,
-        /// not something this method used to enforce. Module.LoadAsync's
-        /// restore drain can lag well behind the module's own Update() loop
-        /// starting to tick (LoadAsync awaits a full account-snapshot
-        /// network refresh AFTER arming the restore flag but BEFORE
-        /// returning, and Blish HUD does not call a module's Update() until
-        /// LoadAsync's Task completes) - so a user can open the window and
-        /// click Generate while LoadAsync is still in flight, and have that
-        /// generation's Begin(1)/UpdatePhase(1,...)/Finish(1,...) all land
-        /// BEFORE this seed call finally runs. Unconditionally stomping
-        /// _sequence back to 0 in that window would silently reject every
-        /// subsequent UpdatePhase/Finish call for that in-flight generation
-        /// (StatusUpdateGuard.ShouldApply(1, 0, ...) is false once _sequence
-        /// is back to 0) and freeze its spinner on the next tick
-        /// (PlanStripTickDecision.Decide sees Sequence 0 != myGen 1 and
-        /// stops) - exactly the "lost completion status" bug this board
-        /// exists to prevent. Checking _sequence == 0 alone would already
-        /// be sufficient (Begin only ever moves _sequence away from 0, and
-        /// never back), but the _inFlight check is kept too as a defensive,
-        /// self-documenting belt-and-braces guard rather than relying on
-        /// that invariant alone.
+        /// (_sequence != 0) or is currently in flight. That is enforced, not
+        /// merely expected: a user can click Generate while Module.LoadAsync
+        /// is still in flight, so this seed can run AFTER that generation's
+        /// whole Begin/UpdatePhase/Finish sequence, and stomping _sequence
+        /// back to 0 there would freeze the strip - the exact "lost
+        /// completion status" bug this board exists to prevent.
+        /// Derivation: docs/ARCHITECTURE.md section 6.2.
         /// </para>
         /// </summary>
         public void SeedRestored(string finalStatusText)
@@ -217,28 +153,23 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// undoes a <see cref="SeedRestored"/>
-        /// call whose downstream render subsequently failed - see
-        /// Views/CraftingPlanView.cs's shared rollback helper, called from
-        /// both RenderPlan call sites that can reach a still-unvalidated
-        /// restored plan (Build()'s own unguarded-until-now render tail,
-        /// and ApplyRestoredPlan's live-tab branch). Only clears
-        /// <c>_finalStatusText</c>, and only while this board still
-        /// reflects nothing but that one seed - the exact same
-        /// "<c>_sequence != 0 || _inFlight</c>" guard <see
-        /// cref="SeedRestored"/> itself uses, for the same reason (see its
-        /// own doc comment): a real Generate that raced in between the
-        /// original seed and the render failure that triggered this
-        /// rollback must never be clobbered by a rollback for a plan that
-        /// generation has already superseded. Returns whether it actually
-        /// cleared anything, so the caller knows whether it is also safe
-        /// to reset the status label's already-painted text back to
-        /// "Ready" - RenderFromBoard is pull-based and never overwrites a
-        /// label with an empty FinalStatusText, so clearing the board
-        /// alone is not enough to un-paint an already-rendered banner, but
-        /// forcing that reset unconditionally would stomp a genuinely
-        /// in-flight generation's live spinner text whenever this method's
-        /// own guard (correctly) no-ops.
+        /// Undoes a <see cref="SeedRestored"/> call whose downstream render
+        /// subsequently failed - see Views/CraftingPlanView.cs's shared
+        /// rollback helper. Only clears the seeded final status text, and
+        /// only while this board still reflects nothing but that one seed
+        /// (the same "_sequence != 0 || _inFlight" guard SeedRestored uses,
+        /// for the same reason): a real Generate that raced in between must
+        /// never be clobbered by a rollback for a plan it has superseded.
+        /// <para>
+        /// Returns whether it actually cleared anything, so the caller knows
+        /// whether it is also safe to reset the status label's already-
+        /// painted text back to "Ready". RenderFromBoard is pull-based and
+        /// never overwrites a label with an empty FinalStatusText, so
+        /// clearing the board alone does not un-paint an already-rendered
+        /// banner - but forcing that reset unconditionally would stomp a
+        /// genuinely in-flight generation's live spinner text whenever this
+        /// method's own guard correctly no-ops.
+        /// </para>
         /// </summary>
         public bool ClearRestoredSeed()
         {

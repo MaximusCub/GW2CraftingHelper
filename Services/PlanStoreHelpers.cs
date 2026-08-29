@@ -9,26 +9,20 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Serialization for plan persistence - mirrors SnapshotHelpers'
-    /// shape, with two deliberate differences: (1) DeserializePersistedPlan
-    /// does NOT swallow a parse/schema failure into a silent null itself.
-    /// An unreadable file requires a log line (unlike snapshot.json's own
-    /// silent-null precedent) - so this
-    /// lets the exception propagate to PlanStore.LoadLatest's single
-    /// try/catch, which reports a corrupt file at Warn via the same onError
-    /// callback every other store uses and drift from an older SHIPPED
-    /// schema version at Info via its own onInfo callback (see PlanStore.cs).
-    /// (2) Compact (not Indented)
-    /// formatting - see SerializePersistedPlan's own doc comment.
+    /// Serialization for plan persistence. Two deliberate differences from
+    /// SnapshotHelpers' shape: DeserializePersistedPlan does NOT swallow a
+    /// parse/schema failure into a silent null - it lets the exception
+    /// propagate to PlanStore.LoadLatest's single try/catch, which owns the
+    /// Warn-vs-Info split - and the formatting is compact rather than
+    /// Indented (see SerializePersistedPlan's own doc comment).
     /// <para>
     /// Two read entry points, because a plan.json is two independently
-    /// versioned layers (see PersistedPlan's own doc comment):
-    /// LoadPersistedPlanDocument reads both and degrades to the request
-    /// alone when the result layer is unreadable, while
-    /// DeserializePersistedPlan is the strict all-or-nothing read a caller
-    /// takes when a request without a result would buy it nothing -
+    /// versioned layers: LoadPersistedPlanDocument reads both and degrades
+    /// to the request alone when the result layer is unreadable;
+    /// DeserializePersistedPlan is the strict all-or-nothing read, taken by
     /// PlanHistoryBlobStore, whose index row already carries the request.
     /// </para>
+    /// <para>Derivation: docs/ARCHITECTURE.md section 12.</para>
     /// </summary>
     internal static class PlanStoreHelpers
     {

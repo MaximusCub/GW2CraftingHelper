@@ -6,24 +6,18 @@ namespace TaimisToolbench.Services
     /// The Log tab's scannable gutter (Blish-free, unit-testable): a Time
     /// band and a Tag band, each starting at a fixed x on every row, with
     /// the message taking everything left over.
-    ///
     /// <para>
-    /// This replaces one worst-case prefix TEMPLATE - the widest level word,
-    /// a widest-digit stamp, and a fourteen-'w' tag allowance, measured once
-    /// and applied to every row at every width whatever the rows actually
-    /// contained. The template existed for a real reason (recorded on
-    /// LogTabContent.FullPrefixWidth): the incremental append path sees only
-    /// the new entries, so a width derived from what IT can see would drift
-    /// from what a full rebuild produced. That is answered rather than
-    /// reverted - the view holds the widest rendered tag as a monotonic
-    /// high-water mark per render generation, so both paths agree by
-    /// construction while the band still tracks the content.
+    /// The Tag band tracks content rather than a worst-case template, which
+    /// only works because the view holds the widest rendered tag as a
+    /// monotonic high-water mark per render generation - the incremental
+    /// append path sees only the new entries, so a width derived from what
+    /// IT can see would otherwise drift from what a full rebuild produced
+    /// (see LogTabContent.FullPrefixWidth).
+    /// Derivation: docs/ARCHITECTURE.md section S1.2.
     /// </para>
-    ///
     /// <para>
     /// The message half stays <see cref="LogRowLayout"/>'s: its floor and
-    /// its half-row cap are the degenerate-width behaviour this tab already
-    /// gets right, and they now apply to the SUM of the two bands.
+    /// its half-row cap now apply to the SUM of the two bands.
     /// </para>
     /// </summary>
     internal static class LogGutterLayout

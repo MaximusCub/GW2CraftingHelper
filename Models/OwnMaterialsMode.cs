@@ -4,28 +4,21 @@ namespace TaimisToolbench.Models
     /// How the plan values materials the player already owns and that
     /// inventory reduction consumes. An owned unit is always consumed
     /// first, at zero acquisition cost - this enum never makes an owned
-    /// unit "cost" anything. What it DOES control:
-    /// 1. Valued runs a zero-owned decision pass BEFORE the real solve
-    ///    (reusing the same force-buy pre-pass baseline): a node is
-    ///    excluded from crafting when buying it outright costs less than
-    ///    85% of what its own components would cost to buy fresh (gw2e's
-    ///    getCheaperToBuyItemIds) - i.e. a bad trade even though the
-    ///    components happen to be in-hand right now.
-    /// 2. Valued's reduction is now DECISION-GUIDED, not merely gated: owned
-    ///    stock only ever discounts the recipe option that zero-owned
-    ///    decision pass actually chose to Craft - never a never-chosen
-    ///    option or a node decided Buy/Vendor - so owned stock can no
-    ///    longer flip a decision toward a chain that is worse at market
-    ///    prices, and a Buy-decided node's ingredients are never
-    ///    phantom-consumed into UsedMaterials.
-    /// 3. Valued also deducts owned materials' trading-post sell
-    ///    opportunity cost from CraftingProfit, computed from the
-    ///    decision-guided UsedMaterials list.
-    /// In Free mode, reduction falls back to the legacy primary-recipe-
-    /// option heuristic unchanged.
-    /// All of the above only takes effect when an account snapshot actually
-    /// drove reduction (CraftingPlanPipeline's own gate) - with no
-    /// snapshot, this setting is inert regardless of its value.
+    /// unit "cost" anything.
+    /// <para>
+    /// Valued runs a zero-owned decision pass BEFORE the real solve: a node
+    /// is excluded from crafting when buying it outright costs less than
+    /// 85% of what its own components would cost to buy fresh (gw2e's
+    /// getCheaperToBuyItemIds). Its reduction is then decision-GUIDED, not
+    /// merely gated, and it deducts owned materials' trading-post sell
+    /// opportunity cost from CraftingProfit. Free falls back to the legacy
+    /// primary-recipe-option heuristic unchanged.
+    /// </para>
+    /// <para>
+    /// All of the above is inert unless an account snapshot actually drove
+    /// reduction (CraftingPlanPipeline's own gate), whatever the value.
+    /// Derivation: docs/ARCHITECTURE.md section 8.2.
+    /// </para>
     /// </summary>
     internal enum OwnMaterialsMode
     {

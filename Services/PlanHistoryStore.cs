@@ -14,24 +14,15 @@ namespace TaimisToolbench.Services
     /// writers (the capture path's ThreadPool continuation and the tab's
     /// main-thread mutations).
     /// <para>
-    /// Schema handling is deliberately FORGIVING, unlike PlanStore's
-    /// throw: a corrupt plan.json costs the user one plan, but a thrown
-    /// index load would cost them the whole tab. A file written at any
-    /// version this build still reads
-    /// ([PlanHistoryIndex.MinimumReadableSchemaVersion,
-    /// CurrentSchemaVersion]) loads its rows and is restamped by the next
-    /// Save - silently, because nothing was lost and there is nothing to
-    /// tell the user. Only a version outside that range, or a file that
-    /// will not parse, costs the history: one Warn through onError, then
-    /// an empty index the next Save overwrites. The bad file is left on
-    /// disk for inspection, never deleted here.
+    /// Schema handling is deliberately FORGIVING, unlike PlanStore's throw:
+    /// a file stamped anywhere in [PlanHistoryIndex.
+    /// MinimumReadableSchemaVersion, CurrentSchemaVersion] loads its rows
+    /// and is restamped by the next Save, silently. Only a version outside
+    /// that range, or a file that will not parse, costs the history: one
+    /// Warn through onError, then an empty index the next Save overwrites.
+    /// The bad file is left on disk for inspection, never deleted here.
     /// </para>
-    /// <para>
-    /// Serialization is Indented, following RankerStore/SnapshotHelpers'
-    /// precedent rather than PlanStoreHelpers' compact one: the index is
-    /// single-digit KB and rewritten once per Generate, not per pill
-    /// click, so the compact decision's rationale does not apply.
-    /// </para>
+    /// <para>Derivation: docs/ARCHITECTURE.md section 12.</para>
     /// </summary>
     internal class PlanHistoryStore
     {

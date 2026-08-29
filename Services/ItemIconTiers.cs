@@ -61,30 +61,20 @@ namespace TaimisToolbench.Services
 
     /// <summary>
     /// The module's two item-icon sizes, matched to the game's own two
-    /// inventory tiers (owner ruling, 2026-08-26), plus the pixel table
-    /// behind <see cref="ItemIconTier"/>. Blish-free so the layout math
-    /// that reserves room for an icon and the view that draws it read the
-    /// same number.
-    ///
+    /// inventory tiers, plus the pixel table behind
+    /// <see cref="ItemIconTier"/>. Blish-free so the layout math that
+    /// reserves room for an icon and the view that draws it read the same
+    /// number.
     /// <para>
-    /// MEASURED from the staged references against the in-game tooltip
-    /// text (~14px, the same class as UiFonts.Body, so game pixels at
-    /// default UI scale read 1:1 as module logical pixels):
-    /// bag-icon-size-reference.png shows a main bag grid at ~59-60px slot
-    /// pitch with ~54-56px of slot art; bag-sidebar-icon-size-reference.png
-    /// shows the bag side bar at ~44px pitch with ~39-40px of art - a
-    /// sidebar:slot art ratio of ~0.72.
+    /// Art sizes below EXCLUDE the module's own rarity frame, so the frame
+    /// lands inside the measured window: 52+2 = 54 against the game's 54-56,
+    /// 40+2 = 42 against 39-40 plus its border. That derivation is why the
+    /// frame is 1px at every tier - a 2px frame would put tier 1 at 56, the
+    /// top of the measured window rather than inside it - and why the
+    /// thickness is a property of the tier here rather than a number each
+    /// call site chooses.
     /// </para>
-    ///
-    /// <para>
-    /// Art sizes below exclude the module's own rarity frame, so the frame
-    /// lands inside the measured window: 52+2 = 54 against the game's
-    /// 54-56, 40+2 = 42 against 39-40 plus its border. That derivation is
-    /// why the frame is 1px at every tier - a 2px frame would put tier 1 at
-    /// 56, the top of the measured window rather than inside it - and why
-    /// the thickness is a property of the tier here rather than a number
-    /// each call site chooses.
-    /// </para>
+    /// <para>Measurements: docs/ARCHITECTURE.md section S1.3.</para>
     /// </summary>
     internal static class ItemIconTiers
     {

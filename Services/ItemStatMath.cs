@@ -3,27 +3,22 @@ using System;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The attribute arithmetic behind a stat-selectable item's numbers,
-    /// and the API-token to in-game-name map every attribute line needs.
-    ///
+    /// The attribute arithmetic behind a stat-selectable item's numbers, and
+    /// the API-token to in-game-name map every attribute line needs.
     /// <para>
     /// THE FORMULA IS THE API'S OWN, not a reconstruction: for every
-    /// fixed-stat item the endpoint publishes BOTH the inputs
-    /// (details.attribute_adjustment, plus the multipliers on its
-    /// /v2/itemstats entry) AND the answer (infix_upgrade.attributes), and
+    /// fixed-stat item the endpoint publishes both the inputs
+    /// (details.attribute_adjustment plus the multipliers on its
+    /// /v2/itemstats entry) and the answer (infix_upgrade.attributes), and
     /// round(multiplier * attribute_adjustment) reproduces that published
-    /// answer exactly. Measured on Berserker's (itemstats 161,
-    /// .35/.25/.25) against Zojja's Warfists/Pauldrons (adjustment
-    /// 134.442 -> 47/34/34), Visor (179.256 -> 63/45/45), Tassets
-    /// (268.884 -> 94/67/67) and Breastplate (403.326 -> 141/101/101) -
-    /// see ItemStatMathTests, which asserts against those published
+    /// answer exactly. ItemStatMathTests asserts against those published
     /// answers rather than against this method's own arithmetic.
     /// </para>
     /// <para>
-    /// The legacy "value" field on a /v2/itemstats attribute is NOT part
-    /// of this: entry 161 reports value 0 on all three attributes while a
+    /// The legacy "value" field on a /v2/itemstats attribute is NOT part of
+    /// this: entry 161 reports value 0 on all three attributes while a
     /// different entry of the same name reports non-zero ones. Multiplier
-    /// only.
+    /// only. Measurements: docs/ARCHITECTURE.md section S1.4.
     /// </para>
     /// </summary>
     internal static class ItemStatMath

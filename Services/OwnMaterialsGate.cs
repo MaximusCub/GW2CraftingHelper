@@ -2,25 +2,21 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Resolves the "Use Own Materials" toggle against the one fact that
-    /// decides whether it can do anything: whether an account snapshot
-    /// exists to subtract from.
+    /// decides whether it can do anything: whether an account snapshot exists
+    /// to subtract from.
     /// <para>
-    /// Invariant: with no snapshot there is nothing to subtract, so the
-    /// plan is solved as if the account owns nothing. The toggle must not
-    /// render as an active, satisfied setting while that is true - which is
-    /// why <see cref="OwnMaterialsControlState.Checked"/> is BOTH what the
-    /// checkbox displays and the value handed to the solver. The two cannot
+    /// Invariant: with no snapshot there is nothing to subtract, so the plan
+    /// is solved as if the account owns nothing, and the toggle must not
+    /// render as an active, satisfied setting while that is true. That is why
+    /// <see cref="OwnMaterialsControlState.Checked"/> is BOTH what the
+    /// checkbox displays and the value handed to the solver: the two cannot
     /// drift, so the box can never claim an input the plan did not get.
     /// </para>
     /// <para>
     /// The user's standing intent is held by the caller and passed through
     /// untouched, so a snapshot arriving later restores the setting with no
-    /// restart and no second source of truth.
-    /// </para>
-    /// <para>
-    /// Blish-free and unit-testable, for the same reason as
-    /// <see cref="PlanStripTickDecision"/>: the view that consumes it is
-    /// not.
+    /// restart and no second source of truth. Blish-free and unit-testable,
+    /// for the same reason as <see cref="PlanStripTickDecision"/>.
     /// </para>
     /// </summary>
     internal static class OwnMaterialsGate

@@ -7,34 +7,23 @@ using Newtonsoft.Json;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// File-IO half of the module logging system (dev/proposals/d2-log-system.md Section
-    /// 4.1/4.2): persists ModuleLogEntry lines to a single append-only
-    /// newline-delimited JSON file, data/module_log.jsonl. JSONL rather than
-    /// one big JSON array (the SnapshotStore/StatusStore/VendorOfferStore
-    /// shape) because a log is fundamentally append-heavy and a crash
-    /// mid-append to JSONL loses at most the last, tolerated-as-partial
-    /// line, whereas a crash mid-write to one big array can corrupt the
-    /// entire file.
+    /// File-IO half of the module logging system
+    /// (dev/proposals/d2-log-system.md Section 4.1/4.2): persists
+    /// ModuleLogEntry lines to a single append-only newline-delimited JSON
+    /// file, data/module_log.jsonl.
     /// <para>
-    /// Rotation is split into two independently callable, independently
-    /// testable operations rather than d2's single combined
-    /// "RotateIfNeeded(maxBytes, maxAgeDays)" signature, matching how they
-    /// actually fire at different cadences: <see cref="AppendLine"/> self-
-    /// trims by SIZE on every call (cheap - one FileInfo.Length syscall),
-    /// while <see cref="PruneOlderThan"/> is meant to be called once per
-    /// session (Module.LoadAsync) for the AGE-based check. Both use the
-    /// same atomic .tmp + File.Replace rewrite every other store in the
-    /// module shares (SnapshotStore.Save, StatusStore.Save, PlanStore.Save,
-    /// VendorOfferStore.SaveOverlay).
+    /// Rotation is two independently callable operations, not one:
+    /// <see cref="AppendLine"/> self-trims by SIZE on every call (one
+    /// FileInfo.Length syscall); <see cref="PruneOlderThan"/> does the AGE
+    /// check, once per session. Both use the same atomic .tmp + File.Replace.
     /// </para>
     /// <para>
-    /// Blish-free (see ModuleLogEntry's own doc comment for why) and takes
-    /// an <paramref name="onError"/> callback from day one -
-    /// called instead of throwing on any IO failure, so a log store failure
-    /// can never itself crash the caller. Never logs through ModuleLog on
-    /// its own failure (that would be unbounded recursion into the sink
-    /// whose own write just failed) - callers should route this callback to
-    /// Blish's own Logger only, see Module.cs's wiring.
+    /// Blish-free. An onError callback is called instead of throwing on any
+    /// IO failure, so a log store failure can never itself crash the caller.
+    /// This class must never log through ModuleLog on its own failure -
+    /// unbounded recursion into the sink whose write just failed - so
+    /// callers must route onError to Blish's own Logger only.
+    /// Derivation: docs/ARCHITECTURE.md section S1.1.
     /// </para>
     /// </summary>
     internal class ModuleLogStore

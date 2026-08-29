@@ -5,28 +5,22 @@ namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Which account-inventory sources the Snapshot tab's search/filter row
-    /// should include (dev/proposals/d1-snapshot-about-settings.md Feature 1). The three
-    /// storage locations default to true (show everything), matching the
-    /// pre-search-box tab's implicit no-filter behavior.
+    /// should include (dev/proposals/d1-snapshot-about-settings.md Feature
+    /// 1). The three storage locations default to true (show everything),
+    /// matching the pre-search-box tab's implicit no-filter behavior.
     /// <para>
-    /// Characters are carried as an EXCLUSION set of bare character names
-    /// (no "Character:" encoding prefix), resolving Feature 1 Open Question
-    /// 1 in favor of per-character checkboxes. Exclusion rather than
-    /// inclusion is what makes a character absent from the set visible, so a
-    /// character that appears in a fresh snapshot defaults to shown without
-    /// this type ever needing to know the account's roster. Ordinal
-    /// comparison: the names are the same strings AccountItemIndex encodes
-    /// its "Character:&lt;name&gt;" source keys from, so exact match is the
-    /// only meaningful one.
+    /// Characters are carried as an EXCLUSION set of bare character names (no
+    /// "Character:" encoding prefix). Exclusion rather than inclusion is what
+    /// makes a character absent from the set VISIBLE, so a character that
+    /// appears in a fresh snapshot defaults to shown without this type ever
+    /// needing to know the account's roster. Ordinal comparison: the names
+    /// are the same strings AccountItemIndex encodes its source keys from.
     /// </para>
     /// <para>
-    /// Deliberately a plain data carrier with no behavior of its own -
-    /// matching/mapping this against a raw AccountItemIndex source string
-    /// lives in Services.SnapshotSearchResultBuilder instead, keeping this
-    /// Models type free of a Services-namespace dependency (no existing
-    /// Models type references Services; see AccountItemIndex/
-    /// Gw2AccountSnapshotService for where the raw source strings
-    /// themselves are defined).
+    /// A plain data carrier with no behavior of its own - matching it against
+    /// a raw AccountItemIndex source string lives in
+    /// Services.SnapshotSearchResultBuilder, keeping this Models type free of
+    /// a Services-namespace dependency.
     /// </para>
     /// </summary>
     internal class SnapshotSourceFilter

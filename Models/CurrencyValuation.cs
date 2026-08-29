@@ -7,24 +7,21 @@ namespace TaimisToolbench.Models
     /// User-provided coin valuations for the two kinds of non-coin thing a
     /// vendor takes - non-coin wallet CURRENCIES and untradeable barter
     /// ITEMS - plus which of each the user has explicitly CLEARED of the
-    /// curated defaults. Precedence per id: user-set value wins; else a
+    /// curated defaults. Precedence per id: a user-set value wins; else a
     /// cleared id has no value at all (a deliberate, persisted
-    /// suppression); else the curated default applies
-    /// (CurrencyDecisionDefaults / BarterItemDecisionDefaults). See
-    /// TryGetEffectiveCopperValue and TryGetEffectiveItemCopperValue - they
-    /// are not called by the solver at runtime; WithDefaults materializes
-    /// the precedence into plain dictionaries first. TryGetCopperValue and
+    /// suppression); else the curated default applies.
+    /// <para>
+    /// TryGetEffectiveCopperValue/TryGetEffectiveItemCopperValue express that
+    /// precedence but are NOT called by the solver at runtime - WithDefaults
+    /// materializes it into plain dictionaries first. TryGetCopperValue and
     /// TryGetItemCopperValue stay raw user-override lookups.
-    ///
-    /// Currencies and items are two tables, not one: a GW2 currency id and
-    /// a GW2 item id are different id spaces that collide numerically
-    /// (currency 39 and item 39 are unrelated things), so a single
-    /// int-keyed map would answer the wrong question for one of them.
-    ///
-    /// The GW2 API defines no exchange rate for either kind, so the solver
-    /// never invents one (repo invariant): only an id with an effective
-    /// value is usable for comparison; everything else stays unvalued and
-    /// fallback-tier only.
+    /// </para>
+    /// <para>
+    /// Two tables, not one: a GW2 currency id and a GW2 item id are
+    /// different id spaces that collide numerically. The GW2 API defines no
+    /// exchange rate for either kind and the solver never invents one, so an
+    /// id with no effective value stays fallback-tier only.
+    /// </para>
     /// </summary>
     internal class CurrencyValuation
     {

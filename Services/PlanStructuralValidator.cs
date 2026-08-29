@@ -6,32 +6,22 @@ namespace TaimisToolbench.Services
     /// <summary>
     /// One class-level structural walk of the ENTIRE object graph a
     /// deserialized <see cref="PersistedPlan"/> carries, run at the
-    /// deserialization boundary (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>)
-    /// before the file is accepted at all.
+    /// deserialization boundary
+    /// (<see cref="PlanStoreHelpers.DeserializePersistedPlan"/>) before the
+    /// file is accepted at all.
     /// <para>
     /// Every check below exists because a specific production path
     /// dereferences that exact field with no null guard, on an assumption
-    /// that holds for every solver-BUILT <see cref="CraftingPlanResult"/>/
-    /// <see cref="PlanSolveContext"/> - those are only ever constructed by
-    /// <see cref="PlanSolver"/>/<see cref="PlanResultBuilder"/>/<see cref="CraftingTreeBuilder"/>.
-    /// A restored plan is the one path that bypasses the solver and hands
-    /// the same types straight from disk into that trusted code, so the
-    /// invariants are re-established here, once, instead of at each call
-    /// site: several of those sites sit outside any try/catch (Expand All
-    /// and the per-node toggle call RenderTreeNode straight from a Click
-    /// handler, on nodes a guarded initial render never visited because
-    /// they were collapsed; Craft All/Buy All walk the whole tree through
-    /// BuildPresetOverrides before ApplyOverridesAndResolve's catch is
-    /// reached). See each check's own inline comment for the site it
-    /// protects.
+    /// that holds for every solver-BUILT result. See each check's own
+    /// inline comment for the site it protects.
     /// </para>
     /// <para>
     /// Validation failure is the corrupt-file path: the caller throws,
-    /// <see cref="PlanStore.LoadLatest"/> catches, logs one Warn and returns
-    /// null (fresh start). Never a partial accept - one invalid field
-    /// rejects the whole file, like every other tolerance gate in
-    /// <see cref="PlanStoreHelpers.DeserializePersistedPlan"/>.
+    /// <see cref="PlanStore.LoadLatest"/> catches, logs one Warn and
+    /// returns null. Never a partial accept - one invalid field rejects the
+    /// whole file.
     /// </para>
+    /// <para>Derivation: docs/ARCHITECTURE.md section 12.</para>
     /// </summary>
     internal static class PlanStructuralValidator
     {

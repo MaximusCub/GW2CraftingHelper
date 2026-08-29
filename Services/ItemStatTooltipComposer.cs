@@ -287,27 +287,21 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// The consume prompt and effect block, the way the game draws
-        /// them (measured on live3 soul-pastries / candy-corn / omnomberry,
-        /// 2026-08-26):
+        /// The consume prompt and effect block, the way the game draws them:
         /// <code>
         /// Double-click to consume.                       white
         /// [icon] Nourishment (45 m): +100 Concentration  grey (#AAA)
         ///        +70 Power                               grey
         ///        +15% Experience from Kills              grey
         /// </code>
-        /// The effect NAME (details.name), its duration and its first
-        /// effect line share one line; EVERY line of the block is the
-        /// annotation grey - all three captures saturate at (170,170,170),
-        /// superseding F7's white-first-line split, whose allspice/steak
-        /// evidence was JPEG-era. The effect lines' own +/% prefixes come
-        /// from the API text and are not normalised (omnomberry:
-        /// "30% Magic Find" beside "+10% Experience from Kills").
+        /// The effect NAME (details.name), its duration and its first effect
+        /// line share one line; EVERY line of the block is the annotation
+        /// grey. The effect lines' own +/% prefixes come from the API text
+        /// and are not normalised.
         /// <para>
         /// Ascended food returns details:{type:Food} and nothing else
-        /// (measured on 91805). Silence, not a "no effect data" marker:
-        /// the absence is not itself confusing, and inventing a line would
-        /// be the one thing this module never does.
+        /// (measured on 91805). Silence, not a "no effect data" marker.
+        /// Measurements: docs/ARCHITECTURE.md section S1.4.
         /// </para>
         /// </summary>
         private static void AppendConsumableEffect(TooltipContentBuilder builder, ItemStatBlock stats)
