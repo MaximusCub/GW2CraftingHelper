@@ -17,9 +17,10 @@ namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The Plan History tab: a list of previously-generated plans, newest
-    /// first with pinned rows on top, each offering View (free, frozen
-    /// summary), Open (restore the exact saved plan, pills live, no
-    /// network) and Re-solve (run the same request again at today's
+    /// first with pinned rows on top. A row expands in place from its
+    /// caret, its icon or its name (free, frozen summary) and offers Open
+    /// in Planner (restore the exact saved plan, pills live, no network)
+    /// and Re-Solve in Planner (run the same request again at today's
     /// prices).
     ///
     /// Structurally a RankerTabContent-shaped tab: fixed chrome siblings
@@ -66,6 +67,10 @@ namespace TaimisToolbench.Views
         private const int EmptyStateHeight = 44;
 
         private static readonly Color DimColor = new Color(150, 150, 150);
+
+        /// <summary>The expand caret's ink, as the Recipe Tree draws it.</summary>
+        private static readonly Color CaretColor = Color.White;
+
         private static readonly Color StatusColor = new Color(200, 200, 200);
         private static readonly Color ErrorColor = new Color(255, 100, 100);
 
@@ -336,9 +341,13 @@ namespace TaimisToolbench.Views
         {
             var bands = BandsFor(barWidth);
 
-            SetHeaderLabel(0, bands.IconX);
-            SetHeaderLabelRight(1, bands.CostRightEdge);
-            SetHeaderLabelRight(2, bands.WhenRightEdge);
+            // Plan is the flexing label column and reads from its left
+            // edge; the two data columns centre on their own axes, so a
+            // short header sits over the values it names instead of only
+            // meeting them at one edge (JustifiedColumnTracks).
+            SetHeaderLabel(0, bands.CaretX);
+            SetHeaderLabelCentered(1, bands.CostCenterX);
+            SetHeaderLabelCentered(2, bands.WhenCenterX);
         }
 
         private void SetHeaderLabel(int index, int x)
@@ -349,7 +358,7 @@ namespace TaimisToolbench.Views
             }
         }
 
-        private void SetHeaderLabelRight(int index, int rightEdge)
+        private void SetHeaderLabelCentered(int index, int centerX)
         {
             if (index >= _columnHeaderLabels.Count)
             {
@@ -357,7 +366,7 @@ namespace TaimisToolbench.Views
             }
 
             var label = _columnHeaderLabels[index];
-            label.Location = new Point(Math.Max(0, rightEdge - label.Width), ColumnHeaderLabelY);
+            label.Location = new Point(Math.Max(0, centerX - label.Width / 2), ColumnHeaderLabelY);
         }
 
         // ---------------------------------------------------------------
@@ -371,7 +380,7 @@ namespace TaimisToolbench.Views
             public IconNameRowHelpers.IconNameHandle IconName;
             public CoinCurrencyRenderer.ValueCellHandle CostCell;
             public Label WhenLabel;
-            public FeedbackButton View;
+            public Label Caret;
             public FeedbackButton Open;
             public FeedbackButton Resolve;
             public Checkbox Pin;
@@ -520,6 +529,9 @@ namespace TaimisToolbench.Views
             string firstRarity = ResolvedRarity(firstSummary);
             var hover = RowHover(entry, firstSummary, firstRarity);
 
+            bool expanded = string.Equals(_expandedEntryId, entry.EntryId, StringComparison.Ordinal);
+            row.Caret = CreateCaret(row.Panel, expanded, bands.CaretX);
+
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 row.Panel, firstSummary?.IconUrl, firstRarity,
                 bands.IconX, PlanHistoryRowLayout.IconY, row.FullLabel, UiFonts.Body,
@@ -534,26 +546,29 @@ namespace TaimisToolbench.Views
                 row.Panel, WhenText(entry), UiFonts.Body, StatusColor,
                 bands.WhenRightEdge, PlanHistoryRowLayout.MainLineTextY);
 
-            row.View = CreateActionButton(row.Panel, "View", bands.ViewX,
-                "Show what this plan cost when it was generated. Nothing is recalculated.");
-            row.View.Click += (_, __) => ToggleDetail(entry.EntryId);
+            // The caret, the icon and the name are one affordance: all
+            // three toggle the same panel, so the biggest targets on the
+            // row do what the caret advertises. Wired per control rather
+            // than on row.Panel because Blish delivers a click to the
+            // deepest control under the cursor and never bubbles - a
+            // handler on the panel alone would answer only the gaps.
+            string entryId = entry.EntryId;
+            WireExpandTarget(row.Caret, entryId);
+            WireExpandTarget(row.IconName.IconFrame, entryId);
+            WireExpandTarget(row.IconName.NameLabel, entryId);
 
+            // Omitted, not disabled, when the saved plan is gone. The
+            // cluster is right-anchored, so the empty slot reads as
+            // whitespace to the left of Re-Solve, not as a dead button.
             if (entry.BlobPresent)
             {
-                row.Open = CreateActionButton(row.Panel, "Open", bands.OpenX,
+                row.Open = CreateActionButton(row.Panel, "Open in Planner", bands.OpenX,
                     "Load this exact saved plan into the Crafting Plan tab, with its decision pills, "
                         + "at the prices it was generated with. Replaces the plan currently shown there.");
                 row.Open.Click += (_, __) => OnOpenClicked(entry);
             }
-            else
-            {
-                // Open is hidden, not disabled - the remaining buttons
-                // re-pack so no dead slot sits in the cluster; View takes
-                // the Open slot, staying adjacent to Re-solve.
-                row.View.Location = new Point(bands.OpenX, row.View.Location.Y);
-            }
 
-            row.Resolve = CreateActionButton(row.Panel, "Re-solve", bands.ResolveX,
+            row.Resolve = CreateActionButton(row.Panel, "Re-Solve in Planner", bands.ResolveX,
                 "Run this same request again at current prices and show it in the Crafting Plan tab. "
                     + "Replaces the plan currently shown there. Manual decision overrides are not restored.");
             row.Resolve.Click += (_, __) => OnResolveClicked(entry);
@@ -574,7 +589,7 @@ namespace TaimisToolbench.Views
                 SetRowEnabled(row, false);
             }
 
-            if (string.Equals(_expandedEntryId, entry.EntryId, StringComparison.Ordinal))
+            if (expanded)
             {
                 row.DetailPanel = BuildDetailPanel(row, entry, barWidth, bands);
             }
@@ -687,6 +702,55 @@ namespace TaimisToolbench.Views
             button.IconTint = RemoveIconTint;
             TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
+        }
+
+        // The Recipe Tree's own expand affordance, from the module's glyph
+        // page, degrading to ASCII exactly where that page does.
+        private Label CreateCaret(Panel parent, bool expanded, int x)
+        {
+            var caret = new Label
+            {
+                Font = UiFonts.BodyGlyphs,
+                Text = UiGlyphs.ExpandCaret(expanded, UiFonts.GlyphsAvailable),
+                TextColor = CaretColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(x, PlanHistoryRowLayout.MainLineTextY),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(
+                caret,
+                expanded
+                    ? "Collapse this plan."
+                    : "Expand this plan to see what it cost when it was generated. "
+                        + "Nothing is recalculated.");
+            return caret;
+        }
+
+        /// <summary>
+        /// Makes one control - and everything nested inside it, since Blish
+        /// resolves a click on the deepest control under the cursor and
+        /// never bubbles - toggle the row's detail panel.
+        /// </summary>
+        private void WireExpandTarget(Control control, string entryId)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            control.Click += (_, __) => ToggleDetail(entryId);
+
+            var container = control as Container;
+            if (container == null)
+            {
+                return;
+            }
+
+            foreach (var child in container.Children.ToArray())
+            {
+                WireExpandTarget(child, entryId);
+            }
         }
 
         // Checkbox centres its 32px state art on Height/2, so handing it
@@ -974,6 +1038,7 @@ namespace TaimisToolbench.Views
                     bands.NameX + bands.NameWidth, 0, 0);
             }
 
+            row.Caret.Location = new Point(bands.CaretX, row.Caret.Location.Y);
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 
@@ -983,7 +1048,6 @@ namespace TaimisToolbench.Views
                 Math.Max(0, bands.WhenRightEdge - row.WhenLabel.Width),
                 PlanHistoryRowLayout.MainLineTextY);
 
-            row.View.Location = new Point(row.Open != null ? bands.ViewX : bands.OpenX, MainLineButtonY);
             if (row.Open != null)
             {
                 row.Open.Location = new Point(bands.OpenX, MainLineButtonY);
@@ -1022,8 +1086,17 @@ namespace TaimisToolbench.Views
         // ---------------------------------------------------------------
         // Actions
         // ---------------------------------------------------------------
+        // Guarded like every other row action. The gate lives here rather
+        // than on the controls because the expand targets are a Label, an
+        // icon frame and a name - none of them buttons, so SetRowEnabled
+        // has nothing on them to switch off.
         private void ToggleDetail(string entryId)
         {
+            if (_isResolving)
+            {
+                return;
+            }
+
             _expandedEntryId = string.Equals(_expandedEntryId, entryId, StringComparison.Ordinal)
                 ? null
                 : entryId;
@@ -1237,7 +1310,10 @@ namespace TaimisToolbench.Views
 
         private static void SetRowEnabled(RenderedRow row, bool enabled)
         {
-            row.View.Enabled = enabled;
+            // The one row affordance that is not a button, and so takes no
+            // disabled plate: it says so in its own ink instead.
+            row.Caret.TextColor = enabled ? CaretColor : DimColor;
+
             if (row.Open != null)
             {
                 row.Open.Enabled = enabled;
