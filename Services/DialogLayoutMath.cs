@@ -181,16 +181,25 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// One line of message plus the button row and the paddings - the
+        /// smallest content box a dialog can be answered in.
+        /// </summary>
+        public static int MinContentHeight(int lineHeight)
+        {
+            return MessageTopMargin + Math.Max(1, lineHeight)
+                + MessageToButtonGap + ButtonHeight + ButtonBottomMargin;
+        }
+
+        /// <summary>
         /// The height a dialog's content may occupy on this screen.
         /// <paramref name="chromeHeight"/> is what the window spends outside
         /// the content box - its title bar and its insets. Never returns less
-        /// than one line plus the button row: a dialog whose buttons have
+        /// than <see cref="MinContentHeight"/>: a dialog whose buttons have
         /// left the screen cannot be answered.
         /// </summary>
         public static int MaxContentHeight(int screenHeight, int chromeHeight, int lineHeight)
         {
-            int floor = MessageTopMargin + Math.Max(1, lineHeight)
-                + MessageToButtonGap + ButtonHeight + ButtonBottomMargin;
+            int floor = MinContentHeight(lineHeight);
             int usable = screenHeight - (2 * ScreenEdgeMargin) - Math.Max(0, chromeHeight);
             return usable < floor ? floor : usable;
         }

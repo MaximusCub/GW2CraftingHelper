@@ -1410,15 +1410,15 @@ display-only read.
 
 ### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
 
-It follows the same `StandardWindow` construction technique as
-`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
-`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
-class rather than a generalization of it. `ModalDialog`'s shape is one
-short sentence, a fixed "Confirm" title, and a caller-named confirm button
-beside a fixed Cancel; this dialog is a multi-line numbered checklist under
-a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
-is also not wrapped at all, which is fine for its own short sentence and
-wrong for full-sentence checklist items.
+It shares `DialogWindow` and `Services/DialogLayoutMath` with `ModalDialog`
+- a 1x1 pixel background stretched to the window's own size, `TopMost`, a
+stable `Id`, `Show()`/`Hide()` semantics, and one content-driven sizing pass
+- but is a separate class rather than a generalization of it. `ModalDialog`
+is one short sentence under a fixed "Confirm" title, centred, with a
+caller-named confirm button and an optional second seat; this dialog is a
+multi-paragraph numbered checklist under a different title, left-aligned,
+with a fixed Retry/Close pair. What was duplicated between them was the
+geometry, and that is now in one place.
 
 It deliberately skips `ModalDialog`'s settings-backed drag position
 persistence. This is a rare error-path dialog, not a workflow a user
@@ -2150,6 +2150,35 @@ having settled that question. `TextBox`es are 26 at nine of their eleven sites
 (Settings' six, the Snapshot and Log search boxes, About's), and the two
 `Dropdown`s outside the plan tab are 30, so the Log toolbar's run is three
 input heights wide before any button is placed.
+### V.37 `DialogWindow`: resizing a window Blish sizes once
+
+`WindowBase2` takes its window and content regions in a PROTECTED
+`ConstructWindow` and `Container.ContentRegion` has no public setter, so a
+dialog that wrote its own `Height` from outside would keep the content
+region it was built with and walk its buttons out of it - which is what the
+pre-sizing `ModalDialog` documented as the reason it could not grow.
+Subclassing is the seam that reaches `ConstructWindow`, and re-calling it
+recomputes padding, content margin, background ratios, title-bar bounds and
+`Size` together, exactly as a fresh window would have them.
+
+Two offsets come out of the decompiled 1.3.0 arithmetic and are worth
+writing down, because neither is visible from the call site. First,
+`ConstructWindow` places the content region at `contentRegion.Y + 40 -
+Padding.Top`, and `Padding.Top` is `Math.Max(windowRegion.Top - 40, 11)`,
+which for a window region starting at 0 is the 11 floor: a 35px inset lands
+the content 64px down. Second, its own `base.Size = windowSize` assignment
+fires `OnResized`, which recomputes the content region from `Size` minus the
+content margin. So the height actually handed to `ConstructWindow` is not
+the height the region ends up with. `DialogWindow` passes the REQUESTED
+content height rather than the window region's remainder: when `OnResized`
+fires the region lands 11px taller, and when it does not (a resize to the
+size the window already has) it lands exactly as passed. Both hold the
+content box; passing the remainder would leave the shorter of the two 11px
+short, with the button row's bottom edge outside it.
+
+`ChromeHeight` is the 74 that falls out: 24px of window above the content
+region, the 40px title bar, and the 10px kept below.
+
 ### 12.1 Two verdicts, two severities
 
 `PlanStore` mirrors `SnapshotStore`'s shape - single-file JSON, atomic

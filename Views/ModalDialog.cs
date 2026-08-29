@@ -13,58 +13,10 @@ namespace TaimisToolbench.Views
     {
         private const string WindowId = "TaimisToolbench_ModalDialog_c4f19a";
 
-        // 400x150 before, with the message in an unwrapped 380px-wide
-        // centered Label: a sentence wider than the label (Clear Cache's is
-        // ~640px at DefaultFont14) was centered on the label's midpoint and
-        // clipped at BOTH ends by the label's own scissor, so the dialog
-        // showed the middle of the sentence and nothing else. The width also
-        // squeezed WindowBase2's left title-bar texture into ~200px, which
-        // rasterized as coloured streaks behind the title.
-        //
-        // 560 is ApiAccessDialog's width, whose title bar renders clean and
-        // whose wrapped body is the shape copied below - the two dialogs are
-        // now the same size for the same reasons. Blish draws the title
-        // itself at a fixed 80px indent in DefaultFont32 with no alignment
-        // control (see ApiAccessDialog's own measurement note), so window
-        // width is the only lever either dialog has over the title bar.
-        private const int WindowWidth = 560;
-        // 190, not 170. The message area is capped to whole lines of the
-        // body font (see MessageAreaHeight), and the +2pt bump made that
-        // text ~11% wider while growing its line box 18 -> 20 - the same
-        // sentence needs a line it did not need before. 20px is exactly one
-        // Font16 line, which takes the cap from three lines back to four.
-        private const int WindowHeight = 190;
-        private const int ContentX = 10;
-        private const int ContentY = 35;
-        private const int ContentWidth = WindowWidth - (2 * ContentX);
-        private const int ContentHeight = WindowHeight - ContentY - 10;
-        private const int MessageTopMargin = 6;
-        private const int MessageToButtonGap = 16;
-        private const int ButtonHeight = 25;
-        private const int ButtonBottomMargin = 10;
-
-        // Total left+right slack around a measured button label, so a label
-        // that only just fits the button's floor width does not sit edge to
-        // edge with the border. 12px a side, matching the message label's
-        // own MessageTopMargin-scale spacing.
-        private const int ButtonSidePadding = 24;
-
-        // The button line is FIXED, not measured against the message, and
-        // the message is capped to the lines that fit above it instead.
-        // The window cannot grow to fit a longer sentence: WindowBase2
-        // derives ContentRegion from the region passed to its protected
-        // ConstructWindow, and Container.ContentRegion has no public
-        // setter, so a Height written from here would leave the content
-        // region where it was. Pushing the buttons down instead (what the
-        // previous Math.Max did) walks them out of that region - at five
-        // wrapped lines they land almost entirely outside it and stop
-        // taking clicks, leaving the title-bar X as the only exit. A capped
-        // message keeps Confirm/Cancel reachable for any input; the full
-        // text stays available on the label's tooltip.
-        private const int ButtonY = ContentHeight - ButtonHeight - ButtonBottomMargin;
-        private const int MessageAreaHeight = ButtonY - MessageToButtonGap - MessageTopMargin;
-
-        private readonly StandardWindow _window;
+        // Sizing, arrangement and every clamp: Services/DialogLayoutMath,
+        // which is measured against the message and the button labels this
+        // Show was handed. Nothing here is a geometry constant any more.
+        private readonly DialogWindow _window;
         private readonly ModuleSettings _settings;
 
         // The surface a confirm has to freeze while it is up, resolved
@@ -89,13 +41,15 @@ namespace TaimisToolbench.Views
             _settings = settings;
             _blockedSurface = blockedSurface;
 
-            // Use a 1x1 pixel texture to avoid overflow from large asset textures.
-            // StandardWindow chrome (title bar, borders, close button) uses its own
-            // built-in textures and does not depend on the background parameter.
-            _window = new StandardWindow(
+            // Use a 1x1 pixel texture to avoid overflow from large asset
+            // textures. StandardWindow chrome (title bar, borders, close
+            // button) uses its own built-in textures and does not depend on
+            // the background parameter. The size below is the floor and is
+            // re-seated by every Show before the window is ever visible.
+            _window = new DialogWindow(
                 new AsyncTexture2D(ContentService.Textures.Pixel),
-                new Rectangle(0, 0, WindowWidth, WindowHeight),
-                new Rectangle(ContentX, ContentY, ContentWidth, ContentHeight))
+                DialogLayoutMath.MinContentWidth,
+                DialogLayoutMath.MinContentHeight(0))
             {
                 BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
@@ -179,69 +133,61 @@ namespace TaimisToolbench.Views
             // property, for the reason ApiAccessDialog documents: that
             // property pins its wrap width at the control's first internal
             // layout pass, which runs before a Width assigned later in the
-            // same object initializer takes effect. TextWrapMath rather
-            // than DrawUtil.WrapText because only the former caps the line
-            // count, which is what keeps the buttons in the content region
-            // (see ButtonY) - the same greedy wrap plus ellipsized tail the
-            // notes section already renders with.
+            // same object initializer takes effect.
+            //
+            // Measured in Caption for the buttons, not in the message's
+            // Body: StandardButton (FeedbackButton's base) draws its own
+            // label in DefaultFont14 and exposes no Font seam, exactly like
+            // Checkbox - see UiFonts' note on the exclusions. The title is
+            // measured in Display, the face WindowBase2 paints it in.
             var font = UiFonts.Body;
             var measure = LabelHelpers.MeasureWith(font);
+            var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
             int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
-            var wrapped = TextWrapMath.Wrap(
-                message ?? "",
-                ContentWidth,
-                ContentWidth,
+            string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
+
+            var screen = GameService.Graphics.SpriteScreen;
+            var layout = DialogLayoutMath.Measure(
+                new[] { message ?? "" },
                 measure,
-                MessageAreaHeight / lineHeight);
+                lineHeight,
+                LabelHelpers.MeasureWith(UiFonts.Display)(_window.Title),
+                buttonMeasure(confirmText ?? ""),
+                acknowledgeOnly ? -1 : buttonMeasure(cancelLabel),
+                DialogLayoutMath.MaxContentWidth(screen.Width, DialogWindow.ChromeWidth),
+                DialogLayoutMath.MaxContentHeight(screen.Height, DialogWindow.ChromeHeight, lineHeight));
+
+            // Before the children: they are placed against the region this
+            // call establishes.
+            _window.Resize(layout.ContentWidth, layout.ContentHeight);
 
             // Auto-size BOTH axes and parent last - ApiAccessDialog's
             // proven AddWrappedLine shape. A fixed Width with
             // AutoSizeHeight takes Blish's stale-layout-pass measure and
             // clipped the second wrapped line mid-glyph (gate capture
             // gA6w). The block centers by its measured width instead.
+            var block = layout.Blocks[0];
             var messageLabel = new Label()
             {
-                Text = string.Join("\n", wrapped.Lines),
+                Text = string.Join("\n", block.Lines),
                 Font = font,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
             };
             messageLabel.Location = new Point(
-                System.Math.Max(0, (ContentWidth - messageLabel.Width) / 2),
-                MessageTopMargin);
+                Math.Max(0, (layout.ContentWidth - messageLabel.Width) / 2),
+                block.Y);
             messageLabel.Parent = _window;
 
             // Only when text was actually dropped - a tooltip repeating the
             // visible sentence is noise.
-            TooltipFacility.ApplyPlain(messageLabel, wrapped.Truncated ? message : null);
-
-            // Buttons: centered horizontally, on the fixed bottom line so
-            // every caller's dialog puts them in the same place. 100 and 70
-            // are the widths every caller had before either label was
-            // configurable and remain the floors, so all four existing
-            // dialogs are pixel-identical; a label too long for its floor
-            // grows the button instead of being clipped by StandardButton's
-            // own scissor (it centres text with zero side padding, so the
-            // breathing room has to be added here).
-            // Measured in Caption, not in the message's Body: StandardButton
-            // (FeedbackButton's base) draws its own label in DefaultFont14
-            // and exposes no Font seam, exactly like Checkbox - see UiFonts'
-            // note on the exclusions. Measuring in Body would pad every
-            // over-floor button by ~11% of a width it never paints.
-            var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
-            string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
-            int btnW = System.Math.Max(100, buttonMeasure(confirmText ?? "") + ButtonSidePadding);
-            int cancelW = System.Math.Max(70, buttonMeasure(cancelLabel) + ButtonSidePadding);
-            int btnGap = 16;
-            int totalBtnW = acknowledgeOnly ? btnW : btnW + btnGap + cancelW;
-            int btnX = (ContentWidth - totalBtnW) / 2;
-            int btnY = ButtonY;
+            TooltipFacility.ApplyPlain(messageLabel, block.Truncated ? message : null);
 
             var confirmBtn = new FeedbackButton()
             {
                 Text = confirmText,
-                Size = new Point(btnW, ButtonHeight),
-                Location = new Point(btnX, btnY),
+                Size = new Point(layout.ConfirmWidth, DialogLayoutMath.ButtonHeight),
+                Location = new Point(layout.ConfirmX, layout.ButtonY),
                 Parent = _window,
             };
             confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
@@ -251,26 +197,33 @@ namespace TaimisToolbench.Views
                 var cancelBtn = new FeedbackButton()
                 {
                     Text = cancelLabel,
-                    Size = new Point(cancelW, ButtonHeight),
-                    Location = new Point(btnX + btnW + btnGap, btnY),
+                    Size = new Point(layout.CancelWidth, DialogLayoutMath.ButtonHeight),
+                    Location = new Point(layout.CancelX, layout.ButtonY),
                     Parent = _window,
                 };
                 cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
             }
 
             // Position: restore saved location, or center on first show
-            var screen = GameService.Graphics.SpriteScreen;
             int sx = _settings.ModalDialogX.Value;
             int sy = _settings.ModalDialogY.Value;
 
-            if (sx < 0 || sy < 0
-                || sx + _window.Width > screen.Width
-                || sy + _window.Height > screen.Height)
+            if (sx < 0 || sy < 0)
             {
                 sx = (screen.Width - _window.Width) / 2;
                 sy = (screen.Height - _window.Height) / 2;
                 _settings.ModalDialogX.Value = sx;
                 _settings.ModalDialogY.Value = sy;
+            }
+            else
+            {
+                // Clamped without writing back, where the pre-sizing code
+                // re-centered and overwrote. The box now follows its
+                // message, so a saved corner that only a taller dialog
+                // overflows must not cost the user the spot they dragged
+                // this to.
+                sx = Math.Min(sx, Math.Max(0, screen.Width - _window.Width));
+                sy = Math.Min(sy, Math.Max(0, screen.Height - _window.Height));
             }
 
             _window.Location = new Point(sx, sy);

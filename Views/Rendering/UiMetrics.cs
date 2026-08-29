@@ -8,9 +8,9 @@ namespace TaimisToolbench.Views.Rendering
     {
         /// <summary>
         /// Height of every StandardButton on a TAB. The two dialogs
-        /// (ModalDialog, ApiAccessDialog) keep their own 25px footer buttons and
-        /// are not covered: their geometry is hand-placed against a fixed window
-        /// size, which is a separate decision and an unmade one.
+        /// (ModalDialog, ApiAccessDialog) are not covered: their 25px footer
+        /// buttons come from Services/DialogLayoutMath, which sizes them
+        /// beside the offsets they have to agree with.
         /// <para>
         /// It is NOT the module's input height. TextBoxes are 26 at nine of
         /// their eleven sites and the two Dropdowns outside the plan tab are 30,
