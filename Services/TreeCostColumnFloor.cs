@@ -29,6 +29,17 @@ namespace TaimisToolbench.Services
         /// the coin icons line up on (TreeCostColumnMath.ComputeEdges) -
         /// comparing totals would let a wide currency run pay for a
         /// narrowed gold band and slide that band's icons sideways.
+        /// <para>
+        /// WidestRowRunWidth is carried the same way. It must be carried
+        /// at all - dropping it left the "Cost" header centring over an
+        /// ink extent of 0, i.e. right-aligned on the column edge - and it
+        /// is widened rather than adopted because a row's reach back from
+        /// that edge grows with the reserve it is measured against
+        /// (TreeCostColumnMath.WidestRowRun computes it off the SCAN's
+        /// bands, which the floor may widen afterwards), and because a
+        /// one-way value keeps a re-solve that only removes ink eligible
+        /// for TreeSectionController's in-place refresh.
+        /// </para>
         /// </summary>
         public static TreeCostColumnMath.CostColumnWidths Widen(
             TreeCostColumnMath.CostColumnWidths floor, TreeCostColumnMath.CostColumnWidths scanned)
@@ -37,13 +48,18 @@ namespace TaimisToolbench.Services
                 Max(floor.GoldTextWidth, scanned.GoldTextWidth),
                 Max(floor.SilverTextWidth, scanned.SilverTextWidth),
                 Max(floor.CopperTextWidth, scanned.CopperTextWidth),
-                Max(floor.CurrencyRunWidth, scanned.CurrencyRunWidth));
+                Max(floor.CurrencyRunWidth, scanned.CurrencyRunWidth),
+                Max(floor.WidestRowRunWidth, scanned.WidestRowRunWidth));
         }
 
         /// <summary>
-        /// Whether two width sets reserve the same sub-columns - the test
+        /// Whether two width sets describe the same cost column - the test
         /// an in-place refresh gates on, so it is asked in one place
-        /// rather than by each caller comparing four fields.
+        /// rather than by each caller comparing fields. Every public field
+        /// of CostColumnWidths participates, header ink extent included:
+        /// an unequal one means chrome the refresh preserves rather than
+        /// redraws is already wrong. A field added there and not added
+        /// here fails TreeCostColumnFloorTests' field-count tripwire.
         /// </summary>
         public static bool Equal(
             TreeCostColumnMath.CostColumnWidths a, TreeCostColumnMath.CostColumnWidths b)
@@ -51,7 +67,8 @@ namespace TaimisToolbench.Services
             return a.GoldTextWidth == b.GoldTextWidth
                 && a.SilverTextWidth == b.SilverTextWidth
                 && a.CopperTextWidth == b.CopperTextWidth
-                && a.CurrencyRunWidth == b.CurrencyRunWidth;
+                && a.CurrencyRunWidth == b.CurrencyRunWidth
+                && a.WidestRowRunWidth == b.WidestRowRunWidth;
         }
 
         private static int Max(int a, int b)

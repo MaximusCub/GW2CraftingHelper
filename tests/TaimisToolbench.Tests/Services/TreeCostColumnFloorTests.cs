@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
 using Xunit;
@@ -140,20 +141,85 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void Equal_SeesEverySubColumn()
+        public void Equal_SeesEveryField()
         {
-            var baseline = new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4);
+            var baseline = new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5);
 
             Assert.True(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(9, 2, 3, 4)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(9, 2, 3, 4, 5)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 9, 3, 4)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 9, 3, 4, 5)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 9, 4)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 9, 4, 5)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 9)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 9, 5)));
+            Assert.False(TreeCostColumnFloor.Equal(
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 9)));
+        }
+
+        /// <summary>
+        /// The comparator and the floor are hand-written field lists, so
+        /// nothing but this stops a sixth field from being added and
+        /// silently ignored by both - which is exactly how the ink extent
+        /// came to be dropped. Reflection lives HERE and not in the
+        /// production comparator on purpose: the gate is a compile-time
+        /// count, not a per-comparison cost.
+        /// </summary>
+        [Fact]
+        public void CostColumnWidths_HasNoFieldTheFloorIgnores()
+        {
+            var fields = typeof(TreeCostColumnMath.CostColumnWidths)
+                .GetFields(BindingFlags.Public | BindingFlags.Instance);
+
+            Assert.Equal(5, fields.Length);
+        }
+
+        /// <summary>
+        /// The ink extent the "Cost" header centres over survives the
+        /// floor. It did not: Widen rebuilt the struct through the
+        /// four-argument constructor, so every floored width reported an
+        /// extent of 0 and TreeCostColumnMath.HeaderX degenerated to
+        /// right-aligning the word on the column edge.
+        /// </summary>
+        [Fact]
+        public void Widen_CarriesTheInkExtent()
+        {
+            var scanned = Scan(TreeWithACurrencyRow());
+            Assert.True(scanned.WidestRowRunWidth > 0);
+
+            var floored = TreeCostColumnFloor.Widen(
+                TreeCostColumnMath.CostColumnWidths.Empty, scanned);
+
+            Assert.Equal(scanned.WidestRowRunWidth, floored.WidestRowRunWidth);
+
+            // The extent is load-bearing, not decorative: the header lands
+            // somewhere else entirely without it.
+            var dropped = new TreeCostColumnMath.CostColumnWidths(
+                floored.GoldTextWidth, floored.SilverTextWidth,
+                floored.CopperTextWidth, floored.CurrencyRunWidth);
+            Assert.NotEqual(
+                TreeCostColumnMath.HeaderX(600, dropped, 30),
+                TreeCostColumnMath.HeaderX(600, floored, 30));
+        }
+
+        /// <summary>
+        /// One-way, like every other field: a re-solve that only removes
+        /// the widest ink keeps the header where it was, which is also
+        /// what keeps that re-solve eligible for the in-place refresh
+        /// (TreeSectionController.TryRefreshInPlace gates on Equal).
+        /// </summary>
+        [Fact]
+        public void Widen_NeverNarrowsTheInkExtent()
+        {
+            var floor = TreeCostColumnFloor.Widen(
+                TreeCostColumnMath.CostColumnWidths.Empty, Scan(TreeWithACurrencyRow()));
+            var afterIgnore = TreeCostColumnFloor.Widen(floor, Scan(TreeWithThatRowIgnored()));
+
+            Assert.True(Scan(TreeWithThatRowIgnored()).WidestRowRunWidth < floor.WidestRowRunWidth);
+            Assert.Equal(floor.WidestRowRunWidth, afterIgnore.WidestRowRunWidth);
+            Assert.True(TreeCostColumnFloor.Equal(floor, afterIgnore));
         }
     }
 }
