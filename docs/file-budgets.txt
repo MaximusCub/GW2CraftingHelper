@@ -321,7 +321,7 @@ Views/Rendering/UsedMaterialsSectionRenderer.cs                                 
 Views/ResizableTabbedWindow.cs                                                          250
 Views/SettingsTabContent.cs                                                             2874
 Views/SuggestionPanel.cs                                                                 504
-Views/ViewAdapter.cs                                                                    247
+Views/ViewAdapter.cs                                                                    261
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
 tests/TaimisToolbench.Tests/Helpers/CapturingProgress.cs                               22
 tests/TaimisToolbench.Tests/Helpers/CraftingPlanResultBuilders.cs                      94
@@ -359,6 +359,7 @@ tests/TaimisToolbench.Tests/Services/AcquisitionHintServiceTests.cs             
 tests/TaimisToolbench.Tests/Services/AmalgamatedRiftEssenceIngestionTests.cs          358
 tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                       196
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                         131
+tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                    158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                           211
 tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                          319
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                        193

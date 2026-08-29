@@ -51,6 +51,21 @@ namespace TaimisToolbench.Views
         private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
 
+        /// <summary>
+        /// ZIndex every control of the pinned top strip carries, above the
+        /// scrolling content panel's default 0. Blish paints a container's
+        /// children in ZIndex order, and this is not decoration: content
+        /// scrolled ABOVE the viewport paints a few pixels into the strip,
+        /// growing with tree depth, because Container.Paint unscales the
+        /// physical scissor back to logical space for its children and
+        /// floor(floor(y*s)/s) is less than or equal to y - so every
+        /// nesting level can move the propagated clip's top edge up and
+        /// none can move it back down. docs/ARCHITECTURE.md section V.26
+        /// is where that inequality is transcribed from the decompiled
+        /// binary; ClipTopSlipSimulationTests runs it.
+        /// </summary>
+        private const int TopStripZIndex = 1;
+
         // Aliased, not duplicated: the band height, its title y and its
         // caret y are one piece of arithmetic against the section-title
         // font's measured ink - see PlanContentHeightMath.
@@ -2003,6 +2018,7 @@ namespace TaimisToolbench.Views
                 Size = new Point(w, layout.InputPanelHeight),
                 Location = new Point(0, InputRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
             _inputRows.Rebuild(_inputPanel, w);
 
@@ -2012,6 +2028,7 @@ namespace TaimisToolbench.Views
                 Size = new Point(w, RowHeight),
                 Location = new Point(0, layout.ControlsRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             var ownMaterialsState = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
@@ -2131,9 +2148,11 @@ namespace TaimisToolbench.Views
                 AutoSizeHeight = true,
                 Location = new Point(0, layout.StatusRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
+            _statusSpinner.ZIndex = TopStripZIndex;
             InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Static separator between controls and content
@@ -2143,6 +2162,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
@@ -2262,6 +2282,7 @@ namespace TaimisToolbench.Views
             _treeToolbarPanel = new Panel()
             {
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             CreateTreeStateChips();
