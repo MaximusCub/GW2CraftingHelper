@@ -433,19 +433,19 @@ namespace TaimisToolbench.Services
             /// <summary>
             /// Band the marker column reserves, from <see cref="MarkerX"/>
             /// to the table's pinned right edge. The pills inside it are
-            /// LEFT-ruled on MarkerX, so this is the clamp for the "Status"
-            /// header rather than the extent it centres over - see
-            /// JustifiedColumnTracks.CenteredOverContent.
+            /// LEFT-ruled on MarkerX, so it is neither the extent the
+            /// "Status" header centres over nor what bounds it - see
+            /// <see cref="CurrencyHeaderRoomsFor"/>.
             /// </summary>
             public readonly int MarkerWidth;
 
             /// <summary>
-            /// The band all three number columns reserve, and so the clamp
-            /// each header centres inside - never the extent it centres
-            /// OVER, which is that one column's own widest number (see
-            /// JustifiedColumnTracks.CenteredOverContent). One band for
-            /// three columns is why: it is floored at the widest of the
-            /// three header labels
+            /// The band all three number columns reserve. NOT the extent a
+            /// header centres over (that is the column's own widest
+            /// number) and NOT what bounds one either (that is the gap to
+            /// the neighbouring column - <see cref="CurrencyHeaderRoomsFor"/>).
+            /// One band for three columns is why: it is floored at the
+            /// widest of the three header labels
             /// (SummarySectionRenderer.WidestCurrencyHeaderLabel) and at
             /// the widest number in ANY of them, so it routinely exceeds
             /// what a given column draws.
@@ -544,6 +544,79 @@ namespace TaimisToolbench.Services
             return JustifiedColumnTracks.CenteredX(
                 CurrencyNameX, trackSpan, CurrencyTrackCount, index, numberColumnWidth)
                 + numberColumnWidth;
+        }
+
+        /// <summary>
+        /// Where each of the table's four headers may sit: from the column
+        /// on its left to the column on its right, gutters split - never
+        /// the column's own band, which is narrower than the header it
+        /// names and would right-align it against its own numbers. Ink
+        /// widths are this render's measured widest cell per column
+        /// (SummarySectionRenderer.CurrencyColumnScan), so the rooms move
+        /// with the data exactly as the headers do.
+        /// </summary>
+        public readonly struct CurrencyHeaderRooms
+        {
+            public readonly JustifiedColumnTracks.HeaderRoom Required;
+            public readonly JustifiedColumnTracks.HeaderRoom Have;
+            public readonly JustifiedColumnTracks.HeaderRoom Needed;
+            public readonly JustifiedColumnTracks.HeaderRoom Status;
+
+            internal CurrencyHeaderRooms(
+                JustifiedColumnTracks.HeaderRoom required,
+                JustifiedColumnTracks.HeaderRoom have,
+                JustifiedColumnTracks.HeaderRoom needed,
+                JustifiedColumnTracks.HeaderRoom status)
+            {
+                Required = required;
+                Have = have;
+                Needed = needed;
+                Status = status;
+            }
+        }
+
+        /// <summary>
+        /// <see cref="CurrencyHeaderRooms"/> for one render. The currency
+        /// name flexes, so Required's left neighbour is the ellipsis budget
+        /// that name is allowed to fill rather than any measured string;
+        /// the Status column's own right-hand neighbour is the table edge.
+        /// No marker ink is needed: the marker column is reserved from
+        /// <see cref="CurrencyColumnEdges.MarkerX"/> whether or not a row
+        /// is covered, so that is where Needed's neighbour begins either
+        /// way.
+        /// </summary>
+        public static CurrencyHeaderRooms CurrencyHeaderRoomsFor(
+            CurrencyColumnEdges edges, int requiredInk, int haveInk, int neededInk)
+        {
+            int nameBudgetRight = edges.RequiredBandX - CurrencyColumnGap;
+            int requiredInkX = edges.RequiredRightEdge - requiredInk;
+            int haveInkX = edges.HaveRightEdge - haveInk;
+            int neededInkX = edges.NeededRightEdge - neededInk;
+
+            return new CurrencyHeaderRooms(
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(nameBudgetRight, requiredInkX),
+                    JustifiedColumnTracks.RoomRightBound(edges.RequiredRightEdge, haveInkX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(edges.RequiredRightEdge, haveInkX),
+                    JustifiedColumnTracks.RoomRightBound(edges.HaveRightEdge, neededInkX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(edges.HaveRightEdge, neededInkX),
+                    JustifiedColumnTracks.RoomRightBound(edges.NeededRightEdge, edges.MarkerX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(edges.NeededRightEdge, edges.MarkerX),
+                    edges.MarkerX + edges.MarkerWidth));
+        }
+
+        /// <summary>
+        /// The extent the "Status" header centres over: the measured pill,
+        /// or the column's reserved band when no row is covered, so the
+        /// header holds still whether or not a currency crosses into full
+        /// coverage.
+        /// </summary>
+        public static int CurrencyStatusInk(CurrencyColumnEdges edges, int markerInk)
+        {
+            return markerInk > 0 ? markerInk : edges.MarkerWidth;
         }
 
         private static CurrencyColumnEdges EdgesFromRightEdge(

@@ -515,7 +515,17 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // --- HeaderX (the "Cost" header centres over the INK, not over
-        // either reserve around it - see JustifiedColumnTracks) ---
+        // either reserve around it, and only the pill column on its left
+        // and the table's own edge on its right may move it - see
+        // JustifiedColumnTracks.HeaderRoom) ---
+        private static JustifiedColumnTracks.HeaderRoom CostRoom(int costRightEdge, int costInk)
+        {
+            PlanRelayoutMath.ComputeTreeHeaderRooms(
+                new PlanRelayoutMath.TreeColumnEdges(costRightEdge - 500, costRightEdge, 0),
+                60, costInk, out _, out var cost);
+            return cost;
+        }
+
         [Fact]
         public void HeaderX_CentresTheHeaderOverTheInk_NotOverTheReserve()
         {
@@ -525,7 +535,7 @@ namespace TaimisToolbench.Tests.Services
             // left of the numbers, which is the reported defect.
             var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 88, 136);
 
-            int x = TreeCostColumnMath.HeaderX(1000, widths, 40);
+            int x = TreeCostColumnMath.HeaderX(1000, widths, 40, CostRoom(1000, 136));
 
             Assert.Equal(912, x);
             Assert.Equal(
@@ -544,24 +554,28 @@ namespace TaimisToolbench.Tests.Services
             var wide = new TreeCostColumnMath.CostColumnWidths(20, 20, 20, 60, 38);
 
             Assert.Equal(
-                TreeCostColumnMath.HeaderX(1000, narrow, 40),
-                TreeCostColumnMath.HeaderX(1000, wide, 40));
+                TreeCostColumnMath.HeaderX(1000, narrow, 40, CostRoom(1000, 38)),
+                TreeCostColumnMath.HeaderX(1000, wide, 40, CostRoom(1000, 38)));
         }
 
         [Fact]
-        public void HeaderX_HeaderWiderThanTheInk_RightAlignsInstead()
+        public void HeaderX_HeaderWiderThanTheInk_StopsAtTheTableEdge()
         {
-            // Nothing priced, and a single-copper tree whose ink is narrower
-            // than the word: both fall back to the column's right edge, so
-            // the header can never overhang the panel margin to the right of
-            // it, nor drift left off a one-character value.
-            Assert.Equal(
-                960,
-                TreeCostColumnMath.HeaderX(1000, TreeCostColumnMath.CostColumnWidths.Empty, 40));
+            // Cost is the last column, so its right-hand bound is the
+            // table's own edge and there is nowhere for a header wider than
+            // its ink to centre. It right-aligns on that edge rather than
+            // overhanging the panel margin - the one bound the header law
+            // never yields, and where a tree with nothing priced at all
+            // lands too.
             Assert.Equal(
                 960,
                 TreeCostColumnMath.HeaderX(
-                    1000, new TreeCostColumnMath.CostColumnWidths(1, 0, 0, 0, 19), 40));
+                    1000, TreeCostColumnMath.CostColumnWidths.Empty, 40, CostRoom(1000, 0)));
+            Assert.Equal(
+                960,
+                TreeCostColumnMath.HeaderX(
+                    1000, new TreeCostColumnMath.CostColumnWidths(1, 0, 0, 0, 19), 40,
+                    CostRoom(1000, 19)));
         }
 
         [Fact]
@@ -570,8 +584,8 @@ namespace TaimisToolbench.Tests.Services
             var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 0, 130);
 
             Assert.Equal(
-                TreeCostColumnMath.HeaderX(1000, widths, 40) + 200,
-                TreeCostColumnMath.HeaderX(1200, widths, 40));
+                TreeCostColumnMath.HeaderX(1000, widths, 40, CostRoom(1000, 130)) + 200,
+                TreeCostColumnMath.HeaderX(1200, widths, 40, CostRoom(1200, 130)));
         }
 
         [Fact]

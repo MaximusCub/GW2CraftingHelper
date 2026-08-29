@@ -15,9 +15,10 @@ namespace TaimisToolbench.Services
     /// DISTRIBUTE over equal tracks across the rest; below the width that
     /// supports that they pack right-to-left as they always did. Cells keep
     /// their own rule inside their band - badges left, numbers and coin runs
-    /// right - and each HEADER centres over the INK its cells cover
-    /// (JustifiedColumnTracks.CenteredOverContent), except Item's, which
-    /// stays on the left rule its names keep.
+    /// right - and each HEADER centres over the INK its cells cover, bounded
+    /// only by the columns either side of it (see
+    /// <see cref="HeaderRoomsFor"/>), except Item's, which stays on the left
+    /// rule its names keep.
     /// Why: docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
     /// </para>
     /// </summary>
@@ -87,14 +88,12 @@ namespace TaimisToolbench.Services
             public readonly int SourceX;
 
             /// <summary>
-            /// Each column's reserved BAND width - what its header has to
-            /// centre over (JustifiedColumnTracks.CenteredInBand; every one
-            /// of these bands is floored at its own header label, so a
-            /// header always fits the band it centres in). Carried on the
-            /// edges
-            /// rather than re-derived by the caller: the header row and the
-            /// data rows both read them off one instance, so neither can
-            /// centre over a band the other did not reserve.
+            /// Each column's reserved BAND width - what its CELLS grow
+            /// inside, not what its header centres over or is bounded by
+            /// (<see cref="HeaderRoomsFor"/>). Carried on the edges rather
+            /// than re-derived by the caller: the header row and the data
+            /// rows both read them off one instance, so neither can reserve
+            /// a band the other did not.
             /// </summary>
             public readonly int SourceBandWidth;
             public readonly int QtyBandWidth;
@@ -267,6 +266,60 @@ namespace TaimisToolbench.Services
         private static int Max(int a, int b)
         {
             return a > b ? a : b;
+        }
+
+        /// <summary>
+        /// Where each of the four data headers may sit: from the column on
+        /// its left to the column on its right, gutters split - never the
+        /// column's own band, which is floored at its own header label and
+        /// at <see cref="TotalMinWidth"/>/<see cref="EachMinWidth"/>, so
+        /// clamping into one right-aligns the header on its own values.
+        /// </summary>
+        public readonly struct HeaderRooms
+        {
+            public readonly JustifiedColumnTracks.HeaderRoom Source;
+            public readonly JustifiedColumnTracks.HeaderRoom Amount;
+            public readonly JustifiedColumnTracks.HeaderRoom Each;
+            public readonly JustifiedColumnTracks.HeaderRoom Total;
+
+            internal HeaderRooms(
+                JustifiedColumnTracks.HeaderRoom source, JustifiedColumnTracks.HeaderRoom amount,
+                JustifiedColumnTracks.HeaderRoom each, JustifiedColumnTracks.HeaderRoom total)
+            {
+                Source = source;
+                Amount = amount;
+                Each = each;
+                Total = total;
+            }
+        }
+
+        /// <summary>
+        /// <see cref="HeaderRooms"/> for one render. Total's right-hand
+        /// neighbour is the table's own pinned edge, which a header may not
+        /// cross whatever its width.
+        /// </summary>
+        public static HeaderRooms HeaderRoomsFor(
+            ColumnEdges edges, int nameGap, int sourceInk, int qtyInk, int eachInk, int totalInk)
+        {
+            int nameBudgetRight = edges.SourceX - nameGap;
+            int sourceInkRight = edges.SourceX + sourceInk;
+            int qtyInkX = edges.QtyRightEdge - qtyInk;
+            int eachInkX = edges.EachRightEdge - eachInk;
+            int totalInkX = edges.TotalRightEdge - totalInk;
+
+            return new HeaderRooms(
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(nameBudgetRight, edges.SourceX),
+                    JustifiedColumnTracks.RoomRightBound(sourceInkRight, qtyInkX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(sourceInkRight, qtyInkX),
+                    JustifiedColumnTracks.RoomRightBound(edges.QtyRightEdge, eachInkX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(edges.QtyRightEdge, eachInkX),
+                    JustifiedColumnTracks.RoomRightBound(edges.EachRightEdge, totalInkX)),
+                JustifiedColumnTracks.HeaderRoom.Between(
+                    JustifiedColumnTracks.RoomLeftBound(edges.EachRightEdge, totalInkX),
+                    edges.TotalRightEdge));
         }
 
         /// <summary>

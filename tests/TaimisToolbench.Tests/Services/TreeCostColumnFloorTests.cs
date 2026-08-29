@@ -199,9 +199,10 @@ namespace TaimisToolbench.Tests.Services
             var dropped = new TreeCostColumnMath.CostColumnWidths(
                 floored.GoldTextWidth, floored.SilverTextWidth,
                 floored.CopperTextWidth, floored.CurrencyRunWidth);
+            var room = JustifiedColumnTracks.HeaderRoom.Between(0, 600);
             Assert.NotEqual(
-                TreeCostColumnMath.HeaderX(600, dropped, 30),
-                TreeCostColumnMath.HeaderX(600, floored, 30));
+                TreeCostColumnMath.HeaderX(600, dropped, 30, room),
+                TreeCostColumnMath.HeaderX(600, floored, 30, room));
         }
 
         /// <summary>

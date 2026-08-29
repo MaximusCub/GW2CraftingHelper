@@ -127,5 +127,51 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(300, wide.LevelRightEdge - narrow.LevelRightEdge);
             Assert.Equal(100, wide.CharX - narrow.CharX);
         }
+
+        [Fact]
+        public void HeaderRooms_LeaveTheHeadersFreeOfTheirOwnBands()
+        {
+            // "Characters" out-measures a two-name run and "Level" a bare
+            // "400", so both bands are floored at their own labels. Neither
+            // floor may bound the header: the columns are a whole track
+            // apart and the rooms have to say so.
+            var edges = DisciplinesColumnMath.ComputeEdges(1200, 90, 200, 44);
+            DisciplinesColumnMath.HeaderRooms(
+                edges, 90, 60, 20, out var characters, out var level);
+
+            Assert.True(characters.Width > 200, $"characters room {characters.Width}");
+            Assert.True(level.Width > 200, $"level room {level.Width}");
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, level.Left - characters.Right);
+
+            // Level is the last column, so its own bound is the table edge.
+            Assert.Equal(edges.LevelRightEdge, level.Right);
+        }
+
+        [Fact]
+        public void HeaderRooms_NarrowInkUnderAWideHeader_CentresRatherThanPinning()
+        {
+            var edges = DisciplinesColumnMath.ComputeEdges(1200, 90, 200, 44);
+            DisciplinesColumnMath.HeaderRooms(
+                edges, 90, 20, 20, out var characters, out _);
+
+            int x = JustifiedColumnTracks.CenteredOverContent(
+                edges.CharX, 20, 72, characters);
+
+            Assert.Equal(2 * edges.CharX + 20, 2 * x + 72);
+            Assert.NotEqual(edges.CharX, x);
+        }
+
+        [Fact]
+        public void HeaderRooms_NoCharacterColumn_HandsLevelTheDisciplineNamesAsItsNeighbour()
+        {
+            var edges = DisciplinesColumnMath.ComputeEdges(1200, 90, 0, 44);
+            DisciplinesColumnMath.HeaderRooms(edges, 90, 0, 20, out _, out var level);
+
+            Assert.Equal(
+                JustifiedColumnTracks.RoomLeftBound(
+                    DisciplinesColumnMath.NameX + 90, edges.LevelRightEdge - 20),
+                level.Left);
+        }
     }
 }

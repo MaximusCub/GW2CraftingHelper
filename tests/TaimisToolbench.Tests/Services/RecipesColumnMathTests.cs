@@ -80,5 +80,40 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(20, edges.NameMaxWidth);
         }
+
+        [Fact]
+        public void HeaderRooms_DisciplineHeaderOverruns_ItsOwnBandWithoutReachingTheNames()
+        {
+            // "Discipline" at the header tier out-measures a "Chef 400", so
+            // the band is the header's own width and centring in it pins
+            // the word to the column's left rule. The room lets it overhang
+            // as far as the recipe names' ellipsis budget allows.
+            var edges = RecipesColumnMath.ComputeEdges(1252, 90, 70, NameX);
+            RecipesColumnMath.HeaderRooms(edges, 40, 60, out var discipline, out _);
+
+            int x = JustifiedColumnTracks.CenteredOverContent(
+                edges.DisciplineX, 40, 70, discipline);
+
+            Assert.True(x < edges.DisciplineX, $"header at {x}, rule at {edges.DisciplineX}");
+            Assert.True(
+                x >= edges.DisciplineX - RecipesColumnMath.NameToDisciplineGap,
+                $"header at {x} reached the recipe names");
+        }
+
+        [Fact]
+        public void HeaderRooms_StatusIsBoundedByTheTableEdge()
+        {
+            var edges = RecipesColumnMath.ComputeEdges(1252, 90, 70, NameX);
+            RecipesColumnMath.HeaderRooms(edges, 40, 60, out _, out var status);
+
+            Assert.Equal(edges.StatusRightEdge, status.Right);
+
+            // A status header wider than every tag under it has nowhere to
+            // centre and right-aligns on that edge.
+            Assert.Equal(
+                edges.StatusRightEdge - 90,
+                JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.StatusRightEdge, 60, 90, status));
+        }
     }
 }

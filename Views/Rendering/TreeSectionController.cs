@@ -415,7 +415,8 @@ namespace TaimisToolbench.Views.Rendering
             // block's x is width-derived), hence middleXForWidth/
             // rightXForWidth rather than build-time x's, and both centre
             // over the INK their cells cover rather than over the bands
-            // reserved for them (JustifiedColumnTracks.CenteredOverContent).
+            // reserved for them, bounded only by each other and by the
+            // table's edge (JustifiedColumnTracks.HeaderRoom).
             // Counted by PlanContentHeightMath.MultiRootTreeFlowHeight,
             // which every treeFlow height assignment goes through, and
             // guarded on the same "is there a tree at all" condition that
@@ -438,22 +439,32 @@ namespace TaimisToolbench.Views.Rendering
                 // the header centres over is not knowable until the loop
                 // below has run and NoteSourceHeaderInk has re-placed the
                 // header behind it.
+                Func<int, PlanRelayoutMath.TreeColumnEdges> headerEdgesFor =
+                    w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin);
+
                 _treeHeaderRelayout = ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
                     middleLabel: SourceHeaderText,
-                    middleXForWidth: w => TreePillRunLayout.HeaderX(
-                        PlanRelayoutMath.ComputeTreeColumnEdges(
-                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
-                        TreePillColumnWidth,
-                        _sourceHeaderInkWidth,
-                        sourceHeaderWidth),
-                    rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
-                    rightLabelXForWidth: w => TreeCostColumnMath.HeaderX(
-                        PlanRelayoutMath.ComputeTreeColumnEdges(
-                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
-                        headerCostWidths,
-                        costHeaderWidth));
+                    middleXForWidth: w =>
+                    {
+                        var edges = headerEdgesFor(w);
+                        PlanRelayoutMath.ComputeTreeHeaderRooms(
+                            edges, _sourceHeaderInkWidth, headerCostWidths.WidestRowRunWidth,
+                            out var sourceRoom, out _);
+                        return TreePillRunLayout.HeaderX(
+                            edges.PillColX, _sourceHeaderInkWidth, sourceHeaderWidth, sourceRoom);
+                    },
+                    rightXForWidth: w => headerEdgesFor(w).CostRightEdge,
+                    rightLabelXForWidth: w =>
+                    {
+                        var edges = headerEdgesFor(w);
+                        PlanRelayoutMath.ComputeTreeHeaderRooms(
+                            edges, _sourceHeaderInkWidth, headerCostWidths.WidestRowRunWidth,
+                            out _, out var costRoom);
+                        return TreeCostColumnMath.HeaderX(
+                            edges.CostRightEdge, headerCostWidths, costHeaderWidth, costRoom);
+                    });
             }
 
 #if DEBUG

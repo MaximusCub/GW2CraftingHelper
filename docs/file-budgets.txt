@@ -108,7 +108,7 @@ Services/DecisionPillPlanner.cs                                                 
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
 Services/DialogLayoutMath.cs                                                            374
-Services/DisciplinesColumnMath.cs                                                       121
+Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
 Services/GridLayout.cs                                                                   93
@@ -167,7 +167,7 @@ Services/PlanHistoryRetention.cs                                                
 Services/PlanHistoryRowLayout.cs                                                        361
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanPhaseEvent.cs                                                               73
-Services/PlanRelayoutMath.cs                                                            402
+Services/PlanRelayoutMath.cs                                                            429
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                 2304
 Services/PlanStore.cs                                                                   219
@@ -204,7 +204,7 @@ Services/Recipes/RecipeCacheSerializer.cs                                       
 Services/Recipes/RecipeCorpusRefresher.cs                                               434
 Services/Recipes/RecipeCorpusVerifier.cs                                                257
 Services/Recipes/SeededRecipeCacheStore.cs                                              215
-Services/RecipesColumnMath.cs                                                            79
+Services/RecipesColumnMath.cs                                                            101
 Services/RequestLabelFormatter.cs                                                        63
 Services/RequiredRecipesVisibility.cs                                                    99
 Services/ResizeSettleDebounce.cs                                                        153
@@ -217,7 +217,7 @@ Services/SettingsCurrencyGridLayout.cs                                          
 Services/SettingsFormLayout.cs                                                          174
 Services/SettingsInputParser.cs                                                         239
 Services/SettingsSaveBarLayout.cs                                                        80
-Services/ShoppingColumnMath.cs                                                          396
+Services/ShoppingColumnMath.cs                                                          449
 Services/ShoppingRowTooltipFormatter.cs                                                 145
 Services/ShoppingSourceBadge.cs                                                          89
 Services/SnapshotCommitGate.cs                                                          102
@@ -241,7 +241,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    583
+Services/SummarySectionLayoutMath.cs                                                    656
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -306,11 +306,11 @@ Views/Rendering/PlanHeaderRenderer.cs                                           
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
 Views/Rendering/RarityColors.cs                                                         169
-Views/Rendering/RecipesSectionRenderer.cs                                               340
+Views/Rendering/RecipesSectionRenderer.cs                                               357
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
 Views/Rendering/ShoppingBadgeColors.cs                                                   72
-Views/Rendering/ShoppingListSectionRenderer.cs                                          539
+Views/Rendering/ShoppingListSectionRenderer.cs                                          550
 Views/Rendering/SortableHeaderCells.cs                                                  230
 Views/Rendering/SortableHeaderLabel.cs                                                   69
 Views/Rendering/SummarySectionRenderer.cs                                               1041
@@ -321,7 +321,7 @@ Views/Rendering/TreeToolbarCommands.cs                                          
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                            60
-Views/Rendering/UsedMaterialsSectionRenderer.cs                                         217
+Views/Rendering/UsedMaterialsSectionRenderer.cs                                         221
 Views/ResizableTabbedWindow.cs                                                          250
 Views/SettingsTabContent.cs                                                             2874
 Views/SuggestionPanel.cs                                                                 504
@@ -394,7 +394,7 @@ tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs           
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
 tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                         342
-tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                    131
+tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                    177
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153
 tests/TaimisToolbench.Tests/Services/GridLawGoldenTests.cs                            100
@@ -449,7 +449,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryRetentionTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     422
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         323
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
-tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         700
+tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         746
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                       1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                           412
 tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs            425
@@ -513,7 +513,7 @@ tests/TaimisToolbench.Tests/Services/Recipes/RecipeCacheSerializerTests.cs      
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusRefresherTests.cs            659
 tests/TaimisToolbench.Tests/Services/Recipes/RecipeCorpusVerifierTests.cs             362
 tests/TaimisToolbench.Tests/Services/Recipes/SeedFinalizeIndexTests.cs                108
-tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                         84
+tests/TaimisToolbench.Tests/Services/RecipesColumnMathTests.cs                         119
 tests/TaimisToolbench.Tests/Services/RequestLabelFormatterTests.cs                     76
 tests/TaimisToolbench.Tests/Services/RequiredRecipesVisibilityTests.cs                144
 tests/TaimisToolbench.Tests/Services/ResizeSettleDebounceTests.cs                     353
@@ -528,7 +528,7 @@ tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs         
 tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                       268
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                      338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                    117
-tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         587
+tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         630
 tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs              197
 tests/TaimisToolbench.Tests/Services/ShoppingSourceBadgeTests.cs                      233
 tests/TaimisToolbench.Tests/Services/SnapshotCommitGateTests.cs                       239
@@ -548,7 +548,7 @@ tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs             
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                              116
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                               345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1013
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1112
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
@@ -561,7 +561,7 @@ tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                           70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                       507
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                      283
-tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         586
+tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         600
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                          246
 tests/TaimisToolbench.Tests/Services/TreeRowShapeGoldenTests.cs                       145
 tests/TaimisToolbench.Tests/Services/TreeRowTooltipComposerTests.cs                   538

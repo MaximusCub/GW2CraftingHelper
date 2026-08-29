@@ -70,5 +70,32 @@ namespace TaimisToolbench.Services
 
             return new ColumnEdges(statusRightEdge, disciplineX, nameMaxWidth);
         }
+
+        /// <summary>
+        /// Where the two right-hand headers may sit: from the column on
+        /// their left to the column on their right, gutters split - never
+        /// their own band, which is floored at the header label itself and
+        /// so pins a header that should be centred over shorter values.
+        /// Status's right-hand neighbour is the table's pinned edge, and
+        /// the recipe name flexes, so what precedes the Discipline column
+        /// is that name's ellipsis budget rather than a measured string.
+        /// </summary>
+        public static void HeaderRooms(
+            ColumnEdges edges, int disciplineInk, int statusInk,
+            out JustifiedColumnTracks.HeaderRoom discipline,
+            out JustifiedColumnTracks.HeaderRoom status)
+        {
+            int nameBudgetRight = edges.DisciplineX - NameToDisciplineGap;
+            int disciplineInkRight = edges.DisciplineX + disciplineInk;
+            int statusInkX = edges.StatusRightEdge - statusInk;
+
+            discipline = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(nameBudgetRight, edges.DisciplineX),
+                JustifiedColumnTracks.RoomRightBound(disciplineInkRight, statusInkX));
+            status = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(
+                    disciplineInk > 0 ? disciplineInkRight : nameBudgetRight, statusInkX),
+                edges.StatusRightEdge);
+        }
     }
 }

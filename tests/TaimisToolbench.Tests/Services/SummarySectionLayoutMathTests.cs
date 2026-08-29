@@ -862,9 +862,10 @@ namespace TaimisToolbench.Tests.Services
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 120);
             const int requiredInk = 80;
             const int headerWidth = 56;
+            var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(edges, requiredInk, 120, 120);
 
             int overInk = JustifiedColumnTracks.CenteredOverContentRightAligned(
-                edges.RequiredRightEdge, edges.NumberColumnWidth, requiredInk, headerWidth);
+                edges.RequiredRightEdge, requiredInk, headerWidth, rooms.Required);
             int overBand = JustifiedColumnTracks.CenteredInBand(
                 edges.RequiredBandX, edges.NumberColumnWidth, headerWidth);
 
@@ -875,6 +876,102 @@ namespace TaimisToolbench.Tests.Services
 
             // ...which is 20px right of where the band put it.
             Assert.Equal(20, overInk - overBand);
+        }
+
+        // The owner's 2026-08-28 capture, re-derived. Every one of the
+        // three number headers out-measured the values under it, and the
+        // band clamp answered that by pinning the header's RIGHT edge to
+        // the values' right edge - right-alignment, the exact thing the
+        // centring was added to remove. Header minus ink was 34, 24 and 30
+        // px, so the headers sat 17, 12 and 15px left of their ink.
+        [Theory]
+        [InlineData(20, 54)]
+        [InlineData(8, 32)]
+        [InlineData(24, 54)]
+        public void CurrencyHeaders_NarrowInkUnderAWideHeader_AreNotRightAligned(
+            int ink, int headerWidth)
+        {
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1750, 120, 40);
+            var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(edges, ink, ink, ink);
+
+            int required = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.RequiredRightEdge, ink, headerWidth, rooms.Required);
+            int have = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.HaveRightEdge, ink, headerWidth, rooms.Have);
+            int needed = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.NeededRightEdge, ink, headerWidth, rooms.Needed);
+
+            // Centre on centre, stated in doubled units so the assertion
+            // does not turn on which way an odd width truncates.
+            Assert.Equal(2 * edges.RequiredRightEdge - ink, 2 * required + headerWidth);
+            Assert.Equal(2 * edges.HaveRightEdge - ink, 2 * have + headerWidth);
+            Assert.Equal(2 * edges.NeededRightEdge - ink, 2 * needed + headerWidth);
+
+            // And the header now overhangs its own column's ink on both
+            // sides rather than ending flush with it.
+            Assert.Equal((headerWidth - ink) / 2, required + headerWidth - edges.RequiredRightEdge);
+            Assert.Equal((headerWidth - ink) / 2, edges.RequiredRightEdge - ink - required);
+            Assert.NotEqual(edges.RequiredRightEdge, required + headerWidth);
+        }
+
+        [Fact]
+        public void CurrencyHeaderRooms_LeaveTheNumberColumnsHundredsOfPixelsOfSlack()
+        {
+            // Why no clamp fires on a real panel: the columns are a whole
+            // track apart, so the room around each one dwarfs any header.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1750, 120, 40);
+            var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(edges, 20, 8, 24);
+
+            Assert.True(rooms.Required.Width > 200, $"Required room {rooms.Required.Width}");
+            Assert.True(rooms.Have.Width > 200, $"Have room {rooms.Have.Width}");
+            Assert.True(rooms.Needed.Width > 200, $"Needed room {rooms.Needed.Width}");
+
+            // Adjacent rooms never overlap: the gutter is the whole of what
+            // separates two headers that both run to their bound.
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Have.Left - rooms.Required.Right);
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Needed.Left - rooms.Have.Right);
+            Assert.Equal(
+                JustifiedColumnTracks.HeaderGutter, rooms.Status.Left - rooms.Needed.Right);
+        }
+
+        [Fact]
+        public void CurrencyHeaderRooms_PackedNarrowPanel_StopAtTheNeighbourRatherThanOverlapIt()
+        {
+            // Below the distribution threshold the columns pack 14px apart,
+            // and there genuinely is nowhere for a wide header to go. It
+            // degrades to the neighbour's bound - not past it.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(420, 60, 34);
+            var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(edges, 20, 20, 20);
+
+            int needed = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.NeededRightEdge, 20, 54, rooms.Needed);
+
+            Assert.Equal(rooms.Needed.Right, needed + 54);
+            Assert.True(
+                needed + 54 <= edges.MarkerX,
+                $"header right {needed + 54} past marker {edges.MarkerX}");
+        }
+
+        [Fact]
+        public void CurrencyStatusHeader_NoCoveredRow_CentresInTheReservedBand()
+        {
+            // No pill measured this render, so the reserved band stands in
+            // for the ink and the header holds still whether or not a
+            // currency crosses into full coverage.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1750, 120, 40);
+            var rooms = SummarySectionLayoutMath.CurrencyHeaderRoomsFor(edges, 20, 8, 24);
+
+            int x = JustifiedColumnTracks.CenteredOverContent(
+                edges.MarkerX,
+                SummarySectionLayoutMath.CurrencyStatusInk(edges, 0),
+                34,
+                rooms.Status);
+
+            Assert.Equal(edges.MarkerWidth, SummarySectionLayoutMath.CurrencyStatusInk(edges, 0));
+            Assert.Equal(
+                JustifiedColumnTracks.CenteredInBand(edges.MarkerX, edges.MarkerWidth, 34), x);
         }
 
         [Fact]

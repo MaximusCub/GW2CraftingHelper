@@ -2521,11 +2521,33 @@ The cells were never the problem and do not move: badges stay left so their
 left edges rule down the column, numbers stay right so their digits line up.
 Only the header moves, onto the centre of the extent the cells actually
 cover. The caller derives that extent from the cells' own justification
-(`bandX` for a left-ruled column, `rightEdge - contentWidth` for a
-right-aligned one) and the result is clamped back into the band, so a header
-wider than the content it names pins to the band's near edge rather than
-overhanging a neighbour or the panel margin - which is exactly where the
-plain shared-edge rule used to put it.
+(the column's left rule for a left-ruled column, `rightEdge - contentWidth`
+for a right-aligned one).
+
+Clamping that result back into the *band* was the first attempt's own second
+defect, and shipped the disease as the cure. `bandX + bandWidth - headerWidth`
+is the column's right edge whenever the band ends there, so the clamp fires
+for every header wider than its column's ink - which is most of them, since
+every band is floored at its own header label - and pins the header's right
+edge to the values' right edge. That is right-alignment: precisely what the
+centring was added to remove, and what the owner measured on the 2026-08-29
+capture, where Required/Have/Needed sat 17, 12 and 15px left of their ink -
+exactly half of each header's excess over the numbers under it.
+
+A band is not a boundary. What a header must not reach is the *neighbouring
+column*, and on a justified table those sit a whole track apart. So the
+clamp is `JustifiedColumnTracks.HeaderRoom`: from the boundary with the
+column on the left to the boundary with the column on the right, each
+boundary the middle of the gap between the two columns' ink and each header
+backing off half a `HeaderGutter` from it, so two headers that both run to
+their bound stay a whole gutter apart and can never touch. Where there is no
+neighbouring column the bound is the table's own edge, which nothing crosses.
+A column's own ink is always inside its room, however little gap precedes it,
+and a header wider than the whole room pins to the room's left bound and
+spills rightward only - the one direction `CenteredX` already spills in.
+Used Materials' Amount column is the case that reaches that last rule: it
+reserves nothing beyond its widest quantity and pins to the table edge, so
+its header has ~27px of room and cannot be centred at all.
 
 `Services/LogGutterLayout.cs` replaced one worst-case prefix *template* -
 the widest level word, a widest-digit stamp, and a fourteen-`w` tag
