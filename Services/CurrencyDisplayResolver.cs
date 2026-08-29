@@ -56,6 +56,26 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The currency's own prose from /v2/currencies, or null when the
+        /// session holds no metadata for this id. There is no offline
+        /// fallback table for descriptions the way there is for names
+        /// (Gw2Constants.ResolveCurrencyName): a description the module
+        /// wrote itself would be invented data.
+        /// </summary>
+        public static string ResolveDescription(
+            int currencyId, IReadOnlyDictionary<int, CurrencyMetadata> currencyMetadata)
+        {
+            if (currencyMetadata != null &&
+                currencyMetadata.TryGetValue(currencyId, out var meta) &&
+                !string.IsNullOrEmpty(meta.Description))
+            {
+                return meta.Description;
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Resolves a full non-coin currency cost (CostLine list, already
         /// scaled to the caller's quantity - e.g. PlanStep/SolverDecision's
         /// VendorCurrencyCosts, or a CraftingTreeNode's) into display-ready

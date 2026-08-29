@@ -90,7 +90,7 @@ Views/Rendering/SummarySectionRenderer.cs                                       
 Views/Rendering/TreeSectionController.cs                                                     5     0
 Views/Rendering/UiFonts.cs                                                                   0     1
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                              1     0
-Views/SettingsTabContent.cs                                                                  4     0
+Views/SettingsTabContent.cs                                                                  3     0
 Views/SuggestionPanel.cs                                                                     1     0
 tests/TaimisToolbench.Tests/Models/AccountSnapshotSerializationTests.cs                      1     0
 tests/TaimisToolbench.Tests/Models/Gw2ConstantsCurrencyNamesTests.cs                         1     0

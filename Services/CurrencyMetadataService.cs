@@ -9,7 +9,7 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Fetches name/icon metadata for GW2 wallet currencies from
+    /// Fetches name/icon/description metadata for GW2 wallet currencies from
     /// api.guildwars2.com/v2/currencies. Blish-free (plain HttpClient +
     /// JSON), matching Gw2PriceApiClient/Gw2ItemApiClient so it can be
     /// exercised in tests without any Blish HUD dependency.
@@ -90,6 +90,7 @@ namespace TaimisToolbench.Services
                                 CurrencyId = id,
                                 Name = entry.Value<string>("name") ?? "",
                                 IconUrl = entry.Value<string>("icon") ?? "",
+                                Description = entry.Value<string>("description") ?? "",
                             };
                         }
 
@@ -127,6 +128,23 @@ namespace TaimisToolbench.Services
                 // plan generation. Nothing is cached, so the next call
                 // (next plan generation) retries automatically.
                 return SnapshotCache();
+            }
+        }
+
+        /// <summary>
+        /// This session's cached entry for one currency, or null. A PURE
+        /// READ - never a fetch - because its caller is a tooltip resolving
+        /// on the UI thread, the same contract
+        /// <c>ItemMetadataService.GetCachedStatBlock</c> carries. Whatever
+        /// <see cref="GetAllAsync"/> call the session already made is what
+        /// fills it; before one lands this answers null and the hover
+        /// degrades to the facts the row itself holds.
+        /// </summary>
+        public CurrencyMetadata GetCached(int currencyId)
+        {
+            lock (_cacheLock)
+            {
+                return _cache.TryGetValue(currencyId, out var meta) ? meta : null;
             }
         }
 

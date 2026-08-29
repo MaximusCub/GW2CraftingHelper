@@ -107,13 +107,34 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// A subject with no item identity to compose from - a currency, a
-        /// coin denomination. Its name in plain prose, which is all there
-        /// is to say about it.
+        /// THE standard wallet-currency hover: the game's own currency
+        /// tooltip - icon+name, the wallet balance, the currency's prose,
+        /// the type line (<see cref="CurrencyTooltipComposer"/>).
+        /// <paramref name="getFacts"/> is read at hover time, so a
+        /// /v2/currencies reply that lands after the row was built still
+        /// reaches the box.
+        /// <para>
+        /// The KIND is the caller's to choose and it must come from the id
+        /// space the caller drew the icon from, never from the name:
+        /// Gaeting Crystal is item 86094 AND wallet currencies 39 and 77,
+        /// one in-game good in two id spaces, so a name lookup cannot tell
+        /// which tooltip it is owed. A good the module lists among its
+        /// currencies but which is really an ITEM - Crystalline Ore 46682
+        /// - takes <see cref="ForItem(ItemTooltipIdentity, Func{ItemStatBlock})"/>
+        /// instead. Views/SettingsTabContent's <c>IsBarterItem</c> is the
+        /// discriminator that already carries this distinction.
+        /// </para>
         /// </summary>
-        internal static ItemIconTooltip Naming(string subject)
+        internal static ItemIconTooltip ForCurrency(
+            string name, Func<CurrencyTooltipFacts> getFacts)
         {
-            return new ItemIconTooltip(null, subject);
+            if (getFacts == null)
+            {
+                throw new ArgumentNullException(nameof(getFacts));
+            }
+
+            return new ItemIconTooltip(
+                () => CurrencyTooltipComposer.BuildContent(getFacts()), name);
         }
 
         /// <summary>
@@ -166,8 +187,8 @@ namespace TaimisToolbench.Views.Rendering
 
             // The icon's own note ("no icon available for this entry") is
             // already on the tree and is worth more than silence, so a
-            // silent or plain-only intent leaves the plain layer alone
-            // rather than clearing it.
+            // silent intent leaves the plain layer alone rather than
+            // clearing it.
             if (_build == null)
             {
                 return;

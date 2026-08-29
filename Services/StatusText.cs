@@ -153,11 +153,15 @@ namespace TaimisToolbench.Services
             return "Update failed: " + (message ?? "");
         }
 
+        // A month, flat: TimeSpan carries no calendar, and an age this
+        // deep reads as "long dead" rather than a figure counted back from.
+        private const int AgeDaysPerMonth = 30;
+
         /// <summary>
-        /// How much time an age is, with no "ago"/"old" framing - the
-        /// bucket ladder behind <see cref="ForSnapshotAgeSuffix"/>. The
-        /// caller handles the sub-minute case; below a minute this reports
-        /// "0m".
+        /// How much time an age is, with no "ago" framing - the bucket
+        /// ladder behind <see cref="ForAgeAgo"/>. Each bucket names the
+        /// coarsest unit reached plus at most one finer term. The caller
+        /// handles the sub-minute case; below a minute this reports "0m".
         /// </summary>
         private static string AgeMagnitude(TimeSpan age)
         {
@@ -171,24 +175,25 @@ namespace TaimisToolbench.Services
                 return $"{(int)age.TotalHours}h {age.Minutes}m";
             }
 
-            return $"{(int)age.TotalDays}d";
+            if (age.TotalDays < AgeDaysPerMonth)
+            {
+                return $"{(int)age.TotalDays}d";
+            }
+
+            return $"{(int)(age.TotalDays / AgeDaysPerMonth)}mo";
         }
 
         /// <summary>
-        /// The Snapshot header's age suffix, worded so it cannot be read as
-        /// part of the timestamp beside it. The line pairs two different
-        /// moments - when the last refresh ATTEMPT happened and how old the
-        /// snapshot on screen is - and the old
-        /// "Refresh failed: ... - Aug 15, 2026 3:41 PM (29d ago)" put a
-        /// bare relative time immediately after an absolute one, which
-        /// reads as a restatement of that same instant rather than a
-        /// second fact about a different one. "(snapshot 29d old)" names
-        /// its subject, so the two can no longer collapse into one.
+        /// The Snapshot header's age suffix: how long ago the snapshot on
+        /// screen was captured, in <see cref="ForAgeAgo"/>'s framing and
+        /// over its ladder. The caller punctuates it apart from the refresh
+        /// timestamp it follows - Views/MainView.cs parenthesises it.
         /// <para>
-        /// The module's only snapshot-age wording. A second one ("2m ago")
-        /// briefly existed beside it and was deleted once this replaced its
-        /// last caller: two formatters over one ladder, with only tests
-        /// holding the older one up, is drift waiting to happen.
+        /// Sub-minute reads "just captured", not ForAgeAgo's "just now":
+        /// the line pairs two moments - when the last refresh ATTEMPT
+        /// happened and how old the snapshot is - and "just now" straight
+        /// after an absolute timestamp reads as a restatement of that same
+        /// instant rather than a second fact about a different one.
         /// </para>
         /// <para>
         /// A negative age (CapturedAt momentarily ahead of the local clock -
@@ -203,21 +208,15 @@ namespace TaimisToolbench.Services
                 age = TimeSpan.Zero;
             }
 
-            if (age.TotalMinutes < 1)
-            {
-                return "snapshot just captured";
-            }
-
-            return $"snapshot {AgeMagnitude(age)} old";
+            return age.TotalMinutes < 1 ? "just captured" : ForAgeAgo(age);
         }
 
         /// <summary>
-        /// A plain relative age - "5m ago", "3h 12m ago", "2d ago" - over
-        /// the same bucket ladder as <see cref="ForSnapshotAgeSuffix"/>,
-        /// for lines whose subject is already named by the sentence around
-        /// it (the Plan History detail panel's cost-delta line). Sub-minute
-        /// ages read "just now"; a negative age (clock skew) is treated as
-        /// zero, matching ForSnapshotAgeSuffix.
+        /// A relative age - "5m ago", "3h 12m ago", "2d ago", "4mo ago" -
+        /// over <see cref="AgeMagnitude"/>'s ladder. The module's one
+        /// elapsed-time wording; <see cref="ForSnapshotAgeSuffix"/> is this
+        /// with a different sub-minute case. Sub-minute reads "just now"; a
+        /// negative age (clock skew) is treated as zero.
         /// </summary>
         public static string ForAgeAgo(TimeSpan age)
         {

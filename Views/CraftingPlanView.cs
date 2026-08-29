@@ -1077,7 +1077,11 @@ namespace TaimisToolbench.Views
                     }
                 }
 
-                string target = string.IsNullOrEmpty(plan.TargetItemName) ? "unnamed" : plan.TargetItemName;
+                // TargetNameSuffix carries a batch's " + N others"; without
+                // it this line names only the first of the requested items.
+                string target = string.IsNullOrEmpty(plan.TargetItemName)
+                    ? "unnamed"
+                    : plan.TargetItemName + (plan.TargetNameSuffix ?? "");
                 return $"target={target} x{plan.TargetQuantity}, roots={rootCount}, sections={sectionCount}, rows={rowCount}";
             }
             catch (Exception ex)
@@ -3470,6 +3474,15 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
+        /// The module's lifetime token, or None when this view was built
+        /// without one. Read per call, never cached - see the field comment.
+        /// </summary>
+        private CancellationToken ModuleLifetimeToken()
+        {
+            return _moduleLifetimeToken == null ? CancellationToken.None : _moduleLifetimeToken();
+        }
+
+        /// <summary>
         /// Every control that can START a generation, switched together.
         /// <para>
         /// The Generate button used to be the only one disabled for the
@@ -3490,15 +3503,6 @@ namespace TaimisToolbench.Views
         /// site).
         /// </para>
         /// </summary>
-        /// <summary>
-        /// The module's lifetime token, or None when this view was built
-        /// without one. Read per call, never cached - see the field comment.
-        /// </summary>
-        private CancellationToken ModuleLifetimeToken()
-        {
-            return _moduleLifetimeToken == null ? CancellationToken.None : _moduleLifetimeToken();
-        }
-
         private void SetGenerateInputsEnabled(bool enabled)
         {
             if (_generateButton != null)

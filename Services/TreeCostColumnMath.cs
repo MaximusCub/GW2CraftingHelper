@@ -197,6 +197,34 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// Left edge of the "Cost" header, centred over the band the
+        /// column's values actually occupy - which ends at
+        /// <paramref name="costRightEdge"/> and is
+        /// <see cref="TotalWidth"/> wide, not the wider floor the tree
+        /// reserves for the column (TreeSectionController.
+        /// EffectiveCostColumnWidth). A header centred over the reserve
+        /// would drift off its own numbers by half of whatever the reserve
+        /// exceeds them by.
+        /// <para>
+        /// The band is floored at the header's own width, so a tree whose
+        /// every value is a single copper - or one in which nothing is
+        /// priced at all - right-aligns the header on the column's edge
+        /// rather than centring it over a band too narrow to hold it and
+        /// letting the word overhang the panel margin.
+        /// </para>
+        /// </summary>
+        public static int HeaderX(int costRightEdge, CostColumnWidths widths, int headerWidth)
+        {
+            int band = TotalWidth(widths);
+            if (band < headerWidth)
+            {
+                band = headerWidth;
+            }
+
+            return JustifiedColumnTracks.CenteredInBand(costRightEdge - band, band, headerWidth);
+        }
+
+        /// <summary>
         /// Whether a node's cost cell renders its non-coin currency
         /// segments. A node whose children are the synthesised
         /// cost-component leaves shows only its compact coin total (the

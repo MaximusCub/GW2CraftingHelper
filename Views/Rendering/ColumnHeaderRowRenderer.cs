@@ -38,6 +38,13 @@ namespace TaimisToolbench.Views.Rendering
     // Omitting it anchors the label at PlanRelayoutMath.PinnedRightEdge,
     // which is what every flat table wants.
     //
+    // rightLabelXForWidth places the right label OUTRIGHT rather than
+    // right-aligning it, for the caller whose header has to centre over the
+    // band its values occupy instead of merely ending where they end (see
+    // Services/JustifiedColumnTracks). rightXForWidth still owns the
+    // column's own right edge, and so the band width and the cell split;
+    // only where the word is drawn changes.
+    //
     // Chrome (band color, font, label color, height, label y) comes from
     // the shared HeaderBands - see that class for the L3 inventory and
     // the reason the band, rather than the Shopping List's lighter
@@ -64,7 +71,7 @@ namespace TaimisToolbench.Views.Rendering
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
-            Func<int, int> leftColumnEndForWidth = null)
+            Func<int, int> leftColumnEndForWidth = null, Func<int, int> rightLabelXForWidth = null)
         {
             var rowPanel = HeaderBands.CreateColumnHeaderBand(
                 parent, BandWidth(rightXForWidth, panelWidth));
@@ -88,12 +95,20 @@ namespace TaimisToolbench.Views.Rendering
                 });
             }
 
-            var rightLabelControl = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, rightLabel, font, HeaderBands.LabelColor,
-                rightXForWidth != null
-                    ? rightXForWidth(panelWidth)
-                    : panelWidth - PlanRelayoutMath.TableRightMargin,
-                HeaderBands.LabelY);
+            var rightLabelControl = rightLabelXForWidth != null
+                ? LabelHelpers.WithDescenderClearance(new Label()
+                {
+                    Text = rightLabel ?? "", Font = font, TextColor = HeaderBands.LabelColor,
+                    AutoSizeWidth = true, AutoSizeHeight = true,
+                    Location = new Point(rightLabelXForWidth(panelWidth), HeaderBands.LabelY),
+                    Parent = rowPanel,
+                })
+                : LabelHelpers.CreateRightAlignedLabel(
+                    rowPanel, rightLabel, font, HeaderBands.LabelColor,
+                    rightXForWidth != null
+                        ? rightXForWidth(panelWidth)
+                        : panelWidth - PlanRelayoutMath.TableRightMargin,
+                    HeaderBands.LabelY);
 
             // The hit area is the whole cell (SortableHeaderCells); the
             // labels only carry the note, which they would swallow.
@@ -131,7 +146,10 @@ namespace TaimisToolbench.Views.Rendering
                 rowPanel.Size = new Point(BandWidth(rightXForWidth, w), HeaderBands.RowHeight);
                 int rightEdge = rightXForWidth != null ? rightXForWidth(w) : w - PlanRelayoutMath.TableRightMargin;
                 rightLabelControl.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width), HeaderBands.LabelY);
+                    rightLabelXForWidth != null
+                        ? rightLabelXForWidth(w)
+                        : PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width),
+                    HeaderBands.LabelY);
                 if (middleLabelControl != null && middleXForWidth != null)
                 {
                     middleLabelControl.Location = new Point(middleXForWidth(w), HeaderBands.LabelY);

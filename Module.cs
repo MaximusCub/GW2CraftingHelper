@@ -920,7 +920,11 @@ namespace TaimisToolbench
                 ClearCache,
                 SaveStatus,
                 SaveStatusThreadSafe,
-                itemMetadataService.GetCachedStatBlock
+                itemMetadataService.GetCachedStatBlock,
+                // The wallet rows' currency tooltips read the same
+                // session cache WarmCurrencyMetadataForSettings fills, so
+                // the description arrives without a second fetch.
+                _currencyMetadataService.GetCached
             );
 
             // The generate callback is always routed through the list
@@ -956,7 +960,15 @@ namespace TaimisToolbench
                 () => lifetimeToken
             );
 
-            _settingsContent = new SettingsTabContent(_settings, _modalDialog);
+            _settingsContent = new SettingsTabContent(
+                _settings,
+                // The valuation grid's barter rows are items and hover like
+                // items. WarmBarterItemMetadataForSettings below fills this
+                // same service's stat side table on the /v2/items fetch it
+                // already makes for their icons, so those hovers need no
+                // ItemStatWarmer of their own.
+                itemMetadataService.GetCachedStatBlock,
+                _modalDialog);
             WarmCurrencyMetadataForSettings(lifetimeToken);
             WarmBarterItemMetadataForSettings(itemMetadataService, lifetimeToken);
 

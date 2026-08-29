@@ -169,7 +169,7 @@ namespace TaimisToolbench.Views.Rendering
         // paints ON the fill (see CreateHighlightBox), so an edge lands at
         // 1 - 0.5 * 0.86 ~= 0.57 against that 0.14 interior - the ring is
         // four times the interior's density, which is what makes it read
-        // as an edge at 1px.
+        // as an edge at the frame's hairline width.
         private static readonly Color ResultHighlightTint = new Color(214, 176, 96);
         private static readonly Color ResultHighlightFill = ResultHighlightTint * 0.14f;
         private static readonly Color ResultHighlightBorder = ResultHighlightTint * 0.5f;
@@ -526,16 +526,30 @@ namespace TaimisToolbench.Views.Rendering
 #endif
         }
 
-        /// <summary>Width of the highlight box's frame.</summary>
-        private const int HighlightBoxBorder = 1;
+        /// <summary>
+        /// Width of the highlight box's frame. TWO logical pixels, for the
+        /// reason LabelHelpers.CreateRowDivider is 2px: Blish applies the
+        /// GW2 UI scale as a real GPU scale matrix, so a 1px logical quad
+        /// rasterizes to floor(scale) = 0 guaranteed physical pixels and
+        /// vanishes or survives according to its own sub-pixel phase
+        /// (KNOWN-ISSUES #23). The band's y is a scroll offset away and the
+        /// box's x follows the panel width, so the four edges each land on
+        /// a different phase - field report: the box drew its top and
+        /// bottom and neither side. At 2, floor(2 * 0.81) = 1 covered
+        /// physical pixel at the smallest supported UI scale, on all four
+        /// edges. Content is inset by CostBandBoxPadX (14) / PadY (6), so
+        /// the wider frame still cannot reach it.
+        /// </summary>
+        private const int HighlightBoxBorder = 2;
 
         /// <summary>
         /// The result tile's highlight box, and the container its caption,
         /// disclosure line and amount are parented to. The box IS the fill
         /// panel - nothing paints beneath it, so the parchment behind the
         /// section shows through at exactly ResultHighlightFill's alpha.
-        /// The frame is four 1px edge panels drawn ON the fill (so an edge
-        /// composites to fill+border, visibly denser than the interior);
+        /// The frame is four HighlightBoxBorder-wide edge panels drawn ON
+        /// the fill (so an edge composites to fill+border, visibly denser
+        /// than the interior);
         /// deliberately NOT the LabelHelpers.CreateSmallTag idiom of a
         /// border-coloured panel with the fill inset inside it, which every
         /// other caller gets away with only because its border is opaque.
@@ -634,10 +648,10 @@ namespace TaimisToolbench.Views.Rendering
             // handful of entries in practice) with the SAME font both the
             // header and every data row already use.
             // The number bands are never narrower than their own header
-            // labels: "Required"/"Have"/"Needed" right-align onto the same
-            // edges as the numbers, and at the ColumnHeader tier they
-            // routinely out-measure a short value, which would let the
-            // currency name run under its own header.
+            // labels: each header centres over its band, and at the
+            // ColumnHeader tier "Required"/"Have"/"Needed" routinely
+            // out-measure a short value, so a band sized to the value alone
+            // would let the currency name run under its own header.
             var font = UiFonts.Body;
             int widestNumberWidth = WidestCurrencyHeaderLabel();
             foreach (var row in rows)
@@ -678,7 +692,7 @@ namespace TaimisToolbench.Views.Rendering
             int widest = 0;
             for (int i = 0; i < CurrencyHeaderLabels.Length; i++)
             {
-                int width = (int)System.Math.Ceiling(font.MeasureString(CurrencyHeaderLabels[i]).Width);
+                int width = MeasureHeader(font, CurrencyHeaderLabels[i]);
                 if (width > widest)
                 {
                     widest = width;
@@ -769,15 +783,24 @@ namespace TaimisToolbench.Views.Rendering
 
             var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
                 panelWidth, widestNumberWidth);
-            var requiredLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, RequiredHeaderText, font, HeaderBands.LabelColor,
-                edges.RequiredRightEdge, HeaderBands.LabelY);
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, HaveHeaderText, font, HeaderBands.LabelColor,
-                edges.HaveRightEdge, HeaderBands.LabelY);
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(
-                band, NeededHeaderText, font, HeaderBands.LabelColor,
-                edges.NeededRightEdge, HeaderBands.LabelY);
+
+            // Each header centres over the band its own numbers occupy, not
+            // against that band's right edge - see JustifiedColumnTracks.
+            // Measured from the strings, which are fixed, so the resize
+            // closure below neither measures nor reads a Blish Label's Width
+            // (not settled until its next layout pass).
+            int requiredHeaderWidth = MeasureHeader(font, RequiredHeaderText);
+            int haveHeaderWidth = MeasureHeader(font, HaveHeaderText);
+            int neededHeaderWidth = MeasureHeader(font, NeededHeaderText);
+            var requiredLabel = CreateCurrencyHeaderLabel(
+                band, RequiredHeaderText, font,
+                edges.RequiredBandX, edges.NumberColumnWidth, requiredHeaderWidth);
+            var haveLabel = CreateCurrencyHeaderLabel(
+                band, HaveHeaderText, font,
+                edges.HaveBandX, edges.NumberColumnWidth, haveHeaderWidth);
+            var neededLabel = CreateCurrencyHeaderLabel(
+                band, NeededHeaderText, font,
+                edges.NeededBandX, edges.NumberColumnWidth, neededHeaderWidth);
 
             // WidestNumberWidth is cached from the build-time
             // pre-scan (data-derived, not panelWidth-derived - it never
@@ -789,11 +812,40 @@ namespace TaimisToolbench.Views.Rendering
                 band.Size = new Point(w, HeaderBands.RowHeight);
                 var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
                 requiredLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), HeaderBands.LabelY);
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.RequiredBandX, e.NumberColumnWidth, requiredHeaderWidth),
+                    HeaderBands.LabelY);
                 haveLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), HeaderBands.LabelY);
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.HaveBandX, e.NumberColumnWidth, haveHeaderWidth),
+                    HeaderBands.LabelY);
                 neededLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), HeaderBands.LabelY);
+                    JustifiedColumnTracks.CenteredInBand(
+                        e.NeededBandX, e.NumberColumnWidth, neededHeaderWidth),
+                    HeaderBands.LabelY);
+            });
+        }
+
+        private static int MeasureHeader(BitmapFont font, string text)
+        {
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        private static Label CreateCurrencyHeaderLabel(
+            Panel band, string text, BitmapFont font,
+            int bandX, int numberColumnWidth, int headerWidth)
+        {
+            return LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Text = text,
+                Font = font,
+                TextColor = HeaderBands.LabelColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(
+                    JustifiedColumnTracks.CenteredInBand(bandX, numberColumnWidth, headerWidth),
+                    HeaderBands.LabelY),
+                Parent = band,
             });
         }
 
@@ -833,7 +885,17 @@ namespace TaimisToolbench.Views.Rendering
                 IconControls.CreateItemIcon(
                     rowPanel, row.IconUrl, ItemIconFrame.NotAnItem(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
-                    ItemIconTier.CurrencyListRow, ItemIconTooltip.Naming(row.Label));
+                    ItemIconTier.CurrencyListRow,
+                    // A CurrencyCost row is a wallet currency by
+                    // construction (PlanViewModelBuilder.
+                    // BuildCurrencyTableRows reads Plan.CurrencyCosts), and
+                    // CurrencyOwnedQuantity is already the raw unclamped
+                    // wallet holding the game's tooltip states.
+                    ItemIconTooltip.ForCurrency(
+                        row.Label,
+                        () => CurrencyTooltipFacts.For(
+                            row.Label, row.IconUrl, row.CurrencyDescription,
+                            row.CurrencyOwnedQuantity)));
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
@@ -852,9 +914,9 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = rowPanel,
             });
 
-            // No tooltip on the name or the row: the currency's icon names
-            // it (ItemIconTooltip.Naming), and that is the one control on
-            // the row that answers for it.
+            // No tooltip on the name or the row: the currency's icon
+            // answers for it, and that is the one control on the row that
+            // does.
             var numberColor = new Color(220, 220, 220);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";

@@ -282,6 +282,11 @@ namespace TaimisToolbench.Views
 
         private readonly ModuleSettings _settings;
         private readonly ModalDialog _modalDialog;
+
+        // The session item-stat cache the barter rows' hovers read, from
+        // the module's one ItemMetadataService. Never a fetch.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
         private readonly List<CurrencyRow> _rows = new List<CurrencyRow>();
 
         // Row names in _rows order, held so the filter keystroke path does
@@ -415,14 +420,23 @@ namespace TaimisToolbench.Views
         // a half-built form has nothing to compare, not everything.
         private volatile bool _buildComplete;
 
+        /// <param name="getItemStatBlock">
+        /// The session stat cache the grid's barter rows hover from. Never
+        /// a fetch (ItemMetadataService.GetCachedStatBlock); null degrades
+        /// those hovers to their icon+name header.
+        /// </param>
         /// <param name="modalDialog">
         /// Raises the Discard confirm. Null degrades to discarding without
         /// one rather than losing the affordance - the confirm matrix is a
         /// UX rule, not a correctness gate.
         /// </param>
-        public SettingsTabContent(ModuleSettings settings, ModalDialog modalDialog = null)
+        public SettingsTabContent(
+            ModuleSettings settings,
+            Func<int, ItemStatBlock> getItemStatBlock,
+            ModalDialog modalDialog = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _getItemStatBlock = getItemStatBlock;
             _modalDialog = modalDialog;
 
             _resizeSettle = new ResizeSettleDebounce(
@@ -536,9 +550,6 @@ namespace TaimisToolbench.Views
             // controls are disposed with their container.
             _sections.Clear();
             _boardPanel = null;
-            _currencyProsePanels.Clear();
-            _currencyProseLabels.Clear();
-            _currencyProse.Clear();
             _dirtyChipLabel = null;
             _discardButton = null;
             _saveButton = null;
@@ -789,7 +800,6 @@ namespace TaimisToolbench.Views
             }
 
             LayoutSectionBoard(measureText);
-            LayoutCurrencyProse(measureText);
 
             if (_currencyGridPanel == null)
             {
@@ -823,7 +833,8 @@ namespace TaimisToolbench.Views
         /// grid to the filtered list would therefore snap the tab to the top
         /// on every filter keystroke that changes the match count; the cost
         /// of the fixed height is trailing blank space below a filtered
-        /// list, which is why the grid is the last thing in the panel.
+        /// list, which is why nothing but the section's two-line footnote
+        /// follows the grid.
         /// </summary>
         private void SetCurrencyGridHeight()
         {
@@ -1277,24 +1288,6 @@ namespace TaimisToolbench.Views
             // exist on the rows with no default. The price-basis pointer
             // moved to this section's title hover: it points at another tab
             // rather than instructing about a control here.
-            // dev/proposals/addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
-            // for Astral Acclaim specifically - it is untradable and earned
-            // via capped seasonal play, so unlike the other currencies
-            // below, there is no rate this settings row can honestly
-            // suggest. Left blank (the default) simply keeps it out of
-            // price comparisons, same as any other unset currency. Above the
-            // grid rather than below it because the grid is deliberately the
-            // last thing in the panel - see SetCurrencyGridHeight.
-            AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
-            // The same posture, for the same reason, on the barter-item
-            // side: the Black Lion family is gem-store RNG-chest currency
-            // and every listed row would need a gem-to-gold opinion the
-            // module has no business making for the user. Left out of the
-            // grid entirely rather than shown blank - an unlisted item is
-            // simply unvalued, and its vendor offers still appear, just
-            // honestly unranked.
-            AddInfoLine("Black Lion tickets, statuettes and vouchers come from gem-store chests - their value is personal too, so they are not listed.", panelWidth);
-
             AddCurrencyFilterRow(panelWidth);
             AddCurrencyGridHeader(panelWidth);
 
@@ -1324,6 +1317,21 @@ namespace TaimisToolbench.Views
             _currencyForceVisible = new bool[_rows.Count];
             SetCurrencyGridHeight();
             ApplyCurrencyFilter();
+
+            // The two families the grid deliberately does not price, as one
+            // footnote under it. Astral Acclaim is untradable and earned via
+            // capped seasonal play; the Black Lion family is gem-store
+            // RNG-chest currency. Neither has a rate this module can
+            // honestly suggest, so Astral Acclaim ships unset - which simply
+            // keeps it out of price comparisons, like any other unset
+            // currency - and the Black Lion rows are left out of the grid
+            // entirely: an unlisted item is unvalued, and its vendor offers
+            // still appear, just unranked.
+            // dev/proposals/addendum-astral-acclaim.md P1.
+            AddInfoLine(
+                "Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.\n"
+                + "Black Lion tickets, statuettes and vouchers come from gem-store chests - their value is personal too, so they are not listed.",
+                panelWidth);
         }
 
         // The slider stays FIXED at this width whatever the column does:
@@ -1743,13 +1751,6 @@ namespace TaimisToolbench.Views
             return invalidCount;
         }
 
-        // The full-width Vendor Cost Valuations section's own header and notes.
-        // The board sections build their own (BeginSection); this shape is
-        // for the one section that is a grid rather than a block.
-        private readonly List<Panel> _currencyProsePanels = new List<Panel>();
-        private readonly List<Label> _currencyProseLabels = new List<Label>();
-        private readonly List<string> _currencyProse = new List<string>();
-
         private void AddSectionHeader(string title, int panelWidth, string tooltip = null)
         {
             var headerPanel = new Panel()
@@ -1784,42 +1785,42 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One wrapped note under the full-width section's header. Capped at
-        /// <see cref="SettingsFormLayout.ProseMeasure"/> rather than run to
-        /// the panel edge: the section is a table, but a sentence under it is
-        /// still prose, and a 280-character line at a wide window is not
-        /// readable.
+        /// One note of the full-width section's own prose: its header notes
+        /// and its closing footnote. Each embedded newline starts a new
+        /// line and nothing else breaks - the strings are written short
+        /// enough to sit on one line at
+        /// <see cref="WindowSizing.MinWindowWidth"/>, so a wrap budget here
+        /// would only strand the width the section itself uses. The label
+        /// auto-sizes, so a resize moves nothing.
         /// </summary>
         private void AddInfoLine(string text, int panelWidth)
         {
+            int lines = 1;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    lines++;
+                }
+            }
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, InfoRowHeight),
+                Size = new Point(panelWidth, (lines * InfoRowHeight) + 2),
                 Parent = _rootPanel,
             };
             _fullWidthPanels.Add(rowPanel);
 
-            _currencyProsePanels.Add(rowPanel);
-            _currencyProseLabels.Add(CreateWrappedLabel(rowPanel));
-            _currencyProse.Add(text);
-
-            LayoutCurrencyProseLine(_currencyProse.Count - 1, panelWidth, measureText: true);
-        }
-
-        private void LayoutCurrencyProseLine(int index, int panelWidth, bool measureText)
-        {
-            int height = LayoutWrappedLabel(
-                _currencyProseLabels[index], _currencyProse[index], NameColumnX, 2,
-                SettingsFormLayout.SectionProseMaxWidth(panelWidth), measureText);
-            _currencyProsePanels[index].Height = height + 2;
-        }
-
-        private void LayoutCurrencyProse(bool measureText)
-        {
-            for (int i = 0; i < _currencyProse.Count; i++)
+            new Label()
             {
-                LayoutCurrencyProseLine(i, _panelWidth, measureText);
-            }
+                Font = UiFonts.Body,
+                Text = text,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, 2),
+                TextColor = InfoTextColor,
+                Parent = rowPanel,
+            };
         }
 
         // One line per currency: icon, name, input, Ignore, and one tag slot
@@ -2227,17 +2228,24 @@ namespace TaimisToolbench.Views
                     return;
                 }
 
+                // These rows ARE items, unlike their currency neighbours,
+                // and the rarity came from the same /v2/items entry as the
+                // icon beside it. Resolved once and fed to the frame and
+                // the hover header alike - see ItemTooltipIdentity.ForItem.
+                string rarity = ItemRarityResolution.Normalize(item.Rarity);
+                int itemId = row.Id;
                 row.Icon = IconControls.CreateItemIcon(
                     row.Cell,
                     item.IconUrl,
-                    // These rows ARE items, unlike their currency
-                    // neighbours, and the rarity came from the same
-                    // /v2/items entry as the icon beside it.
-                    ItemIconFrame.ForRarity(ItemRarityResolution.Normalize(item.Rarity)),
+                    ItemIconFrame.ForRarity(rarity),
                     SettingsCurrencyGridLayout.CellIconX,
                     SettingsCurrencyGridLayout.CellIconY,
                     ItemIconTier.CurrencyListRow,
-                    ItemIconTooltip.Naming(row.Name));
+                    ItemIconTooltip.ForItem(
+                        ItemTooltipIdentity.ForItem(row.Name, item.IconUrl, rarity),
+                        _getItemStatBlock == null || itemId <= 0
+                            ? (Func<ItemStatBlock>)null
+                            : () => _getItemStatBlock(itemId)));
                 return;
             }
 
@@ -2246,9 +2254,11 @@ namespace TaimisToolbench.Views
                 return;
             }
 
+            int currencyId = row.Id;
+            string currencyName = row.Name;
             row.Icon = IconControls.CreateItemIcon(
                 row.Cell,
-                CurrencyDisplayResolver.ResolveIconUrl(row.Id, _currencyMetadata),
+                CurrencyDisplayResolver.ResolveIconUrl(currencyId, _currencyMetadata),
                 // A currency has no rarity to resolve: neutral by intent,
                 // the same call ItemIconFrame.NotAnItem() records at the
                 // Snapshot tab's wallet rows.
@@ -2256,7 +2266,16 @@ namespace TaimisToolbench.Views
                 SettingsCurrencyGridLayout.CellIconX,
                 SettingsCurrencyGridLayout.CellIconY,
                 ItemIconTier.CurrencyListRow,
-                ItemIconTooltip.Naming(row.Name));
+                ItemIconTooltip.ForCurrency(
+                    currencyName,
+                    // No balance: this tab reads no wallet snapshot, and
+                    // null is "not known", which drops the line rather than
+                    // claiming the player holds none.
+                    () => CurrencyTooltipFacts.For(
+                        currencyName,
+                        CurrencyDisplayResolver.ResolveIconUrl(currencyId, _currencyMetadata),
+                        CurrencyDisplayResolver.ResolveDescription(currencyId, _currencyMetadata),
+                        null)));
         }
 
         /// <summary>

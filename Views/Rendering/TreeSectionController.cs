@@ -364,26 +364,41 @@ namespace TaimisToolbench.Views.Rendering
             _treeFlow = treeFlow;
 
             // Column headers over the two columns a tree row's right-hand
-            // side actually has. Both track the panel width now (the
-            // pill+cost block's x is width-derived), hence
-            // middleXForWidth/rightXForWidth rather than build-time x's.
-            // Counted by
-            // PlanContentHeightMath.MultiRootTreeFlowHeight, which every
-            // treeFlow height assignment goes through.
-            // Guarded on the same "is there a tree at all" condition
-            // MultiRootTreeFlowHeight counts the header under: a header
-            // drawn over zero roots would be a row the section's own
-            // height math reserves nothing for.
+            // side actually has. Both track the panel width (the pill+cost
+            // block's x is width-derived), hence middleXForWidth/
+            // rightXForWidth rather than build-time x's, and both centre
+            // over what they name (JustifiedColumnTracks.CenteredInBand).
+            // Counted by PlanContentHeightMath.MultiRootTreeFlowHeight,
+            // which every treeFlow height assignment goes through, and
+            // guarded on the same "is there a tree at all" condition that
+            // math counts the header under: a header over zero roots would
+            // be a row the section's own height math reserves nothing for.
             if (_treeRoots.Count > 0)
             {
                 int headerCostColumnWidth = EffectiveCostColumnWidth();
+
+                // Captured by value beside headerCostColumnWidth: an
+                // in-place refresh that would change either one bails out
+                // and rebuilds (TryRefreshInPlace), so a live field read
+                // here could only ever disagree with the rows.
+                var headerCostWidths = _costColumnWidths;
+                int sourceHeaderWidth = MeasureHeaderLabel(SourceHeaderText);
+                int costHeaderWidth = MeasureHeaderLabel(CostHeaderText);
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, "Cost", _sink,
-                    middleLabel: "Source",
-                    middleXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
+                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
+                    middleLabel: SourceHeaderText,
+                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
+                        PlanRelayoutMath.ComputeTreeColumnEdges(
+                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
+                        TreePillColumnWidth,
+                        sourceHeaderWidth),
                     rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge);
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
+                    rightLabelXForWidth: w => TreeCostColumnMath.HeaderX(
+                        PlanRelayoutMath.ComputeTreeColumnEdges(
+                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
+                        headerCostWidths,
+                        costHeaderWidth));
             }
 
 #if DEBUG
@@ -664,6 +679,9 @@ namespace TaimisToolbench.Views.Rendering
         // 12 -> 16, pills 10 -> 14). The icon itself stays top-padded by
         // PlanContentHeightMath.TreeRowIconPad, which is the height law's
         // own term.
+        private const string SourceHeaderText = "Source";
+        private const string CostHeaderText = "Cost";
+
         private const int TreeRowTextY = 16;
         private const int TreeRowPillY = 14;
         private const int TreePillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
@@ -693,6 +711,17 @@ namespace TaimisToolbench.Views.Rendering
         // is always the answer, however deep the row sits.
         private const string DimmedPillTooltip =
             "Under a bought item - switch the parent to CRAFT to change this";
+
+        /// <summary>
+        /// A header label's width at the header band's own font - measured
+        /// from the string, because a Blish Label's Width is not settled
+        /// until its next layout pass and the centring closures run before
+        /// then.
+        /// </summary>
+        private static int MeasureHeaderLabel(string text)
+        {
+            return (int)Math.Ceiling(HeaderBands.Font.MeasureString(text ?? "").Width);
+        }
 
         /// <summary>
         /// Width the cost column actually needs this render: its fixed

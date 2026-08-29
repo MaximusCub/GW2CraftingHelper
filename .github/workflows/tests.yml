@@ -557,17 +557,22 @@ jobs:
                   i += 1
               return None
 
-          def last_argument(args):
+          def split_arguments(args):
               # Top-level split: a nested call's own commas are not ours.
-              depth, start = 0, 0
+              parts, depth, start = [], 0, 0
               for i, ch in enumerate(args):
                   if ch in '([':
                       depth += 1
                   elif ch in ')]':
                       depth -= 1
                   elif ch == ',' and depth == 0:
+                      parts.append(args[start:i].strip())
                       start = i + 1
-              return args[start:].strip()
+              parts.append(args[start:].strip())
+              return parts
+
+          def last_argument(args):
+              return split_arguments(args)[-1]
 
           bad, silent, unused = [], [], []
           seen = set()
@@ -598,6 +603,25 @@ jobs:
               if path not in files:
                   silent.append(f'{path}: forward-listed but not in the tree ({why})')
 
+          # A hard-coded null stat source on ForItem composes a header-only
+          # hover: an icon and a name, and nothing the game's own item
+          # tooltip says. Every other call site passes a CONDITIONAL null -
+          # "no stat block for THIS id, on this surface" - which is a
+          # different statement and stays allowed. No file is exempt: the
+          # last one that was, Views/PlanHistoryTabContent.cs, is what the
+          # owner saw as "just an icon and name".
+          statless = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for m in re.finditer(re.escape('ItemIconTooltip.ForItem('), text):
+                  args = arguments(text, m.end() - 1)
+                  if args is None:
+                      continue
+                  parts = split_arguments(args)
+                  line = text.count('\n', 0, m.start()) + 1
+                  if len(parts) > 1 and parts[1] == 'null':
+                      statless.append(f'{f}:{line}')
+
           # The stamping seams, pinned by name and by parameter type. A new
           # one, or one widened to Control/Label, is how the whole-row
           # stamping would come back.
@@ -617,6 +641,27 @@ jobs:
               print('pin here in the same commit and say why in the message.')
               silent.append('Views/Rendering/ItemIconTooltip.cs: seam set')
 
+          # The factory set, pinned the same way and for the same reason.
+          # Naming() - a subject's name and nothing else, no icon, no wallet
+          # balance, no prose - was the one hatch through which an item or a
+          # currency could reach the screen as a bare line, and it was what
+          # every currency hover in the module used to be. It was deleted
+          # with its last caller. An ITEM takes ForItem/Composed and a WALLET
+          # CURRENCY takes ForCurrency, decided by the id space the call site
+          # drew the icon from and never by the name: Gaeting Crystal is item
+          # 86094 AND currencies 39/77, one good in two id spaces.
+          FACTORIES = {'ForItem', 'Composed', 'ForCurrency', 'None'}
+          factories = set(re.findall(
+              r'^        internal static ItemIconTooltip (\w+)\(', intent, re.M))
+          if factories != FACTORIES:
+              print('ItemIconTooltip\'s factory set changed.')
+              print('  pinned:   ' + '; '.join(sorted(FACTORIES)))
+              print('  declared: ' + '; '.join(sorted(factories)))
+              print('A new factory is a new thing an icon is allowed to say on hover.')
+              print('If it is genuinely a fifth kind, change the pin here in the same')
+              print('commit and say why; a factory that yields a bare name is not one.')
+              silent.append('Views/Rendering/ItemIconTooltip.cs: factory set')
+
           if bad:
               print('These item icons are built without a named ItemIconTier:')
               print('\n'.join(sorted(bad)))
@@ -626,9 +671,16 @@ jobs:
               print('These item icons are built without a named ItemIconTooltip:')
               print('\n'.join(sorted(silent)))
               print('Pass one from Views/Rendering/ItemIconTooltip.cs: ForItem/Composed for')
-              print('the standard item hover, Naming for a currency, or None(ItemIconSilence.X)')
+              print('an item, ForCurrency for a wallet currency, or None(ItemIconSilence.X)')
               print('to say out loud that this icon shows nothing and why.')
-          if bad or silent:
+          if statless:
+              print('These item hovers are composed with no stat source at all, so they')
+              print('can only ever be an icon and a name:')
+              print('\n'.join(sorted(statless)))
+              print('Pass the surface\'s own session stat lookup. A null that depends on')
+              print('the row (no id, no accessor on this surface) is a conditional and is')
+              print('not what this asks about.')
+          if bad or silent or statless:
               sys.exit(1)
           if unused:
               print('NOTE: these files no longer call a pre-tier overload - drop them')

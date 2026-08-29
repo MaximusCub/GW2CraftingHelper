@@ -32,11 +32,10 @@ namespace TaimisToolbench.Tests.Services
 
             // Cost sits left of the timestamp, timestamp left of the cluster.
             Assert.True(bands.CostRightEdge < bands.WhenX);
-            Assert.True(bands.WhenX + bands.WhenWidth < bands.ViewX);
+            Assert.True(bands.WhenX + bands.WhenWidth < bands.OpenX);
 
-            // The cluster runs View, Open, Re-solve, the Pin toggle and
-            // Delete with no overlap...
-            Assert.True(bands.ViewX + PlanHistoryRowLayout.ActionButtonWidth <= bands.OpenX);
+            // The cluster runs Open in Planner, Re-Solve in Planner, the
+            // Pin toggle and Delete with no overlap...
             Assert.True(bands.OpenX + PlanHistoryRowLayout.ActionButtonWidth <= bands.ResolveX);
             Assert.True(bands.ResolveX + PlanHistoryRowLayout.ActionButtonWidth <= bands.PinX);
             Assert.True(bands.PinX + PlanHistoryRowLayout.PinToggleWidth <= bands.DeleteX);
@@ -87,10 +86,12 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(atFloor.WhenX, floored.WhenX);
             Assert.Equal(PlanHistoryRowLayout.MinWhenWidth, floored.WhenWidth);
 
-            // Above the floor, every extra cost pixel comes out of the
-            // flexing name band, nothing else moves.
+            // Above the floor, a wider cost band grows about its own
+            // track's centre, so it takes HALF of each added pixel from the
+            // flexing name band and half from the gap on its right.
+            // Generated does not move: it owns a different track.
             var wide = PlanHistoryRowLayout.Compute(1200, PlanHistoryRowLayout.MinCostCellWidth + 40, 0);
-            Assert.Equal(40, floored.NameWidth - wide.NameWidth);
+            Assert.Equal(20, floored.NameWidth - wide.NameWidth);
             Assert.Equal(floored.WhenX, wide.WhenX);
         }
 
@@ -144,7 +145,10 @@ namespace TaimisToolbench.Tests.Services
         {
             var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
 
-            Assert.Equal(PlanHistoryRowLayout.Inset, bands.IconX);
+            // The caret column stands where the row starts; the icon
+            // begins after it, and the name after the icon frame.
+            Assert.Equal(PlanHistoryRowLayout.Inset, bands.CaretX);
+            Assert.Equal(bands.CaretX + PlanHistoryRowLayout.CaretColumnWidth, bands.IconX);
             Assert.Equal(
                 bands.IconX + PlanHistoryRowLayout.IconTotal + PlanHistoryRowLayout.IconGap,
                 bands.NameX);
@@ -201,79 +205,101 @@ namespace TaimisToolbench.Tests.Services
 
         /// <summary>
         /// The owner's report: Plan / Cost / Generated packed together and
-        /// left a stranded band before the action controls. The columns are
-        /// distributed now, on the same law the Crafting Plan tab's
-        /// currency table uses, and the property that says so is
-        /// geometric - Cost's right edge sits two thirds of the way across
-        /// the span, Generated's on its end - not a restatement of the
-        /// arithmetic that produced it.
+        /// left a stranded band before the action controls. Each data
+        /// column now CENTRES its band on its own track, so its header
+        /// stands over the values it names. The property that says so is
+        /// geometric - three equal tracks put Cost's axis at the span's
+        /// midpoint and Generated's five sixths along it - not a
+        /// restatement of the arithmetic that produced it.
         /// </summary>
         [Theory]
         [MemberData(nameof(GateWidths))]
-        public void AtEveryGateWidth_TheColumnsAreJustifiedAcrossTheSpanRatherThanPacked(int rowWidth)
+        public void AtEveryGateWidth_TheDataColumnsCentreOnTheirOwnTracks(int rowWidth)
         {
             var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
 
-            int spanEnd = bands.WhenRightEdge;
-            int beforeCost = bands.CostRightEdge - bands.NameX;
-            int afterCost = spanEnd - bands.CostRightEdge;
+            int span = ColumnSpanEnd(bands) - bands.NameX;
 
-            // Two tracks before Cost, one after: the label is the flexing
-            // column and takes the slack of the first data column's track.
-            Assert.InRange(beforeCost - (2 * afterCost), -2, 2);
+            Assert.InRange(bands.CostCenterX - (bands.NameX + (span / 2)), -2, 2);
+            Assert.InRange(bands.WhenCenterX - (bands.NameX + (5 * span / 6)), -2, 2);
 
             // ...and every track is a real, usable width, not a sliver.
-            Assert.True(afterCost > WhenWidth);
+            Assert.True(span / PlanHistoryRowLayout.TrackCount > WhenWidth);
         }
 
         /// <summary>
-        /// The defect this distribution was asked to remove: a wide dead
-        /// band between the last data column and the action cluster. The
-        /// cluster is right-anchored, so the columns' own right edge is one
-        /// cell gap clear of it at EVERY width.
+        /// The cluster is right-anchored, so the span the columns are
+        /// distributed across is exactly the row up to one cell gap before
+        /// it. Generated no longer ENDS there - it centres in the last
+        /// track, which is what puts its header over its own values - but
+        /// nothing may reach past this edge.
         /// </summary>
         [Theory]
         [MemberData(nameof(GateWidths))]
-        public void GeneratedEndsExactlyOneCellGapBeforeTheActionCluster(int rowWidth)
+        public void TheColumnSpanEndsExactlyOneCellGapBeforeTheActionCluster(int rowWidth)
         {
             var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
 
-            Assert.Equal(bands.ViewX - PlanHistoryRowLayout.CellGap, bands.WhenRightEdge);
+            Assert.True(bands.WhenRightEdge <= ColumnSpanEnd(bands));
         }
 
         /// <summary>
-        /// A header that computes its own right edge is how the Ranker's
-        /// drifted 37px off the column it named. Both seats read one
-        /// value per column, so they cannot disagree - this pins that the
-        /// value exists and is the cell's own edge.
+        /// A header that computes its own seat is how the Ranker's drifted
+        /// 37px off the column it named. Each column publishes ONE axis,
+        /// and it is that column's band centre - so a header centred on it
+        /// cannot land anywhere but over the cells.
         /// </summary>
         [Theory]
         [MemberData(nameof(GateWidths))]
-        public void EveryColumnHasOneRightEdgeForItsHeaderAndItsCell(int rowWidth)
+        public void EveryColumnPublishesOneAxisAndItIsItsBandCentre(int rowWidth)
         {
             var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
 
             Assert.Equal(bands.WhenX + bands.WhenWidth, bands.WhenRightEdge);
 
+            int costLeftEdge = bands.CostRightEdge - CostWidth;
+            AssertIsBandCentre(bands.CostCenterX, costLeftEdge, bands.CostRightEdge);
+            AssertIsBandCentre(bands.WhenCenterX, bands.WhenX, bands.WhenRightEdge);
+
             // Ordered and non-overlapping, in the order the headers read:
             // Plan, then Cost, then Generated.
-            Assert.True(bands.NameX < bands.CostRightEdge - CostWidth);
+            Assert.True(bands.NameX < costLeftEdge);
             Assert.True(bands.CostRightEdge < bands.WhenX);
-            Assert.True(bands.WhenRightEdge < bands.ViewX);
+            Assert.True(bands.WhenRightEdge < bands.OpenX);
+        }
+
+        private static int ColumnSpanEnd(in PlanHistoryRowLayout.Bands bands)
+        {
+            return bands.OpenX - PlanHistoryRowLayout.CellGap;
+        }
+
+        private static void AssertIsBandCentre(int centerX, int left, int right)
+        {
+            Assert.InRange((centerX - left) - (right - centerX), -1, 1);
         }
 
         /// <summary>
         /// Widening the window may not walk a column backwards - a column
         /// that moves left as the row grows is the artifact distribution
         /// exists to remove.
+        /// <para>
+        /// Swept from the narrowest row the view can hand Compute: the tab
+        /// panel at the module's own minimum window, less the scrollbar
+        /// allowance. Below ~1050px a track can no longer hold its band and
+        /// the table packs instead, and Generated steps left once as it
+        /// stops hugging the cluster and starts centring - a handoff that
+        /// exists only at widths the window cannot be resized to.
+        /// </para>
         /// </summary>
         [Fact]
         public void EveryColumnEdgeMovesRightAsTheRowWidens()
         {
             int previousCost = int.MinValue;
             int previousWhen = int.MinValue;
+            int narrowest = WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth)
+                - WindowSizing.ScrollbarAllowance;
 
-            for (int rowWidth = 600; rowWidth <= 3000; rowWidth += 17)
+            for (int rowWidth = narrowest; rowWidth <= 3000; rowWidth += 17)
             {
                 var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
                 Assert.True(bands.CostRightEdge >= previousCost, $"Cost went backwards at {rowWidth}");
@@ -297,7 +323,7 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(bands.WhenX - PlanHistoryRowLayout.CellGap, bands.CostRightEdge);
             Assert.True(bands.CostRightEdge < bands.WhenX);
-            Assert.True(bands.WhenRightEdge <= bands.ViewX);
+            Assert.True(bands.WhenRightEdge <= bands.OpenX);
             Assert.True(bands.NameWidth >= 0);
         }
 
@@ -309,16 +335,40 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TheNameBandGrowsWithTheRowButNeverSwallowsTheWholeSlack()
         {
-            var narrow = PlanHistoryRowLayout.Compute(900, CostWidth, WhenWidth);
-            var wide = PlanHistoryRowLayout.Compute(1800, CostWidth, WhenWidth);
+            var narrow = PlanHistoryRowLayout.Compute(1232, CostWidth, WhenWidth);
+            var wide = PlanHistoryRowLayout.Compute(1232 + 900, CostWidth, WhenWidth);
 
             Assert.True(wide.NameWidth > narrow.NameWidth);
 
             // Under the old packed law the name band took EVERY added
-            // pixel - 900 of them. Under distribution it takes the two
-            // tracks it owns and the Generated column keeps the third.
+            // pixel - 900 of them. It now runs to the CENTRE of the middle
+            // track, so it takes exactly half of each one and the two data
+            // columns spread into the rest.
             int addedToName = wide.NameWidth - narrow.NameWidth;
-            Assert.InRange(addedToName, 560, 640);
+            Assert.InRange(addedToName, 445, 455);
+        }
+
+        /// <summary>
+        /// The owner's report: expanding a one-item plan redrew the icon
+        /// and name the collapsed row above it was already showing. A
+        /// single-item plan draws no item list at all, and the panel's
+        /// height is measured from the same count so it cannot reserve
+        /// space for lines nobody draws.
+        /// </summary>
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(1, 0)]
+        [InlineData(2, 2)]
+        [InlineData(7, 7)]
+        public void ASingleItemPlanRepeatsTheRowAboveIt_SoItsDetailListIsEmpty(
+            int itemCount, int expectedLines)
+        {
+            Assert.Equal(expectedLines, PlanHistoryRowLayout.DetailItemLineCount(itemCount));
+
+            Assert.Equal(
+                PlanHistoryRowLayout.DetailHeight(0, false, false, false, false),
+                PlanHistoryRowLayout.DetailHeight(
+                    PlanHistoryRowLayout.DetailItemLineCount(1), false, false, false, false));
         }
 
         [Fact]

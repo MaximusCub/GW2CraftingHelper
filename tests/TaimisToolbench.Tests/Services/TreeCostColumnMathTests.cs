@@ -455,6 +455,64 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(costOnly.CopperTextWidth, both.CostWidths.CopperTextWidth);
         }
 
+        // --- HeaderX (the "Cost" header centres over the band its values
+        // occupy, rather than right-aligning on the column's own edge) ---
+        [Fact]
+        public void HeaderX_CentresTheHeaderOverThePopulatedBand()
+        {
+            // One gold sub-column: 30px of text plus the label-icon gap and
+            // the coin icon. A 40px header centres in whatever that comes
+            // to, half of the surplus in from the band's left edge.
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 0, 0, 0);
+            int band = TreeCostColumnMath.TotalWidth(widths);
+
+            int x = TreeCostColumnMath.HeaderX(1000, widths, 40);
+
+            Assert.Equal((1000 - band) + ((band - 40) / 2), x);
+            Assert.True(x + 40 < 1000, "a centred header ends inside its own band");
+        }
+
+        [Fact]
+        public void HeaderX_IsIndependentOfTheColumnsWiderReserve()
+        {
+            // TreeSectionController reserves max(TotalWidth, its 150px
+            // floor) for the column. Centring over the RESERVE would leave
+            // the header up to half that surplus left of the values it
+            // names; centring over the band cannot, because the band is all
+            // this function is given.
+            var narrow = new TreeCostColumnMath.CostColumnWidths(20, 0, 0, 0);
+            var wide = new TreeCostColumnMath.CostColumnWidths(20, 20, 20, 60);
+
+            Assert.NotEqual(
+                TreeCostColumnMath.HeaderX(1000, narrow, 40),
+                TreeCostColumnMath.HeaderX(1000, wide, 40));
+        }
+
+        [Fact]
+        public void HeaderX_BandNarrowerThanTheHeader_RightAlignsInstead()
+        {
+            // Nothing priced, and a band too narrow to hold the word: both
+            // fall back to the column's right edge, so the header can never
+            // overhang the panel margin to the right of it.
+            Assert.Equal(
+                960,
+                TreeCostColumnMath.HeaderX(1000, TreeCostColumnMath.CostColumnWidths.Empty, 40));
+            Assert.Equal(
+                960,
+                TreeCostColumnMath.HeaderX(
+                    1000, new TreeCostColumnMath.CostColumnWidths(1, 0, 0, 0), 40));
+        }
+
+        [Fact]
+        public void HeaderX_TracksTheColumnsRightEdge()
+        {
+            var widths = new TreeCostColumnMath.CostColumnWidths(30, 20, 20, 0);
+
+            Assert.Equal(
+                TreeCostColumnMath.HeaderX(1000, widths, 40) + 200,
+                TreeCostColumnMath.HeaderX(1200, widths, 40));
+        }
+
         [Fact]
         public void SegmentWidth_AbsentText_IsZero()
         {

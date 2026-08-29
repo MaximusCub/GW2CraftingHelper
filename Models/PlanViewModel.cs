@@ -102,12 +102,29 @@ namespace TaimisToolbench.Models
 
     internal class PlanViewModel
     {
+        // The plan's heading item: the single requested item, or the FIRST
+        // of a batch. A batch used to null the icon and rarity because "no
+        // single target item exists", which cost the header both its art
+        // and its rarity colour; naming the first item is what the title
+        // already does, so these three now agree with it.
         public string TargetItemName { get; set; }
 
         public string TargetIconUrl { get; set; }
 
         // GW2 API rarity string; null/empty = unknown (neutral color/border).
         public string TargetRarity { get; set; }
+
+        // The uncoloured remainder of a batch's heading (" + 2 others"),
+        // null for a single-item plan. Its own field because only
+        // TargetItemName carries the rarity colour - the count is about the
+        // batch, not about that item, and colouring it would claim
+        // otherwise.
+        public string TargetNameSuffix { get; set; }
+
+        // Every requested item AFTER the first, in request order, for the
+        // header's stacked icon run. Null for a single-item plan; never
+        // empty when non-null (a batch is 2+ items by definition).
+        public List<PlanHeaderItem> AdditionalTargetItems { get; set; }
 
         public int TargetQuantity { get; set; }
 
@@ -178,6 +195,25 @@ namespace TaimisToolbench.Models
         // offer cap in O(1) instead of scanning the list per row. Null
         // when the plan has no timegated items at all.
         public IReadOnlyDictionary<int, TimegatedItem> VendorCapsByItemId { get; set; }
+    }
+
+    /// <summary>
+    /// One item in the plan header's stacked batch run: what it takes to
+    /// draw a framed icon and hover it. The same three display fields
+    /// PlanViewModelBuilder resolves for every other row, plus the id the
+    /// hover needs to reach this session's stat cache.
+    /// </summary>
+    internal class PlanHeaderItem
+    {
+        public int ItemId { get; set; }
+
+        public string Name { get; set; }
+
+        public string IconUrl { get; set; }
+
+        // GW2 API rarity string; null/empty = unknown (neutral colour and
+        // frame, never guessed).
+        public string Rarity { get; set; }
     }
 
     /// <summary>
@@ -326,6 +362,14 @@ namespace TaimisToolbench.Models
         // rather than silently capping it at Quantity. CurrencyNeededQuantity
         // below is the (still-clamped-to-zero) gap derived from this value.
         public int? CurrencyOwnedQuantity { get; set; }
+
+        // The currency's own /v2/currencies prose, for a CurrencyCost
+        // row's hover (CurrencyTooltipComposer). Resolved here rather than
+        // at the render site because the renderer holds no currency id -
+        // by design: a row carries no id at all, so its tooltip can never
+        // be keyed into the wrong id space. Null when the plan ran without
+        // currency metadata, which drops the paragraph.
+        public string CurrencyDescription { get; set; }
 
         // Still-to-acquire gap for a CurrencyCost row in the
         // redesigned currency table's "Needed" column - max(0, Quantity -

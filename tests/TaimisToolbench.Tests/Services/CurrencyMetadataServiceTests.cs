@@ -103,6 +103,57 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public async Task GetAllAsync_ParsesDescription_TheCurrencyTooltipsBodyProse()
+        {
+            // The endpoint has always returned it and the parse used to
+            // drop it on the floor, which is why every currency hover in
+            // the module was a bare name.
+            using (var handler = new StubHandler(HttpStatusCode.OK, SampleJson))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+                var result = await service.GetAllAsync(CancellationToken.None);
+
+                Assert.Equal("Gained after reaching level 80.", result[23].Description);
+                Assert.Equal("Awarded for participating in WvW.", result[15].Description);
+            }
+        }
+
+        [Fact]
+        public async Task GetAllAsync_EntryWithNoDescription_ParsesToEmptyNotNull()
+        {
+            const string json = @"[{ ""id"": 7, ""name"": ""Karma"", ""icon"": ""k.png"" }]";
+            using (var handler = new StubHandler(HttpStatusCode.OK, json))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+                var result = await service.GetAllAsync(CancellationToken.None);
+
+                Assert.Equal("", result[7].Description);
+            }
+        }
+
+        [Fact]
+        public async Task GetCached_IsAPureRead_AnsweringNullBeforeAnyFetchLanded()
+        {
+            using (var handler = new StubHandler(HttpStatusCode.OK, SampleJson))
+            using (var http = new HttpClient(handler))
+            {
+                var service = new CurrencyMetadataService(http);
+
+                Assert.Null(service.GetCached(23));
+                Assert.Equal(0, handler.CallCount);
+
+                await service.GetAllAsync(CancellationToken.None);
+
+                Assert.Equal("Spirit Shards", service.GetCached(23).Name);
+                Assert.Equal("Gained after reaching level 80.", service.GetCached(23).Description);
+                Assert.Null(service.GetCached(999));
+                Assert.Equal(1, handler.CallCount);
+            }
+        }
+
+        [Fact]
         public async Task GetAllAsync_SecondCall_DoesNotRefetch()
         {
             using (var handler = new StubHandler(HttpStatusCode.OK, SampleJson))

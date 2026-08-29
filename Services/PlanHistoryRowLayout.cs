@@ -13,12 +13,14 @@ namespace TaimisToolbench.Services
     /// Crafting Plan tab's currency table distributes by. At no width is
     /// there empty space to the right of the action buttons.
     /// <para>
-    /// Distribution replaced a packed stack in which Cost and Generated
-    /// hugged the buttons and the name band absorbed ALL of the row's
-    /// slack: at the real window width that put several hundred px of
-    /// nothing between a plan's name and its cost, with no anchor for the
-    /// eye between them - the same complaint, and the same fix, the
-    /// currency table already carries.
+    /// Cost and Generated CENTRE their bands on their own tracks rather
+    /// than pinning a right edge, so each column header sits over the
+    /// values it names instead of only meeting them at one edge - see
+    /// <see cref="JustifiedColumnTracks"/> for the law and for which bands
+    /// still pin (here: the action buttons). Inside a centred band the
+    /// cells stay right-aligned on <see cref="Bands.CostRightEdge"/> /
+    /// <see cref="Bands.WhenRightEdge"/>, because a coin run that
+    /// ragged-rights against the run above it is unreadable.
     /// </para>
     /// </summary>
     internal static class PlanHistoryRowLayout
@@ -40,6 +42,13 @@ namespace TaimisToolbench.Services
         public const int IconGap = 8;
         public const int CellGap = 20;
         public const int ButtonGap = 8;
+
+        /// <summary>
+        /// The expand caret's column, left of the icon. The Recipe Tree's
+        /// own column, not a second number: the two affordances are the
+        /// same glyph at the same size and must read as one vocabulary.
+        /// </summary>
+        public const int CaretColumnWidth = TreeRowShapePlanner.CaretColumnWidth;
 
         /// <summary>
         /// Clearance above and below an icon frame on this tab, the
@@ -68,7 +77,17 @@ namespace TaimisToolbench.Services
         public static readonly int MainLineTextY =
             (RowHeight - TypeRampMetrics.Regular16.LineHeight) / 2;
 
-        public const int ActionButtonWidth = 84;
+        /// <summary>
+        /// Fits the longest action label the row carries, "Re-Solve in
+        /// Planner", with clearance in Blish's own DefaultFont14 - the face
+        /// StandardButton draws with, which this module's type ramp does
+        /// not cover. Interpolated from the module's hand-fitted button
+        /// widths (Clear Overrides 124 at 15 characters, Buy All 70 at 7):
+        /// ~6.75px per character plus ~23px of plate, giving ~151 before
+        /// the narrow-glyph credit this label's four thin characters earn.
+        /// </summary>
+        public const int ActionButtonWidth = 156;
+
         public const int IconButtonWidth = 28;
 
         /// <summary>
@@ -137,6 +156,10 @@ namespace TaimisToolbench.Services
         public readonly struct Bands
         {
             public readonly int RowWidth;
+
+            /// <summary>Left edge of the expand caret, and of the row.</summary>
+            public readonly int CaretX;
+
             public readonly int IconX;
             public readonly int NameX;
             public readonly int NameWidth;
@@ -144,8 +167,18 @@ namespace TaimisToolbench.Services
             /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
             public readonly int CostRightEdge;
 
+            /// <summary>
+            /// The Cost column's centre axis - the header centres on it and
+            /// the cell band is centred on it, which is the whole point of
+            /// distributing rather than pinning an edge.
+            /// </summary>
+            public readonly int CostCenterX;
+
             public readonly int WhenX;
             public readonly int WhenWidth;
+
+            /// <summary>The Generated column's centre axis - see <see cref="CostCenterX"/>.</summary>
+            public readonly int WhenCenterX;
 
             /// <summary>
             /// Right edge of the Generated column - the timestamp cell's
@@ -159,25 +192,26 @@ namespace TaimisToolbench.Services
                 get { return WhenX + WhenWidth; }
             }
 
-            public readonly int ViewX;
             public readonly int OpenX;
             public readonly int ResolveX;
             public readonly int PinX;
             public readonly int DeleteX;
 
             public Bands(
-                int rowWidth, int iconX, int nameX, int nameWidth,
-                int costRightEdge, int whenX, int whenWidth,
-                int viewX, int openX, int resolveX, int pinX, int deleteX)
+                int rowWidth, int caretX, int iconX, int nameX, int nameWidth,
+                int costRightEdge, int costCenterX, int whenX, int whenWidth, int whenCenterX,
+                int openX, int resolveX, int pinX, int deleteX)
             {
                 RowWidth = rowWidth;
+                CaretX = caretX;
                 IconX = iconX;
                 NameX = nameX;
                 NameWidth = nameWidth;
                 CostRightEdge = costRightEdge;
+                CostCenterX = costCenterX;
                 WhenX = whenX;
                 WhenWidth = whenWidth;
-                ViewX = viewX;
+                WhenCenterX = whenCenterX;
                 OpenX = openX;
                 ResolveX = resolveX;
                 PinX = pinX;
@@ -205,26 +239,38 @@ namespace TaimisToolbench.Services
             int pinX = deleteX - ButtonGap - PinToggleWidth;
             int resolveX = pinX - ButtonGap - ActionButtonWidth;
             int openX = resolveX - ButtonGap - ActionButtonWidth;
-            int viewX = openX - ButtonGap - ActionButtonWidth;
 
-            int iconX = Inset;
+            int caretX = Inset;
+            int iconX = caretX + CaretColumnWidth;
             int nameX = iconX + IconTotal + IconGap;
 
-            // The columns' own pinned right edge: the action block's left
-            // edge, one cell gap clear of it. Generated always lands here;
-            // where Cost lands is what distribution decides.
-            int columnsRightEdge = viewX - CellGap;
+            // The columns' own span ends one cell gap clear of the action
+            // block's left edge. Where the two data bands land inside it is
+            // what distribution decides.
+            int columnsRightEdge = openX - CellGap;
             int trackSpan = columnsRightEdge - nameX;
+
+            int costLeftEdge;
+            int whenX;
 
             // Both bands have to clear a track, not just the wider one:
             // equal tracks mean the widest band is the binding constraint.
-            int costRightEdge = JustifiedColumnTracks.FitsDistributed(
-                trackSpan, TrackCount, Math.Max(costWidth, whenWidth), CellGap)
-                ? JustifiedColumnTracks.RightEdge(nameX, trackSpan, TrackCount, 1)
-                : columnsRightEdge - whenWidth - CellGap;
+            if (JustifiedColumnTracks.FitsDistributed(
+                    trackSpan, TrackCount, Math.Max(costWidth, whenWidth), CellGap))
+            {
+                costLeftEdge = JustifiedColumnTracks.CenteredX(
+                    nameX, trackSpan, TrackCount, 1, costWidth);
+                whenX = JustifiedColumnTracks.CenteredX(
+                    nameX, trackSpan, TrackCount, 2, whenWidth);
+            }
+            else
+            {
+                whenX = columnsRightEdge - whenWidth;
+                costLeftEdge = whenX - CellGap - costWidth;
+            }
 
-            int whenX = columnsRightEdge - whenWidth;
-            int nameWidth = costRightEdge - costWidth - CellGap - nameX;
+            int costRightEdge = costLeftEdge + costWidth;
+            int nameWidth = costLeftEdge - CellGap - nameX;
 
             // A window narrow enough to squeeze the name out clamps
             // rather than emitting a negative width the view would hand
@@ -235,14 +281,28 @@ namespace TaimisToolbench.Services
             }
 
             return new Bands(
-                rowWidth, iconX, nameX, nameWidth,
-                costRightEdge, whenX, whenWidth,
-                viewX, openX, resolveX, pinX, deleteX);
+                rowWidth, caretX, iconX, nameX, nameWidth,
+                costRightEdge, costLeftEdge + costWidth / 2,
+                whenX, whenWidth, whenX + whenWidth / 2,
+                openX, resolveX, pinX, deleteX);
         }
 
         /// <summary>
-        /// Height of the expanded detail panel: one line per item summary,
-        /// the settings line, the chip strip (only when either count is
+        /// Item lines the expanded panel draws for a plan of
+        /// <paramref name="itemCount"/> items. A single-item plan draws
+        /// NONE: the collapsed row above it already headlines that item's
+        /// icon and name, so the list would repeat the row it hangs off and
+        /// add nothing. Read by both the height math and the render loop,
+        /// so a panel cannot be sized for lines it does not draw.
+        /// </summary>
+        public static int DetailItemLineCount(int itemCount)
+        {
+            return itemCount <= 1 ? 0 : itemCount;
+        }
+
+        /// <summary>
+        /// Height of the expanded detail panel: one line per item line
+        /// (<see cref="DetailItemLineCount"/>), the settings line, the chip strip (only when either count is
         /// non-zero), the Generated caption (always), and up to three
         /// optional note/sample lines, plus padding. Computed, not
         /// guessed, so the FlowPanel reflow is exact.

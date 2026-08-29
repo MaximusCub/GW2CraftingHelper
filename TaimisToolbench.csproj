@@ -152,6 +152,8 @@
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\TreeCostColumnMath.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
+    <Compile Include="Services\MultiItemHeaderLayout.cs" />
+    <Compile Include="Services\MultiItemHeaderTooltipComposer.cs" />
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
     <Compile Include="Services\ItemRowSelection.cs" />
@@ -217,6 +219,8 @@
     <Compile Include="Services\CachingAccountRecipeClient.cs" />
     <Compile Include="Services\CurrencyMetadataService.cs" />
     <Compile Include="Services\CurrencyDisplayResolver.cs" />
+    <Compile Include="Services\CurrencyTooltipComposer.cs" />
+    <Compile Include="Services\CurrencyTooltipFacts.cs" />
     <Compile Include="Services\ShoppingRowTooltipFormatter.cs" />
     <Compile Include="Services\ShoppingSourceBadge.cs" />
     <Compile Include="Services\TreeRowTooltipComposer.cs" />

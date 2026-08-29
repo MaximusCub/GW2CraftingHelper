@@ -50,6 +50,42 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The item id of an entry that is about exactly ONE item, else 0.
+        /// Counts the same summaries <see cref="ItemLineTexts"/> renders -
+        /// nulls skipped - so "one line" and "one item" cannot drift apart.
+        /// <para>
+        /// It decides whether a history row's hover is owed a stat body: a
+        /// one-item entry's header IS that item, while one item's stats are
+        /// not a three-item request's.
+        /// </para>
+        /// </summary>
+        public static int SingleItemId(PlanHistoryEntry entry)
+        {
+            if (entry?.ItemSummaries == null)
+            {
+                return 0;
+            }
+
+            PlanHistoryItemSummary only = null;
+            foreach (var summary in entry.ItemSummaries)
+            {
+                if (summary == null)
+                {
+                    continue;
+                }
+
+                if (only != null)
+                {
+                    return 0;
+                }
+
+                only = summary;
+            }
+
+            return only != null && only.ItemId > 0 ? only.ItemId : 0;
+        }
+
+        /// <summary>
         /// The row's one-line label: the item lines through
         /// RequestLabelFormatter's "+N more" cap.
         /// </summary>
