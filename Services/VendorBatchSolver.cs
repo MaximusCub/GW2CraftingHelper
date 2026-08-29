@@ -222,6 +222,22 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
+                // An offer with no cost lines is data we cannot interpret,
+                // not a free lunch: the fold below would leave coinCost 0,
+                // priceable true and allValued true, landing it in the
+                // COMPARABLE tier at a comparison value of 0 - beating
+                // every priced route. See CostLineValuation.HasAnyCostLine
+                // for how much of the shipped seed this is.
+                // Skipped rather than demoted to the fallback tier: that
+                // tier ranks on the coin part, where a 0 wins just as
+                // wrongly, and unlike a barter offer - which has a real
+                // cost that merely has no coin equivalent - this row has no
+                // cost line left to report in a demoted decision at all.
+                if (!CostLineValuation.HasAnyCostLine(offer.CostLines))
+                {
+                    continue;
+                }
+
                 // Computed before any pricing, because it needs none: an
                 // offer that charges a craftable recipe's ingredients plus a
                 // fee is a strictly worse copy of that recipe whatever the
@@ -261,7 +277,7 @@ namespace TaimisToolbench.Services
                 // it.
                 bool resolvedLineHasUnvaluedCost = false;
 
-                foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
+                foreach (var cost in offer.CostLines)
                 {
                     if (string.Equals(cost.Type, "Currency", StringComparison.Ordinal))
                     {
