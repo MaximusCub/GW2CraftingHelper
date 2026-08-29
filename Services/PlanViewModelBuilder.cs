@@ -582,6 +582,8 @@ namespace TaimisToolbench.Services
                     Label = currencyName,
                     Quantity = required,
                     IconUrl = iconUrl,
+                    CurrencyDescription = CurrencyDisplayResolver.ResolveDescription(
+                        cc.CurrencyId, result.CurrencyMetadata),
                     CurrencyOwnedQuantity = owned,
                     CurrencyNeededQuantity = needed,
                     CurrencyFullyCovered = fullyCovered,

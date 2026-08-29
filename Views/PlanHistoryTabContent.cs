@@ -607,9 +607,13 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// One history row's hover: the icon+name header the row already
         /// draws - which is the FIRST item's, quantity and all - then the
-        /// rest of the plan's items and its override/ignored counts. No
-        /// stat block: the row is a PLAN, and claiming one item's stats
-        /// for a three-item request would be a lie the icon does not tell.
+        /// rest of the plan's items and its override/ignored counts.
+        /// <para>
+        /// The stat body belongs to a ONE-ITEM entry only, where the header
+        /// item IS the request. A multi-item entry keeps none: claiming one
+        /// item's stats for a three-item request would be a lie the icon
+        /// does not tell.
+        /// </para>
         /// </summary>
         private ItemIconTooltip RowHover(
             PlanHistoryEntry entry, PlanHistoryItemSummary firstSummary, string firstRarity)
@@ -638,7 +642,15 @@ namespace TaimisToolbench.Views
                 ? ItemTooltipIdentity.ForItem(itemLines[0], firstSummary?.IconUrl, firstRarity)
                 : ItemTooltipIdentity.Unnamed();
 
-            return ItemIconTooltip.ForItem(identity, null, () => extras);
+            // Without this a one-item entry composed to the header alone:
+            // no stats, and no extras either, because its one item IS the
+            // header and most entries carry no chips.
+            int singleItemId = PlanHistoryLabels.SingleItemId(entry);
+            Func<ItemStatBlock> stats = _getItemStatBlock == null || singleItemId <= 0
+                ? (Func<ItemStatBlock>)null
+                : () => _getItemStatBlock(singleItemId);
+
+            return ItemIconTooltip.ForItem(identity, stats, () => extras);
         }
 
         /// <summary>

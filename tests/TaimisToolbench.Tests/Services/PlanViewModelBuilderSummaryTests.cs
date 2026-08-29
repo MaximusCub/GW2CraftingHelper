@@ -738,6 +738,55 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(50, ccRow.Quantity);
         }
 
+        // The paragraph the game's own currency tooltip shows under the
+        // wallet balance. The renderer holds no currency id (see
+        // PlanRowViewModel.CurrencyDescription), so if the builder does not
+        // resolve it here nothing downstream can.
+        [Fact]
+        public void CurrencyTable_DescriptionResolvedFromCurrencyMetadata()
+        {
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 23, Amount = 50 },
+                },
+                currencyMetadata: new Dictionary<int, CurrencyMetadata>
+                {
+                    {
+                        23,
+                        new CurrencyMetadata
+                        {
+                            CurrencyId = 23,
+                            Name = "Spirit Shard",
+                            IconUrl = "shard.png",
+                            Description = "Earned by gaining experience past level 80.",
+                        }
+                    },
+                });
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Earned by gaining experience past level 80.", ccRow.CurrencyDescription);
+        }
+
+        // No offline description table exists, and one the module wrote
+        // itself would be invented data - the hover drops the paragraph.
+        [Fact]
+        public void CurrencyTable_NoMetadata_DescriptionIsNull()
+        {
+            var result = MakeResult(currencyCosts: new List<CurrencyCost>
+            {
+                new CurrencyCost { CurrencyId = 23, Amount = 50 },
+            });
+
+            var vm = _builder.Build(result);
+
+            var ccRow = vm.Sections[0].Rows.Single(r => r.RowType == PlanRowType.CurrencyCost);
+            Assert.Equal("Spirit Shards", ccRow.Label);
+            Assert.Null(ccRow.CurrencyDescription);
+        }
+
         // --- currency-ux-package (Feature 2): plan-scope passthrough for
         // the Recipe Tree's per-leaf currency pill ---
         [Fact]

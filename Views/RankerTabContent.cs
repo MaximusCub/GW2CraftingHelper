@@ -1797,7 +1797,7 @@ namespace TaimisToolbench.Views
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
                     row.Panel, CurrencyIconUrl(shortfall), (string)null,
                     0, y, RankerRowLayout.CurrencyIconSize, 1,
-                    ItemIconTooltip.Naming(fullName)));
+                    CurrencyHover(shortfall.CurrencyId, fullName)));
                 row.CurrencyNameLabels.Add(new Label
                 {
                     Font = UiFonts.Caption,
@@ -2163,6 +2163,30 @@ namespace TaimisToolbench.Views
         private string CurrencyName(RankerCurrencyShortfall shortfall)
         {
             return CurrencyDisplayResolver.ResolveName(shortfall.CurrencyId, CurrencyMetadataFor(shortfall.CurrencyId));
+        }
+
+        /// <summary>
+        /// A currency shortfall chip's hover: the game's own currency box.
+        /// <para>
+        /// With NO wallet balance, deliberately.
+        /// <see cref="RankerCurrencyShortfall.Held"/> is what the wallet has
+        /// left once the higher-priority rows above this one have claimed
+        /// theirs, not what the account holds, so drawing it as "N in
+        /// Wallet" would state something untrue. Null is "not known", which
+        /// drops the line rather than guessing at it.
+        /// </para>
+        /// </summary>
+        private ItemIconTooltip CurrencyHover(int currencyId, string fullName)
+        {
+            return ItemIconTooltip.ForCurrency(fullName, () =>
+            {
+                var metadata = CurrencyMetadataFor(currencyId);
+                return CurrencyTooltipFacts.For(
+                    fullName,
+                    CurrencyDisplayResolver.ResolveIconUrl(currencyId, metadata),
+                    CurrencyDisplayResolver.ResolveDescription(currencyId, metadata),
+                    null);
+            });
         }
 
         private string CurrencyIconUrl(RankerCurrencyShortfall shortfall)
