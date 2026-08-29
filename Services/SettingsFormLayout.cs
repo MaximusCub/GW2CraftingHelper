@@ -76,11 +76,12 @@ namespace TaimisToolbench.Services
             + PlanRelayoutMath.TableRightMargin;
 
         /// <summary>
-        /// Widest a line of prose on this tab is allowed to run: one board
-        /// column's own content width. A settings section is the widest
-        /// thing a sentence here has to sit under, so nothing on the tab -
-        /// including the full-width Currency Valuations section's notes -
-        /// runs a line wider than one, whatever the panel does.
+        /// Widest a line of WRAPPED prose in a board section is allowed to
+        /// run: one board column's own content width, so a section's notes
+        /// and a row's description stay under the column they belong to
+        /// however wide that column grows. It does not bound the full-width
+        /// Vendor Cost Valuations section, whose notes are single lines that
+        /// never wrap (Views/SettingsTabContent.cs AddInfoLine).
         /// </summary>
         public const int ProseMeasure =
             SettingsFormMinColumnWidth - CellLeftPad - PlanRelayoutMath.TableRightMargin;
@@ -156,9 +157,9 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Budget for prose that belongs to a whole section (or to the
-        /// full-width currency section) rather than to one row: the
-        /// column's content width, capped at <see cref="ProseMeasure"/>.
+        /// Budget for prose that belongs to a whole board section rather
+        /// than to one row: the column's content width, capped at
+        /// <see cref="ProseMeasure"/>.
         /// </summary>
         public static int SectionProseMaxWidth(int columnWidth)
         {

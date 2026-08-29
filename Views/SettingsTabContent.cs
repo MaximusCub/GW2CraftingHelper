@@ -536,9 +536,6 @@ namespace TaimisToolbench.Views
             // controls are disposed with their container.
             _sections.Clear();
             _boardPanel = null;
-            _currencyProsePanels.Clear();
-            _currencyProseLabels.Clear();
-            _currencyProse.Clear();
             _dirtyChipLabel = null;
             _discardButton = null;
             _saveButton = null;
@@ -789,7 +786,6 @@ namespace TaimisToolbench.Views
             }
 
             LayoutSectionBoard(measureText);
-            LayoutCurrencyProse(measureText);
 
             if (_currencyGridPanel == null)
             {
@@ -823,7 +819,8 @@ namespace TaimisToolbench.Views
         /// grid to the filtered list would therefore snap the tab to the top
         /// on every filter keystroke that changes the match count; the cost
         /// of the fixed height is trailing blank space below a filtered
-        /// list, which is why the grid is the last thing in the panel.
+        /// list, which is why nothing but the section's two-line footnote
+        /// follows the grid.
         /// </summary>
         private void SetCurrencyGridHeight()
         {
@@ -1277,24 +1274,6 @@ namespace TaimisToolbench.Views
             // exist on the rows with no default. The price-basis pointer
             // moved to this section's title hover: it points at another tab
             // rather than instructing about a control here.
-            // dev/proposals/addendum-astral-acclaim.md P1: neutral, no-single-anchor hint
-            // for Astral Acclaim specifically - it is untradable and earned
-            // via capped seasonal play, so unlike the other currencies
-            // below, there is no rate this settings row can honestly
-            // suggest. Left blank (the default) simply keeps it out of
-            // price comparisons, same as any other unset currency. Above the
-            // grid rather than below it because the grid is deliberately the
-            // last thing in the panel - see SetCurrencyGridHeight.
-            AddInfoLine("Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.", panelWidth);
-            // The same posture, for the same reason, on the barter-item
-            // side: the Black Lion family is gem-store RNG-chest currency
-            // and every listed row would need a gem-to-gold opinion the
-            // module has no business making for the user. Left out of the
-            // grid entirely rather than shown blank - an unlisted item is
-            // simply unvalued, and its vendor offers still appear, just
-            // honestly unranked.
-            AddInfoLine("Black Lion tickets, statuettes and vouchers come from gem-store chests - their value is personal too, so they are not listed.", panelWidth);
-
             AddCurrencyFilterRow(panelWidth);
             AddCurrencyGridHeader(panelWidth);
 
@@ -1324,6 +1303,21 @@ namespace TaimisToolbench.Views
             _currencyForceVisible = new bool[_rows.Count];
             SetCurrencyGridHeight();
             ApplyCurrencyFilter();
+
+            // The two families the grid deliberately does not price, as one
+            // footnote under it. Astral Acclaim is untradable and earned via
+            // capped seasonal play; the Black Lion family is gem-store
+            // RNG-chest currency. Neither has a rate this module can
+            // honestly suggest, so Astral Acclaim ships unset - which simply
+            // keeps it out of price comparisons, like any other unset
+            // currency - and the Black Lion rows are left out of the grid
+            // entirely: an unlisted item is unvalued, and its vendor offers
+            // still appear, just unranked.
+            // dev/proposals/addendum-astral-acclaim.md P1.
+            AddInfoLine(
+                "Astral Acclaim is untradable and earned via capped play - its value is personal, so no rate is suggested here.\n"
+                + "Black Lion tickets, statuettes and vouchers come from gem-store chests - their value is personal too, so they are not listed.",
+                panelWidth);
         }
 
         // The slider stays FIXED at this width whatever the column does:
@@ -1743,13 +1737,6 @@ namespace TaimisToolbench.Views
             return invalidCount;
         }
 
-        // The full-width Vendor Cost Valuations section's own header and notes.
-        // The board sections build their own (BeginSection); this shape is
-        // for the one section that is a grid rather than a block.
-        private readonly List<Panel> _currencyProsePanels = new List<Panel>();
-        private readonly List<Label> _currencyProseLabels = new List<Label>();
-        private readonly List<string> _currencyProse = new List<string>();
-
         private void AddSectionHeader(string title, int panelWidth, string tooltip = null)
         {
             var headerPanel = new Panel()
@@ -1784,42 +1771,42 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One wrapped note under the full-width section's header. Capped at
-        /// <see cref="SettingsFormLayout.ProseMeasure"/> rather than run to
-        /// the panel edge: the section is a table, but a sentence under it is
-        /// still prose, and a 280-character line at a wide window is not
-        /// readable.
+        /// One note of the full-width section's own prose: its header notes
+        /// and its closing footnote. Each embedded newline starts a new
+        /// line and nothing else breaks - the strings are written short
+        /// enough to sit on one line at
+        /// <see cref="WindowSizing.MinWindowWidth"/>, so a wrap budget here
+        /// would only strand the width the section itself uses. The label
+        /// auto-sizes, so a resize moves nothing.
         /// </summary>
         private void AddInfoLine(string text, int panelWidth)
         {
+            int lines = 1;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    lines++;
+                }
+            }
+
             var rowPanel = new Panel()
             {
-                Size = new Point(panelWidth, InfoRowHeight),
+                Size = new Point(panelWidth, (lines * InfoRowHeight) + 2),
                 Parent = _rootPanel,
             };
             _fullWidthPanels.Add(rowPanel);
 
-            _currencyProsePanels.Add(rowPanel);
-            _currencyProseLabels.Add(CreateWrappedLabel(rowPanel));
-            _currencyProse.Add(text);
-
-            LayoutCurrencyProseLine(_currencyProse.Count - 1, panelWidth, measureText: true);
-        }
-
-        private void LayoutCurrencyProseLine(int index, int panelWidth, bool measureText)
-        {
-            int height = LayoutWrappedLabel(
-                _currencyProseLabels[index], _currencyProse[index], NameColumnX, 2,
-                SettingsFormLayout.SectionProseMaxWidth(panelWidth), measureText);
-            _currencyProsePanels[index].Height = height + 2;
-        }
-
-        private void LayoutCurrencyProse(bool measureText)
-        {
-            for (int i = 0; i < _currencyProse.Count; i++)
+            new Label()
             {
-                LayoutCurrencyProseLine(i, _panelWidth, measureText);
-            }
+                Font = UiFonts.Body,
+                Text = text,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(NameColumnX, 2),
+                TextColor = InfoTextColor,
+                Parent = rowPanel,
+            };
         }
 
         // One line per currency: icon, name, input, Ignore, and one tag slot
