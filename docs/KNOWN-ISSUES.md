@@ -1003,6 +1003,26 @@ open, so they live here rather than only in the archive:
   deferred builders plus `ItemMetadataService`'s side-table warm path.
   Recorded deliberate gap, not a regression. Full record:
   `dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`.
+- No maximum content width: every table stretches instead of capping
+  (2026-08-28, observed in game at a ~2950px window on 3440x1440). Eight
+  layout laws - `JustifiedColumnTracks`, `RankerRowLayout`,
+  `PlanHistoryRowLayout`, `RecipesColumnMath`, `PlanRelayoutMath`,
+  `AboutLayoutMath`, `SettingsSaveBarLayout`, `LogToolbarLayout` - each
+  divide the FULL available content width, and nothing caps it. Measured
+  at ~2950px: Ranker gate bars grow to ~480px to hold the text "0%", a
+  sub-gate label and its value sit ~500px apart, and column headers drift
+  far enough from their data to stop reading as labels. Correct from the
+  1378px minimum to roughly 1800px, then it inverts into stretch - this is
+  the over-correction of the distributed-track law that replaced the older
+  packed-left layout, not a regression of it. Candidate fix, unscheduled:
+  a per-tab content cap with the surplus becoming margin, since row and
+  table tabs buy nothing from extra width while the genuine grids
+  (Settings valuations, Snapshot items) legitimately gain a column. In-repo
+  precedent for the shape: `LogToolbarLayout.SearchMaxWidth` caps at 400
+  and lets the rest become space. Open questions when picked up: the cap
+  value (measure the widest legitimate row content rather than guess) and
+  whether capped content centres or left-aligns. Maintainer deferred it
+  2026-08-28 as a distraction.
 
 ---
 
