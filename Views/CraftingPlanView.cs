@@ -753,33 +753,21 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// Applies a plan loaded from disk at module load, rendering it
         /// instantly - no network call, no re-solve. Called from
-        /// Module.Update()'s dirty-flag drain (main thread), at most once
-        /// per session, always before the user could have clicked
-        /// Generate. Mirrors TriggerGenerate's success-path shape: adopts
-        /// <paramref name="result"/> as the override loop's baseline,
-        /// restores the user's prior decision-pill overrides
-        /// (RestoreOverrides - required, not optional), reseeds the
-        /// request inputs (rows, checkboxes, price basis) that produced
-        /// the plan, resets section expansion, rebuilds the view model,
-        /// and seeds the status board with the staleness banner text.
+        /// Module.Update()'s dirty-flag drain (main thread), at most once per
+        /// session, always before the user could have clicked Generate;
+        /// RestoreOverrides is required here, not optional.
         /// <para>
-        /// The tab has usually not been Build() yet, in which case only
-        /// the state fields are set and Build()'s render tail renders on
-        /// first visit; a live tab renders directly, and also calls
-        /// RenderFromBoard since Build()'s re-arm never runs again for it.
+        /// The tab has usually not been Build() yet, in which case only the
+        /// state fields are set and Build()'s render tail renders on first
+        /// visit; a live tab renders directly, and also calls RenderFromBoard
+        /// since Build()'s re-arm never runs again for it. PlanStoreHelpers'
+        /// tolerance gate is only structural, so a degraded plan.json can still
+        /// throw inside the vm build or RenderPlan: the vm build happens before
+        /// any state field is mutated, so a build failure leaves a clean fresh
+        /// start, and a render failure rolls back via
+        /// <see cref="RollBackFailedPlanRender"/>.
         /// </para>
-        /// <para>
-        /// Two narrow try/catches guard this: PlanStoreHelpers' tolerance
-        /// gate is only structural, so a degraded plan.json can still
-        /// throw inside the vm build or RenderPlan (the builder copies
-        /// the tree by reference, so a null child is only dereferenced
-        /// when RenderPlan walks it). The vm build happens before any
-        /// state field is mutated, so a build failure leaves a clean
-        /// fresh start; a render failure rolls back via
-        /// <see cref="RollBackFailedPlanRender"/>, shared with Build()'s
-        /// guarded tail so a poisoned vm can never be committed on either
-        /// path.
-        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         public void ApplyRestoredPlan(
             CraftingPlanResult result,
@@ -974,37 +962,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Shared rollback for a RenderPlan call that threw while
-        /// rendering a restored plan - called from both places that can
-        /// reach a still-unvalidated restored vm: ApplyRestoredPlan's
-        /// live-tab branch and Build()'s guarded render tail. Restores
-        /// every piece of state either call site may have committed back
-        /// to the "nothing restored, nothing generated yet" shape:
-        /// <list type="bullet">
-        /// <item><description>_treeController's override/ignore/expansion
-        /// baseline (ResetForNewPlan(null)) and its per-render tree
-        /// state.</description></item>
-        /// <item><description>_lastDebugLog/_currentPlan/_planGeneratedAt
-        /// - a committed vm that cannot render would re-throw out of
-        /// Build()'s tail on every later visit.</description></item>
-        /// <item><description>_contentPanel's children - a mid-build
-        /// exception can leave a partially-built plan parented in a live
-        /// panel; ResetContentPanelToEmpty sweeps it.</description></item>
-        /// <item><description>the status board's seeded staleness banner
-        /// and its painted label text - both skipped when
-        /// ClearRestoredSeed reports a real Generate has raced in, so a
-        /// superseding generation's status is never
-        /// clobbered.</description></item>
-        /// </list>
+        /// Shared rollback for a RenderPlan that threw while rendering a restored
+        /// plan, from either place that can reach a still-unvalidated restored vm
+        /// (ApplyRestoredPlan's live-tab branch, Build()'s guarded render tail).
+        /// Restores every piece of state either call site may have committed back
+        /// to the "nothing restored, nothing generated yet" shape: the tree
+        /// controller's override/ignore/expansion baseline and per-render tree
+        /// state; _lastDebugLog/_currentPlan/_planGeneratedAt; _contentPanel's
+        /// children; and the status board's seeded staleness banner, skipped when
+        /// ClearRestoredSeed reports a real Generate has raced in.
         /// <para>
         /// The catch that reaches here is deliberately still
-        /// <c>catch (Exception)</c> - the rollback is the load-bearing part,
-        /// and narrowing it would trade a vanished plan for a crash on every
-        /// later tab visit. What it must not also do is destroy the evidence:
-        /// the state that would identify the offending node is reset a few
-        /// lines below, so the stack goes to Blish's Logger and the plan's
+        /// <c>catch (Exception)</c>. What it must not also do is destroy the
+        /// evidence: the state that would identify the offending node is reset a
+        /// few lines below, so the stack goes to Blish's Logger and the plan's
         /// identity into the ModuleLog line BEFORE any of that happens.
         /// </para>
+        /// Why each of those is on the list: docs/ARCHITECTURE.md, "Views:
+        /// relocated design narrative".
         /// </summary>
         private void RollBackFailedPlanRender(Exception ex, string context)
         {
@@ -1731,34 +1706,22 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// Corrects the damage from a wrapped wheel delta. Blish's
         /// Scrollbar.HandleWheelScroll looks only at Math.Sign of the
-        /// corrupted-negative raw delta, so it has already queued exactly
-        /// one step DOWN by the time this handler runs (this handler is
-        /// subscribed after Blish's own Scrollbar).
+        /// corrupted-negative raw delta, so it has already queued exactly one
+        /// step DOWN by the time this handler runs (this handler is subscribed
+        /// after Blish's own Scrollbar). The cancel-then-direct-write shape is
+        /// load-bearing: against the decompiled vendored Glide, Tween.Cancel
+        /// nulls the "ScrollDistance" lerper slot synchronously, so the wrong
+        /// step never lands at all rather than landing and being undone late.
+        /// A bounded defensive re-assert (StartWheelWrapVerify) still runs for
+        /// a frame or two - insurance against a future vendor change, not an
+        /// expected failure.
         ///
-        /// Mechanism (verified against the decompiled vendored Glide):
-        /// TweenerImpl.Tween registers a new tween in the by-target
-        /// dictionary synchronously, before returning - so by the time
-        /// this handler runs, the wrong duration-0 tween is already
-        /// registered and TargetCancel finds it immediately.
-        /// Tween.Cancel nulls the "ScrollDistance" lerper slot
-        /// synchronously, so even an Update() that runs before removal
-        /// skips the write - the wrong step never lands, not merely
-        /// "canceled one frame late". That is why the
-        /// cancel-then-direct-write shape is kept over a counter-tween or
-        /// a deferred correction, which would add a wrong frame this
-        /// mechanism does not have. (Scrollbar itself never calls
-        /// TargetCancel; rapid ScrollAnimated calls overwrite each other
-        /// via Tween's default overwrite parameter, an internal-only
-        /// path.)
-        ///
-        /// A bounded defensive re-assert (StartWheelWrapVerify) still
-        /// runs for a frame or two - insurance against a future
-        /// Blish/Glide vendor change, not an expected failure.
-        ///
-        /// The stale-cached-percent hazard does not apply here: a wheel
-        /// event alone never changes content or viewport height, so
-        /// _scrollbarPercent is already fresh and RecalculateLayout is
-        /// not needed before this write.
+        /// The stale-cached-percent hazard does not apply here: a wheel event
+        /// alone never changes content or viewport height, so _scrollbarPercent
+        /// is already fresh and RecalculateLayout is not needed before this
+        /// write.
+        /// Full mechanism: docs/ARCHITECTURE.md, "Views: relocated design
+        /// narrative".
         /// </summary>
         private void ApplyWheelWrapCorrection(int rawIn, int intendedDelta)
         {
@@ -2729,27 +2692,21 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Repositions and re-sizes the toolbar row and its right-anchored
-        /// buttons - pure geometry, no rebuild, so it is safe on every
-        /// resize tick. The sole writer of the panel's Visible/Size, and it
-        /// reads _treeToolbarVisible, the same flag TopRegionLayoutMath is
-        /// handed.
+        /// buttons - pure geometry, no rebuild, so it is safe on every resize
+        /// tick. The sole writer of the panel's Visible/Size, and it reads
+        /// _treeToolbarVisible, the same flag TopRegionLayoutMath is handed.
         /// <para>
-        /// A hidden row is given zero height as well as Visible = false.
-        /// The strip's arithmetic collapses the row entirely when it is
-        /// hidden, which puts its Y exactly on the status row - so a
-        /// full-height panel there would sit over the top few pixels of
-        /// the scrollable content area, and this way it cannot intercept
-        /// anything even if Blish's hit-testing ever stopped honouring
-        /// Visible.
+        /// A hidden row is given zero height as well as Visible = false, so it
+        /// cannot intercept anything even if Blish's hit-testing ever stopped
+        /// honouring Visible.
         /// </para>
         /// <para>
-        /// Placing the buttons also PUBLISHES where their cluster starts,
-        /// and the chips are re-fitted against it. The two clusters share
-        /// one row and only this method knows its width, so a left cluster
-        /// laid out without that number is a left cluster laid out over the
-        /// buttons - which is what the chips did before
-        /// TreeChipStripLayout.Fit existed.
+        /// Placing the buttons also PUBLISHES where their cluster starts, and
+        /// the chips are re-fitted against it. The two clusters share one row
+        /// and only this method knows its width, so a left cluster laid out
+        /// without that number is a left cluster laid out over the buttons.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void PlaceTreeToolbarRow(int w, int rowY)
         {
@@ -2906,49 +2863,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Per-tick counterpart to ApplySavedScrollSynchronously
-        /// for a resize drag that changes the content panel's viewport
-        /// HEIGHT, as opposed to a content rebuild (PreserveScrollAcross's
-        /// case). Root cause, confirmed by decompiling the vendor assembly
-        /// (packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe,
-        /// Blish_HUD.Controls.Scrollbar and Panel):
-        ///
-        /// Scrollbar.RecalculateLayout caches
-        /// _scrollbarPercent = ContentRegion.Height / containerLowestContent
-        /// and zeroes ScrollDistance (and, via UpdateAssocContainer,
-        /// VerticalScrollOffset) whenever that ratio differs from the
-        /// previously cached value. RecalculateLayout runs from two places:
-        /// (1) synchronously, nested inside Panel's own "Height"
-        /// PropertyChanged handler (UpdatePanelScrollbarOnOwnPropertyChanged
-        /// sets _panelScrollbar.Height, itself a Control.Height write that
-        /// invalidates/recalculates the scrollbar) - but .NET's
-        /// PropertyChanged event fires BEFORE Control.Size's own
-        /// OnPropertyChanged("Height", invalidateLayout: true) call to
-        /// Invalidate(), so this nested call runs before Panel's own
-        /// RecalculateLayout has refreshed ContentRegion for the new size
-        /// and reads the STALE (pre-resize) ContentRegion.Height, seeing no
-        /// change; and (2) once every real engine frame, unconditionally,
-        /// from Scrollbar.DoUpdate's own Invalidate() call - by the time
-        /// THAT runs, ContentRegion.Height has already been refreshed (the
-        /// panel's own RecalculateLayout already ran synchronously earlier
-        /// in the same Height-setter chain), so it now sees a genuine
-        /// change and resets. Net effect: the reset lands on a later real
-        /// frame - typically the next one - not synchronously inside this
-        /// tick's Size write. This is the same delayed-reset window
-        /// ApplySavedScrollSynchronously's class doc already describes for
-        /// rebuilds (StartScrollVerify exists there for exactly this
-        /// reason).
-        ///
-        /// A write here keeps the visible position correct for the
-        /// remainder of THIS tick, so the drag never flashes;
-        /// OnPanelResized separately arms a bounded
-        /// verify window at drag SETTLE (ResizeSettleStep), not per tick,
-        /// to contest that trailing later-frame reset once the drag stops
-        /// producing new ticks - see StartResizeScrollVerify. A per-tick
-        /// verify window is not used: it would spawn (or
-        /// cancel-and-replace) a FrameTicker on every single drag frame,
-        /// and the per-tick synchronous write already keeps each tick
-        /// visually correct without one.
+        /// Per-tick counterpart to ApplySavedScrollSynchronously for a resize
+        /// drag that changes the content panel's viewport HEIGHT, as opposed to
+        /// a content rebuild (PreserveScrollAcross's case).
+        /// <para>
+        /// Blish's Scrollbar resets the offset on a viewport-height change, but
+        /// the reset lands on a LATER real frame - typically the next one - not
+        /// synchronously inside this tick's Size write (measured against the
+        /// vendored Blish HUD 1.3.0 binary). It is the same delayed-reset
+        /// window ApplySavedScrollSynchronously's class doc describes.
+        /// </para>
+        /// <para>
+        /// So a write here keeps the visible position correct for the remainder
+        /// of THIS tick and the drag never flashes, while OnPanelResized arms a
+        /// bounded verify window at drag SETTLE (ResizeSettleStep), not per
+        /// tick, to contest that trailing later-frame reset - see
+        /// StartResizeScrollVerify.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void PreserveScrollAcrossResize(int savedOffsetPx, int newContentPanelHeight)
         {
@@ -3039,36 +2971,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Replays every registered relayout closure at the given
-        /// panelWidth - position/width writes on already-existing controls
-        /// only, never a MeasureString call, never a Height change (see the
-        /// _relayoutActions field comment). Wrapped in the vendor
-        /// SuspendLayout/ResumeLayout pair (m2 risk 2): resizing a row
-        /// Panel's Width fires its own Resized event, which FlowPanel wires
-        /// to a full sibling reflow of its parent on every single write:
-        /// for a long shopping list or deep tree, replaying dozens of
-        /// per-row closures in a single tick would otherwise trigger that
-        /// many redundant reflow passes in the same frame (m2's O(rows^2)
-        /// comparison-cost risk). SuspendLayout on _contentPanel propagates
-        /// down (Blish's own IsLayoutSuspended check walks the parent
-        /// chain), so every nested FlowPanel's reflow this tick is
-        /// deferred; ResumeLayout(false) does not force it back
-        /// synchronously - Blish's own per-frame Control.Update ->
-        /// UpdateLayout call resolves any still-Invalidated FlowPanel
-        /// automatically on the very next real frame, so nothing is lost,
-        /// only coalesced. Since these writes only ever touch Width/X (row
-        /// heights stay fixed), the coalesced reflow is a no-op
-        /// for vertical position anyway - SingleTopToBottom flow positions
-        /// children from cumulative Height, not Width.
-        ///
-        /// PERF CAVEAT: this replaces a ONE-TIME
-        /// dispose+rebuild 150ms after the drag settled with a full replay
-        /// of _relayoutActions on EVERY real drag frame - a genuine change
-        /// in perf character, not just a different trigger. The mitigation
-        /// above is reasoned, not measured: no live drag-resize check on a
-        /// large, fully-expanded plan (deep tree + long shopping list) has
-        /// been performed against a running Blish instance. If this ever
-        /// needs tightening, look here first.
+        /// Replays every registered relayout closure at the given panelWidth -
+        /// position/width writes on already-existing controls only, never a
+        /// MeasureString call, never a Height change (see the _relayoutActions
+        /// field comment). Wrapped in the vendor SuspendLayout/ResumeLayout
+        /// pair, because resizing a row Panel's Width fires its own Resized
+        /// event and FlowPanel wires that to a full sibling reflow of its
+        /// parent on every single write. SuspendLayout on _contentPanel
+        /// propagates down (Blish's IsLayoutSuspended check walks the parent
+        /// chain), and ResumeLayout(false) does not force it back
+        /// synchronously - Blish's per-frame UpdateLayout resolves any
+        /// still-Invalidated FlowPanel next frame, so nothing is lost.
+        /// <para>
+        /// PERF CAVEAT: this runs on EVERY real drag frame and its mitigation
+        /// is reasoned, not measured - no live drag-resize check on a large,
+        /// fully-expanded plan has been performed. If this ever needs
+        /// tightening, look here first. Reasoning: docs/ARCHITECTURE.md,
+        /// "Views: relocated design narrative".
+        /// </para>
         /// </summary>
         private void ReplayRelayout(int panelWidth)
         {
@@ -3136,27 +3056,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The settle-only text-measurement pass. Every relayout
-        /// closure already ran (and re-ran) synchronously on every drag
-        /// tick via ReplayRelayout; this only re-runs the 3 LabelHelpers.EllipsizeToWidth
-        /// call sites' MEASURE work (Used Materials, Shopping List, Tree row
-        /// names), since MeasureString is comparatively expensive to run on
-        /// every tick across a long list/deep tree and the visible cost of
-        /// deferring it (truncated text unchanged mid-drag, corrected once
-        /// the drag settles) is small. Neither
-        /// this pass nor the defensive ReplayRelayout repeat below ever
-        /// changes a row's Height, so - unlike the settle rebuild
-        /// this replaces - nothing in RunReellipsis/ReplayRelayout can
-        /// perturb scroll position; no PreserveScrollAcross wrapper is
-        /// needed around them. The one case that genuinely needs a new
-        /// height (a Notes line count that moved with the width) does not
-        /// stretch that contract: the closure requests a rebuild instead,
-        /// and this method runs it afterwards through PreserveScrollAcross
-        /// like every other rebuild - see RequestRerenderAfterSettle.
-        /// This method also arms the resize
-        /// drag's single settle-time scroll-verify window, if a
-        /// height-changing tick during the drag needs one - see
-        /// StartResizeScrollVerify and _resizeScrollRestorePending.
+        /// The settle-only text-measurement pass. Every relayout closure
+        /// already ran synchronously on every drag tick via ReplayRelayout;
+        /// this only re-runs the 3 LabelHelpers.EllipsizeToWidth call sites'
+        /// MEASURE work (Used Materials, Shopping List, Tree row names).
+        /// <para>
+        /// Neither this pass nor the defensive ReplayRelayout repeat below ever
+        /// changes a row's Height, so neither can perturb scroll position and no
+        /// PreserveScrollAcross wrapper is needed around them. The one case that
+        /// genuinely needs a new height (a Notes line count that moved with the
+        /// width) does not stretch that contract: the closure requests a rebuild
+        /// instead, and this method runs it afterwards through
+        /// PreserveScrollAcross - see RequestRerenderAfterSettle.
+        /// </para>
+        /// This method also arms the resize drag's single settle-time
+        /// scroll-verify window, if a height-changing tick during the drag
+        /// needs one - see StartResizeScrollVerify.
+        /// Why measure work is deferred to settle: docs/ARCHITECTURE.md,
+        /// "Views: relocated design narrative".
         /// </summary>
         private bool ResizeSettleStep(GameTime gameTime)
         {
@@ -3402,25 +3319,23 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Generate's entry point. Rows the user typed a full item name
-        /// into but never picked from the suggestion list carry no item id;
-        /// they are resolved against the search provider here, before
+        /// Generate's entry point. Rows the user typed a full item name into
+        /// but never picked from the suggestion list carry no item id; they are
+        /// resolved against the search provider here, before
         /// GenerateFromResolvedRows decides whether anything is selected at
-        /// all. The resolution await lives in this thin wrapper rather than
-        /// inside GenerateFromResolvedRows because IItemSearchProvider may
-        /// complete asynchronously and Blish's host installs no
-        /// SynchronizationContext - everything after such an await would
-        /// otherwise run on a ThreadPool thread, and the generate body
-        /// touches controls from its first line. The marshal hop puts it
-        /// back on the main thread; two overlapping calls are handled the
-        /// way they always were, by _generateSequence.
+        /// all. IItemSearchProvider may complete asynchronously and Blish's
+        /// host installs no SynchronizationContext, so the marshal hop after
+        /// that await is what puts the generate body - which touches controls
+        /// from its first line - back on the main thread. Two overlapping calls
+        /// are handled the way they always were, by _generateSequence.
         /// <para>
-        /// It also owns the Generate button for the length of that
-        /// resolution - the generate body's own disable/re-enable pair
-        /// starts too late to cover it - and every path out of here hands
-        /// the button back, including the one where the marshaled callback
-        /// is dropped instead of queued.
+        /// It also owns the Generate button for the length of that resolution -
+        /// the generate body's own disable/re-enable pair starts too late to
+        /// cover it - and every path out of here hands the button back,
+        /// including the one where the marshaled callback is dropped instead of
+        /// queued.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private async Task TriggerGenerate()
         {
@@ -3483,25 +3398,20 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Every control that can START a generation, switched together.
-        /// <para>
-        /// The Generate button used to be the only one disabled for the
-        /// length of a run, which left "Use Own Materials" clickable while a
-        /// plan was still generating - and its confirm callback starts
-        /// another generation. Two runs then shared one ItemMetadataService,
-        /// which is a data race, and _generateSequence does not help: it
-        /// makes the last result win, it does not stop the redundant work.
-        /// The service is now internally locked (ItemMetadataService's
-        /// _cacheLock), so this is no longer a crash guard - it is the
-        /// single-flight rule that stops the redundant run from starting at
-        /// all.
-        /// </para>
+        /// Every control that can START a generation, switched together: the
+        /// single-flight rule that stops a redundant concurrent run from
+        /// starting at all. It is not a crash guard - ItemMetadataService is
+        /// internally locked (_cacheLock) - and _generateSequence does not
+        /// substitute for it, since that makes the last result win without
+        /// stopping the redundant work.
         /// <para>
         /// "Value Own Materials" is restored to <c>_useOwnMaterials</c>, not
         /// to true: it is inert without a snapshot driving reduction and is
         /// disabled whenever Use Own Materials is off (see its construction
         /// site).
         /// </para>
+        /// The run this was added for: docs/ARCHITECTURE.md, "Views: relocated
+        /// design narrative".
         /// </summary>
         private void SetGenerateInputsEnabled(bool enabled)
         {
@@ -4124,27 +4034,24 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// FrameTicker step for generation
-        /// <paramref name="myGen"/>. Pulls a fresh snapshot from
-        /// _statusBoard every real frame and hands it, together with
+        /// FrameTicker step for generation <paramref name="myGen"/>. Pulls a
+        /// fresh snapshot from _statusBoard every real frame and hands it, with
         /// <paramref name="myGen"/>, to the pure
         /// <see cref="PlanStripTickDecision.Decide"/> - the race-sensitive
         /// "stop, render the spinner, or render the final text and stop"
-        /// decision itself lives there (Blish-free, so the "finish landed
-        /// before/between ticks" orderings are directly testable); this
-        /// method only carries out whatever it returns and owns the
-        /// re-render throttling.
-        /// <see cref="PlanStripTickAction.RenderFinalAndStop"/> is what
-        /// makes "the board reports finished -> render final status and
-        /// stop" true without any separate completion-callback write into
-        /// this control ever being needed. The strip re-renders once per
-        /// SpinnerTickInterval,
-        /// not every frame - DoUpdate fires ~60x/sec, and writing to an
-        /// AutoSizeWidth Label's Text re-triggers a text measure/layout
-        /// pass even when the string is unchanged, so re-rendering every
-        /// single frame instead of ~7x/sec would be a real, avoidable
-        /// per-frame cost on the UI thread for the entire duration of every
-        /// generation.
+        /// decision lives there (Blish-free, so the "finish landed
+        /// before/between ticks" orderings are directly testable); this method
+        /// only carries out whatever it returns and owns the re-render
+        /// throttling.
+        /// <para>
+        /// The strip re-renders once per SpinnerTickInterval, not every frame:
+        /// DoUpdate fires ~60x/sec, and writing to an AutoSizeWidth Label's
+        /// Text re-triggers a text measure/layout pass even when the string is
+        /// unchanged, so re-rendering every frame instead of ~7x/sec would be a
+        /// real, avoidable per-frame cost on the UI thread for the whole
+        /// duration of every generation.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private bool SpinnerTick(int myGen, GameTime gameTime)
         {
@@ -4516,21 +4423,19 @@ namespace TaimisToolbench.Views
         /// sections and the Recipe Tree alike): caret + Font16 title, a 2px
         /// divider spanning the full width under the header, a hover wash on
         /// the whole clickable row, and click-to-toggle with expansion state
-        /// persisted in _sectionExpansion under sectionKey. suppressToggle
-        /// lets a caller with its own header-row control veto the toggle
-        /// when the click landed on that control, and suppressPress does the
-        /// same for the press feedback (Container.TriggerMouseInput raises
-        /// the header's own press before walking to that control, so without
-        /// it one press on the control dims the whole header and plays the
-        /// click sound twice) - only Required Recipes' "Hide Unlocked"
-        /// checkbox still needs either.
+        /// persisted in _sectionExpansion under sectionKey. suppressToggle lets
+        /// a caller with its own header-row control veto the toggle when the
+        /// click landed on that control, and suppressPress does the same for
+        /// the press feedback - Container.TriggerMouseInput raises the header's
+        /// own press before walking to that control, so without it one press on
+        /// the control dims the whole header and plays the click sound twice.
         /// <para>
-        /// routeChromeToTreeRegistry sends this header's own relayout
-        /// closure to the tree-scoped registry instead of the view's, so
-        /// the tree's chrome survives a preserving re-render that clears
-        /// the view's. Only the Recipe Tree passes it - see
-        /// ITreePlanHost.CreateTreeSectionHeader.
+        /// routeChromeToTreeRegistry sends this header's own relayout closure
+        /// to the tree-scoped registry instead of the view's, so the tree's
+        /// chrome survives a preserving re-render that clears the view's. Only
+        /// the Recipe Tree passes it - see ITreePlanHost.CreateTreeSectionHeader.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private SectionHeaderHandle CreateSectionHeader(
             string title, PlanSectionType sectionKey, int panelWidth, bool defaultExpanded,
@@ -4849,33 +4754,23 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Required Recipes' own CreateCollapsibleSection variant.
-        /// section.Rows is guaranteed non-empty here (the builder only
-        /// adds this section when a non-Mystic-Forge recipe survives its
-        /// filter), so this method's job is purely the second,
-        /// session-toggleable filter: RequiredRecipesVisibility.ApplyFilter
-        /// hides Learned/Auto-learned rows when _hideUnlockedRecipes is
-        /// checked (the default), and the header title always states the
-        /// TOTAL alongside the visible count so it can never read as
-        /// dishonest about how many recipes the plan actually needs.
-        ///
-        /// The header-row "Hide Unlocked" checkbox is now the only
-        /// interactive control left in any section header (the Recipe
-        /// Tree's five buttons moved to the non-scrolling strip - see
-        /// TreeToolbarCommands), so this is the sole remaining user of
-        /// CreateSectionHeader's suppressToggle guard:
-        /// pressStartedOnCheckbox is declared before CreateSectionHeader
-        /// runs (its click-to-toggle wiring captures the suppressToggle
-        /// closure by reference, reading the checkbox's MouseOver lazily at
-        /// click time, well after the checkbox itself exists below) so a
-        /// click landing on the checkbox never also collapses/expands the
-        /// section.
-        ///
-        /// Toggling the checkbox re-renders through RenderPlan(_currentPlan)
-        /// - the same full rebuild path a pill click's local re-solve and a
-        /// fresh Generate both already use (TreeSectionController's own
-        /// _preserveScrollAcross(() => _renderPlan(vm)) call) - rather than
-        /// inventing a second, parallel relayout mechanism just for this
-        /// section.
+        /// section.Rows is guaranteed non-empty here (the builder only adds
+        /// this section when a non-Mystic-Forge recipe survives its filter), so
+        /// this method's job is purely the second, session-toggleable filter:
+        /// RequiredRecipesVisibility.ApplyFilter hides Learned/Auto-learned rows
+        /// when _hideUnlockedRecipes is checked (the default), and the header
+        /// title always states the TOTAL alongside the visible count so it can
+        /// never read as dishonest about how many recipes the plan needs.
+        /// <para>
+        /// pressStartedOnCheckbox must be declared BEFORE CreateSectionHeader
+        /// runs: the click-to-toggle wiring captures the suppressToggle closure
+        /// by reference and reads the checkbox's MouseOver lazily at click
+        /// time, well after the checkbox itself exists below, so a click
+        /// landing on the checkbox never also collapses the section.
+        /// </para>
+        /// Toggling re-renders through RenderPlan(_currentPlan), the same full
+        /// rebuild path a pill click and a fresh Generate use.
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void CreateRequiredRecipesSection(PlanSectionViewModel section, int panelWidth)
         {

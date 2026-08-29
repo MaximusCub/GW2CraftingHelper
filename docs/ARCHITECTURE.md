@@ -1091,3 +1091,169 @@ placeholder - which is the state it really is in. The item fetch answers
 per id, so an id absent from the reply is one nobody has an icon for yet,
 not one the API says has none; holding a barter row to "the fetch happened"
 would draw the placeholder over the first case.
+
+### V.9 `CraftingPlanView.ApplyRestoredPlan` and `RollBackFailedPlanRender`
+
+`ApplyRestoredPlan` mirrors `TriggerGenerate`'s success-path shape: it adopts
+the restored `result` as the override loop's baseline, restores the user's
+prior decision-pill overrides, reseeds the request inputs (rows, checkboxes,
+price basis) that produced the plan, resets section expansion, rebuilds the
+view model, and seeds the status board with the staleness banner text.
+`RestoreOverrides` is not optional there - see V.17 for what a restored
+session loses without it.
+
+Two narrow try/catches guard the restore. `PlanStoreHelpers`' tolerance gate
+is only structural, so a degraded `plan.json` can still throw inside the view
+model build or inside `RenderPlan` - the builder copies the tree by
+reference, so a null child is only dereferenced when `RenderPlan` walks it.
+`RollBackFailedPlanRender` is shared with `Build()`'s guarded tail so a
+poisoned view model can never be committed on either path.
+
+Each thing the rollback restores is on the list for its own reason:
+
+- The tree controller's override/ignore/expansion baseline
+  (`ResetForNewPlan(null)`) and its per-render tree state, because the
+  restored result was adopted as `_lastResult` before the render was
+  attempted.
+- `_lastDebugLog` / `_currentPlan` / `_planGeneratedAt`, because a committed
+  view model that cannot render would re-throw out of `Build()`'s tail on
+  every later tab visit.
+- `_contentPanel`'s children, because a mid-build exception can leave a
+  partially-built plan parented in a live panel; `ResetContentPanelToEmpty`
+  sweeps it.
+- The status board's seeded staleness banner and its painted label text -
+  both skipped when `ClearRestoredSeed` reports a real Generate has raced
+  in, so a superseding generation's status is never clobbered.
+
+The catch is `catch (Exception)` on purpose: the rollback is the load-bearing
+part, and narrowing it would trade a vanished plan for a crash on every later
+tab visit.
+
+### V.10 `ApplyWheelWrapCorrection`: why cancel-then-direct-write
+
+Verified against the decompiled vendored Glide: `TweenerImpl.Tween` registers
+a new tween in the by-target dictionary synchronously, before returning - so
+by the time this handler runs, the wrong duration-0 tween is already
+registered and `TargetCancel` finds it immediately. `Tween.Cancel` nulls the
+`"ScrollDistance"` lerper slot synchronously, so even an `Update()` that runs
+before removal skips the write: the wrong step never lands, rather than being
+canceled one frame late.
+
+That is why the shape is cancel-then-direct-write rather than a counter-tween
+or a deferred correction, either of which would add a wrong frame this
+mechanism does not have. (`Scrollbar` itself never calls `TargetCancel`;
+rapid `ScrollAnimated` calls overwrite each other via `Tween`'s default
+overwrite parameter, an internal-only path.)
+
+Section 2 above covers the vendored `WheelDelta` defect this corrects.
+
+### V.11 `PlaceTreeToolbarRow`: the collapsed row, and publishing the cluster
+
+The strip's arithmetic collapses the toolbar row entirely when it is hidden,
+which puts its Y exactly on the status row. A full-height panel left there
+would sit over the top few pixels of the scrollable content area, so a hidden
+row is given zero height as well as `Visible = false` and cannot intercept
+anything even if Blish's hit-testing ever stopped honouring `Visible`.
+
+Publishing where the button cluster starts matters because the two clusters
+share one row and only this method knows its width. A left cluster laid out
+without that number is a left cluster laid out over the buttons - which is
+exactly what the chips did before `TreeChipStripLayout.Fit` existed.
+
+### V.12 `PreserveScrollAcrossResize`: why the reset lands a frame late
+
+Confirmed by decompiling the vendor assembly
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`,
+`Blish_HUD.Controls.Scrollbar` and `Panel`):
+
+`Scrollbar.RecalculateLayout` caches
+`_scrollbarPercent = ContentRegion.Height / containerLowestContent` and zeroes
+`ScrollDistance` (and, via `UpdateAssocContainer`, `VerticalScrollOffset`)
+whenever that ratio differs from the previously cached value.
+`RecalculateLayout` runs from two places:
+
+1. Synchronously, nested inside `Panel`'s own `"Height"` `PropertyChanged`
+   handler - `UpdatePanelScrollbarOnOwnPropertyChanged` sets
+   `_panelScrollbar.Height`, itself a `Control.Height` write that
+   invalidates/recalculates the scrollbar. But .NET's `PropertyChanged` event
+   fires BEFORE `Control.Size`'s own
+   `OnPropertyChanged("Height", invalidateLayout: true)` call to
+   `Invalidate()`, so this nested call runs before `Panel`'s own
+   `RecalculateLayout` has refreshed `ContentRegion` for the new size, reads
+   the STALE (pre-resize) `ContentRegion.Height`, and sees no change.
+2. Once every real engine frame, unconditionally, from `Scrollbar.DoUpdate`'s
+   own `Invalidate()` call. By the time THAT runs, `ContentRegion.Height` has
+   already been refreshed - the panel's own `RecalculateLayout` ran
+   synchronously earlier in the same `Height`-setter chain - so it now sees a
+   genuine change and resets.
+
+Net effect: the reset lands on a later real frame, typically the next one,
+not synchronously inside the tick's `Size` write. This is the same
+delayed-reset window `ApplySavedScrollSynchronously`'s class doc describes
+for rebuilds, and the reason `StartScrollVerify` exists there.
+
+A per-tick verify window is deliberately not used: it would spawn (or
+cancel-and-replace) a `FrameTicker` on every single drag frame, and the
+per-tick synchronous write already keeps each tick visually correct without
+one. The bounded window is armed once, at drag settle.
+
+### V.13 `ReplayRelayout` and `ResizeSettleStep`: the drag-frame budget
+
+`SuspendLayout`/`ResumeLayout` around the replay is about comparison cost.
+For a long shopping list or a deep tree, replaying dozens of per-row closures
+in a single tick without it would trigger that many redundant full sibling
+reflows in the same frame (the `O(rows^2)` risk raised as m2 risk 2). The
+coalesced reflow is a no-op for vertical position anyway, because these
+writes only ever touch `Width`/`X` - row heights stay fixed, and
+`SingleTopToBottom` flow positions children from cumulative `Height`.
+
+The perf caveat on `ReplayRelayout` is real and stated inline: this shape
+replaced a ONE-TIME dispose+rebuild 150ms after the drag settled with a full
+replay of `_relayoutActions` on EVERY real drag frame. That is a genuine
+change in perf character, not just a different trigger, and the mitigation
+above is reasoned rather than measured - no live drag-resize check on a
+large, fully-expanded plan (deep tree plus long shopping list) has been
+performed against a running Blish instance.
+
+`ResizeSettleStep` defers only the MEASURE half, and only because
+`MeasureString` is comparatively expensive to run on every tick across a long
+list or deep tree. The visible cost of deferring it is small: truncated text
+stays unchanged mid-drag and is corrected once the drag settles.
+
+### V.14 `TriggerGenerate`: why the resolution await lives in the wrapper
+
+The await could have gone inside `GenerateFromResolvedRows`, and that is the
+version this replaced. It cannot: `IItemSearchProvider` may complete
+asynchronously, Blish's host installs no `SynchronizationContext` (section 1
+above), and everything after such an await would therefore run on a
+ThreadPool thread - while the generate body touches controls from its first
+line. Keeping the await in a thin wrapper puts exactly one marshal hop
+between the resolution and a body that has no async seams of its own.
+
+### V.15 `SetGenerateInputsEnabled`: the run it was added for
+
+The Generate button used to be the only control disabled for the length of a
+run, which left "Use Own Materials" clickable while a plan was still
+generating - and its confirm callback starts another generation. Two runs
+then shared one `ItemMetadataService`, which is a data race, and
+`_generateSequence` does not help: it makes the last result win, it does not
+stop the redundant work. `ItemMetadataService` is now internally locked
+(`_cacheLock`), so this is no longer a crash guard; it is the single-flight
+rule that stops the redundant run from starting at all.
+
+### V.16 `SpinnerTick`, `CreateSectionHeader`, `CreateRequiredRecipesSection`
+
+`PlanStripTickAction.RenderFinalAndStop` is what makes "the board reports
+finished, so render final status and stop" true without any separate
+completion-callback write into this control ever being needed. The tick reads
+the board; nothing writes back into the tick.
+
+`CreateSectionHeader`'s `suppressToggle`/`suppressPress` pair has exactly one
+remaining user: Required Recipes' "Hide Unlocked" checkbox, the only
+interactive control left in any section header now that the Recipe Tree's
+five buttons moved to the non-scrolling strip (see `TreeToolbarCommands`).
+
+Toggling that checkbox re-renders through `RenderPlan(_currentPlan)` - the
+same full rebuild path a pill click's local re-solve and a fresh Generate
+both already use - rather than inventing a second, parallel relayout
+mechanism for one section.
