@@ -1113,8 +1113,22 @@ namespace TaimisToolbench.Services
 
             if (fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.HasValue)
             {
+                // A BARTER line contributes nothing to an offer's coin
+                // part, so that part is a PARTIAL accounting while a craft
+                // route's real cost is a complete one; ranking them against
+                // each other lets an offer win on a price missing most of
+                // itself. An unvalued non-coin CURRENCY line deliberately
+                // does not count here: it has no coin equivalent by
+                // invariant rather than by missing data, and both sides
+                // omit one the same way. docs/ARCHITECTURE.md sections 7.1
+                // and 8.
+                bool fallbackVendorOmitsItemCost =
+                    HasBarterItemCost(vendorEvaluation.FallbackItemCosts);
+
                 bool fallbackVendorWins = vendorEvaluation.FallbackCoinCost.HasValue &&
-                    (!fallbackCraftCost.HasValue || vendorEvaluation.FallbackCoinCost.Value <= fallbackCraftCost.Value);
+                    (!fallbackCraftCost.HasValue ||
+                     (!fallbackVendorOmitsItemCost &&
+                      vendorEvaluation.FallbackCoinCost.Value <= fallbackCraftCost.Value));
 
                 if (fallbackVendorWins)
                 {
@@ -1362,14 +1376,26 @@ namespace TaimisToolbench.Services
         /// </summary>
         private static bool HasBarterItemCost(Decision decision)
         {
-            if (decision.VendorItemCosts == null)
+            return HasBarterItemCost(decision.VendorItemCosts);
+        }
+
+        /// <summary>
+        /// The same test against a vendor evaluation's raw item cost lines,
+        /// before any decision has been committed from them. Indexed rather
+        /// than foreach'd: the parameter is an interface, so foreach would
+        /// box a heap enumerator on every call, and the decision overload
+        /// above runs once per vendor step in the aggregation walk.
+        /// </summary>
+        private static bool HasBarterItemCost(IReadOnlyList<VendorItemCostLine> itemCosts)
+        {
+            if (itemCosts == null)
             {
                 return false;
             }
 
-            foreach (var line in decision.VendorItemCosts)
+            for (int i = 0; i < itemCosts.Count; i++)
             {
-                if (!line.GoldValue.HasValue)
+                if (!itemCosts[i].GoldValue.HasValue)
                 {
                     return true;
                 }
