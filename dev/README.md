@@ -18,6 +18,7 @@ page there disagree, `docs/` wins and this directory is stale by design.
 | [`archive/known-issues/`](archive/known-issues/) | 69 older milestone records, rotated out of `docs/KNOWN-ISSUES.md` in one pass on 2026-08-24, before per-branch files existed. Same content, older filing scheme. |
 | [`archive/`](archive/) | Closed point-in-time audits (`m37-*`, `m38-a4/a5/a6`) and the original per-phase project plans under `archive/plans/`. |
 | [`dev-notes/HISTORY.md`](dev-notes/HISTORY.md) | The pre-M38 fix-pass diary: hypotheses, instrumentation, root-cause traces and dated gate records, filed under the same item numbers `docs/KNOWN-ISSUES.md` uses. |
+| [`dev-notes/SESSION-HANDOFF.md`](dev-notes/SESSION-HANDOFF.md) | State of play at the 2026-08-28 handoff, written so a fresh session can recover after the local folder rename forks Claude's memory directory. Read it before resuming work. |
 | [`dev-notes/m38-plan/`](dev-notes/m38-plan/) | The M38 cleanup wave's analysis and work-package plan. Executed; kept for the reasoning. |
 | [`proposals/`](proposals/) | Written-up designs for features that were never built. Not a roadmap. |
 
