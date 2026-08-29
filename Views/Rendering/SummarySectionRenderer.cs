@@ -634,10 +634,10 @@ namespace TaimisToolbench.Views.Rendering
             // handful of entries in practice) with the SAME font both the
             // header and every data row already use.
             // The number bands are never narrower than their own header
-            // labels: "Required"/"Have"/"Needed" right-align onto the same
-            // edges as the numbers, and at the ColumnHeader tier they
-            // routinely out-measure a short value, which would let the
-            // currency name run under its own header.
+            // labels: each header centres over its band, and at the
+            // ColumnHeader tier "Required"/"Have"/"Needed" routinely
+            // out-measure a short value, so a band sized to the value alone
+            // would let the currency name run under its own header.
             var font = UiFonts.Body;
             int widestNumberWidth = WidestCurrencyHeaderLabel();
             foreach (var row in rows)

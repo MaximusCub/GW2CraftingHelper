@@ -294,8 +294,9 @@ namespace TaimisToolbench.Views.Rendering
                     JustifiedColumnTracks.CenteredInBand(e.TotalBandX, e.TotalBandWidth, totalHeaderWidth),
                     HeaderBands.LabelY);
 
-                // Four of the five columns are pinned off the panel edge,
-                // so their cells move with them.
+                // Every data column's x is width-derived - a track under
+                // distribution, the pinned right edge under the packed
+                // fallback - so their cells move with the panel.
                 ApplyHeaderBoundaries(plan, scan, w, boundaries);
                 plan.Sync(rowPanel.Width);
             });
