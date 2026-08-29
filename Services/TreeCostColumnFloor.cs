@@ -5,25 +5,19 @@ namespace TaimisToolbench.Services
     /// plan is on screen (Blish-free, unit-testable).
     /// <para>
     /// TreeCostColumnMath.ScanColumns measures the widest value each
-    /// sub-column holds, and TreeSectionController turns that total into
-    /// the cost column's reserved width - which
+    /// sub-column holds; TreeSectionController turns that total into the
+    /// cost column's reserved width, which
     /// PlanRelayoutMath.ComputeTreeColumnEdges subtracts from the panel
-    /// width to place the decision pills. So a scan that comes back
-    /// narrower moves the pill column's left edge RIGHT, on every row of
-    /// the tree. Ignoring one row does exactly that whenever that row
-    /// owned the widest currency run or gold figure: the user clicks one
-    /// pill and the whole pill run jumps sideways, including on rows the
-    /// click never touched.
+    /// width to place the decision pills. So a narrower scan moves the
+    /// pill column's left edge, on every row - and ignoring one row does
+    /// exactly that when it owned the widest cost run.
     /// </para>
     /// <para>
-    /// So a scan may widen the reservation and never narrow it, per
-    /// sub-column, for as long as the plan is rendered. The floor is a
-    /// property of the PLAN, not of the current decision toggles: a fresh
-    /// Generate (or a restored plan) starts from
-    /// CostColumnWidths.Empty and re-derives everything. Widening still
-    /// moves the pills - a re-solve can introduce a currency run no
-    /// earlier state had - but it is one-way, so a toggled-back-and-forth
-    /// decision settles instead of oscillating.
+    /// A scan may therefore widen the reservation and never narrow it.
+    /// The floor belongs to the PLAN, not to the current decision
+    /// toggles: a fresh Generate starts again from
+    /// CostColumnWidths.Empty. Widening still moves the pills, but is
+    /// one-way, so a decision toggled back and forth settles.
     /// </para>
     /// </summary>
     internal static class TreeCostColumnFloor
