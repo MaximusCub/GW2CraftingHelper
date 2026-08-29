@@ -11,39 +11,23 @@ using static VendorOfferUpdater.Tests.Helpers.RepoFileLocator;
 namespace VendorOfferUpdater.Tests
 {
     /// <summary>
-    /// Guards the
-    /// exact regression - VendorOfferUpdater.Models.
-    /// VendorOffer used to have no SeasonalFestival property, so a
-    /// --merge-into run (Program.MergeIntoBaseline, reached via
-    /// Program.cs's deserialize-the-whole-baseline-through-this-model then
-    /// re-serialize flow) would silently drop the tag from every offer it
-    /// re-serializes, even one scraping an unrelated merchant - with no
-    /// OfferId change to make the loss noticeable (SeasonalFestival is
-    /// deliberately not hashed by VendorOfferHasher). Loads the REAL
-    /// shipped ref/vendor_offers.json (not a fixture) through the tool's
-    /// own model, exactly like Program.cs's --merge-into baseline read,
-    /// merges in an unrelated fresh merchant's offer, and asserts every
-    /// known tagged offer still carries seasonalFestival afterward.
+    /// Guards the exact regression: VendorOfferUpdater.Models.VendorOffer used
+    /// to have no SeasonalFestival property, so a --merge-into run
+    /// (Program.MergeIntoBaseline, reached via Program.cs's
+    /// deserialize-the-whole-baseline-through-this-model then re-serialize
+    /// flow) silently dropped the tag from every offer it re-serialized, even
+    /// one scraping an unrelated merchant - with no OfferId change to make the
+    /// loss noticeable, since SeasonalFestival is deliberately not hashed by
+    /// VendorOfferHasher.
     ///
-    /// Festival-vendor auto-tagging follow-up: the shipped
-    /// baseline now carries seasonalFestival on 57 offers across all six
-    /// known festivals, not just the original three hand-tagged Candy Corn
-    /// Vendor (Weekly) ecto offers - Dragon Bash Merchant (Weekly),
-    /// Wintersday Trader (Weekly), Festival Rewards Vendor (Weekly),
-    /// Gauntlet Ticket Vendor, New Year Vendor, and Super Adventure Box
-    /// Weekly Trader were live-tagged via a scoped
-    /// --tag-seasonal-festivals --merge-into run targeting exactly those
-    /// six merchants (Candy Corn Vendor (Weekly) deliberately excluded
-    /// from that scoped query, so its three original offer IDs - and every
-    /// other one of its nine offers - stay byte-for-byte identical to what
-    /// was hand-tagged before; a fresh scrape of ANY merchant recomputes
-    /// new OfferIds for that merchant, per VendorOfferHasher's own doc
-    /// comment on the Astral Acclaim hash-format migration, so
-    /// touching Candy Corn Vendor (Weekly) in that pass would have broken
-    /// the "3 known offer IDs survive identically" requirement). See
-    /// KNOWN-ISSUES #63 for the full partial-coverage note (thousands
-    /// of non-festival vendor pages remain untagged - this pass only
-    /// covered the known festival vendor list, not a full re-scrape).
+    /// Loads the REAL shipped ref/vendor_offers.json (not a fixture) through
+    /// the tool's own model, exactly like Program.cs's --merge-into baseline
+    /// read, merges in an unrelated fresh merchant's offer, and asserts every
+    /// known tagged offer still carries seasonalFestival afterward - including
+    /// three Candy Corn Vendor (Weekly) offer IDs that must survive
+    /// byte-identically. Which vendors that baseline has tagged, how they were
+    /// tagged, and why coverage is deliberately partial: KNOWN-ISSUES #63 and
+    /// docs/ARCHITECTURE.md section T.8.
     /// </summary>
     public class SeasonalFestivalRoundTripTests
     {

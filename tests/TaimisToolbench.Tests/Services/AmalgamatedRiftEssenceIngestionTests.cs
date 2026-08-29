@@ -13,34 +13,24 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// KNOWN-ISSUES #48: end-to-end
-    /// proof, through the REAL production pipeline
-    /// (CraftingPlanPipeline -> RecipeService -> PlanSolver ->
-    /// CraftingTreeBuilder), that recipe 14025 (Amalgamated Rift Essence ->
-    /// item 100930) - the concrete recipe that was invisible to every
-    /// unversioned GW2 API call before this fix - now produces a real,
-    /// craftable tree with its 3 currency-typed ingredients rendered as
-    /// leaves and its 1 item-typed ingredient (Glob of Ectoplasm) rendered
-    /// as an ordinary priced leaf.
+    /// KNOWN-ISSUES #48: end-to-end proof through the REAL production
+    /// pipeline (CraftingPlanPipeline -> RecipeService -> PlanSolver ->
+    /// CraftingTreeBuilder) that recipe 14025 (Amalgamated Rift Essence ->
+    /// item 100930), invisible to every unversioned GW2 API call before this
+    /// fix, now produces a real craftable tree with its 3 currency-typed
+    /// ingredients rendered as leaves and its 1 item-typed ingredient (Glob
+    /// of Ectoplasm) rendered as an ordinary priced leaf.
     ///
-    /// The seeded recipe row below is the REAL entry now shipped in
-    /// ref/recipes_seed.json after re-running
-    /// tools/TaimisToolbench.RecipeSeeder (verified byte-for-byte
-    /// against a live `curl .../v2/recipes/14025?v=` fetch - see
-    /// Gw2RecipeApiClientParseTests' own real-JSON test for that capture).
-    /// It is loaded through the exact same production deserialization path
-    /// a real module install uses (SeededRecipeCacheStore.Load via
-    /// RecipeCacheSerializer, matching RecipeCacheStoreTests' own
-    /// MemoryStream pattern) rather than hand-built directly as a RawRecipe,
-    /// so this test also proves the row round-trips through the real seed
-    /// JSON shape correctly - not just that RecipeService's in-memory model
-    /// can represent it.
+    /// The seeded row below is the REAL entry now shipped in
+    /// ref/recipes_seed.json (verified byte-for-byte against a live
+    /// /v2/recipes/14025?v= fetch), loaded through the exact production
+    /// deserialization path a real install uses (SeededRecipeCacheStore.Load
+    /// via RecipeCacheSerializer) rather than hand-built as a RawRecipe, so
+    /// it also pins the row's round trip through the real seed JSON shape.
     ///
-    /// Also covers the guildupgrade-ingredients fix (KNOWN-ISSUES #54):
-    /// this same schema-versioning fix incidentally revealed a second,
-    /// previously-unmodeled ingredient type ("GuildUpgrade", a Guild
-    /// Decoration recipe's claimed-guild-hall-upgrade requirement) through
-    /// the exact same production pipeline - see the tests below.
+    /// GuildUpgrade ingredients (KNOWN-ISSUES #54), a second previously
+    /// unmodeled ingredient type the same schema-versioning fix revealed,
+    /// are covered by the tests below through the same pipeline.
     /// </summary>
     public class AmalgamatedRiftEssenceIngestionTests
     {

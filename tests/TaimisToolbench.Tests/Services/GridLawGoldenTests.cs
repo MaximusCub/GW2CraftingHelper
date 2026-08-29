@@ -11,7 +11,6 @@ namespace TaimisToolbench.Tests.Services
     /// The module's column-grid law, swept width by width across the whole
     /// range a player can drag the window to, for all three grids at once.
     ///
-    /// <para>
     /// The three used to state the law three times - SnapshotItemGridLayout,
     /// SettingsCurrencyGridLayout and ColumnBoardLayout each had their own
     /// ComputeColumnCount and ComputeColumnWidth - and they had already
@@ -20,14 +19,11 @@ namespace TaimisToolbench.Tests.Services
     /// implementations BEFORE they were collapsed onto Services/GridLayout,
     /// so an identical sweep afterwards is proof the collapse changed no
     /// pixel at any width, not merely that the older assertions still pass.
-    /// </para>
     ///
-    /// <para>
     /// The currency columns were re-captured once when the Settings grid's
     /// cell gained its leading currency icon and its minimum column width
     /// grew with the band; the snapshot/board columns are still the original
     /// pre-collapse capture, and the law itself has never moved.
-    /// </para>
     /// </summary>
     public class GridLawGoldenTests
     {

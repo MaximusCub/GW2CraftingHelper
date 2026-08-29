@@ -533,26 +533,22 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass: every prior multi-item test passed
-        /// snapshot=null, so InventoryReducer.Reduce's shared consumption
-        /// pool (created once per GenerateStructuredMultiAsync call and
-        /// walked depth-first through the wrapper's N item-root
-        /// ingredients in request order - see
-        /// InventoryReducer.ReduceNodeSourced's own doc comment) was never
+        /// Every prior multi-item test passed snapshot=null, so
+        /// InventoryReducer.Reduce's shared consumption pool - created once per
+        /// GenerateStructuredMultiAsync call and walked depth-first through the
+        /// wrapper's N item-root ingredients in request order, see
+        /// InventoryReducer.ReduceNodeSourced's own doc comment - was never
         /// exercised across two roots.
         ///
         /// Two items (800, 801) each need 3 of the SAME owned raw material
-        /// (900); the account owns 4. Root 800 is walked first (request
-        /// order) and fully satisfies its need of 3, draining the shared
-        /// pool to 1 remaining unit BEFORE root 801 is ever reduced. Root
-        /// 801 then only finds 1 unit left and must buy the other 2.
-        ///
-        /// This is the behavior that distinguishes a genuinely SHARED pool
-        /// from a bug where each root were (incorrectly) reduced against
-        /// its own fresh copy of the ownership index: in that buggy
-        /// scenario both roots would independently see all 4 owned units
-        /// and neither would need to buy anything (0 total purchases)
-        /// instead of the 2 asserted below.
+        /// (900); the account owns 4. Root 800 is walked first (request order)
+        /// and fully satisfies its need of 3, draining the shared pool to 1
+        /// remaining unit BEFORE root 801 is reduced, so 801 finds only 1 unit
+        /// left and must buy the other 2. That is what distinguishes a
+        /// genuinely SHARED pool from each root being reduced against its own
+        /// fresh copy of the ownership index: in the latter both roots would
+        /// independently see all 4 owned units and neither would buy anything
+        /// (0 total purchases) instead of the 2 asserted below.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_MultiItem_WithSnapshot_SharedOwnedRawMaterial_PoolDrainsAcrossRootsInRequestOrder()
@@ -821,26 +817,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Fix pass: before ApplyBatchSellSideEconomics
-        /// existed, NOTHING ever set CraftingPlanResult.PriceBasis for a
-        /// multi-item batch (PlanResultBuilder.Build never touches it, and
+        /// Before ApplyBatchSellSideEconomics existed, NOTHING ever set
+        /// CraftingPlanResult.PriceBasis for a multi-item batch
+        /// (PlanResultBuilder.Build never touches it, and
         /// GenerateStructuredMultiAsync never called ApplySellSideEconomics,
         /// the only other place that did) - it silently stayed at the enum
         /// default (PriceBasis.InstantBuy = 0) regardless of which basis
-        /// actually priced the plan, so a batch generated with the
-        /// module's own default (BuyOrder) never showed the "Total
-        /// (buy-order prices)" label suffix. ApplyBatchSellSideEconomics
-        /// now sets it unconditionally (mirroring ApplySellSideEconomics'
-        /// own single-item behavior) even when zero roots qualify for the
-        /// sell/profit rollup below.
+        /// actually priced the plan, so a batch generated with the module's own
+        /// default (BuyOrder) never showed the "Total (buy-order prices)" label
+        /// suffix. ApplyBatchSellSideEconomics now sets it unconditionally,
+        /// mirroring ApplySellSideEconomics' single-item behavior, even when
+        /// zero roots qualify for the sell/profit rollup below.
         ///
-        /// The original version of this
-        /// test reused BuildTwoIndependentItemsPipeline, whose items 300/400
-        /// BOTH have a live sell price of their own - every requested root
-        /// actually qualified for the rollup there, so the `!anySellable`
-        /// early-return branch this test's name claims to cover was never
-        /// exercised. BuildTwoUntradableItemsPipeline (above) genuinely has
-        /// zero qualifying roots.
+        /// The fixture matters: an earlier version of this test reused
+        /// BuildTwoIndependentItemsPipeline, whose items 300/400 BOTH have a
+        /// live sell price, so every requested root qualified for the rollup
+        /// and the !anySellable early-return branch this test's name claims to
+        /// cover was never exercised. BuildTwoUntradableItemsPipeline (above)
+        /// genuinely has zero qualifying roots.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_MultiItem_PriceBasisIsSetEvenWithNoQualifyingRoots()
@@ -1196,26 +1190,23 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Re-baselined under the decision-guided reduction design.
-        /// Originally (pre-VOM): InventoryReducer.Reduce walked the WHOLE
-        /// unreduced wrapper tree price-blind, before PlanSolver.Solve ever
-        /// decided per-root Buy vs. Craft, so it phantom-consumed root
-        /// 1100's owned craft ingredient (1101) even though 1100 always
-        /// ends up BOUGHT (see BuildBuyVsCraftPipeline's own doc comment -
-        /// buy 50 beats craft 500 even zero-owned), folding a forgone-value
-        /// deduction into MaterialOpportunityCost for a branch that was
-        /// never actually crafted - the "phantom UsedMaterials" bug the
-        /// decision-guided reduction fixes.
+        /// Re-baselined under the decision-guided reduction design. Originally,
+        /// InventoryReducer.Reduce walked the WHOLE unreduced wrapper tree
+        /// price-blind, before PlanSolver.Solve ever decided per-root Buy vs.
+        /// Craft, so it phantom-consumed root 1100's owned craft ingredient
+        /// (1101) even though 1100 always ends up BOUGHT (see
+        /// BuildBuyVsCraftPipeline's own doc comment - buy 50 beats craft 500
+        /// even zero-owned), folding a forgone-value deduction into
+        /// MaterialOpportunityCost for a branch that was never crafted.
         ///
-        /// Now: the guided reduction (InventoryReducer.Reduce's
-        /// zeroOwnedDecisions parameter) sees that 1100's zero-owned
-        /// decision is BuyFromTp, so NO option under 1100 consumes the
-        /// pool - the owned 2 units of item 1101 are never touched at all.
-        /// MaterialOpportunityCost is therefore null throughout (standalone
-        /// 1100, standalone 1200 - which never owned anything of its own -
-        /// and the batch), not "non-zero, folded in regardless of the
-        /// decision." This test now locks in the FIXED interaction instead
-        /// of the bug, so a future regression cannot silently reintroduce
+        /// Now the guided reduction (InventoryReducer.Reduce's
+        /// zeroOwnedDecisions parameter) sees that 1100's zero-owned decision
+        /// is BuyFromTp, so no option under 1100 consumes the pool and the
+        /// owned 2 units of item 1101 are never touched. MaterialOpportunityCost
+        /// is therefore null throughout - standalone 1100, standalone 1200
+        /// (which never owned anything), and the batch - rather than non-zero
+        /// and folded in regardless of the decision. This test locks in the
+        /// FIXED interaction, so a regression cannot silently reintroduce
         /// phantom credit for a bought root.
         /// </summary>
         [Fact]
@@ -1284,31 +1275,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Coverage: every Valued-mode multi-item
-        /// assertion above (this class) exercised a wrapper root whose
-        /// guide decision was Buy - so `UsedMaterials`/
-        /// `MaterialOpportunityCost` were always asserted NULL/empty, and
-        /// the one test that DOES prove owned stock is drained through the
-        /// synthetic wrapper
+        /// Coverage: every Valued-mode multi-item assertion above exercised a
+        /// wrapper root whose guide decision was Buy, so UsedMaterials and
+        /// MaterialOpportunityCost were always asserted NULL/empty; and the one
+        /// test that does drain owned stock through the synthetic wrapper
         /// (GenerateStructuredAsync_MultiItem_WithSnapshot_SharedOwnedRawMaterial_PoolDrainsAcrossRootsInRequestOrder
-        /// above) calls GenerateStructuredAsync WITHOUT ownMaterialsMode,
-        /// which defaults to Free and never builds a guide at all. Net
-        /// effect: positive owned-material crediting through the wrapper in
-        /// Valued mode had zero coverage - if the wrapper root's guide
-        /// decision were ever not Craft-with-matching-RecipeId, ALL
-        /// owned-material crediting in multi-item Valued mode would
-        /// silently vanish and the whole suite would still be green.
+        /// above) calls GenerateStructuredAsync WITHOUT ownMaterialsMode, which
+        /// defaults to Free and never builds a guide. Net effect: positive
+        /// owned-material crediting through the wrapper in Valued mode had zero
+        /// coverage - if the wrapper root's guide decision were ever not
+        /// Craft-with-matching-RecipeId, ALL owned-material crediting in
+        /// multi-item Valued mode would silently vanish, suite still green.
         ///
         /// Reuses BuildBuyVsCraftPipeline's exact fixture (root 1100 always
-        /// buys, root 1200 always crafts - see that method's own doc
-        /// comment) but this time owns root 1200's OWN craft ingredient
-        /// (1201, fully - exactly the 1 unit its recipe needs) instead of
-        /// root 1100's. Since 1200's zero-owned decision is Craft, the
-        /// guided reduction (InventoryReducer.Reduce's zeroOwnedDecisions
-        /// parameter) must let this owned unit be consumed - proving the
-        /// positive-crediting path actually works through the multi-item
-        /// wrapper, not merely that the negative (Buy-decided, no
-        /// crediting) path does.
+        /// buys, root 1200 always crafts - see that method's own doc comment)
+        /// but owns root 1200's OWN craft ingredient (1201, exactly the 1 unit
+        /// its recipe needs). Since 1200's zero-owned decision is Craft, the
+        /// guided reduction must let that unit be consumed, proving the positive
+        /// crediting path works through the wrapper, not only the Buy-decided one.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_MultiItem_ValuedMode_CraftDecidedRootOwnedIngredientIsCreditedThroughWrapper()
@@ -1369,26 +1353,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Regression: no committed test exercised
-        /// ApplyBatchSellSideEconomics' per-root ItemCraftCost summation
-        /// when two qualifying (crafted + tradable) roots share a cost
-        /// that FinalizeVendorBatches/AllocateVendorNodeCosts merges
-        /// across roots. Same shared-bulk-vendor-material shape as
+        /// Regression: no committed test exercised ApplyBatchSellSideEconomics'
+        /// per-root ItemCraftCost summation when two qualifying (crafted +
+        /// tradable) roots share a cost that FinalizeVendorBatches /
+        /// AllocateVendorNodeCosts merges across roots. Same shared-bulk-vendor
+        /// -material shape as
         /// GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_SingleCeilAcrossBoth
         /// above (two roots each need 2 of a shared "5 for 20 coin" vendor
-        /// material - merged demand 4, one batch, 20 coin total), but this
-        /// time BOTH finished items also have a live TP sell price, so the
-        /// SellableQuantity/NetSaleValue/CraftingProfit summing code this
-        /// milestone added actually runs. AllocateVendorNodeCosts
-        /// redistributes the corrected 20-coin batch total across the two
-        /// occurrences by largest-remainder apportionment, proportional to
-        /// each occurrence's own quantity share of demand (see that
-        /// method's own doc comment) - here an even 10/10 split, since
-        /// both occurrences need the same quantity (2) of the shared
-        /// material and 20 divides 4 exactly - proving the batch's
-        /// CraftingProfit uses this real, non-duplicated per-root share
-        /// (which sums to EXACTLY Plan.TotalCoinCost) rather than double-
-        /// counting or dropping the shared portion.
+        /// material - merged demand 4, one batch, 20 coin total), but this time
+        /// BOTH finished items also have a live TP sell price, so the
+        /// SellableQuantity/NetSaleValue/CraftingProfit summing actually runs.
+        /// AllocateVendorNodeCosts redistributes the corrected 20-coin batch
+        /// total across the two occurrences by largest-remainder apportionment
+        /// proportional to each occurrence's quantity share of demand (see that
+        /// method's own doc comment) - here an even 10/10 split, since both need
+        /// the same quantity (2) and 20 divides 4 exactly - proving the batch's
+        /// CraftingProfit uses this real, non-duplicated per-root share, which
+        /// sums to EXACTLY Plan.TotalCoinCost, rather than double-counting or
+        /// dropping the shared portion.
         /// </summary>
         [Fact]
         public async Task GenerateStructuredAsync_TwoItems_SharedBulkVendorMaterial_BothTradable_CraftingProfitUsesRealNonDuplicatedSharedCost()

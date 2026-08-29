@@ -6,39 +6,19 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The divider-vanishing immunity proof (KNOWN-ISSUES #23 / M36b),
-    /// executable. What is under test is the production geometry - every
+    /// The divider-vanishing immunity proof (KNOWN-ISSUES #23), executable.
+    /// What is under test is the production geometry - every
     /// (rowHeight, bottomClearance) pair the module hands to
     /// LabelHelpers.CreateRowDivider, most of them derived in
     /// PlanContentHeightMath from ItemIconTiers.BagSidebarIconSize - swept
     /// through a model of the paint pipeline that decides whether a 2px
     /// divider quad reaches the screen.
     ///
-    /// <para>
-    /// The model is transcribed from the decompiled Blish HUD 1.3.0 binary
-    /// (transcription, not invention - each step names its source):
-    /// RectangleExtension.ScaleBy floors X/Y and ceils W/H after a
-    /// float32 multiply; Control.Draw sets the physical scissor to
-    /// Intersect(logicalScissor, bounds).ScaleBy(uiScale); Container.Paint
-    /// then unscales that physical scissor back to logical space with
-    /// ScaleBy(1/uiScale) before re-intersecting and re-scaling it for
-    /// each child (the second, independent floor/ceil round trip M36b
-    /// identified as the root cause); and the GPU rasterizes a physical
-    /// scanline of the divider quad only when the scanline's center lies
-    /// inside the quad's scaled interval. A divider "vanishes" at a scroll
-    /// phase when no rasterized scanline survives the scissor.
-    /// </para>
-    ///
-    /// <para>
-    /// The model is validated against the M36b findings before it is
-    /// trusted with the shipped geometry: it must reproduce the
-    /// historically measured vulnerable heights (44px/32px rows at the
-    /// 0.897 "Normal" scale, the then-30px section header at the 0.81
-    /// "Small" scale - the scale of that session's live pixel-scans) and
-    /// the historically immune 36px rows, at the same ~10.2% vanish rates
-    /// the investigation published. A model that cannot reproduce the
-    /// live-verified past has no authority over the present.
-    /// </para>
+    /// The model is transcribed from the decompiled Blish HUD 1.3.0 binary,
+    /// and must reproduce the historically measured vulnerable and immune
+    /// heights before it is trusted with the shipped geometry. Both the
+    /// transcription and that validation requirement are set out in
+    /// docs/ARCHITECTURE.md section V.26.
     /// </summary>
     public class RowDividerScissorSimulationTests
     {

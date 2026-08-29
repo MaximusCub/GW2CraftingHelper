@@ -161,6 +161,35 @@ comment instead claims `Children` itself would have been corrupted is
 asserting something the decompiled source disproves - its own defect
 (KNOWN-ISSUES #36).
 
+### Tab changes have no pre-change hook: the unsaved-Settings prompt
+
+`Module.cs`'s `PromptForUnsavedSettings` asks whether to keep or drop unsaved
+Settings edits only after the user has already left the tab, because Blish
+1.3.0 has nowhere to put the question earlier. Measured from the vendored
+binary: `TabbedWindow2.SelectedTab`'s setter assigns the backing field via
+`SetProperty` and only then calls `OnTabChanged`, which itself calls
+`ShowView` (tearing down the old view) BEFORE raising the public `TabChanged`
+event. There is no pre-change event, nothing the handler can set to veto, and
+the one virtual member in the chain already runs after the assignment - so by
+the time any module code is reached the tab has changed and cannot be changed
+back without triggering a second switch. KNOWN-ISSUES #51 records the
+alternatives that were measured and rejected.
+
+The prompt still has the user's text to save because of the detach-not-dispose
+behaviour above: `ClearChildren` unparents the outgoing view's controls
+without disposing them, so the Settings `TextBox`es still hold what was typed
+and Save persists exactly what was on screen.
+
+Only the tab path is hooked. The window's own `Hidden` event deliberately is
+not: measured in the vendored 1.3.0 binary, every `WindowBase2` subscribes to
+`Gw2Mumble.PlayerCharacter.IsInCombatChanged` and
+`Gw2Instance.IsInGameChanged`, both of which call `Hide()` when the user has
+Blish's "hide windows in combat" or "hide during loading" overlay options on,
+so entering combat with an edited field would pop a modal over gameplay.
+Closing the window leaves the edits in the live `TextBox`es exactly as it
+always has: nothing tears the view down, so reopening the window shows the
+typed text again.
+
 ### The logging-channel rule for these guards
 
 Every one of these primitives ends in a catch that swallows rather than
@@ -450,7 +479,21 @@ a resize that happened inside a layout pass, so the arithmetic is mirrored
 Blish-free instead. The class's own doc comment states the hazard and
 points here rather than restating the mechanism.
 
-**Full history:** KNOWN-ISSUES items 12, 14, 19, 65.
+**The viewport's bottom, and the band at its top.** The chain from the
+window's height down to the panel a tab renders into has two ends that moved
+independently. At the bottom, the viewport used to stop 74px above the window
+while its top sat flush under the title bar: the content region `Module.cs`
+hands Blish was authored window-region-relative, and Blish reads it as
+absolute texture coordinates (KNOWN-ISSUES #66). At the top, the module sets
+no `Panel.Title`, so Blish reserves no 36px header and the tab's name is drawn
+on the module's own taller band inside the content region instead - which is
+the chain `ViewAdapter` really builds, and the one
+`tests/TaimisToolbench.Tests/Services/PanelChromeMathTests.cs` sweeps, at
+window sizes from the module's floor to a 4K-tall client. Its budgets are
+written as literals so that shrinking the band back cannot quietly move the
+assertions with it.
+
+**Full history:** KNOWN-ISSUES items 12, 14, 19, 65, 66.
 
 ---
 
@@ -1889,6 +1932,24 @@ tier-2 heights absorb the clearance pixel in their own derivation:
 frame. The proof is executable - `RowDividerScissorSimulationTests` sweeps
 every shipped (`rowHeight`, `clearance`) pair at all four scales and fails on
 any vanish - so a future height change re-runs it by construction.
+
+That proof is a transcription of the decompiled 1.3.0 paint pipeline rather
+than an invention, and each step names its source: `RectangleExtension.ScaleBy`
+floors X/Y and ceils W/H after a float32 multiply; `Control.Draw` sets the
+physical scissor to `Intersect(logicalScissor, bounds).ScaleBy(uiScale)`;
+`Container.Paint` unscales that physical scissor back to logical space with
+`ScaleBy(1/uiScale)` before re-intersecting and re-scaling it for each child
+(the second, independent round trip named above); and the GPU rasterizes a
+physical scanline of the divider quad only when the scanline's center lies
+inside the quad's scaled interval. A divider "vanishes" at a scroll phase when
+no rasterized scanline survives the scissor.
+
+The model earns its authority over the shipped geometry by first reproducing
+the measured past: the vulnerable 44px and 32px rows at the 0.897 "Normal"
+scale and the then-30px section header at the 0.81 "Small" scale (the scale of
+that session's live pixel scans), at the same ~10.2% vanish rates published
+above, and the immune 36px rows. A model that cannot reproduce the
+live-verified past has no authority over the present.
 
 `WithDescenderClearance` pins `VerticalAlignment` to `Top` for a related
 reason. `Blish_HUD.Controls.Label.VerticalAlignment` is a public settable
