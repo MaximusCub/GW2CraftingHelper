@@ -278,9 +278,9 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1424
-Views/RankerTabContent.cs                                                               2961
+Views/RankerTabContent.cs                                                               2963
 Views/Rendering/ClickSound.cs                                                            197
-Views/Rendering/CoinCurrencyRenderer.cs                                                  600
+Views/Rendering/CoinCurrencyRenderer.cs                                                  607
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
 Views/Rendering/CraftStepsSectionRenderer.cs                                             264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
@@ -291,7 +291,7 @@ Views/Rendering/HeaderCellPlan.cs                                               
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
 Views/Rendering/ITreePlanHost.cs                                                         88
-Views/Rendering/IconControls.cs                                                         284
+Views/Rendering/IconControls.cs                                                         286
 Views/Rendering/IconNameRowHelpers.cs                                                   182
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
@@ -300,7 +300,7 @@ Views/Rendering/PillColors.cs                                                   
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
-Views/Rendering/RarityColors.cs                                                         147
+Views/Rendering/RarityColors.cs                                                         169
 Views/Rendering/RecipesSectionRenderer.cs                                               338
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72

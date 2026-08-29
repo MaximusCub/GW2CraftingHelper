@@ -1827,8 +1827,8 @@ namespace TaimisToolbench.Views
                 string fullName = CurrencyName(shortfall);
                 row.CurrencyNameFulls.Add(fullName);
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
-                    row.Panel, CurrencyIconUrl(shortfall), (string)null,
-                    0, y, RankerRowLayout.CurrencyIconSize, 1,
+                    row.Panel, CurrencyIconUrl(shortfall), ItemIconFrame.Currency(),
+                    0, y, ItemIconTier.CurrencyListRow,
                     CurrencyHover(shortfall.CurrencyId, fullName)));
                 row.CurrencyNameLabels.Add(new Label
                 {
@@ -1994,7 +1994,9 @@ namespace TaimisToolbench.Views
                 var icon = row.CurrencyIconFrames[i];
                 var name = row.CurrencyNameLabels[i];
                 var value = row.CurrencyValueLabels[i];
-                int nameX = cellX + RankerRowLayout.CurrencyIconSize + 2
+                // No border term: CurrencyIconSize is the FRAMED box at the
+                // wallet-list tier, art inset inside it (ItemIconTiers).
+                int nameX = cellX + RankerRowLayout.CurrencyIconSize
                     + RankerRowLayout.CurrencyIconGap;
                 int valueX = Math.Max(nameX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap);
 

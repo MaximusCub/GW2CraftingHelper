@@ -835,7 +835,7 @@ namespace TaimisToolbench.Views.Rendering
                 // inset inside the box the unframed icon occupied so the
                 // currency column's own x's do not move.
                 IconControls.CreateItemIcon(
-                    rowPanel, row.IconUrl, ItemIconFrame.NotAnItem(),
+                    rowPanel, row.IconUrl, ItemIconFrame.Currency(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
                     ItemIconTier.CurrencyListRow,
                     // A CurrencyCost row is a wallet currency by
