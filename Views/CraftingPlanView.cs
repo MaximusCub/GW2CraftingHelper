@@ -2106,7 +2106,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(w - 120 - RightEdgePadding, 3),
                 Parent = _controlsPanel,
             };
-            _generateButton.Click += async (_, __) => await TriggerGenerate();
+            _generateButton.Click += async (_, __) => await TriggerGenerate(userPressedGenerate: true);
 
             // This tooltip is Generate Plan's ENTIRE safety mechanism: it
             // is the one action in the tree's vocabulary that destroys
@@ -3342,12 +3342,12 @@ namespace TaimisToolbench.Views
         /// </para>
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
-        private async Task TriggerGenerate()
+        private async Task TriggerGenerate(bool userPressedGenerate = false)
         {
             var pending = CollectUnresolvedTypedRows();
             if (pending.Count == 0)
             {
-                await GenerateFromResolvedRows(false);
+                await GenerateFromResolvedRows(false, userPressedGenerate);
                 return;
             }
 
@@ -3380,7 +3380,7 @@ namespace TaimisToolbench.Views
                 }
 
                 bool anyAmbiguous = AdoptTypedRowMatches(matches);
-                _ = GenerateFromResolvedRows(anyAmbiguous);
+                _ = GenerateFromResolvedRows(anyAmbiguous, userPressedGenerate);
             });
 
             if (!queued)
@@ -3576,7 +3576,7 @@ namespace TaimisToolbench.Views
             return count;
         }
 
-        private async Task GenerateFromResolvedRows(bool anyAmbiguousTypedName)
+        private async Task GenerateFromResolvedRows(bool anyAmbiguousTypedName, bool userPressedGenerate)
         {
             // Gather every
             // row's selection + quantity into the request list the
@@ -3650,8 +3650,22 @@ namespace TaimisToolbench.Views
                 // typed-name pass above could not match), or a name several
                 // items share. The old single "select an item" line was
                 // misleading for the last two - the box looked filled in.
-                SetStatus(WithStandingNotices(
-                    ItemRowSelection.EmptyRequestStatus(unresolvedTypedRows > 0, anyAmbiguousTypedName)));
+                string emptyRequest = ItemRowSelection.EmptyRequestStatus(
+                    unresolvedTypedRows > 0, anyAmbiguousTypedName);
+                SetStatus(WithStandingNotices(emptyRequest));
+
+                // The status line is the persistent record and stays. It
+                // also sits under the toolbar, well away from the button
+                // just pressed, which is why a press that produced nothing
+                // read as no response at all. Only a press: a re-solve or a
+                // regeneration confirm reaching this branch has no click to
+                // answer, and a dialog raised over one the user just
+                // dismissed is a nuisance, not an explanation.
+                if (userPressedGenerate)
+                {
+                    _modalDialog?.ShowAcknowledgement(emptyRequest);
+                }
+
                 return;
             }
 

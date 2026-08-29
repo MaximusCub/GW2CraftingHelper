@@ -277,7 +277,7 @@ Views/LogTabContent.cs                                                          
 Views/MainThreadMarshal.cs                                                              141
 Views/MainView.cs                                                                       2770
 Views/ModalBackdrop.cs                                                                  132
-Views/ModalDialog.cs                                                                    398
+Views/ModalDialog.cs                                                                    426
 Views/PlanHistoryTabContent.cs                                                          1403
 Views/RankerTabContent.cs                                                               2922
 Views/Rendering/ClickSound.cs                                                            197
@@ -406,7 +406,7 @@ tests/TaimisToolbench.Tests/Services/ItemMetadataServiceStatCacheTests.cs       
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceTests.cs                      245
 tests/TaimisToolbench.Tests/Services/ItemRarityResolutionTests.cs                      83
 tests/TaimisToolbench.Tests/Services/ItemRowRequestBuilderTests.cs                    132
-tests/TaimisToolbench.Tests/Services/ItemRowSelectionTests.cs                         222
+tests/TaimisToolbench.Tests/Services/ItemRowSelectionTests.cs                         258
 tests/TaimisToolbench.Tests/Services/ItemRowTooltipComposerTests.cs                   126
 tests/TaimisToolbench.Tests/Services/ItemSearchProviderFactoryTests.cs                 84
 tests/TaimisToolbench.Tests/Services/ItemStatBlockFactoryTests.cs                     191
