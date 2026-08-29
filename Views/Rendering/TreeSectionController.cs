@@ -718,14 +718,6 @@ namespace TaimisToolbench.Views.Rendering
             "Under a bought item - switch the parent to CRAFT to change this";
 
         /// <summary>
-        /// Width the cost column actually needs this render: its fixed
-        /// floor, or the pre-scanned sub-columns' real total when a tree
-        /// full of multi-gold (or currency-priced) values needs more. The
-        /// column's RIGHT edge never moves, so widening it only pushes the
-        /// decision pills and the name budget left - which is the point:
-        /// before, a wide cost run silently overprinted the pills.
-        /// </summary>
-        /// <summary>
         /// A header label's width at the header band's own font - measured
         /// from the string, because a Blish Label's Width is not settled
         /// until its next layout pass and the centring closures run before
@@ -736,6 +728,14 @@ namespace TaimisToolbench.Views.Rendering
             return (int)Math.Ceiling(HeaderBands.Font.MeasureString(text ?? "").Width);
         }
 
+        /// <summary>
+        /// Width the cost column actually needs this render: its fixed
+        /// floor, or the pre-scanned sub-columns' real total when a tree
+        /// full of multi-gold (or currency-priced) values needs more. The
+        /// column's RIGHT edge never moves, so widening it only pushes the
+        /// decision pills and the name budget left - which is the point:
+        /// before, a wide cost run silently overprinted the pills.
+        /// </summary>
         private int EffectiveCostColumnWidth()
         {
             int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);

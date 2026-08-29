@@ -1693,7 +1693,6 @@ namespace TaimisToolbench.Views
                 : "Your account snapshot has not loaded, so what you can afford is not known yet.";
         }
 
-        /// <summary>Returns the number of sub-lines rendered.</summary>        /// <summary>Returns the number of sub-lines rendered.</summary>
         /// <summary>
         /// The row's breakdown, under its headline. Returns the block the
         /// row's height is taken from.
