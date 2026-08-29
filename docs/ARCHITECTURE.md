@@ -1437,15 +1437,15 @@ display-only read.
 
 ### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
 
-It follows the same `StandardWindow` construction technique as
-`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
-`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
-class rather than a generalization of it. `ModalDialog`'s shape is one
-short sentence, a fixed "Confirm" title, and a caller-named confirm button
-beside a fixed Cancel; this dialog is a multi-line numbered checklist under
-a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
-is also not wrapped at all, which is fine for its own short sentence and
-wrong for full-sentence checklist items.
+It shares `DialogWindow` and `Services/DialogLayoutMath` with `ModalDialog`
+- a 1x1 pixel background stretched to the window's own size, `TopMost`, a
+stable `Id`, `Show()`/`Hide()` semantics, and one content-driven sizing pass
+- but is a separate class rather than a generalization of it. `ModalDialog`
+is one short sentence under a fixed "Confirm" title, centred, with a
+caller-named confirm button and an optional second seat; this dialog is a
+multi-paragraph numbered checklist under a different title, left-aligned,
+with a fixed Retry/Close pair. What was duplicated between them was the
+geometry, and that is now in one place.
 
 It deliberately skips `ModalDialog`'s settings-backed drag position
 persistence. This is a rare error-path dialog, not a workflow a user
@@ -2177,6 +2177,35 @@ having settled that question. `TextBox`es are 26 at nine of their eleven sites
 (Settings' six, the Snapshot and Log search boxes, About's), and the two
 `Dropdown`s outside the plan tab are 30, so the Log toolbar's run is three
 input heights wide before any button is placed.
+### V.37 `DialogWindow`: resizing a window Blish sizes once
+
+`WindowBase2` takes its window and content regions in a PROTECTED
+`ConstructWindow` and `Container.ContentRegion` has no public setter, so a
+dialog that wrote its own `Height` from outside would keep the content
+region it was built with and walk its buttons out of it - which is what the
+pre-sizing `ModalDialog` documented as the reason it could not grow.
+Subclassing is the seam that reaches `ConstructWindow`, and re-calling it
+recomputes padding, content margin, background ratios, title-bar bounds and
+`Size` together, exactly as a fresh window would have them.
+
+Two offsets come out of the decompiled 1.3.0 arithmetic and are worth
+writing down, because neither is visible from the call site. First,
+`ConstructWindow` places the content region at `contentRegion.Y + 40 -
+Padding.Top`, and `Padding.Top` is `Math.Max(windowRegion.Top - 40, 11)`,
+which for a window region starting at 0 is the 11 floor: a 35px inset lands
+the content 64px down. Second, its own `base.Size = windowSize` assignment
+fires `OnResized`, which recomputes the content region from `Size` minus the
+content margin. So the height actually handed to `ConstructWindow` is not
+the height the region ends up with. `DialogWindow` passes the REQUESTED
+content height rather than the window region's remainder: when `OnResized`
+fires the region lands 11px taller, and when it does not (a resize to the
+size the window already has) it lands exactly as passed. Both hold the
+content box; passing the remainder would leave the shorter of the two 11px
+short, with the button row's bottom edge outside it.
+
+`ChromeHeight` is the 74 that falls out: 24px of window above the content
+region, the 40px title bar, and the 10px kept below.
+
 ### 12.1 Two verdicts, two severities
 
 `PlanStore` mirrors `SnapshotStore`'s shape - single-file JSON, atomic
@@ -2654,6 +2683,51 @@ when it is supplied it becomes the "total" with the phase sum appended
 alongside as "(phases Nms)" for comparison; when absent - every existing
 test, any future non-UI caller - the "total" stays the phase sum exactly as
 before.
+
+### S1.10 Dialog sizing: the width bracket and the balanced wrap
+
+`Services/DialogLayoutMath.cs` replaced two fixed rectangles. `ModalDialog`
+was a 560x190 window whose every inner offset was derived from those two
+numbers, so a one-line acknowledgement and a four-line warning drew the same
+box; `ApiAccessDialog` was a second fixed rectangle, 560x300, with its own
+copy of the same constants. Both were sized for their worst case.
+
+**Why the width has a floor at all.** Nothing about readability stops a
+dialog at 500px. The title bar does. Decompiled BlishHUD 1.3.0,
+`WindowBase2.RecalculateLayout`, draws the left title-bar texture into
+`Min(textureWidth, windowWidth - 216)` and `DrawOnCtrl` stretches rather
+than crops, so a narrow window squeezes the art. The recorded evidence is
+two points: a 400px window (about 184px of draw) rasterized as coloured
+streaks behind the title, and 560 (about 344px) renders clean. 500 - the
+480px `MinContentWidth` plus the shell's 2x10 side insets - sits at about
+284px of draw. That is inferred from the bracket, not measured; if the art
+degrades in the field the floor moves up, and nothing else has to change.
+
+**Why the title can push past the ceiling.** `PaintTitleText` draws the
+title in `DefaultFont32` at a fixed 80px indent with no alignment control,
+and the exit button sits at a fixed inset from the right, so window width is
+the only lever a dialog has over its own title. `ApiAccessDialog` learned
+this the expensive way: at 480 its title clipped three characters mid-word.
+That is now a rule rather than a magic number - the caller measures its
+title in the face Blish paints it in and the width floor becomes
+`TitleTextIndent + titleWidth + TitleRightReserve`, which reproduces the 560
+that dialog needs without anyone writing 560 down.
+
+**The balanced wrap.** Wrapping at the ceiling and stopping there gives a
+full first line and a stub second one. The width is instead the narrowest
+that still reaches the same line count, found by binary search over
+`TextWrapMath.Wrap`: greedy wrapping never yields fewer lines as the width
+shrinks, so the predicate is monotone and the search is exact. It runs once
+per `Show`, about ten wraps of one message, and never on a render path.
+
+**Order of operations.** Balance within the preferred wrap ceiling; raise to
+the largest of the button row, the title and the width floor; clamp to what
+the screen can actually hold. The screen wins last, which is why
+`MaxContentWidth` returns the screen's hard ceiling and applies no preferred
+clamp of its own - a button row wider than the preferred width must be able
+to grow the box, and only the screen may refuse it.
+
+
 ## S2. Services Q-Z: relocated design narrative
 
 Design narrative moved out of doc comments in `Services/` (files whose

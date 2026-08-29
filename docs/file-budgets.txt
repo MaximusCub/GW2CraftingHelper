@@ -107,6 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         440
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
+Services/DialogLayoutMath.cs                                                            374
 Services/DisciplinesColumnMath.cs                                                       121
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
@@ -269,7 +270,7 @@ Services/WikiLinkLauncher.cs                                                    
 Services/WindowPlacement.cs                                                             106
 Services/WindowSizing.cs                                                                276
 Views/AboutTabContent.cs                                                                1000
-Views/ApiAccessDialog.cs                                                                251
+Views/ApiAccessDialog.cs                                                                231
 Views/AutocompleteTextBox.cs                                                             45
 Views/CraftingPlanView.cs                                                               5028
 Views/FocusRelease.cs                                                                   159
@@ -278,8 +279,9 @@ Views/ItemRowState.cs                                                           
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
 Views/MainView.cs                                                                       2770
+Views/DialogWindow.cs                                                                   84
 Views/ModalBackdrop.cs                                                                  132
-Views/ModalDialog.cs                                                                    426
+Views/ModalDialog.cs                                                                    379
 Views/PlanHistoryTabContent.cs                                                          1424
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                            197
@@ -391,6 +393,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                 209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
+tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                         342
 tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                    131
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153

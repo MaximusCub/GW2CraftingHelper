@@ -56,12 +56,11 @@ Services/TreeRowTooltipComposer.cs                                              
 Services/TypeRampMetrics.cs                                                                  1     0
 Services/VendorBatchSolver.cs                                                                5     0
 Services/WikiLinkBuilder.cs                                                                  1     0
-Views/ApiAccessDialog.cs                                                                     1     0
 Views/CraftingPlanView.cs                                                                   12     0
 Views/ItemInputRowStrip.cs                                                                   1     0
 Views/LogTabContent.cs                                                                       4     0
 Views/MainView.cs                                                                            5     0
-Views/ModalDialog.cs                                                                         4     0
+Views/ModalDialog.cs                                                                         2     0
 Views/Rendering/CoinCurrencyRenderer.cs                                                      1     0
 Views/Rendering/ColumnHeaderRowRenderer.cs                                                   1     0
 Views/Rendering/CraftStepsSectionRenderer.cs                                                 2     0
