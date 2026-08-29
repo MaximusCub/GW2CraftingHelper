@@ -354,7 +354,7 @@ namespace TaimisToolbench.Services
         /// <para>
         /// A raw coin component never gets its own leaf - it stays folded
         /// into the parent's SubtreeCost, which keeps "parent total = sum of
-        /// the parts a leaf can show" true. See docs/ARCHITECTURE.md S1.6.
+        /// the parts a leaf can show" true. See docs/ARCHITECTURE.md section S1.6.
         /// </para>
         /// <para>
         /// Every number on a leaf is read from

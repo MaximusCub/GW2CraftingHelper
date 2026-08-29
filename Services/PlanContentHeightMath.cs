@@ -21,7 +21,7 @@ namespace TaimisToolbench.Services
     /// <para>
     /// CraftingPlanView uses these SAME constants both to size the
     /// AutoSize-replacement containers and to size the individual row Panels
-    /// it creates, so the two cannot drift. See docs/ARCHITECTURE.md 4/4.2.
+    /// it creates, so the two cannot drift. See docs/ARCHITECTURE.md section 4.2.
     /// </para>
     /// </summary>
     internal static class PlanContentHeightMath

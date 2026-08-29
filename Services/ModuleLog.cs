@@ -23,7 +23,7 @@ namespace TaimisToolbench.Services
     /// by any caller other than <see cref="SeedFromStore"/>:
     /// <see cref="_gate"/> guards the in-memory ring/Version,
     /// <see cref="_fileGate"/> the attached file sink, and Write never
-    /// performs disk IO itself. Derivation: docs/ARCHITECTURE.md S1.1.
+    /// performs disk IO itself. Derivation: docs/ARCHITECTURE.md section S1.1.
     /// </para>
     /// </summary>
     internal class ModuleLog

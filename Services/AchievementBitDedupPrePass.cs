@@ -20,7 +20,7 @@ namespace TaimisToolbench.Services
     /// <para>
     /// Runs exactly ONCE, after the tree is built and before inventory
     /// reduction and Solve, never again for that tree. Pure, Blish-free,
-    /// mutates the tree in place. Derivation: docs/ARCHITECTURE.md 8.1.
+    /// mutates the tree in place. Derivation: docs/ARCHITECTURE.md section 8.1.
     /// </para>
     /// </summary>
     internal static class AchievementBitDedupPrePass
