@@ -32,14 +32,18 @@ namespace TaimisToolbench.Services
 
             if (isMultiItem)
             {
-                // No single target item/icon/rarity exists for a batch -
-                // the header shows gw2e's document-title convention
-                // ("Gift of Exordium and 2 others") and TargetQuantity is
-                // suppressed so the "x{qty}" suffix never renders a
-                // meaningless combined number.
-                vm.TargetItemName = BuildMultiItemTitle(result.RequestedItems, result.ItemMetadata);
-                vm.TargetIconUrl = null;
-                vm.TargetRarity = null;
+                // A batch heads on its FIRST requested item - name, icon
+                // and rarity - with the rest of the batch named by an
+                // uncoloured suffix and stacked as icons after it. Only
+                // TargetQuantity stays suppressed: a combined "x{qty}"
+                // across different items is not a number.
+                var first = result.RequestedItems[0];
+                vm.TargetItemName = ResolveName(first.ItemId, result.ItemMetadata);
+                vm.TargetIconUrl = ResolveIconUrl(first.ItemId, result.ItemMetadata);
+                vm.TargetRarity = ResolveRarity(first.ItemId, result.ItemMetadata);
+                vm.TargetNameSuffix = BuildMultiItemNameSuffix(result.RequestedItems.Count);
+                vm.AdditionalTargetItems = BuildAdditionalTargetItems(
+                    result.RequestedItems, result.ItemMetadata);
             }
             else if (result.ItemMetadata != null &&
                 result.ItemMetadata.TryGetValue(result.Plan.TargetItemId, out var targetMeta))
@@ -128,21 +132,46 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// gw2e's document-title convention for a multi-item batch: the
-        /// first requested item's name plus " and N others". items is
-        /// guaranteed non-empty by the isMultiItem gate.
+        /// What follows the first item's name in a batch heading:
+        /// " + 2 others". Deliberately NOT gw2e's " and N others"
+        /// document-title wording - the heading is a name plus a running
+        /// count of icons beside it, and " + " is what reads as that
+        /// rather than as a second title. Null when there is no remainder.
         /// </summary>
-        private static string BuildMultiItemTitle(
+        private static string BuildMultiItemNameSuffix(int requestedItemCount)
+        {
+            int rest = requestedItemCount - 1;
+            return rest <= 0 ? null : " + " + StatusText.Count(rest, "other");
+        }
+
+        /// <summary>
+        /// The batch's items after the first, in request order, resolved to
+        /// the display fields the header's icon run draws and hovers.
+        /// Returns null (not an empty list) for a batch with no remainder,
+        /// so the header's "is there a run at all" test is one null check.
+        /// </summary>
+        private static List<PlanHeaderItem> BuildAdditionalTargetItems(
             IReadOnlyList<PlanRequestItem> items, IReadOnlyDictionary<int, ItemMetadata> metadata)
         {
-            string firstName = ResolveName(items[0].ItemId, metadata);
-            int rest = items.Count - 1;
-            if (rest <= 0)
+            if (items == null || items.Count <= 1)
             {
-                return firstName;
+                return null;
             }
 
-            return firstName + " and " + StatusText.Count(rest, "other");
+            var additional = new List<PlanHeaderItem>(items.Count - 1);
+            for (int i = 1; i < items.Count; i++)
+            {
+                int itemId = items[i].ItemId;
+                additional.Add(new PlanHeaderItem
+                {
+                    ItemId = itemId,
+                    Name = ResolveName(itemId, metadata),
+                    IconUrl = ResolveIconUrl(itemId, metadata),
+                    Rarity = ResolveRarity(itemId, metadata),
+                });
+            }
+
+            return additional;
         }
 
         // Tooltip bodies shared between the collapsed and uncollapsed

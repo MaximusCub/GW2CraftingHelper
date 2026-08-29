@@ -57,7 +57,7 @@ Models/PlanRequestItem.cs                                                       
 Models/PlanSolveContext.cs                                                              196
 Models/PlanStatus.cs                                                                     11
 Models/PlanStep.cs                                                                       51
-Models/PlanViewModel.cs                                                                 387
+Models/PlanViewModel.cs                                                                 423
 Models/PriceBasis.cs                                                                     32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                         59
@@ -144,6 +144,8 @@ Services/ModuleLogEntry.cs                                                      
 Services/ModuleLogLevel.cs                                                               20
 Services/ModuleLogStore.cs                                                              272
 Services/ModuleSettings.cs                                                              437
+Services/MultiItemHeaderLayout.cs                                                       137
+Services/MultiItemHeaderTooltipComposer.cs                                               65
 Services/MysticForgeRecipeData.cs                                                       211
 Services/NotesSectionLayoutMath.cs                                                      111
 Services/OwnedMaterialsForceBuyPrePass.cs                                               128
@@ -169,7 +171,7 @@ Services/PlanStripStatusBoard.cs                                                
 Services/PlanStripTickDecision.cs                                                        97
 Services/PlanStructuralValidator.cs                                                     597
 Services/PlanTableSorter.cs                                                             261
-Services/PlanViewModelBuilder.cs                                                       1539
+Services/PlanViewModelBuilder.cs                                                       1568
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                         87
@@ -264,7 +266,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                251
 Views/AutocompleteTextBox.cs                                                             45
-Views/CraftingPlanView.cs                                                               5024
+Views/CraftingPlanView.cs                                                               5028
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              381
 Views/ItemRowState.cs                                                                    31
@@ -413,6 +415,8 @@ tests/TaimisToolbench.Tests/Services/LogToolbarLayoutTests.cs                   
 tests/TaimisToolbench.Tests/Services/LogViewFloorTests.cs                              49
 tests/TaimisToolbench.Tests/Services/ModuleLogStoreTests.cs                           309
 tests/TaimisToolbench.Tests/Services/ModuleLogTests.cs                                503
+tests/TaimisToolbench.Tests/Services/MultiItemHeaderLayoutTests.cs                    179
+tests/TaimisToolbench.Tests/Services/MultiItemHeaderTooltipComposerTests.cs           148
 tests/TaimisToolbench.Tests/Services/MultiItemPlanTests.cs                           1631
 tests/TaimisToolbench.Tests/Services/MysticForgeIntegrationTests.cs                   696
 tests/TaimisToolbench.Tests/Services/MysticForgeRecipeDataTests.cs                    560
@@ -462,7 +466,7 @@ tests/TaimisToolbench.Tests/Services/PlanTableSorterTests.cs                    
 tests/TaimisToolbench.Tests/Services/PlanTimingAnalyzerTests.cs                        90
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderAcquisitionHintsTests.cs     151
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderDailyCooldownTests.cs        290
-tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderMultiItemTests.cs            399
+tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderMultiItemTests.cs            450
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderNotesCompetencyTests.cs      101
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderNotesExcessTests.cs          185
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderNotesForgeScopeTests.cs       53

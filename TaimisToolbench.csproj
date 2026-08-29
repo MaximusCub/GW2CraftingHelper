@@ -152,6 +152,8 @@
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\TreeCostColumnMath.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
+    <Compile Include="Services\MultiItemHeaderLayout.cs" />
+    <Compile Include="Services\MultiItemHeaderTooltipComposer.cs" />
     <Compile Include="Services\NotesSectionLayoutMath.cs" />
     <Compile Include="Services\ItemRowRequestBuilder.cs" />
     <Compile Include="Services\ItemRowSelection.cs" />
