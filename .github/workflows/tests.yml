@@ -598,6 +598,39 @@ jobs:
               if path not in files:
                   silent.append(f'{path}: forward-listed but not in the tree ({why})')
 
+          # The bare-name hatch, and who may still reach it. Naming() yields
+          # a name-only hover with no icon, no wallet balance, no prose - it
+          # is what every currency in the module used to show, and the owner's
+          # rule is that there is no way to display an item or a currency
+          # wrong. An ITEM takes ForItem/Composed and a WALLET CURRENCY takes
+          # ForCurrency; the kind must come from the id space the call site
+          # drew the icon from, never from the name (Gaeting Crystal is item
+          # 86094 AND currencies 39/77 - one good, two id spaces).
+          #
+          # Each entry below is a call site still awaiting conversion and the
+          # branch that owns the file. Removing an entry is the act of the
+          # commit that converts it; adding one needs a reason in the message,
+          # and "the subject is a currency" is not one.
+          NAMING_PENDING = {
+              'Views/SettingsTabContent.cs':
+                  'the settings branch owns this file - its CurrencyRow.IsBarterItem'
+                  ' already picks the id space, so the two icon calls in'
+                  ' EnsureCurrencyRowIcon take ForItem and ForCurrency respectively',
+              'Views/RankerTabContent.cs':
+                  'the Ranker branch owns this file - its currency shortfall chips'
+                  ' take ForCurrency',
+          }
+          naming = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for m in re.finditer(re.escape('ItemIconTooltip.Naming('), text):
+                  line = text.count('\n', 0, m.start()) + 1
+                  if f not in NAMING_PENDING:
+                      naming.append(f'{f}:{line}')
+          for path, why in sorted(NAMING_PENDING.items()):
+              if path not in files:
+                  naming.append(f'{path}: listed as pending but not in the tree ({why})')
+
           # The stamping seams, pinned by name and by parameter type. A new
           # one, or one widened to Control/Label, is how the whole-row
           # stamping would come back.
@@ -626,9 +659,16 @@ jobs:
               print('These item icons are built without a named ItemIconTooltip:')
               print('\n'.join(sorted(silent)))
               print('Pass one from Views/Rendering/ItemIconTooltip.cs: ForItem/Composed for')
-              print('the standard item hover, Naming for a currency, or None(ItemIconSilence.X)')
+              print('an item, ForCurrency for a wallet currency, or None(ItemIconSilence.X)')
               print('to say out loud that this icon shows nothing and why.')
-          if bad or silent:
+          if naming:
+              print('These icons show a bare name where the entity has a tooltip of')
+              print('its own:')
+              print('\n'.join(sorted(naming)))
+              print('ItemIconTooltip.Naming is retiring. An item takes ForItem/Composed,')
+              print('a wallet currency takes ForCurrency - and which one is decided by the')
+              print('id space the call site drew the icon from, never by the name.')
+          if bad or silent or naming:
               sys.exit(1)
           if unused:
               print('NOTE: these files no longer call a pre-tier overload - drop them')

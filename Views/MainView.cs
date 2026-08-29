@@ -35,6 +35,8 @@ namespace TaimisToolbench.Views
         private static readonly Color InfoTextColor = new Color(170, 170, 170);
 
         private readonly Func<int, ItemStatBlock> _getItemStatBlock;
+
+        private readonly Func<int, CurrencyMetadata> _getCurrencyMetadata;
         private static readonly Color WarningTextColor = new Color(255, 200, 60);
 
         private AccountSnapshot _snapshot;
@@ -392,7 +394,13 @@ namespace TaimisToolbench.Views
             // pure cache read - a snapshot row whose item no plan has
             // fetched this session degrades to the ellipsis tooltip it
             // always had. See KNOWN-ISSUES #42.
-            Func<int, ItemStatBlock> getItemStatBlock = null)
+            Func<int, ItemStatBlock> getItemStatBlock = null,
+            // Session currency lookup (CurrencyMetadataService's own
+            // cache), for the wallet rows' currency tooltips. Optional and
+            // a pure cache read on the same terms as the item lookup
+            // above: before /v2/currencies has landed the hover shows the
+            // name and balance the row already holds, without its prose.
+            Func<int, CurrencyMetadata> getCurrencyMetadata = null)
         {
             _snapshot = snapshot;
             // The constructor sets _snapshot directly, bypassing
@@ -412,6 +420,7 @@ namespace TaimisToolbench.Views
             _saveStatus = saveStatus;
             _saveStatusThreadSafe = saveStatusThreadSafe;
             _getItemStatBlock = getItemStatBlock;
+            _getCurrencyMetadata = getCurrencyMetadata;
 
             _rowRefitSettle = new ResizeSettleDebounce(
                 RefitResultRows,
@@ -2548,9 +2557,23 @@ namespace TaimisToolbench.Views
             string currencyName = string.IsNullOrEmpty(entry.CurrencyName)
                 ? "Unknown Currency"
                 : entry.CurrencyName;
+            int currencyId = entry.CurrencyId;
+            int walletValue = entry.Value;
             IconControls.CreateItemIcon(
                 rowPanel, entry.IconUrl, ItemIconFrame.NotAnItem(), 2, 2,
-                ItemIconTier.CurrencyListRow, ItemIconTooltip.Naming(currencyName));
+                ItemIconTier.CurrencyListRow,
+                // A WALLET row is a wallet currency by construction - the
+                // id came out of /v2/account/wallet - so the kind needs no
+                // guessing, and this row's own Value IS the balance the
+                // game's tooltip states.
+                ItemIconTooltip.ForCurrency(
+                    currencyName,
+                    () => CurrencyTooltipFacts.For(
+                        currencyName,
+                        entry.IconUrl,
+                        _getCurrencyMetadata == null
+                            ? null : _getCurrencyMetadata(currencyId)?.Description,
+                        walletValue)));
 
             // Never display raw currency IDs (repo invariant). Same two
             // columns as the item run above, so one header pair shape

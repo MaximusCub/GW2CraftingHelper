@@ -57,18 +57,22 @@ namespace TaimisToolbench.Models
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Last moved by the barter-item valuation work, which is purely
-        /// ADDITIVE (see tests/shared/persisted_plan_schema.txt's four-line
-        /// diff): two CurrencyValuation collections, absent from an older
-        /// file and left empty by Newtonsoft, and two bool flags, absent
-        /// and left false - which is what an older plan, written when no
-        /// barter offer could win at all, correctly means. A plan or
-        /// snapshot written before any of them still deserializes and
-        /// <see cref="CurrentSchemaVersion"/> stays at 3. A bump here now
-        /// costs a re-solve rather than the plan, but it still costs one.
+        /// Last moved by the currency tooltip work, which is purely
+        /// ADDITIVE: one string, CurrencyMetadata.Description, absent from
+        /// an older file and left null by Newtonsoft - which drops the
+        /// tooltip's paragraph and nothing else. A plan written before it
+        /// still deserializes and <see cref="CurrentSchemaVersion"/> stays
+        /// at 3. A bump here now costs a re-solve rather than the plan, but
+        /// it still costs one.
+        /// <para>
+        /// It does cost bytes: the persisted CurrencyMetadata is the whole
+        /// /v2/currencies reply, so every saved plan grows by the
+        /// descriptions of all 79 currencies - measured 2026-08-28 at 8.5KB
+        /// raw, ~2.5KB gzipped, per plan blob.
+        /// </para>
         /// </remarks>
         public const string SchemaShapeHash =
-            "175e4a5791f5dc7868a0f36becaad5546b6c9c25de4b700eff0cf93d401a6e33";
+            "85bc46dd6078bfcc7216e1b1adeae667b4c178e7094a0f04c69a6033b2769796";
 
         /// <summary>
         /// See <see cref="CurrentSchemaVersion"/>'s own doc comment for why

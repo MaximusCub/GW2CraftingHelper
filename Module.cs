@@ -920,7 +920,11 @@ namespace TaimisToolbench
                 ClearCache,
                 SaveStatus,
                 SaveStatusThreadSafe,
-                itemMetadataService.GetCachedStatBlock
+                itemMetadataService.GetCachedStatBlock,
+                // The wallet rows' currency tooltips read the same
+                // session cache WarmCurrencyMetadataForSettings fills, so
+                // the description arrives without a second fetch.
+                _currencyMetadataService.GetCached
             );
 
             // The generate callback is always routed through the list
