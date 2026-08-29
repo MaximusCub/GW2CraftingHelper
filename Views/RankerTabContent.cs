@@ -366,11 +366,22 @@ namespace TaimisToolbench.Views
             return mode == RankerMode.Independent ? IndependentModeItem : CascadeModeItem;
         }
 
+        /// <summary>
+        /// What each option DOES, on the caption and on both halves of each
+        /// option - Blish resolves a tooltip on the deepest control under the
+        /// cursor and never bubbles to the parent (KNOWN-ISSUES #57), so the
+        /// dot and its label each need their own.
+        /// </summary>
+        private const string ModeStripTooltip =
+            "How the table measures each row. \"" + CascadeModeItem +
+            "\" measures every row against what the rows above it leave behind; \"" +
+            IndependentModeItem + "\" measures every row against your whole account.";
+
         private static string ModeTooltip(RankerMode mode)
         {
             return mode == RankerMode.Independent
                 ? "Every row is measured against your full account, ignoring the other rows - which is closest to done right now? Closest sorts to the top; your priority order is kept and restored when you switch back."
-                : "Each row is measured after the rows above it claim your materials, currencies and daily crafts.";
+                : "Rows are measured top down, each one against what the rows above it leave behind: higher rows have first claim on your materials, currencies, coin and daily crafts. The table stays in your own priority order, and the arrows move a row up or down it.";
         }
 
         /// <summary>
@@ -517,6 +528,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(0, 10),
                 Parent = _addPanel,
             };
+            TooltipFacility.ApplyPlain(_modeLabel, ModeStripTooltip);
 
             _modeRadios.Clear();
             _modeRadios.Add(CreateModeRadio(RankerMode.Cascade));
