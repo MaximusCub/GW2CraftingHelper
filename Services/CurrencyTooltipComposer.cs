@@ -53,7 +53,7 @@ namespace TaimisToolbench.Services
             var builder = new TooltipContentBuilder();
 
             // No rarity: a currency has none, and the neutral name colour
-            // is the same statement ItemIconFrame.NotAnItem() makes about
+            // is the same statement ItemIconFrame.Currency() makes about
             // the icon beside it.
             builder.Header(facts.IconUrl, facts.Name, null);
 

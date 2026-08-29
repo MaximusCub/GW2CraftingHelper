@@ -182,9 +182,13 @@ namespace TaimisToolbench.Views.Rendering
             };
 
             // Through the icon component, like the currency half of this
-            // file. Unframed for the reason CreateUnframedIcon states: a
-            // frame's 2px is a term in the minimum-window-width derivation,
-            // and a denomination has no rarity.
+            // file - but deliberately UNFRAMED where a wallet currency is
+            // framed (IconControls.CreateCurrencyIcon). A denomination is a
+            // unit marker on a number rather than a subject, and its size
+            // here is the caller's, not a tier's: the rich tooltip draws
+            // these larger. With no tier there is nothing to inset the art
+            // inside, so a frame would add 2px to every segment's advance -
+            // a term in the minimum-window-width derivation.
             var icon = IconControls.CreateAssetIcon(
                 parent, seg.AssetId,
                 x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y + iconYOffset,
@@ -357,9 +361,12 @@ namespace TaimisToolbench.Views.Rendering
                 // name text anywhere in this cell (unlike SummarySectionRenderer.
                 // CreateCurrencyRow, which prints the name as a label before
                 // the icon) - a hover tooltip is the only way to identify it.
-                var icon = IconControls.CreateUnframedIcon(
+                // Framed at the bar tier, whose art is inset inside the
+                // measured 16px box, so this segment's advance below is the
+                // number it always was.
+                var icon = IconControls.CreateCurrencyIcon(
                     parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y,
-                    CoinSegmentMath.CoinIconSize, seg.Name);
+                    ItemIconTier.CurrencyBarRun, seg.Name);
 
                 controls[i] = (label, icon);
                 widths[i] = seg.TextWidth;

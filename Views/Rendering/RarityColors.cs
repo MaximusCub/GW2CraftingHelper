@@ -50,6 +50,26 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
+        /// THE currency frame, for every currency and coin icon in the
+        /// module - there is no rarity to look up and no second opinion to
+        /// have, so this takes no argument and every currency site reaches
+        /// it through <see cref="ItemIconFrame.Currency"/>.
+        /// <para>
+        /// A third grey, distinct from the two above on purpose: the (60,
+        /// 60, 60) unknown-rarity fallback is nearly invisible on the dark
+        /// window - which is what "these icons have no border at all" meant
+        /// in the field - and 90 is spoken for by Basic, which sits beside
+        /// real rarity frames and must not be confused with one. 100 reads
+        /// as a deliberate edge without competing with the tinted frames
+        /// around it.
+        /// </para>
+        /// </summary>
+        internal static Color GetCurrencyBorderColor()
+        {
+            return new Color(100, 100, 100);
+        }
+
+        /// <summary>
         /// Rarity palette for item NAME text - the measured live palette
         /// above, replacing the GW2 wiki dark-skin values the module
         /// shipped with (web-legibility-tuned and measurably desaturated
@@ -126,12 +146,14 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// The subject has no rarity to resolve at all - a currency, a coin
-        /// denomination. Same neutral frame as an unknown rarity, but the
-        /// call site is on record that nothing is missing.
+        /// denomination. Not the unknown-rarity frame: the call site is on
+        /// record that nothing is missing, and it gets the module's one
+        /// currency frame (<see cref="RarityColors.GetCurrencyBorderColor"/>)
+        /// rather than a per-surface grey.
         /// </summary>
-        internal static ItemIconFrame NotAnItem()
+        internal static ItemIconFrame Currency()
         {
-            return new ItemIconFrame(RarityColors.GetRarityBorderColor(null));
+            return new ItemIconFrame(RarityColors.GetCurrencyBorderColor());
         }
 
         /// <summary>

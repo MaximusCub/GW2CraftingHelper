@@ -2539,7 +2539,7 @@ namespace TaimisToolbench.Views
             int walletValue = entry.Value;
             string currencyIconUrl = entry.IconUrl;
             IconControls.CreateItemIcon(
-                rowPanel, currencyIconUrl, ItemIconFrame.NotAnItem(), 2, 2,
+                rowPanel, currencyIconUrl, ItemIconFrame.Currency(), 2, 2,
                 ItemIconTier.CurrencyListRow,
                 // A WALLET row is a wallet currency by construction - the
                 // id came out of /v2/account/wallet - so the kind needs no

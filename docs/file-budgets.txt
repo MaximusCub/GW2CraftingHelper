@@ -162,7 +162,7 @@ Services/PlanHistoryBlobStore.cs                                                
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                           118
 Services/PlanHistoryRetention.cs                                                        102
-Services/PlanHistoryRowLayout.cs                                                        323
+Services/PlanHistoryRowLayout.cs                                                        361
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
@@ -182,7 +182,8 @@ Services/RankerReadinessCalculator.cs                                           
 Services/RankerReadinessRamp.cs                                                         265
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             725
+Services/RankerRowLayout.cs                                                             745
+Services/RankerSnapshotWatch.cs                                                          93
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -278,10 +279,10 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                       2770
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
-Views/PlanHistoryTabContent.cs                                                          1403
-Views/RankerTabContent.cs                                                               2922
+Views/PlanHistoryTabContent.cs                                                          1424
+Views/RankerTabContent.cs                                                               2995
 Views/Rendering/ClickSound.cs                                                            197
-Views/Rendering/CoinCurrencyRenderer.cs                                                  600
+Views/Rendering/CoinCurrencyRenderer.cs                                                  607
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
 Views/Rendering/CraftStepsSectionRenderer.cs                                             264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
@@ -292,7 +293,7 @@ Views/Rendering/HeaderCellPlan.cs                                               
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
 Views/Rendering/ITreePlanHost.cs                                                         88
-Views/Rendering/IconControls.cs                                                         284
+Views/Rendering/IconControls.cs                                                         286
 Views/Rendering/IconNameRowHelpers.cs                                                   182
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
@@ -301,7 +302,7 @@ Views/Rendering/PillColors.cs                                                   
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
-Views/Rendering/RarityColors.cs                                                         147
+Views/Rendering/RarityColors.cs                                                         169
 Views/Rendering/RecipesSectionRenderer.cs                                               340
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
@@ -439,7 +440,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                       94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                        138
 tests/TaimisToolbench.Tests/Services/PlanHistoryRetentionTests.cs                     139
-tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     389
+tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs                     422
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         323
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
 tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         700
@@ -490,6 +491,7 @@ tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs          
 tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      225
 tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
 tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                            933
+tests/TaimisToolbench.Tests/Services/RankerSnapshotWatchTests.cs                        141
 tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                                285
 tests/TaimisToolbench.Tests/Services/ReceiptCaptionHelperTests.cs                     124
 tests/TaimisToolbench.Tests/Services/RecipeCacheStoreTests.cs                         998

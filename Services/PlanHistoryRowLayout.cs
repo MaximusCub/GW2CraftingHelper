@@ -48,6 +48,16 @@ namespace TaimisToolbench.Services
         public const int CaretColumnWidth = TreeRowShapePlanner.CaretColumnWidth;
 
         /// <summary>
+        /// Padding to the LEFT of the caret glyph inside its click target,
+        /// taken out of the row's own inset. There is no matching right-hand
+        /// constant: the target runs all the way to the icon's left edge,
+        /// because the strip between the glyph and the icon used to swallow
+        /// clicks, and two adjacent targets for the same action must not
+        /// leave a gap between them.
+        /// </summary>
+        public const int CaretHitPadX = IconGap;
+
+        /// <summary>
         /// Clearance above and below an icon frame on this tab, the
         /// 3px-each-side law every frame-driven row in the module is built
         /// on (RankerRowLayout.RowHeight's tier-1 60,
@@ -60,6 +70,17 @@ namespace TaimisToolbench.Services
         /// <summary>y of the row's icon frame - and, with the frame, the
         /// whole of RowHeight.</summary>
         public const int IconY = IconPad;
+
+        /// <summary>
+        /// The caret's click target spans the ADJACENT ICON's box, top to
+        /// bottom, rather than the glyph's own line box: the caret is the
+        /// smallest mark on the row and the one the pointer has to find
+        /// first. The glyph inside it does not move - it stays on
+        /// <see cref="MainLineTextY"/>, which centres on this same box.
+        /// </summary>
+        public const int CaretHitY = IconY;
+
+        public const int CaretHitHeight = IconTotal;
 
         // 54 + 3 + 3 = 60, the same sum RankerRowLayout.RowHeight is.
         public const int RowHeight = IconTotal + 2 * IconPad;
@@ -160,6 +181,26 @@ namespace TaimisToolbench.Services
             public readonly int IconX;
             public readonly int NameX;
             public readonly int NameWidth;
+
+            /// <summary>
+            /// Left edge of the caret's click target - see
+            /// <see cref="CaretHitPadX"/>. Clamped at the row's own left
+            /// edge, which is all the padding a zero inset could give.
+            /// </summary>
+            public int CaretHitX
+            {
+                get { return Math.Max(0, CaretX - CaretHitPadX); }
+            }
+
+            /// <summary>
+            /// Width of the caret's click target: it ends ON the icon's left
+            /// edge, so the caret and the icon - both of which expand the
+            /// row - are contiguous.
+            /// </summary>
+            public int CaretHitWidth
+            {
+                get { return Math.Max(0, IconX - CaretHitX); }
+            }
 
             /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
             public readonly int CostRightEdge;

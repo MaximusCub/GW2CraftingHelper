@@ -2257,9 +2257,9 @@ namespace TaimisToolbench.Views
                 row.Cell,
                 CurrencyDisplayResolver.ResolveIconUrl(currencyId, _currencyMetadata),
                 // A currency has no rarity to resolve: neutral by intent,
-                // the same call ItemIconFrame.NotAnItem() records at the
+                // the same call ItemIconFrame.Currency() records at the
                 // Snapshot tab's wallet rows.
-                ItemIconFrame.NotAnItem(),
+                ItemIconFrame.Currency(),
                 SettingsCurrencyGridLayout.CellIconX,
                 SettingsCurrencyGridLayout.CellIconY,
                 ItemIconTier.CurrencyListRow,
