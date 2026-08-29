@@ -462,7 +462,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverPillSubduingTests.cs             
 tests/TaimisToolbench.Tests/Services/PlanSolverPriceBasisAndOverrideTests.cs          424
 tests/TaimisToolbench.Tests/Services/PlanSolverQuantityZeroGuardTests.cs               76
 tests/TaimisToolbench.Tests/Services/PlanSolverRecipeSelectionTieBreakTests.cs        267
-tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs            362
+tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs            372
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorBatchingTests.cs                 805
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorCapTests.cs                      455
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorOfferTests.cs                    614

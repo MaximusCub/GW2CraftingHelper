@@ -137,6 +137,16 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(PricedMaterialUnitPrice, result.Decisions[0].ComparisonValue);
             Assert.Equal(PricedMaterialUnitPrice, result.Plan.TotalCoinCost);
             Assert.DoesNotContain(result.Plan.Steps, s => s.ItemId == BreastplateItemId && s.Source == AcquisitionSource.BuyFromVendor);
+
+            // Committing the offer collapsed the whole tree into one step.
+            // Crafting expands it, so every Gift the player must obtain is
+            // named with a quantity - including the vendor-only one, whose
+            // own acquisition is itself unpriced and which must not vanish
+            // just because no coin figure can be put on it.
+            Assert.Contains(result.Plan.Steps, s => s.ItemId == CraftableGiftItemId);
+            var vendorOnly = result.Plan.Steps.Single(s => s.ItemId == VendorOnlyGiftItemId);
+            Assert.Equal(1, vendorOnly.Quantity);
+            Assert.True(vendorOnly.VendorHasBarterItemCost);
         }
 
         [Fact]
