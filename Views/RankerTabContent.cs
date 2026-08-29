@@ -165,7 +165,8 @@ namespace TaimisToolbench.Views
         private Label _modeLabel;
         private readonly List<ModeRadio> _modeRadios = new List<ModeRadio>();
         private Label _statusLabel;
-        private Checkbox _compactCheckbox;
+        private Checkbox _categoriesCheckbox;
+        private Checkbox _currenciesCheckbox;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
         private Label _bannerLabel;
@@ -345,11 +346,14 @@ namespace TaimisToolbench.Views
         private RankerMode Mode => _watchlist.Mode;
 
         /// <summary>
-        /// Headline plus gate percentages only - see RenderSubLines. Persisted
-        /// beside the mode, because it is the same kind of choice: how the
-        /// user wants to read the table, not what the table says.
+        /// The two display toggles - see RenderSubLines. Persisted beside the
+        /// mode, because they are the same kind of choice: how the user wants
+        /// to read the table, not what the table says. Both off is the
+        /// default, and is the headline row alone.
         /// </summary>
-        private bool Compact => _watchlist.Compact;
+        private bool ShowCategories => _watchlist.ShowCategories;
+
+        private bool ShowCurrencies => _watchlist.ShowCurrencies;
 
         // ---------------------------------------------------------------
         // Comparison mode
@@ -362,11 +366,22 @@ namespace TaimisToolbench.Views
             return mode == RankerMode.Independent ? IndependentModeItem : CascadeModeItem;
         }
 
+        /// <summary>
+        /// What each option DOES, on the caption and on both halves of each
+        /// option - Blish resolves a tooltip on the deepest control under the
+        /// cursor and never bubbles to the parent (KNOWN-ISSUES #57), so the
+        /// dot and its label each need their own.
+        /// </summary>
+        private const string ModeStripTooltip =
+            "How the table measures each row. \"" + CascadeModeItem +
+            "\" measures every row against what the rows above it leave behind; \"" +
+            IndependentModeItem + "\" measures every row against your whole account.";
+
         private static string ModeTooltip(RankerMode mode)
         {
             return mode == RankerMode.Independent
                 ? "Every row is measured against your full account, ignoring the other rows - which is closest to done right now? Closest sorts to the top; your priority order is kept and restored when you switch back."
-                : "Each row is measured after the rows above it claim your materials, currencies and daily crafts.";
+                : "Rows are measured top down, each one against what the rows above it leave behind: higher rows have first claim on your materials, currencies, coin and daily crafts. The table stays in your own priority order, and the arrows move a row up or down it.";
         }
 
         /// <summary>
@@ -513,6 +528,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(0, 10),
                 Parent = _addPanel,
             };
+            TooltipFacility.ApplyPlain(_modeLabel, ModeStripTooltip);
 
             _modeRadios.Clear();
             _modeRadios.Add(CreateModeRadio(RankerMode.Cascade));
@@ -647,15 +663,27 @@ namespace TaimisToolbench.Views
 
             // Blish's own Checkbox, art and all - the module's established
             // shape for a persisted on/off, and no glyph anywhere near it.
-            _compactCheckbox = new Checkbox
+            // Two of them, in the order the detail they reveal appears down
+            // the row: the category strip, then the currency list under it.
+            _categoriesCheckbox = new Checkbox
             {
-                Text = "Compact",
-                Checked = Compact,
+                Text = CategoriesToggleText,
+                Checked = ShowCategories,
                 Location = new Point(0, 12),
                 Parent = _toolbarPanel,
             };
-            TooltipFacility.ApplyPlain(_compactCheckbox, CompactTooltip);
-            _compactCheckbox.CheckedChanged += (_, e) => OnCompactChanged(e.Checked);
+            TooltipFacility.ApplyPlain(_categoriesCheckbox, CategoriesTooltip);
+            _categoriesCheckbox.CheckedChanged += (_, e) => OnShowCategoriesChanged(e.Checked);
+
+            _currenciesCheckbox = new Checkbox
+            {
+                Text = CurrenciesToggleText,
+                Checked = ShowCurrencies,
+                Location = new Point(0, 12),
+                Parent = _toolbarPanel,
+            };
+            TooltipFacility.ApplyPlain(_currenciesCheckbox, CurrenciesTooltip);
+            _currenciesCheckbox.CheckedChanged += (_, e) => OnShowCurrenciesChanged(e.Checked);
 
             _refreshButton = new FeedbackButton
             {
@@ -667,21 +695,40 @@ namespace TaimisToolbench.Views
             _refreshButton.Click += (_, __) => OnRefreshClicked();
         }
 
-        private const string CompactTooltip =
-            "Show each row's headline and its five category percentages only, so more rows fit on screen. The currency detail and the notes come back when you switch it off.";
+        private const string CategoriesToggleText = "Show Categories";
+        private const string CurrenciesToggleText = "Show Currencies";
+
+        private const string CategoriesTooltip =
+            "Show the five categories under each row - materials, currencies, time gates, disciplines and recipes - as the bars the Ready figure is blended from, along with the notes that explain them. Off by default so more rows fit on screen.";
+
+        private const string CurrenciesTooltip =
+            "List the currencies each row is still short of, and by how much. The Currencies category says how close you are; this says which currency.";
 
         /// <summary>
         /// A display choice, not a measurement one: nothing is recomputed and
         /// no answer changes, so both modes' answer sets survive it untouched.
         /// </summary>
-        private void OnCompactChanged(bool compact)
+        private void OnShowCategoriesChanged(bool show)
         {
-            if (compact == _watchlist.Compact)
+            if (show == _watchlist.ShowCategories)
             {
                 return;
             }
 
-            _watchlist.Compact = compact;
+            _watchlist.ShowCategories = show;
+            Persist();
+            RebuildRows();
+        }
+
+        /// <summary>See <see cref="OnShowCategoriesChanged"/>.</summary>
+        private void OnShowCurrenciesChanged(bool show)
+        {
+            if (show == _watchlist.ShowCurrencies)
+            {
+                return;
+            }
+
+            _watchlist.ShowCurrencies = show;
             Persist();
             RebuildRows();
         }
@@ -745,14 +792,14 @@ namespace TaimisToolbench.Views
             // The checkbox's art hangs 9px left of its own Location (Blish
             // draws it at x-9), so the width the toolbar reserves for it
             // includes that overhang and the control is seated 9px inside.
-            int compactWidth = CheckboxArtOverhang + CheckboxTextInset
-                + LabelHelpers.MeasureWith(UiFonts.Caption)(_compactCheckbox.Text);
             var toolbar = RankerRowLayout.Toolbar(
                 barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
-                compactWidth);
+                ToggleFootprint(_categoriesCheckbox), ToggleFootprint(_currenciesCheckbox));
             _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
-            _compactCheckbox.Location = new Point(
-                toolbar.CompactX + CheckboxArtOverhang, _compactCheckbox.Location.Y);
+            _categoriesCheckbox.Location = new Point(
+                toolbar.FirstToggleX + CheckboxArtOverhang, _categoriesCheckbox.Location.Y);
+            _currenciesCheckbox.Location = new Point(
+                toolbar.SecondToggleX + CheckboxArtOverhang, _currenciesCheckbox.Location.Y);
             _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
@@ -769,6 +816,16 @@ namespace TaimisToolbench.Views
             _contentPanel.Location = new Point(0, TopChromeHeight);
         }
 
+        /// <summary>
+        /// What one toggle costs the toolbar: Blish's checkbox art, the inset
+        /// it draws its label at, and the label itself.
+        /// </summary>
+        private static int ToggleFootprint(Checkbox checkbox)
+        {
+            return CheckboxArtOverhang + CheckboxTextInset
+                + LabelHelpers.MeasureWith(UiFonts.Caption)(checkbox.Text);
+        }
+
         private void PositionColumnHeader(int barWidth)
         {
             // The header labels sit on the columns they name because every
@@ -778,14 +835,54 @@ namespace TaimisToolbench.Views
             SetHeaderLabel(0, bands.RankX);
             SetHeaderLabel(1, bands.NameX);
 
-            // Status is the one LEFT-aligned data column: its content is a
-            // variable-width badge, and a badge that shares a right edge
-            // down the column starts at a different x on every row, which is
-            // the alignment the column was asked for in the first place.
-            SetHeaderLabel(2, bands.StatusX);
-            SetHeaderLabelRight(3, bands.ReadyRightEdge);
-            SetHeaderLabelRight(4, bands.DaysRightEdge);
-            SetHeaderLabelRight(5, bands.RemainingRightEdge);
+            // The four data columns centre their header on the same track
+            // their cells centre on, which is what puts a header over the
+            // values it names. The rank and the item name stay left-aligned:
+            // they are the row's index and its subject, and both read down
+            // the table from one rail.
+            for (int column = 0; column < RankerRowLayout.DataColumnCount; column++)
+            {
+                var label = _columnHeaderLabels.Count > FirstDataColumnHeader + column
+                    ? _columnHeaderLabels[FirstDataColumnHeader + column]
+                    : null;
+                if (label != null)
+                {
+                    label.Location = new Point(
+                        CenteredInColumn(bands, column, label.Width), ColumnHeaderLabelY);
+                }
+            }
+        }
+
+        /// <summary>Index of the Status header in <see cref="ColumnHeaders"/>.</summary>
+        private const int FirstDataColumnHeader = 2;
+
+        /// <summary>
+        /// X at which content of <paramref name="contentWidth"/> centres in
+        /// data column <paramref name="column"/>. One track, one centring
+        /// law (Services/JustifiedColumnTracks) for the header and for the
+        /// cells under it - a second copy is how the two drift apart, which
+        /// is the drift this replaced.
+        /// </summary>
+        private static int CenteredInColumn(
+            in RankerRowLayout.Bands bands, int column, int contentWidth)
+        {
+            bands.DataTrack(column, out int trackX, out int trackWidth);
+            return Math.Max(0, JustifiedColumnTracks.CenteredX(
+                trackX, trackWidth, 1, 0, contentWidth));
+        }
+
+        /// <summary>
+        /// The right edge that centres this row's coin run in the Remaining
+        /// column. CoinCurrencyRenderer lays a value cell out from its right
+        /// edge, and RemainingCellWidth is the very measurement it lays out
+        /// from (MeasureRowCells), so the two cannot disagree about where
+        /// the run starts.
+        /// </summary>
+        private static int RemainingCellRightEdge(in RankerRowLayout.Bands bands, RenderedRow row)
+        {
+            return CenteredInColumn(
+                bands, RankerRowLayout.RemainingColumn, row.RemainingCellWidth)
+                + row.RemainingCellWidth;
         }
 
         /// <summary>
@@ -816,17 +913,6 @@ namespace TaimisToolbench.Views
             {
                 _columnHeaderLabels[index].Location = new Point(x, ColumnHeaderLabelY);
             }
-        }
-
-        private void SetHeaderLabelRight(int index, int rightEdge)
-        {
-            if (index >= _columnHeaderLabels.Count)
-            {
-                return;
-            }
-
-            var label = _columnHeaderLabels[index];
-            label.Location = new Point(Math.Max(0, rightEdge - label.Width), ColumnHeaderLabelY);
         }
 
         // ---------------------------------------------------------------
@@ -1305,17 +1391,22 @@ namespace TaimisToolbench.Views
                 bands.NameX + bands.NameWidth, 0, 0, bands.NameX, MainLineNameY,
                 hover, iconSize: RankerRowLayout.IconSize);
 
+            // Chip and placeholder are both exactly StatusCellWidth wide
+            // (MeasureRowCells measures whichever of the two this row has),
+            // so one centred x serves both.
+            int statusX = CenteredInColumn(
+                bands, RankerRowLayout.StatusColumn, row.StatusCellWidth);
             if (chipText != null)
             {
                 ChipColors(metrics, out Color chipBorder, out Color chipFill);
                 row.StatusChip = LabelHelpers.CreateSmallTag(
-                    row.Panel, chipText, bands.StatusX, MainLineChipY, chipBorder, chipFill);
+                    row.Panel, chipText, statusX, MainLineChipY, chipBorder, chipFill);
                 LabelHelpers.ApplyTagTooltip(row.StatusChip, ChipTooltip(metrics));
             }
             else
             {
                 row.StatusPlaceholder = CreateUnknownCell(
-                    row.Panel, bands.StatusX, MainLineTextY, StatusPlaceholderTooltip(metrics));
+                    row.Panel, statusX, MainLineTextY, StatusPlaceholderTooltip(metrics));
             }
 
             RenderReadyCell(row, bands, metrics);
@@ -1354,7 +1445,7 @@ namespace TaimisToolbench.Views
                 // gw2e-style "not sold or craftable" case and would claim
                 // something this row is not saying.
                 row.RemainingCell = CoinCurrencyRenderer.RenderZeroValueCellRightAligned(
-                    row.Panel, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
+                    row.Panel, RemainingCellRightEdge(bands, row), MainLineTextY, UiFonts.Body);
                 foreach (var segment in row.RemainingCell.CoinSegments.Controls)
                 {
                     // The NUMBER only. The coin beside it already carries its
@@ -1368,7 +1459,8 @@ namespace TaimisToolbench.Views
             else
             {
                 row.RemainingCell = CoinCurrencyRenderer.RenderValueCellRightAligned(
-                    row.Panel, metrics.RemainingCoinCost, null, bands.RemainingRightEdge, MainLineTextY, UiFonts.Body);
+                    row.Panel, metrics.RemainingCoinCost, null,
+                    RemainingCellRightEdge(bands, row), MainLineTextY, UiFonts.Body);
             }
 
             row.Up = null;
@@ -1436,9 +1528,11 @@ namespace TaimisToolbench.Views
             }
 
             // No bar: the unmeasured dash and the non-numeric verdict both
-            // right-align on the column's rail, under its header.
+            // centre on the column's track, where a bar's own percentage
+            // would have been.
             row.ReadyLabel.Location = new Point(
-                Math.Max(0, bands.ReadyRightEdge - row.ReadyLabel.Width), MainLineTextY);
+                CenteredInColumn(bands, RankerRowLayout.ReadyColumn, row.ReadyLabel.Width),
+                MainLineTextY);
         }
 
         /// <summary>
@@ -1615,12 +1709,14 @@ namespace TaimisToolbench.Views
         /// The row's breakdown, under its headline. Returns the block the
         /// row's height is taken from.
         /// <para>
-        /// COMPACT MODE stops after the gate strip: the five category
-        /// percentages are the comparison, the currency detail and the notes
-        /// are the explanation, and a user comparing twenty rows wants the
-        /// former on screen at once (owner ruling, 2026-08-27). Nothing is
-        /// lost - the hidden detail is one toggle away, and the gate strip
-        /// itself still hovers with its own numbers.
+        /// TWO TOGGLES, both off by default: the headline row is the
+        /// comparison and everything here is the explanation, and a user
+        /// comparing twenty rows wants the comparison on screen at once
+        /// (owner ruling, 2026-08-28). Nothing is lost - each half is one
+        /// toggle away, and the headline itself still hovers with the
+        /// breakdown. The NOTES travel with the category strip because that
+        /// is what they explain: a discipline gap, a contested claim, a
+        /// vendor cap on one of the five categories.
         /// </para>
         /// </summary>
         private RankerRowLayout.SubLineBlock RenderSubLines(
@@ -1632,15 +1728,14 @@ namespace TaimisToolbench.Views
                 return RankerRowLayout.SubLines(false, 0, 0);
             }
 
-            bool detail = !Compact;
-            int currencyLines = detail
+            int currencyLines = ShowCurrencies
                 ? RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count)
                 : 0;
-            var notes = detail ? BuildNotes(metrics) : EmptyNotes;
+            var notes = ShowCategories ? BuildNotes(metrics) : EmptyNotes;
 
             // A measured row always has gates; one that somehow has none
             // must not reserve a line for a strip it will not draw.
-            bool hasGates = metrics.Gates != null && metrics.Gates.Count > 0;
+            bool hasGates = ShowCategories && metrics.Gates != null && metrics.Gates.Count > 0;
             var block = RankerRowLayout.SubLines(hasGates, currencyLines, notes.Count);
 
             // The gate breakdown, justified across the full sub-line band so
@@ -1665,20 +1760,17 @@ namespace TaimisToolbench.Views
 
                 RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
 
-                // A gate this item does not have gets NO bar. An empty bar
-                // would be a 0% reading, and "this item needs no recipe
-                // unlocks" is not the same claim as "you have unlocked none
-                // of the recipes it needs".
-                double fraction = gate.Applies ? gate.Completion : -1;
+                // A gate this item does not have draws a FULL bar: there is
+                // nothing outstanding behind a barrier that is not there, so
+                // it reads 100% like any other finished gate
+                // (RankerReadinessCalculator.FormatGate, which is also where
+                // the caveat about the headline lives).
+                double fraction = gate.Applies ? gate.Completion : 1.0;
                 row.GateFractions.Add(fraction);
-                Panel track = null;
-                Panel fill = null;
-                if (gate.Applies)
-                {
-                    track = CreateBar(
-                        row.Panel, barX, gateY + GateBarOffsetY, barWidth,
-                        RankerRowLayout.GateBarHeight, gate.Completion, out fill);
-                }
+                Panel fill;
+                Panel track = CreateBar(
+                    row.Panel, barX, gateY + GateBarOffsetY, barWidth,
+                    RankerRowLayout.GateBarHeight, fraction, out fill);
 
                 row.GateBarTracks.Add(track);
                 row.GateBarFills.Add(fill);
@@ -1690,7 +1782,7 @@ namespace TaimisToolbench.Views
                     // on the ramp (Services/RankerReadinessRamp) - which is
                     // the constraint that made the ramp as deep as it is.
                     Text = RankerReadinessCalculator.FormatGate(gate),
-                    TextColor = gate.Applies ? Color.White : ValueTextColor,
+                    TextColor = Color.White,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY + GateValueY),
@@ -1810,28 +1902,39 @@ namespace TaimisToolbench.Views
 
             if (row.StatusChip != null)
             {
-                row.StatusChip.Location = new Point(bands.StatusX, MainLineChipY);
+                row.StatusChip.Location = new Point(
+                    CenteredInColumn(bands, RankerRowLayout.StatusColumn, row.StatusChip.Width),
+                    MainLineChipY);
             }
 
             if (row.StatusPlaceholder != null)
             {
-                row.StatusPlaceholder.Location = new Point(bands.StatusX, MainLineTextY);
+                row.StatusPlaceholder.Location = new Point(
+                    CenteredInColumn(
+                        bands, RankerRowLayout.StatusColumn, row.StatusPlaceholder.Width),
+                    MainLineTextY);
             }
 
             LayoutReadyCell(row, bands);
 
             row.DaysLabel.Location = new Point(
-                Math.Max(0, bands.DaysRightEdge - row.DaysLabel.Width), MainLineTextY);
+                CenteredInColumn(bands, RankerRowLayout.DaysColumn, row.DaysLabel.Width),
+                MainLineTextY);
 
             if (row.RemainingDash != null)
             {
                 row.RemainingDash.Location = new Point(
-                    Math.Max(0, bands.RemainingRightEdge - row.RemainingDash.Width), MainLineTextY);
+                    CenteredInColumn(
+                        bands, RankerRowLayout.RemainingColumn, row.RemainingDash.Width),
+                    MainLineTextY);
             }
             else if (row.RemainingCell != null)
             {
+                // The coin run is laid out from its RIGHT edge, so centring
+                // it means handing the renderer the right edge a centred run
+                // of this row's measured width would have.
                 CoinCurrencyRenderer.RepositionValueCellRightAligned(
-                    row.RemainingCell, bands.RemainingRightEdge, MainLineTextY);
+                    row.RemainingCell, RemainingCellRightEdge(bands, row), MainLineTextY);
             }
 
             if (row.Up != null)
@@ -1850,18 +1953,12 @@ namespace TaimisToolbench.Views
 
                 RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
                 var track = row.GateBarTracks[i];
-                if (track != null)
-                {
-                    track.Location = new Point(barX, track.Location.Y);
-                    track.Size = new Point(barWidth, RankerRowLayout.GateBarHeight);
-                    row.GateBarFills[i].Size = new Point(
-                        RankerReadinessRamp.FillWidth(barWidth, row.GateFractions[i]),
-                        RankerRowLayout.GateBarHeight);
-                }
+                track.Location = new Point(barX, track.Location.Y);
+                track.Size = new Point(barWidth, RankerRowLayout.GateBarHeight);
+                row.GateBarFills[i].Size = new Point(
+                    RankerReadinessRamp.FillWidth(barWidth, row.GateFractions[i]),
+                    RankerRowLayout.GateBarHeight);
 
-                // Centred in the bar's own span whether or not a bar was
-                // drawn, so an inapplicable gate's dash sits where every
-                // other cell's number sits rather than trailing its label.
                 var value = row.GateValueLabels[i];
                 value.Location = new Point(
                     barX + Math.Max(0, (barWidth - value.Width) / 2), value.Location.Y);
@@ -2220,7 +2317,7 @@ namespace TaimisToolbench.Views
                 lines.Add(gate.Applies
                     ? label + ": " + RankerReadinessCalculator.FormatPercent(gate.Completion) +
                       " at weight " + gate.Weight.ToString("0.00", CultureInfo.InvariantCulture)
-                    : label + ": this item has none");
+                    : label + ": this item has none, so it is not part of the blend");
             }
 
             lines.Add("");

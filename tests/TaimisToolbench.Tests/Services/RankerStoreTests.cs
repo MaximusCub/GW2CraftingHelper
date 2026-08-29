@@ -231,24 +231,37 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void TheCompactChoice_PersistsAndDefaultsToTheFullBreakdown()
+        public void TheTwoDisplayToggles_PersistIndependentlyAndDefaultToOff()
         {
             var store = new RankerStore(_temp.Path);
             var watchlist = SampleWatchlist();
 
-            Assert.False(watchlist.Compact);
-            watchlist.Compact = true;
-            Assert.True(store.Save(watchlist));
-            Assert.True(store.Load().Compact);
+            Assert.False(watchlist.ShowCategories);
+            Assert.False(watchlist.ShowCurrencies);
 
-            // And a file written before the field existed reads as the full
-            // breakdown the tab has always shown, list intact.
+            // One at a time: a single stored flag driving both halves of the
+            // breakdown is exactly the shape this replaced.
+            watchlist.ShowCurrencies = true;
+            Assert.True(store.Save(watchlist));
+
+            var reloaded = store.Load();
+            Assert.True(reloaded.ShowCurrencies);
+            Assert.False(reloaded.ShowCategories);
+
+            reloaded.ShowCategories = true;
+            Assert.True(store.Save(reloaded));
+            Assert.True(store.Load().ShowCategories);
+            Assert.True(store.Load().ShowCurrencies);
+
+            // A file carrying neither flag opens on the headline row alone,
+            // list intact.
             File.WriteAllText(FilePath,
                 "{ \"SchemaVersion\": 1, \"Mode\": 1, \"Entries\": [ " +
                 "{ \"ItemId\": 30684, \"Quantity\": 1, \"Name\": \"Twilight\" } ] }");
 
             var loaded = store.Load();
-            Assert.False(loaded.Compact);
+            Assert.False(loaded.ShowCategories);
+            Assert.False(loaded.ShowCurrencies);
             Assert.Equal(RankerMode.Independent, loaded.Mode);
             Assert.Single(loaded.Entries);
         }

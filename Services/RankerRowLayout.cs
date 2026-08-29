@@ -69,9 +69,9 @@ namespace TaimisToolbench.Services
         // The three right-hand cells each reserve enough width for BOTH
         // their widest cell text ("100%", "999d", a coin amount) and their
         // own column-header label at the header band's bold ColumnHeader
-        // font. The header labels right-align at the same edges the cells
-        // do, so a band narrower than its header collides the headers into
-        // each other - the live desktop gate caught exactly that
+        // font. Header and cells centre on the same track, so a track
+        // narrower than its header spills into the columns on BOTH sides of
+        // it - the live desktop gate caught the right-aligned form of that
         // ("ReadhyDaining") when an empty table let the coin band collapse
         // to the width of a dash.
 
@@ -141,13 +141,19 @@ namespace TaimisToolbench.Services
             /// <summary>Width of that bar, or 0 at a width that cannot hold one.</summary>
             public readonly int ReadyBarWidth;
 
-            /// <summary>Right edge of the Ready track - the bar's right edge, and the header's.</summary>
+            /// <summary>Right edge of the Ready track - the bar's right edge.</summary>
             public readonly int ReadyRightEdge;
 
-            /// <summary>Right edge of the right-aligned days cell.</summary>
+            /// <summary>Left edge of the Days track.</summary>
+            public readonly int DaysTrackX;
+
+            /// <summary>Right edge of the Days track.</summary>
             public readonly int DaysRightEdge;
 
-            /// <summary>Right edge handed to CoinCurrencyRenderer's right-aligned value cell.</summary>
+            /// <summary>Left edge of the Remaining track.</summary>
+            public readonly int RemainingTrackX;
+
+            /// <summary>Right edge of the Remaining track.</summary>
             public readonly int RemainingRightEdge;
 
             /// <summary>
@@ -175,10 +181,13 @@ namespace TaimisToolbench.Services
                 int rowWidth, int rankX, int iconX, int nameX, int nameWidth,
                 int statusX, int statusWidth,
                 int readyBarX, int readyBarWidth, int readyRightEdge,
-                int daysRightEdge, int remainingRightEdge, bool distributed,
+                int daysTrackX, int daysRightEdge,
+                int remainingTrackX, int remainingRightEdge, bool distributed,
                 int upX, int downX, int removeX,
                 int subLineX, int subLineWidth)
             {
+                DaysTrackX = daysTrackX;
+                RemainingTrackX = remainingTrackX;
                 RowWidth = rowWidth;
                 RankX = rankX;
                 IconX = iconX;
@@ -198,7 +207,52 @@ namespace TaimisToolbench.Services
                 SubLineX = subLineX;
                 SubLineWidth = subLineWidth;
             }
+
+            /// <summary>
+            /// The band data column <paramref name="index"/> owns - the one
+            /// track its header and its cell content both centre in, which
+            /// is what puts a header over the values it names. Ready's track
+            /// is its bar: the bar is a gauge, so it FILLS the track and
+            /// only the percentage inside it centres.
+            /// <para>
+            /// An index outside 0..<see cref="DataColumnCount"/>-1 returns a
+            /// zero-width band at the first column's left edge, the same
+            /// shape <see cref="GateCell"/> uses.
+            /// </para>
+            /// </summary>
+            public void DataTrack(int index, out int x, out int width)
+            {
+                switch (index)
+                {
+                    case StatusColumn:
+                        x = StatusX;
+                        width = Math.Max(0, StatusWidth);
+                        return;
+                    case ReadyColumn:
+                        x = ReadyBarX;
+                        width = Math.Max(0, ReadyBarWidth);
+                        return;
+                    case DaysColumn:
+                        x = DaysTrackX;
+                        width = Math.Max(0, DaysRightEdge - DaysTrackX);
+                        return;
+                    case RemainingColumn:
+                        x = RemainingTrackX;
+                        width = Math.Max(0, RemainingRightEdge - RemainingTrackX);
+                        return;
+                    default:
+                        x = StatusX;
+                        width = 0;
+                        return;
+                }
+            }
         }
+
+        /// <summary>Data column indices for <see cref="Bands.DataTrack"/>, left to right.</summary>
+        public const int StatusColumn = 0;
+        public const int ReadyColumn = 1;
+        public const int DaysColumn = 2;
+        public const int RemainingColumn = 3;
 
         /// <summary>
         /// Columns the row is divided into between the item name's left edge
@@ -232,20 +286,6 @@ namespace TaimisToolbench.Services
 
         /// <summary>Status, Ready, Days, Remaining - one track each.</summary>
         public const int DataColumnCount = 4;
-
-        /// <summary>
-        /// Right edge of track <paramref name="index"/> (0-based) of
-        /// <see cref="TrackCount"/> equal tracks spanning trackSpan px from
-        /// nameX. Integer-exact off the span rather than accumulated from a
-        /// rounded track width - the same shape GateCell and
-        /// SummarySectionLayoutMath.TrackRightEdge use - so the last track's
-        /// edge lands exactly on the span's own end instead of a rounding
-        /// pixel short of it.
-        /// </summary>
-        private static int TrackEdge(int nameX, int trackSpan, int index)
-        {
-            return nameX + (int)((long)trackSpan * index / TrackCount);
-        }
 
         /// <summary>
         /// rowWidth is the SCROLLING panel's width minus
@@ -297,30 +337,48 @@ namespace TaimisToolbench.Services
             int widestCell = Math.Max(
                 Math.Max(statusCellWidth, remainingCellWidth),
                 Math.Max(ReadyCellWidth, DaysCellWidth));
-            bool distributed = trackSpan > 0 && trackSpan / TrackCount >= widestCell + CellGap;
+            bool distributed = JustifiedColumnTracks.FitsDistributed(
+                trackSpan, TrackCount, widestCell, CellGap);
 
             int statusX;
             int statusWidth;
             int readyRightEdge;
+            int daysTrackX;
             int daysRightEdge;
+            int remainingTrackX;
             int remainingRightEdge;
             int readyTrackWidth;
 
             if (distributed)
             {
-                int nameTrackEnd = TrackEdge(nameX, trackSpan, NameTrackSpan);
-                statusX = nameTrackEnd;
-                statusWidth = TrackEdge(nameX, trackSpan, NameTrackSpan + 1) - statusX - CellGap;
-                readyRightEdge = TrackEdge(nameX, trackSpan, NameTrackSpan + 2);
-                daysRightEdge = TrackEdge(nameX, trackSpan, NameTrackSpan + 3);
-                remainingRightEdge = TrackEdge(nameX, trackSpan, TrackCount);
-                readyTrackWidth = readyRightEdge - TrackEdge(nameX, trackSpan, NameTrackSpan + 1);
+                // Data column i sits on track NameTrackSpan + i; the name
+                // takes the tracks before them.
+                statusX = JustifiedColumnTracks.LeftEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + StatusColumn);
+                statusWidth = JustifiedColumnTracks.Width(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + StatusColumn) - CellGap;
+                readyTrackWidth = JustifiedColumnTracks.Width(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + ReadyColumn);
+                readyRightEdge = JustifiedColumnTracks.RightEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + ReadyColumn);
+                daysTrackX = JustifiedColumnTracks.LeftEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + DaysColumn);
+                daysRightEdge = JustifiedColumnTracks.RightEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + DaysColumn);
+                remainingTrackX = JustifiedColumnTracks.LeftEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + RemainingColumn);
+                remainingRightEdge = JustifiedColumnTracks.RightEdge(
+                    nameX, trackSpan, TrackCount, NameTrackSpan + RemainingColumn);
             }
             else
             {
+                // Packed: a column's track is the band it reserves, so the
+                // centring the view does is identical in both regimes.
                 remainingRightEdge = dataRightEdge;
-                daysRightEdge = remainingRightEdge - remainingCellWidth - CellGap;
-                readyRightEdge = daysRightEdge - DaysCellWidth - CellGap;
+                remainingTrackX = remainingRightEdge - remainingCellWidth;
+                daysRightEdge = remainingTrackX - CellGap;
+                daysTrackX = daysRightEdge - DaysCellWidth;
+                readyRightEdge = daysTrackX - CellGap;
                 statusX = readyRightEdge - ReadyCellWidth - CellGap - statusCellWidth;
                 statusWidth = statusCellWidth;
                 readyTrackWidth = ReadyCellWidth;
@@ -353,7 +411,8 @@ namespace TaimisToolbench.Services
                 rowWidth, rankX, iconX, nameX, nameWidth,
                 statusX, Math.Max(0, statusWidth),
                 readyBarX, readyBarWidth, readyRightEdge,
-                daysRightEdge, remainingRightEdge, distributed,
+                daysTrackX, daysRightEdge,
+                remainingTrackX, remainingRightEdge, distributed,
                 upX, downX, removeX,
                 subLineX, subLineWidth);
         }
@@ -422,7 +481,7 @@ namespace TaimisToolbench.Services
         /// <para>
         /// A block with no lines takes no height AND no gap, so a row with
         /// nothing below its headline is exactly RowHeight tall - which is
-        /// what compact mode is.
+        /// what the table shows with both display toggles off.
         /// </para>
         /// </summary>
         public readonly struct SubLineBlock
@@ -497,8 +556,11 @@ namespace TaimisToolbench.Services
             /// <summary>Left edge of the right-anchored Refresh button.</summary>
             public readonly int RefreshX;
 
-            /// <summary>Left edge of the compact toggle, seated left of Refresh.</summary>
-            public readonly int CompactX;
+            /// <summary>Left edge of the first display toggle, seated left of the second.</summary>
+            public readonly int FirstToggleX;
+
+            /// <summary>Left edge of the second display toggle, seated left of Refresh.</summary>
+            public readonly int SecondToggleX;
 
             /// <summary>Left edge of the status line's band.</summary>
             public readonly int StatusX;
@@ -509,10 +571,12 @@ namespace TaimisToolbench.Services
             /// </summary>
             public readonly int StatusWidth;
 
-            public ToolbarSlots(int refreshX, int compactX, int statusX, int statusWidth)
+            public ToolbarSlots(
+                int refreshX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
             {
                 RefreshX = refreshX;
-                CompactX = compactX;
+                FirstToggleX = firstToggleX;
+                SecondToggleX = secondToggleX;
                 StatusX = statusX;
                 StatusWidth = statusWidth;
             }
@@ -520,20 +584,30 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The toolbar row: one full-width status band on the left, the
-        /// Refresh button pinned right, the inline spinner between them.
+        /// Refresh button pinned right, the two display toggles between them
+        /// in reading order, the inline spinner after the status text.
         /// The refresh-progress text renders in the status band and ONLY
         /// there - the field test showed status-length text stamped onto
         /// the fixed-width button spilling past its edges.
+        /// <para>
+        /// A toggle whose width is zero takes no slot at all, so the status
+        /// band keeps the space rather than a rail of nothing sitting in it.
+        /// </para>
         /// </summary>
         public static ToolbarSlots Toolbar(
-            int barWidth, int spinnerSize, int labelGap, int compactWidth = 0)
+            int barWidth, int spinnerSize, int labelGap,
+            int firstToggleWidth = 0, int secondToggleWidth = 0)
         {
             int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
-            int compactX = compactWidth <= 0
+            int secondX = secondToggleWidth <= 0
                 ? refreshX
-                : Math.Max(Inset, refreshX - CellGap - compactWidth);
-            int statusRight = compactX - spinnerSize - 2 * labelGap;
-            return new ToolbarSlots(refreshX, compactX, Inset, Math.Max(0, statusRight - Inset));
+                : Math.Max(Inset, refreshX - CellGap - secondToggleWidth);
+            int firstX = firstToggleWidth <= 0
+                ? secondX
+                : Math.Max(Inset, secondX - CellGap - firstToggleWidth);
+            int statusRight = firstX - spinnerSize - 2 * labelGap;
+            return new ToolbarSlots(
+                refreshX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
         }
 
         public readonly struct ModeStripSlots

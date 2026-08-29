@@ -175,6 +175,38 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void AGateTheItemDoesNotHave_Reads100PercentWithoutJoiningTheBlend()
+        {
+            // The owner's ruling: nothing is outstanding behind a barrier the
+            // item does not have, so its cell reads 100% rather than a dash.
+            // The cell is NOT a term of the mean, and this row is what proves
+            // it - four of the five gates read 100% while the headline stays
+            // at the materials figure. Entering four gates at 1.0 instead of
+            // dropping them would put this row at 90%.
+            var metrics = RankerReadinessCalculator.Compute(
+                Result(coin: 1000), Result(coin: 270), Availability(), 0);
+
+            foreach (var gate in metrics.Gates)
+            {
+                Assert.Equal(
+                    gate.Gate == RankerGate.Materials ? "73%" : "100%",
+                    RankerReadinessCalculator.FormatGate(gate));
+            }
+
+            Assert.Equal(0.73, metrics.Readiness, 6);
+            Assert.Equal("73%", RankerReadinessCalculator.FormatReadiness(metrics));
+        }
+
+        [Fact]
+        public void AMissingGateObject_StillReadsAsUnmeasuredRatherThanComplete()
+        {
+            // The dash's remaining job: a row that has never been measured is
+            // not a row whose barriers are all satisfied.
+            Assert.Equal(
+                RankerReadinessCalculator.DashText, RankerReadinessCalculator.FormatGate(null));
+        }
+
+        [Fact]
         public void NinetyFivePercentByCoinWithThirtyDaysOfDailiesLeft_IsNotNinetyFivePercent()
         {
             // The owner's worked case. 0.5*(0.95) + 0.5*(1 - 30/32) = 0.506.
